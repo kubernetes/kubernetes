@@ -32,7 +32,6 @@ go_test(
     data = glob([
         "testdata/*",
     ]),
-    importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy_test",
     deps = [
         ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
@@ -55,8 +54,7 @@ go_test(
     name = "go_default_test",
     srcs = ["controller_policy_test.go"],
     data = glob(["testdata/**"]),
-    importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

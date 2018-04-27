@@ -14,8 +14,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["timer_test.go"],
-    importpath = "k8s.io/kubernetes/test/e2e/framework/timer",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/github.com/onsi/gomega:go_default_library"],
 )
 

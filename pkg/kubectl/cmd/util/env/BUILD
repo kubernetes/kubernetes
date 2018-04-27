@@ -37,6 +37,5 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["env_parse_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/env",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )

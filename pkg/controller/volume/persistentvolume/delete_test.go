@@ -192,7 +192,7 @@ func TestDeleteSync(t *testing.T) {
 			},
 		},
 	}
-	runSyncTests(t, tests, []*storage.StorageClass{})
+	runSyncTests(t, tests, []*storage.StorageClass{}, []*v1.Pod{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all

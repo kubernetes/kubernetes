@@ -21,10 +21,12 @@ package reconciler
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -145,7 +147,7 @@ func (rc *reconciler) isMultiAttachForbidden(volumeSpec *volume.Spec) bool {
 		}
 	}
 
-	// Only if this volume is a persistent volume, we have reliable information on wether it's allowed or not to
+	// Only if this volume is a persistent volume, we have reliable information on whether it's allowed or not to
 	// multi-attach. We trust in the individual volume implementations to not allow unsupported access modes
 	if volumeSpec.PersistentVolume != nil {
 		// Check for persistent volume types which do not fail when trying to multi-attach
@@ -269,12 +271,8 @@ func (rc *reconciler) attachDesiredVolumes() {
 			nodes := rc.actualStateOfWorld.GetNodesForVolume(volumeToAttach.VolumeName)
 			if len(nodes) > 0 {
 				if !volumeToAttach.MultiAttachErrorReported {
-					simpleMsg, detailedMsg := volumeToAttach.GenerateMsg("Multi-Attach error", "Volume is already exclusively attached to one node and can't be attached to another")
-					for _, pod := range volumeToAttach.ScheduledPods {
-						rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
-					}
+					rc.reportMultiAttachError(volumeToAttach, nodes)
 					rc.desiredStateOfWorld.SetMultiAttachError(volumeToAttach.VolumeName, volumeToAttach.NodeName)
-					glog.Warningf(detailedMsg)
 				}
 				continue
 			}
@@ -292,5 +290,78 @@ func (rc *reconciler) attachDesiredVolumes() {
 			glog.Errorf(volumeToAttach.GenerateErrorDetailed("attacherDetacher.AttachVolume failed to start", err).Error())
 		}
 	}
+}
 
+// reportMultiAttachError sends events and logs situation that a volume that
+// should be attached to a node is already attached to different node(s).
+func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach, nodes []types.NodeName) {
+	// Filter out the current node from list of nodes where the volume is
+	// attached.
+	// Some methods need []string, some other needs []NodeName, collect both.
+	// In theory, these arrays should have always only one element - the
+	// controller does not allow more than one attachment. But use array just
+	// in case...
+	otherNodes := []types.NodeName{}
+	otherNodesStr := []string{}
+	for _, node := range nodes {
+		if node != volumeToAttach.NodeName {
+			otherNodes = append(otherNodes, node)
+			otherNodesStr = append(otherNodesStr, string(node))
+		}
+	}
+
+	// Get list of pods that use the volume on the other nodes.
+	pods := rc.desiredStateOfWorld.GetVolumePodsOnNodes(otherNodes, volumeToAttach.VolumeName)
+
+	if len(pods) == 0 {
+		// We did not find any pods that requests the volume. The pod must have been deleted already.
+		simpleMsg, _ := volumeToAttach.GenerateMsg("Multi-Attach error", "Volume is already exclusively attached to one node and can't be attached to another")
+		for _, pod := range volumeToAttach.ScheduledPods {
+			rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+		}
+		// Log detailed message to system admin
+		nodeList := strings.Join(otherNodesStr, ", ")
+		detailedMsg := volumeToAttach.GenerateMsgDetailed("Multi-Attach error", fmt.Sprintf("Volume is already exclusively attached to node %s and can't be attached to another", nodeList))
+		glog.Warningf(detailedMsg)
+		return
+	}
+
+	// There are pods that require the volume and run on another node. Typically
+	// it's user error, e.g. a ReplicaSet uses a PVC and has >1 replicas. Let
+	// the user know what pods are blocking the volume.
+	for _, scheduledPod := range volumeToAttach.ScheduledPods {
+		// Each scheduledPod must get a custom message. They can run in
+		// different namespaces and user of a namespace should not see names of
+		// pods in other namespaces.
+		localPodNames := []string{} // Names of pods in scheduledPods's namespace
+		otherPods := 0              // Count of pods in other namespaces
+		for _, pod := range pods {
+			if pod.Namespace == scheduledPod.Namespace {
+				localPodNames = append(localPodNames, pod.Name)
+			} else {
+				otherPods++
+			}
+		}
+
+		var msg string
+		if len(localPodNames) > 0 {
+			msg = fmt.Sprintf("Volume is already used by pod(s) %s", strings.Join(localPodNames, ", "))
+			if otherPods > 0 {
+				msg = fmt.Sprintf("%s and %d pod(s) in different namespaces", msg, otherPods)
+			}
+		} else {
+			// No local pods, there are pods only in different namespaces.
+			msg = fmt.Sprintf("Volume is already used by %d pod(s) in different namespaces", otherPods)
+		}
+		simpleMsg, _ := volumeToAttach.GenerateMsg("Multi-Attach error", msg)
+		rc.recorder.Eventf(scheduledPod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+	}
+
+	// Log all pods for system admin
+	podNames := []string{}
+	for _, pod := range pods {
+		podNames = append(podNames, pod.Namespace+"/"+pod.Name)
+	}
+	detailedMsg := volumeToAttach.GenerateMsgDetailed("Multi-Attach error", fmt.Sprintf("Volume is already used by pods %s on node %s", strings.Join(podNames, ", "), strings.Join(otherNodesStr, ", ")))
+	glog.Warningf(detailedMsg)
 }

@@ -19,7 +19,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"strings"
 	"time"
@@ -42,18 +41,24 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 type DrainOptions struct {
+	PrintFlags *printers.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
+
+	Namespace          string
 	client             kubernetes.Interface
 	restClient         *restclient.RESTClient
-	Factory            cmdutil.Factory
 	Force              bool
 	DryRun             bool
 	GracePeriodSeconds int
@@ -65,9 +70,9 @@ type DrainOptions struct {
 	PodSelector        string
 	mapper             meta.RESTMapper
 	nodeInfos          []*resource.Info
-	Out                io.Writer
-	ErrOut             io.Writer
 	typer              runtime.ObjectTyper
+
+	genericclioptions.IOStreams
 }
 
 // Takes a pod and returns a bool indicating whether or not to operate on the
@@ -101,16 +106,21 @@ var (
 		kubectl cordon foo`))
 )
 
-func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &DrainOptions{Factory: f, Out: out}
+func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	options := &DrainOptions{
+		PrintFlags: printers.NewPrintFlags("cordoned"),
+
+		IOStreams: ioStreams,
+	}
 
 	cmd := &cobra.Command{
-		Use:     "cordon NODE",
+		Use: "cordon NODE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Mark node as unschedulable"),
 		Long:    cordon_long,
 		Example: cordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.SetupDrain(cmd, args))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunCordonOrUncordon(true))
 		},
 	}
@@ -128,16 +138,20 @@ var (
 		$ kubectl uncordon foo`))
 )
 
-func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &DrainOptions{Factory: f, Out: out}
+func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	options := &DrainOptions{
+		PrintFlags: printers.NewPrintFlags("uncordoned"),
+		IOStreams:  ioStreams,
+	}
 
 	cmd := &cobra.Command{
-		Use:     "uncordon NODE",
+		Use: "uncordon NODE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Mark node as schedulable"),
 		Long:    uncordon_long,
 		Example: uncordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.SetupDrain(cmd, args))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunCordonOrUncordon(false))
 		},
 	}
@@ -180,24 +194,35 @@ var (
 		$ kubectl drain foo --grace-period=900`))
 )
 
-func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &DrainOptions{Factory: f, Out: out, ErrOut: errOut, backOff: clockwork.NewRealClock()}
+func NewDrainOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainOptions {
+	return &DrainOptions{
+		PrintFlags: printers.NewPrintFlags("drained"),
+
+		IOStreams:          ioStreams,
+		backOff:            clockwork.NewRealClock(),
+		GracePeriodSeconds: -1,
+	}
+}
+
+func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	options := NewDrainOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
-		Use:     "drain NODE",
+		Use: "drain NODE",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Drain node in preparation for maintenance"),
 		Long:    drain_long,
 		Example: drain_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.SetupDrain(cmd, args))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunDrain())
 		},
 	}
-	cmd.Flags().BoolVar(&options.Force, "force", false, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
-	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", false, "Ignore DaemonSet-managed pods.")
-	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", false, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
-	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
-	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up, zero means infinite")
+	cmd.Flags().BoolVar(&options.Force, "force", options.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
+	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", options.IgnoreDaemonsets, "Ignore DaemonSet-managed pods.")
+	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", options.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
+	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", options.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
+	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "The length of time to wait before giving up, zero means infinite")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&options.PodSelector, "pod-selector", "", options.PodSelector, "Label selector to filter pods on the node")
 
@@ -205,11 +230,10 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	return cmd
 }
 
-// SetupDrain populates some fields from the factory, grabs command line
+// Complete populates some fields from the factory, grabs command line
 // arguments and looks up the node using Builder
-func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
+func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
-	o.Selector = cmdutil.GetFlagString(cmd, "selector")
 
 	if len(args) == 0 && !cmd.Flags().Changed("selector") {
 		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
@@ -221,9 +245,9 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
 	}
 
-	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
-	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
+	if o.client, err = f.KubernetesClientSet(); err != nil {
 		return err
 	}
 
@@ -233,22 +257,34 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	o.restClient, err = o.Factory.RESTClient()
+	o.restClient, err = f.RESTClient()
 	if err != nil {
 		return err
 	}
 
 	o.nodeInfos = []*resource.Info{}
-	o.mapper, o.typer = o.Factory.Object()
 
-	cmdNamespace, _, err := o.Factory.DefaultNamespace()
+	o.Namespace, _, err = f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	builder := o.Factory.NewBuilder().
+	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		if o.DryRun {
+			o.PrintFlags.Complete("%s (dry run)")
+		}
+
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+		return printer.PrintObj, nil
+	}
+
+	builder := f.NewBuilder().
 		Internal().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
+		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceNames("nodes", args...).
 		SingleResourceType().
 		Flatten()
@@ -283,6 +319,11 @@ func (o *DrainOptions) RunDrain() error {
 		return err
 	}
 
+	printer, err := o.ToPrinter("drained")
+	if err != nil {
+		return err
+	}
+
 	drainedNodes := sets.NewString()
 	var fatal error
 
@@ -293,7 +334,7 @@ func (o *DrainOptions) RunDrain() error {
 		}
 		if err == nil || o.DryRun {
 			drainedNodes.Insert(info.Name)
-			o.Factory.PrintSuccess(o.mapper, false, o.Out, "node", info.Name, o.DryRun, "drained")
+			printer.PrintObj(info.Object, o.Out)
 		} else {
 			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q, aborting command...\n\n", info.Name)
 			remainingNodes := []string{}
@@ -446,7 +487,7 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev
 
 	for _, pod := range podList.Items {
 		podOk := true
-		for _, filt := range []podFilter{mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter, o.daemonsetFilter} {
+		for _, filt := range []podFilter{o.daemonsetFilter, mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter} {
 			filterOk, w, f := filt(pod)
 
 			podOk = podOk && filterOk
@@ -455,6 +496,13 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev
 			}
 			if f != nil {
 				fs[f.string] = append(fs[f.string], pod.Name)
+			}
+
+			// short-circuit as soon as pod not ok
+			// at that point, there is no reason to run pod
+			// through any additional filters
+			if !podOk {
+				break
 			}
 		}
 		if podOk {
@@ -602,12 +650,17 @@ func (o *DrainOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.D
 	} else {
 		verbStr = "deleted"
 	}
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	printer, err := o.ToPrinter(verbStr)
+	if err != nil {
+		return pods, err
+	}
+
+	err = wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pendingPods := []corev1.Pod{}
 		for i, pod := range pods {
 			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				o.Factory.PrintSuccess(o.mapper, false, o.Out, "pod", pod.Name, false, verbStr)
+				printer.PrintObj(&pod, o.Out)
 				continue
 			} else if err != nil {
 				return false, err
@@ -659,11 +712,6 @@ func SupportEviction(clientset kubernetes.Interface) (string, error) {
 // RunCordonOrUncordon runs either Cordon or Uncordon.  The desired value for
 // "Unschedulable" is passed as the first arg.
 func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
-	cmdNamespace, _, err := o.Factory.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-
 	cordonOrUncordon := "cordon"
 	if !desired {
 		cordonOrUncordon = "un" + cordonOrUncordon
@@ -671,7 +719,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 
 	for _, nodeInfo := range o.nodeInfos {
 		if nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
-			obj, err := nodeInfo.Mapping.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
+			obj, err := legacyscheme.Scheme.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
 			if err != nil {
 				fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 				continue
@@ -688,7 +736,12 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			}
 			unsched := node.Spec.Unschedulable
 			if unsched == desired {
-				o.Factory.PrintSuccess(o.mapper, false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, o.DryRun, already(desired))
+				printer, err := o.ToPrinter(already(desired))
+				if err != nil {
+					fmt.Printf("error: %v", err)
+					continue
+				}
+				printer.PrintObj(nodeInfo.AsVersioned(), o.Out)
 			} else {
 				if !o.DryRun {
 					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
@@ -703,16 +756,26 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 						continue
 					}
-					_, err = helper.Patch(cmdNamespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes)
+					_, err = helper.Patch(o.Namespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes)
 					if err != nil {
 						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 						continue
 					}
 				}
-				o.Factory.PrintSuccess(o.mapper, false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, o.DryRun, changed(desired))
+				printer, err := o.ToPrinter(changed(desired))
+				if err != nil {
+					fmt.Fprintf(o.ErrOut, "%v", err)
+					continue
+				}
+				printer.PrintObj(nodeInfo.AsVersioned(), o.Out)
 			}
 		} else {
-			o.Factory.PrintSuccess(o.mapper, false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, o.DryRun, "skipped")
+			printer, err := o.ToPrinter("skipped")
+			if err != nil {
+				fmt.Fprintf(o.ErrOut, "%v", err)
+				continue
+			}
+			printer.PrintObj(nodeInfo.AsVersioned(), o.Out)
 		}
 	}
 

@@ -38,10 +38,13 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["union_test.go"],
-    importpath = "k8s.io/apiserver/pkg/audit",
-    library = ":go_default_library",
+    srcs = [
+        "request_test.go",
+        "union_test.go",
+    ],
+    embed = [":go_default_library"],
     deps = [
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
     ],

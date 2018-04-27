@@ -19,32 +19,32 @@ package openstack
 import "github.com/prometheus/client_golang/prometheus"
 
 const (
-	OpenstackSubsystem         = "openstack"
-	OpenstackOperationKey      = "cloudprovider_openstack_api_request_duration_seconds"
-	OpenstackOperationErrorKey = "cloudprovider_openstack_api_request_errors"
+	openstackSubsystem         = "openstack"
+	openstackOperationKey      = "cloudprovider_openstack_api_request_duration_seconds"
+	openstackOperationErrorKey = "cloudprovider_openstack_api_request_errors"
 )
 
 var (
-	OpenstackOperationsLatency = prometheus.NewHistogramVec(
+	openstackOperationsLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Subsystem: OpenstackSubsystem,
-			Name:      OpenstackOperationKey,
+			Subsystem: openstackSubsystem,
+			Name:      openstackOperationKey,
 			Help:      "Latency of openstack api call",
 		},
 		[]string{"request"},
 	)
 
-	OpenstackApiRequestErrors = prometheus.NewCounterVec(
+	openstackAPIRequestErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Subsystem: OpenstackSubsystem,
-			Name:      OpenstackOperationErrorKey,
+			Subsystem: openstackSubsystem,
+			Name:      openstackOperationErrorKey,
 			Help:      "Cumulative number of openstack Api call errors",
 		},
 		[]string{"request"},
 	)
 )
 
-func RegisterMetrics() {
-	prometheus.MustRegister(OpenstackOperationsLatency)
-	prometheus.MustRegister(OpenstackApiRequestErrors)
+func registerMetrics() {
+	prometheus.MustRegister(openstackOperationsLatency)
+	prometheus.MustRegister(openstackAPIRequestErrors)
 }

@@ -169,14 +169,6 @@ func LessEndpointAddress(a, b *v1.EndpointAddress) bool {
 	return a.TargetRef.UID < b.TargetRef.UID
 }
 
-type addrPtrsByIpAndUID []*v1.EndpointAddress
-
-func (sl addrPtrsByIpAndUID) Len() int      { return len(sl) }
-func (sl addrPtrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrPtrsByIpAndUID) Less(i, j int) bool {
-	return LessEndpointAddress(sl[i], sl[j])
-}
-
 // SortSubsets sorts an array of EndpointSubset objects in place.  For ease of
 // use it returns the input slice.
 func SortSubsets(subsets []v1.EndpointSubset) []v1.EndpointSubset {

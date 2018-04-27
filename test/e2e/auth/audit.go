@@ -21,21 +21,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/evanphx/json-patch"
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var (
@@ -62,8 +65,18 @@ var _ = SIGDescribe("Advanced Audit", func() {
 
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "failed to load config")
-		apiExtensionClient, err := clientset.NewForConfig(config)
+		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
 		framework.ExpectNoError(err, "failed to initialize apiExtensionClient")
+
+		By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
+		config, err = framework.LoadConfig()
+		framework.ExpectNoError(err)
+		config.Impersonate = restclient.ImpersonationConfig{
+			UserName: "system:anonymous",
+			Groups:   []string{"system:unauthenticated"},
+		}
+		anonymousClient, err := clientset.NewForConfig(config)
+		framework.ExpectNoError(err)
 
 		testCases := []struct {
 			action func()
@@ -79,7 +92,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						Spec: apiv1.PodSpec{
 							Containers: []apiv1.Container{{
 								Name:  "pause",
-								Image: framework.GetPauseImageName(f.ClientSet),
+								Image: imageutils.GetPauseImageName(),
 							}},
 						},
 					}
@@ -117,6 +130,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						true,
 						true,
+						"allow",
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
@@ -128,6 +142,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
@@ -139,6 +154,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseStarted,
@@ -150,6 +166,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
@@ -161,6 +178,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
@@ -172,6 +190,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						true,
 						true,
+						"allow",
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
@@ -183,6 +202,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						true,
 						true,
+						"allow",
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
@@ -194,6 +214,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						true,
 						true,
+						"allow",
 					},
 				},
 			},
@@ -238,6 +259,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						true,
 						true,
+						"allow",
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
@@ -249,6 +271,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
@@ -260,6 +283,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseStarted,
@@ -271,6 +295,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
@@ -282,6 +307,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
@@ -293,6 +319,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						true,
 						true,
+						"allow",
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
@@ -304,6 +331,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						true,
 						true,
+						"allow",
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
@@ -315,6 +343,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						true,
 						true,
+						"allow",
 					},
 				},
 			},
@@ -365,6 +394,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -376,6 +406,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -387,6 +418,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseStarted,
@@ -398,6 +430,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -409,6 +442,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -420,6 +454,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -431,6 +466,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -442,6 +478,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					},
 				},
 			},
@@ -491,6 +528,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -502,6 +540,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -513,6 +552,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseStarted,
@@ -524,6 +564,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -535,6 +576,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -546,6 +588,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -557,6 +600,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					}, {
 						v1beta1.LevelMetadata,
 						v1beta1.StageResponseComplete,
@@ -568,6 +612,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						namespace,
 						false,
 						false,
+						"allow",
 					},
 				},
 			},
@@ -580,75 +625,124 @@ var _ = SIGDescribe("Advanced Audit", func() {
 				},
 				[]auditEvent{
 					{
-						level:          v1beta1.LevelRequestResponse,
-						stage:          v1beta1.StageResponseComplete,
-						requestURI:     "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions",
-						verb:           "create",
-						code:           201,
-						user:           auditTestUser,
-						resource:       "customresourcedefinitions",
-						requestObject:  true,
-						responseObject: true,
+						level:             v1beta1.LevelRequestResponse,
+						stage:             v1beta1.StageResponseComplete,
+						requestURI:        "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions",
+						verb:              "create",
+						code:              201,
+						user:              auditTestUser,
+						resource:          "customresourcedefinitions",
+						requestObject:     true,
+						responseObject:    true,
+						authorizeDecision: "allow",
 					}, {
-						level:          v1beta1.LevelMetadata,
-						stage:          v1beta1.StageResponseComplete,
-						requestURI:     fmt.Sprintf("/apis/%s/v1beta1/%s", crdNamespace, crdName),
-						verb:           "create",
-						code:           201,
-						user:           auditTestUser,
-						resource:       crdName,
-						requestObject:  false,
-						responseObject: false,
+						level:             v1beta1.LevelMetadata,
+						stage:             v1beta1.StageResponseComplete,
+						requestURI:        fmt.Sprintf("/apis/%s/v1beta1/%s", crdNamespace, crdName),
+						verb:              "create",
+						code:              201,
+						user:              auditTestUser,
+						resource:          crdName,
+						requestObject:     false,
+						responseObject:    false,
+						authorizeDecision: "allow",
 					}, {
-						level:          v1beta1.LevelRequestResponse,
-						stage:          v1beta1.StageResponseComplete,
-						requestURI:     fmt.Sprintf("/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/%s", crd.Name),
-						verb:           "delete",
-						code:           200,
-						user:           auditTestUser,
-						resource:       "customresourcedefinitions",
-						requestObject:  false,
-						responseObject: true,
+						level:             v1beta1.LevelRequestResponse,
+						stage:             v1beta1.StageResponseComplete,
+						requestURI:        fmt.Sprintf("/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/%s", crd.Name),
+						verb:              "delete",
+						code:              200,
+						user:              auditTestUser,
+						resource:          "customresourcedefinitions",
+						requestObject:     false,
+						responseObject:    true,
+						authorizeDecision: "allow",
 					}, {
-						level:          v1beta1.LevelMetadata,
-						stage:          v1beta1.StageResponseComplete,
-						requestURI:     fmt.Sprintf("/apis/%s/v1beta1/%s/setup-instance", crdNamespace, crdName),
-						verb:           "delete",
-						code:           200,
-						user:           auditTestUser,
-						resource:       crdName,
-						requestObject:  false,
-						responseObject: false,
+						level:             v1beta1.LevelMetadata,
+						stage:             v1beta1.StageResponseComplete,
+						requestURI:        fmt.Sprintf("/apis/%s/v1beta1/%s/setup-instance", crdNamespace, crdName),
+						verb:              "delete",
+						code:              200,
+						user:              auditTestUser,
+						resource:          crdName,
+						requestObject:     false,
+						responseObject:    false,
+						authorizeDecision: "allow",
 					},
 				},
 			},
 		}
 
+		// test authorizer annotations, RBAC is required.
+		annotationTestCases := []struct {
+			action func()
+			events []auditEvent
+		}{
+
+			// get a pod with unauthorized user
+			{
+				func() {
+					_, err := anonymousClient.CoreV1().Pods(namespace).Get("another-audit-pod", metav1.GetOptions{})
+					expectForbidden(err)
+				},
+				[]auditEvent{
+					{
+						level:             v1beta1.LevelRequest,
+						stage:             v1beta1.StageResponseComplete,
+						requestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods/another-audit-pod", namespace),
+						verb:              "get",
+						code:              403,
+						user:              auditTestUser,
+						resource:          "pods",
+						namespace:         namespace,
+						requestObject:     false,
+						responseObject:    false,
+						authorizeDecision: "forbid",
+					},
+				},
+			},
+		}
+
+		if framework.IsRBACEnabled(f) {
+			testCases = append(testCases, annotationTestCases...)
+		}
 		expectedEvents := []auditEvent{}
 		for _, t := range testCases {
 			t.action()
 			expectedEvents = append(expectedEvents, t.events...)
 		}
 
-		expectAuditLines(f, expectedEvents)
+		// The default flush timeout is 30 seconds, therefore it should be enough to retry once
+		// to find all expected events. However, we're waiting for 5 minutes to avoid flakes.
+		pollingInterval := 30 * time.Second
+		pollingTimeout := 5 * time.Minute
+		err = wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
+			ok, err := checkAuditLines(f, expectedEvents)
+			if err != nil {
+				framework.Logf("Failed to observe audit events: %v", err)
+			}
+			return ok, nil
+		})
+		framework.ExpectNoError(err, "after %v failed to observe audit events", pollingTimeout)
 	})
 })
 
 type auditEvent struct {
-	level          v1beta1.Level
-	stage          v1beta1.Stage
-	requestURI     string
-	verb           string
-	code           int32
-	user           string
-	resource       string
-	namespace      string
-	requestObject  bool
-	responseObject bool
+	level             v1beta1.Level
+	stage             v1beta1.Stage
+	requestURI        string
+	verb              string
+	code              int32
+	user              string
+	resource          string
+	namespace         string
+	requestObject     bool
+	responseObject    bool
+	authorizeDecision string
 }
 
 // Search the audit log for the expected audit lines.
-func expectAuditLines(f *framework.Framework, expected []auditEvent) {
+func checkAuditLines(f *framework.Framework, expected []auditEvent) (bool, error) {
 	expectations := map[auditEvent]bool{}
 	for _, event := range expected {
 		expectations[event] = false
@@ -656,25 +750,36 @@ func expectAuditLines(f *framework.Framework, expected []auditEvent) {
 
 	// Fetch the log stream.
 	stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
-	framework.ExpectNoError(err, "could not read audit log")
+	if err != nil {
+		return false, err
+	}
 	defer stream.Close()
 
 	scanner := bufio.NewScanner(stream)
 	for scanner.Scan() {
 		line := scanner.Text()
 		event, err := parseAuditLine(line)
-		framework.ExpectNoError(err)
+		if err != nil {
+			return false, err
+		}
 
 		// If the event was expected, mark it as found.
 		if _, found := expectations[event]; found {
 			expectations[event] = true
 		}
 	}
-	framework.ExpectNoError(scanner.Err(), "error reading audit log")
-
-	for event, found := range expectations {
-		Expect(found).To(BeTrue(), "Event %#v not found!", event)
+	if err := scanner.Err(); err != nil {
+		return false, err
 	}
+
+	noneMissing := true
+	for event, found := range expectations {
+		if !found {
+			framework.Logf("Event %#v not found!", event)
+		}
+		noneMissing = noneMissing && found
+	}
+	return noneMissing, nil
 }
 
 func parseAuditLine(line string) (auditEvent, error) {
@@ -702,5 +807,6 @@ func parseAuditLine(line string) (auditEvent, error) {
 	if e.RequestObject != nil {
 		event.requestObject = true
 	}
+	event.authorizeDecision = e.Annotations["authorization.k8s.io/decision"]
 	return event, nil
 }

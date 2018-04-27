@@ -30,10 +30,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 ALL_VERSIONS_CSV=$(IFS=',';echo "${KUBE_AVAILABLE_GROUP_VERSIONS[*]// /,}";IFS=$)
 KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS:-${ALL_VERSIONS_CSV}}"
 
-# Give integration tests longer to run
-# TODO: allow a larger value to be passed in
-#KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 240s}
-KUBE_TIMEOUT="-timeout 600s"
+# Give integration tests longer to run by default.
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 600s}
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}

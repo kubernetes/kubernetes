@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
@@ -54,6 +54,51 @@ func TestValidateTokenDiscovery(t *testing.T) {
 				"failed ValidateTokenDiscovery:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(err == nil),
+			)
+		}
+	}
+}
+
+func TestValidateValidateTokenUsages(t *testing.T) {
+	var tests = []struct {
+		u        []string
+		f        *field.Path
+		expected bool
+	}{
+		{[]string{}, nil, true},                            // supported (no usages)
+		{[]string{"signing", "authentication"}, nil, true}, // supported
+		{[]string{"something else"}, nil, false},           // usage not supported
+	}
+	for _, rt := range tests {
+		actual := ValidateTokenUsages(rt.u, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateTokenUsages:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateTokenGroups(t *testing.T) {
+	var tests = []struct {
+		u        []string
+		g        []string
+		f        *field.Path
+		expected bool
+	}{
+		{[]string{"some usage"}, []string{"some group"}, nil, false},                       // groups doesn't makes sense if usage authentication
+		{[]string{"authentication"}, []string{"some group"}, nil, false},                   // group not supported
+		{[]string{"authentication"}, []string{"system:bootstrappers:anygroup"}, nil, true}, // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateTokenGroups(rt.u, rt.g, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateTokenGroups:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
 			)
 		}
 	}
@@ -134,7 +179,7 @@ func TestValidateCloudProvider(t *testing.T) {
 	}
 }
 
-func TestValidateAPIServerCertSANs(t *testing.T) {
+func TestValidateCertSANs(t *testing.T) {
 	var tests = []struct {
 		sans     []string
 		expected bool
@@ -148,10 +193,10 @@ func TestValidateAPIServerCertSANs(t *testing.T) {
 		{[]string{"my-hostname2", "my.other.subdomain", "2001:db8::10"}, true}, // supported
 	}
 	for _, rt := range tests {
-		actual := ValidateAPIServerCertSANs(rt.sans, nil)
+		actual := ValidateCertSANs(rt.sans, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed ValidateAPIServerCertSANs:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateCertSANs:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
 			)
@@ -230,7 +275,73 @@ func TestValidateAPIEndpoint(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "Valid IPv4 address and default port",
+			name: "Valid DNS ControlPlaneEndpoint (with port), AdvertiseAddress and default port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "cp.k8s.io:8081",
+					AdvertiseAddress:     "4.5.6.7",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv4 ControlPlaneEndpoint (with port), AdvertiseAddress and default port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1.2.3.4:8081",
+					AdvertiseAddress:     "4.5.6.7",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv6 ControlPlaneEndpoint (with port), ControlPlaneEndpoint and port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "[2001:db7::1]:8081",
+					AdvertiseAddress:     "2001:db7::2",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid DNS ControlPlaneEndpoint (without port), AdvertiseAddress and default port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "cp.k8s.io",
+					AdvertiseAddress:     "4.5.6.7",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv4 ControlPlaneEndpoint (without port), AdvertiseAddress and default port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1.2.3.4",
+					AdvertiseAddress:     "4.5.6.7",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv6 ControlPlaneEndpoint (without port), ControlPlaneEndpoint and port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "2001:db7::1",
+					AdvertiseAddress:     "2001:db7::2",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv4 AdvertiseAddress and default port",
 			s: &kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
@@ -240,7 +351,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "Valid IPv6 address and port",
+			name: "Valid IPv6 AdvertiseAddress and port",
 			s: &kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "2001:db7::1",
@@ -250,7 +361,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "Invalid IPv4 address",
+			name: "Invalid IPv4 AdvertiseAddress",
 			s: &kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.34",
@@ -260,7 +371,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "Invalid IPv6 address",
+			name: "Invalid IPv6 AdvertiseAddress",
 			s: &kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "2001:db7:1",
@@ -269,9 +380,55 @@ func TestValidateAPIEndpoint(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "Invalid BindPort",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         0,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid DNS ControlPlaneEndpoint",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "bad!!.k8s.io",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid ipv4 ControlPlaneEndpoint",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1..3.4",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid ipv6 ControlPlaneEndpoint",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid ControlPlaneEndpoint port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1.2.3.4:0",
+				},
+			},
+			expected: false,
+		},
 	}
 	for _, rt := range tests {
-		actual := ValidateAPIEndpoint(rt.s, nil)
+		actual := ValidateAPIEndpoint(&rt.s.API, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"%s test case failed:\n\texpected: %t\n\t  actual: %t",
@@ -568,12 +725,11 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 
 func TestValidateKubeletConfiguration(t *testing.T) {
 	successCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 			CgroupsPerQOS:               utilpointer.BoolPtr(true),
 			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
 			SystemCgroups:               "",
 			CgroupRoot:                  "",
-			CAdvisorPort:                utilpointer.Int32Ptr(0),
 			EventBurst:                  10,
 			EventRecordQPS:              utilpointer.Int32Ptr(5),
 			HealthzPort:                 utilpointer.Int32Ptr(10248),
@@ -588,9 +744,10 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			OOMScoreAdj:                 utilpointer.Int32Ptr(-999),
 			PodsPerCore:                 100,
 			Port:                        65535,
-			ReadOnlyPort:                utilpointer.Int32Ptr(0),
+			ReadOnlyPort:                0,
 			RegistryBurst:               10,
 			RegistryPullQPS:             utilpointer.Int32Ptr(5),
+			HairpinMode:                 "promiscuous-bridge",
 		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase, nil); len(allErrors) != 0 {
@@ -598,12 +755,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}
 
 	errorCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 			CgroupsPerQOS:               utilpointer.BoolPtr(false),
 			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
 			SystemCgroups:               "/",
 			CgroupRoot:                  "",
-			CAdvisorPort:                utilpointer.Int32Ptr(-10),
 			EventBurst:                  -10,
 			EventRecordQPS:              utilpointer.Int32Ptr(-10),
 			HealthzPort:                 utilpointer.Int32Ptr(-10),
@@ -618,7 +774,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			OOMScoreAdj:                 utilpointer.Int32Ptr(-1001),
 			PodsPerCore:                 -10,
 			Port:                        0,
-			ReadOnlyPort:                utilpointer.Int32Ptr(-10),
+			ReadOnlyPort:                -10,
 			RegistryBurst:               -10,
 			RegistryPullQPS:             utilpointer.Int32Ptr(-10),
 		},
@@ -661,7 +817,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 	}
 
 	for _, successCase := range successCases {
-		if errs := ValidateProxy(&successCase, nil); len(errs) != 0 {
+		if errs := ValidateProxy(successCase.KubeProxy.Config, nil); len(errs) != 0 {
 			t.Errorf("failed ValidateProxy: expect no errors but got %v", errs)
 		}
 	}
@@ -865,7 +1021,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 	}
 
 	for i, errorCase := range errorCases {
-		if errs := ValidateProxy(&errorCase.masterConfig, nil); len(errs) == 0 {
+		if errs := ValidateProxy(errorCase.masterConfig.KubeProxy.Config, nil); len(errs) == 0 {
 			t.Errorf("%d failed ValidateProxy: expected error for %s, but got no error", i, errorCase.msg)
 		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
 			t.Errorf("%d failed ValidateProxy: unexpected error: %v, expected: %s", i, errs[0], errorCase.msg)
@@ -996,7 +1152,7 @@ func TestValidateJoinDiscoveryTokenAPIServer(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := ValidateJoinDiscoveryTokenAPIServer(rt.s, nil)
+		actual := ValidateJoinDiscoveryTokenAPIServer(rt.s.DiscoveryTokenAPIServers, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"failed ValidateJoinDiscoveryTokenAPIServer:\n\texpected: %t\n\t  actual: %t",

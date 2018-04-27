@@ -108,7 +108,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 			})
 
 			ginkgo.By("Checking that too long lines are trimmed", func() {
-				maxLength := 100000
+				maxLength := 100 * 1024
 				cmd := []string{
 					"/bin/sh",
 					"-c",
@@ -162,7 +162,11 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 			}()
 
 			ginkgo.By("Waiting for events to ingest")
-			c := utils.NewLogChecker(p, utils.UntilFirstEntry, utils.JustTimeout, "")
+			location := framework.TestContext.CloudConfig.Zone
+			if framework.TestContext.CloudConfig.MultiZone {
+				location = framework.TestContext.CloudConfig.Region
+			}
+			c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLocation(location), utils.JustTimeout, "")
 			err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
 			framework.ExpectNoError(err)
 		})
@@ -178,9 +182,9 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 				framework.ExpectNoError(err)
 			})
 
-			ginkgo.By("Waiting for some docker logs to be ingested from each node", func() {
+			ginkgo.By("Waiting for some container runtime logs to be ingested from each node", func() {
 				nodeIds := utils.GetNodeIds(f.ClientSet)
-				log := fmt.Sprintf("projects/%s/logs/docker", framework.TestContext.CloudConfig.ProjectID)
+				log := fmt.Sprintf("projects/%s/logs/container-runtime", framework.TestContext.CloudConfig.ProjectID)
 				c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLog(log), utils.JustTimeout, nodeIds...)
 				err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
 				framework.ExpectNoError(err)

@@ -49,7 +49,8 @@ var (
 func NewCmdRollout(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:     "rollout SUBCOMMAND",
+		Use: "rollout SUBCOMMAND",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Manage the rollout of a resource"),
 		Long:    rollout_long,
 		Example: rollout_example,

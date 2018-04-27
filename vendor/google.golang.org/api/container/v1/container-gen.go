@@ -1,4 +1,4 @@
-// Package container provides access to the Google Container Engine API.
+// Package container provides access to the Google Kubernetes Engine API.
 //
 // See https://cloud.google.com/container-engine/
 //
@@ -163,8 +163,8 @@ type AcceleratorConfig struct {
 }
 
 func (s *AcceleratorConfig) MarshalJSON() ([]byte, error) {
-	type noMethod AcceleratorConfig
-	raw := noMethod(*s)
+	type NoMethod AcceleratorConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -188,6 +188,13 @@ type AddonsConfig struct {
 	// KubernetesDashboard: Configuration for the Kubernetes Dashboard.
 	KubernetesDashboard *KubernetesDashboard `json:"kubernetesDashboard,omitempty"`
 
+	// NetworkPolicyConfig: Configuration for NetworkPolicy. This only
+	// tracks whether the addon
+	// is enabled or not on the Master, it does not track whether network
+	// policy
+	// is enabled for the nodes.
+	NetworkPolicyConfig *NetworkPolicyConfig `json:"networkPolicyConfig,omitempty"`
+
 	// ForceSendFields is a list of field names (e.g.
 	// "HorizontalPodAutoscaling") to unconditionally include in API
 	// requests. By default, fields with empty values are omitted from API
@@ -208,8 +215,8 @@ type AddonsConfig struct {
 }
 
 func (s *AddonsConfig) MarshalJSON() ([]byte, error) {
-	type noMethod AddonsConfig
-	raw := noMethod(*s)
+	type NoMethod AddonsConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -249,8 +256,8 @@ type AutoUpgradeOptions struct {
 }
 
 func (s *AutoUpgradeOptions) MarshalJSON() ([]byte, error) {
-	type noMethod AutoUpgradeOptions
-	raw := noMethod(*s)
+	type NoMethod AutoUpgradeOptions
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -286,8 +293,8 @@ type CidrBlock struct {
 }
 
 func (s *CidrBlock) MarshalJSON() ([]byte, error) {
-	type noMethod CidrBlock
-	raw := noMethod(*s)
+	type NoMethod CidrBlock
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -317,12 +324,12 @@ type ClientCertificateConfig struct {
 }
 
 func (s *ClientCertificateConfig) MarshalJSON() ([]byte, error) {
-	type noMethod ClientCertificateConfig
-	raw := noMethod(*s)
+	type NoMethod ClientCertificateConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// Cluster: A Google Container Engine cluster.
+// Cluster: A Google Kubernetes Engine cluster.
 type Cluster struct {
 	// AddonsConfig: Configurations for the various addons available to run
 	// in the cluster.
@@ -414,10 +421,7 @@ type Cluster struct {
 	// time.
 	InitialNodeCount int64 `json:"initialNodeCount,omitempty"`
 
-	// InstanceGroupUrls: [Output only] The resource URLs of
-	// [instance
-	// groups](/compute/docs/instance-groups/) associated with this
-	// cluster.
+	// InstanceGroupUrls: Deprecated. Use node_pools.instance_group_urls.
 	InstanceGroupUrls []string `json:"instanceGroupUrls,omitempty"`
 
 	// IpAllocationPolicy: Configuration for cluster IP allocation.
@@ -445,6 +449,9 @@ type Cluster struct {
 	// * `none` - no logs will be exported from the cluster.
 	// * if left as an empty string,`logging.googleapis.com` will be used.
 	LoggingService string `json:"loggingService,omitempty"`
+
+	// MaintenancePolicy: Configure the maintenance policy for this cluster.
+	MaintenancePolicy *MaintenancePolicy `json:"maintenancePolicy,omitempty"`
 
 	// MasterAuth: The authentication information for accessing the master
 	// endpoint.
@@ -594,8 +601,8 @@ type Cluster struct {
 }
 
 func (s *Cluster) MarshalJSON() ([]byte, error) {
-	type noMethod Cluster
-	raw := noMethod(*s)
+	type NoMethod Cluster
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -688,8 +695,8 @@ type ClusterUpdate struct {
 }
 
 func (s *ClusterUpdate) MarshalJSON() ([]byte, error) {
-	type noMethod ClusterUpdate
-	raw := noMethod(*s)
+	type NoMethod ClusterUpdate
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -724,8 +731,8 @@ type CreateClusterRequest struct {
 }
 
 func (s *CreateClusterRequest) MarshalJSON() ([]byte, error) {
-	type noMethod CreateClusterRequest
-	raw := noMethod(*s)
+	type NoMethod CreateClusterRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -753,8 +760,49 @@ type CreateNodePoolRequest struct {
 }
 
 func (s *CreateNodePoolRequest) MarshalJSON() ([]byte, error) {
-	type noMethod CreateNodePoolRequest
-	raw := noMethod(*s)
+	type NoMethod CreateNodePoolRequest
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// DailyMaintenanceWindow: Time window specified for daily maintenance
+// operations.
+type DailyMaintenanceWindow struct {
+	// Duration: [Output only] Duration of the time window, automatically
+	// chosen to be
+	// smallest possible in the given scenario.
+	// Duration will be in
+	// [RFC3339](https://www.ietf.org/rfc/rfc3339.txt)
+	// format "PTnHnMnS".
+	Duration string `json:"duration,omitempty"`
+
+	// StartTime: Time within the maintenance window to start the
+	// maintenance operations.
+	// Time format should be in
+	// [RFC3339](https://www.ietf.org/rfc/rfc3339.txt)
+	// format "HH:MM”, where HH : [00-23] and MM : [00-59] GMT.
+	StartTime string `json:"startTime,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Duration") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Duration") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *DailyMaintenanceWindow) MarshalJSON() ([]byte, error) {
+	type NoMethod DailyMaintenanceWindow
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -807,8 +855,8 @@ type HorizontalPodAutoscaling struct {
 }
 
 func (s *HorizontalPodAutoscaling) MarshalJSON() ([]byte, error) {
-	type noMethod HorizontalPodAutoscaling
-	raw := noMethod(*s)
+	type NoMethod HorizontalPodAutoscaling
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -842,8 +890,8 @@ type HttpLoadBalancing struct {
 }
 
 func (s *HttpLoadBalancing) MarshalJSON() ([]byte, error) {
-	type noMethod HttpLoadBalancing
-	raw := noMethod(*s)
+	type NoMethod HttpLoadBalancing
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -987,8 +1035,8 @@ type IPAllocationPolicy struct {
 }
 
 func (s *IPAllocationPolicy) MarshalJSON() ([]byte, error) {
-	type noMethod IPAllocationPolicy
-	raw := noMethod(*s)
+	type NoMethod IPAllocationPolicy
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1016,8 +1064,8 @@ type KubernetesDashboard struct {
 }
 
 func (s *KubernetesDashboard) MarshalJSON() ([]byte, error) {
-	type noMethod KubernetesDashboard
-	raw := noMethod(*s)
+	type NoMethod KubernetesDashboard
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1052,8 +1100,8 @@ type LegacyAbac struct {
 }
 
 func (s *LegacyAbac) MarshalJSON() ([]byte, error) {
-	type noMethod LegacyAbac
-	raw := noMethod(*s)
+	type NoMethod LegacyAbac
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1092,8 +1140,8 @@ type ListClustersResponse struct {
 }
 
 func (s *ListClustersResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListClustersResponse
-	raw := noMethod(*s)
+	type NoMethod ListClustersResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1125,8 +1173,8 @@ type ListNodePoolsResponse struct {
 }
 
 func (s *ListNodePoolsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListNodePoolsResponse
-	raw := noMethod(*s)
+	type NoMethod ListNodePoolsResponse
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1164,8 +1212,70 @@ type ListOperationsResponse struct {
 }
 
 func (s *ListOperationsResponse) MarshalJSON() ([]byte, error) {
-	type noMethod ListOperationsResponse
-	raw := noMethod(*s)
+	type NoMethod ListOperationsResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// MaintenancePolicy: MaintenancePolicy defines the maintenance policy
+// to be used for the cluster.
+type MaintenancePolicy struct {
+	// Window: Specifies the maintenance window in which maintenance may be
+	// performed.
+	Window *MaintenanceWindow `json:"window,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Window") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Window") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *MaintenancePolicy) MarshalJSON() ([]byte, error) {
+	type NoMethod MaintenancePolicy
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// MaintenanceWindow: MaintenanceWindow defines the maintenance window
+// to be used for the cluster.
+type MaintenanceWindow struct {
+	// DailyMaintenanceWindow: DailyMaintenanceWindow specifies a daily
+	// maintenance operation window.
+	DailyMaintenanceWindow *DailyMaintenanceWindow `json:"dailyMaintenanceWindow,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g.
+	// "DailyMaintenanceWindow") to unconditionally include in API requests.
+	// By default, fields with empty values are omitted from API requests.
+	// However, any non-pointer, non-interface field appearing in
+	// ForceSendFields will be sent to the server regardless of whether the
+	// field is empty or not. This may be used to include empty fields in
+	// Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "DailyMaintenanceWindow")
+	// to include in API requests with the JSON null value. By default,
+	// fields with empty values are omitted from API requests. However, any
+	// field with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *MaintenanceWindow) MarshalJSON() ([]byte, error) {
+	type NoMethod MaintenanceWindow
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1230,8 +1340,8 @@ type MasterAuth struct {
 }
 
 func (s *MasterAuth) MarshalJSON() ([]byte, error) {
-	type noMethod MasterAuth
-	raw := noMethod(*s)
+	type NoMethod MasterAuth
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1271,8 +1381,8 @@ type MasterAuthorizedNetworksConfig struct {
 }
 
 func (s *MasterAuthorizedNetworksConfig) MarshalJSON() ([]byte, error) {
-	type noMethod MasterAuthorizedNetworksConfig
-	raw := noMethod(*s)
+	type NoMethod MasterAuthorizedNetworksConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1309,8 +1419,40 @@ type NetworkPolicy struct {
 }
 
 func (s *NetworkPolicy) MarshalJSON() ([]byte, error) {
-	type noMethod NetworkPolicy
-	raw := noMethod(*s)
+	type NoMethod NetworkPolicy
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// NetworkPolicyConfig: Configuration for NetworkPolicy. This only
+// tracks whether the addon
+// is enabled or not on the Master, it does not track whether network
+// policy
+// is enabled for the nodes.
+type NetworkPolicyConfig struct {
+	// Disabled: Whether NetworkPolicy is enabled for this cluster.
+	Disabled bool `json:"disabled,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Disabled") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Disabled") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *NetworkPolicyConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod NetworkPolicyConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1380,10 +1522,17 @@ type NodeConfig struct {
 	// server.
 	// Additionally, to avoid ambiguity, keys must not conflict with any
 	// other
-	// metadata keys for the project or be one of the four reserved
-	// keys:
-	// "instance-template", "kube-env", "startup-script", and
-	// "user-data"
+	// metadata keys for the project or be one of the reserved keys:
+	//  "cluster-location"
+	//  "cluster-name"
+	//  "cluster-uid"
+	//  "configure-sh"
+	//  "gci-update-strategy"
+	//  "gci-ensure-gke-docker"
+	//  "instance-template"
+	//  "kube-env"
+	//  "startup-script"
+	//  "user-data"
 	//
 	// Values are free-form strings, and only have meaning as interpreted
 	// by
@@ -1393,6 +1542,20 @@ type NodeConfig struct {
 	//
 	// The total size of all keys and values must be less than 512 KB.
 	Metadata map[string]string `json:"metadata,omitempty"`
+
+	// MinCpuPlatform: Minimum CPU platform to be used by this instance. The
+	// instance may be
+	// scheduled on the specified or newer CPU platform. Applicable values
+	// are the
+	// friendly names of CPU platforms, such as
+	// <code>minCpuPlatform: &quot;Intel Haswell&quot;</code>
+	// or
+	// <code>minCpuPlatform: &quot;Intel Sandy Bridge&quot;</code>. For
+	// more
+	// information, read [how to specify min CPU
+	// platform](https://cloud.google.com/compute/docs/instances/specify-min-
+	// cpu-platform)
+	MinCpuPlatform string `json:"minCpuPlatform,omitempty"`
 
 	// OauthScopes: The set of Google API scopes to be made available on all
 	// of the
@@ -1457,8 +1620,8 @@ type NodeConfig struct {
 }
 
 func (s *NodeConfig) MarshalJSON() ([]byte, error) {
-	type noMethod NodeConfig
-	raw := noMethod(*s)
+	type NoMethod NodeConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1503,8 +1666,8 @@ type NodeManagement struct {
 }
 
 func (s *NodeManagement) MarshalJSON() ([]byte, error) {
-	type noMethod NodeManagement
-	raw := noMethod(*s)
+	type NoMethod NodeManagement
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1537,10 +1700,11 @@ type NodePool struct {
 	// firewall and routes quota.
 	InitialNodeCount int64 `json:"initialNodeCount,omitempty"`
 
-	// InstanceGroupUrls: [Output only] The resource URLs of
-	// [instance
-	// groups](/compute/docs/instance-groups/) associated with this
-	// node pool.
+	// InstanceGroupUrls: [Output only] The resource URLs of the [managed
+	// instance
+	// groups](/compute/docs/instance-groups/creating-groups-of-mana
+	// ged-instances)
+	// associated with this node pool.
 	InstanceGroupUrls []string `json:"instanceGroupUrls,omitempty"`
 
 	// Management: NodeManagement configuration for this NodePool.
@@ -1584,7 +1748,7 @@ type NodePool struct {
 	// node pool instance, if available.
 	StatusMessage string `json:"statusMessage,omitempty"`
 
-	// Version: [Output only] The version of the Kubernetes of this node.
+	// Version: The version of the Kubernetes of this node.
 	Version string `json:"version,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -1609,8 +1773,8 @@ type NodePool struct {
 }
 
 func (s *NodePool) MarshalJSON() ([]byte, error) {
-	type noMethod NodePool
-	raw := noMethod(*s)
+	type NoMethod NodePool
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1649,8 +1813,8 @@ type NodePoolAutoscaling struct {
 }
 
 func (s *NodePoolAutoscaling) MarshalJSON() ([]byte, error) {
-	type noMethod NodePoolAutoscaling
-	raw := noMethod(*s)
+	type NoMethod NodePoolAutoscaling
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1688,6 +1852,7 @@ type Operation struct {
 	//   "SET_MASTER_AUTH" - Set/generate master auth materials
 	//   "SET_NODE_POOL_SIZE" - Set node pool size.
 	//   "SET_NETWORK_POLICY" - Updates network policy for a cluster.
+	//   "SET_MAINTENANCE_POLICY" - Set the maintenance policy.
 	OperationType string `json:"operationType,omitempty"`
 
 	// SelfLink: Server-defined URL for the resource.
@@ -1743,8 +1908,8 @@ type Operation struct {
 }
 
 func (s *Operation) MarshalJSON() ([]byte, error) {
-	type noMethod Operation
-	raw := noMethod(*s)
+	type NoMethod Operation
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1756,7 +1921,7 @@ func (s *Operation) MarshalJSON() ([]byte, error) {
 type RollbackNodePoolUpgradeRequest struct {
 }
 
-// ServerConfig: Container Engine service configuration.
+// ServerConfig: Kubernetes Engine service configuration.
 type ServerConfig struct {
 	// DefaultClusterVersion: Version of Kubernetes the service deploys by
 	// default.
@@ -1798,8 +1963,8 @@ type ServerConfig struct {
 }
 
 func (s *ServerConfig) MarshalJSON() ([]byte, error) {
-	type noMethod ServerConfig
-	raw := noMethod(*s)
+	type NoMethod ServerConfig
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1829,8 +1994,8 @@ type SetAddonsConfigRequest struct {
 }
 
 func (s *SetAddonsConfigRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetAddonsConfigRequest
-	raw := noMethod(*s)
+	type NoMethod SetAddonsConfigRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1844,7 +2009,7 @@ type SetLabelsRequest struct {
 	// this resource,
 	// used to detect conflicts. The fingerprint is initially generated
 	// by
-	// Container Engine and changes after every request to modify or
+	// Kubernetes Engine and changes after every request to modify or
 	// update
 	// labels. You must always provide an up-to-date fingerprint hash
 	// when
@@ -1875,8 +2040,8 @@ type SetLabelsRequest struct {
 }
 
 func (s *SetLabelsRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetLabelsRequest
-	raw := noMethod(*s)
+	type NoMethod SetLabelsRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1905,8 +2070,8 @@ type SetLegacyAbacRequest struct {
 }
 
 func (s *SetLegacyAbacRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetLegacyAbacRequest
-	raw := noMethod(*s)
+	type NoMethod SetLegacyAbacRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1944,8 +2109,8 @@ type SetLocationsRequest struct {
 }
 
 func (s *SetLocationsRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetLocationsRequest
-	raw := noMethod(*s)
+	type NoMethod SetLocationsRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -1979,20 +2144,59 @@ type SetLoggingServiceRequest struct {
 }
 
 func (s *SetLoggingServiceRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetLoggingServiceRequest
-	raw := noMethod(*s)
+	type NoMethod SetLoggingServiceRequest
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// SetMaintenancePolicyRequest: SetMaintenancePolicyRequest sets the
+// maintenance policy for a cluster.
+type SetMaintenancePolicyRequest struct {
+	// MaintenancePolicy: The maintenance policy to be set for the cluster.
+	// An empty field
+	// clears the existing maintenance policy.
+	MaintenancePolicy *MaintenancePolicy `json:"maintenancePolicy,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "MaintenancePolicy")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "MaintenancePolicy") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SetMaintenancePolicyRequest) MarshalJSON() ([]byte, error) {
+	type NoMethod SetMaintenancePolicyRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // SetMasterAuthRequest: SetMasterAuthRequest updates the admin password
 // of a cluster.
 type SetMasterAuthRequest struct {
-	// Action: The exact form of action to be taken on the master auth
+	// Action: The exact form of action to be taken on the master auth.
 	//
 	// Possible values:
-	//   "UNKNOWN" - Operation is unknown and will error out
+	//   "UNKNOWN" - Operation is unknown and will error out.
 	//   "SET_PASSWORD" - Set the password to a user generated value.
 	//   "GENERATE_PASSWORD" - Generate a new password and set it to that.
+	//   "SET_USERNAME" - Set the username.  If an empty username is
+	// provided, basic authentication
+	// is disabled for the cluster.  If a non-empty username is provided,
+	// basic
+	// authentication is enabled, with either a provided password or a
+	// generated
+	// one.
 	Action string `json:"action,omitempty"`
 
 	// Update: A description of the update.
@@ -2016,8 +2220,8 @@ type SetMasterAuthRequest struct {
 }
 
 func (s *SetMasterAuthRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetMasterAuthRequest
-	raw := noMethod(*s)
+	type NoMethod SetMasterAuthRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2051,8 +2255,8 @@ type SetMonitoringServiceRequest struct {
 }
 
 func (s *SetMonitoringServiceRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetMonitoringServiceRequest
-	raw := noMethod(*s)
+	type NoMethod SetMonitoringServiceRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2080,8 +2284,8 @@ type SetNetworkPolicyRequest struct {
 }
 
 func (s *SetNetworkPolicyRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetNetworkPolicyRequest
-	raw := noMethod(*s)
+	type NoMethod SetNetworkPolicyRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2109,8 +2313,8 @@ type SetNodePoolAutoscalingRequest struct {
 }
 
 func (s *SetNodePoolAutoscalingRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetNodePoolAutoscalingRequest
-	raw := noMethod(*s)
+	type NoMethod SetNodePoolAutoscalingRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2139,8 +2343,8 @@ type SetNodePoolManagementRequest struct {
 }
 
 func (s *SetNodePoolManagementRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetNodePoolManagementRequest
-	raw := noMethod(*s)
+	type NoMethod SetNodePoolManagementRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2169,8 +2373,8 @@ type SetNodePoolSizeRequest struct {
 }
 
 func (s *SetNodePoolSizeRequest) MarshalJSON() ([]byte, error) {
-	type noMethod SetNodePoolSizeRequest
-	raw := noMethod(*s)
+	type NoMethod SetNodePoolSizeRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2204,19 +2408,17 @@ type UpdateClusterRequest struct {
 }
 
 func (s *UpdateClusterRequest) MarshalJSON() ([]byte, error) {
-	type noMethod UpdateClusterRequest
-	raw := noMethod(*s)
+	type NoMethod UpdateClusterRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // UpdateMasterRequest: UpdateMasterRequest updates the master of the
 // cluster.
 type UpdateMasterRequest struct {
-	// MasterVersion: The Kubernetes version to change the master to. The
-	// only valid value is the
-	// latest supported version. Use "-" to have the server automatically
-	// select
-	// the latest version.
+	// MasterVersion: The Kubernetes version to change the master to. Use
+	// "-" to have the server
+	// automatically select the default version.
 	MasterVersion string `json:"masterVersion,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "MasterVersion") to
@@ -2237,8 +2439,8 @@ type UpdateMasterRequest struct {
 }
 
 func (s *UpdateMasterRequest) MarshalJSON() ([]byte, error) {
-	type noMethod UpdateMasterRequest
-	raw := noMethod(*s)
+	type NoMethod UpdateMasterRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2272,8 +2474,8 @@ type UpdateNodePoolRequest struct {
 }
 
 func (s *UpdateNodePoolRequest) MarshalJSON() ([]byte, error) {
-	type noMethod UpdateNodePoolRequest
-	raw := noMethod(*s)
+	type NoMethod UpdateNodePoolRequest
+	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
@@ -2289,7 +2491,7 @@ type ProjectsZonesGetServerconfigCall struct {
 	header_      http.Header
 }
 
-// GetServerconfig: Returns configuration info about the Container
+// GetServerconfig: Returns configuration info about the Kubernetes
 // Engine service.
 func (r *ProjectsZonesService) GetServerconfig(projectId string, zone string) *ProjectsZonesGetServerconfigCall {
 	c := &ProjectsZonesGetServerconfigCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -2388,12 +2590,12 @@ func (c *ProjectsZonesGetServerconfigCall) Do(opts ...googleapi.CallOption) (*Se
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
 	// {
-	//   "description": "Returns configuration info about the Container Engine service.",
+	//   "description": "Returns configuration info about the Kubernetes Engine service.",
 	//   "flatPath": "v1/projects/{projectId}/zones/{zone}/serverconfig",
 	//   "httpMethod": "GET",
 	//   "id": "container.projects.zones.getServerconfig",
@@ -2532,7 +2734,7 @@ func (c *ProjectsZonesClustersAddonsCall) Do(opts ...googleapi.CallOption) (*Ope
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2686,7 +2888,7 @@ func (c *ProjectsZonesClustersCompleteIpRotationCall) Do(opts ...googleapi.CallO
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2853,7 +3055,7 @@ func (c *ProjectsZonesClustersCreateCall) Do(opts ...googleapi.CallOption) (*Ope
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3004,7 +3206,7 @@ func (c *ProjectsZonesClustersDeleteCall) Do(opts ...googleapi.CallOption) (*Ope
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3162,7 +3364,7 @@ func (c *ProjectsZonesClustersGetCall) Do(opts ...googleapi.CallOption) (*Cluste
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3314,7 +3516,7 @@ func (c *ProjectsZonesClustersLegacyAbacCall) Do(opts ...googleapi.CallOption) (
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3474,7 +3676,7 @@ func (c *ProjectsZonesClustersListCall) Do(opts ...googleapi.CallOption) (*ListC
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3618,7 +3820,7 @@ func (c *ProjectsZonesClustersLocationsCall) Do(opts ...googleapi.CallOption) (*
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3772,7 +3974,7 @@ func (c *ProjectsZonesClustersLoggingCall) Do(opts ...googleapi.CallOption) (*Op
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -3926,7 +4128,7 @@ func (c *ProjectsZonesClustersMasterCall) Do(opts ...googleapi.CallOption) (*Ope
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4080,7 +4282,7 @@ func (c *ProjectsZonesClustersMonitoringCall) Do(opts ...googleapi.CallOption) (
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4234,7 +4436,7 @@ func (c *ProjectsZonesClustersResourceLabelsCall) Do(opts ...googleapi.CallOptio
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4271,6 +4473,160 @@ func (c *ProjectsZonesClustersResourceLabelsCall) Do(opts ...googleapi.CallOptio
 	//   "path": "v1/projects/{projectId}/zones/{zone}/clusters/{clusterId}/resourceLabels",
 	//   "request": {
 	//     "$ref": "SetLabelsRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
+}
+
+// method id "container.projects.zones.clusters.setMaintenancePolicy":
+
+type ProjectsZonesClustersSetMaintenancePolicyCall struct {
+	s                           *Service
+	projectId                   string
+	zone                        string
+	clusterId                   string
+	setmaintenancepolicyrequest *SetMaintenancePolicyRequest
+	urlParams_                  gensupport.URLParams
+	ctx_                        context.Context
+	header_                     http.Header
+}
+
+// SetMaintenancePolicy: Sets the maintenance policy for a cluster.
+func (r *ProjectsZonesClustersService) SetMaintenancePolicy(projectId string, zone string, clusterId string, setmaintenancepolicyrequest *SetMaintenancePolicyRequest) *ProjectsZonesClustersSetMaintenancePolicyCall {
+	c := &ProjectsZonesClustersSetMaintenancePolicyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.projectId = projectId
+	c.zone = zone
+	c.clusterId = clusterId
+	c.setmaintenancepolicyrequest = setmaintenancepolicyrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsZonesClustersSetMaintenancePolicyCall) Fields(s ...googleapi.Field) *ProjectsZonesClustersSetMaintenancePolicyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsZonesClustersSetMaintenancePolicyCall) Context(ctx context.Context) *ProjectsZonesClustersSetMaintenancePolicyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsZonesClustersSetMaintenancePolicyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsZonesClustersSetMaintenancePolicyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.setmaintenancepolicyrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/projects/{projectId}/zones/{zone}/clusters/{clusterId}:setMaintenancePolicy")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"projectId": c.projectId,
+		"zone":      c.zone,
+		"clusterId": c.clusterId,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "container.projects.zones.clusters.setMaintenancePolicy" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *ProjectsZonesClustersSetMaintenancePolicyCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Sets the maintenance policy for a cluster.",
+	//   "flatPath": "v1/projects/{projectId}/zones/{zone}/clusters/{clusterId}:setMaintenancePolicy",
+	//   "httpMethod": "POST",
+	//   "id": "container.projects.zones.clusters.setMaintenancePolicy",
+	//   "parameterOrder": [
+	//     "projectId",
+	//     "zone",
+	//     "clusterId"
+	//   ],
+	//   "parameters": {
+	//     "clusterId": {
+	//       "description": "The name of the cluster to update.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "projectId": {
+	//       "description": "The Google Developers Console [project ID or project\nnumber](https://support.google.com/cloud/answer/6158840).",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "zone": {
+	//       "description": "The name of the Google Compute Engine\n[zone](/compute/docs/zones#available) in which the cluster\nresides.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v1/projects/{projectId}/zones/{zone}/clusters/{clusterId}:setMaintenancePolicy",
+	//   "request": {
+	//     "$ref": "SetMaintenancePolicyRequest"
 	//   },
 	//   "response": {
 	//     "$ref": "Operation"
@@ -4392,7 +4748,7 @@ func (c *ProjectsZonesClustersSetMasterAuthCall) Do(opts ...googleapi.CallOption
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4546,7 +4902,7 @@ func (c *ProjectsZonesClustersSetNetworkPolicyCall) Do(opts ...googleapi.CallOpt
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4700,7 +5056,7 @@ func (c *ProjectsZonesClustersStartIpRotationCall) Do(opts ...googleapi.CallOpti
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -4854,7 +5210,7 @@ func (c *ProjectsZonesClustersUpdateCall) Do(opts ...googleapi.CallOption) (*Ope
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5011,7 +5367,7 @@ func (c *ProjectsZonesClustersNodePoolsAutoscalingCall) Do(opts ...googleapi.Cal
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5172,7 +5528,7 @@ func (c *ProjectsZonesClustersNodePoolsCreateCall) Do(opts ...googleapi.CallOpti
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5322,7 +5678,7 @@ func (c *ProjectsZonesClustersNodePoolsDeleteCall) Do(opts ...googleapi.CallOpti
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5490,7 +5846,7 @@ func (c *ProjectsZonesClustersNodePoolsGetCall) Do(opts ...googleapi.CallOption)
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5655,7 +6011,7 @@ func (c *ProjectsZonesClustersNodePoolsListCall) Do(opts ...googleapi.CallOption
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5811,7 +6167,7 @@ func (c *ProjectsZonesClustersNodePoolsRollbackCall) Do(opts ...googleapi.CallOp
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -5975,7 +6331,7 @@ func (c *ProjectsZonesClustersNodePoolsSetManagementCall) Do(opts ...googleapi.C
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6139,7 +6495,7 @@ func (c *ProjectsZonesClustersNodePoolsSetSizeCall) Do(opts ...googleapi.CallOpt
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6304,7 +6660,7 @@ func (c *ProjectsZonesClustersNodePoolsUpdateCall) Do(opts ...googleapi.CallOpti
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6465,7 +6821,7 @@ func (c *ProjectsZonesOperationsCancelCall) Do(opts ...googleapi.CallOption) (*E
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6626,7 +6982,7 @@ func (c *ProjectsZonesOperationsGetCall) Do(opts ...googleapi.CallOption) (*Oper
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -6782,7 +7138,7 @@ func (c *ProjectsZonesOperationsListCall) Do(opts ...googleapi.CallOption) (*Lis
 		},
 	}
 	target := &ret
-	if err := json.NewDecoder(res.Body).Decode(target); err != nil {
+	if err := gensupport.DecodeResponse(target, res); err != nil {
 		return nil, err
 	}
 	return ret, nil

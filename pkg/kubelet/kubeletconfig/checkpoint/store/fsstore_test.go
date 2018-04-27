@@ -18,7 +18,9 @@ package store
 
 import (
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -27,17 +29,37 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
+	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
-const testCheckpointsDir = "/test-checkpoints-dir"
+var testdir string
+
+func init() {
+	tmp, err := ioutil.TempDir("", "fsstore-test")
+	if err != nil {
+		panic(err)
+	}
+	testdir = tmp
+}
 
 func newInitializedFakeFsStore() (*fsStore, error) {
-	fs := utilfs.NewFakeFs()
-	store := NewFsStore(fs, testCheckpointsDir)
+	// Test with the default filesystem, the fake filesystem has an issue caused by afero: https://github.com/spf13/afero/issues/141
+	// The default filesystem also behaves more like production, so we should probably not mock the filesystem for unit tests.
+	fs := utilfs.DefaultFs{}
+
+	tmpdir, err := fs.TempDir(testdir, "store-")
+	if err != nil {
+		return nil, err
+	}
+
+	store := NewFsStore(fs, tmpdir)
 	if err := store.Initialize(); err != nil {
 		return nil, err
 	}
@@ -50,167 +72,203 @@ func TestFsStoreInitialize(t *testing.T) {
 		t.Fatalf("fsStore.Initialize() failed with error: %v", err)
 	}
 
-	// check that testCheckpointsDir exists
-	_, err = store.fs.Stat(testCheckpointsDir)
-	if err != nil {
-		t.Fatalf("expect %q to exist, but stat failed with error: %v", testCheckpointsDir, err)
+	// check that store.dir exists
+	if _, err := store.fs.Stat(store.dir); err != nil {
+		t.Fatalf("expect %q to exist, but stat failed with error: %v", store.dir, err)
 	}
 
-	// check that testCheckpointsDir contains the curFile
-	curPath := filepath.Join(testCheckpointsDir, curFile)
-	_, err = store.fs.Stat(curPath)
-	if err != nil {
-		t.Fatalf("expect %q to exist, but stat failed with error: %v", curPath, err)
+	// check that meta dir exists
+	if _, err := store.fs.Stat(store.metaPath("")); err != nil {
+		t.Fatalf("expect %q to exist, but stat failed with error: %v", store.metaPath(""), err)
 	}
 
-	// check that testCheckpointsDir contains the lkgFile
-	lkgPath := filepath.Join(testCheckpointsDir, lkgFile)
-	_, err = store.fs.Stat(lkgPath)
-	if err != nil {
-		t.Fatalf("expect %q to exist, but stat failed with error: %v", lkgPath, err)
+	// check that checkpoints dir exists
+	if _, err := store.fs.Stat(store.checkpointPath("")); err != nil {
+		t.Fatalf("expect %q to exist, but stat failed with error: %v", store.checkpointPath(""), err)
+	}
+
+	// check that currentFile exists
+	if _, err := store.fs.Stat(store.metaPath(currentFile)); err != nil {
+		t.Fatalf("expect %q to exist, but stat failed with error: %v", store.metaPath(currentFile), err)
+	}
+
+	// check that lastKnownGoodFile exists
+	if _, err := store.fs.Stat(store.metaPath(lastKnownGoodFile)); err != nil {
+		t.Fatalf("expect %q to exist, but stat failed with error: %v", store.metaPath(lastKnownGoodFile), err)
 	}
 }
 
 func TestFsStoreExists(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
-	// create a checkpoint file; this is enough for an exists check
-	cpt, err := checkpoint.NewConfigMapCheckpoint(&apiv1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{UID: "uid"},
-	})
+	// checkpoint a payload
+	const uid = "uid"
+	p, err := checkpoint.NewConfigMapPayload(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: uid}})
 	if err != nil {
 		t.Fatalf("could not construct checkpoint, error: %v", err)
 	}
-	saveTestCheckpointFile(t, store.fs, cpt)
+	store.Save(p)
 
 	cases := []struct {
 		desc   string
-		uid    string // the uid to test
+		uid    types.UID
 		expect bool
 		err    string
 	}{
-		{"exists", "uid", true, ""},
+		{"exists", uid, true, ""},
 		{"does not exist", "bogus-uid", false, ""},
 	}
 
 	for _, c := range cases {
-		ok, err := store.Exists(c.uid)
-		if utiltest.SkipRest(t, c.desc, err, c.err) {
-			continue
-		}
-		if c.expect != ok {
-			t.Errorf("case %q, expect %t but got %t", c.desc, c.expect, ok)
-		}
+		t.Run(c.desc, func(t *testing.T) {
+			source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
+				ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: c.uid}})
+			if err != nil {
+				t.Fatalf("error constructing remote config source: %v", err)
+			}
+			ok, err := store.Exists(source)
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			if c.expect != ok {
+				t.Errorf("expect %t but got %t", c.expect, ok)
+			}
+		})
 	}
 }
 
 func TestFsStoreSave(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
-	cpt, err := checkpoint.NewConfigMapCheckpoint(&apiv1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{UID: "uid"},
-	})
-	if err != nil {
-		t.Fatalf("could not construct checkpoint, error: %v", err)
+	nameTooLong := func() string {
+		s := ""
+		for i := 0; i < 256; i++ {
+			s += "a"
+		}
+		return s
+	}()
+
+	cases := []struct {
+		desc  string
+		files map[string]string
+		err   string
+	}{
+		{"valid payload", map[string]string{"foo": "foocontent", "bar": "barcontent"}, ""},
+		{"empty key name", map[string]string{"": "foocontent"}, "must not be empty"},
+		{"key name is not a base file name (foo/bar)", map[string]string{"foo/bar": "foocontent"}, "only base names are allowed"},
+		{"key name is not a base file name (/foo)", map[string]string{"/bar": "foocontent"}, "only base names are allowed"},
+		{"used .", map[string]string{".": "foocontent"}, "may not be '.' or '..'"},
+		{"used ..", map[string]string{"..": "foocontent"}, "may not be '.' or '..'"},
+		{"length violation", map[string]string{nameTooLong: "foocontent"}, "must be less than 255 characters"},
 	}
 
-	// save the checkpoint
-	err = store.Save(cpt)
-	if err != nil {
-		t.Fatalf("unable to save checkpoint, error: %v", err)
-	}
-
-	// expect the saved checkpoint file to match the encoding of the checkpoint
-	data, err := cpt.Encode()
-	if err != nil {
-		t.Fatalf("unable to encode the checkpoint, error: %v", err)
-	}
-	expect := string(data)
-
-	data = readTestCheckpointFile(t, store.fs, cpt.UID())
-	cptFile := string(data)
-
-	if expect != cptFile {
-		t.Errorf("expect %q but got %q", expect, cptFile)
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			// construct the payload
+			p, err := checkpoint.NewConfigMapPayload(&apiv1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{UID: "uid"},
+				Data:       c.files,
+			})
+			if err != nil {
+				t.Fatalf("error constructing payload: %v", err)
+			}
+			// save the payload
+			err = store.Save(p)
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			// read the saved checkpoint
+			m, err := mapFromCheckpoint(store, p.UID())
+			if err != nil {
+				t.Fatalf("error loading checkpoint to map: %v", err)
+			}
+			// compare our expectation to what got saved
+			expect := p.Files()
+			if !reflect.DeepEqual(expect, m) {
+				t.Errorf("expect %v, but got %v", expect, m)
+			}
+		})
 	}
 }
 
 func TestFsStoreLoad(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
-
-	const uid = "uid"
-	cpt, err := checkpoint.NewConfigMapCheckpoint(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: types.UID(uid)}})
+	// encode a kubelet configuration that has all defaults set
+	expect, err := newKubeletConfiguration()
 	if err != nil {
-		t.Fatalf("unable to construct checkpoint, error: %v", err)
+		t.Fatalf("error constructing KubeletConfiguration: %v", err)
+	}
+	data, err := utilcodec.EncodeKubeletConfig(expect, v1beta1.SchemeGroupVersion)
+	if err != nil {
+		t.Fatalf("error encoding KubeletConfiguration: %v", err)
+	}
+	// construct a payload that contains the kubeletconfig
+	const uid = "uid"
+	p, err := checkpoint.NewConfigMapPayload(&apiv1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{UID: types.UID(uid)},
+		Data: map[string]string{
+			kubeletKey: string(data),
+		},
+	})
+	if err != nil {
+		t.Fatalf("error constructing payload: %v", err)
+	}
+	// save the payload
+	err = store.Save(p)
+	if err != nil {
+		t.Fatalf("error saving payload: %v", err)
 	}
 
 	cases := []struct {
-		desc    string
-		loadUID string
-		cpt     checkpoint.Checkpoint
-		err     string
+		desc string
+		uid  types.UID
+		err  string
 	}{
-		{"checkpoint exists", uid, cpt, ""},
-		{"checkpoint does not exist", "bogus-uid", nil, "failed to read"},
+		{"checkpoint exists", uid, ""},
+		{"checkpoint does not exist", "bogus-uid", "no checkpoint for source"},
 	}
 	for _, c := range cases {
-		if c.cpt != nil {
-			saveTestCheckpointFile(t, store.fs, c.cpt)
-		}
-		cpt, err := store.Load(c.loadUID)
-		if utiltest.SkipRest(t, c.desc, err, c.err) {
-			continue
-		}
-		if !checkpoint.EqualCheckpoints(c.cpt, cpt) {
-			t.Errorf("case %q, expect %q but got %q", c.desc, spew.Sdump(c.cpt), spew.Sdump(cpt))
-		}
-	}
-}
-
-func TestFsStoreRoundTrip(t *testing.T) {
-	store, err := newInitializedFakeFsStore()
-	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
-	}
-	const uid = "uid"
-	cpt, err := checkpoint.NewConfigMapCheckpoint(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: types.UID(uid)}})
-	if err != nil {
-		t.Fatalf("unable to construct checkpoint, error: %v", err)
-	}
-	err = store.Save(cpt)
-	if err != nil {
-		t.Fatalf("unable to save checkpoint, error: %v", err)
-	}
-	cptAfter, err := store.Load(uid)
-	if err != nil {
-		t.Fatalf("unable to load checkpoint, error: %v", err)
-	}
-	if !checkpoint.EqualCheckpoints(cpt, cptAfter) {
-		t.Errorf("expect %q but got %q", spew.Sdump(cpt), spew.Sdump(cptAfter))
+		t.Run(c.desc, func(t *testing.T) {
+			source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
+				ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: c.uid}})
+			if err != nil {
+				t.Fatalf("error constructing remote config source: %v", err)
+			}
+			loaded, err := store.Load(source)
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			if !reflect.DeepEqual(expect, loaded) {
+				t.Errorf("expect %#v, but got %#v", expect, loaded)
+			}
+		})
 	}
 }
 
 func TestFsStoreCurrentModified(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
 	// create an empty current file, this is good enough for testing
-	saveTestSourceFile(t, store.fs, curFile, nil)
+	saveTestSourceFile(t, store, currentFile, nil)
 
-	// set the timestamps to the current time, so we can compare to result of store.SetCurrentModified
+	// set the timestamps to the current time, so we can compare to result of store.CurrentModified
 	now := time.Now()
-	err = store.fs.Chtimes(filepath.Join(testCheckpointsDir, curFile), now, now)
+	err = store.fs.Chtimes(store.metaPath(currentFile), now, now)
 	if err != nil {
 		t.Fatalf("could not change timestamps, error: %v", err)
 	}
@@ -229,7 +287,7 @@ func TestFsStoreCurrentModified(t *testing.T) {
 func TestFsStoreCurrent(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
@@ -247,24 +305,27 @@ func TestFsStoreCurrent(t *testing.T) {
 		{"non-default source", source, ""},
 	}
 	for _, c := range cases {
-		// save the last known good source
-		saveTestSourceFile(t, store.fs, curFile, c.expect)
+		t.Run(c.desc, func(t *testing.T) {
+			// save the last known good source
+			saveTestSourceFile(t, store, currentFile, c.expect)
 
-		// load last-known-good and compare to expected result
-		source, err := store.Current()
-		if utiltest.SkipRest(t, c.desc, err, c.err) {
-			continue
-		}
-		if !checkpoint.EqualRemoteConfigSources(c.expect, source) {
-			t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.expect), spew.Sdump(c.expect), spew.Sdump(source))
-		}
+			// load last-known-good and compare to expected result
+			source, err := store.Current()
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			if !checkpoint.EqualRemoteConfigSources(c.expect, source) {
+				t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.expect), spew.Sdump(c.expect), spew.Sdump(source))
+			}
+		})
 	}
 }
 
 func TestFsStoreLastKnownGood(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
@@ -282,28 +343,37 @@ func TestFsStoreLastKnownGood(t *testing.T) {
 		{"non-default source", source, ""},
 	}
 	for _, c := range cases {
-		// save the last known good source
-		saveTestSourceFile(t, store.fs, lkgFile, c.expect)
+		t.Run(c.desc, func(t *testing.T) {
+			// save the last known good source
+			saveTestSourceFile(t, store, lastKnownGoodFile, c.expect)
 
-		// load last-known-good and compare to expected result
-		source, err := store.LastKnownGood()
-		if utiltest.SkipRest(t, c.desc, err, c.err) {
-			continue
-		}
-		if !checkpoint.EqualRemoteConfigSources(c.expect, source) {
-			t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.expect), spew.Sdump(c.expect), spew.Sdump(source))
-		}
+			// load last-known-good and compare to expected result
+			source, err := store.LastKnownGood()
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			if !checkpoint.EqualRemoteConfigSources(c.expect, source) {
+				t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.expect), spew.Sdump(c.expect), spew.Sdump(source))
+			}
+		})
 	}
 }
 
 func TestFsStoreSetCurrent(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
 	const uid = "uid"
-	expect := fmt.Sprintf(`{"kind":"NodeConfigSource","apiVersion":"v1","configMapRef":{"namespace":"namespace","name":"name","uid":"%s"}}%s`, uid, "\n")
+	expect := fmt.Sprintf(`apiVersion: v1
+configMapRef:
+  name: name
+  namespace: namespace
+  uid: %s
+kind: NodeConfigSource
+`, uid)
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{
 		Name: "name", Namespace: "namespace", UID: types.UID(uid)}})
 	if err != nil {
@@ -316,97 +386,26 @@ func TestFsStoreSetCurrent(t *testing.T) {
 	}
 
 	// check that the source saved as we would expect
-	data := readTestSourceFile(t, store.fs, curFile)
+	data := readTestSourceFile(t, store, currentFile)
 	if expect != string(data) {
 		t.Errorf("expect current source file to contain %q, but got %q", expect, string(data))
 	}
 }
 
-func TestFsStoreSetCurrentUpdated(t *testing.T) {
-	store, err := newInitializedFakeFsStore()
-	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
-	}
-
-	cases := []struct {
-		current       string
-		newCurrent    string
-		expectUpdated bool
-		err           string
-	}{
-		{"", "", false, ""},
-		{"uid", "", true, ""},
-		{"", "uid", true, ""},
-		{"uid", "uid", false, ""},
-		{"uid", "other-uid", true, ""},
-		{"other-uid", "uid", true, ""},
-		{"other-uid", "other-uid", false, ""},
-	}
-
-	for _, c := range cases {
-		// construct current source
-		var source checkpoint.RemoteConfigSource
-		expectSource := ""
-		if len(c.current) > 0 {
-			expectSource = fmt.Sprintf(`{"kind":"NodeConfigSource","apiVersion":"v1","configMapRef":{"namespace":"namespace","name":"name","uid":"%s"}}%s`, c.current, "\n")
-			source, _, err = checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{
-				Name: "name", Namespace: "namespace", UID: types.UID(c.current)}})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		}
-
-		// construct new source
-		var newSource checkpoint.RemoteConfigSource
-		expectNewSource := ""
-		if len(c.newCurrent) > 0 {
-			expectNewSource = fmt.Sprintf(`{"kind":"NodeConfigSource","apiVersion":"v1","configMapRef":{"namespace":"namespace","name":"new-name","uid":"%s"}}%s`, c.newCurrent, "\n")
-			newSource, _, err = checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{
-				Name: "new-name", Namespace: "namespace", UID: types.UID(c.newCurrent)}})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		}
-
-		// set the initial current
-		if err := store.SetCurrent(source); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		// update to the new current
-		updated, err := store.SetCurrentUpdated(newSource)
-		if utiltest.SkipRest(t, fmt.Sprintf("%q -> %q", c.current, c.newCurrent), err, c.err) {
-			continue
-		}
-
-		// check that SetCurrentUpdated correctly reports whether the current checkpoint changed
-		if c.expectUpdated != updated {
-			t.Errorf("case %q -> %q, expect %v but got %v", c.current, c.newCurrent, c.expectUpdated, updated)
-		}
-
-		// check that curFile is saved by SetCurrentUpdated as we expect
-		data := readTestSourceFile(t, store.fs, curFile)
-		if c.current == c.newCurrent {
-			// same UID should leave file unchanged
-			if expectSource != string(data) {
-				t.Errorf("case %q -> %q, expect current source file to contain %q, but got %q", c.current, c.newCurrent, expectSource, string(data))
-			}
-		} else if expectNewSource != string(data) {
-			// otherwise expect the file to change
-			t.Errorf("case %q -> %q, expect current source file to contain %q, but got %q", c.current, c.newCurrent, expectNewSource, string(data))
-		}
-	}
-
-}
-
 func TestFsStoreSetLastKnownGood(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
 	const uid = "uid"
-	expect := fmt.Sprintf(`{"kind":"NodeConfigSource","apiVersion":"v1","configMapRef":{"namespace":"namespace","name":"name","uid":"%s"}}%s`, uid, "\n")
+	expect := fmt.Sprintf(`apiVersion: v1
+configMapRef:
+  name: name
+  namespace: namespace
+  uid: %s
+kind: NodeConfigSource
+`, uid)
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{
 		Name: "name", Namespace: "namespace", UID: types.UID(uid)}})
 	if err != nil {
@@ -419,7 +418,7 @@ func TestFsStoreSetLastKnownGood(t *testing.T) {
 	}
 
 	// check that the source saved as we would expect
-	data := readTestSourceFile(t, store.fs, lkgFile)
+	data := readTestSourceFile(t, store, lastKnownGoodFile)
 	if expect != string(data) {
 		t.Errorf("expect last-known-good source file to contain %q, but got %q", expect, string(data))
 	}
@@ -428,7 +427,7 @@ func TestFsStoreSetLastKnownGood(t *testing.T) {
 func TestFsStoreReset(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}})
@@ -453,47 +452,49 @@ func TestFsStoreReset(t *testing.T) {
 		{"otherSource -> source", otherSource, source, true},
 	}
 	for _, c := range cases {
-		// manually save the sources to their respective files
-		saveTestSourceFile(t, store.fs, curFile, c.current)
-		saveTestSourceFile(t, store.fs, lkgFile, c.lastKnownGood)
+		t.Run(c.desc, func(t *testing.T) {
+			// manually save the sources to their respective files
+			saveTestSourceFile(t, store, currentFile, c.current)
+			saveTestSourceFile(t, store, lastKnownGoodFile, c.lastKnownGood)
 
-		// reset
-		updated, err := store.Reset()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+			// reset
+			updated, err := store.Reset()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-		// make sure the files were emptied
-		if size := testSourceFileSize(t, store.fs, curFile); size > 0 {
-			t.Errorf("case %q, expect source file %q to be empty but got %d bytes", c.desc, curFile, size)
-		}
-		if size := testSourceFileSize(t, store.fs, lkgFile); size > 0 {
-			t.Errorf("case %q, expect source file %q to be empty but got %d bytes", c.desc, lkgFile, size)
-		}
+			// make sure the files were emptied
+			if size := testSourceFileSize(t, store, currentFile); size > 0 {
+				t.Errorf("case %q, expect source file %q to be empty but got %d bytes", c.desc, currentFile, size)
+			}
+			if size := testSourceFileSize(t, store, lastKnownGoodFile); size > 0 {
+				t.Errorf("case %q, expect source file %q to be empty but got %d bytes", c.desc, lastKnownGoodFile, size)
+			}
 
-		// make sure Current() and LastKnownGood() both return nil
-		current, err := store.Current()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		lastKnownGood, err := store.LastKnownGood()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if current != nil || lastKnownGood != nil {
-			t.Errorf("case %q, expect nil for current and last-known-good checkpoints, but still have %q and %q, respectively",
-				c.desc, current, lastKnownGood)
-		}
-		if c.updated != updated {
-			t.Errorf("case %q, expect reset to return %t, but got %t", c.desc, c.updated, updated)
-		}
+			// make sure Current() and LastKnownGood() both return nil
+			current, err := store.Current()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			lastKnownGood, err := store.LastKnownGood()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if current != nil || lastKnownGood != nil {
+				t.Errorf("case %q, expect nil for current and last-known-good checkpoints, but still have %q and %q, respectively",
+					c.desc, current, lastKnownGood)
+			}
+			if c.updated != updated {
+				t.Errorf("case %q, expect reset to return %t, but got %t", c.desc, c.updated, updated)
+			}
+		})
 	}
 }
 
-func TestFsStoreSourceFromFile(t *testing.T) {
+func TestFsStoreReadRemoteConfigSource(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{
@@ -513,21 +514,24 @@ func TestFsStoreSourceFromFile(t *testing.T) {
 
 	const name = "some-source-file"
 	for _, c := range cases {
-		saveTestSourceFile(t, store.fs, name, c.expect)
-		source, err := store.sourceFromFile(name)
-		if utiltest.SkipRest(t, c.desc, err, c.err) {
-			continue
-		}
-		if !checkpoint.EqualRemoteConfigSources(c.expect, source) {
-			t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.expect), spew.Sdump(c.expect), spew.Sdump(source))
-		}
+		t.Run(c.desc, func(t *testing.T) {
+			saveTestSourceFile(t, store, name, c.expect)
+			source, err := readRemoteConfigSource(store.fs, store.metaPath(name))
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			if !checkpoint.EqualRemoteConfigSources(c.expect, source) {
+				t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.expect), spew.Sdump(c.expect), spew.Sdump(source))
+			}
+		})
 	}
 }
 
-func TestFsStoreSetSourceFile(t *testing.T) {
+func TestFsStoreWriteRemoteConfigSource(t *testing.T) {
 	store, err := newInitializedFakeFsStore()
 	if err != nil {
-		t.Fatalf("failed to construct a store, error: %v", err)
+		t.Fatalf("error constructing store: %v", err)
 	}
 
 	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}})
@@ -536,93 +540,112 @@ func TestFsStoreSetSourceFile(t *testing.T) {
 	}
 
 	cases := []struct {
+		desc   string
 		source checkpoint.RemoteConfigSource
 	}{
-		{nil},
-		{source},
+		{"nil source", nil},
+		{"non-nil source", source},
 	}
 
 	const name = "some-source-file"
 	for _, c := range cases {
-		// set the source file
-		err := store.setSourceFile(name, c.source)
-		if err != nil {
-			t.Fatalf("unable to set source file, error: %v", err)
-		}
-		// read back the file
-		data := readTestSourceFile(t, store.fs, name)
-		str := string(data)
-
-		if c.source != nil {
-			// expect the contents to match the encoding of the source
-			data, err := c.source.Encode()
-			expect := string(data)
+		t.Run(c.desc, func(t *testing.T) {
+			// set the source file
+			err := writeRemoteConfigSource(store.fs, store.metaPath(name), c.source)
 			if err != nil {
-				t.Fatalf("couldn't encode source, error: %v", err)
+				t.Fatalf("unable to set source file, error: %v", err)
 			}
-			if expect != str {
-				t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.source), expect, str)
+			// read back the file
+			data := readTestSourceFile(t, store, name)
+			str := string(data)
+
+			if c.source != nil {
+				// expect the contents to match the encoding of the source
+				data, err := c.source.Encode()
+				expect := string(data)
+				if err != nil {
+					t.Fatalf("couldn't encode source, error: %v", err)
+				}
+				if expect != str {
+					t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.source), expect, str)
+				}
+			} else {
+				// expect empty file
+				expect := ""
+				if expect != str {
+					t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.source), expect, str)
+				}
 			}
-		} else {
-			// expect empty file
-			expect := ""
-			if expect != str {
-				t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.source), expect, str)
-			}
+		})
+	}
+}
+
+func mapFromCheckpoint(store *fsStore, uid string) (map[string]string, error) {
+	files, err := store.fs.ReadDir(store.checkpointPath(uid))
+	if err != nil {
+		return nil, err
+	}
+	m := map[string]string{}
+	for _, f := range files {
+		// expect no subdirs, only regular files
+		if !f.Mode().IsRegular() {
+			return nil, fmt.Errorf("expect only regular files in checkpoint dir %q", uid)
 		}
+		// read the file contents and build the map
+		data, err := store.fs.ReadFile(filepath.Join(store.checkpointPath(uid), f.Name()))
+		if err != nil {
+			return nil, err
+		}
+		m[f.Name()] = string(data)
 	}
+	return m, nil
 }
 
-func readTestCheckpointFile(t *testing.T, fs utilfs.Filesystem, uid string) []byte {
-	data, err := fs.ReadFile(filepath.Join(testCheckpointsDir, uid))
-	if err != nil {
-		t.Fatalf("unable to read test checkpoint file, error: %v", err)
-	}
-	return data
-}
-
-func saveTestCheckpointFile(t *testing.T, fs utilfs.Filesystem, cpt checkpoint.Checkpoint) {
-	data, err := cpt.Encode()
-	if err != nil {
-		t.Fatalf("unable to encode test checkpoint, error: %v", err)
-	}
-	fmt.Println(cpt.UID())
-	err = utilfiles.ReplaceFile(fs, filepath.Join(testCheckpointsDir, cpt.UID()), data)
-	if err != nil {
-		t.Fatalf("unable to save test checkpoint file, error: %v", err)
-	}
-}
-
-func readTestSourceFile(t *testing.T, fs utilfs.Filesystem, relPath string) []byte {
-	data, err := fs.ReadFile(filepath.Join(testCheckpointsDir, relPath))
+func readTestSourceFile(t *testing.T, store *fsStore, relPath string) []byte {
+	data, err := store.fs.ReadFile(store.metaPath(relPath))
 	if err != nil {
 		t.Fatalf("unable to read test source file, error: %v", err)
 	}
 	return data
 }
 
-func saveTestSourceFile(t *testing.T, fs utilfs.Filesystem, relPath string, source checkpoint.RemoteConfigSource) {
+func saveTestSourceFile(t *testing.T, store *fsStore, relPath string, source checkpoint.RemoteConfigSource) {
 	if source != nil {
 		data, err := source.Encode()
 		if err != nil {
 			t.Fatalf("unable to save test source file, error: %v", err)
 		}
-		err = utilfiles.ReplaceFile(fs, filepath.Join(testCheckpointsDir, relPath), data)
+		err = utilfiles.ReplaceFile(store.fs, store.metaPath(relPath), data)
 		if err != nil {
 			t.Fatalf("unable to save test source file, error: %v", err)
 		}
 	} else {
-		err := utilfiles.ReplaceFile(fs, filepath.Join(testCheckpointsDir, relPath), []byte{})
+		err := utilfiles.ReplaceFile(store.fs, store.metaPath(relPath), []byte{})
 		if err != nil {
 			t.Fatalf("unable to save test source file, error: %v", err)
 		}
 	}
 }
 
-func testSourceFileSize(t *testing.T, fs utilfs.Filesystem, relPath string) int64 {
-	info, err := fs.Stat(filepath.Join(testCheckpointsDir, relPath))
+func testSourceFileSize(t *testing.T, store *fsStore, relPath string) int64 {
+	info, err := store.fs.Stat(store.metaPath(relPath))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	return info.Size()
+}
+
+// newKubeletConfiguration will create a new KubeletConfiguration with default values set
+func newKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
+	s, _, err := scheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	versioned := &v1beta1.KubeletConfiguration{}
+	s.Default(versioned)
+	config := &kubeletconfig.KubeletConfiguration{}
+	if err := s.Convert(versioned, config, nil); err != nil {
+		return nil, err
+	}
+	return config, nil
 }

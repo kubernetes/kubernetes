@@ -56,6 +56,19 @@ type NodeStats struct {
 	// Stats about the underlying container runtime.
 	// +optional
 	Runtime *RuntimeStats `json:"runtime,omitempty"`
+	// Stats about the rlimit of system.
+	// +optional
+	Rlimit *RlimitStats `json:"rlimit,omitempty"`
+}
+
+// RlimitStats are stats rlimit of OS.
+type RlimitStats struct {
+	Time metav1.Time `json:"time"`
+
+	// The max PID of OS.
+	MaxPID *int64 `json:"maxpid,omitempty"`
+	// The number of running process in the OS.
+	NumOfRunningProcesses *int64 `json:"curproc,omitempty"`
 }
 
 // RuntimeStats are stats pertaining to the underlying container runtime.
@@ -70,10 +83,12 @@ type RuntimeStats struct {
 const (
 	// SystemContainerKubelet is the container name for the system container tracking Kubelet usage.
 	SystemContainerKubelet = "kubelet"
-	// SystemContainerRuntime is the container name for the system container tracking the runtime (e.g. docker or rkt) usage.
+	// SystemContainerRuntime is the container name for the system container tracking the runtime (e.g. docker) usage.
 	SystemContainerRuntime = "runtime"
 	// SystemContainerMisc is the container name for the system container tracking non-kubernetes processes.
 	SystemContainerMisc = "misc"
+	// SystemContainerPods is the container name for the system container tracking user pods.
+	SystemContainerPods = "pods"
 )
 
 // PodStats holds pod-level unprocessed sample stats.

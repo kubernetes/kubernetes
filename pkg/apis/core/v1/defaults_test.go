@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 
 	// enforce that all types are installed
 	_ "k8s.io/kubernetes/pkg/api/testapi"
@@ -164,12 +165,6 @@ func TestSetDefaultReplicationController(t *testing.T) {
 	}
 }
 
-func newInt(val int32) *int32 {
-	p := new(int32)
-	*p = val
-	return p
-}
-
 func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 	tests := []struct {
 		rc             v1.ReplicationController
@@ -192,7 +187,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: newInt(0),
+					Replicas: utilpointer.Int32Ptr(0),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -207,7 +202,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: newInt(3),
+					Replicas: utilpointer.Int32Ptr(3),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -1038,20 +1033,6 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 	}
 }
 
-func TestSetDefaultNodeExternalID(t *testing.T) {
-	name := "node0"
-	n := &v1.Node{}
-	n.Name = name
-	obj2 := roundTrip(t, runtime.Object(n))
-	n2 := obj2.(*v1.Node)
-	if n2.Spec.ExternalID != name {
-		t.Errorf("Expected default External ID: %s, got: %s", name, n2.Spec.ExternalID)
-	}
-	if n2.Spec.ProviderID != "" {
-		t.Errorf("Expected empty default Cloud Provider ID, got: %s", n2.Spec.ProviderID)
-	}
-}
-
 func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
 	capacity := v1.ResourceList{
 		v1.ResourceCPU:    resource.MustParse("1000m"),
@@ -1274,7 +1255,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 	}
 	rc := &v1.ReplicationController{
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: newInt(3),
+			Replicas: utilpointer.Int32Ptr(3),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{

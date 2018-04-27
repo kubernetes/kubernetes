@@ -28,8 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["resources_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/quota",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

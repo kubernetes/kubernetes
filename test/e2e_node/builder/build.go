@@ -87,8 +87,27 @@ func getK8sBin(bin string) (string, error) {
 	return "", fmt.Errorf("Unable to locate %s.  Can be defined using --k8s-path.", bin)
 }
 
-// TODO: Dedup / merge this with comparable utilities in e2e/util.go
+// GetK8sRootDir returns the root directory for kubernetes, if present in the gopath.
 func GetK8sRootDir() (string, error) {
+	dir, err := RootDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, fmt.Sprintf("%s/", "k8s.io/kubernetes")), nil
+}
+
+// GetCAdvisorRootDir returns the root directory for cAdvisor, if present in the gopath.
+func GetCAdvisorRootDir() (string, error) {
+	dir, err := RootDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, fmt.Sprintf("%s/", "github.com/google/cadvisor")), nil
+}
+
+// TODO: Dedup / merge this with comparable utilities in e2e/util.go
+// RootDir returns the path to the directory containing the k8s.io directory
+func RootDir() (string, error) {
 	// Get the directory of the current executable
 	_, testExec, _, _ := runtime.Caller(0)
 	path := filepath.Dir(testExec)
@@ -96,7 +115,7 @@ func GetK8sRootDir() (string, error) {
 	// Look for the kubernetes source root directory
 	if strings.Contains(path, "k8s.io/kubernetes") {
 		splitPath := strings.Split(path, "k8s.io/kubernetes")
-		return filepath.Join(splitPath[0], "k8s.io/kubernetes/"), nil
+		return splitPath[0], nil
 	}
 
 	return "", fmt.Errorf("Could not find kubernetes source root directory.")

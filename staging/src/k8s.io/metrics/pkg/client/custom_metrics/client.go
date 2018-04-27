@@ -69,7 +69,7 @@ func NewForConfigOrDie(c *rest.Config) CustomMetricsClient {
 	return client
 }
 
-// NewForMapper constucts the client with a RESTMapper, which allows more
+// NewForMapper constructs the client with a RESTMapper, which allows more
 // accurate translation from GroupVersionKind to GroupVersionResource.
 func NewForMapper(client rest.Interface, mapper meta.RESTMapper) CustomMetricsClient {
 	return &customMetricsClient{

@@ -58,3 +58,79 @@ func TestRemoveNestedField(t *testing.T) {
 	RemoveNestedField(obj, "x") // Remove of a non-existent field
 	assert.Empty(t, obj)
 }
+
+func TestNestedFieldNoCopy(t *testing.T) {
+	target := map[string]interface{}{"foo": "bar"}
+
+	obj := map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": target,
+			"c": nil,
+			"d": []interface{}{"foo"},
+		},
+	}
+
+	// case 1: field exists and is non-nil
+	res, exists, err := NestedFieldNoCopy(obj, "a", "b")
+	assert.True(t, exists)
+	assert.Nil(t, err)
+	assert.Equal(t, target, res)
+	target["foo"] = "baz"
+	assert.Equal(t, target["foo"], res.(map[string]interface{})["foo"], "result should be a reference to the expected item")
+
+	// case 2: field exists and is nil
+	res, exists, err = NestedFieldNoCopy(obj, "a", "c")
+	assert.True(t, exists)
+	assert.Nil(t, err)
+	assert.Nil(t, res)
+
+	// case 3: error traversing obj
+	res, exists, err = NestedFieldNoCopy(obj, "a", "d", "foo")
+	assert.False(t, exists)
+	assert.NotNil(t, err)
+	assert.Nil(t, res)
+
+	// case 4: field does not exist
+	res, exists, err = NestedFieldNoCopy(obj, "a", "e")
+	assert.False(t, exists)
+	assert.Nil(t, err)
+	assert.Nil(t, res)
+}
+
+func TestNestedFieldCopy(t *testing.T) {
+	target := map[string]interface{}{"foo": "bar"}
+
+	obj := map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": target,
+			"c": nil,
+			"d": []interface{}{"foo"},
+		},
+	}
+
+	// case 1: field exists and is non-nil
+	res, exists, err := NestedFieldCopy(obj, "a", "b")
+	assert.True(t, exists)
+	assert.Nil(t, err)
+	assert.Equal(t, target, res)
+	target["foo"] = "baz"
+	assert.NotEqual(t, target["foo"], res.(map[string]interface{})["foo"], "result should be a copy of the expected item")
+
+	// case 2: field exists and is nil
+	res, exists, err = NestedFieldCopy(obj, "a", "c")
+	assert.True(t, exists)
+	assert.Nil(t, err)
+	assert.Nil(t, res)
+
+	// case 3: error traversing obj
+	res, exists, err = NestedFieldCopy(obj, "a", "d", "foo")
+	assert.False(t, exists)
+	assert.NotNil(t, err)
+	assert.Nil(t, res)
+
+	// case 4: field does not exist
+	res, exists, err = NestedFieldCopy(obj, "a", "e")
+	assert.False(t, exists)
+	assert.Nil(t, err)
+	assert.Nil(t, res)
+}

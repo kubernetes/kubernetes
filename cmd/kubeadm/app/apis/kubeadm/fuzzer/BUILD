@@ -11,7 +11,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",

@@ -47,6 +47,7 @@ func IPPart(s string) string {
 	return ""
 }
 
+// PortPart returns just the port part of an endpoint string.
 func PortPart(s string) (int, error) {
 	// Must be IP:port
 	_, port, err := net.SplitHostPort(s)

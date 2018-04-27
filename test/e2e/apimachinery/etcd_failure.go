@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/apps"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -47,7 +48,7 @@ var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 			Client:    f.ClientSet,
 			Name:      "baz",
 			Namespace: f.Namespace.Name,
-			Image:     framework.GetPauseImageName(f.ClientSet),
+			Image:     imageutils.GetPauseImageName(),
 			Replicas:  1,
 		})).NotTo(HaveOccurred())
 	})

@@ -28,8 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["healthcheck_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/proxy/healthcheck",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",

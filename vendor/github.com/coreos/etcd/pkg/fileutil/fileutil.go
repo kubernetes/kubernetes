@@ -17,6 +17,7 @@ package fileutil
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -101,11 +102,11 @@ func Exist(name string) bool {
 // shorten the length of the file.
 func ZeroToEnd(f *os.File) error {
 	// TODO: support FALLOC_FL_ZERO_RANGE
-	off, err := f.Seek(0, os.SEEK_CUR)
+	off, err := f.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
-	lenf, lerr := f.Seek(0, os.SEEK_END)
+	lenf, lerr := f.Seek(0, io.SeekEnd)
 	if lerr != nil {
 		return lerr
 	}
@@ -116,6 +117,6 @@ func ZeroToEnd(f *os.File) error {
 	if err = Preallocate(f, lenf, true); err != nil {
 		return err
 	}
-	_, err = f.Seek(off, os.SEEK_SET)
+	_, err = f.Seek(off, io.SeekStart)
 	return err
 }

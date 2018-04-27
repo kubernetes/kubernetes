@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -32,7 +33,6 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 // Etcd watch event actions
@@ -76,7 +76,7 @@ type etcdWatcher struct {
 	valueTransformer ValueTransformer
 
 	list    bool // If we're doing a recursive watch, should be true.
-	quorum  bool // If we enable quorum, shoule be true
+	quorum  bool // If we enable quorum, should be true
 	include includeFunc
 	pred    storage.SelectionPredicate
 

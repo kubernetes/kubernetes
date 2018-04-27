@@ -96,4 +96,14 @@ func (v delegatingStrategy) MergeEmpty(diff apply.EmptyElement) (apply.Result, e
 	return v.merge.MergeEmpty(diff)
 }
 
+// doConflictDetect detects conflicts in element when option enabled, return error if conflict happened.
+func (v delegatingStrategy) doConflictDetect(e apply.Element) error {
+	if v.options.FailOnConflict {
+		if e, ok := e.(apply.ConflictDetector); ok {
+			return e.HasConflict()
+		}
+	}
+	return nil
+}
+
 var _ apply.Strategy = &delegatingStrategy{}

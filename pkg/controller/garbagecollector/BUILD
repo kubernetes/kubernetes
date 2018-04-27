@@ -50,8 +50,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["garbagecollector_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/controller/garbagecollector",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/install:go_default_library",
@@ -69,6 +68,7 @@ go_test(
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",

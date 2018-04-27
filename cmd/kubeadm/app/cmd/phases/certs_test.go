@@ -74,6 +74,21 @@ func TestCertsSubCommandsHasFlags(t *testing.T) {
 			command: "apiserver-kubelet-client",
 		},
 		{
+			command: "etcd-ca",
+		},
+		{
+			command: "etcd-server",
+		},
+		{
+			command: "etcd-peer",
+		},
+		{
+			command: "etcd-healthcheck-client",
+		},
+		{
+			command: "apiserver-etcd-client",
+		},
+		{
 			command: "sa",
 		},
 		{
@@ -112,6 +127,16 @@ func TestSubCmdCertsCreateFilesWithFlags(t *testing.T) {
 		{
 			subCmds:       []string{"ca", "apiserver", "apiserver-kubelet-client"},
 			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName, kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
+		},
+		{
+			subCmds: []string{"etcd-ca", "etcd-server", "etcd-peer", "etcd-healthcheck-client", "apiserver-etcd-client"},
+			expectedFiles: []string{
+				kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName,
+				kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName,
+				kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName,
+				kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
+				kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName,
+			},
 		},
 		{
 			subCmds:       []string{"sa"},
@@ -203,6 +228,16 @@ func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
 		{
 			subCmds:       []string{"ca", "apiserver", "apiserver-kubelet-client"},
 			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName, kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
+		},
+		{
+			subCmds: []string{"etcd-ca", "etcd-server", "etcd-peer", "etcd-healthcheck-client", "apiserver-etcd-client"},
+			expectedFiles: []string{
+				kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName,
+				kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName,
+				kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName,
+				kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
+				kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName,
+			},
 		},
 		{
 			subCmds:       []string{"front-proxy-ca", "front-proxy-client"},

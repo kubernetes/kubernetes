@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -63,6 +64,49 @@ const (
 	APIServerKubeletClientKeyName = "apiserver-kubelet-client.key"
 	// APIServerKubeletClientCertCommonName defines kubelet client certificate common name (CN)
 	APIServerKubeletClientCertCommonName = "kube-apiserver-kubelet-client"
+
+	// EtcdCACertAndKeyBaseName defines etcd's CA certificate and key base name
+	EtcdCACertAndKeyBaseName = "etcd/ca"
+	// EtcdCACertName defines etcd's CA certificate name
+	EtcdCACertName = "etcd/ca.crt"
+	// EtcdCAKeyName defines etcd's CA key name
+	EtcdCAKeyName = "etcd/ca.key"
+
+	// EtcdServerCertAndKeyBaseName defines etcd's server certificate and key base name
+	EtcdServerCertAndKeyBaseName = "etcd/server"
+	// EtcdServerCertName defines etcd's server certificate name
+	EtcdServerCertName = "etcd/server.crt"
+	// EtcdServerKeyName defines etcd's server key name
+	EtcdServerKeyName = "etcd/server.key"
+	// EtcdServerCertCommonName defines etcd's server certificate common name (CN)
+	EtcdServerCertCommonName = "kube-etcd"
+
+	// EtcdPeerCertAndKeyBaseName defines etcd's peer certificate and key base name
+	EtcdPeerCertAndKeyBaseName = "etcd/peer"
+	// EtcdPeerCertName defines etcd's peer certificate name
+	EtcdPeerCertName = "etcd/peer.crt"
+	// EtcdPeerKeyName defines etcd's peer key name
+	EtcdPeerKeyName = "etcd/peer.key"
+	// EtcdPeerCertCommonName defines etcd's peer certificate common name (CN)
+	EtcdPeerCertCommonName = "kube-etcd-peer"
+
+	// EtcdHealthcheckClientCertAndKeyBaseName defines etcd's healthcheck client certificate and key base name
+	EtcdHealthcheckClientCertAndKeyBaseName = "etcd/healthcheck-client"
+	// EtcdHealthcheckClientCertName defines etcd's healthcheck client certificate name
+	EtcdHealthcheckClientCertName = "etcd/healthcheck-client.crt"
+	// EtcdHealthcheckClientKeyName defines etcd's healthcheck client key name
+	EtcdHealthcheckClientKeyName = "etcd/healthcheck-client.key"
+	// EtcdHealthcheckClientCertCommonName defines etcd's healthcheck client certificate common name (CN)
+	EtcdHealthcheckClientCertCommonName = "kube-etcd-healthcheck-client"
+
+	// APIServerEtcdClientCertAndKeyBaseName defines apiserver's etcd client certificate and key base name
+	APIServerEtcdClientCertAndKeyBaseName = "apiserver-etcd-client"
+	// APIServerEtcdClientCertName defines apiserver's etcd client certificate name
+	APIServerEtcdClientCertName = "apiserver-etcd-client.crt"
+	// APIServerEtcdClientKeyName defines apiserver's etcd client key name
+	APIServerEtcdClientKeyName = "apiserver-etcd-client.key"
+	// APIServerEtcdClientCertCommonName defines apiserver's etcd client certificate common name (CN)
+	APIServerEtcdClientCertCommonName = "kube-apiserver-etcd-client"
 
 	// ServiceAccountKeyBaseName defines SA key base name
 	ServiceAccountKeyBaseName = "sa"
@@ -151,23 +195,19 @@ const (
 	KubeletBaseConfigurationConfigMap = "kubelet-base-config-1.9"
 
 	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration of kubelet should be stored
-	// TODO: Use the constant ("kubelet.config.k8s.io") defined in pkg/kubelet/kubeletconfig/util/keys/keys.go
-	// after https://github.com/kubernetes/kubernetes/pull/53833 being merged.
 	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
 	// KubeletBaseConfigurationDir specifies the directory on the node where stores the initial remote configuration of kubelet
 	KubeletBaseConfigurationDir = "/var/lib/kubelet/config/init"
 
 	// KubeletBaseConfigurationFile specifies the file name on the node which stores initial remote configuration of kubelet
-	// TODO: Use the constant ("kubelet.config.k8s.io") defined in pkg/kubelet/kubeletconfig/util/keys/keys.go
-	// after https://github.com/kubernetes/kubernetes/pull/53833 being merged.
 	KubeletBaseConfigurationFile = "kubelet"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.0.14"
+	MinExternalEtcdVersion = "3.2.17"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.1.10"
+	DefaultEtcdVersion = "3.2.18"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -199,6 +239,22 @@ const (
 	CoreDNS = "coredns"
 	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
 	KubeDNS = "kube-dns"
+
+	// CRICtlPackage defines the go package that installs crictl
+	CRICtlPackage = "github.com/kubernetes-incubator/cri-tools/cmd/crictl"
+
+	// KubeAuditPolicyVolumeName is the name of the volume that will contain the audit policy
+	KubeAuditPolicyVolumeName = "audit"
+	// AuditPolicyDir is the directory that will contain the audit policy
+	AuditPolicyDir = "audit"
+	// AuditPolicyFile is the name of the audit policy file itself
+	AuditPolicyFile = "audit.yaml"
+	// AuditPolicyLogFile is the name of the file audit logs get written to
+	AuditPolicyLogFile = "audit.log"
+	// KubeAuditPolicyLogVolumeName is the name of the volume that will contain the audit logs
+	KubeAuditPolicyLogVolumeName = "audit-log"
+	// StaticPodAuditPolicyLogDir is the name of the directory in the static pod that will have the audit logs
+	StaticPodAuditPolicyLogDir = "/var/log/kubernetes/audit"
 )
 
 var (
@@ -220,7 +276,10 @@ var (
 	AuthorizationWebhookConfigPath = filepath.Join(KubernetesDir, "webhook_authz.conf")
 
 	// DefaultTokenUsages specifies the default functions a token will get
-	DefaultTokenUsages = []string{"signing", "authentication"}
+	DefaultTokenUsages = bootstrapapi.KnownTokenUsages
+
+	// DefaultTokenGroups specifies the default groups that this token will authenticate as when used for authentication
+	DefaultTokenGroups = []string{NodeBootstrapTokenAuthGroup}
 
 	// MasterComponents defines the master component names
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
@@ -233,9 +292,9 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		8:  "3.0.17",
-		9:  "3.1.10",
-		10: "3.1.10",
+		9:  "3.1.12",
+		10: "3.1.12",
+		11: "3.2.18",
 	}
 )
 
@@ -254,7 +313,7 @@ func EtcdSupportedVersion(versionString string) (*version.Version, error) {
 		}
 		return etcdVersion, nil
 	}
-	return nil, fmt.Errorf("Unsupported or unknown kubernetes version")
+	return nil, fmt.Errorf("Unsupported or unknown kubernetes version(%v)", kubernetesVersion)
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
@@ -306,4 +365,9 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 	}
 
 	return dnsIP, nil
+}
+
+// GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod
+func GetStaticPodAuditPolicyFile() string {
+	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditPolicyFile)
 }

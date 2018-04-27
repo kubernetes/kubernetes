@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "console.go",
         "container.go",
         "error.go",
         "factory.go",
@@ -12,9 +11,8 @@ go_library(
         "stats.go",
         "sync.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "capabilities_linux.go",
-            "compat_1.5_linux.go",
             "console_linux.go",
             "container_linux.go",
             "criu_opts_linux.go",
@@ -26,17 +24,10 @@ go_library(
             "process_linux.go",
             "restored_process.go",
             "rootfs_linux.go",
-            "setgroups_linux.go",
             "setns_init_linux.go",
             "standard_init_linux.go",
             "state_linux.go",
             "stats_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "console_windows.go",
-            "container_windows.go",
-            "criu_opts_windows.go",
-            "stats_windows.go",
         ],
         "//conditions:default": [],
     }),
@@ -47,19 +38,20 @@ go_library(
         "//vendor/github.com/opencontainers/runc/libcontainer/stacktrace:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/utils:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//vendor/github.com/docker/docker/pkg/mount:go_default_library",
-            "//vendor/github.com/docker/docker/pkg/symlink:go_default_library",
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/containerd/console:go_default_library",
+            "//vendor/github.com/cyphar/filepath-securejoin:go_default_library",
             "//vendor/github.com/golang/protobuf/proto:go_default_library",
             "//vendor/github.com/mrunalp/fileutils:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/apparmor:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
-            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/rootless:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs/validate:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/criurpc:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/intelrdt:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/keys:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/mount:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/seccomp:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/system:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
@@ -89,7 +81,9 @@ filegroup(
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/configs:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/criurpc:all-srcs",
+        "//vendor/github.com/opencontainers/runc/libcontainer/intelrdt:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/keys:all-srcs",
+        "//vendor/github.com/opencontainers/runc/libcontainer/mount:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/seccomp:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/stacktrace:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/system:all-srcs",

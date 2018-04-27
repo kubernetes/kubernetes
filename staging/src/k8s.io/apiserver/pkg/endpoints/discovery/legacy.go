@@ -17,7 +17,6 @@ limitations under the License.
 package discovery
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/emicklei/go-restful"
@@ -28,31 +27,28 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // legacyRootAPIHandler creates a webservice serving api group discovery.
 type legacyRootAPIHandler struct {
 	// addresses is used to build cluster IPs for discovery.
-	addresses     Addresses
-	apiPrefix     string
-	serializer    runtime.NegotiatedSerializer
-	apiVersions   []string
-	contextMapper request.RequestContextMapper
+	addresses   Addresses
+	apiPrefix   string
+	serializer  runtime.NegotiatedSerializer
+	apiVersions []string
 }
 
-func NewLegacyRootAPIHandler(addresses Addresses, serializer runtime.NegotiatedSerializer, apiPrefix string, apiVersions []string, contextMapper request.RequestContextMapper) *legacyRootAPIHandler {
+func NewLegacyRootAPIHandler(addresses Addresses, serializer runtime.NegotiatedSerializer, apiPrefix string, apiVersions []string) *legacyRootAPIHandler {
 	// Because in release 1.1, /apis returns response with empty APIVersion, we
 	// use stripVersionNegotiatedSerializer to keep the response backwards
 	// compatible.
 	serializer = stripVersionNegotiatedSerializer{serializer}
 
 	return &legacyRootAPIHandler{
-		addresses:     addresses,
-		apiPrefix:     apiPrefix,
-		serializer:    serializer,
-		apiVersions:   apiVersions,
-		contextMapper: contextMapper,
+		addresses:   addresses,
+		apiPrefix:   apiPrefix,
+		serializer:  serializer,
+		apiVersions: apiVersions,
 	}
 }
 
@@ -72,17 +68,11 @@ func (s *legacyRootAPIHandler) WebService() *restful.WebService {
 }
 
 func (s *legacyRootAPIHandler) handle(req *restful.Request, resp *restful.Response) {
-	ctx, ok := s.contextMapper.Get(req.Request)
-	if !ok {
-		responsewriters.InternalError(resp.ResponseWriter, req.Request, errors.New("no context found for request"))
-		return
-	}
-
 	clientIP := utilnet.GetClientIP(req.Request)
 	apiVersions := &metav1.APIVersions{
 		ServerAddressByClientCIDRs: s.addresses.ServerAddressByClientCIDRs(clientIP),
 		Versions:                   s.apiVersions,
 	}
 
-	responsewriters.WriteObjectNegotiated(ctx, s.serializer, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, apiVersions)
+	responsewriters.WriteObjectNegotiated(s.serializer, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, apiVersions)
 }

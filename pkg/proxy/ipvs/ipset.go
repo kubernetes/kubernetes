@@ -40,8 +40,8 @@ const (
 	// KubeLoadBalancerSet is used to store service load balancer ingress ip + port, it is the service lb portal.
 	KubeLoadBalancerSet = "KUBE-LOAD-BALANCER"
 
-	// KubeLoadBalancerMasqSet is used to store service load balancer ingress ip + port for masquerade purpose.
-	KubeLoadBalancerMasqSet = "KUBE-LOAD-BALANCER-MASQ"
+	// KubeLoadBalancerIngressLocalSet is used to store service load balancer ingress ip + port with externalTrafficPolicy=local.
+	KubeLoadBalancerIngressLocalSet = "KUBE-LB-INGRESS-LOCAL"
 
 	// KubeLoadBalancerSourceIPSet is used to store service load balancer ingress ip + port + source IP for packet filter purpose.
 	KubeLoadBalancerSourceIPSet = "KUBE-LOAD-BALANCER-SOURCE-IP"
@@ -49,11 +49,17 @@ const (
 	// KubeLoadBalancerSourceCIDRSet is used to store service load balancer ingress ip + port + source cidr for packet filter purpose.
 	KubeLoadBalancerSourceCIDRSet = "KUBE-LOAD-BALANCER-SOURCE-CIDR"
 
-	// KubeNodePortSetTCP is used to store nodeport TCP port for masquerade purpose.
+	// KubeNodePortSetTCP is used to store the nodeport TCP port for masquerade purpose.
 	KubeNodePortSetTCP = "KUBE-NODE-PORT-TCP"
 
-	// KubeNodePortSetUDP is used to store nodeport UDP port for masquerade purpose.
+	// KubeNodePortLocalSetTCP is used to store the nodeport TCP port with externalTrafficPolicy=local.
+	KubeNodePortLocalSetTCP = "KUBE-NODE-PORT-LOCAL-TCP"
+
+	// KubeNodePortSetUDP is used to store the nodeport UDP port for masquerade purpose.
 	KubeNodePortSetUDP = "KUBE-NODE-PORT-UDP"
+
+	// KubeNodePortLocalSetUDP is used to store the nodeport UDP port with externalTrafficPolicy=local.
+	KubeNodePortLocalSetUDP = "KUBE-NODE-PORT-LOCAL-UDP"
 )
 
 // IPSetVersioner can query the current ipset version.
@@ -89,6 +95,10 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 	return set
 }
 
+func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
+	return entry.Validate(&set.IPSet)
+}
+
 func (set *IPSet) isEmpty() bool {
 	return len(set.activeEntries.UnsortedList()) == 0
 }
@@ -114,14 +124,16 @@ func (set *IPSet) syncIPSetEntries() {
 		// Clean legacy entries
 		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
 			if err := set.handle.DelEntry(entry, set.Name); err != nil {
-				glog.Errorf("Failed to delete ip set entry: %s from ip set: %s, error: %v", entry, set.Name, err)
+				if !utilipset.IsNotFoundError(err) {
+					glog.Errorf("Failed to delete ip set entry: %s from ip set: %s, error: %v", entry, set.Name, err)
+				}
 			} else {
 				glog.V(3).Infof("Successfully delete legacy ip set entry: %s from ip set: %s", entry, set.Name)
 			}
 		}
 		// Create active entries
 		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
-			if err := set.handle.AddEntry(entry, set.Name, true); err != nil {
+			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
 				glog.Errorf("Failed to add entry: %v to ip set: %s, error: %v", entry, set.Name, err)
 			} else {
 				glog.V(3).Infof("Successfully add entry: %v to ip set: %s", entry, set.Name)

@@ -17,8 +17,8 @@ limitations under the License.
 package azure_dd
 
 import (
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	storage "github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// interface exposed by the cloud provider implementing Disk functionlity
+// interface exposed by the cloud provider implementing Disk functionality
 type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskUri string) error

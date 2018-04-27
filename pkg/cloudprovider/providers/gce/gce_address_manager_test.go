@@ -21,7 +21,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	computebeta "google.golang.org/api/compute/v0.beta"
+	compute "google.golang.org/api/compute/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
 const testSvcName = "my-service"
@@ -34,8 +35,8 @@ func TestAddressManagerNoRequestedIP(t *testing.T) {
 	svc := NewFakeCloudAddressService()
 	targetIP := ""
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, schemeInternal)
-	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(schemeInternal))
+	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(cloud.SchemeInternal))
 	testReleaseAddress(t, mgr, svc, testLBName, testRegion)
 }
 
@@ -44,8 +45,8 @@ func TestAddressManagerBasic(t *testing.T) {
 	svc := NewFakeCloudAddressService()
 	targetIP := "1.1.1.1"
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, schemeInternal)
-	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(schemeInternal))
+	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(cloud.SchemeInternal))
 	testReleaseAddress(t, mgr, svc, testLBName, testRegion)
 }
 
@@ -55,12 +56,12 @@ func TestAddressManagerOrphaned(t *testing.T) {
 	svc := NewFakeCloudAddressService()
 	targetIP := "1.1.1.1"
 
-	addr := &computebeta.Address{Name: testLBName, Address: targetIP, AddressType: string(schemeInternal)}
-	err := svc.ReserveBetaRegionAddress(addr, testRegion)
+	addr := &compute.Address{Name: testLBName, Address: targetIP, AddressType: string(cloud.SchemeInternal)}
+	err := svc.ReserveRegionAddress(addr, testRegion)
 	require.NoError(t, err)
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, schemeInternal)
-	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(schemeInternal))
+	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(cloud.SchemeInternal))
 	testReleaseAddress(t, mgr, svc, testLBName, testRegion)
 }
 
@@ -71,12 +72,12 @@ func TestAddressManagerOutdatedOrphan(t *testing.T) {
 	previousAddress := "1.1.0.0"
 	targetIP := "1.1.1.1"
 
-	addr := &computebeta.Address{Name: testLBName, Address: previousAddress, AddressType: string(schemeExternal)}
-	err := svc.ReserveBetaRegionAddress(addr, testRegion)
+	addr := &compute.Address{Name: testLBName, Address: previousAddress, AddressType: string(cloud.SchemeExternal)}
+	err := svc.ReserveRegionAddress(addr, testRegion)
 	require.NoError(t, err)
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, schemeInternal)
-	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(schemeInternal))
+	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(cloud.SchemeInternal))
 	testReleaseAddress(t, mgr, svc, testLBName, testRegion)
 }
 
@@ -86,11 +87,11 @@ func TestAddressManagerExternallyOwned(t *testing.T) {
 	svc := NewFakeCloudAddressService()
 	targetIP := "1.1.1.1"
 
-	addr := &computebeta.Address{Name: "my-important-address", Address: targetIP, AddressType: string(schemeInternal)}
-	err := svc.ReserveBetaRegionAddress(addr, testRegion)
+	addr := &compute.Address{Name: "my-important-address", Address: targetIP, AddressType: string(cloud.SchemeInternal)}
+	err := svc.ReserveRegionAddress(addr, testRegion)
 	require.NoError(t, err)
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, schemeInternal)
+	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
 	ipToUse, err := mgr.HoldAddress()
 	require.NoError(t, err)
 	assert.NotEmpty(t, ipToUse)
@@ -107,11 +108,11 @@ func TestAddressManagerBadExternallyOwned(t *testing.T) {
 	svc := NewFakeCloudAddressService()
 	targetIP := "1.1.1.1"
 
-	addr := &computebeta.Address{Name: "my-important-address", Address: targetIP, AddressType: string(schemeExternal)}
-	err := svc.ReserveBetaRegionAddress(addr, testRegion)
+	addr := &compute.Address{Name: "my-important-address", Address: targetIP, AddressType: string(cloud.SchemeExternal)}
+	err := svc.ReserveRegionAddress(addr, testRegion)
 	require.NoError(t, err)
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, schemeInternal)
+	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
 	_, err = mgr.HoldAddress()
 	assert.NotNil(t, err)
 }
@@ -121,7 +122,7 @@ func testHoldAddress(t *testing.T, mgr *addressManager, svc CloudAddressService,
 	require.NoError(t, err)
 	assert.NotEmpty(t, ipToUse)
 
-	addr, err := svc.GetBetaRegionAddress(name, region)
+	addr, err := svc.GetRegionAddress(name, region)
 	require.NoError(t, err)
 	if targetIP != "" {
 		assert.EqualValues(t, targetIP, addr.Address)
@@ -132,6 +133,6 @@ func testHoldAddress(t *testing.T, mgr *addressManager, svc CloudAddressService,
 func testReleaseAddress(t *testing.T, mgr *addressManager, svc CloudAddressService, name, region string) {
 	err := mgr.ReleaseAddress()
 	require.NoError(t, err)
-	_, err = svc.GetBetaRegionAddress(name, region)
+	_, err = svc.GetRegionAddress(name, region)
 	assert.True(t, isNotFound(err))
 }

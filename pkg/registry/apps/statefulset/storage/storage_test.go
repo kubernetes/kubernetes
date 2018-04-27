@@ -44,17 +44,6 @@ func newStorage(t *testing.T) (StatefulSetStorage, *etcdtesting.EtcdTestServer) 
 	return storage, server
 }
 
-// createStatefulSet is a helper function that returns a StatefulSet with the updated resource version.
-func createStatefulSet(storage *REST, ps apps.StatefulSet, t *testing.T) (apps.StatefulSet, error) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), ps.Namespace)
-	obj, err := storage.Create(ctx, &ps, rest.ValidateAllObjectFunc, false)
-	if err != nil {
-		t.Errorf("Failed to create StatefulSet, %v", err)
-	}
-	newPS := obj.(*apps.StatefulSet)
-	return *newPS, nil
-}
-
 func validNewStatefulSet() *apps.StatefulSet {
 	return &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{

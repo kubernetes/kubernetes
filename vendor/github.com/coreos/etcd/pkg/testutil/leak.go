@@ -62,10 +62,11 @@ func CheckLeakedGoroutine() bool {
 	return true
 }
 
-func AfterTest(t *testing.T) {
+// CheckAfterTest returns an error if AfterTest would fail with an error.
+func CheckAfterTest(d time.Duration) error {
 	http.DefaultTransport.(*http.Transport).CloseIdleConnections()
 	if testing.Short() {
-		return
+		return nil
 	}
 	var bad string
 	badSubstring := map[string]string{
@@ -75,10 +76,12 @@ func AfterTest(t *testing.T) {
 		"net.(*netFD).connect(":                        "a timing out dial",
 		").noteClientGone(":                            "a closenotifier sender",
 		").readLoop(":                                  "a Transport",
+		".grpc":                                        "a gRPC resource",
 	}
 
 	var stacks string
-	for i := 0; i < 6; i++ {
+	begin := time.Now()
+	for time.Since(begin) < d {
 		bad = ""
 		stacks = strings.Join(interestingGoroutines(), "\n\n")
 		for substr, what := range badSubstring {
@@ -87,13 +90,22 @@ func AfterTest(t *testing.T) {
 			}
 		}
 		if bad == "" {
-			return
+			return nil
 		}
 		// Bad stuff found, but goroutines might just still be
 		// shutting down, so give it some time.
 		time.Sleep(50 * time.Millisecond)
 	}
-	t.Errorf("Test appears to have leaked %s:\n%s", bad, stacks)
+	return fmt.Errorf("appears to have leaked %s:\n%s", bad, stacks)
+}
+
+// AfterTest is meant to run in a defer that executes after a test completes.
+// It will detect common goroutine leaks, retrying in case there are goroutines
+// not synchronously torn down, and fail the test if any goroutines are stuck.
+func AfterTest(t *testing.T) {
+	if err := CheckAfterTest(300 * time.Millisecond); err != nil {
+		t.Errorf("Test %v", err)
+	}
 }
 
 func interestingGoroutines() (gs []string) {
@@ -106,6 +118,7 @@ func interestingGoroutines() (gs []string) {
 		}
 		stack := strings.TrimSpace(sl[1])
 		if stack == "" ||
+			strings.Contains(stack, "sync.(*WaitGroup).Done") ||
 			strings.Contains(stack, "created by os/signal.init") ||
 			strings.Contains(stack, "runtime/panic.go") ||
 			strings.Contains(stack, "created by testing.RunTests") ||

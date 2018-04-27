@@ -114,30 +114,34 @@ func CreatePrivilegedPSPBinding(f *Framework, namespace string) {
 		psp, err = f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().Create(psp)
 		ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
 
-		// Create the Role to bind it to the namespace.
-		_, err = f.ClientSet.RbacV1beta1().ClusterRoles().Create(&rbacv1beta1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: podSecurityPolicyPrivileged},
-			Rules: []rbacv1beta1.PolicyRule{{
-				APIGroups:     []string{"extensions"},
-				Resources:     []string{"podsecuritypolicies"},
-				ResourceNames: []string{podSecurityPolicyPrivileged},
-				Verbs:         []string{"use"},
-			}},
-		})
-		ExpectNoError(err, "Failed to create PSP role")
+		if IsRBACEnabled(f) {
+			// Create the Role to bind it to the namespace.
+			_, err = f.ClientSet.RbacV1beta1().ClusterRoles().Create(&rbacv1beta1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{Name: podSecurityPolicyPrivileged},
+				Rules: []rbacv1beta1.PolicyRule{{
+					APIGroups:     []string{"extensions"},
+					Resources:     []string{"podsecuritypolicies"},
+					ResourceNames: []string{podSecurityPolicyPrivileged},
+					Verbs:         []string{"use"},
+				}},
+			})
+			ExpectNoError(err, "Failed to create PSP role")
+		}
 	})
 
-	By(fmt.Sprintf("Binding the %s PodSecurityPolicy to the default service account in %s",
-		podSecurityPolicyPrivileged, namespace))
-	BindClusterRoleInNamespace(f.ClientSet.RbacV1beta1(),
-		podSecurityPolicyPrivileged,
-		namespace,
-		rbacv1beta1.Subject{
-			Kind:      rbacv1beta1.ServiceAccountKind,
-			Namespace: namespace,
-			Name:      "default",
-		})
-	ExpectNoError(WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
-		serviceaccount.MakeUsername(namespace, "default"), namespace, "use", podSecurityPolicyPrivileged,
-		schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}, true))
+	if IsRBACEnabled(f) {
+		By(fmt.Sprintf("Binding the %s PodSecurityPolicy to the default service account in %s",
+			podSecurityPolicyPrivileged, namespace))
+		BindClusterRoleInNamespace(f.ClientSet.RbacV1beta1(),
+			podSecurityPolicyPrivileged,
+			namespace,
+			rbacv1beta1.Subject{
+				Kind:      rbacv1beta1.ServiceAccountKind,
+				Namespace: namespace,
+				Name:      "default",
+			})
+		ExpectNoError(WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
+			serviceaccount.MakeUsername(namespace, "default"), namespace, "use", podSecurityPolicyPrivileged,
+			schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}, true))
+	}
 }

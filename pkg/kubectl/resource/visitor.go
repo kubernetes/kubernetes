@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -78,6 +77,9 @@ type Info struct {
 	// Mapping may be nil if the object has no available metadata, but is still parseable
 	// from disk.
 	Mapping *meta.RESTMapping
+	// ObjectConverter allows conversion
+	toVersionedObjectConverter runtime.ObjectConvertor
+
 	// Namespace will be set if the object is namespaced and has a specified value.
 	Namespace string
 	Name      string
@@ -118,7 +120,7 @@ func (i *Info) Get() (err error) {
 		return err
 	}
 	i.Object = obj
-	i.ResourceVersion, _ = i.Mapping.MetadataAccessor.ResourceVersion(obj)
+	i.ResourceVersion, _ = metadataAccessor.ResourceVersion(obj)
 	return nil
 }
 
@@ -126,7 +128,7 @@ func (i *Info) Get() (err error) {
 // the Object will be updated even if name, namespace, or resourceVersion
 // attributes cannot be loaded from the object.
 func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
-	name, err := i.Mapping.MetadataAccessor.Name(obj)
+	name, err := metadataAccessor.Name(obj)
 	if err != nil {
 		if !ignoreError {
 			return err
@@ -134,7 +136,7 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	} else {
 		i.Name = name
 	}
-	namespace, err := i.Mapping.MetadataAccessor.Namespace(obj)
+	namespace, err := metadataAccessor.Namespace(obj)
 	if err != nil {
 		if !ignoreError {
 			return err
@@ -142,7 +144,7 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	} else {
 		i.Namespace = namespace
 	}
-	version, err := i.Mapping.MetadataAccessor.ResourceVersion(obj)
+	version, err := metadataAccessor.ResourceVersion(obj)
 	if err != nil {
 		if !ignoreError {
 			return err
@@ -152,6 +154,17 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	}
 	i.Object = obj
 	return nil
+}
+
+// String returns the general purpose string representation
+func (i *Info) String() string {
+	basicInfo := fmt.Sprintf("Name: %q, Namespace: %q\nObject: %+q", i.Name, i.Namespace, i.Object)
+	if i.Mapping != nil {
+		mappingInfo := fmt.Sprintf("Resource: %q, GroupVersionKind: %q", i.Mapping.Resource,
+			i.Mapping.GroupVersionKind.String())
+		return fmt.Sprint(mappingInfo, "\n", basicInfo)
+	}
+	return basicInfo
 }
 
 // Namespaced returns true if the object belongs to a namespace
@@ -169,57 +182,19 @@ func (i *Info) ResourceMapping() *meta.RESTMapping {
 	return i.Mapping
 }
 
-// Internal attempts to convert the provided object to an internal type or returns an error.
-func (i *Info) Internal() (runtime.Object, error) {
-	return i.Mapping.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
-}
-
-// AsInternal returns the object in internal form if possible, or i.Object if it cannot be
-// converted.
-func (i *Info) AsInternal() runtime.Object {
-	if obj, err := i.Internal(); err == nil {
-		return obj
-	}
-	return i.Object
-}
-
 // Versioned returns the object as a Go type in the mapping's version or returns an error.
 func (i *Info) Versioned() (runtime.Object, error) {
-	return i.Mapping.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupVersion())
+	return i.toVersionedObjectConverter.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupVersion())
 }
 
 // AsVersioned returns the object as a Go object in the external form if possible (matching the
 // group version kind of the mapping, or i.Object if it cannot be converted.
 func (i *Info) AsVersioned() runtime.Object {
+	if i.toVersionedObjectConverter == nil {
+		panic("attempt to call AsVersioned object using .Unstructured builder")
+	}
 	if obj, err := i.Versioned(); err == nil {
 		return obj
-	}
-	return i.Object
-}
-
-// Unstructured returns the current object in unstructured form (as a runtime.Unstructured)
-func (i *Info) Unstructured() (runtime.Unstructured, error) {
-	switch t := i.Object.(type) {
-	case runtime.Unstructured:
-		return t, nil
-	case *runtime.Unknown:
-		gvk := i.Mapping.GroupVersionKind
-		out, _, err := unstructured.UnstructuredJSONScheme.Decode(t.Raw, &gvk, nil)
-		return out.(runtime.Unstructured), err
-	default:
-		out := &unstructured.Unstructured{}
-		if err := i.Mapping.Convert(i.Object, out, nil); err != nil {
-			return nil, err
-		}
-		return out, nil
-	}
-}
-
-// AsUnstructured returns the object as a Go object in external form as a runtime.Unstructured
-// (map of JSON equivalent values) or as i.Object if it cannot be converted.
-func (i *Info) AsUnstructured() runtime.Object {
-	if out, err := i.Unstructured(); err == nil {
-		return out
 	}
 	return i.Object
 }
@@ -578,7 +553,7 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 			if err == io.EOF {
 				return nil
 			}
-			return err
+			return fmt.Errorf("error parsing %s: %v", v.Source, err)
 		}
 		// TODO: This needs to be able to handle object in other encodings and schemas.
 		ext.Raw = bytes.TrimSpace(ext.Raw)
@@ -606,7 +581,7 @@ func UpdateObjectNamespace(info *Info, err error) error {
 		return err
 	}
 	if info.Object != nil {
-		return info.Mapping.MetadataAccessor.SetNamespace(info.Object, info.Namespace)
+		return metadataAccessor.SetNamespace(info.Object, info.Namespace)
 	}
 	return nil
 }

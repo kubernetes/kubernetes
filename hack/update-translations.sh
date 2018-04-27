@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/util.sh"
+
 KUBECTL_FILES="pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go"
 
 generate_pot="false"
@@ -62,8 +65,9 @@ if [[ "${generate_pot}" == "true" ]]; then
   perl -pi -e 's/CHARSET/UTF-8/' tmp.pot
   perl -pi -e 's/\\\(/\\\\\(/g' tmp.pot
   perl -pi -e 's/\\\)/\\\\\)/g' tmp.pot
-  if msgcat -s tmp.pot > /tmp/template.pot; then
-    mv /tmp/template.pot translations/kubectl/template.pot
+  kube::util::ensure-temp-dir
+  if msgcat -s tmp.pot > "${KUBE_TEMP}/template.pot"; then
+    mv "${KUBE_TEMP}/template.pot" translations/kubectl/template.pot
     rm tmp.pot
   else
     echo "Failed to update template.pot"

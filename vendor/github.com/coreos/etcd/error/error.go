@@ -154,9 +154,10 @@ func (e Error) StatusCode() int {
 	return status
 }
 
-func (e Error) WriteTo(w http.ResponseWriter) {
+func (e Error) WriteTo(w http.ResponseWriter) error {
 	w.Header().Add("X-Etcd-Index", fmt.Sprint(e.Index))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(e.StatusCode())
-	fmt.Fprintln(w, e.toJsonString())
+	_, err := w.Write([]byte(e.toJsonString() + "\n"))
+	return err
 }

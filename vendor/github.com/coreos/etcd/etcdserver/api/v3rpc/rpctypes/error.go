@@ -17,16 +17,20 @@ package rpctypes
 import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
 	// server-side error
-	ErrGRPCEmptyKey     = grpc.Errorf(codes.InvalidArgument, "etcdserver: key is not provided")
-	ErrGRPCTooManyOps   = grpc.Errorf(codes.InvalidArgument, "etcdserver: too many operations in txn request")
-	ErrGRPCDuplicateKey = grpc.Errorf(codes.InvalidArgument, "etcdserver: duplicate key given in txn request")
-	ErrGRPCCompacted    = grpc.Errorf(codes.OutOfRange, "etcdserver: mvcc: required revision has been compacted")
-	ErrGRPCFutureRev    = grpc.Errorf(codes.OutOfRange, "etcdserver: mvcc: required revision is a future revision")
-	ErrGRPCNoSpace      = grpc.Errorf(codes.ResourceExhausted, "etcdserver: mvcc: database space exceeded")
+	ErrGRPCEmptyKey      = grpc.Errorf(codes.InvalidArgument, "etcdserver: key is not provided")
+	ErrGRPCKeyNotFound   = grpc.Errorf(codes.InvalidArgument, "etcdserver: key not found")
+	ErrGRPCValueProvided = grpc.Errorf(codes.InvalidArgument, "etcdserver: value is provided")
+	ErrGRPCLeaseProvided = grpc.Errorf(codes.InvalidArgument, "etcdserver: lease is provided")
+	ErrGRPCTooManyOps    = grpc.Errorf(codes.InvalidArgument, "etcdserver: too many operations in txn request")
+	ErrGRPCDuplicateKey  = grpc.Errorf(codes.InvalidArgument, "etcdserver: duplicate key given in txn request")
+	ErrGRPCCompacted     = grpc.Errorf(codes.OutOfRange, "etcdserver: mvcc: required revision has been compacted")
+	ErrGRPCFutureRev     = grpc.Errorf(codes.OutOfRange, "etcdserver: mvcc: required revision is a future revision")
+	ErrGRPCNoSpace       = grpc.Errorf(codes.ResourceExhausted, "etcdserver: mvcc: database space exceeded")
 
 	ErrGRPCLeaseNotFound = grpc.Errorf(codes.NotFound, "etcdserver: requested lease not found")
 	ErrGRPCLeaseExist    = grpc.Errorf(codes.FailedPrecondition, "etcdserver: lease already exists")
@@ -53,6 +57,7 @@ var (
 	ErrGRPCPermissionNotGranted = grpc.Errorf(codes.FailedPrecondition, "etcdserver: permission is not granted to the role")
 	ErrGRPCAuthNotEnabled       = grpc.Errorf(codes.FailedPrecondition, "etcdserver: authentication is not enabled")
 	ErrGRPCInvalidAuthToken     = grpc.Errorf(codes.Unauthenticated, "etcdserver: invalid auth token")
+	ErrGRPCInvalidAuthMgmt      = grpc.Errorf(codes.InvalidArgument, "etcdserver: invalid auth management")
 
 	ErrGRPCNoLeader                   = grpc.Errorf(codes.Unavailable, "etcdserver: no leader")
 	ErrGRPCNotCapable                 = grpc.Errorf(codes.Unavailable, "etcdserver: not capable")
@@ -63,7 +68,11 @@ var (
 	ErrGRPCUnhealthy                  = grpc.Errorf(codes.Unavailable, "etcdserver: unhealthy cluster")
 
 	errStringToError = map[string]error{
-		grpc.ErrorDesc(ErrGRPCEmptyKey):     ErrGRPCEmptyKey,
+		grpc.ErrorDesc(ErrGRPCEmptyKey):      ErrGRPCEmptyKey,
+		grpc.ErrorDesc(ErrGRPCKeyNotFound):   ErrGRPCKeyNotFound,
+		grpc.ErrorDesc(ErrGRPCValueProvided): ErrGRPCValueProvided,
+		grpc.ErrorDesc(ErrGRPCLeaseProvided): ErrGRPCLeaseProvided,
+
 		grpc.ErrorDesc(ErrGRPCTooManyOps):   ErrGRPCTooManyOps,
 		grpc.ErrorDesc(ErrGRPCDuplicateKey): ErrGRPCDuplicateKey,
 		grpc.ErrorDesc(ErrGRPCCompacted):    ErrGRPCCompacted,
@@ -95,6 +104,7 @@ var (
 		grpc.ErrorDesc(ErrGRPCPermissionNotGranted): ErrGRPCPermissionNotGranted,
 		grpc.ErrorDesc(ErrGRPCAuthNotEnabled):       ErrGRPCAuthNotEnabled,
 		grpc.ErrorDesc(ErrGRPCInvalidAuthToken):     ErrGRPCInvalidAuthToken,
+		grpc.ErrorDesc(ErrGRPCInvalidAuthMgmt):      ErrGRPCInvalidAuthMgmt,
 
 		grpc.ErrorDesc(ErrGRPCNoLeader):                   ErrGRPCNoLeader,
 		grpc.ErrorDesc(ErrGRPCNotCapable):                 ErrGRPCNotCapable,
@@ -106,12 +116,15 @@ var (
 	}
 
 	// client-side error
-	ErrEmptyKey     = Error(ErrGRPCEmptyKey)
-	ErrTooManyOps   = Error(ErrGRPCTooManyOps)
-	ErrDuplicateKey = Error(ErrGRPCDuplicateKey)
-	ErrCompacted    = Error(ErrGRPCCompacted)
-	ErrFutureRev    = Error(ErrGRPCFutureRev)
-	ErrNoSpace      = Error(ErrGRPCNoSpace)
+	ErrEmptyKey      = Error(ErrGRPCEmptyKey)
+	ErrKeyNotFound   = Error(ErrGRPCKeyNotFound)
+	ErrValueProvided = Error(ErrGRPCValueProvided)
+	ErrLeaseProvided = Error(ErrGRPCLeaseProvided)
+	ErrTooManyOps    = Error(ErrGRPCTooManyOps)
+	ErrDuplicateKey  = Error(ErrGRPCDuplicateKey)
+	ErrCompacted     = Error(ErrGRPCCompacted)
+	ErrFutureRev     = Error(ErrGRPCFutureRev)
+	ErrNoSpace       = Error(ErrGRPCNoSpace)
 
 	ErrLeaseNotFound = Error(ErrGRPCLeaseNotFound)
 	ErrLeaseExist    = Error(ErrGRPCLeaseExist)
@@ -138,6 +151,7 @@ var (
 	ErrPermissionNotGranted = Error(ErrGRPCPermissionNotGranted)
 	ErrAuthNotEnabled       = Error(ErrGRPCAuthNotEnabled)
 	ErrInvalidAuthToken     = Error(ErrGRPCInvalidAuthToken)
+	ErrInvalidAuthMgmt      = Error(ErrGRPCInvalidAuthMgmt)
 
 	ErrNoLeader                   = Error(ErrGRPCNoLeader)
 	ErrNotCapable                 = Error(ErrGRPCNotCapable)
@@ -174,4 +188,11 @@ func Error(err error) error {
 		return err
 	}
 	return EtcdError{code: grpc.Code(verr), desc: grpc.ErrorDesc(verr)}
+}
+
+func ErrorDesc(err error) string {
+	if s, ok := status.FromError(err); ok {
+		return s.Message()
+	}
+	return err.Error()
 }

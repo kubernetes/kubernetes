@@ -16,8 +16,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["object_cache_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/util/cache",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",

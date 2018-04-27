@@ -20,6 +20,7 @@ package mount
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/golang/glog"
 )
@@ -56,7 +57,7 @@ func (m *execMounter) Mount(source string, target string, fstype string, options
 	return m.doExecMount(source, target, fstype, options)
 }
 
-// doExecMount calls exec(mount <waht> <where>) using given exec interface.
+// doExecMount calls exec(mount <what> <where>) using given exec interface.
 func (m *execMounter) doExecMount(source, target, fstype string, options []string) error {
 	glog.V(5).Infof("Exec Mounting %s %s %s %v", source, target, fstype, options)
 	mountArgs := makeMountArgs(source, target, fstype, options)
@@ -137,4 +138,16 @@ func (m *execMounter) MakeDir(pathname string) error {
 
 func (m *execMounter) ExistsPath(pathname string) bool {
 	return m.wrappedMounter.ExistsPath(pathname)
+}
+
+func (m *execMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return m.wrappedMounter.PrepareSafeSubpath(subPath)
+}
+
+func (m *execMounter) CleanSubPaths(podDir string, volumeName string) error {
+	return m.wrappedMounter.CleanSubPaths(podDir, volumeName)
+}
+
+func (m *execMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return m.wrappedMounter.SafeMakeDir(pathname, base, perm)
 }

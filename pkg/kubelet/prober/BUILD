@@ -26,6 +26,7 @@ go_library(
         "//pkg/probe/http:go_default_library",
         "//pkg/probe/tcp:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
@@ -45,8 +46,7 @@ go_test(
         "prober_test.go",
         "worker_test.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/prober",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",

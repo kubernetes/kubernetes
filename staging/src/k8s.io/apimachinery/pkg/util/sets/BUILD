@@ -23,7 +23,7 @@ go_library(
 go_genrule(
     name = "set-gen",
     srcs = [
-        "//hack/boilerplate:boilerplate.go.txt",
+        "//hack/boilerplate:boilerplate.generatego.txt",
     ],
     outs = [
         "byte.go",
@@ -37,7 +37,7 @@ go_genrule(
 $(location //vendor/k8s.io/code-generator/cmd/set-gen) \
     --input-dirs ./vendor/k8s.io/apimachinery/pkg/util/sets/types \
     --output-base $$(dirname $$(dirname $(location :byte.go))) \
-    --go-header-file $(location //hack/boilerplate:boilerplate.go.txt) \
+    --go-header-file $(location //hack/boilerplate:boilerplate.generatego.txt) \
     --output-package sets
     """,
     go_deps = [
@@ -51,8 +51,7 @@ $(location //vendor/k8s.io/code-generator/cmd/set-gen) \
 go_test(
     name = "go_default_test",
     srcs = ["set_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/util/sets",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

@@ -25,8 +25,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 const tokenCreateRetries = 5
@@ -115,7 +116,7 @@ func encodeTokenSecretData(tokenID, tokenSecret string, duration time.Duration, 
 	}
 
 	// validate usages
-	if err := bootstrapapi.ValidateUsages(usages); err != nil {
+	if err := bootstraputil.ValidateUsages(usages); err != nil {
 		return nil, err
 	}
 	for _, usage := range usages {

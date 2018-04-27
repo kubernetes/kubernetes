@@ -14,8 +14,7 @@ go_test(
         "certificate_manager_test.go",
         "certificate_store_test.go",
     ],
-    importpath = "k8s.io/client-go/util/certificate",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",

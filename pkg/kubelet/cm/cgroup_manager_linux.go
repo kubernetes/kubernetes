@@ -319,14 +319,18 @@ type subsystem interface {
 	GetStats(path string, stats *libcontainercgroups.Stats) error
 }
 
-// getSupportedSubsystems returns list of subsystems supported
-func getSupportedSubsystems() []subsystem {
-	supportedSubsystems := []subsystem{
-		&cgroupfs.MemoryGroup{},
-		&cgroupfs.CpuGroup{},
+// getSupportedSubsystems returns a map of subsystem and if it must be mounted for the kubelet to function.
+func getSupportedSubsystems() map[subsystem]bool {
+	supportedSubsystems := map[subsystem]bool{
+		&cgroupfs.MemoryGroup{}: true,
+		&cgroupfs.CpuGroup{}:    true,
 	}
+	// not all hosts support hugetlb cgroup, and in the absent of hugetlb, we will fail silently by reporting no capacity.
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
-		supportedSubsystems = append(supportedSubsystems, &cgroupfs.HugetlbGroup{})
+		supportedSubsystems[&cgroupfs.HugetlbGroup{}] = false
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) {
+		supportedSubsystems[&cgroupfs.PidsGroup{}] = true
 	}
 	return supportedSubsystems
 }
@@ -341,9 +345,14 @@ func getSupportedSubsystems() []subsystem {
 // but this is not possible with libcontainers Set() method
 // See https://github.com/opencontainers/runc/issues/932
 func setSupportedSubsystems(cgroupConfig *libcontainerconfigs.Cgroup) error {
-	for _, sys := range getSupportedSubsystems() {
+	for sys, required := range getSupportedSubsystems() {
 		if _, ok := cgroupConfig.Paths[sys.Name()]; !ok {
-			return fmt.Errorf("Failed to find subsystem mount for subsystem: %v", sys.Name())
+			if required {
+				return fmt.Errorf("Failed to find subsystem mount for required subsystem: %v", sys.Name())
+			}
+			// the cgroup is not mounted, but its not required so continue...
+			glog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
+			continue
 		}
 		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil {
 			return fmt.Errorf("Failed to set config for supported subsystems : %v", err)
@@ -430,6 +439,10 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		Paths:     cgroupPaths,
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters.PodPidsLimit != nil {
+		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PodPidsLimit
+	}
+
 	if err := setSupportedSubsystems(libcontainerCgroupConfig); err != nil {
 		return fmt.Errorf("failed to set supported cgroup subsystems for cgroup %v: %v", cgroupConfig.Name, err)
 	}
@@ -461,6 +474,10 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 		Name:      driverName,
 		Parent:    driverParent,
 		Resources: resources,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters.PodPidsLimit != nil {
+		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PodPidsLimit
 	}
 
 	// get the manager with the specified cgroup configuration
@@ -552,9 +569,14 @@ func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
 
 func getStatsSupportedSubsystems(cgroupPaths map[string]string) (*libcontainercgroups.Stats, error) {
 	stats := libcontainercgroups.NewStats()
-	for _, sys := range getSupportedSubsystems() {
+	for sys, required := range getSupportedSubsystems() {
 		if _, ok := cgroupPaths[sys.Name()]; !ok {
-			return nil, fmt.Errorf("Failed to find subsystem mount for subsystem: %v", sys.Name())
+			if required {
+				return nil, fmt.Errorf("Failed to find subsystem mount for required subsystem: %v", sys.Name())
+			}
+			// the cgroup is not mounted, but its not required so continue...
+			glog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
+			continue
 		}
 		if err := sys.GetStats(cgroupPaths[sys.Name()], stats); err != nil {
 			return nil, fmt.Errorf("Failed to get stats for supported subsystems : %v", err)

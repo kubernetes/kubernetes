@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	compute "google.golang.org/api/compute/v1"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,6 +42,36 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+const (
+	defaultServeHostnameServicePort = 80
+	defaultServeHostnameServiceName = "svc-hostname"
+)
+
+var (
+	defaultServeHostnameService = v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultServeHostnameServiceName,
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{{
+				Port:       int32(defaultServeHostnameServicePort),
+				TargetPort: intstr.FromInt(9376),
+				Protocol:   "TCP",
+			}},
+			Selector: map[string]string{
+				"name": defaultServeHostnameServiceName,
+			},
+		},
+	}
+)
+
+func getServeHostnameService(name string) *v1.Service {
+	svc := defaultServeHostnameService.DeepCopy()
+	svc.ObjectMeta.Name = name
+	svc.Spec.Selector["name"] = name
+	return svc
+}
 
 var _ = SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
@@ -59,7 +91,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Zone)
+			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -82,9 +114,9 @@ var _ = SIGDescribe("Services", func() {
 			valid/accessible endpoints (same port number for service and pods).
 	*/
 	framework.ConformanceIt("should serve a basic endpoint from pods ", func() {
-		// TODO: use the ServiceTestJig here
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
+		jig := framework.NewServiceTestJig(cs, serviceName)
 		labels := map[string]string{
 			"foo": "bar",
 			"baz": "blah",
@@ -95,20 +127,12 @@ var _ = SIGDescribe("Services", func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred())
 		}()
+		ports := []v1.ServicePort{{
+			Port:       80,
+			TargetPort: intstr.FromInt(80),
+		}}
+		_, err := jig.CreateServiceWithServicePort(labels, ns, ports)
 
-		service := &v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: serviceName,
-			},
-			Spec: v1.ServiceSpec{
-				Selector: labels,
-				Ports: []v1.ServicePort{{
-					Port:       80,
-					TargetPort: intstr.FromInt(80),
-				}},
-			},
-		}
-		_, err := cs.CoreV1().Services(ns).Create(service)
 		Expect(err).NotTo(HaveOccurred())
 
 		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{})
@@ -147,10 +171,10 @@ var _ = SIGDescribe("Services", func() {
 			valid/accessible endpoints (different port number for pods).
 	*/
 	framework.ConformanceIt("should serve multiport endpoints from pods ", func() {
-		// TODO: use the ServiceTestJig here
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
 		ns := f.Namespace.Name
+		jig := framework.NewServiceTestJig(cs, serviceName)
 
 		defer func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
@@ -163,27 +187,19 @@ var _ = SIGDescribe("Services", func() {
 		svc2port := "svc2"
 
 		By("creating service " + serviceName + " in namespace " + ns)
-		service := &v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: serviceName,
+		ports := []v1.ServicePort{
+			{
+				Name:       "portname1",
+				Port:       80,
+				TargetPort: intstr.FromString(svc1port),
 			},
-			Spec: v1.ServiceSpec{
-				Selector: labels,
-				Ports: []v1.ServicePort{
-					{
-						Name:       "portname1",
-						Port:       80,
-						TargetPort: intstr.FromString(svc1port),
-					},
-					{
-						Name:       "portname2",
-						Port:       81,
-						TargetPort: intstr.FromString(svc2port),
-					},
-				},
+			{
+				Name:       "portname2",
+				Port:       81,
+				TargetPort: intstr.FromString(svc2port),
 			},
 		}
-		_, err := cs.CoreV1().Services(ns).Create(service)
+		_, err := jig.CreateServiceWithServicePort(labels, ns, ports)
 		Expect(err).NotTo(HaveOccurred())
 		port1 := 100
 		port2 := 101
@@ -299,13 +315,13 @@ var _ = SIGDescribe("Services", func() {
 		framework.SkipUnlessSSHKeyPresent()
 
 		ns := f.Namespace.Name
-		numPods, servicePort := 3, 80
+		numPods, servicePort := 3, defaultServeHostnameServicePort
 
 		By("creating service1 in namespace " + ns)
-		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, ns, "service1", servicePort, numPods)
+		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service1"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
 		By("creating service2 in namespace " + ns)
-		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, ns, "service2", servicePort, numPods)
+		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service2"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		hosts, err := framework.NodeSSHHosts(cs)
@@ -323,7 +339,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// Stop service 1 and make sure it is gone.
 		By("stopping service1")
-		framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, ns, "service1"))
+		framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, "service1"))
 
 		By("verifying service1 is not up")
 		framework.ExpectNoError(framework.VerifyServeHostnameServiceDown(cs, host, svc1IP, servicePort))
@@ -332,7 +348,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// Start another service and verify both are up.
 		By("creating service3 in namespace " + ns)
-		podNames3, svc3IP, err := framework.StartServeHostnameService(cs, internalClientset, ns, "service3", servicePort, numPods)
+		podNames3, svc3IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service3"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc2IP == svc3IP {
@@ -351,21 +367,21 @@ var _ = SIGDescribe("Services", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		ns := f.Namespace.Name
-		numPods, servicePort := 3, 80
+		numPods, servicePort := 3, defaultServeHostnameServicePort
 
 		svc1 := "service1"
 		svc2 := "service2"
 
 		defer func() {
-			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, ns, svc1))
+			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, svc1))
 		}()
-		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, ns, svc1, servicePort, numPods)
+		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService(svc1), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		defer func() {
-			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, ns, svc2))
+			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, svc2))
 		}()
-		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, ns, svc2, servicePort, numPods)
+		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService(svc2), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
@@ -410,9 +426,9 @@ var _ = SIGDescribe("Services", func() {
 		numPods, servicePort := 3, 80
 
 		defer func() {
-			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, ns, "service1"))
+			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, "service1"))
 		}()
-		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, ns, "service1", servicePort, numPods)
+		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service1"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		hosts, err := framework.NodeSSHHosts(cs)
@@ -426,7 +442,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// Restart apiserver
 		By("Restarting apiserver")
-		if err := framework.RestartApiserver(cs.Discovery()); err != nil {
+		if err := framework.RestartApiserver(cs); err != nil {
 			framework.Failf("error restarting apiserver: %v", err)
 		}
 		By("Waiting for apiserver to come up by polling /healthz")
@@ -437,9 +453,9 @@ var _ = SIGDescribe("Services", func() {
 
 		// Create a new service and check if it's not reusing IP.
 		defer func() {
-			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, ns, "service2"))
+			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, "service2"))
 		}()
-		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, ns, "service2", servicePort, numPods)
+		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service2"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
@@ -483,7 +499,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #52495 is fixed.
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	It("should be able to change the type and ports of a service [Slow] [DisabledForLargeClusters]", func() {
 		// requires cloud load-balancer support
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
@@ -572,16 +588,23 @@ var _ = SIGDescribe("Services", func() {
 		if framework.ProviderIs("gce", "gke") {
 			By("creating a static load balancer IP")
 			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunId)
-			requestedIP, err = framework.CreateGCEStaticIP(staticIPName)
+			gceCloud, err := framework.GetGCECloud()
+			Expect(err).NotTo(HaveOccurred())
+
+			err = gceCloud.ReserveRegionAddress(&compute.Address{Name: staticIPName}, gceCloud.Region())
 			defer func() {
 				if staticIPName != "" {
 					// Release GCE static IP - this is not kube-managed and will not be automatically released.
-					if err := framework.DeleteGCEStaticIP(staticIPName); err != nil {
+					if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
 						framework.Logf("failed to release static IP %s: %v", staticIPName, err)
 					}
 				}
 			}()
 			Expect(err).NotTo(HaveOccurred())
+			reservedAddr, err := gceCloud.GetRegionAddress(staticIPName, gceCloud.Region())
+			Expect(err).NotTo(HaveOccurred())
+
+			requestedIP = reservedAddr.Address
 			framework.Logf("Allocated static load balancer IP: %s", requestedIP)
 		}
 
@@ -622,9 +645,11 @@ var _ = SIGDescribe("Services", func() {
 			// coming from, so this is first-aid rather than surgery).
 			By("demoting the static IP to ephemeral")
 			if staticIPName != "" {
+				gceCloud, err := framework.GetGCECloud()
+				Expect(err).NotTo(HaveOccurred())
 				// Deleting it after it is attached "demotes" it to an
 				// ephemeral IP, which can be auto-released.
-				if err := framework.DeleteGCEStaticIP(staticIPName); err != nil {
+				if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
 					framework.Failf("failed to release static IP %s: %v", staticIPName, err)
 				}
 				staticIPName = ""
@@ -1265,7 +1290,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		By("Scaling down replication controller to zero")
-		framework.ScaleRC(f.ClientSet, f.InternalClientset, t.Namespace, rcSpec.Name, 0, false)
+		framework.ScaleRC(f.ClientSet, f.ScalesGetter, t.Namespace, rcSpec.Name, 0, false)
 
 		By("Update service to not tolerate unready services")
 		_, err = framework.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
@@ -1401,7 +1426,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPodName, svcIP)
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #52495 is fixed.
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	It("should be able to create an internal type load balancer [Slow] [DisabledForLargeClusters]", func() {
 		framework.SkipUnlessProviderIs("azure", "gke", "gce")
 
@@ -1518,9 +1543,65 @@ var _ = SIGDescribe("Services", func() {
 		By("switching to ClusterIP type to destroy loadbalancer")
 		jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, createTimeout)
 	})
+
+	It("should have session affinity work for service with type clusterIP", func() {
+		svc := getServeHostnameService("service")
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		execAffinityTestForNonLBService(f, cs, svc, false)
+	})
+
+	It("should be able to switch session affinity for service with type clusterIP", func() {
+		svc := getServeHostnameService("service")
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		execAffinityTestForNonLBService(f, cs, svc, true)
+	})
+
+	It("should have session affinity work for NodePort service", func() {
+		svc := getServeHostnameService("service")
+		svc.Spec.Type = v1.ServiceTypeNodePort
+		execAffinityTestForNonLBService(f, cs, svc, false)
+	})
+
+	It("should be able to switch session affinity for NodePort service", func() {
+		svc := getServeHostnameService("service")
+		svc.Spec.Type = v1.ServiceTypeNodePort
+		execAffinityTestForNonLBService(f, cs, svc, true)
+	})
+
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
+	It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters]", func() {
+		svc := getServeHostnameService("service")
+		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		execAffinityTestForLBService(f, cs, svc, false)
+	})
+
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
+	It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters]", func() {
+		svc := getServeHostnameService("service")
+		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		execAffinityTestForLBService(f, cs, svc, true)
+	})
+
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
+	It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters]", func() {
+		svc := getServeHostnameService("service")
+		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+		execAffinityTestForLBService(f, cs, svc, false)
+	})
+
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
+	It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters]", func() {
+		svc := getServeHostnameService("service")
+		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+		execAffinityTestForLBService(f, cs, svc, true)
+	})
 })
 
-// TODO: Get rid of [DisabledForLargeClusters] tag when issue #52495 is fixed.
+// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 	f := framework.NewDefaultFramework("esipp")
 	loadBalancerCreateTimeout := framework.LoadBalancerCreateTimeoutDefault
@@ -1544,7 +1625,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Zone)
+			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -1672,7 +1753,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				framework.Logf("Health checking %s, http://%s%s, expectedSuccess %v", nodes.Items[n].Name, ipPort, path, expectedSuccess)
 				Expect(jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, framework.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)).NotTo(HaveOccurred())
 			}
-			framework.ExpectNoError(framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, namespace, serviceName))
+			framework.ExpectNoError(framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, namespace, serviceName))
 		}
 	})
 
@@ -1871,4 +1952,93 @@ func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeNam
 		framework.Failf("exec pod returned unexpected stdout format: [%v]\n", stdout)
 	}
 	return execPod.Status.PodIP, outputs[1]
+}
+
+// execAffinityTestForNonLBService is a helper function that wrap the logic of
+// affinity test for non-load-balancer services. Session afinity will be
+// enabled when the service is created. If parameter isTransitionTest is true,
+// session affinity will be switched off/on and test if the service converges
+// to a stable affinity state.
+func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interface, svc *v1.Service, isTransitionTest bool) {
+	ns := f.Namespace.Name
+	numPods, servicePort, serviceName := 3, defaultServeHostnameServicePort, svc.ObjectMeta.Name
+	By("creating service in namespace " + ns)
+	serviceType := svc.Spec.Type
+	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+	_, _, err := framework.StartServeHostnameService(cs, f.InternalClientset, svc, ns, numPods)
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		framework.StopServeHostnameService(cs, f.InternalClientset, f.ScalesGetter, ns, serviceName)
+	}()
+	jig := framework.NewServiceTestJig(cs, serviceName)
+	svc, err = jig.Client.CoreV1().Services(ns).Get(serviceName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	var svcIp string
+	if serviceType == v1.ServiceTypeNodePort {
+		nodes := framework.GetReadySchedulableNodesOrDie(cs)
+		addrs := framework.CollectAddresses(nodes, v1.NodeInternalIP)
+		Expect(len(addrs)).To(BeNumerically(">", 0), "Failed to get Node internal IP")
+		svcIp = addrs[0]
+		servicePort = int(svc.Spec.Ports[0].NodePort)
+	} else {
+		svcIp = svc.Spec.ClusterIP
+	}
+
+	execPodName := framework.CreateExecPodOrFail(cs, ns, "execpod-affinity", nil)
+	defer func() {
+		framework.Logf("Cleaning up the exec pod")
+		err := cs.CoreV1().Pods(ns).Delete(execPodName, nil)
+		Expect(err).NotTo(HaveOccurred())
+	}()
+	execPod, err := cs.CoreV1().Pods(ns).Get(execPodName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	if !isTransitionTest {
+		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true, false)).To(BeTrue())
+	}
+	if isTransitionTest {
+		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
+		})
+		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, false, true)).To(BeTrue())
+		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+		})
+		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true, true)).To(BeTrue())
+	}
+}
+
+// execAffinityTestForLBService is a helper function that wrap the logic of
+// affinity test for load balancer services, similar to
+// execAffinityTestForNonLBService.
+func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface, svc *v1.Service, isTransitionTest bool) {
+	numPods, ns, serviceName := 3, f.Namespace.Name, svc.ObjectMeta.Name
+
+	By("creating service in namespace " + ns)
+	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+	_, _, err := framework.StartServeHostnameService(cs, f.InternalClientset, svc, ns, numPods)
+	Expect(err).NotTo(HaveOccurred())
+	jig := framework.NewServiceTestJig(cs, serviceName)
+	By("waiting for loadbalancer for service " + ns + "/" + serviceName)
+	svc = jig.WaitForLoadBalancerOrFail(ns, serviceName, framework.LoadBalancerCreateTimeoutDefault)
+	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+	defer func() {
+		framework.StopServeHostnameService(cs, f.InternalClientset, f.ScalesGetter, ns, serviceName)
+	}()
+	ingressIP := framework.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+	port := int(svc.Spec.Ports[0].Port)
+
+	if !isTransitionTest {
+		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true, false)).To(BeTrue())
+	}
+	if isTransitionTest {
+		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
+		})
+		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, false, true)).To(BeTrue())
+		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+		})
+		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true, true)).To(BeTrue())
+	}
 }

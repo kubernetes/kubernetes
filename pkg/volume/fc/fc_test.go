@@ -19,6 +19,9 @@ package fc
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"strconv"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -48,8 +51,23 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/fc" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
+	if plug.CanSupport(&volume.Spec{}) {
+		t.Errorf("Expected false")
+	}
 	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
 		t.Errorf("Expected false")
+	}
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{FC: &v1.FCVolumeSource{}}}}) {
+		t.Errorf("Expected true")
+	}
+	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{}}}) {
+		t.Errorf("Expected false")
+	}
+	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{}}}}) {
+		t.Errorf("Expected false")
+	}
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{FC: &v1.FCVolumeSource{}}}}}) {
+		t.Errorf("Expected true")
 	}
 }
 
@@ -163,13 +181,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
 	}
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
@@ -410,5 +421,83 @@ func Test_getWwnsLunWwidsError(t *testing.T) {
 	// expected no wwn and lun and wwid
 	if (len(wwn) != 0 && lun != "" && len(wwid) != 0) || err == nil {
 		t.Errorf("unexpected fc disk found")
+	}
+}
+
+func Test_ConstructVolumeSpec(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skipf("Test_ConstructVolumeSpec is not supported on GOOS=%s", runtime.GOOS)
+	}
+	fm := &mount.FakeMounter{
+		MountPoints: []mount.MountPoint{
+			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1"},
+			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/fc/50060e801049cfd1-lun-0"},
+			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod2"},
+			{Device: "/dev/sdc", Path: "/var/lib/kubelet/plugins/kubernetes.io/fc/volumeDevices/3600508b400105e210000900000490000"},
+		},
+	}
+	mountPaths := []string{
+		"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1",
+		"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod2",
+	}
+	for _, path := range mountPaths {
+		refs, err := mount.GetMountRefs(fm, path)
+		if err != nil {
+			t.Errorf("couldn't get mountrefs. err: %v", err)
+		}
+		var globalPDPath string
+		for _, ref := range refs {
+			if strings.Contains(ref, "kubernetes.io/fc") {
+				globalPDPath = ref
+				break
+			}
+		}
+		if len(globalPDPath) == 0 {
+			t.Errorf("couldn't fetch mountrefs")
+		}
+		arr := strings.Split(globalPDPath, "/")
+		if len(arr) < 1 {
+			t.Errorf("failed to retrieve volume plugin information from globalPDPath: %v", globalPDPath)
+		}
+		volumeInfo := arr[len(arr)-1]
+		if strings.Contains(volumeInfo, "-lun-") {
+			wwnLun := strings.Split(volumeInfo, "-lun-")
+			if len(wwnLun) < 2 {
+				t.Errorf("failed to retrieve TargetWWN and Lun. volumeInfo is invalid: %v", volumeInfo)
+			}
+			lun, _ := strconv.Atoi(wwnLun[1])
+			lun32 := int32(lun)
+			if wwnLun[0] != "50060e801049cfd1" || lun32 != 0 {
+				t.Errorf("failed to retrieve TargetWWN and Lun")
+			}
+		} else {
+			if volumeInfo != "3600508b400105e210000900000490000" {
+				t.Errorf("failed to retrieve WWIDs")
+			}
+		}
+	}
+}
+
+func Test_ConstructVolumeSpecNoRefs(t *testing.T) {
+	fm := &mount.FakeMounter{
+		MountPoints: []mount.MountPoint{
+			{Device: "/dev/sdd", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1"},
+		},
+	}
+	mountPaths := []string{
+		"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1",
+	}
+	for _, path := range mountPaths {
+		refs, _ := mount.GetMountRefs(fm, path)
+		var globalPDPath string
+		for _, ref := range refs {
+			if strings.Contains(ref, "kubernetes.io/fc") {
+				globalPDPath = ref
+				break
+			}
+		}
+		if len(globalPDPath) != 0 {
+			t.Errorf("invalid globalPDPath")
+		}
 	}
 }

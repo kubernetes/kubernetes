@@ -40,7 +40,7 @@ function cleanup {
 trap cleanup EXIT
 
 echo "Building client-gen"
-CLIENTGEN="${PWD}/client-gen-binary"
+CLIENTGEN="${PWD}/client-gen"
 go build -o "${CLIENTGEN}" ${CODEGEN_PKG}/cmd/client-gen
 
 PREFIX=k8s.io/apiextensions-apiserver/pkg/apis
@@ -53,7 +53,7 @@ INPUT="--input ${INPUT_APIS[@]}"
 CLIENTSET_PATH="--output-package k8s.io/apiextensions-apiserver/pkg/client/clientset"
 
 ${CLIENTGEN} ${INPUT_BASE} ${INPUT} ${CLIENTSET_PATH} --output-base ${SCRIPT_BASE}
-${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input apiextensions/v1beta1 ${CLIENTSET_PATH}  --output-base ${SCRIPT_BASE}
+${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input apiextensions/v1beta1 ${CLIENTSET_PATH}  --output-base ${SCRIPT_BASE} --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
 
 
 echo "Building lister-gen"
@@ -62,7 +62,7 @@ go build -o "${listergen}" ${CODEGEN_PKG}/cmd/lister-gen
 
 LISTER_INPUT="--input-dirs k8s.io/apiextensions-apiserver/pkg/apis/apiextensions --input-dirs k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 LISTER_PATH="--output-package k8s.io/apiextensions-apiserver/pkg/client/listers"
-${listergen} ${LISTER_INPUT} ${LISTER_PATH} --output-base ${SCRIPT_BASE}
+${listergen} ${LISTER_INPUT} ${LISTER_PATH} --output-base ${SCRIPT_BASE} --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
 
 
 echo "Building informer-gen"
@@ -75,5 +75,6 @@ ${informergen} \
   --versioned-clientset-package k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset \
   --internal-clientset-package k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset \
   --listers-package k8s.io/apiextensions-apiserver/pkg/client/listers \
-  --output-package k8s.io/apiextensions-apiserver/pkg/client/informers
+  --output-package k8s.io/apiextensions-apiserver/pkg/client/informers \
+  --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
   "$@"

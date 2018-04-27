@@ -20,8 +20,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["i18n_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util/i18n",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

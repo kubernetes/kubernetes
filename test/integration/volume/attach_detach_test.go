@@ -34,7 +34,7 @@ import (
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -86,7 +86,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
 			Annotations: map[string]string{
-				volumehelper.ControllerManagedAttachAnnotation: "true",
+				util.ControllerManagedAttachAnnotation: "true",
 			},
 		},
 	}
@@ -152,7 +152,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
 			Annotations: map[string]string{
-				volumehelper.ControllerManagedAttachAnnotation: "true",
+				util.ControllerManagedAttachAnnotation: "true",
 			},
 		},
 	}
@@ -219,8 +219,8 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
 			Annotations: map[string]string{
-				volumehelper.ControllerManagedAttachAnnotation:  "true",
-				volumehelper.KeepTerminatedPodVolumesAnnotation: "true",
+				util.ControllerManagedAttachAnnotation:  "true",
+				util.KeepTerminatedPodVolumesAnnotation: "true",
 			},
 		},
 	}
@@ -383,7 +383,7 @@ func TestPodAddedByDswp(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
 			Annotations: map[string]string{
-				volumehelper.ControllerManagedAttachAnnotation: "true",
+				util.ControllerManagedAttachAnnotation: "true",
 			},
 		},
 	}

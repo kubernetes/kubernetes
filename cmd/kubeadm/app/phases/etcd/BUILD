@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["local_test.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
@@ -28,6 +27,7 @@ go_library(
         "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/staticpod:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
     ],
 )

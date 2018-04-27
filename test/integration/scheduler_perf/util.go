@@ -17,25 +17,14 @@ limitations under the License.
 package benchmark
 
 import (
-	"net/http"
-	"net/http/httptest"
-
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/plugin/pkg/scheduler"
-	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
-	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/pkg/scheduler"
+	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/test/integration/util"
 )
-
-const enableEquivalenceCache = true
 
 // mustSetupScheduler starts the following components:
 // - k8s api server (a.k.a. master)
@@ -44,63 +33,19 @@ const enableEquivalenceCache = true
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroyFunc func()) {
-
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
-	framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
-
+func mustSetupScheduler() (scheduler.Configurator, util.ShutdownFunc) {
+	apiURL, apiShutdown := util.StartApiserver()
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
-		Host:          s.URL,
+		Host:          apiURL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
 		QPS:           5000.0,
 		Burst:         5000,
 	})
+	schedulerConfig, schedulerShutdown := util.StartScheduler(clientSet, true)
 
-	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
-
-	schedulerConfigurator = factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		clientSet,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
-	)
-
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
-
-	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *scheduler.Config) {
-		conf.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
-	})
-	if err != nil {
-		glog.Fatalf("Error creating scheduler: %v", err)
+	shutdownFunc := func() {
+		schedulerShutdown()
+		apiShutdown()
 	}
-
-	stop := make(chan struct{})
-	informerFactory.Start(stop)
-
-	sched.Run()
-
-	destroyFunc = func() {
-		glog.Infof("destroying")
-		sched.StopEverything()
-		close(stop)
-		s.Close()
-		glog.Infof("destroyed")
-	}
-	return
+	return schedulerConfig, shutdownFunc
 }

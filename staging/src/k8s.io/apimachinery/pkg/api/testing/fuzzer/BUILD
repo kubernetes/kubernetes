@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["valuefuzz_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/api/testing/fuzzer",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(

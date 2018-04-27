@@ -23,7 +23,7 @@
 #   b) in case of etcd3
 #      $ etcdctl --endpoints=<address> snapshot save
 #      produced .db file
-# - version.txt file is in the current directy (if it isn't it will be
+# - version.txt file is in the current directory (if it isn't it will be
 #     defaulted to "2.2.1/etcd2"). Based on this file, the script will
 #     decide to which version we are restoring (procedures are different
 #     for etcd2 and etcd3).
@@ -217,7 +217,7 @@ mkdir -p "${MNT_DISK}/var/etcd-corrupted"
 echo "Saving corrupted data to ${MNT_DISK}/var/etcd-corrupted"
 mv /var/etcd/data "${MNT_DISK}/var/etcd-corrupted"
 
-# Replace the corrupted data dir with the resotred data.
+# Replace the corrupted data dir with the restored data.
 echo "Copying restored data to /var/etcd/data"
 mv "${BACKUP_DIR}" /var/etcd/data
 

@@ -18,13 +18,14 @@ import (
 	"sync"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
 // Txn is the interface that wraps mini-transactions.
 //
-//	 Tx.If(
+//	 Txn(context.TODO()).If(
 //	  Compare(Value(k1), ">", v1),
 //	  Compare(Version(k1), "=", 2)
 //	 ).Then(
@@ -49,8 +50,6 @@ type Txn interface {
 
 	// Commit tries to commit the transaction.
 	Commit() (*TxnResponse, error)
-
-	// TODO: add a Do for shortcut the txn without any condition?
 }
 
 type txn struct {
@@ -68,6 +67,8 @@ type txn struct {
 
 	sus []*pb.RequestOp
 	fas []*pb.RequestOp
+
+	callOpts []grpc.CallOption
 }
 
 func (txn *txn) If(cs ...Cmp) Txn {
@@ -137,30 +138,14 @@ func (txn *txn) Else(ops ...Op) Txn {
 func (txn *txn) Commit() (*TxnResponse, error) {
 	txn.mu.Lock()
 	defer txn.mu.Unlock()
-	for {
-		resp, err := txn.commit()
-		if err == nil {
-			return resp, err
-		}
-		if isHaltErr(txn.ctx, err) {
-			return nil, toErr(txn.ctx, err)
-		}
-		if txn.isWrite {
-			return nil, toErr(txn.ctx, err)
-		}
-	}
-}
 
-func (txn *txn) commit() (*TxnResponse, error) {
 	r := &pb.TxnRequest{Compare: txn.cmps, Success: txn.sus, Failure: txn.fas}
 
-	var opts []grpc.CallOption
-	if !txn.isWrite {
-		opts = []grpc.CallOption{grpc.FailFast(false)}
-	}
-	resp, err := txn.kv.remote.Txn(txn.ctx, r, opts...)
+	var resp *pb.TxnResponse
+	var err error
+	resp, err = txn.kv.remote.Txn(txn.ctx, r, txn.callOpts...)
 	if err != nil {
-		return nil, err
+		return nil, toErr(txn.ctx, err)
 	}
 	return (*TxnResponse)(resp), nil
 }

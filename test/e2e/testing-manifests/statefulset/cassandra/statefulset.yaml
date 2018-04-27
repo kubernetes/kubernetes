@@ -1,10 +1,13 @@
-apiVersion: "apps/v1beta1"
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: cassandra
 spec:
   serviceName: cassandra
   replicas: 3
+  selector:
+    matchLabels:
+      app: cassandra
   template:
     metadata:
       labels:
@@ -12,7 +15,7 @@ spec:
     spec:
       containers:
       - name: cassandra
-        image: gcr.io/google-samples/cassandra:v12
+        image: gcr.io/google-samples/cassandra:v13
         imagePullPolicy: Always
         ports:
         - containerPort: 7000
@@ -34,7 +37,10 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/sh", "-c", "PID=$(pidof java) && kill $PID && while ps -p $PID > /dev/null; do sleep 1; done"]
+              command: 
+              - /bin/sh
+              - -c
+              - nodetool drain
         env:
           - name: MAX_HEAP_SIZE
             value: 512M
@@ -52,8 +58,6 @@ spec:
             value: "DC1-K8Demo"
           - name: CASSANDRA_RACK
             value: "Rack1-K8Demo"
-          - name: CASSANDRA_AUTO_BOOTSTRAP
-            value: "false"
           - name: POD_IP
             valueFrom:
               fieldRef:

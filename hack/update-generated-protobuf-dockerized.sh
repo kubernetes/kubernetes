@@ -45,6 +45,7 @@ PACKAGES=(
   k8s.io/apiserver/pkg/apis/example/v1
   k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
   k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
+  k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
   k8s.io/api/core/v1
   k8s.io/api/policy/v1beta1
   k8s.io/api/extensions/v1beta1
@@ -78,6 +79,7 @@ PACKAGES=(
   k8s.io/metrics/pkg/apis/metrics/v1alpha1
   k8s.io/metrics/pkg/apis/metrics/v1beta1
   k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
+  k8s.io/metrics/pkg/apis/external_metrics/v1beta1
   k8s.io/apiserver/pkg/apis/audit/v1alpha1
   k8s.io/apiserver/pkg/apis/audit/v1beta1
   k8s.io/apiserver/pkg/apis/example2/v1
@@ -91,5 +93,6 @@ PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   "${gotoprotobuf}" \
   --proto-import="${KUBE_ROOT}/vendor" \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \
-  --packages=$(IFS=, ; echo "${PACKAGES[*]}")
+  --packages=$(IFS=, ; echo "${PACKAGES[*]}") \
+  --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt \
   "$@"

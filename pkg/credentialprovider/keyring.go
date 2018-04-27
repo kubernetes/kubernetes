@@ -17,7 +17,6 @@ limitations under the License.
 package credentialprovider
 
 import (
-	"encoding/json"
 	"net"
 	"net/url"
 	"path/filepath"
@@ -27,7 +26,6 @@ import (
 	"github.com/golang/glog"
 
 	dockertypes "github.com/docker/docker/api/types"
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -284,14 +282,12 @@ func (f *FakeKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
 	return f.auth, f.ok
 }
 
-// unionDockerKeyring delegates to a set of keyrings.
-type unionDockerKeyring struct {
-	keyrings []DockerKeyring
-}
+// UnionDockerKeyring delegates to a set of keyrings.
+type UnionDockerKeyring []DockerKeyring
 
-func (k *unionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
+func (k UnionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
 	authConfigs := []LazyAuthConfiguration{}
-	for _, subKeyring := range k.keyrings {
+	for _, subKeyring := range k {
 		if subKeyring == nil {
 			continue
 		}
@@ -301,38 +297,4 @@ func (k *unionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool
 	}
 
 	return authConfigs, (len(authConfigs) > 0)
-}
-
-// MakeDockerKeyring inspects the passedSecrets to see if they contain any DockerConfig secrets.  If they do,
-// then a DockerKeyring is built based on every hit and unioned with the defaultKeyring.
-// If they do not, then the default keyring is returned
-func MakeDockerKeyring(passedSecrets []v1.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {
-	passedCredentials := []DockerConfig{}
-	for _, passedSecret := range passedSecrets {
-		if dockerConfigJsonBytes, dockerConfigJsonExists := passedSecret.Data[v1.DockerConfigJsonKey]; (passedSecret.Type == v1.SecretTypeDockerConfigJson) && dockerConfigJsonExists && (len(dockerConfigJsonBytes) > 0) {
-			dockerConfigJson := DockerConfigJson{}
-			if err := json.Unmarshal(dockerConfigJsonBytes, &dockerConfigJson); err != nil {
-				return nil, err
-			}
-
-			passedCredentials = append(passedCredentials, dockerConfigJson.Auths)
-		} else if dockercfgBytes, dockercfgExists := passedSecret.Data[v1.DockerConfigKey]; (passedSecret.Type == v1.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
-			dockercfg := DockerConfig{}
-			if err := json.Unmarshal(dockercfgBytes, &dockercfg); err != nil {
-				return nil, err
-			}
-
-			passedCredentials = append(passedCredentials, dockercfg)
-		}
-	}
-
-	if len(passedCredentials) > 0 {
-		basicKeyring := &BasicDockerKeyring{}
-		for _, currCredentials := range passedCredentials {
-			basicKeyring.Add(currCredentials)
-		}
-		return &unionDockerKeyring{[]DockerKeyring{basicKeyring, defaultKeyring}}, nil
-	}
-
-	return defaultKeyring, nil
 }

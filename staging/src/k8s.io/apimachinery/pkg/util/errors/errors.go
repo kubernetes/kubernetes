@@ -21,7 +21,7 @@ import (
 	"fmt"
 )
 
-// MessageCountMap contains occurance for each error message.
+// MessageCountMap contains occurrence for each error message.
 type MessageCountMap map[string]int
 
 // Aggregate represents an object that contains multiple errors, but does not

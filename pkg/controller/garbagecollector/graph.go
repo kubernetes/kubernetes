@@ -53,6 +53,9 @@ type node struct {
 	// this records if the object's deletionTimestamp is non-nil.
 	beingDeleted     bool
 	beingDeletedLock sync.RWMutex
+	// this records if the object was constructed virtually and never observed via informer event
+	virtual     bool
+	virtualLock sync.RWMutex
 	// when processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
 	owners []metav1.OwnerReference
@@ -70,6 +73,17 @@ func (n *node) isBeingDeleted() bool {
 	n.beingDeletedLock.RLock()
 	defer n.beingDeletedLock.RUnlock()
 	return n.beingDeleted
+}
+
+func (n *node) markObserved() {
+	n.virtualLock.Lock()
+	defer n.virtualLock.Unlock()
+	n.virtual = false
+}
+func (n *node) isObserved() bool {
+	n.virtualLock.RLock()
+	defer n.virtualLock.RUnlock()
+	return n.virtual == false
 }
 
 func (n *node) markDeletingDependents() {

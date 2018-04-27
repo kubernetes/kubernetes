@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -41,6 +42,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 		},
 	}
+
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -53,6 +55,21 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 		},
 	}
+
+	invalidTime := int64(60)
+	invalidPodTemplate2 := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"foo": "bar"},
+			},
+			Spec: api.PodSpec{
+				RestartPolicy:         api.RestartPolicyOnFailure,
+				DNSPolicy:             api.DNSClusterFirst,
+				ActiveDeadlineSeconds: &invalidTime,
+			},
+		},
+	}
+
 	successCases := []apps.StatefulSet{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -105,10 +122,13 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 		},
 	}
-	for _, successCase := range successCases {
-		if errs := ValidateStatefulSet(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
+
+	for i, successCase := range successCases {
+		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
+			if errs := ValidateStatefulSet(&successCase); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
 	}
 
 	errorCases := map[string]apps.StatefulSet{
@@ -250,7 +270,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
-		"invalid udpate strategy": {
+		"invalid update strategy": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -258,6 +278,29 @@ func TestValidateStatefulSet(t *testing.T) {
 				Template:            validPodTemplate.Template,
 				Replicas:            3,
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: "foo"},
+			},
+		},
+		"empty update strategy": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            3,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: ""},
+			},
+		},
+		"invalid rolling update": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            3,
+				UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType,
+					RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+						return &apps.RollingUpdateStatefulSetStrategy{Partition: 1}
+					}()},
 			},
 		},
 		"negative parition": {
@@ -273,31 +316,67 @@ func TestValidateStatefulSet(t *testing.T) {
 					}()},
 			},
 		},
+		"empty pod management policy": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: "",
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            3,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
+		"invalid pod management policy": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: "foo",
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            3,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
+		"set active deadline seconds": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: "foo",
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            invalidPodTemplate2.Template,
+				Replicas:            3,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
 	}
+
 	for k, v := range errorCases {
-		errs := ValidateStatefulSet(&v)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		}
-		for i := range errs {
-			field := errs[i].Field
-			if !strings.HasPrefix(field, "spec.template.") &&
-				field != "metadata.name" &&
-				field != "metadata.namespace" &&
-				field != "spec.selector" &&
-				field != "spec.template" &&
-				field != "GCEPersistentDisk.ReadOnly" &&
-				field != "spec.replicas" &&
-				field != "spec.template.labels" &&
-				field != "metadata.annotations" &&
-				field != "metadata.labels" &&
-				field != "status.replicas" &&
-				field != "spec.updateStrategy" &&
-				field != "spec.updateStrategy.rollingUpdate" &&
-				field != "spec.updateStrategy.rollingUpdate.partition" {
-				t.Errorf("%s: missing prefix for: %v", k, errs[i])
+		t.Run(k, func(t *testing.T) {
+			errs := ValidateStatefulSet(&v)
+			if len(errs) == 0 {
+				t.Errorf("expected failure for %s", k)
 			}
-		}
+
+			for i := range errs {
+				field := errs[i].Field
+				if !strings.HasPrefix(field, "spec.template.") &&
+					field != "metadata.name" &&
+					field != "metadata.namespace" &&
+					field != "spec.selector" &&
+					field != "spec.template" &&
+					field != "GCEPersistentDisk.ReadOnly" &&
+					field != "spec.replicas" &&
+					field != "spec.template.labels" &&
+					field != "metadata.annotations" &&
+					field != "metadata.labels" &&
+					field != "status.replicas" &&
+					field != "spec.updateStrategy" &&
+					field != "spec.updateStrategy.rollingUpdate" &&
+					field != "spec.updateStrategy.rollingUpdate.partition" &&
+					field != "spec.podManagementPolicy" &&
+					field != "spec.template.spec.activeDeadlineSeconds" {
+					t.Errorf("%s: missing prefix for: %v", k, errs[i])
+				}
+			}
+		})
 	}
 }
 
@@ -399,19 +478,21 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		status := apps.StatefulSetStatus{
-			Replicas:           test.replicas,
-			ReadyReplicas:      test.readyReplicas,
-			CurrentReplicas:    test.currentReplicas,
-			UpdatedReplicas:    test.updatedReplicas,
-			ObservedGeneration: test.observedGeneration,
-			CollisionCount:     test.collisionCount,
-		}
+		t.Run(test.name, func(t *testing.T) {
+			status := apps.StatefulSetStatus{
+				Replicas:           test.replicas,
+				ReadyReplicas:      test.readyReplicas,
+				CurrentReplicas:    test.currentReplicas,
+				UpdatedReplicas:    test.updatedReplicas,
+				ObservedGeneration: test.observedGeneration,
+				CollisionCount:     test.collisionCount,
+			}
 
-		errs := ValidateStatefulSetStatus(&status, field.NewPath("status"))
-		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
-			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errs.ToAggregate().Error())
-		}
+			errs := ValidateStatefulSetStatus(&status, field.NewPath("status"))
+			if hasErr := len(errs) > 0; hasErr != test.expectedErr {
+				t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errs.ToAggregate().Error())
+			}
+		})
 	}
 }
 
@@ -462,6 +543,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 	}
+
 	type psUpdateTest struct {
 		old    apps.StatefulSet
 		update apps.StatefulSet
@@ -529,13 +611,17 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 	}
-	for _, successCase := range successCases {
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateStatefulSetUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
+
+	for i, successCase := range successCases {
+		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
+			successCase.old.ObjectMeta.ResourceVersion = "1"
+			successCase.update.ObjectMeta.ResourceVersion = "1"
+			if errs := ValidateStatefulSetUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
 	}
+
 	errorCases := map[string]psUpdateTest{
 		"more than one read/write": {
 			old: apps.StatefulSet{
@@ -656,10 +742,13 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 	}
+
 	for testName, errorCase := range errorCases {
-		if errs := ValidateStatefulSetUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
-		}
+		t.Run(testName, func(t *testing.T) {
+			if errs := ValidateStatefulSetUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+				t.Errorf("expected failure: %s", testName)
+			}
+		})
 	}
 }
 
@@ -715,13 +804,15 @@ func TestValidateControllerRevision(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		errs := ValidateControllerRevision(&tc.history)
-		if tc.isValid && len(errs) > 0 {
-			t.Errorf("%v: unexpected error: %v", name, errs)
-		}
-		if !tc.isValid && len(errs) == 0 {
-			t.Errorf("%v: unexpected non-error", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateControllerRevision(&tc.history)
+			if tc.isValid && len(errs) > 0 {
+				t.Errorf("%v: unexpected error: %v", name, errs)
+			}
+			if !tc.isValid && len(errs) == 0 {
+				t.Errorf("%v: unexpected non-error", name)
+			}
+		})
 	}
 }
 
@@ -809,12 +900,14 @@ func TestValidateControllerRevisionUpdate(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		errs := ValidateControllerRevisionUpdate(&tc.newHistory, &tc.oldHistory)
-		if tc.isValid && len(errs) > 0 {
-			t.Errorf("%v: unexpected error: %v", tc.name, errs)
-		}
-		if !tc.isValid && len(errs) == 0 {
-			t.Errorf("%v: unexpected non-error", tc.name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateControllerRevisionUpdate(&tc.newHistory, &tc.oldHistory)
+			if tc.isValid && len(errs) > 0 {
+				t.Errorf("%v: unexpected error: %v", tc.name, errs)
+			}
+			if !tc.isValid && len(errs) == 0 {
+				t.Errorf("%v: unexpected non-error", tc.name)
+			}
+		})
 	}
 }

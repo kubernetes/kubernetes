@@ -8,8 +8,7 @@ load(
 
 go_binary(
     name = "test-webserver",
-    importpath = "k8s.io/kubernetes/test/images/test-webserver",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(

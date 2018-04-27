@@ -17,6 +17,8 @@ limitations under the License.
 package azure
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -29,16 +31,91 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/flowcontrol"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/stretchr/testify/assert"
 )
 
 var testClusterName = "testCluster"
+
+func TestParseConfig(t *testing.T) {
+	azureConfig := `{
+		"aadClientCertPassword": "aadClientCertPassword",
+		"aadClientCertPath": "aadClientCertPath",
+		"aadClientId": "aadClientId",
+		"aadClientSecret": "aadClientSecret",
+		"cloud":"AzurePublicCloud",
+		"cloudProviderBackoff": true,
+		"cloudProviderBackoffDuration": 1,
+		"cloudProviderBackoffExponent": 1,
+		"cloudProviderBackoffJitter": 1,
+		"cloudProviderBackoffRetries": 1,
+		"cloudProviderRatelimit": true,
+		"cloudProviderRateLimitBucket": 1,
+		"CloudProviderRateLimitBucketWrite": 1,
+		"cloudProviderRateLimitQPS": 1,
+		"CloudProviderRateLimitQPSWrite": 1,
+		"location": "location",
+		"maximumLoadBalancerRuleCount": 1,
+		"primaryAvailabilitySetName": "primaryAvailabilitySetName",
+		"primaryScaleSetName": "primaryScaleSetName",
+		"resourceGroup": "resourceGroup",
+		"routeTableName": "routeTableName",
+		"securityGroupName": "securityGroupName",
+		"subnetName": "subnetName",
+		"subscriptionId": "subscriptionId",
+		"tenantId": "tenantId",
+		"useInstanceMetadata": true,
+		"useManagedIdentityExtension": true,
+		"vnetName": "vnetName",
+		"vnetResourceGroup": "vnetResourceGroup",
+		vmType: "standard"
+	}`
+	expected := &Config{
+		AzureAuthConfig: auth.AzureAuthConfig{
+			AADClientCertPassword:       "aadClientCertPassword",
+			AADClientCertPath:           "aadClientCertPath",
+			AADClientID:                 "aadClientId",
+			AADClientSecret:             "aadClientSecret",
+			Cloud:                       "AzurePublicCloud",
+			SubscriptionID:              "subscriptionId",
+			TenantID:                    "tenantId",
+			UseManagedIdentityExtension: true,
+		},
+		CloudProviderBackoff:              true,
+		CloudProviderBackoffDuration:      1,
+		CloudProviderBackoffExponent:      1,
+		CloudProviderBackoffJitter:        1,
+		CloudProviderBackoffRetries:       1,
+		CloudProviderRateLimit:            true,
+		CloudProviderRateLimitBucket:      1,
+		CloudProviderRateLimitBucketWrite: 1,
+		CloudProviderRateLimitQPS:         1,
+		CloudProviderRateLimitQPSWrite:    1,
+		Location:                          "location",
+		MaximumLoadBalancerRuleCount:      1,
+		PrimaryAvailabilitySetName:        "primaryAvailabilitySetName",
+		PrimaryScaleSetName:               "primaryScaleSetName",
+		ResourceGroup:                     "resourceGroup",
+		RouteTableName:                    "routeTableName",
+		SecurityGroupName:                 "securityGroupName",
+		SubnetName:                        "subnetName",
+		UseInstanceMetadata:               true,
+		VMType:                            "standard",
+		VnetName:                          "vnetName",
+		VnetResourceGroup:                 "vnetResourceGroup",
+	}
+
+	buffer := bytes.NewBufferString(azureConfig)
+	config, err := parseConfig(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, config)
+}
 
 // Test flipServiceInternalAnnotation
 func TestFlipServiceInternalAnnotation(t *testing.T) {
@@ -125,7 +202,7 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -139,8 +216,8 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 		}
 
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lb := (*result.Value)[0]
-		lbCount := len(*result.Value)
+		lb := result.Values()[0]
+		lbCount := len(result.Values())
 		expectedNumOfLB := 1
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
@@ -178,7 +255,7 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -189,14 +266,14 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 		// expected is MIN(index, availabilitySetCount)
 		expectedNumOfLB := int(math.Min(float64(index), float64(availabilitySetCount)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(*result.Value)
+		lbCount := len(result.Values())
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
 
 		maxRules := 0
 		minRules := serviceCount
-		for _, lb := range *result.Value {
+		for _, lb := range result.Values() {
 			ruleCount := len(*lb.LoadBalancingRules)
 			if ruleCount < minRules {
 				minRules = ruleCount
@@ -241,7 +318,7 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 		lbMode := fmt.Sprintf("%s,%s", selectedAvailabilitySetName1, selectedAvailabilitySetName2)
 		setLoadBalancerModeAnnotation(&svc, lbMode)
 
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -252,7 +329,7 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 		// expected is MIN(index, 2)
 		expectedNumOfLB := int(math.Min(float64(index), float64(2)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(*result.Value)
+		lbCount := len(result.Values())
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
@@ -279,7 +356,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -290,7 +367,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 		// expected is MIN(index, az.Config.MaximumLoadBalancerRuleCount)
 		expectedNumOfLBRules := int(math.Min(float64(index), float64(az.Config.MaximumLoadBalancerRuleCount)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(*result.Value)
+		lbCount := len(result.Values())
 		if lbCount != expectedNumOfLBRules {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLBRules, lbCount)
 		}
@@ -305,7 +382,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 	} else {
 		svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 	}
-	_, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+	_, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 	if err == nil {
 		t.Errorf("Expect any new service to fail as max limit in lb has reached")
 	} else {
@@ -336,7 +413,7 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -360,12 +437,12 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 		// expected is MIN(index, availabilitySetCount)
 		expectedNumOfLB := int(math.Min(float64(index), float64(availabilitySetCount)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(*result.Value)
+		lbCount := len(result.Values())
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
 
-		err := az.EnsureLoadBalancerDeleted(testClusterName, &svc)
+		err := az.EnsureLoadBalancerDeleted(context.TODO(), testClusterName, &svc)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -850,8 +927,10 @@ func TestReconcilePublicIPWithExternalAndInternalSwitch(t *testing.T) {
 func getTestCloud() (az *Cloud) {
 	az = &Cloud{
 		Config: Config{
-			TenantID:                     "tenant",
-			SubscriptionID:               "subscription",
+			AzureAuthConfig: auth.AzureAuthConfig{
+				TenantID:       "tenant",
+				SubscriptionID: "subscription",
+			},
 			ResourceGroup:                "rg",
 			VnetResourceGroup:            "rg",
 			Location:                     "westus",
@@ -861,16 +940,25 @@ func getTestCloud() (az *Cloud) {
 			RouteTableName:               "rt",
 			PrimaryAvailabilitySetName:   "as",
 			MaximumLoadBalancerRuleCount: 250,
+			VMType: vmTypeStandard,
 		},
 	}
-	az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(100, 100)
+	az.DisksClient = newFakeDisksClient()
+	az.InterfacesClient = newFakeAzureInterfacesClient()
 	az.LoadBalancerClient = newFakeAzureLBClient()
 	az.PublicIPAddressesClient = newFakeAzurePIPClient(az.Config.SubscriptionID)
-	az.SubnetsClient = newFakeAzureSubnetsClient()
+	az.RoutesClient = newFakeRoutesClient()
+	az.RouteTablesClient = newFakeRouteTablesClient()
 	az.SecurityGroupsClient = newFakeAzureNSGClient()
+	az.SubnetsClient = newFakeAzureSubnetsClient()
+	az.VirtualMachineScaleSetsClient = newFakeVirtualMachineScaleSetsClient()
+	az.VirtualMachineScaleSetVMsClient = newFakeVirtualMachineScaleSetVMsClient()
 	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
-	az.InterfacesClient = newFakeAzureInterfacesClient()
 	az.vmSet = newAvailabilitySet(az)
+	az.vmCache, _ = az.newVMCache()
+	az.lbCache, _ = az.newLBCache()
+	az.nsgCache, _ = az.newNSGCache()
+	az.rtCache, _ = az.newRouteTableCache()
 
 	return az
 }
@@ -979,8 +1067,10 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 			},
 		}
 
-		_, errChan := az.VirtualMachinesClient.CreateOrUpdate(az.Config.ResourceGroup, vmName, newVM, nil)
-		if err := <-errChan; err != nil {
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		_, err := az.VirtualMachinesClient.CreateOrUpdate(ctx, az.Config.ResourceGroup, vmName, newVM)
+		if err != nil {
 		}
 		// add to kubernetes
 		newNode := &v1.Node{
@@ -999,23 +1089,6 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 
 func getBackendPort(port int32) int32 {
 	return port + 10000
-}
-
-func getTestPublicFipConfigurationProperties() network.FrontendIPConfigurationPropertiesFormat {
-	return network.FrontendIPConfigurationPropertiesFormat{
-		PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/this/is/a/public/ip/address/id")},
-	}
-}
-
-func getTestInternalFipConfigurationProperties(expectedSubnetName *string) network.FrontendIPConfigurationPropertiesFormat {
-	var expectedSubnet *network.Subnet
-	if expectedSubnetName != nil {
-		expectedSubnet = &network.Subnet{Name: expectedSubnetName}
-	}
-	return network.FrontendIPConfigurationPropertiesFormat{
-		PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/this/is/a/public/ip/address/id")},
-		Subnet:          expectedSubnet,
-	}
 }
 
 func getTestService(identifier string, proto v1.Protocol, requestedPorts ...int32) v1.Service {
@@ -1055,39 +1128,6 @@ func setLoadBalancerModeAnnotation(service *v1.Service, lbMode string) {
 
 func setLoadBalancerAutoModeAnnotation(service *v1.Service) {
 	setLoadBalancerModeAnnotation(service, ServiceAnnotationLoadBalancerAutoModeValue)
-}
-
-func getTestLoadBalancer(services ...v1.Service) network.LoadBalancer {
-	rules := []network.LoadBalancingRule{}
-	probes := []network.Probe{}
-
-	for _, service := range services {
-		for _, port := range service.Spec.Ports {
-			ruleName := getLoadBalancerRuleName(&service, port, nil)
-			rules = append(rules, network.LoadBalancingRule{
-				Name: to.StringPtr(ruleName),
-				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-					FrontendPort: to.Int32Ptr(port.Port),
-					BackendPort:  to.Int32Ptr(port.Port),
-				},
-			})
-			probes = append(probes, network.Probe{
-				Name: to.StringPtr(ruleName),
-				ProbePropertiesFormat: &network.ProbePropertiesFormat{
-					Port: to.Int32Ptr(port.NodePort),
-				},
-			})
-		}
-	}
-
-	lb := network.LoadBalancer{
-		LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
-			LoadBalancingRules: &rules,
-			Probes:             &probes,
-		},
-	}
-
-	return lb
 }
 
 func getServiceSourceRanges(service *v1.Service) []string {
@@ -1276,17 +1316,17 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 		t.Errorf("Expected publicIP resource exists, when it is not an internal service")
 	}
 
-	if publicIP.Tags == nil || (*publicIP.Tags)["service"] == nil {
+	if publicIP.Tags == nil || publicIP.Tags["service"] == nil {
 		t.Errorf("Expected publicIP resource has tags[service]")
 	}
 
 	serviceName := getServiceName(service)
-	if serviceName != *(*publicIP.Tags)["service"] {
+	if serviceName != *(publicIP.Tags["service"]) {
 		t.Errorf("Expected publicIP resource has matching tags[service]")
 	}
 	// We cannot use service.Spec.LoadBalancerIP to compare with
 	// Public IP's IPAddress
-	// Becuase service properties are updated outside of cloudprovider code
+	// Because service properties are updated outside of cloudprovider code
 }
 
 func contains(ruleValues []string, targetValue string) bool {
@@ -1608,10 +1648,48 @@ func validateEmptyConfig(t *testing.T, config string) {
 	if azureCloud.CloudProviderBackoff != false {
 		t.Errorf("got incorrect value for CloudProviderBackoff")
 	}
-
 	// rate limits should be disabled by default if not explicitly enabled in config
 	if azureCloud.CloudProviderRateLimit != false {
 		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	}
+}
+func TestGetZone(t *testing.T) {
+	data := `{"ID":"_azdev","UD":"0","FD":"99"}`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, data)
+	}))
+	defer ts.Close()
+
+	cloud := &Cloud{}
+	cloud.Location = "eastus"
+
+	zone, err := cloud.getZoneFromURL(ts.URL)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if zone.FailureDomain != "99" {
+		t.Errorf("Unexpected value: %s, expected '99'", zone.FailureDomain)
+	}
+	if zone.Region != cloud.Location {
+		t.Errorf("Expected: %s, saw: %s", cloud.Location, zone.Region)
+	}
+}
+
+func TestFetchFaultDomain(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, `{"ID":"_azdev","UD":"0","FD":"99"}`)
+	}))
+	defer ts.Close()
+
+	faultDomain, err := fetchFaultDomain(ts.URL)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if faultDomain == nil {
+		t.Errorf("Unexpected nil fault domain")
+	}
+	if *faultDomain != "99" {
+		t.Errorf("Expected '99', saw '%s'", *faultDomain)
 	}
 }
 
@@ -1620,7 +1698,7 @@ func TestDecodeInstanceInfo(t *testing.T) {
 
 	faultDomain, err := readFaultDomain(strings.NewReader(response))
 	if err != nil {
-		t.Error("Unexpected error in ReadFaultDomain")
+		t.Errorf("Unexpected error in ReadFaultDomain: %v", err)
 	}
 
 	if faultDomain == nil {
@@ -1719,7 +1797,7 @@ func TestMetadataParsing(t *testing.T) {
         "macAddress": "002248020E1E"
       }
     ]
-}	
+}
 `
 
 	network := NetworkMetadata{}

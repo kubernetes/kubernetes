@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	policyvalidation "k8s.io/kubernetes/pkg/apis/policy/validation"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -43,14 +42,6 @@ func SafeSysctlWhitelist() []string {
 		"net.ipv4.ip_local_port_range",
 		"net.ipv4.tcp_syncookies",
 	}
-}
-
-// Whitelist provides a list of allowed sysctls and sysctl patterns (ending in *)
-// and a function to check whether a given sysctl matches this list.
-type Whitelist interface {
-	// Validate checks that all sysctls given in a v1.SysctlsPodAnnotationKey annotation
-	// are valid according to the whitelist.
-	Validate(pod *v1.Pod) error
 }
 
 // patternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
@@ -73,11 +64,11 @@ func NewWhitelist(patterns []string, annotationKey string) (*patternWhitelist, e
 	}
 
 	for _, s := range patterns {
-		if !extvalidation.IsValidSysctlPattern(s) {
+		if !policyvalidation.IsValidSysctlPattern(s) {
 			return nil, fmt.Errorf("sysctl %q must have at most %d characters and match regex %s",
 				s,
 				validation.SysctlMaxLength,
-				extvalidation.SysctlPatternFmt,
+				policyvalidation.SysctlPatternFmt,
 			)
 		}
 		if strings.HasSuffix(s, "*") {
@@ -130,7 +121,7 @@ func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 	return fmt.Errorf("%q not whitelisted", sysctl)
 }
 
-// Admit checks that all sysctls given in a v1.SysctlsPodAnnotationKey annotation
+// Admit checks that all sysctls given in annotations v1.SysctlsPodAnnotationKey and v1.UnsafeSysctlsPodAnnotationKey
 // are valid according to the whitelist.
 func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod

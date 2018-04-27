@@ -29,7 +29,7 @@ import (
 // runCmdPhase creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
 func runCmdPhase(cmdFunc func(outDir string, cfg *kubeadmapi.MasterConfiguration) error, outDir, cfgPath *string, cfg *kubeadmapiext.MasterConfiguration) func(cmd *cobra.Command, args []string) {
 
-	// the following statement build a clousure that wraps a call to a cmdFunc, binding
+	// the following statement build a closure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
 	// Please note that specific parameter should be passed as value, while other parameters - passed as reference -
 	// are shared between sub commands and gets access to current value e.g. flags value.

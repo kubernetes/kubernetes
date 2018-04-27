@@ -35,13 +35,10 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = [
-        "discovery_client_test.go",
         "helper_blackbox_test.go",
         "restmapper_test.go",
     ],
-    importpath = "k8s.io/client-go/discovery_test",
     deps = [
-        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -73,4 +70,19 @@ filegroup(
         "//staging/src/k8s.io/client-go/discovery/fake:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["discovery_client_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+    ],
 )

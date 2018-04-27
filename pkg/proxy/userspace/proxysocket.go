@@ -87,7 +87,7 @@ func (tcp *tcpProxySocket) ListenPort() int {
 }
 
 // TryConnectEndpoints attempts to connect to the next available endpoint for the given service, cycling
-// through until it is able to successully connect, or it has tried with all timeouts in EndpointDialTimeouts.
+// through until it is able to successfully connect, or it has tried with all timeouts in EndpointDialTimeouts.
 func TryConnectEndpoints(service proxy.ServicePortName, srcAddr net.Addr, protocol string, loadBalancer LoadBalancer) (out net.Conn, err error) {
 	sessionAffinityReset := false
 	for _, dialTimeout := range EndpointDialTimeouts {

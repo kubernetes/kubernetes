@@ -16,28 +16,65 @@ go_test(
         "preallocate_test.go",
         "purge_test.go",
     ],
-    importpath = "k8s.io/kubernetes/third_party/forked/etcd221/pkg/fileutil",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
         "fileutil.go",
-        "lock_unix.go",
-        "perallocate_unsupported.go",
         "purge.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "lock_unix.go",
+            "perallocate_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "lock_unix.go",
+            "perallocate_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "lock_unix.go",
+            "perallocate_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "lock_unix.go",
+            "perallocate_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "lock_unix.go",
             "preallocate.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "lock_unix.go",
+            "perallocate_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "lock_unix.go",
+            "perallocate_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "lock_unix.go",
+            "perallocate_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "lock_plan9.go",
+            "perallocate_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "lock_solaris.go",
+            "perallocate_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "lock_windows.go",
+            "perallocate_unsupported.go",
         ],
         "//conditions:default": [],
     }),
     importpath = "k8s.io/kubernetes/third_party/forked/etcd221/pkg/fileutil",
-    deps = ["//vendor/github.com/coreos/pkg/capnslog:go_default_library"],
+    deps = [
+        "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
+    ],
 )
 
 filegroup(

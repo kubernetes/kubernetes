@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["requestheader_test.go"],
-    importpath = "k8s.io/apiserver/pkg/authentication/request/headerrequest",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 

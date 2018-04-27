@@ -84,150 +84,40 @@ func compareContexts(name string, ex, ac *v1.SELinuxOptions, t *testing.T) {
 	}
 }
 
-func containerWithUser(ptr *int64) *v1.Container {
-	return &v1.Container{SecurityContext: &v1.SecurityContext{RunAsUser: ptr}}
-}
-
-func TestHaRootUID(t *testing.T) {
-	nonRoot := int64(1)
-	root := int64(0)
-
-	tests := map[string]struct {
-		container *v1.Container
-		expect    bool
-	}{
-		"nil sc": {
-			container: &v1.Container{SecurityContext: nil},
-		},
-		"nil runAsuser": {
-			container: containerWithUser(nil),
-		},
-		"runAsUser non-root": {
-			container: containerWithUser(&nonRoot),
-		},
-		"runAsUser root": {
-			container: containerWithUser(&root),
-			expect:    true,
-		},
-	}
-
-	for k, v := range tests {
-		actual := HasRootUID(v.container)
-		if actual != v.expect {
-			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
-		}
-	}
-}
-
-func TestHasRunAsUser(t *testing.T) {
-	runAsUser := int64(0)
-
-	tests := map[string]struct {
-		container *v1.Container
-		expect    bool
-	}{
-		"nil sc": {
-			container: &v1.Container{SecurityContext: nil},
-		},
-		"nil runAsUser": {
-			container: containerWithUser(nil),
-		},
-		"valid runAsUser": {
-			container: containerWithUser(&runAsUser),
-			expect:    true,
-		},
-	}
-
-	for k, v := range tests {
-		actual := HasRunAsUser(v.container)
-		if actual != v.expect {
-			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
-		}
-	}
-}
-
-func TestHasRootRunAsUser(t *testing.T) {
-	nonRoot := int64(1)
-	root := int64(0)
-
-	tests := map[string]struct {
-		container *v1.Container
-		expect    bool
-	}{
-		"nil sc": {
-			container: &v1.Container{SecurityContext: nil},
-		},
-		"nil runAsuser": {
-			container: containerWithUser(nil),
-		},
-		"runAsUser non-root": {
-			container: containerWithUser(&nonRoot),
-		},
-		"runAsUser root": {
-			container: containerWithUser(&root),
-			expect:    true,
-		},
-	}
-
-	for k, v := range tests {
-		actual := HasRootRunAsUser(v.container)
-		if actual != v.expect {
-			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
-		}
-	}
-}
-
 func TestAddNoNewPrivileges(t *testing.T) {
-	var nonRoot int64 = 1000
-	var root int64 = 0
 	pfalse := false
 	ptrue := true
 
 	tests := map[string]struct {
-		sc     v1.SecurityContext
+		sc     *v1.SecurityContext
 		expect bool
 	}{
-		"allowPrivilegeEscalation nil security context nil": {},
-		"allowPrivilegeEscalation nil nonRoot": {
-			sc: v1.SecurityContext{
-				RunAsUser: &nonRoot,
-			},
+		"allowPrivilegeEscalation nil security context nil": {
+			sc:     nil,
+			expect: false,
 		},
-		"allowPrivilegeEscalation nil root": {
-			sc: v1.SecurityContext{
-				RunAsUser: &root,
+		"allowPrivilegeEscalation nil": {
+			sc: &v1.SecurityContext{
+				AllowPrivilegeEscalation: nil,
 			},
+			expect: false,
 		},
-		"allowPrivilegeEscalation false nonRoot": {
-			sc: v1.SecurityContext{
-				RunAsUser:                &nonRoot,
+		"allowPrivilegeEscalation false": {
+			sc: &v1.SecurityContext{
 				AllowPrivilegeEscalation: &pfalse,
 			},
 			expect: true,
 		},
-		"allowPrivilegeEscalation false root": {
-			sc: v1.SecurityContext{
-				RunAsUser:                &root,
-				AllowPrivilegeEscalation: &pfalse,
-			},
-			expect: true,
-		},
-		"allowPrivilegeEscalation true nonRoot": {
-			sc: v1.SecurityContext{
-				RunAsUser:                &nonRoot,
+		"allowPrivilegeEscalation true": {
+			sc: &v1.SecurityContext{
 				AllowPrivilegeEscalation: &ptrue,
 			},
-		},
-		"allowPrivilegeEscalation true root": {
-			sc: v1.SecurityContext{
-				RunAsUser:                &root,
-				AllowPrivilegeEscalation: &ptrue,
-			},
+			expect: false,
 		},
 	}
 
 	for k, v := range tests {
-		actual := AddNoNewPrivileges(&v.sc)
+		actual := AddNoNewPrivileges(v.sc)
 		if actual != v.expect {
 			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
 		}

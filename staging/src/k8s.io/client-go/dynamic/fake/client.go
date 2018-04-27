@@ -46,7 +46,7 @@ func (c *FakeClient) GetRateLimiter() flowcontrol.RateLimiter {
 
 // Resource returns an API interface to the specified resource for this client's
 // group and version.  If resource is not a namespaced resource, then namespace
-// is ignored.  The ResourceClient inherits the paramater codec of this client
+// is ignored.  The ResourceClient inherits the parameter codec of this client
 func (c *FakeClient) Resource(resource *metav1.APIResource, namespace string) dynamic.ResourceInterface {
 	return &FakeResourceClient{
 		Resource:  c.GroupVersion.WithResource(resource.Name),

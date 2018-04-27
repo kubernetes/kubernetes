@@ -6,11 +6,49 @@ go_library(
         "inmem_socket.go",
         "proxy.go",
         "sockets.go",
-        "sockets_unix.go",
         "tcp_socket.go",
-        "unix_socket.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "sockets_unix.go",
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "sockets_windows.go",
         ],
         "//conditions:default": [],
@@ -20,7 +58,7 @@ go_library(
     deps = [
         "//vendor/golang.org/x/net/proxy:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/Microsoft/go-winio:go_default_library",
         ],
         "//conditions:default": [],

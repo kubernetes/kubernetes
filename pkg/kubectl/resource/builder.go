@@ -186,6 +186,8 @@ func (b *Builder) Unstructured() *Builder {
 		return b
 	}
 	b.mapper = b.unstructured
+	// the unstructured mapper doesn't do any conversion
+	b.mapper.ObjectConverter = nil
 	return b
 }
 
@@ -286,6 +288,9 @@ func (b *Builder) Path(recursive bool, paths ...string) *Builder {
 		}
 
 		b.paths = append(b.paths, visitors...)
+	}
+	if len(b.paths) == 0 && len(b.errs) == 0 {
+		b.errs = append(b.errs, fmt.Errorf("error reading %v: recognized file extensions are %v", paths, FileExtensions))
 	}
 	return b
 }
@@ -598,23 +603,43 @@ func (b *Builder) SingleResourceType() *Builder {
 	return b
 }
 
-// mappingFor returns the RESTMapping for the Kind referenced by the resource.
-// prefers a fully specified GroupVersionResource match.  If we don't have one match on GroupResource
-func (b *Builder) mappingFor(resourceArg string) (*meta.RESTMapping, error) {
-	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(resourceArg)
+// mappingFor returns the RESTMapping for the Kind given, or the Kind referenced by the resource.
+// Prefers a fully specified GroupVersionResource match. If one is not found, we match on a fully
+// specified GroupVersionKind, or fallback to a match on GroupKind.
+func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error) {
+	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(resourceOrKindArg)
 	gvk := schema.GroupVersionKind{}
 	if fullySpecifiedGVR != nil {
 		gvk, _ = b.mapper.KindFor(*fullySpecifiedGVR)
 	}
 	if gvk.Empty() {
-		var err error
-		gvk, err = b.mapper.KindFor(groupResource.WithVersion(""))
-		if err != nil {
-			return nil, err
+		gvk, _ = b.mapper.KindFor(groupResource.WithVersion(""))
+	}
+	if !gvk.Empty() {
+		return b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	}
+
+	fullySpecifiedGVK, groupKind := schema.ParseKindArg(resourceOrKindArg)
+	if fullySpecifiedGVK == nil {
+		gvk := groupKind.WithVersion("")
+		fullySpecifiedGVK = &gvk
+	}
+
+	if !fullySpecifiedGVK.Empty() {
+		if mapping, err := b.mapper.RESTMapping(fullySpecifiedGVK.GroupKind(), fullySpecifiedGVK.Version); err == nil {
+			return mapping, nil
 		}
 	}
 
-	return b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := b.mapper.RESTMapping(groupKind, gvk.Version)
+	if err != nil {
+		// if we error out here, it is because we could not match a resource or a kind
+		// for the given argument. To maintain consistency with previous behavior,
+		// announce that a resource type could not be found.
+		return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
+	}
+
+	return mapping, nil
 }
 
 func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
@@ -622,11 +647,17 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 		return nil, fmt.Errorf("you may only specify a single resource type")
 	}
 	mappings := []*meta.RESTMapping{}
+	seen := map[schema.GroupVersionKind]bool{}
 	for _, r := range b.resources {
 		mapping, err := b.mappingFor(r)
 		if err != nil {
 			return nil, err
 		}
+		// This ensures the mappings for resources(shortcuts, plural) unique
+		if seen[mapping.GroupVersionKind] {
+			continue
+		}
+		seen[mapping.GroupVersionKind] = true
 
 		mappings = append(mappings, mapping)
 	}
@@ -731,7 +762,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
+		visitors = append(visitors, NewSelector(client, mapping, b.mapper.ObjectConverter, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)
@@ -806,11 +837,12 @@ func (b *Builder) visitByResource() *Result {
 		}
 
 		info := &Info{
-			Client:    client,
-			Mapping:   mapping,
-			Namespace: selectorNamespace,
-			Name:      tuple.Name,
-			Export:    b.export,
+			Client:                     client,
+			Mapping:                    mapping,
+			toVersionedObjectConverter: b.mapper.ObjectConverter,
+			Namespace:                  selectorNamespace,
+			Name:                       tuple.Name,
+			Export:                     b.export,
 		}
 		items = append(items, info)
 	}
@@ -871,11 +903,12 @@ func (b *Builder) visitByName() *Result {
 	visitors := []Visitor{}
 	for _, name := range b.names {
 		info := &Info{
-			Client:    client,
-			Mapping:   mapping,
-			Namespace: selectorNamespace,
-			Name:      name,
-			Export:    b.export,
+			Client:                     client,
+			Mapping:                    mapping,
+			toVersionedObjectConverter: b.mapper.ObjectConverter,
+			Namespace:                  selectorNamespace,
+			Name:                       name,
+			Export:                     b.export,
 		}
 		visitors = append(visitors, info)
 	}

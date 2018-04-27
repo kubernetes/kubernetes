@@ -163,7 +163,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.restartPolicy",
 				"spec.schedulerName",
 				"status.phase",
-				"status.podIP":
+				"status.podIP",
+				"status.nominatedNodeName":
 				return label, value, nil
 			// This is for backwards compatibility with old v1 clients which send spec.host
 			case "spec.host":
@@ -349,6 +350,10 @@ func Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in *core.PodTemplateSpec
 		return err
 	}
 
+	// drop init container annotations so they don't take effect on legacy kubelets.
+	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
+	out.Annotations = dropInitContainerAnnotations(out.Annotations)
+
 	return nil
 }
 
@@ -356,6 +361,9 @@ func Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *v1.PodTemplateSpec, 
 	if err := autoConvert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
+
+	// drop init container annotations so they don't show up as differences when receiving requests from old clients
+	out.Annotations = dropInitContainerAnnotations(out.Annotations)
 
 	return nil
 }
@@ -376,6 +384,7 @@ func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s con
 		out.HostPID = in.SecurityContext.HostPID
 		out.HostNetwork = in.SecurityContext.HostNetwork
 		out.HostIPC = in.SecurityContext.HostIPC
+		out.ShareProcessNamespace = in.SecurityContext.ShareProcessNamespace
 	}
 
 	return nil
@@ -400,6 +409,18 @@ func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s con
 	out.SecurityContext.HostNetwork = in.HostNetwork
 	out.SecurityContext.HostPID = in.HostPID
 	out.SecurityContext.HostIPC = in.HostIPC
+	out.SecurityContext.ShareProcessNamespace = in.ShareProcessNamespace
+
+	return nil
+}
+
+func Convert_v1_Pod_To_core_Pod(in *v1.Pod, out *core.Pod, s conversion.Scope) error {
+	if err := autoConvert_v1_Pod_To_core_Pod(in, out, s); err != nil {
+		return err
+	}
+
+	// drop init container annotations so they don't show up as differences when receiving requests from old clients
+	out.Annotations = dropInitContainerAnnotations(out.Annotations)
 
 	return nil
 }
@@ -411,17 +432,7 @@ func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) e
 
 	// drop init container annotations so they don't take effect on legacy kubelets.
 	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
-	if len(out.Annotations) > 0 {
-		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-		delete(out.Annotations, "pod.beta.kubernetes.io/init-containers")
-		delete(out.Annotations, "pod.alpha.kubernetes.io/init-containers")
-		delete(out.Annotations, "pod.beta.kubernetes.io/init-container-statuses")
-		delete(out.Annotations, "pod.alpha.kubernetes.io/init-container-statuses")
-	}
+	out.Annotations = dropInitContainerAnnotations(out.Annotations)
 
 	return nil
 }
@@ -443,6 +454,7 @@ func Convert_v1_Secret_To_core_Secret(in *v1.Secret, out *core.Secret, s convers
 
 	return nil
 }
+
 func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext, out *v1.SecurityContext, s conversion.Scope) error {
 	if in.Capabilities != nil {
 		out.Capabilities = new(v1.Capabilities)
@@ -462,6 +474,7 @@ func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext
 		out.SELinuxOptions = nil
 	}
 	out.RunAsUser = in.RunAsUser
+	out.RunAsGroup = in.RunAsGroup
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	out.AllowPrivilegeEscalation = in.AllowPrivilegeEscalation
@@ -479,6 +492,7 @@ func Convert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecuri
 		out.SELinuxOptions = nil
 	}
 	out.RunAsUser = in.RunAsUser
+	out.RunAsGroup = in.RunAsGroup
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.FSGroup = in.FSGroup
 	return nil
@@ -495,6 +509,7 @@ func Convert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurity
 		out.SELinuxOptions = nil
 	}
 	out.RunAsUser = in.RunAsUser
+	out.RunAsGroup = in.RunAsGroup
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.FSGroup = in.FSGroup
 	return nil
@@ -568,4 +583,41 @@ func AddFieldLabelConversionsForSecret(scheme *runtime.Scheme) error {
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
 		})
+}
+
+var initContainerAnnotations = map[string]bool{
+	"pod.beta.kubernetes.io/init-containers":          true,
+	"pod.alpha.kubernetes.io/init-containers":         true,
+	"pod.beta.kubernetes.io/init-container-statuses":  true,
+	"pod.alpha.kubernetes.io/init-container-statuses": true,
+}
+
+// dropInitContainerAnnotations returns a copy of the annotations with init container annotations removed,
+// or the original annotations if no init container annotations were present.
+//
+// this can be removed once no clients prior to 1.8 are supported, and no kubelets prior to 1.8 can be run
+// (we don't support kubelets older than 2 versions skewed from the apiserver, but we don't prevent them, either)
+func dropInitContainerAnnotations(oldAnnotations map[string]string) map[string]string {
+	if len(oldAnnotations) == 0 {
+		return oldAnnotations
+	}
+
+	found := false
+	for k := range initContainerAnnotations {
+		if _, ok := oldAnnotations[k]; ok {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return oldAnnotations
+	}
+
+	newAnnotations := make(map[string]string, len(oldAnnotations))
+	for k, v := range oldAnnotations {
+		if !initContainerAnnotations[k] {
+			newAnnotations[k] = v
+		}
+	}
+	return newAnnotations
 }

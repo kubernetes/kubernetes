@@ -12,8 +12,7 @@ go_test(
         "errors_test.go",
         "path_test.go",
     ],
-    importpath = "k8s.io/apimachinery/pkg/util/validation/field",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(

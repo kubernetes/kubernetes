@@ -64,7 +64,8 @@ func NewCmdReconcile(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "reconcile -f FILENAME",
+		Use: "reconcile -f FILENAME",
+		DisableFlagsInUseLine: true,
 		Short:   "Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects",
 		Long:    reconcileLong,
 		Example: reconcileExample,
@@ -113,15 +114,14 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	o.RBACClient = client.Rbac()
 	o.NamespaceClient = client.Core().Namespaces()
 
-	mapper, _ := f.Object()
 	dryRun := false
 	output := cmdutil.GetFlagString(cmd, "output")
 	shortOutput := output == "name"
 	o.Print = func(info *resource.Info) error {
 		if len(output) > 0 && !shortOutput {
-			return f.PrintResourceInfoForCommand(cmd, info, o.Out)
+			return cmdutil.PrintObject(cmd, info.Object, o.Out)
 		}
-		f.PrintSuccess(mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "reconciled")
+		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "reconciled")
 		return nil
 	}
 

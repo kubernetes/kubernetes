@@ -15,7 +15,6 @@ go_library(
         "deployment_expansion.go",
         "expansion_generated.go",
         "ingress.go",
-        "podsecuritypolicy.go",
         "replicaset.go",
         "replicaset_expansion.go",
     ],
@@ -46,8 +45,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["daemonset_expansion_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",

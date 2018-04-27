@@ -16,6 +16,7 @@ package containerd
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
@@ -45,32 +46,38 @@ type containerdClient interface {
 	Version(ctx context.Context) (string, error)
 }
 
+var once sync.Once
+var ctrdClient containerdClient = nil
+
 // Client creates a containerd client
 func Client() (containerdClient, error) {
-	gopts := []grpc.DialOption{
-		grpc.WithInsecure(),
-		grpc.FailOnNonTempDialError(true),
-		grpc.WithDialer(dialer.Dialer),
-		grpc.WithBlock(),
-		grpc.WithTimeout(2 * time.Second),
-		grpc.WithBackoffMaxDelay(3 * time.Second),
-	}
-	unary, stream := newNSInterceptors(k8sNamespace)
-	gopts = append(gopts,
-		grpc.WithUnaryInterceptor(unary),
-		grpc.WithStreamInterceptor(stream),
-	)
+	var retErr error
+	once.Do(func() {
+		gopts := []grpc.DialOption{
+			grpc.WithInsecure(),
+			grpc.WithDialer(dialer.Dialer),
+			grpc.WithBlock(),
+			grpc.WithTimeout(2 * time.Second),
+			grpc.WithBackoffMaxDelay(3 * time.Second),
+		}
+		unary, stream := newNSInterceptors(k8sNamespace)
+		gopts = append(gopts,
+			grpc.WithUnaryInterceptor(unary),
+			grpc.WithStreamInterceptor(stream),
+		)
 
-	conn, err := grpc.Dial(dialer.DialAddress("/var/run/containerd/containerd.sock"), gopts...)
-	if err != nil {
-		return nil, err
-	}
-	c := &client{
-		containerService: containersapi.NewContainersClient(conn),
-		taskService:      tasksapi.NewTasksClient(conn),
-		versionService:   versionapi.NewVersionClient(conn),
-	}
-	return c, err
+		conn, err := grpc.Dial(dialer.DialAddress("/var/run/containerd/containerd.sock"), gopts...)
+		if err != nil {
+			retErr = err
+			return
+		}
+		ctrdClient = &client{
+			containerService: containersapi.NewContainersClient(conn),
+			taskService:      tasksapi.NewTasksClient(conn),
+			versionService:   versionapi.NewVersionClient(conn),
+		}
+	})
+	return ctrdClient, retErr
 }
 
 func (c *client) LoadContainer(ctx context.Context, id string) (*containers.Container, error) {

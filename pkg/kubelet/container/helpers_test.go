@@ -254,6 +254,20 @@ func TestHasPrivilegedContainer(t *testing.T) {
 			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
 		}
 	}
+	// Test init containers as well.
+	for k, v := range tests {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{
+					{SecurityContext: v.securityContext},
+				},
+			},
+		}
+		actual := HasPrivilegedContainer(pod)
+		if actual != v.expected {
+			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
+		}
+	}
 }
 
 func TestMakePortMappings(t *testing.T) {

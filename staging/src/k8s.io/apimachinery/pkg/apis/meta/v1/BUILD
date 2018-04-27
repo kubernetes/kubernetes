@@ -18,8 +18,7 @@ go_test(
         "time_test.go",
         "types_test.go",
     ],
-    importpath = "k8s.io/apimachinery/pkg/apis/meta/v1",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/json-iterator/go:go_default_library",
@@ -53,7 +52,6 @@ go_library(
     ],
     importpath = "k8s.io/apimachinery/pkg/apis/meta/v1",
     deps = [
-        "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
@@ -67,7 +65,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 
@@ -97,7 +94,6 @@ filegroup(
 go_test(
     name = "go_default_xtest",
     srcs = ["conversion_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/apis/meta/v1_test",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

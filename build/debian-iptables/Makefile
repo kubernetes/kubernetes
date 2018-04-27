@@ -14,7 +14,7 @@
 
 .PHONY:	build push
 
-REGISTRY?="k8s.gcr.io"
+REGISTRY?="staging-k8s.gcr.io"
 IMAGE=debian-iptables
 TAG=v10
 ARCH?=amd64
@@ -55,6 +55,6 @@ endif
 	docker build --pull -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
+	docker push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
 
 all: push

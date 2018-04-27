@@ -32,8 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 )
 
 const message = "Preempted in order to admit critical pod"
@@ -248,7 +248,6 @@ func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod)
 // returns true if pod1 has a smaller request than pod2
 func smallerResourceRequest(pod1 *v1.Pod, pod2 *v1.Pod) bool {
 	priorityList := []v1.ResourceName{
-		v1.ResourceNvidiaGPU,
 		v1.ResourceMemory,
 		v1.ResourceCPU,
 	}

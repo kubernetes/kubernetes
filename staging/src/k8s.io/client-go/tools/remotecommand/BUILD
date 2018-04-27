@@ -12,8 +12,7 @@ go_test(
         "v2_test.go",
         "v4_test.go",
     ],
-    importpath = "k8s.io/client-go/tools/remotecommand",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",

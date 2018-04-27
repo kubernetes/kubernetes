@@ -16,8 +16,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["keymutex_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/keymutex",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

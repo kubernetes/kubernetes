@@ -199,3 +199,31 @@ func (sm *Manager) AcquireLocalTicket(ctx context.Context, userName string) (*ty
 
 	return &res.Returnval, nil
 }
+
+func (sm *Manager) AcquireCloneTicket(ctx context.Context) (string, error) {
+	req := types.AcquireCloneTicket{
+		This: sm.Reference(),
+	}
+
+	res, err := methods.AcquireCloneTicket(ctx, sm.client, &req)
+	if err != nil {
+		return "", err
+	}
+
+	return res.Returnval, nil
+}
+
+func (sm *Manager) CloneSession(ctx context.Context, ticket string) error {
+	req := types.CloneSession{
+		This:        sm.Reference(),
+		CloneTicket: ticket,
+	}
+
+	res, err := methods.CloneSession(ctx, sm.client, &req)
+	if err != nil {
+		return err
+	}
+
+	sm.userSession = &res.Returnval
+	return nil
+}

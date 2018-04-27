@@ -51,7 +51,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 server_addr=""
-kubelet_addreses=""
+kubelet_addresses=""
 kubelet_binary=""
 master_binary=""
 scheduler_binary=""
@@ -72,10 +72,10 @@ fi
 
 HEAPSTER_VERSION="v0.18.2"
 MASTER_PPROF_PATH=""
-HEAPSTER_PPROF_PATH="/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster"
+HEAPSTER_PPROF_PATH="/api/v1/namespaces/kube-system/services/monitoring-heapster/proxy"
 KUBELET_PPROF_PATH_PREFIX="/api/v1/proxy/nodes"
-SCHEDULER_PPROF_PATH_PREFIX="/api/v1/proxy/namespaces/kube-system/pods/kube-scheduler"
-CONTROLLER_MANAGER_PPROF_PATH_PREFIX="/api/v1/proxy/namespaces/kube-system/pods/kube-controller-manager"
+SCHEDULER_PPROF_PATH_PREFIX="/api/v1/namespaces/kube-system/pods/kube-scheduler/proxy"
+CONTROLLER_MANAGER_PPROF_PATH_PREFIX="/api/v1/namespaces/kube-system/pods/kube-controller-manager/proxy"
 
 eval set -- "${args}"
 
@@ -97,7 +97,7 @@ while true; do
     --master-binary)
       shift
       if [ -z "$1" ]; then
-        >&2 echo "empty argumet to --master-binary flag"
+        >&2 echo "empty argument to --master-binary flag"
         exit 1
       fi
       master_binary=$1
@@ -111,16 +111,16 @@ while true; do
       shift
       profile_components="kubelet ${profile_components}"
       if [ -z "$1" ]; then
-        >&2 echo "empty argumet to --kubelet flag"
+        >&2 echo "empty argument to --kubelet flag"
         exit 1
       fi
-      kubelet_addreses="$1 $kubelet_addreses"
+      kubelet_addresses="$1 $kubelet_addresses"
       shift
       ;;
     --kubelet-binary)
       shift
       if [ -z "$1" ]; then
-        >&2 echo "empty argumet to --kubelet-binary flag"
+        >&2 echo "empty argument to --kubelet-binary flag"
         exit 1
       fi
       kubelet_binary=$1
@@ -133,7 +133,7 @@ while true; do
     --scheduler-binary)
       shift
       if [ -z "$1" ]; then
-        >&2 echo "empty argumet to --scheduler-binary flag"
+        >&2 echo "empty argument to --scheduler-binary flag"
         exit 1
       fi
       scheduler_binary=$1
@@ -142,7 +142,7 @@ while true; do
     --scheduler-port)
       shift
       if [ -z "$1" ]; then
-        >&2 echo "empty argumet to --scheduler-port flag"
+        >&2 echo "empty argument to --scheduler-port flag"
         exit 1
       fi
       scheduler_port=$1
@@ -155,7 +155,7 @@ while true; do
     --controller-manager-binary)
       shift
       if [ -z "$1" ]; then
-        >&2 echo "empty argumet to --controller-manager-binary flag"
+        >&2 echo "empty argument to --controller-manager-binary flag"
         exit 1
       fi
       controller_manager_binary=$1
@@ -164,10 +164,10 @@ while true; do
     --controller-manager-port)
       shift
       if [ -z "$1" ]; then
-        >&2 echo "empty argumet to --controller-manager-port flag"
+        >&2 echo "empty argument to --controller-manager-port flag"
         exit 1
       fi
-      controller-managerr_port=$1
+      controller_manager_port=$1
       shift
       ;;
     -o|--output)
@@ -240,18 +240,18 @@ if [[ -z "${requested_profiles}" ]]; then
   exit 1
 fi
 
-gcloud compute ssh "${server_addr}" --ssh-flag=-nN --ssh-flag=-L${tunnel_port}:localhost:8080 &
+gcloud compute ssh "${server_addr}" --ssh-flag=-nN --ssh-flag=-L"${tunnel_port}":localhost:8080 &
 
 echo "Waiting for tunnel to be created..."
-kube::util::wait_for_url http://localhost:${tunnel_port}/healthz
+kube::util::wait_for_url http://localhost:"${tunnel_port}"/healthz
 
 SSH_PID=$(pgrep -f "/usr/bin/ssh.*${tunnel_port}:localhost:8080")
-kube::util::trap_add 'kill $SSH_PID' EXIT
-kube::util::trap_add 'kill $SSH_PID' SIGTERM
+kube::util::trap_add "kill $SSH_PID" EXIT
+kube::util::trap_add "kill $SSH_PID" SIGTERM
 
-requested_profiles=$(echo ${requested_profiles} | xargs -n1 | LC_ALL=C sort -u | xargs)
-profile_components=$(echo ${profile_components} | xargs -n1 | LC_ALL=C sort -u | xargs)
-kubelet_addreses=$(echo ${kubelet_addreses} | xargs -n1 | LC_ALL=C sort -u | xargs)
+requested_profiles=$(echo "${requested_profiles}" | xargs -n1 | LC_ALL=C sort -u | xargs)
+profile_components=$(echo "${profile_components}" | xargs -n1 | LC_ALL=C sort -u | xargs)
+kubelet_addresses=$(echo "${kubelet_addresses}" | xargs -n1 | LC_ALL=C sort -u | xargs)
 echo "requested profiles: ${requested_profiles}"
 echo "flags for heap profile: ${mem_pprof_flags}"
 
@@ -291,10 +291,10 @@ for component in ${profile_components}; do
   esac
 
   if [[ "${component}" == "kubelet" ]]; then
-    for node in $(echo ${kubelet_addreses} | sed 's/[,;]/\n/g'); do
-      grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}/${node}" "${output_dir}/${component}" "${timestamp}"
-    done    
-  else 
+    for node in ${kubelet_addresses//[,;]/' '}; do
+      grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}/${node}/proxy" "${output_dir}/${component}" "${timestamp}"
+    done
+  else
     grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}" "${output_dir}/${component}" "${timestamp}"
   fi
 done

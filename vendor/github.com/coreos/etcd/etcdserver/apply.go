@@ -16,7 +16,6 @@ package etcdserver
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"time"
 
@@ -30,11 +29,6 @@ import (
 )
 
 const (
-	// noTxn is an invalid txn ID.
-	// To apply with independent Range, Put, Delete, you can pass noTxn
-	// to apply functions instead of a valid txn ID.
-	noTxn = -1
-
 	warnApplyDuration = 100 * time.Millisecond
 )
 
@@ -51,9 +45,9 @@ type applyResult struct {
 type applierV3 interface {
 	Apply(r *pb.InternalRaftRequest) *applyResult
 
-	Put(txnID int64, p *pb.PutRequest) (*pb.PutResponse, error)
-	Range(txnID int64, r *pb.RangeRequest) (*pb.RangeResponse, error)
-	DeleteRange(txnID int64, dr *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error)
+	Put(txn mvcc.TxnWrite, p *pb.PutRequest) (*pb.PutResponse, error)
+	Range(txn mvcc.TxnRead, r *pb.RangeRequest) (*pb.RangeResponse, error)
+	DeleteRange(txn mvcc.TxnWrite, dr *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error)
 	Txn(rt *pb.TxnRequest) (*pb.TxnResponse, error)
 	Compaction(compaction *pb.CompactionRequest) (*pb.CompactionResponse, <-chan struct{}, error)
 
@@ -99,11 +93,11 @@ func (a *applierV3backend) Apply(r *pb.InternalRaftRequest) *applyResult {
 	// call into a.s.applyV3.F instead of a.F so upper appliers can check individual calls
 	switch {
 	case r.Range != nil:
-		ar.resp, ar.err = a.s.applyV3.Range(noTxn, r.Range)
+		ar.resp, ar.err = a.s.applyV3.Range(nil, r.Range)
 	case r.Put != nil:
-		ar.resp, ar.err = a.s.applyV3.Put(noTxn, r.Put)
+		ar.resp, ar.err = a.s.applyV3.Put(nil, r.Put)
 	case r.DeleteRange != nil:
-		ar.resp, ar.err = a.s.applyV3.DeleteRange(noTxn, r.DeleteRange)
+		ar.resp, ar.err = a.s.applyV3.DeleteRange(nil, r.DeleteRange)
 	case r.Txn != nil:
 		ar.resp, ar.err = a.s.applyV3.Txn(r.Txn)
 	case r.Compaction != nil:
@@ -152,106 +146,87 @@ func (a *applierV3backend) Apply(r *pb.InternalRaftRequest) *applyResult {
 	return ar
 }
 
-func (a *applierV3backend) Put(txnID int64, p *pb.PutRequest) (*pb.PutResponse, error) {
-	resp := &pb.PutResponse{}
+func (a *applierV3backend) Put(txn mvcc.TxnWrite, p *pb.PutRequest) (resp *pb.PutResponse, err error) {
+	resp = &pb.PutResponse{}
 	resp.Header = &pb.ResponseHeader{}
-	var (
-		rev int64
-		err error
-	)
 
-	var rr *mvcc.RangeResult
-	if p.PrevKv {
-		if txnID != noTxn {
-			rr, err = a.s.KV().TxnRange(txnID, p.Key, nil, mvcc.RangeOptions{})
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			rr, err = a.s.KV().Range(p.Key, nil, mvcc.RangeOptions{})
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	if txnID != noTxn {
-		rev, err = a.s.KV().TxnPut(txnID, p.Key, p.Value, lease.LeaseID(p.Lease))
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		leaseID := lease.LeaseID(p.Lease)
+	val, leaseID := p.Value, lease.LeaseID(p.Lease)
+	if txn == nil {
 		if leaseID != lease.NoLease {
 			if l := a.s.lessor.Lookup(leaseID); l == nil {
 				return nil, lease.ErrLeaseNotFound
 			}
 		}
-		rev = a.s.KV().Put(p.Key, p.Value, leaseID)
+		txn = a.s.KV().Write()
+		defer txn.End()
 	}
-	resp.Header.Revision = rev
-	if rr != nil && len(rr.KVs) != 0 {
-		resp.PrevKv = &rr.KVs[0]
+
+	var rr *mvcc.RangeResult
+	if p.IgnoreValue || p.IgnoreLease || p.PrevKv {
+		rr, err = txn.Range(p.Key, nil, mvcc.RangeOptions{})
+		if err != nil {
+			return nil, err
+		}
 	}
+	if p.IgnoreValue || p.IgnoreLease {
+		if rr == nil || len(rr.KVs) == 0 {
+			// ignore_{lease,value} flag expects previous key-value pair
+			return nil, ErrKeyNotFound
+		}
+	}
+	if p.IgnoreValue {
+		val = rr.KVs[0].Value
+	}
+	if p.IgnoreLease {
+		leaseID = lease.LeaseID(rr.KVs[0].Lease)
+	}
+	if p.PrevKv {
+		if rr != nil && len(rr.KVs) != 0 {
+			resp.PrevKv = &rr.KVs[0]
+		}
+	}
+
+	resp.Header.Revision = txn.Put(p.Key, val, leaseID)
 	return resp, nil
 }
 
-func (a *applierV3backend) DeleteRange(txnID int64, dr *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error) {
+func (a *applierV3backend) DeleteRange(txn mvcc.TxnWrite, dr *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error) {
 	resp := &pb.DeleteRangeResponse{}
 	resp.Header = &pb.ResponseHeader{}
 
-	var (
-		n   int64
-		rev int64
-		err error
-	)
+	if txn == nil {
+		txn = a.s.kv.Write()
+		defer txn.End()
+	}
 
 	if isGteRange(dr.RangeEnd) {
 		dr.RangeEnd = []byte{}
 	}
 
-	var rr *mvcc.RangeResult
 	if dr.PrevKv {
-		if txnID != noTxn {
-			rr, err = a.s.KV().TxnRange(txnID, dr.Key, dr.RangeEnd, mvcc.RangeOptions{})
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			rr, err = a.s.KV().Range(dr.Key, dr.RangeEnd, mvcc.RangeOptions{})
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	if txnID != noTxn {
-		n, rev, err = a.s.KV().TxnDeleteRange(txnID, dr.Key, dr.RangeEnd)
+		rr, err := txn.Range(dr.Key, dr.RangeEnd, mvcc.RangeOptions{})
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		n, rev = a.s.KV().DeleteRange(dr.Key, dr.RangeEnd)
-	}
-
-	resp.Deleted = n
-	if rr != nil {
-		for i := range rr.KVs {
-			resp.PrevKvs = append(resp.PrevKvs, &rr.KVs[i])
+		if rr != nil {
+			for i := range rr.KVs {
+				resp.PrevKvs = append(resp.PrevKvs, &rr.KVs[i])
+			}
 		}
 	}
-	resp.Header.Revision = rev
+
+	resp.Deleted, resp.Header.Revision = txn.DeleteRange(dr.Key, dr.RangeEnd)
 	return resp, nil
 }
 
-func (a *applierV3backend) Range(txnID int64, r *pb.RangeRequest) (*pb.RangeResponse, error) {
+func (a *applierV3backend) Range(txn mvcc.TxnRead, r *pb.RangeRequest) (*pb.RangeResponse, error) {
 	resp := &pb.RangeResponse{}
 	resp.Header = &pb.ResponseHeader{}
 
-	var (
-		rr  *mvcc.RangeResult
-		err error
-	)
+	if txn == nil {
+		txn = a.s.kv.Read()
+		defer txn.End()
+	}
 
 	if isGteRange(r.RangeEnd) {
 		r.RangeEnd = []byte{}
@@ -275,16 +250,9 @@ func (a *applierV3backend) Range(txnID int64, r *pb.RangeRequest) (*pb.RangeResp
 		Count: r.CountOnly,
 	}
 
-	if txnID != noTxn {
-		rr, err = a.s.KV().TxnRange(txnID, r.Key, r.RangeEnd, ro)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		rr, err = a.s.KV().Range(r.Key, r.RangeEnd, ro)
-		if err != nil {
-			return nil, err
-		}
+	rr, err := txn.Range(r.Key, r.RangeEnd, ro)
+	if err != nil {
+		return nil, err
 	}
 
 	if r.MaxModRevision != 0 {
@@ -350,61 +318,64 @@ func (a *applierV3backend) Range(txnID int64, r *pb.RangeRequest) (*pb.RangeResp
 }
 
 func (a *applierV3backend) Txn(rt *pb.TxnRequest) (*pb.TxnResponse, error) {
-	ok := true
-	for _, c := range rt.Compare {
-		if _, ok = a.applyCompare(c); !ok {
-			break
+	isWrite := !isTxnReadonly(rt)
+	txn := mvcc.NewReadOnlyTxnWrite(a.s.KV().Read())
+
+	reqs, ok := a.compareToOps(txn, rt)
+	if isWrite {
+		if err := a.checkRequestPut(txn, reqs); err != nil {
+			txn.End()
+			return nil, err
 		}
 	}
-
-	var reqs []*pb.RequestOp
-	if ok {
-		reqs = rt.Success
-	} else {
-		reqs = rt.Failure
-	}
-
-	if err := a.checkRequestLeases(reqs); err != nil {
+	if err := checkRequestRange(txn, reqs); err != nil {
+		txn.End()
 		return nil, err
 	}
-	if err := a.checkRequestRange(reqs); err != nil {
-		return nil, err
-	}
-
-	// When executing the operations of txn, we need to hold the txn lock.
-	// So the reader will not see any intermediate results.
-	txnID := a.s.KV().TxnBegin()
 
 	resps := make([]*pb.ResponseOp, len(reqs))
+	txnResp := &pb.TxnResponse{
+		Responses: resps,
+		Succeeded: ok,
+		Header:    &pb.ResponseHeader{},
+	}
+
+	// When executing mutable txn ops, etcd must hold the txn lock so
+	// readers do not see any intermediate results. Since writes are
+	// serialized on the raft loop, the revision in the read view will
+	// be the revision of the write txn.
+	if isWrite {
+		txn.End()
+		txn = a.s.KV().Write()
+	}
 	for i := range reqs {
-		resps[i] = a.applyUnion(txnID, reqs[i])
+		resps[i] = a.applyUnion(txn, reqs[i])
 	}
-
-	err := a.s.KV().TxnEnd(txnID)
-	if err != nil {
-		panic(fmt.Sprint("unexpected error when closing txn", txnID))
+	rev := txn.Rev()
+	if len(txn.Changes()) != 0 {
+		rev++
 	}
+	txn.End()
 
-	txnResp := &pb.TxnResponse{}
-	txnResp.Header = &pb.ResponseHeader{}
-	txnResp.Header.Revision = a.s.KV().Rev()
-	txnResp.Responses = resps
-	txnResp.Succeeded = ok
+	txnResp.Header.Revision = rev
 	return txnResp, nil
 }
 
-// applyCompare applies the compare request.
-// It returns the revision at which the comparison happens. If the comparison
-// succeeds, the it returns true. Otherwise it returns false.
-func (a *applierV3backend) applyCompare(c *pb.Compare) (int64, bool) {
-	rr, err := a.s.KV().Range(c.Key, nil, mvcc.RangeOptions{})
-	rev := rr.Rev
-
-	if err != nil {
-		if err == mvcc.ErrTxnIDMismatch {
-			panic("unexpected txn ID mismatch error")
+func (a *applierV3backend) compareToOps(rv mvcc.ReadView, rt *pb.TxnRequest) ([]*pb.RequestOp, bool) {
+	for _, c := range rt.Compare {
+		if !applyCompare(rv, c) {
+			return rt.Failure, false
 		}
-		return rev, false
+	}
+	return rt.Success, true
+}
+
+// applyCompare applies the compare request.
+// If the comparison succeeds, it returns true. Otherwise, returns false.
+func applyCompare(rv mvcc.ReadView, c *pb.Compare) bool {
+	rr, err := rv.Range(c.Key, nil, mvcc.RangeOptions{})
+	if err != nil {
+		return false
 	}
 	var ckv mvccpb.KeyValue
 	if len(rr.KVs) != 0 {
@@ -416,7 +387,7 @@ func (a *applierV3backend) applyCompare(c *pb.Compare) (int64, bool) {
 			// We can treat non-existence as the empty set explicitly, such that
 			// even a key with a value of length 0 bytes is still a real key
 			// that was written that way
-			return rev, false
+			return false
 		}
 	}
 
@@ -448,30 +419,22 @@ func (a *applierV3backend) applyCompare(c *pb.Compare) (int64, bool) {
 
 	switch c.Result {
 	case pb.Compare_EQUAL:
-		if result != 0 {
-			return rev, false
-		}
+		return result == 0
 	case pb.Compare_NOT_EQUAL:
-		if result == 0 {
-			return rev, false
-		}
+		return result != 0
 	case pb.Compare_GREATER:
-		if result != 1 {
-			return rev, false
-		}
+		return result > 0
 	case pb.Compare_LESS:
-		if result != -1 {
-			return rev, false
-		}
+		return result < 0
 	}
-	return rev, true
+	return true
 }
 
-func (a *applierV3backend) applyUnion(txnID int64, union *pb.RequestOp) *pb.ResponseOp {
+func (a *applierV3backend) applyUnion(txn mvcc.TxnWrite, union *pb.RequestOp) *pb.ResponseOp {
 	switch tv := union.Request.(type) {
 	case *pb.RequestOp_RequestRange:
 		if tv.RequestRange != nil {
-			resp, err := a.Range(txnID, tv.RequestRange)
+			resp, err := a.Range(txn, tv.RequestRange)
 			if err != nil {
 				plog.Panicf("unexpected error during txn: %v", err)
 			}
@@ -479,7 +442,7 @@ func (a *applierV3backend) applyUnion(txnID int64, union *pb.RequestOp) *pb.Resp
 		}
 	case *pb.RequestOp_RequestPut:
 		if tv.RequestPut != nil {
-			resp, err := a.Put(txnID, tv.RequestPut)
+			resp, err := a.Put(txn, tv.RequestPut)
 			if err != nil {
 				plog.Panicf("unexpected error during txn: %v", err)
 			}
@@ -487,7 +450,7 @@ func (a *applierV3backend) applyUnion(txnID int64, union *pb.RequestOp) *pb.Resp
 		}
 	case *pb.RequestOp_RequestDeleteRange:
 		if tv.RequestDeleteRange != nil {
-			resp, err := a.DeleteRange(txnID, tv.RequestDeleteRange)
+			resp, err := a.DeleteRange(txn, tv.RequestDeleteRange)
 			if err != nil {
 				plog.Panicf("unexpected error during txn: %v", err)
 			}
@@ -588,7 +551,7 @@ type applierV3Capped struct {
 // with Puts so that the number of keys in the store is capped.
 func newApplierV3Capped(base applierV3) applierV3 { return &applierV3Capped{applierV3: base} }
 
-func (a *applierV3Capped) Put(txnID int64, p *pb.PutRequest) (*pb.PutResponse, error) {
+func (a *applierV3Capped) Put(txn mvcc.TxnWrite, p *pb.PutRequest) (*pb.PutResponse, error) {
 	return nil, ErrNoSpace
 }
 
@@ -617,7 +580,7 @@ func (a *applierV3backend) AuthDisable() (*pb.AuthDisableResponse, error) {
 }
 
 func (a *applierV3backend) Authenticate(r *pb.InternalAuthenticateRequest) (*pb.AuthenticateResponse, error) {
-	ctx := context.WithValue(context.WithValue(context.Background(), "index", a.s.consistIndex.ConsistentIndex()), "simpleToken", r.SimpleToken)
+	ctx := context.WithValue(context.WithValue(a.s.ctx, "index", a.s.consistIndex.ConsistentIndex()), "simpleToken", r.SimpleToken)
 	resp, err := a.s.AuthStore().Authenticate(ctx, r.Name, r.Password)
 	if resp != nil {
 		resp.Header = newHeader(a.s)
@@ -738,9 +701,9 @@ func newQuotaApplierV3(s *EtcdServer, app applierV3) applierV3 {
 	return &quotaApplierV3{app, NewBackendQuota(s)}
 }
 
-func (a *quotaApplierV3) Put(txnID int64, p *pb.PutRequest) (*pb.PutResponse, error) {
+func (a *quotaApplierV3) Put(txn mvcc.TxnWrite, p *pb.PutRequest) (*pb.PutResponse, error) {
 	ok := a.q.Available(p)
-	resp, err := a.applierV3.Put(txnID, p)
+	resp, err := a.applierV3.Put(txn, p)
 	if err == nil && !ok {
 		err = ErrNoSpace
 	}
@@ -804,14 +767,27 @@ func (s *kvSortByValue) Less(i, j int) bool {
 	return bytes.Compare(s.kvs[i].Value, s.kvs[j].Value) < 0
 }
 
-func (a *applierV3backend) checkRequestLeases(reqs []*pb.RequestOp) error {
+func (a *applierV3backend) checkRequestPut(rv mvcc.ReadView, reqs []*pb.RequestOp) error {
 	for _, requ := range reqs {
 		tv, ok := requ.Request.(*pb.RequestOp_RequestPut)
 		if !ok {
 			continue
 		}
 		preq := tv.RequestPut
-		if preq == nil || lease.LeaseID(preq.Lease) == lease.NoLease {
+		if preq == nil {
+			continue
+		}
+		if preq.IgnoreValue || preq.IgnoreLease {
+			// expects previous key-value, error if not exist
+			rr, err := rv.Range(preq.Key, nil, mvcc.RangeOptions{})
+			if err != nil {
+				return err
+			}
+			if rr == nil || len(rr.KVs) == 0 {
+				return ErrKeyNotFound
+			}
+		}
+		if lease.LeaseID(preq.Lease) == lease.NoLease {
 			continue
 		}
 		if l := a.s.lessor.Lookup(lease.LeaseID(preq.Lease)); l == nil {
@@ -821,7 +797,7 @@ func (a *applierV3backend) checkRequestLeases(reqs []*pb.RequestOp) error {
 	return nil
 }
 
-func (a *applierV3backend) checkRequestRange(reqs []*pb.RequestOp) error {
+func checkRequestRange(rv mvcc.ReadView, reqs []*pb.RequestOp) error {
 	for _, requ := range reqs {
 		tv, ok := requ.Request.(*pb.RequestOp_RequestRange)
 		if !ok {
@@ -832,10 +808,10 @@ func (a *applierV3backend) checkRequestRange(reqs []*pb.RequestOp) error {
 			continue
 		}
 
-		if greq.Revision > a.s.KV().Rev() {
+		if greq.Revision > rv.Rev() {
 			return mvcc.ErrFutureRev
 		}
-		if greq.Revision < a.s.KV().FirstRev() {
+		if greq.Revision < rv.FirstRev() {
 			return mvcc.ErrCompacted
 		}
 	}

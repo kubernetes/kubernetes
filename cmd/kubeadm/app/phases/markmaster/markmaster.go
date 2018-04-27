@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,9 +34,13 @@ import (
 )
 
 // MarkMaster taints the master and sets the master label
-func MarkMaster(client clientset.Interface, masterName string) error {
+func MarkMaster(client clientset.Interface, masterName string, taint bool) error {
 
-	fmt.Printf("[markmaster] Will mark node %s as master by adding a label and a taint\n", masterName)
+	if taint {
+		glog.Infof("[markmaster] will mark node %s as master by adding a label and a taint\n", masterName)
+	} else {
+		glog.Infof("[markmaster] will mark node %s as master by adding a label\n", masterName)
+	}
 
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
 	return wait.Poll(kubeadmconstants.APICallRetryInterval, kubeadmconstants.MarkMasterTimeout, func() (bool, error) {
@@ -56,7 +62,7 @@ func MarkMaster(client clientset.Interface, masterName string) error {
 		}
 
 		// The master node should be tainted and labelled accordingly
-		markMasterNode(n)
+		markMasterNode(n, taint)
 
 		newData, err := json.Marshal(n)
 		if err != nil {
@@ -76,15 +82,23 @@ func MarkMaster(client clientset.Interface, masterName string) error {
 			return false, err
 		}
 
-		fmt.Printf("[markmaster] Master %s tainted and labelled with key/value: %s=%q\n", masterName, kubeadmconstants.LabelNodeRoleMaster, "")
+		if taint {
+			fmt.Printf("[markmaster] Master %s tainted and labelled with key/value: %s=%q\n", masterName, kubeadmconstants.LabelNodeRoleMaster, "")
+		} else {
+			fmt.Printf("[markmaster] Master %s labelled with key/value: %s=%q\n", masterName, kubeadmconstants.LabelNodeRoleMaster, "")
+		}
 
 		return true, nil
 	})
 }
 
-func markMasterNode(n *v1.Node) {
+func markMasterNode(n *v1.Node, taint bool) {
 	n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleMaster] = ""
-	addTaintIfNotExists(n, kubeadmconstants.MasterTaint)
+	if taint {
+		addTaintIfNotExists(n, kubeadmconstants.MasterTaint)
+	} else {
+		delTaintIfExists(n, kubeadmconstants.MasterTaint)
+	}
 }
 
 func addTaintIfNotExists(n *v1.Node, t v1.Taint) {
@@ -95,4 +109,15 @@ func addTaintIfNotExists(n *v1.Node, t v1.Taint) {
 	}
 
 	n.Spec.Taints = append(n.Spec.Taints, t)
+}
+
+func delTaintIfExists(n *v1.Node, t v1.Taint) {
+	var taints []v1.Taint
+	for _, taint := range n.Spec.Taints {
+		if taint == t {
+			continue
+		}
+		taints = append(taints, t)
+	}
+	n.Spec.Taints = taints
 }

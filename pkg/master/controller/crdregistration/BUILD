@@ -43,8 +43,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["crdregistration_controller_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/master/controller/crdregistration",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion:go_default_library",

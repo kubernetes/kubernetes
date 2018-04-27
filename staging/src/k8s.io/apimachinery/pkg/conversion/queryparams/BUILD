@@ -18,7 +18,6 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["convert_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/conversion/queryparams_test",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion/queryparams:go_default_library",

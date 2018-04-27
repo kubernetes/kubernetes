@@ -17,9 +17,8 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,8 +62,18 @@ type Getter interface {
 
 // NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
 func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
-	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
+	optionsModifier := func(options *metav1.ListOptions) {
 		options.FieldSelector = fieldSelector.String()
+	}
+	return NewFilteredListWatchFromClient(c, resource, namespace, optionsModifier)
+}
+
+// NewFilteredListWatchFromClient creates a new ListWatch from the specified client, resource, namespace, and option modifier.
+// Option modifier is a function takes a ListOptions and modifies the consumed ListOptions. Provide customized modifier function
+// to apply modification to ListOptions with a field selector, a label selector, or any other desired options.
+func NewFilteredListWatchFromClient(c Getter, resource string, namespace string, optionsModifier func(options *metav1.ListOptions)) *ListWatch {
+	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
+		optionsModifier(&options)
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).
@@ -74,7 +83,7 @@ func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSe
 	}
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
 		options.Watch = true
-		options.FieldSelector = fieldSelector.String()
+		optionsModifier(&options)
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).

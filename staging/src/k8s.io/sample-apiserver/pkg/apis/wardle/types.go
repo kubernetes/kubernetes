@@ -28,7 +28,20 @@ type FlunderList struct {
 	Items []Flunder
 }
 
+type ReferenceType string
+
+const (
+	FlunderReferenceType = ReferenceType("Flunder")
+	FischerReferenceType = ReferenceType("Fischer")
+)
+
 type FlunderSpec struct {
+	// A name of another flunder, mutually exclusive to the FischerReference.
+	FlunderReference string
+	// A name of a fischer, mutually exclusive to the FlunderReference.
+	FischerReference string
+	// The reference type.
+	ReferenceType ReferenceType
 }
 
 type FlunderStatus struct {

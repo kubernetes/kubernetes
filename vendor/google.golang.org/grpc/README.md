@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/grpc/grpc-go.svg)](https://travis-ci.org/grpc/grpc-go) [![GoDoc](https://godoc.org/google.golang.org/grpc?status.svg)](https://godoc.org/google.golang.org/grpc)
 
-The Go implementation of [gRPC](http://www.grpc.io/): A high performance, open source, general RPC framework that puts mobile and HTTP/2 first. For more information see the [gRPC Quick Start](http://www.grpc.io/docs/) guide.
+The Go implementation of [gRPC](https://grpc.io/): A high performance, open source, general RPC framework that puts mobile and HTTP/2 first. For more information see the [gRPC Quick Start: Go](https://grpc.io/docs/quickstart/go.html) guide.
 
 Installation
 ------------
@@ -10,13 +10,13 @@ Installation
 To install this package, you need to install Go and setup your Go workspace on your computer. The simplest way to install the library is to run:
 
 ```
-$ go get google.golang.org/grpc
+$ go get -u google.golang.org/grpc
 ```
 
 Prerequisites
 -------------
 
-This requires Go 1.6 or later.
+This requires Go 1.7 or later.
 
 Constraints
 -----------
@@ -26,9 +26,13 @@ Documentation
 -------------
 See [API documentation](https://godoc.org/google.golang.org/grpc) for package and API descriptions and find examples in the [examples directory](examples/).
 
+Performance
+-----------
+See the current benchmarks for some of the languages supported in [this dashboard](https://performance-dot-grpc-testing.appspot.com/explore?dashboard=5652536396611584&widget=490377658&container=1286539696).
+
 Status
 ------
-GA
+General Availability [Google Cloud Platform Launch Stages](https://cloud.google.com/terms/launch-stages).
 
 FAQ
 ---

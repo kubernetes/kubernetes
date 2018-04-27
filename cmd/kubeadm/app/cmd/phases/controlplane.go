@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -82,7 +83,7 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 
 	// This is used for unit testing only...
 	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
-	// By setting this explicitely for tests workarounds that
+	// By setting this explicitly for tests workarounds that
 	if defaultKubernetesVersion != "" {
 		cfg.KubernetesVersion = defaultKubernetesVersion
 	}
@@ -109,19 +110,19 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 		},
 		{
 			use:     "apiserver",
-			short:   "Generates the API server static Pod manifest.",
+			short:   "Generates the API server static Pod manifest",
 			long:    apiServerControlplaneLongDesc,
 			cmdFunc: controlplanephase.CreateAPIServerStaticPodManifestFile,
 		},
 		{
 			use:     "controller-manager",
-			short:   "Generates the controller-manager static Pod manifest.",
+			short:   "Generates the controller-manager static Pod manifest",
 			long:    controllerManagerControlplaneLongDesc,
 			cmdFunc: controlplanephase.CreateControllerManagerStaticPodManifestFile,
 		},
 		{
 			use:     "scheduler",
-			short:   "Generates the scheduler static Pod manifest.",
+			short:   "Generates the scheduler static Pod manifest",
 			long:    schedulerControlplaneLongDesc,
 			cmdFunc: controlplanephase.CreateSchedulerStaticPodManifestFile,
 		},
@@ -142,18 +143,24 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 		cmd.Flags().StringVar(&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion, `Choose a specific Kubernetes version for the control plane`)
 
 		if properties.use == "all" || properties.use == "apiserver" {
-			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address or DNS name the API server is accessible on")
+			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address of the API server is accessible on")
 			cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, "The port the API server is accessible on")
 			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, "The range of IP address used for service VIPs")
 			cmd.Flags().StringVar(&featureGatesString, "feature-gates", featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 				"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
+			cmd.Flags().Var(utilflag.NewMapStringString(&cfg.APIServerExtraArgs), "apiserver-extra-args", "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
 		}
 
 		if properties.use == "all" || properties.use == "controller-manager" {
 			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, "The range of IP addresses used for the Pod network")
+			cmd.Flags().Var(utilflag.NewMapStringString(&cfg.ControllerManagerExtraArgs), "controller-manager-extra-args", "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
 		}
 
-		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+		if properties.use == "all" || properties.use == "scheduler" {
+			cmd.Flags().Var(utilflag.NewMapStringString(&cfg.SchedulerExtraArgs), "scheduler-extra-args", "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
+		}
+
+		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental")
 
 		subCmds = append(subCmds, cmd)
 	}
@@ -164,7 +171,7 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 // runCmdControlPlane creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
 func runCmdControlPlane(cmdFunc func(outDir string, cfg *kubeadmapi.MasterConfiguration) error, outDir, cfgPath *string, featureGatesString *string, cfg *kubeadmapiext.MasterConfiguration) func(cmd *cobra.Command, args []string) {
 
-	// the following statement build a clousure that wraps a call to a cmdFunc, binding
+	// the following statement build a closure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
 	// Please note that specific parameter should be passed as value, while other parameters - passed as reference -
 	// are shared between sub commands and gets access to current value e.g. flags value.

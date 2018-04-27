@@ -29,6 +29,8 @@ import (
 // needed to create Info for arbitrary objects.
 type Mapper struct {
 	runtime.ObjectTyper
+	ObjectConverter runtime.ObjectConvertor
+
 	meta.RESTMapper
 	ClientMapper
 	runtime.Decoder
@@ -65,13 +67,14 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 	}
 
-	name, _ := mapping.MetadataAccessor.Name(obj)
-	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
-	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
+	name, _ := metadataAccessor.Name(obj)
+	namespace, _ := metadataAccessor.Namespace(obj)
+	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 
 	return &Info{
-		Client:  client,
-		Mapping: mapping,
+		Client:                     client,
+		Mapping:                    mapping,
+		toVersionedObjectConverter: m.ObjectConverter,
 
 		Source:          source,
 		Namespace:       namespace,
@@ -105,12 +108,13 @@ func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []schema.GroupV
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 	}
-	name, _ := mapping.MetadataAccessor.Name(obj)
-	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
-	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
+	name, _ := metadataAccessor.Name(obj)
+	namespace, _ := metadataAccessor.Namespace(obj)
+	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 	return &Info{
-		Client:  client,
-		Mapping: mapping,
+		Client:                     client,
+		Mapping:                    mapping,
+		toVersionedObjectConverter: m.ObjectConverter,
 
 		Namespace:       namespace,
 		Name:            name,
@@ -198,9 +202,7 @@ func (m relaxedMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*me
 	if err != nil && meta.IsNoMatchError(err) && len(versions) > 0 {
 		return &meta.RESTMapping{
 			GroupVersionKind: gk.WithVersion(versions[0]),
-			MetadataAccessor: meta.NewAccessor(),
 			Scope:            meta.RESTScopeRoot,
-			ObjectConvertor:  identityConvertor{},
 		}, nil
 	}
 	return mapping, err
@@ -211,9 +213,7 @@ func (m relaxedMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]
 		return []*meta.RESTMapping{
 			{
 				GroupVersionKind: gk.WithVersion(versions[0]),
-				MetadataAccessor: meta.NewAccessor(),
 				Scope:            meta.RESTScopeRoot,
-				ObjectConvertor:  identityConvertor{},
 			},
 		}, nil
 	}

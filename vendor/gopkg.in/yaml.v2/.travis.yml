@@ -1,0 +1,9 @@
+language: go
+
+go:
+    - 1.4
+    - 1.5
+    - 1.6
+    - tip
+
+go_import_path: gopkg.in/yaml.v2

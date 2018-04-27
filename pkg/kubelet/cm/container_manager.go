@@ -28,7 +28,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 
 	"fmt"
 	"strconv"
@@ -70,9 +70,10 @@ type ContainerManager interface {
 	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
 	GetCapacity() v1.ResourceList
 
-	// GetDevicePluginResourceCapacity returns the amount of device plugin resources available on the node
+	// GetDevicePluginResourceCapacity returns the node capacity (amount of total device plugin resources),
+	// node allocatable (amount of total healthy resources reported by device plugin),
 	// and inactive device plugin resources previously registered on the node.
-	GetDevicePluginResourceCapacity() (v1.ResourceList, []string)
+	GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string)
 
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
@@ -90,6 +91,9 @@ type ContainerManager interface {
 	UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error
 
 	InternalContainerLifecycle() InternalContainerLifecycle
+
+	// GetPodCgroupRoot returns the cgroup which contains all pods.
+	GetPodCgroupRoot() string
 }
 
 type NodeConfig struct {
@@ -103,9 +107,11 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	ExperimentalQOSReserved               map[v1.ResourceName]int64
+	QOSReserved                           map[v1.ResourceName]int64
 	ExperimentalCPUManagerPolicy          string
 	ExperimentalCPUManagerReconcilePeriod time.Duration
+	ExperimentalPodPidsLimit              int64
+	EnforceCPULimits                      bool
 }
 
 type NodeAllocatableConfig struct {

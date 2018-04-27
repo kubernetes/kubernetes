@@ -100,7 +100,7 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 
 // Authorize makes a REST request to the remote service describing the attempted action as a JSON
 // serialized api.authorization.v1beta1.SubjectAccessReview object. An example request body is
-// provided bellow.
+// provided below.
 //
 //     {
 //       "apiVersion": "authorization.k8s.io/v1beta1",
@@ -238,13 +238,10 @@ func convertToSARExtra(extra map[string][]string) map[string]authorization.Extra
 // authorization/v1beta1. We construct a registry that acknowledges
 // authorization/v1beta1 as an enabled version to pass a check enforced in
 // NewGenericWebhook.
-var registry = registered.NewOrDie("")
+var registry = registered.NewAPIRegistrationManager()
 
 func init() {
 	registry.RegisterVersions(groupVersions)
-	if err := registry.EnableVersions(groupVersions...); err != nil {
-		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
-	}
 }
 
 // subjectAccessReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,

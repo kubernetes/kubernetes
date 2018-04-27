@@ -44,7 +44,7 @@ var validAccessor = resourceAccessor{}
 var validConvertor = fakeConvertor{}
 
 func fakeInterfaces(version schema.GroupVersion) (*VersionInterfaces, error) {
-	return &VersionInterfaces{ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
+	return &VersionInterfaces{ObjectConvertor: validConvertor}, nil
 }
 
 var unmatchedErr = errors.New("no version")
@@ -507,7 +507,7 @@ func TestRESTMapperResourceSingularizer(t *testing.T) {
 
 		{Kind: "lowercase", Plural: "lowercases", Singular: "lowercase"},
 		// TODO this test is broken.  This updates to reflect actual behavior.  Kinds are expected to be singular
-		// old (incorrect), coment: Don't add extra s if the original object is already plural
+		// old (incorrect), comment: Don't add extra s if the original object is already plural
 		{Kind: "lowercases", Plural: "lowercaseses", Singular: "lowercases"},
 	}
 	for i, testCase := range testCases {
@@ -575,10 +575,6 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 		}
 		if mapping.Resource != testCase.Resource {
 			t.Errorf("%d: unexpected resource: %#v", i, mapping)
-		}
-
-		if mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
-			t.Errorf("%d: missing codec and accessor: %#v", i, mapping)
 		}
 
 		groupVersion := testCase.ExpectedGroupVersion
@@ -727,9 +723,6 @@ func TestRESTMapperRESTMappings(t *testing.T) {
 			if mapping.Resource != exp.Resource {
 				t.Errorf("%d - %d: unexpected resource: %#v", i, j, mapping)
 			}
-			if mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
-				t.Errorf("%d - %d: missing codec and accessor: %#v", i, j, mapping)
-			}
 			if mapping.GroupVersionKind != exp.GroupVersionKind {
 				t.Errorf("%d - %d: unexpected GroupVersionKind: %#v", i, j, mapping)
 			}
@@ -744,7 +737,7 @@ func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
 
 	mapper := NewDefaultRESTMapper([]schema.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, unmatchedVersionInterfaces)
 	mapper.Add(expectedGroupVersion1.WithKind("InternalObject"), RESTScopeNamespace)
-	_, err := mapper.RESTMapping(internalObjectGK, expectedGroupVersion1.Version)
+	_, err := mapper.RESTMapping(internalObjectGK, "test3")
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}

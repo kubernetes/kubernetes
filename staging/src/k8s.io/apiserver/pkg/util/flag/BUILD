@@ -9,20 +9,21 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "ciphersuites_flag_test.go",
         "colon_separated_multimap_string_string_test.go",
         "langle_separated_map_string_string_test.go",
         "map_string_bool_test.go",
         "map_string_string_test.go",
         "namedcertkey_flag_test.go",
     ],
-    importpath = "k8s.io/apiserver/pkg/util/flag",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
+        "ciphersuites_flag.go",
         "colon_separated_multimap_string_string.go",
         "configuration_map.go",
         "flags.go",
@@ -30,6 +31,7 @@ go_library(
         "map_string_bool.go",
         "map_string_string.go",
         "namedcertkey_flag.go",
+        "noop.go",
         "omitempty.go",
         "string_flag.go",
         "tristate.go",

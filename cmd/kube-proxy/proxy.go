@@ -19,7 +19,9 @@ package main
 import (
 	goflag "flag"
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -31,6 +33,8 @@ import (
 )
 
 func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	command := app.NewProxyCommand()
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling

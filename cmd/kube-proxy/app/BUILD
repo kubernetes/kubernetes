@@ -11,9 +11,49 @@ go_library(
     srcs = [
         "conntrack.go",
         "server.go",
-        "server_others.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "init_others.go",
+            "server_others.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "init_windows.go",
             "server_windows.go",
         ],
         "//conditions:default": [],
@@ -24,7 +64,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -37,10 +76,9 @@ go_library(
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/proxy/ipvs:go_default_library",
-        "//pkg/proxy/metrics:go_default_library",
         "//pkg/proxy/userspace:go_default_library",
         "//pkg/util/configz:go_default_library",
-        "//pkg/util/dbus:go_default_library",
+        "//pkg/util/flag:go_default_library",
         "//pkg/util/ipset:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/ipvs:go_default_library",
@@ -61,12 +99,13 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/mux:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/routes:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
@@ -75,10 +114,83 @@ go_library(
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//pkg/features:go_default_library",
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/proxy/winkernel:go_default_library",
             "//pkg/proxy/winuserspace:go_default_library",
             "//pkg/util/netsh:go_default_library",
+            "//pkg/windows/service:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -86,21 +198,104 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["server_test.go"],
-    importpath = "k8s.io/kubernetes/cmd/kube-proxy/app",
-    library = ":go_default_library",
+    srcs = [
+        "server_test.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "server_others_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "server_others_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "server_others_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "server_others_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "server_others_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "server_others_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "server_others_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "server_others_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "server_others_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "server_others_test.go",
+        ],
+        "//conditions:default": [],
+    }),
+    embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
-        "//pkg/proxy/ipvs:go_default_library",
         "//pkg/util/configz:go_default_library",
-        "//pkg/util/iptables:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/iptables:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

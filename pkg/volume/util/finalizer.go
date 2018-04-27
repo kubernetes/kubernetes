@@ -19,4 +19,7 @@ package util
 const (
 	// Name of finalizer on PVCs that have a running pod.
 	PVCProtectionFinalizer = "kubernetes.io/pvc-protection"
+
+	// Name of finalizer on PVs that are bound by PVCs
+	PVProtectionFinalizer = "kubernetes.io/pv-protection"
 )

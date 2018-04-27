@@ -18,6 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Unset CDPATH so that path interpolation can work correctly
+# https://github.com/kubernetes/kubernetes/issues/52255
+unset CDPATH
+
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
 
@@ -37,7 +41,7 @@ export no_proxy=127.0.0.1,localhost
 THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/cluster/lib/logging.sh"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 kube::log::install_errexit
 
@@ -127,7 +131,7 @@ function kube::readlinkdashf {
       cd "$1"
       pwd -P
     else
-      cd $(dirname "$1")
+      cd "$(dirname "$1")"
       local f
       f=$(basename "$1")
       if [[ -L "$f" ]]; then

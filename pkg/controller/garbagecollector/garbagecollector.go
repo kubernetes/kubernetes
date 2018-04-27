@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	// install the prometheus plugin
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus"
@@ -167,11 +166,19 @@ type resettableRESTMapper interface {
 // Note that discoveryClient should NOT be shared with gc.restMapper, otherwise
 // the mapper's underlying discovery client will be unnecessarily reset during
 // the course of detecting new resources.
-func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, period time.Duration, stopCh <-chan struct{}) {
+func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterface, period time.Duration, stopCh <-chan struct{}) {
 	oldResources := make(map[schema.GroupVersionResource]struct{})
 	wait.Until(func() {
 		// Get the current resource list from discovery.
 		newResources := GetDeletableResources(discoveryClient)
+
+		// This can occur if there is an internal error in GetDeletableResources.
+		// If the gc attempts to sync with 0 resources it will block forever.
+		// TODO: Implement a more complete solution for the garbage collector hanging.
+		if len(newResources) == 0 {
+			glog.V(5).Infof("no resources reported by discovery, skipping garbage collector sync")
+			return
+		}
 
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
@@ -198,7 +205,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 		// discovered by restMapper during the call to Reset, since they are
 		// distinct discovery clients invalidated at different times. For example,
 		// newResources may contain resources not returned in the restMapper's
-		// discovery call if the resources appeared inbetween the calls. In that
+		// discovery call if the resources appeared in-between the calls. In that
 		// case, the restMapper will fail to map some of newResources until the next
 		// sync period.
 		if err := gc.resyncMonitors(newResources); err != nil {
@@ -215,7 +222,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 
 		// Finally, keep track of our new state. Do this after all preceding steps
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
-		// occured.
+		// occurred.
 		oldResources = newResources
 		glog.V(2).Infof("synced garbage collector")
 	}, period, stopCh)
@@ -259,22 +266,14 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		}
 		// retry if garbage collection of an object failed.
 		gc.attemptToDelete.AddRateLimited(item)
+	} else if !n.isObserved() {
+		// requeue if item hasn't been observed via an informer event yet.
+		// otherwise a virtual node for an item added AND removed during watch reestablishment can get stuck in the graph and never removed.
+		// see https://issue.k8s.io/56121
+		glog.V(5).Infof("item %s hasn't been observed via informer yet", n.identity)
+		gc.attemptToDelete.AddRateLimited(item)
 	}
 	return true
-}
-
-func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.MetadataOnlyObject {
-	return &metaonly.MetadataOnlyObject{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: ref.APIVersion,
-			Kind:       ref.Kind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ref.Namespace,
-			UID:       ref.UID,
-			Name:      ref.Name,
-		},
-	}
 }
 
 // isDangling check if a reference is pointing to an object that doesn't exist.
@@ -304,7 +303,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = client.Resource(resource, item.identity.Namespace).Get(reference.Name, metav1.GetOptions{})
+	owner, err = client.Resource(resource, resourceDefaultNamespace(resource, item.identity.Namespace)).Get(reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)
@@ -353,15 +352,6 @@ func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []me
 	return solid, dangling, waitingForDependentsDeletion, nil
 }
 
-func (gc *GarbageCollector) generateVirtualDeleteEvent(identity objectReference) {
-	event := &event{
-		eventType: deleteEvent,
-		obj:       objectReferenceToMetadataOnlyObject(identity),
-	}
-	glog.V(5).Infof("generating virtual delete event for %s\n\n", event.obj)
-	gc.dependencyGraphBuilder.enqueueChanges(event)
-}
-
 func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 	var ret []types.UID
 	for _, ref := range refs {
@@ -387,7 +377,10 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// exist yet, so we need to enqueue a virtual Delete event to remove
 		// the virtual node from GraphBuilder.uidToNode.
 		glog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
-		gc.generateVirtualDeleteEvent(item.identity)
+		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
+		// since we're manually inserting a delete event to remove this node,
+		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
+		item.markObserved()
 		return nil
 	case err != nil:
 		return err
@@ -395,7 +388,10 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 
 	if latest.GetUID() != item.identity.UID {
 		glog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
-		gc.generateVirtualDeleteEvent(item.identity)
+		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
+		// since we're manually inserting a delete event to remove this node,
+		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
+		item.markObserved()
 		return nil
 	}
 

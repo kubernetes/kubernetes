@@ -151,7 +151,14 @@ var _ StorageFactory = &DefaultStorageFactory{}
 
 const AllResources = "*"
 
-func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource, specialDefaultResourcePrefixes map[schema.GroupResource]string) *DefaultStorageFactory {
+func NewDefaultStorageFactory(
+	config storagebackend.Config,
+	defaultMediaType string,
+	defaultSerializer runtime.StorageSerializer,
+	resourceEncodingConfig ResourceEncodingConfig,
+	resourceConfig APIResourceConfigSource,
+	specialDefaultResourcePrefixes map[schema.GroupResource]string,
+) *DefaultStorageFactory {
 	config.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
@@ -182,7 +189,7 @@ func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource
 }
 
 // SetDisableAPIListChunking allows a specific resource to disable paging at the storage layer, to prevent
-// exposure of key names in continuations. This may be overriden by feature gates.
+// exposure of key names in continuations. This may be overridden by feature gates.
 func (s *DefaultStorageFactory) SetDisableAPIListChunking(groupResource schema.GroupResource) {
 	overrides := s.Overrides[groupResource]
 	overrides.disablePaging = true
@@ -233,7 +240,7 @@ func getAllResourcesAlias(resource schema.GroupResource) schema.GroupResource {
 
 func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
 	for _, potentialStorageResource := range s.Overrides[groupResource].cohabitatingResources {
-		if s.APIResourceConfigSource.AnyVersionOfResourceEnabled(potentialStorageResource) {
+		if s.APIResourceConfigSource.AnyVersionForGroupEnabled(potentialStorageResource.Group) {
 			return potentialStorageResource
 		}
 	}
@@ -314,8 +321,10 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 	backends := []Backend{}
 	for server := range servers {
 		backends = append(backends, Backend{
-			Server:    server,
-			TLSConfig: tlsConfig,
+			Server: server,
+			// We can't share TLSConfig across different backends to avoid races.
+			// For more details see: http://pr.k8s.io/59338
+			TLSConfig: tlsConfig.Clone(),
 		})
 	}
 	return backends

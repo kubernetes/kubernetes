@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -104,4 +105,64 @@ type ExtraValue []string
 
 func (t ExtraValue) String() string {
 	return fmt.Sprintf("%v", []string(t))
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// TokenRequest requests a token for a given service account.
+type TokenRequest struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	Spec TokenRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+	// +optional
+	Status TokenRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// TokenRequestSpec contains client provided parameters of a token request.
+type TokenRequestSpec struct {
+	// Audiences are the intendend audiences of the token. A recipient of a
+	// token must identitfy themself with an identifier in the list of
+	// audiences of the token, and otherwise should reject the token. A
+	// token issued for multiple audiences may be used to authenticate
+	// against any of the audiences listed but implies a high degree of
+	// trust between the target audiences.
+	Audiences []string `json:"audiences" protobuf:"bytes,1,rep,name=audiences"`
+
+	// ExpirationSeconds is the requested duration of validity of the request. The
+	// token issuer may return a token with a different validity duration so a
+	// client needs to check the 'expiration' field in a response.
+	// +optional
+	ExpirationSeconds *int64 `json:"expirationSeconds" protobuf:"varint,4,opt,name=expirationSeconds"`
+
+	// BoundObjectRef is a reference to an object that the token will be bound to.
+	// The token will only be valid for as long as the bound objet exists.
+	// +optional
+	BoundObjectRef *BoundObjectReference `json:"boundObjectRef" protobuf:"bytes,3,opt,name=boundObjectRef"`
+}
+
+// TokenRequestStatus is the result of a token request.
+type TokenRequestStatus struct {
+	// Token is the opaque bearer token.
+	Token string `json:"token" protobuf:"bytes,1,opt,name=token"`
+	// ExpirationTimestamp is the time of expiration of the returned token.
+	ExpirationTimestamp metav1.Time `json:"expirationTimestamp" protobuf:"bytes,2,opt,name=expirationTimestamp"`
+}
+
+// BoundObjectReference is a reference to an object that a token is bound to.
+type BoundObjectReference struct {
+	// Kind of the referent. Valid kinds are 'Pod' and 'Secret'.
+	// +optional
+	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
+	// API version of the referent.
+	// +optional
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=aPIVersion"`
+
+	// Name of the referent.
+	// +optional
+	Name string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
+	// UID of the referent.
+	// +optional
+	UID types.UID `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uID,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }

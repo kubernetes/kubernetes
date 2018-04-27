@@ -48,28 +48,29 @@ func (i *ImageConfig) SetVersion(version string) {
 }
 
 var (
-	AdmissionWebhook         = ImageConfig{e2eRegistry, "k8s-sample-admission-webhook", "1.8v7", true}
+	AdmissionWebhook         = ImageConfig{e2eRegistry, "k8s-sample-admission-webhook", "1.10v2", true}
 	APIServer                = ImageConfig{e2eRegistry, "k8s-aggregator-sample-apiserver", "1.7v2", true}
 	AppArmorLoader           = ImageConfig{gcRegistry, "apparmor-loader", "0.1", false}
 	BusyBox                  = ImageConfig{gcRegistry, "busybox", "1.24", false}
-	CheckMetadataConcealment = ImageConfig{gcRegistry, "check-metadata-concealment", "v0.0.2", false}
+	CheckMetadataConcealment = ImageConfig{gcRegistry, "check-metadata-concealment", "v0.0.3", false}
 	ClusterTester            = ImageConfig{e2eRegistry, "clusterapi-tester", "1.0", true}
 	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0", true}
 	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.0", true}
 	DNSMasq                  = ImageConfig{gcRegistry, "k8s-dns-dnsmasq", "1.14.5", true}
-	EchoServer               = ImageConfig{gcRegistry, "echoserver", "1.6", false}
+	EchoServer               = ImageConfig{gcRegistry, "echoserver", "1.10", false}
 	EntrypointTester         = ImageConfig{e2eRegistry, "entrypoint-tester", "1.0", true}
 	E2ENet                   = ImageConfig{gcRegistry, "e2e-net", "1.0", true}
 	Fakegitserver            = ImageConfig{e2eRegistry, "fakegitserver", "1.0", true}
 	GBFrontend               = ImageConfig{sampleRegistry, "gb-frontend", "v5", true}
 	GBRedisSlave             = ImageConfig{sampleRegistry, "gb-redisslave", "v2", true}
 	Goproxy                  = ImageConfig{e2eRegistry, "goproxy", "1.0", true}
-	Hostexec                 = ImageConfig{e2eRegistry, "hostexec", "1.0", true}
+	Hostexec                 = ImageConfig{e2eRegistry, "hostexec", "1.1", true}
+	IpcUtils                 = ImageConfig{e2eRegistry, "ipc-utils", "1.0", true}
 	Iperf                    = ImageConfig{e2eRegistry, "iperf", "1.0", true}
 	JessieDnsutils           = ImageConfig{e2eRegistry, "jessie-dnsutils", "1.0", true}
 	Kitten                   = ImageConfig{e2eRegistry, "kitten", "1.0", true}
 	Liveness                 = ImageConfig{e2eRegistry, "liveness", "1.0", true}
-	LogsGenerator            = ImageConfig{gcRegistry, "logs-generator", "v0.1.0", false}
+	LogsGenerator            = ImageConfig{e2eRegistry, "logs-generator", "1.0", true}
 	Mounttest                = ImageConfig{e2eRegistry, "mounttest", "1.0", true}
 	MounttestUser            = ImageConfig{e2eRegistry, "mounttest-user", "1.0", true}
 	Nautilus                 = ImageConfig{e2eRegistry, "nautilus", "1.0", true}
@@ -82,8 +83,8 @@ var (
 	NoSnatTest               = ImageConfig{e2eRegistry, "no-snat-test", "1.0", true}
 	NoSnatTestProxy          = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0", true}
 	NWayHTTP                 = ImageConfig{e2eRegistry, "n-way-http", "1.0", true}
-	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	Pause               = ImageConfig{gcRegistry, "pause", "3.0", false}
+	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
+	Pause               = ImageConfig{gcRegistry, "pause", "3.1", false}
 	Porter              = ImageConfig{e2eRegistry, "porter", "1.0", true}
 	PortForwardTester   = ImageConfig{e2eRegistry, "port-forward-tester", "1.0", true}
 	Redis               = ImageConfig{e2eRegistry, "redis", "1.0", true}
@@ -92,11 +93,10 @@ var (
 	SDDummyExporter     = ImageConfig{gcRegistry, "sd-dummy-exporter", "v0.1.0", false}
 	ServeHostname       = ImageConfig{e2eRegistry, "serve-hostname", "1.0", true}
 	TestWebserver       = ImageConfig{e2eRegistry, "test-webserver", "1.0", true}
-	VolumeNFSServer     = ImageConfig{gcRegistry, "volume-nfs", "0.8", false}
-	VolumeISCSIServer   = ImageConfig{gcRegistry, "volume-icsci", "0.1", false}
-	VolumeGlusterServer = ImageConfig{gcRegistry, "volume-gluster", "0.2", false}
-	VolumeCephServer    = ImageConfig{gcRegistry, "volume-ceph", "0.1", false}
-	VolumeRBDServer     = ImageConfig{gcRegistry, "volume-rbd", "0.1", false}
+	VolumeNFSServer     = ImageConfig{e2eRegistry, "volume-nfs", "0.8", false}
+	VolumeISCSIServer   = ImageConfig{e2eRegistry, "volume-iscsi", "0.2", false}
+	VolumeGlusterServer = ImageConfig{e2eRegistry, "volume-gluster", "0.5", false}
+	VolumeRBDServer     = ImageConfig{e2eRegistry, "volume-rbd", "0.2", false}
 )
 
 func GetE2EImage(image ImageConfig) string {
@@ -110,4 +110,9 @@ func GetE2EImageWithArch(image ImageConfig, arch string) string {
 		return fmt.Sprintf("%s/%s:%s", image.registry, image.name, image.version)
 
 	}
+}
+
+// GetPauseImageName returns the pause image name with proper version
+func GetPauseImageName() string {
+	return GetE2EImage(Pause)
 }

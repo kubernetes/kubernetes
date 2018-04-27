@@ -31,10 +31,11 @@ import (
 
 const (
 	storageReadOnlyScope = "https://www.googleapis.com/auth/devstorage.read_only"
+	jwtFileFlagName      = "google-json-key"
 )
 
 var (
-	flagJwtFile = pflag.String("google-json-key", "",
+	flagJwtFile = pflag.String(jwtFileFlagName, "",
 		"The Google Cloud Platform Service Account JSON Key to use for authentication.")
 )
 
@@ -49,6 +50,9 @@ type jwtProvider struct {
 // init registers the various means by which credentials may
 // be resolved on GCP.
 func init() {
+	pflag.CommandLine.MarkDeprecated(jwtFileFlagName, "Will be removed in a future version. "+
+		"To maintain node-level authentication, credentials should instead be included in a docker "+
+		"config.json file, located inside the Kubelet's --root-dir.")
 	credentialprovider.RegisterCredentialProvider("google-jwt-key",
 		&credentialprovider.CachingDockerConfigProvider{
 			Provider: &jwtProvider{

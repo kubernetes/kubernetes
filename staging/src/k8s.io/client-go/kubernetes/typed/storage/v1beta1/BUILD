@@ -12,6 +12,7 @@ go_library(
         "generated_expansion.go",
         "storage_client.go",
         "storageclass.go",
+        "volumeattachment.go",
     ],
     importpath = "k8s.io/client-go/kubernetes/typed/storage/v1beta1",
     deps = [

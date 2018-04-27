@@ -8,8 +8,7 @@ load(
 
 go_binary(
     name = "gendocs",
-    importpath = "k8s.io/kubernetes/cmd/gendocs",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(

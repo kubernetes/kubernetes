@@ -19,7 +19,7 @@ package dns
 const (
 	// v180AndAboveKubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
 	v180AndAboveKubeDNSDeployment = `
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kube-dns
@@ -156,8 +156,8 @@ spec:
         args:
         - --v=2
         - --logtostderr
-        - --probe=kubedns,{{ .DNSProbeAddr }}:10053,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
-        - --probe=dnsmasq,{{ .DNSProbeAddr }}:53,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
+        - --probe=kubedns,{{ .DNSProbeAddr }}:10053,kubernetes.default.svc.{{ .DNSDomain }},5,SRV
+        - --probe=dnsmasq,{{ .DNSProbeAddr }}:53,kubernetes.default.svc.{{ .DNSDomain }},5,SRV
         ports:
         - containerPort: 10054
           name: metrics
@@ -216,7 +216,7 @@ spec:
 
 	// CoreDNSDeployment is the CoreDNS Deployment manifest
 	CoreDNSDeployment = `
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: coredns
@@ -224,7 +224,11 @@ metadata:
   labels:
     k8s-app: kube-dns
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   selector:
     matchLabels:
       k8s-app: kube-dns
@@ -260,9 +264,6 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
-        - containerPort: 9153
-          name: metrics
-          protocol: TCP
         livenessProbe:
           httpGet:
             path: /health
@@ -293,15 +294,16 @@ data:
   Corefile: |
     .:53 {
         errors
-        log
         health
-        kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }} {
+        kubernetes {{ .DNSDomain }} in-addr.arpa ip6.arpa {
            pods insecure
-        }
-        prometheus
-        proxy . /etc/resolv.conf
+           upstream
+           fallthrough in-addr.arpa ip6.arpa
+        }{{ .Federation }}
+        prometheus :9153
+        proxy . {{ .UpstreamNameserver }}
         cache 30
-    }
+    }{{ .StubDomain }}
 `
 	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
 	CoreDNSClusterRole = `

@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
@@ -49,7 +48,7 @@ func NewGenericWebhook(registry *registered.APIRegistrationManager, codecFactory
 
 func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
-		if !registry.IsEnabledVersion(groupVersion) {
+		if !registry.IsRegisteredVersion(groupVersion) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
 		}
 	}
@@ -71,7 +70,7 @@ func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory
 	clientConfig.Timeout = requestTimeout
 
 	codec := codecFactory.LegacyCodec(groupVersions...)
-	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
+	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
 	restClient, err := rest.UnversionedRESTClientFor(clientConfig)
 	if err != nil {

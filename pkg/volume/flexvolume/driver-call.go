@@ -39,7 +39,6 @@ const (
 	mountDeviceCmd   = "mountdevice"
 
 	detachCmd        = "detach"
-	waitForDetachCmd = "waitfordetach"
 	unmountDeviceCmd = "unmountdevice"
 
 	mountCmd   = "mount"

@@ -117,11 +117,32 @@ func TestPVSecrets(t *testing.T) {
 					SecretRef: &api.ObjectReference{
 						Name:      "Spec.PersistentVolumeSource.StorageOS.SecretRef",
 						Namespace: "storageosns"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				CSI: &api.CSIPersistentVolumeSource{
+					ControllerPublishSecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.CSI.ControllerPublishSecretRef",
+						Namespace: "csi"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				CSI: &api.CSIPersistentVolumeSource{
+					NodePublishSecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.CSI.NodePublishSecretRef",
+						Namespace: "csi"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				CSI: &api.CSIPersistentVolumeSource{
+					NodeStageSecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
+						Namespace: "csi"}}}}},
 	}
 	extractedNames := sets.NewString()
 	extractedNamesWithNamespace := sets.NewString()
 	for _, pv := range pvs {
-		VisitPVSecretNames(pv, func(namespace, name string) bool {
+		VisitPVSecretNames(pv, func(namespace, name string, kubeletVisible bool) bool {
 			extractedNames.Insert(name)
 			extractedNamesWithNamespace.Insert(namespace + "/" + name)
 			return true
@@ -143,6 +164,9 @@ func TestPVSecrets(t *testing.T) {
 		"Spec.PersistentVolumeSource.ScaleIO.SecretRef",
 		"Spec.PersistentVolumeSource.ISCSI.SecretRef",
 		"Spec.PersistentVolumeSource.StorageOS.SecretRef",
+		"Spec.PersistentVolumeSource.CSI.ControllerPublishSecretRef",
+		"Spec.PersistentVolumeSource.CSI.NodePublishSecretRef",
+		"Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
 	)
 	secretPaths := collectSecretPaths(t, nil, "", reflect.TypeOf(&api.PersistentVolume{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
@@ -184,6 +208,10 @@ func TestPVSecrets(t *testing.T) {
 		"iscsi/Spec.PersistentVolumeSource.ISCSI.SecretRef",
 
 		"storageosns/Spec.PersistentVolumeSource.StorageOS.SecretRef",
+
+		"csi/Spec.PersistentVolumeSource.CSI.ControllerPublishSecretRef",
+		"csi/Spec.PersistentVolumeSource.CSI.NodePublishSecretRef",
+		"csi/Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
 	)
 	if missingNames := expectedNamespacedNames.Difference(extractedNamesWithNamespace); len(missingNames) > 0 {
 		t.Logf("Missing expected namespaced names:\n%s", strings.Join(missingNames.List(), "\n"))

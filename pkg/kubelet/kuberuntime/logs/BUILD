@@ -7,7 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",
-        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/util/tail:go_default_library",
         "//vendor/github.com/docker/docker/pkg/jsonlog:go_default_library",
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
@@ -19,10 +19,9 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["logs_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime/logs",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

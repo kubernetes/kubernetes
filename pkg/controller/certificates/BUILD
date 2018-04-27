@@ -15,7 +15,7 @@ go_library(
     deps = [
         "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/juju/ratelimit:go_default_library",
+        "//vendor/golang.org/x/time/rate:go_default_library",
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
@@ -54,8 +54,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["certificate_controller_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/controller/certificates",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/controller:go_default_library",
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",

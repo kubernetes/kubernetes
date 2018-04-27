@@ -89,7 +89,7 @@ type waitFor struct {
 
 // waitForPriorityQueue implements a priority queue for waitFor items.
 //
-// waitForPriorityQueue implements heap.Interface. The item occuring next in
+// waitForPriorityQueue implements heap.Interface. The item occurring next in
 // time (i.e., the item with the smallest readyAt) is at the root (index 0).
 // Peek returns this minimum item at index 0. Pop returns the minimum item after
 // it has been removed from the queue and placed at index Len()-1 by

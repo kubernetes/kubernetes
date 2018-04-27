@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["ref_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/ref",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",

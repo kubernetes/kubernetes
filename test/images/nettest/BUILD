@@ -33,6 +33,5 @@ filegroup(
 
 go_binary(
     name = "nettest",
-    importpath = "k8s.io/kubernetes/test/images/nettest",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )

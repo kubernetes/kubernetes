@@ -12,8 +12,7 @@ go_test(
         "conn_test.go",
         "stream_test.go",
     ],
-    importpath = "k8s.io/apiserver/pkg/util/wsstream",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/golang.org/x/net/websocket:go_default_library"],
 )
 

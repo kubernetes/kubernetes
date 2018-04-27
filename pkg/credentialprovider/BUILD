@@ -19,7 +19,6 @@ go_library(
     deps = [
         "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
@@ -31,8 +30,7 @@ go_test(
         "keyring_test.go",
         "provider_test.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/credentialprovider",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/github.com/docker/docker/api/types:go_default_library"],
 )
 
@@ -51,6 +49,7 @@ filegroup(
         "//pkg/credentialprovider/azure:all-srcs",
         "//pkg/credentialprovider/gcp:all-srcs",
         "//pkg/credentialprovider/rancher:all-srcs",
+        "//pkg/credentialprovider/secrets:all-srcs",
     ],
     tags = ["automanaged"],
 )

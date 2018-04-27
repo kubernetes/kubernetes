@@ -12,16 +12,45 @@ go_library(
         "doc.go",
         "oom.go",
         "oom_fake.go",
-        "oom_unsupported.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "oom_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "oom_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "oom_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "oom_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "oom_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "oom_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "oom_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "oom_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "oom_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "oom_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "oom_unsupported.go",
         ],
         "//conditions:default": [],
     }),
     importpath = "k8s.io/kubernetes/pkg/util/oom",
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/cm/util:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
         ],
@@ -32,15 +61,14 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "oom_linux_test.go",
         ],
         "//conditions:default": [],
     }),
-    importpath = "k8s.io/kubernetes/pkg/util/oom",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
         ],
         "//conditions:default": [],

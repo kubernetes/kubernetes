@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // AmbiguousResourceError is returned if the RESTMapper finds multiple matches for a resource
@@ -85,11 +86,26 @@ func (e *NoResourceMatchError) Error() string {
 
 // NoKindMatchError is returned if the RESTMapper can't find any match for a kind
 type NoKindMatchError struct {
-	PartialKind schema.GroupVersionKind
+	// GroupKind is the API group and kind that was searched
+	GroupKind schema.GroupKind
+	// SearchedVersions is the optional list of versions the search was restricted to
+	SearchedVersions []string
 }
 
 func (e *NoKindMatchError) Error() string {
-	return fmt.Sprintf("no matches for %v", e.PartialKind)
+	searchedVersions := sets.NewString()
+	for _, v := range e.SearchedVersions {
+		searchedVersions.Insert(schema.GroupVersion{Group: e.GroupKind.Group, Version: v}.String())
+	}
+
+	switch len(searchedVersions) {
+	case 0:
+		return fmt.Sprintf("no matches for kind %q in group %q", e.GroupKind.Kind, e.GroupKind.Group)
+	case 1:
+		return fmt.Sprintf("no matches for kind %q in version %q", e.GroupKind.Kind, searchedVersions.List()[0])
+	default:
+		return fmt.Sprintf("no matches for kind %q in versions %q", e.GroupKind.Kind, searchedVersions.List())
+	}
 }
 
 func IsNoMatchError(err error) bool {

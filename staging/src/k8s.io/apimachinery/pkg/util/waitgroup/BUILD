@@ -13,8 +13,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["waitgroup_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/util/waitgroup",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

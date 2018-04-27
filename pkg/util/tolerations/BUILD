@@ -32,7 +32,6 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["tolerations_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/tolerations",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//pkg/apis/core:go_default_library"],
 )

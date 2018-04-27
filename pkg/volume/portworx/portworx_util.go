@@ -17,6 +17,8 @@ limitations under the License.
 package portworx
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	osdapi "github.com/libopenstorage/openstorage/api"
 	osdclient "github.com/libopenstorage/openstorage/api/client"
@@ -24,18 +26,21 @@ import (
 	osdspec "github.com/libopenstorage/openstorage/api/spec"
 	volumeapi "github.com/libopenstorage/openstorage/volume"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/volume"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
-	osdMgmtPort      = "9001"
-	osdDriverVersion = "v1"
-	pxdDriverName    = "pxd"
-	pvcClaimLabel    = "pvc"
-	pxServiceName    = "portworx-service"
-	pxDriverName     = "pxd-sched"
+	osdMgmtPort       = "9001"
+	osdDriverVersion  = "v1"
+	pxdDriverName     = "pxd"
+	pvcClaimLabel     = "pvc"
+	pvcNamespaceLabel = "namespace"
+	pxServiceName     = "portworx-service"
+	pxDriverName      = "pxd-sched"
 )
 
 type PortworxVolumeUtil struct {
@@ -43,7 +48,7 @@ type PortworxVolumeUtil struct {
 }
 
 // CreateVolume creates a Portworx volume.
-func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (string, int, map[string]string, error) {
+func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (string, int64, map[string]string, error) {
 	driver, err := util.getPortworxDriver(p.plugin.host, false /*localOnly*/)
 	if err != nil || driver == nil {
 		glog.Errorf("Failed to get portworx driver. Err: %v", err)
@@ -53,8 +58,8 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 	glog.Infof("Creating Portworx volume for PVC: %v", p.options.PVC.Name)
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	// Portworx Volumes are specified in GB
-	requestGB := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
+	// Portworx Volumes are specified in GiB
+	requestGiB := volutil.RoundUpToGiB(capacity)
 
 	// Perform a best-effort parsing of parameters. Portworx 1.2.9 and later parses volume parameters from
 	// spec.VolumeLabels. So even if below SpecFromOpts() fails to parse certain parameters or
@@ -69,7 +74,8 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 	// Pass all parameters as volume labels for Portworx server-side processing.
 	spec.VolumeLabels = p.options.Parameters
 	// Update the requested size in the spec
-	spec.Size = uint64(requestGB * 1024 * 1024 * 1024)
+	spec.Size = uint64(requestGiB * volutil.GIB)
+
 	// Change the Portworx Volume name to PV name
 	if locator == nil {
 		locator = &osdapi.VolumeLocator{
@@ -80,13 +86,24 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	// Add claim Name as a part of Portworx Volume Labels
 	locator.VolumeLabels[pvcClaimLabel] = p.options.PVC.Name
+	locator.VolumeLabels[pvcNamespaceLabel] = p.options.PVC.Namespace
+
+	for k, v := range p.options.PVC.Annotations {
+		if _, present := spec.VolumeLabels[k]; present {
+			glog.Warningf("not saving annotation: %s=%s in spec labels due to an existing key", k, v)
+			continue
+		}
+		spec.VolumeLabels[k] = v
+	}
+
 	volumeID, err := driver.Create(locator, source, spec)
 	if err != nil {
 		glog.Errorf("Error creating Portworx Volume : %v", err)
+		return "", 0, nil, err
 	}
 
 	glog.Infof("Successfully created Portworx volume for PVC: %v", p.options.PVC.Name)
-	return volumeID, requestGB, nil, err
+	return volumeID, requestGiB, nil, err
 }
 
 // DeleteVolume deletes a Portworx volume
@@ -166,6 +183,55 @@ func (util *PortworxVolumeUtil) UnmountVolume(u *portworxVolumeUnmounter, mountP
 		glog.Errorf("Error unmounting Portworx Volume (%v) on Path (%v): %v", u.volName, mountPath, err)
 		return err
 	}
+	return nil
+}
+
+func (util *PortworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource.Quantity, volumeHost volume.VolumeHost) error {
+	driver, err := util.getPortworxDriver(volumeHost, false /*localOnly*/)
+	if err != nil || driver == nil {
+		glog.Errorf("Failed to get portworx driver. Err: %v", err)
+		return err
+	}
+
+	vols, err := driver.Inspect([]string{spec.Name()})
+	if err != nil {
+		return err
+	}
+
+	if len(vols) != 1 {
+		return fmt.Errorf("failed to inspect Portworx volume: %s. Found: %d volumes", spec.Name(), len(vols))
+	}
+
+	vol := vols[0]
+	newSizeInBytes := uint64(volutil.RoundUpToGiB(newSize) * volutil.GIB)
+	if vol.Spec.Size >= newSizeInBytes {
+		glog.Infof("Portworx volume: %s already at size: %d greater than or equal to new "+
+			"requested size: %d. Skipping resize.", vol.Spec.Size, newSizeInBytes)
+		return nil
+	}
+
+	vol.Spec.Size = newSizeInBytes
+	err = driver.Set(spec.Name(), vol.Locator, vol.Spec)
+	if err != nil {
+		return err
+	}
+
+	// check if the volume's size actually got updated
+	vols, err = driver.Inspect([]string{spec.Name()})
+	if err != nil {
+		return err
+	}
+
+	if len(vols) != 1 {
+		return fmt.Errorf("failed to inspect resized Portworx volume: %s. Found: %d volumes", spec.Name(), len(vols))
+	}
+
+	updatedVol := vols[0]
+	if updatedVol.Spec.Size < vol.Spec.Size {
+		return fmt.Errorf("Portworx volume: %s doesn't match expected size after resize. expected:%v actual:%v",
+			spec.Name(), vol.Spec.Size, updatedVol.Spec.Size)
+	}
+
 	return nil
 }
 

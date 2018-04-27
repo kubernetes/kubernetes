@@ -22,15 +22,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // GroupMeta stores the metadata of a group.
 type GroupMeta struct {
-	// GroupVersion represents the preferred version of the group.
-	GroupVersion schema.GroupVersion
-
 	// GroupVersions is Group + all versions in that group.
 	GroupVersions []schema.GroupVersion
+
+	RootScopedKinds sets.String
 
 	// SelfLinker can set or get the SelfLink field of all API types.
 	// TODO: when versioning changes, make this part of each API definition.
@@ -68,7 +68,7 @@ func (gm *GroupMeta) DefaultInterfacesFor(version schema.GroupVersion) (*meta.Ve
 // TODO: remove the "Interfaces" suffix and make this also maintain the
 // .GroupVersions member.
 func (gm *GroupMeta) AddVersionInterfaces(version schema.GroupVersion, interfaces *meta.VersionInterfaces) error {
-	if e, a := gm.GroupVersion.Group, version.Group; a != e {
+	if e, a := gm.GroupVersions[0].Group, version.Group; a != e {
 		return fmt.Errorf("got a version in group %v, but am in group %v", a, e)
 	}
 	if gm.InterfacesByVersion == nil {

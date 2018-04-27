@@ -69,6 +69,7 @@ type apiImplementer interface {
 	VolumeMount(opts storageostypes.VolumeMountOptions) error
 	VolumeUnmount(opts storageostypes.VolumeUnmountOptions) error
 	VolumeDelete(opt storageostypes.DeleteOptions) error
+	Controller(ref string) (*storageostypes.Controller, error)
 }
 
 // storageosUtil is the utility structure to interact with the StorageOS API.
@@ -148,6 +149,12 @@ func (u *storageosUtil) AttachVolume(b *storageosMounter) (string, error) {
 		return "", err
 	}
 
+	// Get the node's device path from the API, falling back to the default if
+	// not set on the node.
+	if b.deviceDir == "" {
+		b.deviceDir = u.DeviceDir(b)
+	}
+
 	vol, err := u.api.Volume(b.volNamespace, b.volName)
 	if err != nil {
 		glog.Warningf("volume retrieve failed for volume %q with namespace %q (%v)", b.volName, b.volNamespace, err)
@@ -167,12 +174,13 @@ func (u *storageosUtil) AttachVolume(b *storageosMounter) (string, error) {
 		}
 	}
 
-	srcPath := path.Join(b.devicePath, vol.ID)
+	srcPath := path.Join(b.deviceDir, vol.ID)
 	dt, err := pathDeviceType(srcPath)
 	if err != nil {
 		glog.Warningf("volume source path %q for volume %q not ready (%v)", srcPath, b.volName, err)
 		return "", err
 	}
+
 	switch dt {
 	case modeBlock:
 		return srcPath, nil
@@ -277,6 +285,22 @@ func (u *storageosUtil) DeleteVolume(d *storageosDeleter) error {
 	return u.api.VolumeDelete(opts)
 }
 
+// Get the node's device path from the API, falling back to the default if not
+// specified.
+func (u *storageosUtil) DeviceDir(b *storageosMounter) string {
+
+	ctrl, err := u.api.Controller(b.plugin.host.GetHostName())
+	if err != nil {
+		glog.Warningf("node device path lookup failed: %v", err)
+		return defaultDeviceDir
+	}
+	if ctrl == nil || ctrl.DeviceDir == "" {
+		glog.Warningf("node device path not set, using default: %s", defaultDeviceDir)
+		return defaultDeviceDir
+	}
+	return ctrl.DeviceDir
+}
+
 // pathMode returns the FileMode for a path.
 func pathDeviceType(path string) (deviceType, error) {
 	fi, err := os.Stat(path)
@@ -332,7 +356,7 @@ func getLoopDevice(path string, exec mount.Exec) (string, error) {
 }
 
 func makeLoopDevice(path string, exec mount.Exec) (string, error) {
-	args := []string{"-f", "--show", path}
+	args := []string{"-f", "-P", "--show", path}
 	out, err := exec.Run(losetupPath, args...)
 	if err != nil {
 		glog.V(2).Infof("Failed device create command for path %s: %v", path, err)

@@ -24,11 +24,12 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	commontypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/controller/volume/expand/util"
 	"k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -44,6 +45,8 @@ type VolumeResizeMap interface {
 	MarkAsResized(*PVCWithResizeRequest, resource.Quantity) error
 	// UpdatePVSize updates just pv size after cloudprovider resizing is successful
 	UpdatePVSize(*PVCWithResizeRequest, resource.Quantity) error
+	// MarkForFSResize updates pvc condition to indicate that a file system resize is pending
+	MarkForFSResize(*PVCWithResizeRequest) error
 }
 
 type volumeResizeMap struct {
@@ -52,7 +55,7 @@ type volumeResizeMap struct {
 	// kube client for making API calls
 	kubeClient clientset.Interface
 	// for guarding access to pvcrs map
-	sync.RWMutex
+	sync.Mutex
 }
 
 // PVCWithResizeRequest struct defines data structure that stores state needed for
@@ -103,9 +106,6 @@ func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv
 		return
 	}
 
-	resizeMap.Lock()
-	defer resizeMap.Unlock()
-
 	pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 	pvcStatusSize := pvc.Status.Capacity[v1.ResourceStorage]
 
@@ -121,6 +121,9 @@ func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv
 		ExpectedSize:     pvcSize,
 		PersistentVolume: pv,
 	}
+
+	resizeMap.Lock()
+	defer resizeMap.Unlock()
 	resizeMap.pvcrs[types.UniquePVCName(pvc.UID)] = pvcRequest
 }
 
@@ -141,18 +144,15 @@ func (resizeMap *volumeResizeMap) GetPVCsWithResizeRequest() []*PVCWithResizeReq
 // DeletePVC removes given pvc object from list of pvcs that needs resizing.
 // deleting a pvc in this map doesn't affect operations that are already inflight.
 func (resizeMap *volumeResizeMap) DeletePVC(pvc *v1.PersistentVolumeClaim) {
-	resizeMap.Lock()
-	defer resizeMap.Unlock()
 	pvcUniqueName := types.UniquePVCName(pvc.UID)
 	glog.V(5).Infof("Removing PVC %v from resize map", pvcUniqueName)
+	resizeMap.Lock()
+	defer resizeMap.Unlock()
 	delete(resizeMap.pvcrs, pvcUniqueName)
 }
 
 // MarkAsResized marks a pvc as fully resized
 func (resizeMap *volumeResizeMap) MarkAsResized(pvcr *PVCWithResizeRequest, newSize resource.Quantity) error {
-	resizeMap.Lock()
-	defer resizeMap.Unlock()
-
 	emptyCondition := []v1.PersistentVolumeClaimCondition{}
 
 	err := resizeMap.updatePVCCapacityAndConditions(pvcr, newSize, emptyCondition)
@@ -163,11 +163,23 @@ func (resizeMap *volumeResizeMap) MarkAsResized(pvcr *PVCWithResizeRequest, newS
 	return nil
 }
 
+// MarkForFSResize marks pvc with condition that indicates a fs resize is pending
+func (resizeMap *volumeResizeMap) MarkForFSResize(pvcr *PVCWithResizeRequest) error {
+	pvcCondition := v1.PersistentVolumeClaimCondition{
+		Type:               v1.PersistentVolumeClaimFileSystemResizePending,
+		Status:             v1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Message:            "Waiting for user to (re-)start a pod to finish file system resize of volume on node.",
+	}
+	conditions := []v1.PersistentVolumeClaimCondition{pvcCondition}
+	newPVC := pvcr.PVC.DeepCopy()
+	newPVC = util.MergeResizeConditionOnPVC(newPVC, conditions)
+	_, err := util.PatchPVCStatus(pvcr.PVC /*oldPVC*/, newPVC, resizeMap.kubeClient)
+	return err
+}
+
 // UpdatePVSize updates just pv size after cloudprovider resizing is successful
 func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSize resource.Quantity) error {
-	resizeMap.Lock()
-	defer resizeMap.Unlock()
-
 	oldPv := pvcr.PersistentVolume
 	pvClone := oldPv.DeepCopy()
 
@@ -201,16 +213,9 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 }
 
 func (resizeMap *volumeResizeMap) updatePVCCapacityAndConditions(pvcr *PVCWithResizeRequest, newSize resource.Quantity, pvcConditions []v1.PersistentVolumeClaimCondition) error {
-
-	claimClone := pvcr.PVC.DeepCopy()
-
-	claimClone.Status.Capacity[v1.ResourceStorage] = newSize
-	claimClone.Status.Conditions = pvcConditions
-
-	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
-	if updateErr != nil {
-		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: failed: %v", pvcr.QualifiedName(), updateErr)
-		return updateErr
-	}
-	return nil
+	newPVC := pvcr.PVC.DeepCopy()
+	newPVC.Status.Capacity[v1.ResourceStorage] = newSize
+	newPVC = util.MergeResizeConditionOnPVC(newPVC, pvcConditions)
+	_, err := util.PatchPVCStatus(pvcr.PVC /*oldPVC*/, newPVC, resizeMap.kubeClient)
+	return err
 }

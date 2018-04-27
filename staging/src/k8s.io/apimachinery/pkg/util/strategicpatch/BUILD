@@ -13,8 +13,7 @@ go_test(
         "testdata/swagger-merge-item.json",
         "testdata/swagger-precision-item.json",
     ],
-    importpath = "k8s.io/apimachinery/pkg/util/strategicpatch",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",

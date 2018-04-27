@@ -51,7 +51,7 @@ func (c *Fake) DockerContainer(name string, req *cadvisorapi.ContainerInfoReques
 }
 
 func (c *Fake) MachineInfo() (*cadvisorapi.MachineInfo, error) {
-	// Simulate a matchin with 1 core and 3.75GB of memory.
+	// Simulate a machine with 1 core and 3.75GB of memory.
 	// We set it to non-zero values to make non-zero-capacity machines in Kubemark.
 	return &cadvisorapi.MachineInfo{
 		NumCores:       1,
@@ -76,10 +76,6 @@ func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error
 	return new(events.EventChannel), nil
 }
 
-func (c *Fake) HasDedicatedImageFs() (bool, error) {
-	return false, nil
-}
-
-func (c *Fake) GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error) {
+func (c *Fake) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }

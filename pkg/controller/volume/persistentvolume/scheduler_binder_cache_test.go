@@ -86,7 +86,7 @@ func TestDeleteBindings(t *testing.T) {
 	// Get nil bindings
 	bindings := cache.GetBindings(pod, "node1")
 	if bindings != nil {
-		t.Errorf("Test failed: expected inital nil bindings, got %+v", bindings)
+		t.Errorf("Test failed: expected initial nil bindings, got %+v", bindings)
 	}
 
 	// Delete nothing

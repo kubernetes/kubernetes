@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -170,7 +170,7 @@ message Binding {
   optional ObjectReference target = 2;
 }
 
-// Represents storage that is managed by an external CSI volume driver
+// Represents storage that is managed by an external CSI volume driver (Beta feature)
 message CSIPersistentVolumeSource {
   // Driver is the name of the driver to use for this volume.
   // Required.
@@ -185,6 +185,40 @@ message CSIPersistentVolumeSource {
   // Defaults to false (read/write).
   // +optional
   optional bool readOnly = 3;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 4;
+
+  // Attributes of the volume to publish.
+  // +optional
+  map<string, string> volumeAttributes = 5;
+
+  // ControllerPublishSecretRef is a reference to the secret object containing
+  // sensitive information to pass to the CSI driver to complete the CSI
+  // ControllerPublishVolume and ControllerUnpublishVolume calls.
+  // This field is optional, and  may be empty if no secret is required. If the
+  // secret object contains more than one secret, all secrets are passed.
+  // +optional
+  optional SecretReference controllerPublishSecretRef = 6;
+
+  // NodeStageSecretRef is a reference to the secret object containing sensitive
+  // information to pass to the CSI driver to complete the CSI NodeStageVolume
+  // and NodeStageVolume and NodeUnstageVolume calls.
+  // This field is optional, and  may be empty if no secret is required. If the
+  // secret object contains more than one secret, all secrets are passed.
+  // +optional
+  optional SecretReference nodeStageSecretRef = 7;
+
+  // NodePublishSecretRef is a reference to the secret object containing
+  // sensitive information to pass to the CSI driver to complete the CSI
+  // NodePublishVolume and NodeUnpublishVolume calls.
+  // This field is optional, and  may be empty if no secret is required. If the
+  // secret object contains more than one secret, all secrets are passed.
+  // +optional
+  optional SecretReference nodePublishSecretRef = 8;
 }
 
 // Adds and removes POSIX capabilities from running containers.
@@ -351,8 +385,21 @@ message ConfigMap {
 
   // Data contains the configuration data.
   // Each key must consist of alphanumeric characters, '-', '_' or '.'.
+  // Values with non-UTF-8 byte sequences must use the BinaryData field.
+  // The keys stored in Data must not overlap with the keys in
+  // the BinaryData field, this is enforced during validation process.
   // +optional
   map<string, string> data = 2;
+
+  // BinaryData contains the binary data.
+  // Each key must consist of alphanumeric characters, '-', '_' or '.'.
+  // BinaryData can contain byte sequences that are not in the UTF-8 range.
+  // The keys stored in BinaryData must not overlap with the ones in
+  // the Data field, this is enforced during validation process.
+  // Using this field will require 1.10+ apiserver and
+  // kubelet.
+  // +optional
+  map<string, bytes> binaryData = 3;
 }
 
 // ConfigMapEnvSource selects a ConfigMap to populate the environment
@@ -762,41 +809,6 @@ message DaemonEndpoint {
   optional int32 Port = 1;
 }
 
-// DeleteOptions may be provided when deleting an API object
-// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
-// +k8s:openapi-gen=false
-message DeleteOptions {
-  // The duration in seconds before the object should be deleted. Value must be non-negative integer.
-  // The value zero indicates delete immediately. If this value is nil, the default grace period for the
-  // specified type will be used.
-  // Defaults to a per object value if not specified. zero means delete immediately.
-  // +optional
-  optional int64 gracePeriodSeconds = 1;
-
-  // Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
-  // returned.
-  // +optional
-  optional Preconditions preconditions = 2;
-
-  // Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
-  // Should the dependent objects be orphaned. If true/false, the "orphan"
-  // finalizer will be added to/removed from the object's finalizers list.
-  // Either this field or PropagationPolicy may be set, but not both.
-  // +optional
-  optional bool orphanDependents = 3;
-
-  // Whether and how garbage collection will be performed.
-  // Either this field or OrphanDependents may be set, but not both.
-  // The default policy is decided by the existing finalizer set in the
-  // metadata.finalizers and the resource-specific default policy.
-  // Acceptable values are: 'Orphan' - orphan the dependents; 'Background' -
-  // allow the garbage collector to delete the dependents in the background;
-  // 'Foreground' - a cascading policy that deletes all dependents in the
-  // foreground.
-  // +optional
-  optional string propagationPolicy = 4;
-}
-
 // Represents downward API info for projecting into a projected volume.
 // Note that this is identical to a downwardAPI volume source without the default
 // mode.
@@ -957,6 +969,7 @@ message Endpoints {
   // subsets for the different ports. No address will appear in both Addresses and
   // NotReadyAddresses in the same subset.
   // Sets of addresses and ports that comprise a service.
+  // +optional
   repeated EndpointSubset subsets = 2;
 }
 
@@ -973,7 +986,7 @@ message EndpointsList {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 message EnvFromSource {
-  // An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+  // An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
   // +optional
   optional string prefix = 1;
 
@@ -1105,12 +1118,12 @@ message EventList {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 message EventSeries {
   // Number of occurrences in this series up to the last heartbeat time
   optional int32 count = 1;
 
-  // Time of the last occurence observed
+  // Time of the last occurrence observed
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 
   // State of this Series: Ongoing or Finished
@@ -1614,43 +1627,6 @@ message List {
   repeated k8s.io.apimachinery.pkg.runtime.RawExtension items = 2;
 }
 
-// ListOptions is the query options to a standard REST list call.
-// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
-// +k8s:openapi-gen=false
-message ListOptions {
-  // A selector to restrict the list of returned objects by their labels.
-  // Defaults to everything.
-  // +optional
-  optional string labelSelector = 1;
-
-  // A selector to restrict the list of returned objects by their fields.
-  // Defaults to everything.
-  // +optional
-  optional string fieldSelector = 2;
-
-  // If true, partially initialized resources are included in the response.
-  // +optional
-  optional bool includeUninitialized = 6;
-
-  // Watch for changes to the described resources and return them as a stream of
-  // add, update, and remove notifications. Specify resourceVersion.
-  // +optional
-  optional bool watch = 3;
-
-  // When specified with a watch call, shows changes that occur after that particular version of a resource.
-  // Defaults to changes from the beginning of history.
-  // When specified for list:
-  // - if unset, then the result is returned from remote storage based on quorum-read flag;
-  // - if it's 0, then we simply return what we currently have in cache, no guarantee;
-  // - if set to non zero, then the result is at least as fresh as given rv.
-  // +optional
-  optional string resourceVersion = 4;
-
-  // Timeout for the list/watch call.
-  // +optional
-  optional int64 timeoutSeconds = 5;
-}
-
 // LoadBalancerIngress represents the status of a load-balancer ingress point:
 // traffic intended for the service should be sent to an ingress point.
 message LoadBalancerIngress {
@@ -1683,11 +1659,13 @@ message LocalObjectReference {
   optional string name = 1;
 }
 
-// Local represents directly-attached storage with node affinity
+// Local represents directly-attached storage with node affinity (Beta feature)
 message LocalVolumeSource {
-  // The full path to the volume on the node
-  // For alpha, this path must be a directory
-  // Once block as a source is supported, then this path can point to a block device
+  // The full path to the volume on the node.
+  // It can be either a directory or block device (disk, partition, ...).
+  // Directories can be represented only by PersistentVolume with VolumeMode=Filesystem.
+  // Block devices can be represented only by VolumeMode=Block, which also requires the
+  // BlockVolume alpha feature gate to be enabled.
   optional string path = 1;
 }
 
@@ -1899,10 +1877,16 @@ message NodeSelectorRequirement {
   repeated string values = 3;
 }
 
-// A null or empty node selector term matches no objects.
+// A null or empty node selector term matches no objects. The requirements of
+// them are ANDed.
 message NodeSelectorTerm {
-  // Required. A list of node selector requirements. The requirements are ANDed.
+  // A list of node selector requirements by node's labels.
+  // +optional
   repeated NodeSelectorRequirement matchExpressions = 1;
+
+  // A list of node selector requirements by node's fields.
+  // +optional
+  repeated NodeSelectorRequirement matchFields = 2;
 }
 
 // NodeSpec describes the attributes that a node is created with.
@@ -1910,11 +1894,6 @@ message NodeSpec {
   // PodCIDR represents the pod IP range assigned to the node.
   // +optional
   optional string podCIDR = 1;
-
-  // External ID of the node assigned by some machine database (e.g. a cloud provider).
-  // Deprecated.
-  // +optional
-  optional string externalID = 2;
 
   // ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
   // +optional
@@ -1933,6 +1912,11 @@ message NodeSpec {
   // The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
   // +optional
   optional NodeConfigSource configSource = 6;
+
+  // Deprecated. Not all kubelets will set this field. Remove field after 1.13.
+  // see: https://issues.k8s.io/61966
+  // +optional
+  optional string externalID = 2;
 }
 
 // NodeStatus is information about the current status of a node.
@@ -2035,170 +2019,6 @@ message ObjectFieldSelector {
 
   // Path of the field to select in the specified API version.
   optional string fieldPath = 2;
-}
-
-// ObjectMeta is metadata that all persisted resources must have, which includes all objects
-// users must create.
-// DEPRECATED: Use k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta instead - this type will be removed soon.
-// +k8s:openapi-gen=false
-message ObjectMeta {
-  // Name must be unique within a namespace. Is required when creating resources, although
-  // some resources may allow a client to request the generation of an appropriate name
-  // automatically. Name is primarily intended for creation idempotence and configuration
-  // definition.
-  // Cannot be updated.
-  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-  // +optional
-  optional string name = 1;
-
-  // GenerateName is an optional prefix, used by the server, to generate a unique
-  // name ONLY IF the Name field has not been provided.
-  // If this field is used, the name returned to the client will be different
-  // than the name passed. This value will also be combined with a unique suffix.
-  // The provided value has the same validation rules as the Name field,
-  // and may be truncated by the length of the suffix required to make the value
-  // unique on the server.
-  // 
-  // If this field is specified and the generated name exists, the server will
-  // NOT return a 409 - instead, it will either return 201 Created or 500 with Reason
-  // ServerTimeout indicating a unique name could not be found in the time allotted, and the client
-  // should retry (optionally after the time indicated in the Retry-After header).
-  // 
-  // Applied only if Name is not specified.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#idempotency
-  // +optional
-  optional string generateName = 2;
-
-  // Namespace defines the space within each name must be unique. An empty namespace is
-  // equivalent to the "default" namespace, but "default" is the canonical representation.
-  // Not all objects are required to be scoped to a namespace - the value of this field for
-  // those objects will be empty.
-  // 
-  // Must be a DNS_LABEL.
-  // Cannot be updated.
-  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-  // +optional
-  optional string namespace = 3;
-
-  // SelfLink is a URL representing this object.
-  // Populated by the system.
-  // Read-only.
-  // +optional
-  optional string selfLink = 4;
-
-  // UID is the unique in time and space value for this object. It is typically generated by
-  // the server on successful creation of a resource and is not allowed to change on PUT
-  // operations.
-  // 
-  // Populated by the system.
-  // Read-only.
-  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-  // +optional
-  optional string uid = 5;
-
-  // An opaque value that represents the internal version of this object that can
-  // be used by clients to determine when objects have changed. May be used for optimistic
-  // concurrency, change detection, and the watch operation on a resource or set of resources.
-  // Clients must treat these values as opaque and passed unmodified back to the server.
-  // They may only be valid for a particular resource or set of resources.
-  // 
-  // Populated by the system.
-  // Read-only.
-  // Value must be treated as opaque by clients and .
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
-  // +optional
-  optional string resourceVersion = 6;
-
-  // A sequence number representing a specific generation of the desired state.
-  // Populated by the system. Read-only.
-  // +optional
-  optional int64 generation = 7;
-
-  // CreationTimestamp is a timestamp representing the server time when this object was
-  // created. It is not guaranteed to be set in happens-before order across separate operations.
-  // Clients may not set this value. It is represented in RFC3339 form and is in UTC.
-  // 
-  // Populated by the system.
-  // Read-only.
-  // Null for lists.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time creationTimestamp = 8;
-
-  // DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
-  // field is set by the server when a graceful deletion is requested by the user, and is not
-  // directly settable by a client. The resource is expected to be deleted (no longer visible
-  // from resource lists, and not reachable by name) after the time in this field. Once set,
-  // this value may not be unset or be set further into the future, although it may be shortened
-  // or the resource may be deleted prior to this time. For example, a user may request that
-  // a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination
-  // signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard
-  // termination signal (SIGKILL) to the container and after cleanup, remove the pod from the
-  // API. In the presence of network partitions, this object may still exist after this
-  // timestamp, until an administrator or automated process can determine the resource is
-  // fully terminated.
-  // If not set, graceful deletion of the object has not been requested.
-  // 
-  // Populated by the system when a graceful deletion is requested.
-  // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time deletionTimestamp = 9;
-
-  // Number of seconds allowed for this object to gracefully terminate before
-  // it will be removed from the system. Only set when deletionTimestamp is also set.
-  // May only be shortened.
-  // Read-only.
-  // +optional
-  optional int64 deletionGracePeriodSeconds = 10;
-
-  // Map of string keys and values that can be used to organize and categorize
-  // (scope and select) objects. May match selectors of replication controllers
-  // and services.
-  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
-  // +optional
-  map<string, string> labels = 11;
-
-  // Annotations is an unstructured key value map stored with a resource that may be
-  // set by external tools to store and retrieve arbitrary metadata. They are not
-  // queryable and should be preserved when modifying objects.
-  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-  // +optional
-  map<string, string> annotations = 12;
-
-  // List of objects depended by this object. If ALL objects in the list have
-  // been deleted, this object will be garbage collected. If this object is managed by a controller,
-  // then an entry in this list will point to this controller, with the controller field set to true.
-  // There cannot be more than one managing controller.
-  // +optional
-  // +patchMergeKey=uid
-  // +patchStrategy=merge
-  repeated k8s.io.apimachinery.pkg.apis.meta.v1.OwnerReference ownerReferences = 13;
-
-  // An initializer is a controller which enforces some system invariant at object creation time.
-  // This field is a list of initializers that have not yet acted on this object. If nil or empty,
-  // this object has been completely initialized. Otherwise, the object is considered uninitialized
-  // and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to
-  // observe uninitialized objects.
-  // 
-  // When an object is created, the system will populate this list with the current set of initializers.
-  // Only privileged users may set or modify this list. Once it is empty, it may not be modified further
-  // by any user.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Initializers initializers = 16;
-
-  // Must be empty before the object is deleted from the registry. Each entry
-  // is an identifier for the responsible component that will remove the entry
-  // from the list. If the deletionTimestamp of the object is non-nil, entries
-  // in this list can only be removed.
-  // +optional
-  // +patchStrategy=merge
-  repeated string finalizers = 14;
-
-  // The name of the cluster which the object belongs to.
-  // This is used to distinguish resources with same name and namespace in different clusters.
-  // This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
-  // +optional
-  optional string clusterName = 15;
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
@@ -2509,7 +2329,7 @@ message PersistentVolumeSource {
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
 
-  // CSI represents storage that handled by an external CSI driver
+  // CSI represents storage that handled by an external CSI driver (Beta feature).
   // +optional
   optional CSIPersistentVolumeSource csi = 22;
 }
@@ -2537,8 +2357,9 @@ message PersistentVolumeSpec {
   optional ObjectReference claimRef = 4;
 
   // What happens to a persistent volume when released from its claim.
-  // Valid options are Retain (default) and Recycle.
-  // Recycling must be supported by the volume plugin underlying this persistent volume.
+  // Valid options are Retain (default for manually created PersistentVolumes), Delete (default
+  // for dynamically provisioned PersistentVolumes), and Recycle (deprecated).
+  // Recycle must be supported by the volume plugin underlying this PersistentVolume.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming
   // +optional
   optional string persistentVolumeReclaimPolicy = 5;
@@ -2559,6 +2380,11 @@ message PersistentVolumeSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string volumeMode = 8;
+
+  // NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+  // This field influences the scheduling of pods that use this volume.
+  // +optional
+  optional VolumeNodeAffinity nodeAffinity = 9;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -2910,6 +2736,14 @@ message PodSecurityContext {
   // +optional
   optional int64 runAsUser = 2;
 
+  // The GID to run the entrypoint of the container process.
+  // Uses runtime default if unset.
+  // May also be set in SecurityContext.  If set in both SecurityContext and
+  // PodSecurityContext, the value specified in SecurityContext takes precedence
+  // for that container.
+  // +optional
+  optional int64 runAsGroup = 6;
+
   // Indicates that the container must run as a non-root user.
   // If true, the Kubelet will validate the image at runtime to ensure that it
   // does not run as UID 0 (root) and fail to start the container if it does.
@@ -3009,7 +2843,6 @@ message PodSpec {
   // DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
   // To have DNS options set along with hostNetwork, you have to specify DNS policy
   // explicitly to 'ClusterFirstWithHostNet'.
-  // Note that 'None' policy is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
   // +optional
   optional string dnsPolicy = 6;
 
@@ -3059,6 +2892,16 @@ message PodSpec {
   // +optional
   optional bool hostIPC = 13;
 
+  // Share a single process namespace between all of the containers in a pod.
+  // When this is set containers will be able to view and signal processes from other containers
+  // in the same pod, and the first process in each container will not be assigned PID 1.
+  // HostPID and ShareProcessNamespace cannot both be set.
+  // Optional: Default to false.
+  // This field is alpha-level and is honored only by servers that enable the PodShareProcessNamespace feature.
+  // +k8s:conversion-gen=false
+  // +optional
+  optional bool shareProcessNamespace = 27;
+
   // SecurityContext holds pod-level security attributes and common container settings.
   // Optional: Defaults to empty.  See type description for default values of each field.
   // +optional
@@ -3103,9 +2946,10 @@ message PodSpec {
   // +patchStrategy=merge
   repeated HostAlias hostAliases = 23;
 
-  // If specified, indicates the pod's priority. "SYSTEM" is a special keyword
-  // which indicates the highest priority. Any other name must be defined by
-  // creating a PriorityClass object with that name.
+  // If specified, indicates the pod's priority. "system-node-critical" and
+  // "system-cluster-critical" are two special keywords which indicate the
+  // highest priorities with the former being the highest priority. Any other
+  // name must be defined by creating a PriorityClass object with that name.
   // If not specified, the pod priority will be default or zero if there is no
   // default.
   // +optional
@@ -3122,7 +2966,6 @@ message PodSpec {
   // Specifies the DNS parameters of a pod.
   // Parameters specified here will be merged to the generated DNS
   // configuration based on DNSPolicy.
-  // This is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
   // +optional
   optional PodDNSConfig dnsConfig = 26;
 }
@@ -3150,6 +2993,16 @@ message PodStatus {
   // e.g. 'Evicted'
   // +optional
   optional string reason = 4;
+
+  // nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be
+  // scheduled right away as preemption victims receive their graceful termination periods.
+  // This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide
+  // to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to
+  // give the resources on this node to a higher priority pod that is created after preemption.
+  // As a result, this field may be different than PodSpec.nodeName when the pod is
+  // scheduled.
+  // +optional
+  optional string nominatedNodeName = 11;
 
   // IP address of the host to which the pod is assigned. Empty if not yet scheduled.
   // +optional
@@ -3179,7 +3032,7 @@ message PodStatus {
 
   // The Quality of Service (QOS) classification assigned to the pod based on resource requirements
   // See PodQOSClass type for available QOS classes
-  // More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md
+  // More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md
   // +optional
   optional string qosClass = 9;
 }
@@ -3951,6 +3804,13 @@ message SecurityContext {
   // +optional
   optional int64 runAsUser = 4;
 
+  // The GID to run the entrypoint of the container process.
+  // Uses runtime default if unset.
+  // May also be set in PodSecurityContext.  If set in both SecurityContext and
+  // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // +optional
+  optional int64 runAsGroup = 8;
+
   // Indicates that the container must run as a non-root user.
   // If true, the Kubelet will validate the image at runtime to ensure that it
   // does not run as UID 0 (root) and fail to start the container if it does.
@@ -4421,10 +4281,15 @@ message VolumeMount {
   // mountPropagation determines how mounts are propagated from the host
   // to container and the other way around.
   // When not set, MountPropagationHostToContainer is used.
-  // This field is alpha in 1.8 and can be reworked or removed in a future
-  // release.
+  // This field is beta in 1.10.
   // +optional
   optional string mountPropagation = 5;
+}
+
+// VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+message VolumeNodeAffinity {
+  // Required specifies hard node constraints that must be met.
+  optional NodeSelector required = 1;
 }
 
 // Projection that may be projected along with other supported volume types

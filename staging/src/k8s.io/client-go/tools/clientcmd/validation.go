@@ -237,6 +237,25 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		}
 	}
 
+	if authInfo.Exec != nil {
+		if authInfo.AuthProvider != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("authProvider cannot be provided in combination with an exec plugin for %s", authInfoName))
+		}
+		if len(authInfo.Exec.Command) == 0 {
+			validationErrors = append(validationErrors, fmt.Errorf("command must be specified for %v to use exec authentication plugin", authInfoName))
+		}
+		if len(authInfo.Exec.APIVersion) == 0 {
+			validationErrors = append(validationErrors, fmt.Errorf("apiVersion must be specified for %v to use exec authentication plugin", authInfoName))
+		}
+		for _, v := range authInfo.Exec.Env {
+			if len(v.Name) == 0 {
+				validationErrors = append(validationErrors, fmt.Errorf("env variable name must be specified for %v to use exec authentication plugin", authInfoName))
+			} else if len(v.Value) == 0 {
+				validationErrors = append(validationErrors, fmt.Errorf("env variable %s value must be specified for %v to use exec authentication plugin", v.Name, authInfoName))
+			}
+		}
+	}
+
 	// authPath also provides information for the client to identify the server, so allow multiple auth methods in that case
 	if (len(methods) > 1) && (!usingAuthPath) {
 		validationErrors = append(validationErrors, fmt.Errorf("more than one authentication method found for %v; found %v, only one is allowed", authInfoName, methods))
@@ -252,6 +271,10 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 // validateContext looks for errors in the context.  It is not transitive, so errors in the reference authInfo or cluster configs are not included in this return
 func validateContext(contextName string, context clientcmdapi.Context, config clientcmdapi.Config) []error {
 	validationErrors := make([]error, 0)
+
+	if len(contextName) == 0 {
+		validationErrors = append(validationErrors, fmt.Errorf("empty context name for %#v is not allowed", context))
+	}
 
 	if len(context.AuthInfo) == 0 {
 		validationErrors = append(validationErrors, fmt.Errorf("user was not specified for context %q", contextName))

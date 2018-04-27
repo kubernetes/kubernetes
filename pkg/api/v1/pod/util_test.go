@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -402,5 +403,120 @@ func TestIsPodAvailable(t *testing.T) {
 		if isAvailable != test.expected {
 			t.Errorf("[tc #%d] expected available pod: %t, got: %t", i, test.expected, isAvailable)
 		}
+	}
+}
+
+func TestGetContainerStatus(t *testing.T) {
+	type ExpectedStruct struct {
+		status v1.ContainerStatus
+		exists bool
+	}
+
+	tests := []struct {
+		status   []v1.ContainerStatus
+		name     string
+		expected ExpectedStruct
+		desc     string
+	}{
+		{
+			status:   []v1.ContainerStatus{{Name: "test1", Ready: false, Image: "image1"}, {Name: "test2", Ready: true, Image: "image1"}},
+			name:     "test1",
+			expected: ExpectedStruct{status: v1.ContainerStatus{Name: "test1", Ready: false, Image: "image1"}, exists: true},
+			desc:     "retrieve ContainerStatus with Name=\"test1\"",
+		},
+		{
+			status:   []v1.ContainerStatus{{Name: "test2", Ready: false, Image: "image2"}},
+			name:     "test1",
+			expected: ExpectedStruct{status: v1.ContainerStatus{}, exists: false},
+			desc:     "no matching ContainerStatus with Name=\"test1\"",
+		},
+		{
+			status:   []v1.ContainerStatus{{Name: "test3", Ready: false, Image: "image3"}},
+			name:     "",
+			expected: ExpectedStruct{status: v1.ContainerStatus{}, exists: false},
+			desc:     "retrieve an empty ContainerStatus with container name empty",
+		},
+		{
+			status:   nil,
+			name:     "",
+			expected: ExpectedStruct{status: v1.ContainerStatus{}, exists: false},
+			desc:     "retrieve an empty ContainerStatus with status nil",
+		},
+	}
+
+	for _, test := range tests {
+		resultStatus, exists := GetContainerStatus(test.status, test.name)
+		assert.Equal(t, test.expected.status, resultStatus, "GetContainerStatus: "+test.desc)
+		assert.Equal(t, test.expected.exists, exists, "GetContainerStatus: "+test.desc)
+
+		resultStatus = GetExistingContainerStatus(test.status, test.name)
+		assert.Equal(t, test.expected.status, resultStatus, "GetExistingContainerStatus: "+test.desc)
+	}
+}
+
+func TestUpdatePodCondition(t *testing.T) {
+	time := metav1.Now()
+
+	podStatus := v1.PodStatus{
+		Conditions: []v1.PodCondition{
+			{
+				Type:               v1.PodReady,
+				Status:             v1.ConditionTrue,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000)),
+			},
+		},
+	}
+	tests := []struct {
+		status     *v1.PodStatus
+		conditions v1.PodCondition
+		expected   bool
+		desc       string
+	}{
+		{
+			status: &podStatus,
+			conditions: v1.PodCondition{
+				Type:               v1.PodReady,
+				Status:             v1.ConditionTrue,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+			expected: false,
+			desc:     "all equal, no update",
+		},
+		{
+			status: &podStatus,
+			conditions: v1.PodCondition{
+				Type:               v1.PodScheduled,
+				Status:             v1.ConditionTrue,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+			expected: true,
+			desc:     "not equal Type, should get updated",
+		},
+		{
+			status: &podStatus,
+			conditions: v1.PodCondition{
+				Type:               v1.PodReady,
+				Status:             v1.ConditionFalse,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+			expected: true,
+			desc:     "not equal Status, should get updated",
+		},
+	}
+
+	for _, test := range tests {
+		var resultStatus bool
+		resultStatus = UpdatePodCondition(test.status, &test.conditions)
+
+		assert.Equal(t, test.expected, resultStatus, test.desc)
 	}
 }

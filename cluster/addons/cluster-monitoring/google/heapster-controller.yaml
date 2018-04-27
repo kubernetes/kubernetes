@@ -1,16 +1,3 @@
-{% set base_metrics_memory = "140Mi" -%}
-{% set base_metrics_cpu = "80m" -%}
-{% set base_eventer_memory = "190Mi" -%}
-{% set metrics_memory_per_node = 4 -%}
-{% set metrics_cpu_per_node = 0.5 -%}
-{% set eventer_memory_per_node = 500 -%}
-{% set num_nodes = pillar.get('num_nodes', -1) -%}
-{% set nanny_memory = "90Mi" -%}
-{% set nanny_memory_per_node = 200 -%}
-{% if num_nodes >= 0 -%}
-  {% set nanny_memory = (90 * 1024 + num_nodes * nanny_memory_per_node)|string + "Ki" -%}
-{% endif -%}
-
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -49,29 +36,30 @@ data:
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: heapster-v1.5.0
+  name: heapster-v1.5.2
   namespace: kube-system
   labels:
     k8s-app: heapster
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v1.5.0
+    version: v1.5.2
 spec:
   replicas: 1
   selector:
     matchLabels:
       k8s-app: heapster
-      version: v1.5.0
+      version: v1.5.2
   template:
     metadata:
       labels:
         k8s-app: heapster
-        version: v1.5.0
+        version: v1.5.2
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       containers:
-        - image: k8s.gcr.io/heapster-amd64:v1.5.0
+        - image: k8s.gcr.io/heapster-amd64:v1.5.2
           name: heapster
           livenessProbe:
             httpGet:
@@ -84,7 +72,7 @@ spec:
             - /heapster
             - --source=kubernetes.summary_api:''
             - --sink=gcm
-        - image: k8s.gcr.io/heapster-amd64:v1.5.0
+        - image: k8s.gcr.io/heapster-amd64:v1.5.2
           name: eventer
           command:
             - /eventer
@@ -101,7 +89,7 @@ spec:
               memory: {{ nanny_memory }}
           volumeMounts:
           - name: heapster-config-volume
-            mountMath: /etc/config
+            mountPath: /etc/config
           env:
             - name: MY_POD_NAME
               valueFrom:
@@ -119,7 +107,7 @@ spec:
             - --memory={{ base_metrics_memory }}
             - --extra-memory={{metrics_memory_per_node}}Mi
             - --threshold=5
-            - --deployment=heapster-v1.5.0
+            - --deployment=heapster-v1.5.2
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential
@@ -143,7 +131,7 @@ spec:
                   fieldPath: metadata.namespace
           volumeMounts:
           - name: eventer-config-volume
-            mountMath: /etc/config
+            mountPath: /etc/config
           command:
             - /pod_nanny
             - --config-dir=/etc/config
@@ -152,7 +140,7 @@ spec:
             - --memory={{base_eventer_memory}}
             - --extra-memory={{eventer_memory_per_node}}Ki
             - --threshold=5
-            - --deployment=heapster-v1.5.0
+            - --deployment=heapster-v1.5.2
             - --container=eventer
             - --poll-period=300000
             - --estimator=exponential
@@ -160,7 +148,6 @@ spec:
         - name: heapster-config-volume
           configMap:
             name: heapster-config
-      volumes:
         - name: eventer-config-volume
           configMap:
             name: eventer-config

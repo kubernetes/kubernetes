@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["registered_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/apimachinery/registered",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apimachinery:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -22,7 +21,6 @@ go_library(
     srcs = ["registered.go"],
     importpath = "k8s.io/apimachinery/pkg/apimachinery/registered",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

@@ -20,6 +20,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
       nodeSelector:
         projectcalico.org/ds-ready: "true"
       hostNetwork: true
@@ -32,7 +33,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: calico/node:v2.6.1
+          image: gcr.io/projectcalico-org/node:v2.6.7
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -86,7 +87,7 @@ spec:
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: calico/cni:v1.11.0
+          image: gcr.io/projectcalico-org/cni:v1.11.2
           command: ["/install-cni.sh"]
           env:
             - name: CNI_CONF_NAME

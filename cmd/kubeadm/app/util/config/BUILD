@@ -20,6 +20,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
@@ -28,8 +29,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["masterconfig_test.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/config",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

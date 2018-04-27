@@ -24,7 +24,7 @@ import time
 from shlex import split
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
-from socket import gethostname
+from socket import gethostname, getfqdn
 
 from charms import layer
 from charms.layer import snap
@@ -63,13 +63,25 @@ def upgrade_charm():
     cleanup_pre_snap_services()
     check_resources_for_upgrade_needed()
 
+    # Remove the RC for nginx ingress if it exists
+    if hookenv.config().get('ingress'):
+        kubectl_success('delete', 'rc', 'nginx-ingress-controller')
+
     # Remove gpu.enabled state so we can reconfigure gpu-related kubelet flags,
     # since they can differ between k8s versions
-    remove_state('kubernetes-worker.gpu.enabled')
+    if is_state('kubernetes-worker.gpu.enabled'):
+        remove_state('kubernetes-worker.gpu.enabled')
+        try:
+            disable_gpu()
+        except ApplyNodeLabelFailed:
+            # Removing node label failed. Probably the master is unavailable.
+            # Proceed with the upgrade in hope GPUs will still be there.
+            hookenv.log('Failed to remove GPU labels. Proceed with upgrade.')
 
     remove_state('kubernetes-worker.cni-plugins.installed')
     remove_state('kubernetes-worker.config.created')
     remove_state('kubernetes-worker.ingress.available')
+    remove_state('worker.auth.bootstrapped')
     set_state('kubernetes-worker.restart-needed')
 
 
@@ -271,17 +283,34 @@ def update_kubelet_status():
         hookenv.status_set('waiting', msg)
 
 
-@when('certificates.available')
-def send_data(tls):
+def get_ingress_address(relation):
+    try:
+        network_info = hookenv.network_get(relation.relation_name)
+    except NotImplementedError:
+        network_info = []
+
+    if network_info and 'ingress-addresses' in network_info:
+        # just grab the first one for now, maybe be more robust here?
+        return network_info['ingress-addresses'][0]
+    else:
+        # if they don't have ingress-addresses they are running a juju that
+        # doesn't support spaces, so just return the private address
+        return hookenv.unit_get('private-address')
+
+
+@when('certificates.available', 'kube-control.connected')
+def send_data(tls, kube_control):
     '''Send the data that is required to create a server certificate for
     this server.'''
     # Use the public ip of this unit as the Common Name for the certificate.
     common_name = hookenv.unit_public_ip()
 
+    ingress_ip = get_ingress_address(kube_control)
+
     # Create SANs that the tls layer will add to the server cert.
     sans = [
         hookenv.unit_public_ip(),
-        hookenv.unit_private_ip(),
+        ingress_ip,
         gethostname()
     ]
 
@@ -324,6 +353,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     # the correct DNS even though the server isn't ready yet.
 
     dns = kube_control.get_dns()
+    ingress_ip = get_ingress_address(kube_control)
     cluster_cidr = cni.get_config()['cidr']
 
     if cluster_cidr is None:
@@ -333,16 +363,13 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     creds = db.get('credentials')
     data_changed('kube-control.creds', creds)
 
-    # set --allow-privileged flag for kubelet
-    set_privileged()
-
     create_config(random.choice(servers), creds)
-    configure_kubelet(dns)
+    configure_kubelet(dns, ingress_ip)
     configure_kube_proxy(servers, cluster_cidr)
     set_state('kubernetes-worker.config.created')
     restart_unit_services()
     update_kubelet_status()
-    apply_node_labels()
+    set_state('kubernetes-worker.label-config-required')
     remove_state('kubernetes-worker.restart-needed')
 
 
@@ -373,7 +400,7 @@ def sdn_changed():
 @when('kubernetes-worker.config.created')
 @when_not('kubernetes-worker.ingress.available')
 def render_and_launch_ingress():
-    ''' If configuration has ingress RC enabled, launch the ingress load
+    ''' If configuration has ingress daemon set enabled, launch the ingress load
     balancer and default http backend. Otherwise attempt deletion. '''
     config = hookenv.config()
     # If ingress is enabled, launch the ingress controller
@@ -384,50 +411,59 @@ def render_and_launch_ingress():
         kubectl_manifest('delete',
                          '/root/cdk/addons/default-http-backend.yaml')
         kubectl_manifest('delete',
-                         '/root/cdk/addons/ingress-replication-controller.yaml')  # noqa
+                         '/root/cdk/addons/ingress-daemon-set.yaml')  # noqa
         hookenv.close_port(80)
         hookenv.close_port(443)
 
 
-@when('kubernetes-worker.ingress.available')
-def scale_ingress_controller():
-    ''' Scale the number of ingress controller replicas to match the number of
-    nodes. '''
-    try:
-        output = kubectl('get', 'nodes', '-o', 'name')
-        count = len(output.splitlines())
-        kubectl('scale', '--replicas=%d' % count, 'rc/nginx-ingress-controller')  # noqa
-    except CalledProcessError:
-        hookenv.log('Failed to scale ingress controllers. Will attempt again next update.')  # noqa
+@when('config.changed.labels')
+def handle_labels_changed():
+    set_state('kubernetes-worker.label-config-required')
 
 
-@when('config.changed.labels', 'kubernetes-worker.config.created')
+@when('kubernetes-worker.label-config-required',
+      'kubernetes-worker.config.created')
 def apply_node_labels():
-    ''' Parse the labels configuration option and apply the labels to the node.
-    '''
-    # scrub and try to format an array from the configuration option
+    ''' Parse the labels configuration option and apply the labels to the
+        node. '''
+    # Get the user's configured labels.
     config = hookenv.config()
-    user_labels = _parse_labels(config.get('labels'))
-
-    # For diffing sake, iterate the previous label set
-    if config.previous('labels'):
-        previous_labels = _parse_labels(config.previous('labels'))
-        hookenv.log('previous labels: {}'.format(previous_labels))
-    else:
-        # this handles first time run if there is no previous labels config
-        previous_labels = _parse_labels("")
-
-    # Calculate label removal
-    for label in previous_labels:
-        if label not in user_labels:
-            hookenv.log('Deleting node label {}'.format(label))
-            _apply_node_label(label, delete=True)
-        # if the label is in user labels we do nothing here, it will get set
-        # during the atomic update below.
-
-    # Atomically set a label
-    for label in user_labels:
-        _apply_node_label(label, overwrite=True)
+    user_labels = {}
+    for item in config.get('labels').split(' '):
+        if '=' in item:
+            key, val = item.split('=')
+            user_labels[key] = val
+        else:
+            hookenv.log('Skipping malformed option: {}.'.format(item))
+    # Collect the current label state.
+    current_labels = db.get('current_labels') or {}
+    # Remove any labels that the user has removed from the config.
+    for key in list(current_labels.keys()):
+        if key not in user_labels:
+            try:
+                remove_label(key)
+                del current_labels[key]
+                db.set('current_labels', current_labels)
+            except ApplyNodeLabelFailed as e:
+                hookenv.log(str(e))
+                return
+    # Add any new labels.
+    for key, val in user_labels.items():
+        try:
+            set_label(key, val)
+            current_labels[key] = val
+            db.set('current_labels', current_labels)
+        except ApplyNodeLabelFailed as e:
+            hookenv.log(str(e))
+            return
+    # Set the juju-application label.
+    try:
+        set_label('juju-application', hookenv.service_name())
+    except ApplyNodeLabelFailed as e:
+        hookenv.log(str(e))
+        return
+    # Label configuration complete.
+    remove_state('kubernetes-worker.label-config-required')
 
 
 @when_any('config.changed.kubelet-extra-args',
@@ -438,7 +474,27 @@ def extra_args_changed():
 
 @when('config.changed.docker-logins')
 def docker_logins_changed():
+    """Set a flag to handle new docker login options.
+
+    If docker daemon options have also changed, set a flag to ensure the
+    daemon is restarted prior to running docker login.
+    """
     config = hookenv.config()
+
+    if data_changed('docker-opts', config['docker-opts']):
+        hookenv.log('Found new docker daemon options. Requesting a restart.')
+        # State will be removed by layer-docker after restart
+        set_state('docker.restart')
+
+    set_state('kubernetes-worker.docker-login')
+
+
+@when('kubernetes-worker.docker-login')
+@when_not('docker.restart')
+def run_docker_login():
+    """Login to a docker registry with configured credentials."""
+    config = hookenv.config()
+
     previous_logins = config.previous('docker-logins')
     logins = config['docker-logins']
     logins = json.loads(logins)
@@ -459,6 +515,7 @@ def docker_logins_changed():
         cmd = ['docker', 'login', server, '-u', username, '-p', password]
         subprocess.check_call(cmd)
 
+    remove_state('kubernetes-worker.docker-login')
     set_state('kubernetes-worker.restart-needed')
 
 
@@ -532,7 +589,7 @@ def configure_kubernetes_service(service, base_args, extra_args_key):
     db.set(prev_args_key, args)
 
 
-def configure_kubelet(dns):
+def configure_kubelet(dns, ingress_ip):
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
     server_cert_path = layer_options.get('server_certificate_path')
@@ -552,20 +609,19 @@ def configure_kubelet(dns):
     kubelet_opts['tls-private-key-file'] = server_key_path
     kubelet_opts['logtostderr'] = 'true'
     kubelet_opts['fail-swap-on'] = 'false'
+    kubelet_opts['node-ip'] = ingress_ip
 
     if (dns['enable-kube-dns']):
         kubelet_opts['cluster-dns'] = dns['sdn-ip']
 
-    privileged = is_state('kubernetes-worker.privileged')
-    kubelet_opts['allow-privileged'] = 'true' if privileged else 'false'
+    # set --allow-privileged flag for kubelet
+    kubelet_opts['allow-privileged'] = set_privileged()
 
     if is_state('kubernetes-worker.gpu.enabled'):
-        if get_version('kubelet') < (1, 6):
-            hookenv.log('Adding --experimental-nvidia-gpus=1 to kubelet')
-            kubelet_opts['experimental-nvidia-gpus'] = '1'
-        else:
-            hookenv.log('Adding --feature-gates=Accelerators=true to kubelet')
-            kubelet_opts['feature-gates'] = 'Accelerators=true'
+        hookenv.log('Adding '
+                    '--feature-gates=DevicePlugins=true '
+                    'to kubelet')
+        kubelet_opts['feature-gates'] = 'DevicePlugins=true'
 
     configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
 
@@ -577,6 +633,7 @@ def configure_kube_proxy(api_servers, cluster_cidr):
     kube_proxy_opts['logtostderr'] = 'true'
     kube_proxy_opts['v'] = '0'
     kube_proxy_opts['master'] = random.choice(api_servers)
+    kube_proxy_opts['hostname-override'] = get_node_name()
 
     if b'lxc' in check_output('virt-what', shell=True):
         kube_proxy_opts['conntrack-max-per-core'] = '0'
@@ -628,17 +685,34 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
     check_call(split(cmd.format(kubeconfig, context)))
 
 
+@when_any('config.changed.default-backend-image',
+          'config.changed.nginx-image')
+@when('kubernetes-worker.config.created')
 def launch_default_ingress_controller():
     ''' Launch the Kubernetes ingress controller & default backend (404) '''
+    config = hookenv.config()
+
+    # need to test this in case we get in
+    # here from a config change to the image
+    if not config.get('ingress'):
+        return
+
     context = {}
     context['arch'] = arch()
     addon_path = '/root/cdk/addons/{}'
 
-    context['defaultbackend_image'] = \
-        "k8s.gcr.io/defaultbackend:1.4"
-    if arch() == 's390x':
-        context['defaultbackend_image'] = \
-            "k8s.gcr.io/defaultbackend-s390x:1.4"
+    context['defaultbackend_image'] = config.get('default-backend-image')
+    if (context['defaultbackend_image'] == "" or
+       context['defaultbackend_image'] == "auto"):
+        if context['arch'] == 's390x':
+            context['defaultbackend_image'] = \
+                "k8s.gcr.io/defaultbackend-s390x:1.4"
+        elif context['arch'] == 'arm64':
+            context['defaultbackend_image'] = \
+                "k8s.gcr.io/defaultbackend-arm64:1.4"
+        else:
+            context['defaultbackend_image'] = \
+                "k8s.gcr.io/defaultbackend:1.4"
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
@@ -653,15 +727,26 @@ def launch_default_ingress_controller():
         hookenv.close_port(443)
         return
 
-    # Render the ingress replication controller manifest
-    context['ingress_image'] = \
-        "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.13"
-    if arch() == 's390x':
-        context['ingress_image'] = \
-            "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
-    manifest = addon_path.format('ingress-replication-controller.yaml')
-    render('ingress-replication-controller.yaml', manifest, context)
-    hookenv.log('Creating the ingress replication controller.')
+    # Render the ingress daemon set controller manifest
+    context['ingress_image'] = config.get('nginx-image')
+    if context['ingress_image'] == "" or context['ingress_image'] == "auto":
+        if context['arch'] == 's390x':
+            context['ingress_image'] = \
+                "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
+        elif context['arch'] == 'arm64':
+            context['ingress_image'] = \
+                "k8s.gcr.io/nginx-ingress-controller-arm64:0.9.0-beta.15"
+        else:
+            context['ingress_image'] = \
+                "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15" # noqa
+    if get_version('kubelet') < (1, 9):
+        context['daemonset_api_version'] = 'extensions/v1beta1'
+    else:
+        context['daemonset_api_version'] = 'apps/v1beta2'
+    context['juju_application'] = hookenv.service_name()
+    manifest = addon_path.format('ingress-daemon-set.yaml')
+    render('ingress-daemon-set.yaml', manifest, context)
+    hookenv.log('Creating the ingress daemon set.')
     try:
         kubectl('apply', '-f', manifest)
     except CalledProcessError as e:
@@ -705,7 +790,7 @@ def kubectl(*args):
 
 
 def kubectl_success(*args):
-    ''' Runs kubectl with the given args. Returns True if succesful, False if
+    ''' Runs kubectl with the given args. Returns True if successful, False if
     not. '''
     try:
         kubectl(*args)
@@ -774,18 +859,25 @@ def remove_nrpe_config(nagios=None):
 
 
 def set_privileged():
-    """Update the allow-privileged flag for kubelet.
-
+    """Return 'true' if privileged containers are needed.
+    This is when a) the user requested them
+                 b) user does not care (auto) and GPUs are available in a pre
+                    1.9 era
     """
-    privileged = hookenv.config('allow-privileged')
-    if privileged == 'auto':
-        gpu_enabled = is_state('kubernetes-worker.gpu.enabled')
-        privileged = 'true' if gpu_enabled else 'false'
+    privileged = hookenv.config('allow-privileged').lower()
+    gpu_needs_privileged = (is_state('kubernetes-worker.gpu.enabled') and
+                            get_version('kubelet') < (1, 9))
 
-    if privileged == 'true':
-        set_state('kubernetes-worker.privileged')
-    else:
-        remove_state('kubernetes-worker.privileged')
+    if privileged == 'auto':
+        privileged = 'true' if gpu_needs_privileged else 'false'
+
+    if privileged == 'false' and gpu_needs_privileged:
+        disable_gpu()
+        remove_state('kubernetes-worker.gpu.enabled')
+        # No need to restart kubernetes (set the restart-needed state)
+        # because set-privileged is already in the restart path
+
+    return privileged
 
 
 @when('config.changed.allow-privileged')
@@ -798,18 +890,17 @@ def on_config_allow_privileged_change():
     remove_state('config.changed.allow-privileged')
 
 
-@when('cuda.installed')
+@when('nvidia-docker.installed')
 @when('kubernetes-worker.config.created')
 @when_not('kubernetes-worker.gpu.enabled')
 def enable_gpu():
     """Enable GPU usage on this node.
 
     """
-    config = hookenv.config()
-    if config['allow-privileged'] == "false":
+    if get_version('kubelet') < (1, 9):
         hookenv.status_set(
             'active',
-            'GPUs available. Set allow-privileged="auto" to enable.'
+            'Upgrade to snap channel >= 1.9/stable to enable GPU suppport.'
         )
         return
 
@@ -824,33 +915,33 @@ def enable_gpu():
         hookenv.log(cpe)
         return
 
-    # Apply node labels
-    _apply_node_label('gpu=true', overwrite=True)
-    _apply_node_label('cuda=true', overwrite=True)
+    set_label('gpu', 'true')
+    set_label('cuda', 'true')
 
     set_state('kubernetes-worker.gpu.enabled')
     set_state('kubernetes-worker.restart-needed')
 
 
 @when('kubernetes-worker.gpu.enabled')
-@when_not('kubernetes-worker.privileged')
+@when_not('nvidia-docker.installed')
 @when_not('kubernetes-worker.restart-needed')
+def nvidia_departed():
+    """Cuda departed, probably due to the docker layer switching to a
+     non nvidia-docker."""
+    disable_gpu()
+    remove_state('kubernetes-worker.gpu.enabled')
+    set_state('kubernetes-worker.restart-needed')
+
+
 def disable_gpu():
     """Disable GPU usage on this node.
-
-    This handler fires when we're running in gpu mode, and then the operator
-    sets allow-privileged="false". Since we can no longer run privileged
-    containers, we need to disable gpu mode.
 
     """
     hookenv.log('Disabling gpu mode')
 
     # Remove node labels
-    _apply_node_label('gpu', delete=True)
-    _apply_node_label('cuda', delete=True)
-
-    remove_state('kubernetes-worker.gpu.enabled')
-    set_state('kubernetes-worker.restart-needed')
+    remove_label('gpu')
+    remove_label('cuda')
 
 
 @when('kubernetes-worker.gpu.enabled')
@@ -879,24 +970,23 @@ def request_kubelet_and_proxy_credentials(kube_control):
     # The kube-cotrol interface is created to support RBAC.
     # At this point we might as well do the right thing and return the hostname
     # even if it will only be used when we enable RBAC
-    nodeuser = 'system:node:{}'.format(gethostname().lower())
+    nodeuser = 'system:node:{}'.format(get_node_name().lower())
     kube_control.set_auth_request(nodeuser)
 
 
 @when('kube-control.connected')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
-    nodeuser = 'system:node:{}'.format(gethostname().lower())
+    nodeuser = 'system:node:{}'.format(get_node_name().lower())
     creds = kube_control.get_auth_credentials(nodeuser)
-    if creds \
-            and data_changed('kube-control.creds', creds) \
-            and creds['user'] == nodeuser:
+    if creds and creds['user'] == nodeuser:
         # We need to cache the credentials here because if the
         # master changes (master leader dies and replaced by a new one)
         # the new master will have no recollection of our certs.
         db.set('credentials', creds)
         set_state('worker.auth.bootstrapped')
-        set_state('kubernetes-worker.restart-needed')
+        if data_changed('kube-control.creds', creds):
+            set_state('kubernetes-worker.restart-needed')
 
 
 @when_not('kube-control.connected')
@@ -934,48 +1024,46 @@ def _systemctl_is_active(application):
         return False
 
 
+def get_node_name():
+    kubelet_extra_args = parse_extra_args('kubelet-extra-args')
+    cloud_provider = kubelet_extra_args.get('cloud-provider', '')
+    if cloud_provider == 'aws':
+        return getfqdn()
+    else:
+        return gethostname()
+
+
 class ApplyNodeLabelFailed(Exception):
     pass
 
 
-def _apply_node_label(label, delete=False, overwrite=False):
-    ''' Invoke kubectl to apply node label changes '''
-
-    # k8s lowercases hostnames and uses them as node names
-    hostname = gethostname().lower()
-    # TODO: Make this part of the kubectl calls instead of a special string
-    cmd_base = 'kubectl --kubeconfig={0} label node {1} {2}'
-
-    if delete is True:
-        label_key = label.split('=')[0]
-        cmd = cmd_base.format(kubeconfig_path, hostname, label_key)
-        cmd = cmd + '-'
-    else:
-        cmd = cmd_base.format(kubeconfig_path, hostname, label)
-        if overwrite:
-            cmd = '{} --overwrite'.format(cmd)
-    cmd = cmd.split()
-
-    deadline = time.time() + 60
+def persistent_call(cmd, retry_message):
+    deadline = time.time() + 180
     while time.time() < deadline:
         code = subprocess.call(cmd)
         if code == 0:
-            break
-        hookenv.log('Failed to apply label %s, exit code %d. Will retry.' % (
-            label, code))
+            return True
+        hookenv.log(retry_message)
         time.sleep(1)
     else:
-        msg = 'Failed to apply label %s' % label
-        raise ApplyNodeLabelFailed(msg)
+        return False
 
 
-def _parse_labels(labels):
-    ''' Parse labels from a key=value string separated by space.'''
-    label_array = labels.split(' ')
-    sanitized_labels = []
-    for item in label_array:
-        if '=' in item:
-            sanitized_labels.append(item)
-        else:
-            hookenv.log('Skipping malformed option: {}'.format(item))
-    return sanitized_labels
+def set_label(label, value):
+    nodename = get_node_name()
+    cmd = 'kubectl --kubeconfig={0} label node {1} {2}={3} --overwrite'
+    cmd = cmd.format(kubeconfig_path, nodename, label, value)
+    cmd = cmd.split()
+    retry = 'Failed to apply label %s=%s. Will retry.' % (label, value)
+    if not persistent_call(cmd, retry):
+        raise ApplyNodeLabelFailed(retry)
+
+
+def remove_label(label):
+    nodename = get_node_name()
+    cmd = 'kubectl --kubeconfig={0} label node {1} {2}-'
+    cmd = cmd.format(kubeconfig_path, nodename, label)
+    cmd = cmd.split()
+    retry = 'Failed to remove label {0}. Will retry.'.format(label)
+    if not persistent_call(cmd, retry):
+        raise ApplyNodeLabelFailed(retry)

@@ -124,12 +124,12 @@ function reconcile_addons() {
   # Filter out `configured` message to not noisily log.
   # `created`, `pruned` and errors will be logged.
   log INFO "== Reconciling with deprecated label =="
-  ${KUBECTL} ${KUBECTL_OPTS} apply --namespace=${SYSTEM_NAMESPACE} -f ${ADDON_PATH} \
+  ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}=true,${ADDON_MANAGER_LABEL}!=EnsureExists \
     --prune=true --recursive | grep -v configured
 
   log INFO "== Reconciling with addon-manager label =="
-  ${KUBECTL} ${KUBECTL_OPTS} apply --namespace=${SYSTEM_NAMESPACE} -f ${ADDON_PATH} \
+  ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}!=true,${ADDON_MANAGER_LABEL}=Reconcile \
     --prune=true --recursive | grep -v configured
 
@@ -139,7 +139,7 @@ function reconcile_addons() {
 function ensure_addons() {
   # Create objects already exist should fail.
   # Filter out `AlreadyExists` message to not noisily log.
-  ${KUBECTL} ${KUBECTL_OPTS} create --namespace=${SYSTEM_NAMESPACE} -f ${ADDON_PATH} \
+  ${KUBECTL} ${KUBECTL_OPTS} create -f ${ADDON_PATH} \
     -l ${ADDON_MANAGER_LABEL}=EnsureExists --recursive 2>&1 | grep -v AlreadyExists
 
   log INFO "== Kubernetes addon ensure completed at $(date -Is) =="
@@ -155,7 +155,7 @@ function is_leader() {
   fi
   KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} -n kube-system get ep kube-controller-manager \
     -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
-    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/'`
+    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}'`
   # If there was any problem with getting the leader election results, var will
   # be empty. Since it's better to have multiple addon managers than no addon
   # managers at all, we're going to assume that we're the leader in such case.

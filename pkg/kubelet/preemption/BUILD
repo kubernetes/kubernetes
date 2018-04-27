@@ -19,8 +19,8 @@ go_library(
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
-        "//plugin/pkg/scheduler/algorithm:go_default_library",
-        "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
+        "//pkg/scheduler/algorithm:go_default_library",
+        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
@@ -44,8 +44,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["preemption_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/preemption",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/types:go_default_library",

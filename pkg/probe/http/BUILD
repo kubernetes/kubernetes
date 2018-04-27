@@ -21,8 +21,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["http_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/probe/http",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//pkg/probe:go_default_library"],
 )
 

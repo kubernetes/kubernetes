@@ -25,8 +25,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["gc_admission_test.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/gc",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",

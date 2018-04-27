@@ -1,4 +1,4 @@
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kibana-logging
@@ -30,7 +30,7 @@ spec:
           - name: ELASTICSEARCH_URL
             value: http://elasticsearch-logging:9200
           - name: SERVER_BASEPATH
-            value: /api/v1/proxy/namespaces/kube-system/services/kibana-logging
+            value: /api/v1/namespaces/kube-system/services/kibana-logging/proxy
           - name: XPACK_MONITORING_ENABLED
             value: "false"
           - name: XPACK_SECURITY_ENABLED

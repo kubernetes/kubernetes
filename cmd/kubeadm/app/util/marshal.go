@@ -18,7 +18,6 @@ package util
 
 import (
 	"fmt"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,17 +42,19 @@ func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs s
 	return runtime.Encode(encoder, obj)
 }
 
-// MarshalToYamlForCodecsWithShift adds spaces in front of each line so the indents line up
-// correctly in the manifest
-func MarshalToYamlForCodecsWithShift(obj runtime.Object, gv schema.GroupVersion, codecs serializer.CodecFactory) (string, error) {
-	serial, err := MarshalToYamlForCodecs(obj, gv, codecs)
-	if err != nil {
-		return "", err
+// UnmarshalFromYaml unmarshals yaml into an object.
+func UnmarshalFromYaml(buffer []byte, gv schema.GroupVersion) (runtime.Object, error) {
+	return UnmarshalFromYamlForCodecs(buffer, gv, clientsetscheme.Codecs)
+}
+
+// UnmarshalFromYamlForCodecs unmarshals yaml into an object using the specified codec
+func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs serializer.CodecFactory) (runtime.Object, error) {
+	mediaType := "application/yaml"
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
-	lines := strings.Split(string(serial), "\n")
-	var newSerial string
-	for _, line := range lines {
-		newSerial = newSerial + "    " + line + "\n"
-	}
-	return newSerial, err
+
+	decoder := codecs.DecoderToVersion(info.Serializer, gv)
+	return runtime.Decode(decoder, buffer)
 }

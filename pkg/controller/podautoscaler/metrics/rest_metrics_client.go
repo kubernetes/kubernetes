@@ -30,12 +30,14 @@ import (
 	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
+	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 )
 
-func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, customClient customclient.CustomMetricsClient) MetricsClient {
+func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, customClient customclient.CustomMetricsClient, externalClient externalclient.ExternalMetricsClient) MetricsClient {
 	return &restMetricsClient{
 		&resourceMetricsClient{resourceClient},
 		&customMetricsClient{customClient},
+		&externalMetricsClient{externalClient},
 	}
 }
 
@@ -45,6 +47,7 @@ func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, cust
 type restMetricsClient struct {
 	*resourceMetricsClient
 	*customMetricsClient
+	*externalMetricsClient
 }
 
 // resourceMetricsClient implements the resource-metrics-related parts of MetricsClient,
@@ -58,11 +61,11 @@ type resourceMetricsClient struct {
 func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	metrics, err := c.client.PodMetricses(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from API: %v", err)
+		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from resource metrics API: %v", err)
 	}
 
 	if len(metrics.Items) == 0 {
-		return nil, time.Time{}, fmt.Errorf("no metrics returned from heapster")
+		return nil, time.Time{}, fmt.Errorf("no metrics returned from resource metrics API")
 	}
 
 	res := make(PodMetricsInfo, len(metrics.Items))
@@ -101,7 +104,7 @@ type customMetricsClient struct {
 func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	metrics, err := c.client.NamespacedMetrics(namespace).GetForObjects(schema.GroupKind{Kind: "Pod"}, selector, metricName)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from API: %v", err)
+		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from custom metrics API: %v", err)
 	}
 
 	if len(metrics.Items) == 0 {
@@ -134,8 +137,34 @@ func (c *customMetricsClient) GetObjectMetric(metricName string, namespace strin
 	}
 
 	if err != nil {
-		return 0, time.Time{}, fmt.Errorf("unable to fetch metrics from API: %v", err)
+		return 0, time.Time{}, fmt.Errorf("unable to fetch metrics from custom metrics API: %v", err)
 	}
 
 	return metricValue.Value.MilliValue(), metricValue.Timestamp.Time, nil
+}
+
+// externalMetricsClient implenets the external metrics related parts of MetricsClient,
+// using data from the external metrics API.
+type externalMetricsClient struct {
+	client externalclient.ExternalMetricsClient
+}
+
+// GetExternalMetric gets all the values of a given external metric
+// that match the specified selector.
+func (c *externalMetricsClient) GetExternalMetric(metricName, namespace string, selector labels.Selector) ([]int64, time.Time, error) {
+	metrics, err := c.client.NamespacedMetrics(namespace).List(metricName, selector)
+	if err != nil {
+		return []int64{}, time.Time{}, fmt.Errorf("unable to fetch metrics from external metrics API: %v", err)
+	}
+
+	if len(metrics.Items) == 0 {
+		return nil, time.Time{}, fmt.Errorf("no metrics returned from external metrics API")
+	}
+
+	res := make([]int64, 0)
+	for _, m := range metrics.Items {
+		res = append(res, m.Value.MilliValue())
+	}
+	timestamp := metrics.Items[0].Timestamp.Time
+	return res, timestamp, nil
 }

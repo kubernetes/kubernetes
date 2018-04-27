@@ -17,6 +17,9 @@ limitations under the License.
 package audit
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/util/errors"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
@@ -54,4 +57,12 @@ func (u union) Shutdown() {
 	for _, backend := range u.backends {
 		backend.Shutdown()
 	}
+}
+
+func (u union) String() string {
+	var backendStrings []string
+	for _, backend := range u.backends {
+		backendStrings = append(backendStrings, fmt.Sprintf("%s", backend))
+	}
+	return fmt.Sprintf("union[%s]", strings.Join(backendStrings, ","))
 }

@@ -18,6 +18,7 @@ go_library(
         "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/scheme:go_default_library",
+        "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/validation:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/node:go_default_library",
@@ -25,17 +26,18 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//vendor/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
+        "//vendor/k8s.io/client-go/tools/bootstrap/token/util:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

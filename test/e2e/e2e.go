@@ -32,10 +32,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/util/logs"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/kubectl/util/logs"
 	"k8s.io/kubernetes/pkg/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -56,7 +56,7 @@ func setupProviderConfig() error {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 
 	case "gce", "gke":
-		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
+		framework.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
 		zone := framework.TestContext.CloudConfig.Zone
 		region := framework.TestContext.CloudConfig.Region
 
@@ -72,10 +72,9 @@ func setupProviderConfig() error {
 			managedZones = []string{zone}
 		}
 
-		gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{gcecloud.AlphaFeatureNetworkEndpointGroup})
-		if err != nil {
-			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
-		}
+		gceAlphaFeatureGate := gcecloud.NewAlphaFeatureGate([]string{
+			gcecloud.AlphaFeatureNetworkEndpointGroup,
+		})
 
 		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
 			ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
@@ -288,20 +287,20 @@ func gatherTestSuiteMetrics() error {
 	}
 
 	metricsForE2E := (*framework.MetricsForE2E)(&received)
-	metricsJson := metricsForE2E.PrintJSON()
+	metricsJSON := metricsForE2E.PrintJSON()
 	if framework.TestContext.ReportDir != "" {
 		filePath := path.Join(framework.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
-		if err := ioutil.WriteFile(filePath, []byte(metricsJson), 0644); err != nil {
+		if err := ioutil.WriteFile(filePath, []byte(metricsJSON), 0644); err != nil {
 			return fmt.Errorf("error writing to %q: %v", filePath, err)
 		}
 	} else {
-		framework.Logf("\n\nTest Suite Metrics:\n%s\n\n", metricsJson)
+		framework.Logf("\n\nTest Suite Metrics:\n%s\n", metricsJSON)
 	}
 
 	return nil
 }
 
-// TestE2E checks configuration parameters (specified through flags) and then runs
+// RunE2ETests checks configuration parameters (specified through flags) and then runs
 // E2E tests using the Ginkgo runner.
 // If a "report directory" is specified, one or more JUnit test reports will be
 // generated in this directory, and cluster logs will also be saved.

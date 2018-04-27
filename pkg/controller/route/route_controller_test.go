@@ -17,6 +17,7 @@ limitations under the License.
 package route
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -279,7 +280,7 @@ func TestReconcile(t *testing.T) {
 		for {
 			select {
 			case <-tick.C:
-				if finalRoutes, err = routes.ListRoutes(cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
+				if finalRoutes, err = routes.ListRoutes(context.TODO(), cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
 					break poll
 				}
 			case <-timeoutChan:

@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -51,55 +50,46 @@ func init() {
 // stores any such user found onto the provided context for the request. If authentication fails or returns an error
 // the failed handler is used. On success, "Authorization" header is removed from the request and handler
 // is invoked to serve the request.
-func WithAuthentication(handler http.Handler, mapper genericapirequest.RequestContextMapper, auth authenticator.Request, failed http.Handler) http.Handler {
+func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler) http.Handler {
 	if auth == nil {
 		glog.Warningf("Authentication is disabled")
 		return handler
 	}
-	return genericapirequest.WithRequestContext(
-		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			user, ok, err := auth.AuthenticateRequest(req)
-			if err != nil || !ok {
-				if err != nil {
-					glog.Errorf("Unable to authenticate the request due to an error: %v", err)
-				}
-				failed.ServeHTTP(w, req)
-				return
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		user, ok, err := auth.AuthenticateRequest(req)
+		if err != nil || !ok {
+			if err != nil {
+				glog.Errorf("Unable to authenticate the request due to an error: %v", err)
 			}
+			failed.ServeHTTP(w, req)
+			return
+		}
 
-			// authorization header is not required anymore in case of a successful authentication.
-			req.Header.Del("Authorization")
+		// authorization header is not required anymore in case of a successful authentication.
+		req.Header.Del("Authorization")
 
-			if ctx, ok := mapper.Get(req); ok {
-				mapper.Update(req, genericapirequest.WithUser(ctx, user))
-			}
+		req = req.WithContext(genericapirequest.WithUser(req.Context(), user))
 
-			authenticatedUserCounter.WithLabelValues(compressUsername(user.GetName())).Inc()
+		authenticatedUserCounter.WithLabelValues(compressUsername(user.GetName())).Inc()
 
-			handler.ServeHTTP(w, req)
-		}),
-		mapper,
-	)
+		handler.ServeHTTP(w, req)
+	})
 }
 
-func Unauthorized(requestContextMapper request.RequestContextMapper, s runtime.NegotiatedSerializer, supportsBasicAuth bool) http.Handler {
+func Unauthorized(s runtime.NegotiatedSerializer, supportsBasicAuth bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if supportsBasicAuth {
 			w.Header().Set("WWW-Authenticate", `Basic realm="kubernetes-master"`)
 		}
-		ctx, ok := requestContextMapper.Get(req)
-		if !ok {
-			responsewriters.InternalError(w, req, errors.New("no context found for request"))
-			return
-		}
-		requestInfo, found := request.RequestInfoFrom(ctx)
+		ctx := req.Context()
+		requestInfo, found := genericapirequest.RequestInfoFrom(ctx)
 		if !found {
 			responsewriters.InternalError(w, req, errors.New("no RequestInfo found in the context"))
 			return
 		}
 
 		gv := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		responsewriters.ErrorNegotiated(ctx, apierrors.NewUnauthorized("Unauthorized"), s, gv, w, req)
+		responsewriters.ErrorNegotiated(apierrors.NewUnauthorized("Unauthorized"), s, gv, w, req)
 	})
 }
 

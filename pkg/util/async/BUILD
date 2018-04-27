@@ -25,8 +25,7 @@ go_test(
         "bounded_frequency_runner_test.go",
         "runner_test.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/util/async",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

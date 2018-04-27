@@ -1,6 +1,0 @@
-<network>
-  <name>kubernetes_pods</name>
-  <bridge name='virbr_kub_pods' stp='off' delay='0'/>
-  <ip address='10.10.0.100' netmask='255.255.0.0'>
-  </ip>
-</network>

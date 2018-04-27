@@ -17,13 +17,13 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 
-	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -169,34 +169,19 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances() returned false")
 	}
 
-	nodeName, err := vs.CurrentNodeName("")
+	nodeName, err := vs.CurrentNodeName(context.TODO(), "")
 	if err != nil {
 		t.Fatalf("CurrentNodeName() failed: %s", err)
 	}
 
-	externalID, err := i.ExternalID(nodeName)
-	if err != nil {
-		t.Fatalf("Instances.ExternalID(%s) failed: %s", nodeName, err)
-	}
-	t.Logf("Found ExternalID(%s) = %s\n", nodeName, externalID)
-
 	nonExistingVM := types.NodeName(rand.String(15))
-	externalID, err = i.ExternalID(nonExistingVM)
-	if err == cloudprovider.InstanceNotFound {
-		t.Logf("VM %s was not found as expected\n", nonExistingVM)
-	} else if err == nil {
-		t.Fatalf("Instances.ExternalID did not fail as expected, VM %s was found", nonExistingVM)
-	} else {
-		t.Fatalf("Instances.ExternalID did not fail as expected, err: %v", err)
-	}
-
-	instanceID, err := i.InstanceID(nodeName)
+	instanceID, err := i.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.InstanceID(%s) failed: %s", nodeName, err)
 	}
 	t.Logf("Found InstanceID(%s) = %s\n", nodeName, instanceID)
 
-	instanceID, err = i.InstanceID(nonExistingVM)
+	instanceID, err = i.InstanceID(context.TODO(), nonExistingVM)
 	if err == cloudprovider.InstanceNotFound {
 		t.Logf("VM %s was not found as expected\n", nonExistingVM)
 	} else if err == nil {
@@ -205,7 +190,7 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances.InstanceID did not fail as expected, err: %v", err)
 	}
 
-	addrs, err := i.NodeAddresses(nodeName)
+	addrs, err := i.NodeAddresses(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", nodeName, err)
 	}
@@ -223,7 +208,7 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
 
-	nodeName, err := vs.CurrentNodeName("")
+	nodeName, err := vs.CurrentNodeName(context.TODO(), "")
 	if err != nil {
 		t.Fatalf("CurrentNodeName() failed: %s", err)
 	}

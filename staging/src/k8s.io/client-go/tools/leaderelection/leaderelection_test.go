@@ -260,7 +260,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 		}
 
 		if test.expectSuccess != le.tryAcquireOrRenew() {
-			t.Errorf("[%v]unexpected result of tryAcquireOrRenew: [succeded=%v]", i, !test.expectSuccess)
+			t.Errorf("[%v]unexpected result of tryAcquireOrRenew: [succeeded=%v]", i, !test.expectSuccess)
 		}
 
 		le.observedRecord.AcquireTime = metav1.Time{}

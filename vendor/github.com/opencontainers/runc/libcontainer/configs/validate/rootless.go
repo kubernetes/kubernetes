@@ -21,13 +21,6 @@ func (v *ConfigValidator) rootless(config *configs.Config) error {
 	if err := rootlessMount(config); err != nil {
 		return err
 	}
-	// Currently, cgroups cannot effectively be used in rootless containers.
-	// The new cgroup namespace doesn't really help us either because it doesn't
-	// have nice interactions with the user namespace (we're working with upstream
-	// to fix this).
-	if err := rootlessCgroup(config); err != nil {
-		return err
-	}
 
 	// XXX: We currently can't verify the user config at all, because
 	//      configs.Config doesn't store the user-related configs. So this
@@ -36,37 +29,27 @@ func (v *ConfigValidator) rootless(config *configs.Config) error {
 	return nil
 }
 
-func rootlessMappings(config *configs.Config) error {
-	rootuid, err := config.HostRootUID()
-	if err != nil {
-		return fmt.Errorf("failed to get root uid from uidMappings: %v", err)
+func hasIDMapping(id int, mappings []configs.IDMap) bool {
+	for _, m := range mappings {
+		if id >= m.ContainerID && id < m.ContainerID+m.Size {
+			return true
+		}
 	}
+	return false
+}
+
+func rootlessMappings(config *configs.Config) error {
 	if euid := geteuid(); euid != 0 {
 		if !config.Namespaces.Contains(configs.NEWUSER) {
 			return fmt.Errorf("rootless containers require user namespaces")
 		}
-		if rootuid != euid {
-			return fmt.Errorf("rootless containers cannot map container root to a different host user")
-		}
 	}
 
-	rootgid, err := config.HostRootGID()
-	if err != nil {
-		return fmt.Errorf("failed to get root gid from gidMappings: %v", err)
+	if len(config.UidMappings) == 0 {
+		return fmt.Errorf("rootless containers requires at least one UID mapping")
 	}
-
-	// Similar to the above test, we need to make sure that we aren't trying to
-	// map to a group ID that we don't have the right to be.
-	if rootgid != getegid() {
-		return fmt.Errorf("rootless containers cannot map container root to a different host group")
-	}
-
-	// We can only map one user and group inside a container (our own).
-	if len(config.UidMappings) != 1 || config.UidMappings[0].Size != 1 {
-		return fmt.Errorf("rootless containers cannot map more than one user")
-	}
-	if len(config.GidMappings) != 1 || config.GidMappings[0].Size != 1 {
-		return fmt.Errorf("rootless containers cannot map more than one group")
+	if len(config.GidMappings) == 0 {
+		return fmt.Errorf("rootless containers requires at least one GID mapping")
 	}
 
 	return nil
@@ -104,11 +87,28 @@ func rootlessMount(config *configs.Config) error {
 		// Check that the options list doesn't contain any uid= or gid= entries
 		// that don't resolve to root.
 		for _, opt := range strings.Split(mount.Data, ",") {
-			if strings.HasPrefix(opt, "uid=") && opt != "uid=0" {
-				return fmt.Errorf("cannot specify uid= mount options in rootless containers where argument isn't 0")
+			if strings.HasPrefix(opt, "uid=") {
+				var uid int
+				n, err := fmt.Sscanf(opt, "uid=%d", &uid)
+				if n != 1 || err != nil {
+					// Ignore unknown mount options.
+					continue
+				}
+				if !hasIDMapping(uid, config.UidMappings) {
+					return fmt.Errorf("cannot specify uid= mount options for unmapped uid in rootless containers")
+				}
 			}
-			if strings.HasPrefix(opt, "gid=") && opt != "gid=0" {
-				return fmt.Errorf("cannot specify gid= mount options in rootless containers where argument isn't 0")
+
+			if strings.HasPrefix(opt, "gid=") {
+				var gid int
+				n, err := fmt.Sscanf(opt, "gid=%d", &gid)
+				if n != 1 || err != nil {
+					// Ignore unknown mount options.
+					continue
+				}
+				if !hasIDMapping(gid, config.GidMappings) {
+					return fmt.Errorf("cannot specify gid= mount options for unmapped gid in rootless containers")
+				}
 			}
 		}
 	}

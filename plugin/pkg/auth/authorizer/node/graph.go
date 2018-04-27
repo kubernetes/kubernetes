@@ -106,15 +106,19 @@ const (
 	pvcVertexType
 	pvVertexType
 	secretVertexType
+	vaVertexType
+	serviceAccountVertexType
 )
 
 var vertexTypes = map[vertexType]string{
-	configMapVertexType: "configmap",
-	nodeVertexType:      "node",
-	podVertexType:       "pod",
-	pvcVertexType:       "pvc",
-	pvVertexType:        "pv",
-	secretVertexType:    "secret",
+	configMapVertexType:      "configmap",
+	nodeVertexType:           "node",
+	podVertexType:            "pod",
+	pvcVertexType:            "pvc",
+	pvVertexType:             "pv",
+	secretVertexType:         "secret",
+	vaVertexType:             "volumeattachment",
+	serviceAccountVertexType: "serviceAccount",
 }
 
 // must be called under a write lock
@@ -194,6 +198,50 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 	}
 }
 
+// must be called under write lock
+// deletes edges from a given vertex type to a specific vertex
+// will delete each orphaned "from" vertex, but will never delete the "to" vertex
+func (g *Graph) deleteEdges_locked(fromType, toType vertexType, toNamespace, toName string) {
+	// get the "to" side
+	toVert, exists := g.getVertex_rlocked(toType, toNamespace, toName)
+	if !exists {
+		return
+	}
+
+	// get potential "from" verts that match fromType
+	namespaces, exists := g.vertices[fromType]
+	if !exists {
+		return
+	}
+
+	// delete all edges between vertices of fromType and toVert
+	removeVerts := []*namedVertex{}
+	for _, vertexMapping := range namespaces {
+		for _, fromVert := range vertexMapping {
+			if g.graph.HasEdgeBetween(fromVert, toVert) {
+				// remove the edge (no-op if edge doesn't exist)
+				g.graph.RemoveEdge(newDestinationEdge(fromVert, toVert, nil))
+				// remember to clean up the fromVert if we orphaned it
+				if g.graph.Degree(fromVert) == 0 {
+					removeVerts = append(removeVerts, fromVert)
+				}
+			}
+		}
+	}
+
+	// clean up orphaned verts
+	for _, v := range removeVerts {
+		g.graph.RemoveNode(v)
+		delete(g.vertices[v.vertexType][v.namespace], v.name)
+		if len(g.vertices[v.vertexType][v.namespace]) == 0 {
+			delete(g.vertices[v.vertexType], v.namespace)
+		}
+		if len(g.vertices[v.vertexType]) == 0 {
+			delete(g.vertices, v.vertexType)
+		}
+	}
+}
+
 // AddPod should only be called once spec.NodeName is populated.
 // It sets up edges for the following relationships (which are immutable for a pod once bound to a node):
 //
@@ -202,6 +250,7 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 //   secret    -> pod
 //   configmap -> pod
 //   pvc       -> pod
+//   svcacct   -> pod
 func (g *Graph) AddPod(pod *api.Pod) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
@@ -210,6 +259,14 @@ func (g *Graph) AddPod(pod *api.Pod) {
 	podVertex := g.getOrCreateVertex_locked(podVertexType, pod.Namespace, pod.Name)
 	nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", pod.Spec.NodeName)
 	g.graph.SetEdge(newDestinationEdge(podVertex, nodeVertex, nodeVertex))
+
+	// TODO(mikedanese): If the pod doesn't mount the service account secrets,
+	// should the node still get access to the service account?
+	//
+	// ref https://github.com/kubernetes/kubernetes/issues/58790
+	if len(pod.Spec.ServiceAccountName) > 0 {
+		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName), podVertex, nodeVertex))
+	}
 
 	podutil.VisitPodSecretNames(pod, func(secret string) bool {
 		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(secretVertexType, pod.Namespace, secret), podVertex, nodeVertex))
@@ -251,9 +308,11 @@ func (g *Graph) AddPV(pv *api.PersistentVolume) {
 
 		// since we don't know the other end of the pvc -> pod -> node chain (or it may not even exist yet), we can't decorate these edges with kubernetes node info
 		g.graph.SetEdge(simple.Edge{F: pvVertex, T: g.getOrCreateVertex_locked(pvcVertexType, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)})
-		pvutil.VisitPVSecretNames(pv, func(namespace, secret string) bool {
+		pvutil.VisitPVSecretNames(pv, func(namespace, secret string, kubeletVisible bool) bool {
 			// This grants access to the named secret in the same namespace as the bound PVC
-			g.graph.SetEdge(simple.Edge{F: g.getOrCreateVertex_locked(secretVertexType, namespace, secret), T: pvVertex})
+			if kubeletVisible {
+				g.graph.SetEdge(simple.Edge{F: g.getOrCreateVertex_locked(secretVertexType, namespace, secret), T: pvVertex})
+			}
 			return true
 		})
 	}
@@ -262,4 +321,49 @@ func (g *Graph) DeletePV(name string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(pvVertexType, "", name)
+}
+
+// AddVolumeAttachment sets up edges for the following relationships:
+//
+//   volume attachment -> node
+func (g *Graph) AddVolumeAttachment(attachmentName, nodeName string) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	// clear existing edges
+	g.deleteVertex_locked(vaVertexType, "", attachmentName)
+
+	// if we have a node, establish new edges
+	if len(nodeName) > 0 {
+		vaVertex := g.getOrCreateVertex_locked(vaVertexType, "", attachmentName)
+		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
+		g.graph.SetEdge(newDestinationEdge(vaVertex, nodeVertex, nodeVertex))
+	}
+}
+func (g *Graph) DeleteVolumeAttachment(name string) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.deleteVertex_locked(vaVertexType, "", name)
+}
+
+// SetNodeConfigMap sets up edges for the Node.Spec.ConfigSource.ConfigMapRef relationship:
+//
+// configmap -> node
+func (g *Graph) SetNodeConfigMap(nodeName, configMapName, configMapNamespace string) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	// TODO(mtaufen): ensure len(nodeName) > 0 in all cases (would sure be nice to have a dependently-typed language here...)
+
+	// clear edges configmaps -> node where the destination is the current node *only*
+	// at present, a node can only have one *direct* configmap reference at a time
+	g.deleteEdges_locked(configMapVertexType, nodeVertexType, "", nodeName)
+
+	// establish new edges if we have a real ConfigMap to reference
+	if len(configMapName) > 0 && len(configMapNamespace) > 0 {
+		configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, configMapNamespace, configMapName)
+		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
+		g.graph.SetEdge(newDestinationEdge(configmapVertex, nodeVertex, nodeVertex))
+	}
+
 }

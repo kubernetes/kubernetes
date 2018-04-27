@@ -230,8 +230,12 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.EqualValues(t, testTime(creationTime, seedPod0Infra).Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
 	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, []int{seedEphemeralVolume1, seedEphemeralVolume2}, ps.EphemeralStorage)
-	checkCPUStats(t, "Pod0", seedPod0Infra, ps.CPU)
-	checkMemoryStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Memory)
+	if ps.CPU != nil {
+		checkCPUStats(t, "Pod0", seedPod0Infra, ps.CPU)
+	}
+	if ps.Memory != nil {
+		checkMemoryStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Memory)
+	}
 
 	// Validate Pod1 Results
 	ps, found = indexPods[prf1]

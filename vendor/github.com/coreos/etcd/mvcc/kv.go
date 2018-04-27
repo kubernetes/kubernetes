@@ -32,14 +32,14 @@ type RangeResult struct {
 	Count int
 }
 
-type KV interface {
-	// Rev returns the current revision of the KV.
-	Rev() int64
-
-	// FirstRev returns the first revision of the KV.
+type ReadView interface {
+	// FirstRev returns the first KV revision at the time of opening the txn.
 	// After a compaction, the first revision increases to the compaction
 	// revision.
 	FirstRev() int64
+
+	// Rev returns the revision of the KV at the time of opening the txn.
+	Rev() int64
 
 	// Range gets the keys in the range at rangeRev.
 	// The returned rev is the current revision of the KV when the operation is executed.
@@ -50,14 +50,17 @@ type KV interface {
 	// Limit limits the number of keys returned.
 	// If the required rev is compacted, ErrCompacted will be returned.
 	Range(key, end []byte, ro RangeOptions) (r *RangeResult, err error)
+}
 
-	// Put puts the given key, value into the store. Put also takes additional argument lease to
-	// attach a lease to a key-value pair as meta-data. KV implementation does not validate the lease
-	// id.
-	// A put also increases the rev of the store, and generates one event in the event history.
-	// The returned rev is the current revision of the KV when the operation is executed.
-	Put(key, value []byte, lease lease.LeaseID) (rev int64)
+// TxnRead represents a read-only transaction with operations that will not
+// block other read transactions.
+type TxnRead interface {
+	ReadView
+	// End marks the transaction is complete and ready to commit.
+	End()
+}
 
+type WriteView interface {
 	// DeleteRange deletes the given range from the store.
 	// A deleteRange increases the rev of the store if any key in the range exists.
 	// The number of key deleted will be returned.
@@ -67,26 +70,51 @@ type KV interface {
 	// if the `end` is not nil, deleteRange deletes the keys in range [key, range_end).
 	DeleteRange(key, end []byte) (n, rev int64)
 
-	// TxnBegin begins a txn. Only Txn prefixed operation can be executed, others will be blocked
-	// until txn ends. Only one on-going txn is allowed.
-	// TxnBegin returns an int64 txn ID.
-	// All txn prefixed operations with same txn ID will be done with the same rev.
-	TxnBegin() int64
-	// TxnEnd ends the on-going txn with txn ID. If the on-going txn ID is not matched, error is returned.
-	TxnEnd(txnID int64) error
-	// TxnRange returns the current revision of the KV when the operation is executed.
-	TxnRange(txnID int64, key, end []byte, ro RangeOptions) (r *RangeResult, err error)
-	TxnPut(txnID int64, key, value []byte, lease lease.LeaseID) (rev int64, err error)
-	TxnDeleteRange(txnID int64, key, end []byte) (n, rev int64, err error)
+	// Put puts the given key, value into the store. Put also takes additional argument lease to
+	// attach a lease to a key-value pair as meta-data. KV implementation does not validate the lease
+	// id.
+	// A put also increases the rev of the store, and generates one event in the event history.
+	// The returned rev is the current revision of the KV when the operation is executed.
+	Put(key, value []byte, lease lease.LeaseID) (rev int64)
+}
+
+// TxnWrite represents a transaction that can modify the store.
+type TxnWrite interface {
+	TxnRead
+	WriteView
+	// Changes gets the changes made since opening the write txn.
+	Changes() []mvccpb.KeyValue
+}
+
+// txnReadWrite coerces a read txn to a write, panicking on any write operation.
+type txnReadWrite struct{ TxnRead }
+
+func (trw *txnReadWrite) DeleteRange(key, end []byte) (n, rev int64) { panic("unexpected DeleteRange") }
+func (trw *txnReadWrite) Put(key, value []byte, lease lease.LeaseID) (rev int64) {
+	panic("unexpected Put")
+}
+func (trw *txnReadWrite) Changes() []mvccpb.KeyValue { return nil }
+
+func NewReadOnlyTxnWrite(txn TxnRead) TxnWrite { return &txnReadWrite{txn} }
+
+type KV interface {
+	ReadView
+	WriteView
+
+	// Read creates a read transaction.
+	Read() TxnRead
+
+	// Write creates a write transaction.
+	Write() TxnWrite
+
+	// Hash retrieves the hash of KV state and revision.
+	// This method is designed for consistency checking purposes.
+	Hash() (hash uint32, revision int64, err error)
 
 	// Compact frees all superseded keys with revisions less than rev.
 	Compact(rev int64) (<-chan struct{}, error)
 
-	// Hash retrieves the hash of KV state and revision.
-	// This method is designed for consistency checking purpose.
-	Hash() (hash uint32, revision int64, err error)
-
-	// Commit commits txns into the underlying backend.
+	// Commit commits outstanding txns into the underlying backend.
 	Commit()
 
 	// Restore restores the KV store from a backend.

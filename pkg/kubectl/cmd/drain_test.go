@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +31,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -44,13 +44,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/ref"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 const (
@@ -70,9 +71,6 @@ func TestMain(m *testing.M) {
 			Name:              "node",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
-		Spec: corev1.NodeSpec{
-			ExternalID: "node",
-		},
 		Status: corev1.NodeStatus{},
 	}
 
@@ -87,7 +85,7 @@ func TestCordon(t *testing.T) {
 		description string
 		node        *corev1.Node
 		expected    *corev1.Node
-		cmd         func(cmdutil.Factory, io.Writer) *cobra.Command
+		cmd         func(cmdutil.Factory, genericclioptions.IOStreams) *cobra.Command
 		arg         string
 		expectFatal bool
 	}{
@@ -150,83 +148,90 @@ func TestCordon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
-		new_node := &corev1.Node{}
-		updated := false
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				m := &MyReq{req}
-				switch {
-				case m.isFor("GET", "/nodes/node"):
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
-				case m.isFor("GET", "/nodes/bar"):
-					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("nope")}, nil
-				case m.isFor("PATCH", "/nodes/node"):
-					data, err := ioutil.ReadAll(req.Body)
-					if err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
-					defer req.Body.Close()
-					oldJSON, err := runtime.Encode(codec, node)
-					if err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
-					appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &corev1.Node{})
-					if err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
-					if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
-					if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
-						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec.Unschedulable, new_node.Spec.Unschedulable)
-					}
-					updated = true
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
-				default:
-					t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.ClientConfig = defaultClientConfig()
+		t.Run(test.description, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		buf := bytes.NewBuffer([]byte{})
-		cmd := test.cmd(f, buf)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
 
-		saw_fatal := false
-		func() {
-			defer func() {
-				// Recover from the panic below.
-				_ = recover()
-				// Restore cmdutil behavior
-				cmdutil.DefaultBehaviorOnFatal()
+			new_node := &corev1.Node{}
+			updated := false
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					m := &MyReq{req}
+					switch {
+					case m.isFor("GET", "/nodes/node"):
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
+					case m.isFor("GET", "/nodes/bar"):
+						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("nope")}, nil
+					case m.isFor("PATCH", "/nodes/node"):
+						data, err := ioutil.ReadAll(req.Body)
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						defer req.Body.Close()
+						oldJSON, err := runtime.Encode(codec, node)
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &corev1.Node{})
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
+							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec.Unschedulable, new_node.Spec.Unschedulable)
+						}
+						updated = true
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+					default:
+						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.ClientConfigVal = defaultClientConfig()
+
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+			cmd := test.cmd(tf, ioStreams)
+
+			saw_fatal := false
+			func() {
+				defer func() {
+					// Recover from the panic below.
+					_ = recover()
+					// Restore cmdutil behavior
+					cmdutil.DefaultBehaviorOnFatal()
+				}()
+				cmdutil.BehaviorOnFatal(func(e string, code int) {
+					saw_fatal = true
+					panic(e)
+				})
+				cmd.SetArgs([]string{test.arg})
+				cmd.Execute()
 			}()
-			cmdutil.BehaviorOnFatal(func(e string, code int) {
-				saw_fatal = true
-				panic(e)
-			})
-			cmd.SetArgs([]string{test.arg})
-			cmd.Execute()
-		}()
 
-		if test.expectFatal {
-			if !saw_fatal {
-				t.Fatalf("%s: unexpected non-error", test.description)
+			if test.expectFatal {
+				if !saw_fatal {
+					t.Fatalf("%s: unexpected non-error", test.description)
+				}
+				if updated {
+					t.Fatalf("%s: unexpected update", test.description)
+				}
 			}
-			if updated {
-				t.Fatalf("%s: unexpcted update", test.description)
-			}
-		}
 
-		if !test.expectFatal && saw_fatal {
-			t.Fatalf("%s: unexpected error", test.description)
-		}
-		if !reflect.DeepEqual(test.expected.Spec, test.node.Spec) && !updated {
-			t.Fatalf("%s: node never updated", test.description)
-		}
+			if !test.expectFatal && saw_fatal {
+				t.Fatalf("%s: unexpected error", test.description)
+			}
+			if !reflect.DeepEqual(test.expected.Spec, test.node.Spec) && !updated {
+				t.Fatalf("%s: node never updated", test.description)
+			}
+		})
 	}
 }
 
@@ -301,6 +306,34 @@ func TestDrain(t *testing.T) {
 		},
 		Spec: corev1.PodSpec{
 			NodeName: "node",
+		},
+	}
+
+	ds_pod_with_emptyDir := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+			Labels:            labels,
+			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "extensions/v1beta1",
+					Kind:               "DaemonSet",
+					Name:               "ds",
+					BlockOwnerDeletion: boolptr(true),
+					Controller:         boolptr(true),
+				},
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "node",
+			Volumes: []corev1.Volume{
+				{
+					Name:         "scratch",
+					VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""}},
+				},
+			},
 		},
 	}
 
@@ -414,15 +447,16 @@ func TestDrain(t *testing.T) {
 	}
 
 	tests := []struct {
-		description  string
-		node         *corev1.Node
-		expected     *corev1.Node
-		pods         []corev1.Pod
-		rcs          []api.ReplicationController
-		replicaSets  []extensions.ReplicaSet
-		args         []string
-		expectFatal  bool
-		expectDelete bool
+		description   string
+		node          *corev1.Node
+		expected      *corev1.Node
+		pods          []corev1.Pod
+		rcs           []api.ReplicationController
+		replicaSets   []extensions.ReplicaSet
+		args          []string
+		expectWarning string
+		expectFatal   bool
+		expectDelete  bool
 	}{
 		{
 			description:  "RC-managed pod",
@@ -473,6 +507,17 @@ func TestDrain(t *testing.T) {
 			args:         []string{"node", "--ignore-daemonsets"},
 			expectFatal:  false,
 			expectDelete: false,
+		},
+		{
+			description:   "DS-managed pod with emptyDir with --ignore-daemonsets",
+			node:          node,
+			expected:      cordoned_node,
+			pods:          []corev1.Pod{ds_pod_with_emptyDir},
+			rcs:           []api.ReplicationController{rc},
+			args:          []string{"node", "--ignore-daemonsets"},
+			expectWarning: "WARNING: Ignoring DaemonSet-managed pods: bar\n",
+			expectFatal:   false,
+			expectDelete:  false,
 		},
 		{
 			description:  "Job-managed pod",
@@ -554,145 +599,167 @@ func TestDrain(t *testing.T) {
 			currMethod = DeleteMethod
 		}
 		for _, test := range tests {
-			new_node := &corev1.Node{}
-			deleted := false
-			evicted := false
-			f, tf, codec, ns := cmdtesting.NewAPIFactory()
-			tf.Client = &fake.RESTClient{
-				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
-				NegotiatedSerializer: ns,
-				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					m := &MyReq{req}
-					switch {
-					case req.Method == "GET" && req.URL.Path == "/api":
-						apiVersions := metav1.APIVersions{
-							Versions: []string{"v1"},
-						}
-						return genResponseWithJsonEncodedBody(apiVersions)
-					case req.Method == "GET" && req.URL.Path == "/apis":
-						groupList := metav1.APIGroupList{
-							Groups: []metav1.APIGroup{
-								{
-									Name: "policy",
-									PreferredVersion: metav1.GroupVersionForDiscovery{
-										GroupVersion: "policy/v1beta1",
+			t.Run(test.description, func(t *testing.T) {
+				new_node := &corev1.Node{}
+				deleted := false
+				evicted := false
+				tf := cmdtesting.NewTestFactory()
+				defer tf.Cleanup()
+
+				codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+				ns := legacyscheme.Codecs
+
+				tf.Client = &fake.RESTClient{
+					GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
+					NegotiatedSerializer: ns,
+					Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+						m := &MyReq{req}
+						switch {
+						case req.Method == "GET" && req.URL.Path == "/api":
+							apiVersions := metav1.APIVersions{
+								Versions: []string{"v1"},
+							}
+							return genResponseWithJsonEncodedBody(apiVersions)
+						case req.Method == "GET" && req.URL.Path == "/apis":
+							groupList := metav1.APIGroupList{
+								Groups: []metav1.APIGroup{
+									{
+										Name: "policy",
+										PreferredVersion: metav1.GroupVersionForDiscovery{
+											GroupVersion: "policy/v1beta1",
+										},
 									},
 								},
-							},
-						}
-						return genResponseWithJsonEncodedBody(groupList)
-					case req.Method == "GET" && req.URL.Path == "/api/v1":
-						resourceList := metav1.APIResourceList{
-							GroupVersion: "v1",
-						}
-						if testEviction {
-							resourceList.APIResources = []metav1.APIResource{
-								{
-									Name: EvictionSubresource,
-									Kind: EvictionKind,
-								},
 							}
+							return genResponseWithJsonEncodedBody(groupList)
+						case req.Method == "GET" && req.URL.Path == "/api/v1":
+							resourceList := metav1.APIResourceList{
+								GroupVersion: "v1",
+							}
+							if testEviction {
+								resourceList.APIResources = []metav1.APIResource{
+									{
+										Name: EvictionSubresource,
+										Kind: EvictionKind,
+									},
+								}
+							}
+							return genResponseWithJsonEncodedBody(resourceList)
+						case m.isFor("GET", "/nodes/node"):
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
+						case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.rcs[0])}, nil
+						case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &ds)}, nil
+						case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
+							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &extensions.DaemonSet{})}, nil
+						case m.isFor("GET", "/namespaces/default/jobs/job"):
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Batch.Codec(), &job)}, nil
+						case m.isFor("GET", "/namespaces/default/replicasets/rs"):
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
+						case m.isFor("GET", "/namespaces/default/pods/bar"):
+							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &corev1.Pod{})}, nil
+						case m.isFor("GET", "/pods"):
+							values, err := url.ParseQuery(req.URL.RawQuery)
+							if err != nil {
+								t.Fatalf("%s: unexpected error: %v", test.description, err)
+							}
+							get_params := make(url.Values)
+							get_params["fieldSelector"] = []string{"spec.nodeName=node"}
+							if !reflect.DeepEqual(get_params, values) {
+								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, get_params, values)
+							}
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.PodList{Items: test.pods})}, nil
+						case m.isFor("GET", "/replicationcontrollers"):
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationControllerList{Items: test.rcs})}, nil
+						case m.isFor("PATCH", "/nodes/node"):
+							data, err := ioutil.ReadAll(req.Body)
+							if err != nil {
+								t.Fatalf("%s: unexpected error: %v", test.description, err)
+							}
+							defer req.Body.Close()
+							oldJSON, err := runtime.Encode(codec, node)
+							if err != nil {
+								t.Fatalf("%s: unexpected error: %v", test.description, err)
+							}
+							appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &corev1.Node{})
+							if err != nil {
+								t.Fatalf("%s: unexpected error: %v", test.description, err)
+							}
+							if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
+								t.Fatalf("%s: unexpected error: %v", test.description, err)
+							}
+							if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
+								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, new_node.Spec)
+							}
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+						case m.isFor("DELETE", "/namespaces/default/pods/bar"):
+							deleted = true
+							return &http.Response{StatusCode: 204, Header: defaultHeader(), Body: objBody(codec, &test.pods[0])}, nil
+						case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
+							evicted = true
+							return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: policyObjBody(&policyv1beta1.Eviction{})}, nil
+						default:
+							t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
+							return nil, nil
 						}
-						return genResponseWithJsonEncodedBody(resourceList)
-					case m.isFor("GET", "/nodes/node"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
-					case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.rcs[0])}, nil
-					case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &ds)}, nil
-					case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &extensions.DaemonSet{})}, nil
-					case m.isFor("GET", "/namespaces/default/jobs/job"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Batch.Codec(), &job)}, nil
-					case m.isFor("GET", "/namespaces/default/replicasets/rs"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
-					case m.isFor("GET", "/namespaces/default/pods/bar"):
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &corev1.Pod{})}, nil
-					case m.isFor("GET", "/pods"):
-						values, err := url.ParseQuery(req.URL.RawQuery)
-						if err != nil {
-							t.Fatalf("%s: unexpected error: %v", test.description, err)
-						}
-						get_params := make(url.Values)
-						get_params["fieldSelector"] = []string{"spec.nodeName=node"}
-						if !reflect.DeepEqual(get_params, values) {
-							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, get_params, values)
-						}
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.PodList{Items: test.pods})}, nil
-					case m.isFor("GET", "/replicationcontrollers"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationControllerList{Items: test.rcs})}, nil
-					case m.isFor("PATCH", "/nodes/node"):
-						data, err := ioutil.ReadAll(req.Body)
-						if err != nil {
-							t.Fatalf("%s: unexpected error: %v", test.description, err)
-						}
-						defer req.Body.Close()
-						oldJSON, err := runtime.Encode(codec, node)
-						if err != nil {
-							t.Fatalf("%s: unexpected error: %v", test.description, err)
-						}
-						appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &corev1.Node{})
-						if err != nil {
-							t.Fatalf("%s: unexpected error: %v", test.description, err)
-						}
-						if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
-							t.Fatalf("%s: unexpected error: %v", test.description, err)
-						}
-						if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
-							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, new_node.Spec)
-						}
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
-					case m.isFor("DELETE", "/namespaces/default/pods/bar"):
-						deleted = true
-						return &http.Response{StatusCode: 204, Header: defaultHeader(), Body: objBody(codec, &test.pods[0])}, nil
-					case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
-						evicted = true
-						return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: policyObjBody(&policyv1beta1.Eviction{})}, nil
-					default:
-						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
-						return nil, nil
-					}
-				}),
-			}
-			tf.ClientConfig = defaultClientConfig()
+					}),
+				}
+				tf.ClientConfigVal = defaultClientConfig()
 
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdDrain(f, buf, errBuf)
+				ioStreams, _, _, errBuf := genericclioptions.NewTestIOStreams()
+				cmd := NewCmdDrain(tf, ioStreams)
 
-			saw_fatal := false
-			func() {
-				defer func() {
-					// Recover from the panic below.
-					_ = recover()
-					// Restore cmdutil behavior
-					cmdutil.DefaultBehaviorOnFatal()
+				saw_fatal := false
+				fatal_msg := ""
+				func() {
+					defer func() {
+						// Recover from the panic below.
+						_ = recover()
+						// Restore cmdutil behavior
+						cmdutil.DefaultBehaviorOnFatal()
+					}()
+					cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; fatal_msg = e; panic(e) })
+					cmd.SetArgs(test.args)
+					cmd.Execute()
 				}()
-				cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; panic(e) })
-				cmd.SetArgs(test.args)
-				cmd.Execute()
-			}()
-			if test.expectFatal {
-				if !saw_fatal {
-					t.Fatalf("%s: unexpected non-error when using %s", test.description, currMethod)
-				}
-			}
+				if test.expectFatal {
+					if !saw_fatal {
+						t.Fatalf("%s: unexpected non-error when using %s", test.description, currMethod)
+					}
+				} else {
+					if saw_fatal {
+						t.Fatalf("%s: unexpected error when using %s: %s", test.description, currMethod, fatal_msg)
 
-			if test.expectDelete {
-				// Test Delete
-				if !testEviction && !deleted {
-					t.Fatalf("%s: pod never deleted", test.description)
+					}
 				}
-				// Test Eviction
-				if testEviction && !evicted {
-					t.Fatalf("%s: pod never evicted", test.description)
+
+				if test.expectDelete {
+					// Test Delete
+					if !testEviction && !deleted {
+						t.Fatalf("%s: pod never deleted", test.description)
+					}
+					// Test Eviction
+					if testEviction && !evicted {
+						t.Fatalf("%s: pod never evicted", test.description)
+					}
 				}
-			}
-			if !test.expectDelete {
-				if deleted {
-					t.Fatalf("%s: unexpected delete when using %s", test.description, currMethod)
+				if !test.expectDelete {
+					if deleted {
+						t.Fatalf("%s: unexpected delete when using %s", test.description, currMethod)
+					}
 				}
-			}
+
+				if len(test.expectWarning) > 0 {
+					if len(errBuf.String()) == 0 {
+						t.Fatalf("%s: expected warning, but found no stderr output", test.description)
+					}
+
+					if errBuf.String() != test.expectWarning {
+						t.Fatalf("%s: actual warning message did not match expected warning message.\n Expecting: %s\n  Got: %s", test.description, test.expectWarning, errBuf.String())
+					}
+				}
+			})
 		}
 	}
 }
@@ -762,31 +829,44 @@ func TestDeletePods(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, _, _, _ := cmdtesting.NewAPIFactory()
-		o := DrainOptions{Factory: f}
-		o.mapper, _ = f.Object()
-		o.Out = os.Stdout
-		_, pods := createPods(false)
-		pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn)
+		t.Run(test.description, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		if test.expectError {
-			if err == nil {
-				t.Fatalf("%s: unexpected non-error", test.description)
-			} else if test.expectedError != nil {
-				if *test.expectedError != err {
-					t.Fatalf("%s: the error does not match expected error", test.description)
+			o := DrainOptions{
+				PrintFlags: printers.NewPrintFlags("drained"),
+			}
+			o.mapper, _ = tf.Object()
+			o.Out = os.Stdout
+
+			o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+				return func(obj runtime.Object, out io.Writer) error {
+					return nil
+				}, nil
+			}
+
+			_, pods := createPods(false)
+			pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn)
+
+			if test.expectError {
+				if err == nil {
+					t.Fatalf("%s: unexpected non-error", test.description)
+				} else if test.expectedError != nil {
+					if *test.expectedError != err {
+						t.Fatalf("%s: the error does not match expected error", test.description)
+					}
 				}
 			}
-		}
-		if !test.expectError && err != nil {
-			t.Fatalf("%s: unexpected error", test.description)
-		}
-		if test.expectPendingPods && len(pendingPods) == 0 {
-			t.Fatalf("%s: unexpected empty pods", test.description)
-		}
-		if !test.expectPendingPods && len(pendingPods) > 0 {
-			t.Fatalf("%s: unexpected pending pods", test.description)
-		}
+			if !test.expectError && err != nil {
+				t.Fatalf("%s: unexpected error", test.description)
+			}
+			if test.expectPendingPods && len(pendingPods) == 0 {
+				t.Fatalf("%s: unexpected empty pods", test.description)
+			}
+			if !test.expectPendingPods && len(pendingPods) > 0 {
+				t.Fatalf("%s: unexpected pending pods", test.description)
+			}
+		})
 	}
 }
 
@@ -825,19 +905,4 @@ func (m *MyReq) isFor(method string, path string) bool {
 		req.URL.Path == strings.Join([]string{"/api/v1", path}, "") ||
 		req.URL.Path == strings.Join([]string{"/apis/extensions/v1beta1", path}, "") ||
 		req.URL.Path == strings.Join([]string{"/apis/batch/v1", path}, ""))
-}
-
-func refJson(t *testing.T, o runtime.Object) string {
-	ref, err := ref.GetReference(legacyscheme.Scheme, o)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	_, _, codec, _ := cmdtesting.NewAPIFactory()
-	json, err := runtime.Encode(codec, &api.SerializedReference{Reference: *ref})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	return string(json)
 }

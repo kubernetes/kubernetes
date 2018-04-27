@@ -28,7 +28,18 @@ type FlunderList struct {
 	Items []Flunder `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+type ReferenceType string
+
+const (
+	FlunderReferenceType = ReferenceType("Flunder")
+	FischerReferenceType = ReferenceType("Fischer")
+)
+
 type FlunderSpec struct {
+	// A name of another flunder or fischer, depending on the reference type.
+	Reference string `json:"reference,omitempty" protobuf:"bytes,1,opt,name=reference"`
+	// The reference type, defaults to "Flunder" if reference is set.
+	ReferenceType *ReferenceType `json:"referenceType,omitempty" protobuf:"bytes,2,opt,name=referenceType"`
 }
 
 type FlunderStatus struct {

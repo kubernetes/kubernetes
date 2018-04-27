@@ -22,83 +22,11 @@ import (
 	"io/ioutil"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
-	"time"
-
-	"github.com/golang/glog"
-
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
 
 // TODO: These should really just use the GCE API client library or at least use
 // better formatted output from the --format flag.
-
-func CreateGCEStaticIP(name string) (string, error) {
-	// gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
-	// abshah@abhidesk:~/go/src/code.google.com/p/google-api-go-client/compute/v1$ gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
-	// Created [https://www.googleapis.com/compute/v1/projects/abshah-kubernetes-001/regions/us-central1/addresses/test-static-ip].
-	// NAME           REGION      ADDRESS       STATUS
-	// test-static-ip us-central1 104.197.143.7 RESERVED
-
-	var outputBytes []byte
-	var err error
-	region, err := gce.GetGCERegion(TestContext.CloudConfig.Zone)
-	if err != nil {
-		return "", fmt.Errorf("failed to convert zone to region: %v", err)
-	}
-	glog.Infof("Creating static IP with name %q in project %q in region %q", name, TestContext.CloudConfig.ProjectID, region)
-	for attempts := 0; attempts < 4; attempts++ {
-		outputBytes, err = exec.Command("gcloud", "compute", "addresses", "create",
-			name, "--project", TestContext.CloudConfig.ProjectID,
-			"--region", region, "-q", "--format=yaml").CombinedOutput()
-		if err == nil {
-			break
-		}
-		glog.Errorf("output from failed attempt to create static IP: %s", outputBytes)
-		time.Sleep(time.Duration(5*attempts) * time.Second)
-	}
-	if err != nil {
-		// Ditch the error, since the stderr in the output is what actually contains
-		// any useful info.
-		return "", fmt.Errorf("failed to create static IP: %s", outputBytes)
-	}
-	output := string(outputBytes)
-	if strings.Contains(output, "RESERVED") {
-		r, _ := regexp.Compile("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+")
-		staticIP := r.FindString(output)
-		if staticIP == "" {
-			return "", fmt.Errorf("static IP not found in gcloud command output: %v", output)
-		} else {
-			return staticIP, nil
-		}
-	} else {
-		return "", fmt.Errorf("static IP %q could not be reserved: %v", name, output)
-	}
-}
-
-func DeleteGCEStaticIP(name string) error {
-	// gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
-	// abshah@abhidesk:~/go/src/code.google.com/p/google-api-go-client/compute/v1$ gcloud compute --project "abshah-kubernetes-001" addresses create "test-static-ip" --region "us-central1"
-	// Created [https://www.googleapis.com/compute/v1/projects/abshah-kubernetes-001/regions/us-central1/addresses/test-static-ip].
-	// NAME           REGION      ADDRESS       STATUS
-	// test-static-ip us-central1 104.197.143.7 RESERVED
-
-	region, err := gce.GetGCERegion(TestContext.CloudConfig.Zone)
-	if err != nil {
-		return fmt.Errorf("failed to convert zone to region: %v", err)
-	}
-	glog.Infof("Deleting static IP with name %q in project %q in region %q", name, TestContext.CloudConfig.ProjectID, region)
-	outputBytes, err := exec.Command("gcloud", "compute", "addresses", "delete",
-		name, "--project", TestContext.CloudConfig.ProjectID,
-		"--region", region, "-q").CombinedOutput()
-	if err != nil {
-		// Ditch the error, since the stderr in the output is what actually contains
-		// any useful info.
-		return fmt.Errorf("failed to delete static IP %q: %v", name, string(outputBytes))
-	}
-	return nil
-}
 
 // Returns master & node image string, or error
 func lookupClusterImageSources() (string, string, error) {
@@ -107,8 +35,12 @@ func lookupClusterImageSources() (string, string, error) {
 	gcloudf := func(argv ...string) ([]string, error) {
 		args := []string{"compute"}
 		args = append(args, argv...)
-		args = append(args, "--project", TestContext.CloudConfig.ProjectID,
-			"--zone", TestContext.CloudConfig.Zone)
+		args = append(args, "--project", TestContext.CloudConfig.ProjectID)
+		if TestContext.CloudConfig.MultiMaster {
+			args = append(args, "--region", TestContext.CloudConfig.Region)
+		} else {
+			args = append(args, "--zone", TestContext.CloudConfig.Zone)
+		}
 		outputBytes, err := exec.Command("gcloud", args...).CombinedOutput()
 		str := strings.Replace(string(outputBytes), ",", "\n", -1)
 		str = strings.Replace(str, ";", "\n", -1)
@@ -195,4 +127,34 @@ func LogClusterImageSources() {
 	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
 		Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
+}
+
+func CreateManagedInstanceGroup(size int64, zone, template string) error {
+	// TODO(verult): make this hit the compute API directly instead of
+	// shelling out to gcloud.
+	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
+		"create",
+		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--zone=%s", zone),
+		TestContext.CloudConfig.NodeInstanceGroup,
+		fmt.Sprintf("--size=%d", size),
+		fmt.Sprintf("--template=%s", template))
+	if err != nil {
+		return fmt.Errorf("gcloud compute instance-groups managed create call failed with err: %v", err)
+	}
+	return nil
+}
+
+func DeleteManagedInstanceGroup(zone string) error {
+	// TODO(verult): make this hit the compute API directly instead of
+	// shelling out to gcloud.
+	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
+		"delete",
+		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--zone=%s", zone),
+		TestContext.CloudConfig.NodeInstanceGroup)
+	if err != nil {
+		return fmt.Errorf("gcloud compute instance-groups managed delete call failed with err: %v", err)
+	}
+	return nil
 }

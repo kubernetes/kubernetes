@@ -18,8 +18,7 @@ go_test(
         "filestore_test.go",
         "store_test.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/util/store",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/util/filesystem:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

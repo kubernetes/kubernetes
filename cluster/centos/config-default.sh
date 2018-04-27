@@ -118,9 +118,13 @@ ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 # define the IP range used for flannel overlay network, should not conflict with above SERVICE_CLUSTER_IP_RANGE
 export FLANNEL_NET=${FLANNEL_NET:-"172.16.0.0/16"}
 
-# Admission Controllers to invoke prior to persisting objects in cluster
-# If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-export ADMISSION_CONTROL=${ADMISSION_CONTROL:-"Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeClaimResize,DefaultTolerationSeconds,Priority,PVCProtection,ResourceQuota"}
+# Admission Controllers to invoke prior to persisting objects in cluster.
+# MutatingAdmissionWebhook should be the last controller that modifies the
+# request object, otherwise users will be confused if the mutating webhooks'
+# modification is overwritten.
+# If we included ResourceQuota, we should keep it at the end of the list to
+# prevent incrementing quota usage prematurely.
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-"Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeClaimResize,DefaultTolerationSeconds,Priority,StorageObjectInUseProtection,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
 
 # Extra options to set on the Docker command line.
 # This is useful for setting --insecure-registry for local registries.

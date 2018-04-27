@@ -18,19 +18,21 @@ package set
 
 import (
 	"fmt"
-	"io"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -59,38 +61,51 @@ var (
 
 // ResourcesOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
 // referencing the cmd.Flags
-type ResourcesOptions struct {
+type SetResourcesOptions struct {
 	resource.FilenameOptions
 
-	Mapper            meta.RESTMapper
+	PrintFlags  *printers.PrintFlags
+	RecordFlags *genericclioptions.RecordFlags
+
 	Infos             []*resource.Info
-	Encoder           runtime.Encoder
-	Out               io.Writer
-	Err               io.Writer
 	Selector          string
 	ContainerSelector string
 	Output            string
 	All               bool
-	Record            bool
-	ChangeCause       string
 	Local             bool
-	Cmd               *cobra.Command
+
+	DryRun bool
+
+	PrintObj printers.ResourcePrinterFunc
+	Recorder genericclioptions.Recorder
 
 	Limits               string
 	Requests             string
 	ResourceRequirements v1.ResourceRequirements
 
-	PrintSuccess           func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
+
+	genericclioptions.IOStreams
 }
 
-func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
-	options := &ResourcesOptions{
-		Out: out,
-		Err: errOut,
+// NewResourcesOptions returns a ResourcesOptions indicating all containers in the selected
+// pod templates are selected by default.
+func NewResourcesOptions(streams genericclioptions.IOStreams) *SetResourcesOptions {
+	return &SetResourcesOptions{
+		PrintFlags:  printers.NewPrintFlags("resource requirements updated"),
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		Recorder: genericclioptions.NoopRecorder{},
+
+		ContainerSelector: "*",
+
+		IOStreams: streams,
 	}
+}
+
+func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewResourcesOptions(streams)
 
 	resourceTypesWithPodTemplate := []string{}
 	for _, resource := range f.SuggestedPodTemplateResources() {
@@ -98,45 +113,57 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:     "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
+		Use: "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Update resource requests/limits on objects with pod templates"),
 		Long:    fmt.Sprintf(resources_long, strings.Join(resourceTypesWithPodTemplate, ", ")),
 		Example: resources_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
+
 	//usage := "Filename, directory, or URL to a file identifying the resource to get from the server"
 	//kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones,supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
-	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set resources will NOT contact api-server but run locally.")
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, not including uninitialized ones,supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVarP(&o.ContainerSelector, "containers", "c", o.ContainerSelector, "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
+	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set resources will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
-	cmd.Flags().StringVar(&options.Limits, "limits", options.Limits, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
-	cmd.Flags().StringVar(&options.Requests, "requests", options.Requests, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
+	cmd.Flags().StringVar(&o.Limits, "limits", o.Limits, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
+	cmd.Flags().StringVar(&o.Requests, "requests", o.Requests, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
 	return cmd
 }
 
-func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, _ = f.Object()
-	o.PrintSuccess = f.PrintSuccess
+func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
-	o.Encoder = f.JSONEncoder()
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.Record = cmdutil.GetRecordFlag(cmd)
-	o.Local = cmdutil.GetFlagBool(cmd, "local")
-	o.ChangeCause = f.Command(cmd, false)
-	o.PrintObject = f.PrintObject
-	o.Cmd = cmd
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = printer.PrintObj
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -175,8 +202,11 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	return nil
 }
 
-func (o *ResourcesOptions) Validate() error {
+func (o *SetResourcesOptions) Validate() error {
 	var err error
+	if o.All && len(o.Selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
 	if len(o.Limits) == 0 && len(o.Requests) == 0 {
 		return fmt.Errorf("you must specify an update to requests or limits (in the form of --requests/--limits)")
 	}
@@ -189,9 +219,9 @@ func (o *ResourcesOptions) Validate() error {
 	return nil
 }
 
-func (o *ResourcesOptions) Run() error {
+func (o *SetResourcesOptions) Run() error {
 	allErrs := []error{}
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		transformed := false
 		info.Object = info.AsVersioned()
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
@@ -218,10 +248,18 @@ func (o *ResourcesOptions) Run() error {
 			}
 			return nil
 		})
-		if transformed && err == nil {
-			return runtime.Encode(o.Encoder, info.Object)
+		if err != nil {
+			return nil, err
 		}
-		return nil, err
+		if !transformed {
+			return nil, nil
+		}
+		// record this change (for rollout history)
+		if err := o.Recorder.Record(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
+		}
+
+		return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 	})
 
 	for _, patch := range patches {
@@ -237,8 +275,8 @@ func (o *ResourcesOptions) Run() error {
 			continue
 		}
 
-		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
+		if o.Local || o.DryRun {
+			if err := o.PrintObj(patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -251,24 +289,9 @@ func (o *ResourcesOptions) Run() error {
 		}
 		info.Refresh(obj, true)
 
-		//record this change (for rollout history)
-		if o.Record || cmdutil.ContainsChangeCause(info) {
-			if err := cmdutil.RecordChangeCause(obj, o.ChangeCause); err == nil {
-				if obj, err = resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, false, obj); err != nil {
-					allErrs = append(allErrs, fmt.Errorf("changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err))
-				}
-			}
+		if err := o.PrintObj(info.AsVersioned(), o.Out); err != nil {
+			return err
 		}
-		info.Refresh(obj, true)
-
-		shortOutput := o.Output == "name"
-		if len(o.Output) > 0 && !shortOutput {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
-				return err
-			}
-			continue
-		}
-		o.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

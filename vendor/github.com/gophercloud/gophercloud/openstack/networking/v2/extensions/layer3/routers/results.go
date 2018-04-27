@@ -60,6 +60,10 @@ type Router struct {
 
 	// Routes are a collection of static routes that the router will host.
 	Routes []Route `json:"routes"`
+
+	// Availability zone hints groups network nodes that run services like DHCP, L3, FW, and others.
+	// Used to make network resources highly available.
+	AvailabilityZoneHints []string `json:"availability_zone_hints"`
 }
 
 // RouterPage is the page returned by a pager when traversing over a

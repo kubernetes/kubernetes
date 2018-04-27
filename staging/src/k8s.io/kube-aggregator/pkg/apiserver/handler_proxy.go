@@ -42,8 +42,6 @@ import (
 // proxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type proxyHandler struct {
-	contextMapper genericapirequest.RequestContextMapper
-
 	// localDelegate is used to satisfy local APIServices
 	localDelegate http.Handler
 
@@ -74,6 +72,8 @@ type proxyHandlingInfo struct {
 	serviceName string
 	// namespace is the namespace the service lives in
 	serviceNamespace string
+	// serviceAvailable indicates this APIService is available or not
+	serviceAvailable bool
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -92,17 +92,17 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if !handlingInfo.serviceAvailable {
+		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
 	if handlingInfo.transportBuildingError != nil {
 		http.Error(w, handlingInfo.transportBuildingError.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	ctx, ok := r.contextMapper.Get(req)
-	if !ok {
-		http.Error(w, "missing context", http.StatusInternalServerError)
-		return
-	}
-	user, ok := genericapirequest.UserFrom(ctx)
+	user, ok := genericapirequest.UserFrom(req.Context())
 	if !ok {
 		http.Error(w, "missing user", http.StatusInternalServerError)
 		return
@@ -113,7 +113,8 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Scheme = "https"
 	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("missing route (%s)", err.Error()), http.StatusInternalServerError)
+		glog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
+		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
 		return
 	}
 	location.Host = rloc.Host
@@ -205,9 +206,10 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 		},
 		serviceName:      apiService.Spec.Service.Name,
 		serviceNamespace: apiService.Spec.Service.Namespace,
+		serviceAvailable: apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available),
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
-	if newInfo.transportBuildingError == nil && r.proxyTransport.Dial != nil {
+	if newInfo.transportBuildingError == nil && r.proxyTransport != nil && r.proxyTransport.Dial != nil {
 		switch transport := newInfo.proxyRoundTripper.(type) {
 		case *http.Transport:
 			transport.Dial = r.proxyTransport.Dial

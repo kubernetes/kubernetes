@@ -79,10 +79,13 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
-		Use:     "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
-		Short:   i18n.T("Perform a rolling update of the given ReplicationController"),
-		Long:    rollingUpdateLong,
-		Example: rollingUpdateExample,
+		Use: "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
+		DisableFlagsInUseLine: true,
+		Short:      "Perform a rolling update. This command is deprecated, use rollout instead.",
+		Long:       rollingUpdateLong,
+		Example:    rollingUpdateExample,
+		Deprecated: `use "rollout" instead`,
+		Hidden:     true,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunRollingUpdate(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
@@ -93,9 +96,7 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Duration("timeout", timeout, `Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	usage := "Filename or URL to file to use to create the new replication controller."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmd.MarkFlagRequired("filename")
 	cmd.Flags().String("image", "", i18n.T("Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"))
-	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("deployment-label-key", "deployment", i18n.T("The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"))
 	cmd.Flags().String("container", "", i18n.T("Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"))
 	cmd.Flags().String("image-pull-policy", "", i18n.T("Explicit policy for when to pull container images. Required when --image is same as existing image, ignored otherwise."))
@@ -103,7 +104,6 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	return cmd
 }
@@ -192,8 +192,6 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	var keepOldName bool
 	var replicasDefaulted bool
 
-	mapper, _ := f.Object()
-
 	if len(filename) != 0 {
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 		if err != nil {
@@ -219,10 +217,19 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 			return cmdutil.UsageErrorf(cmd, "please make sure %s exists and is not empty", filename)
 		}
 
-		switch t := infos[0].AsVersioned().(type) {
+		uncastVersionedObj, err := legacyscheme.Scheme.ConvertToVersion(infos[0].Object, v1.SchemeGroupVersion)
+		if err != nil {
+			return err
+		}
+		switch t := uncastVersionedObj.(type) {
 		case *v1.ReplicationController:
 			replicasDefaulted = t.Spec.Replicas == nil
-			newRc, _ = infos[0].AsInternal().(*api.ReplicationController)
+
+			// previous code ignored the error.  Seem like it's very unlikely to fail, so ok for now.
+			uncastObj, err := legacyscheme.Scheme.ConvertToVersion(uncastVersionedObj, api.SchemeGroupVersion)
+			if err == nil {
+				newRc, _ = uncastObj.(*api.ReplicationController)
+			}
 		}
 		if newRc == nil {
 			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
@@ -296,7 +303,12 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 			filename, oldName)
 	}
 
-	updater := kubectl.NewRollingUpdater(newRc.Namespace, coreClient, coreClient)
+	scalesGetter, err := f.ScaleClient()
+	if err != nil {
+		return err
+	}
+
+	updater := kubectl.NewRollingUpdater(newRc.Namespace, coreClient, coreClient, scalesGetter)
 
 	// To successfully pull off a rolling update the new and old rc have to differ
 	// by at least one selector. Every new pod should have the selector and every
@@ -323,10 +335,10 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 			oldRcData.WriteString(oldRc.Name)
 			newRcData.WriteString(newRc.Name)
 		} else {
-			if err := f.PrintObject(cmd, false, mapper, oldRc, oldRcData); err != nil {
+			if err := cmdutil.PrintObject(cmd, oldRc, oldRcData); err != nil {
 				return err
 			}
-			if err := f.PrintObject(cmd, false, mapper, newRc, newRcData); err != nil {
+			if err := cmdutil.PrintObject(cmd, newRc, newRcData); err != nil {
 				return err
 			}
 		}
@@ -371,9 +383,9 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		return err
 	}
 	if outputFormat != "" {
-		return f.PrintObject(cmd, false, mapper, newRc, out)
+		return cmdutil.PrintObject(cmd, newRc, out)
 	}
-	f.PrintSuccess(mapper, false, out, "replicationcontrollers", oldName, dryrun, message)
+	cmdutil.PrintSuccess(false, out, newRc, dryrun, message)
 	return nil
 }
 

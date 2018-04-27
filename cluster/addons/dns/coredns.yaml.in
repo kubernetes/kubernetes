@@ -57,12 +57,13 @@ data:
   Corefile: |
     .:53 {
         errors
-        log
         health
-        kubernetes {{ pillar['dns_domain'] }} {{ pillar['service_cluster_ip_range'] }} {
+        kubernetes {{ pillar['dns_domain'] }} in-addr.arpa ip6.arpa {
             pods insecure
+            upstream
+            fallthrough in-addr.arpa ip6.arpa
         }
-        prometheus
+        prometheus :9153
         proxy . /etc/resolv.conf
         cache 30
     }
@@ -73,19 +74,26 @@ metadata:
   name: coredns
   namespace: kube-system
   labels:
-    k8s-app: coredns
+    k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "CoreDNS"
 spec:
-  replicas: 1
+  # replicas: not specified here:
+  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
+  # 2. Default is 1.
+  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   selector:
     matchLabels:
-      k8s-app: coredns
+      k8s-app: kube-dns
   template:
     metadata:
       labels:
-        k8s-app: coredns
+        k8s-app: kube-dns
     spec:
       serviceAccountName: coredns
       tolerations:
@@ -95,7 +103,7 @@ spec:
           operator: "Exists"
       containers:
       - name: coredns
-        image: coredns/coredns:1.0.1
+        image: coredns/coredns:1.0.6
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -113,9 +121,6 @@ spec:
           protocol: UDP
         - containerPort: 53
           name: dns-tcp
-          protocol: TCP
-        - containerPort: 9153
-          name: metrics
           protocol: TCP
         livenessProbe:
           httpGet:
@@ -138,16 +143,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: coredns
+  name: kube-dns
   namespace: kube-system
   labels:
-    k8s-app: coredns
+    k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "CoreDNS"
 spec:
   selector:
-    k8s-app: coredns
+    k8s-app: kube-dns
   clusterIP: {{ pillar['dns_server'] }}
   ports:
   - name: dns
@@ -155,7 +160,4 @@ spec:
     protocol: UDP
   - name: dns-tcp
     port: 53
-    protocol: TCP
-  - name: metrics
-    port: 9153
     protocol: TCP

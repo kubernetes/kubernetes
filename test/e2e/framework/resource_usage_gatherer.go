@@ -191,7 +191,7 @@ func (w *resourceGatherWorker) gather(initialSleep time.Duration) {
 	}
 }
 
-type containerResourceGatherer struct {
+type ContainerResourceGatherer struct {
 	client       clientset.Interface
 	stopCh       chan struct{}
 	workers      []resourceGatherWorker
@@ -208,8 +208,8 @@ type ResourceGathererOptions struct {
 	PrintVerboseLogs            bool
 }
 
-func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *v1.PodList) (*containerResourceGatherer, error) {
-	g := containerResourceGatherer{
+func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *v1.PodList) (*ContainerResourceGatherer, error) {
+	g := ContainerResourceGatherer{
 		client:       c,
 		stopCh:       make(chan struct{}),
 		containerIDs: make([]string, 0),
@@ -277,7 +277,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 
 // StartGatheringData starts a stat gathering worker blocks for each node to track,
 // and blocks until StopAndSummarize is called.
-func (g *containerResourceGatherer) StartGatheringData() {
+func (g *ContainerResourceGatherer) StartGatheringData() {
 	if len(g.workers) == 0 {
 		return
 	}
@@ -294,7 +294,7 @@ func (g *containerResourceGatherer) StartGatheringData() {
 // generates resource summary for the passed-in percentiles, and returns the summary.
 // It returns an error if the resource usage at any percentile is beyond the
 // specified resource constraints.
-func (g *containerResourceGatherer) StopAndSummarize(percentiles []int, constraints map[string]ResourceConstraint) (*ResourceUsageSummary, error) {
+func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constraints map[string]ResourceConstraint) (*ResourceUsageSummary, error) {
 	close(g.stopCh)
 	Logf("Closed stop channel. Waiting for %v workers", len(g.workers))
 	finished := make(chan struct{})

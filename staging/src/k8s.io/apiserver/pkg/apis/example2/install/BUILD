@@ -23,8 +23,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["roundtrip_test.go"],
-    importpath = "k8s.io/apiserver/pkg/apis/example2/install",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/example/fuzzer:go_default_library",

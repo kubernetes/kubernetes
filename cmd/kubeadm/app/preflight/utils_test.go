@@ -18,52 +18,38 @@ package preflight
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"testing"
+
+	utilsexec "k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 func TestGetKubeletVersion(t *testing.T) {
-	type T struct {
+	cases := []struct {
 		output   string
 		expected string
+		err      error
 		valid    bool
+	}{
+		{"Kubernetes v1.7.0", "1.7.0", nil, true},
+		{"Kubernetes v1.8.0-alpha.2.1231+afabd012389d53a", "1.8.0-alpha.2.1231+afabd012389d53a", nil, true},
+		{"something-invalid", "", nil, false},
+		{"command not found", "", fmt.Errorf("kubelet not found"), false},
+		{"", "", nil, false},
 	}
 
-	cases := []T{
-		{"v1.7.0", "1.7.0", true},
-		{"v1.8.0-alpha.2.1231+afabd012389d53a", "1.8.0-alpha.2.1231+afabd012389d53a", true},
-		{"something-invalid", "", false},
-	}
-
-	dir, err := ioutil.TempDir("", "test-kubelet-version")
-	if err != nil {
-		t.Errorf("Failed to create directory for testing GetKubeletVersion: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
-	// We don't want to call real kubelet or something else in $PATH
-	oldPATH := os.Getenv("PATH")
-	defer os.Setenv("PATH", oldPATH)
-
-	os.Setenv("PATH", dir)
-
-	// First test case, kubelet not present, should be getting error
-	ver, err := GetKubeletVersion()
-	if err == nil {
-		t.Errorf("failed GetKubeletVersion: expected failure when kubelet not in PATH. Result: %v", ver)
-	}
-
-	kubeletFn := filepath.Join(dir, "kubelet")
 	for _, tc := range cases {
-
-		content := []byte(fmt.Sprintf("#!/bin/sh\necho 'Kubernetes %s'", tc.output))
-		if err := ioutil.WriteFile(kubeletFn, content, 0755); err != nil {
-			t.Errorf("Error creating test stub file %s: %v", kubeletFn, err)
+		fcmd := fakeexec.FakeCmd{
+			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+				func() ([]byte, error) { return []byte(tc.output), tc.err },
+			},
 		}
-
-		ver, err := GetKubeletVersion()
+		fexec := &fakeexec.FakeExec{
+			CommandScript: []fakeexec.FakeCommandAction{
+				func(cmd string, args ...string) utilsexec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			},
+		}
+		ver, err := GetKubeletVersion(fexec)
 		switch {
 		case err != nil && tc.valid:
 			t.Errorf("GetKubeletVersion: unexpected error for %q. Error: %v", tc.output, err)

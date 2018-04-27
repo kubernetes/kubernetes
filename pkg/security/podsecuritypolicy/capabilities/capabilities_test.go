@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 func TestGenerateAdds(t *testing.T) {
@@ -278,7 +278,7 @@ func TestValidateAdds(t *testing.T) {
 			},
 		},
 		"no required, all allowed, container requests valid": {
-			allowedCaps: []api.Capability{extensions.AllowAllCapabilities},
+			allowedCaps: []api.Capability{policy.AllowAllCapabilities},
 			containerCaps: &api.Capabilities{
 				Add: []api.Capability{"foo"},
 			},

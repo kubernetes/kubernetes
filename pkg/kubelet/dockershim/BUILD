@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -14,24 +8,68 @@ go_library(
         "docker_checkpoint.go",
         "docker_container.go",
         "docker_image.go",
-        "docker_image_unsupported.go",
+        "docker_legacy_service.go",
+        "docker_logs.go",
         "docker_sandbox.go",
         "docker_service.go",
-        "docker_stats_unsupported.go",
         "docker_streaming.go",
         "exec.go",
         "helpers.go",
-        "helpers_unsupported.go",
         "naming.go",
         "security_context.go",
         "selinux_util.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "docker_image_linux.go",
             "docker_stats_linux.go",
             "helpers_linux.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "docker_image_unsupported.go",
+            "docker_stats_unsupported.go",
+            "helpers_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "docker_image_windows.go",
             "docker_stats_windows.go",
             "helpers_windows.go",
@@ -39,21 +77,25 @@ go_library(
         "//conditions:default": [],
     }),
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//pkg/kubelet/apis/cri:go_default_library",
-        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/checkpointmanager:go_default_library",
+        "//pkg/kubelet/checkpointmanager/checksum:go_default_library",
+        "//pkg/kubelet/checkpointmanager/errors:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/cm:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/dockershim/metrics:go_default_library",
+        "//pkg/kubelet/dockershim/network:go_default_library",
+        "//pkg/kubelet/dockershim/network/cni:go_default_library",
+        "//pkg/kubelet/dockershim/network/hostport:go_default_library",
+        "//pkg/kubelet/dockershim/network/kubenet:go_default_library",
+        "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
-        "//pkg/kubelet/network:go_default_library",
-        "//pkg/kubelet/network/cni:go_default_library",
-        "//pkg/kubelet/network/hostport:go_default_library",
-        "//pkg/kubelet/network/kubenet:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/kubelet/types:go_default_library",
@@ -61,8 +103,6 @@ go_library(
         "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/kubelet/util/store:go_default_library",
         "//pkg/security/apparmor:go_default_library",
-        "//pkg/util/filesystem:go_default_library",
-        "//pkg/util/hash:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//vendor/github.com/armon/circbuf:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
@@ -78,7 +118,14 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
-    ],
+        "//vendor/k8s.io/utils/exec:go_default_library",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//pkg/kubelet/apis:go_default_library",
+            "//pkg/kubelet/winstats:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
@@ -95,23 +142,20 @@ go_test(
         "security_context_test.go",
         "selinux_util_test.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "helpers_linux_test.go",
         ],
         "//conditions:default": [],
     }),
-    data = [
-    ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
+        "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
-        "//pkg/kubelet/dockershim/testing:go_default_library",
-        "//pkg/kubelet/network:go_default_library",
-        "//pkg/kubelet/network/testing:go_default_library",
+        "//pkg/kubelet/dockershim/network:go_default_library",
+        "//pkg/kubelet/dockershim/network/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/security/apparmor:go_default_library",
@@ -124,7 +168,12 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/k8s.io/api/core/v1:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -141,8 +190,9 @@ filegroup(
         "//pkg/kubelet/dockershim/cm:all-srcs",
         "//pkg/kubelet/dockershim/libdocker:all-srcs",
         "//pkg/kubelet/dockershim/metrics:all-srcs",
+        "//pkg/kubelet/dockershim/network:all-srcs",
         "//pkg/kubelet/dockershim/remote:all-srcs",
-        "//pkg/kubelet/dockershim/testing:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -17,15 +17,19 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -48,7 +52,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
-	w := newCacheWatcher(0, 0, initEvents, filter, forget)
+	w := newCacheWatcher(0, 0, initEvents, filter, forget, testVersioner{})
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
 		lock.RLock()
@@ -73,28 +77,31 @@ func TestCacheWatcherHandlesFiltering(t *testing.T) {
 		{
 			events: []*watchCacheEvent{
 				{
-					Type:      watch.Added,
-					Object:    &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-					ObjFields: fields.Set{"spec.nodeName": "host"},
+					Type:            watch.Added,
+					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+					ObjFields:       fields.Set{"spec.nodeName": "host"},
+					ResourceVersion: 1,
 				},
 				{
-					Type:          watch.Modified,
-					PrevObject:    &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-					PrevObjFields: fields.Set{"spec.nodeName": "host"},
-					Object:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-					ObjFields:     fields.Set{"spec.nodeName": ""},
+					Type:            watch.Modified,
+					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+					PrevObjFields:   fields.Set{"spec.nodeName": "host"},
+					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+					ObjFields:       fields.Set{"spec.nodeName": ""},
+					ResourceVersion: 2,
 				},
 				{
-					Type:          watch.Modified,
-					PrevObject:    &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-					PrevObjFields: fields.Set{"spec.nodeName": ""},
-					Object:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
-					ObjFields:     fields.Set{"spec.nodeName": "host"},
+					Type:            watch.Modified,
+					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+					PrevObjFields:   fields.Set{"spec.nodeName": ""},
+					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
+					ObjFields:       fields.Set{"spec.nodeName": "host"},
+					ResourceVersion: 3,
 				},
 			},
 			expected: []watch.Event{
 				{Type: watch.Added, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}},
-				{Type: watch.Deleted, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}},
+				{Type: watch.Deleted, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}},
 				{Type: watch.Added, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}}},
 			},
 		},
@@ -102,50 +109,56 @@ func TestCacheWatcherHandlesFiltering(t *testing.T) {
 		{
 			events: []*watchCacheEvent{
 				{
-					Type:      watch.Added,
-					Object:    &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-					ObjFields: fields.Set{"spec.nodeName": ""},
+					Type:            watch.Added,
+					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+					ObjFields:       fields.Set{"spec.nodeName": ""},
+					ResourceVersion: 1,
 				},
 				{
-					Type:          watch.Modified,
-					PrevObject:    &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
-					PrevObjFields: fields.Set{"spec.nodeName": ""},
-					Object:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-					ObjFields:     fields.Set{"spec.nodeName": ""},
+					Type:            watch.Modified,
+					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+					PrevObjFields:   fields.Set{"spec.nodeName": ""},
+					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+					ObjFields:       fields.Set{"spec.nodeName": ""},
+					ResourceVersion: 2,
 				},
 				{
-					Type:          watch.Modified,
-					PrevObject:    &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
-					PrevObjFields: fields.Set{"spec.nodeName": ""},
-					Object:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
-					ObjFields:     fields.Set{"spec.nodeName": "host"},
+					Type:            watch.Modified,
+					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+					PrevObjFields:   fields.Set{"spec.nodeName": ""},
+					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
+					ObjFields:       fields.Set{"spec.nodeName": "host"},
+					ResourceVersion: 3,
 				},
 				{
-					Type:          watch.Modified,
-					PrevObject:    &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
-					PrevObjFields: fields.Set{"spec.nodeName": "host"},
-					Object:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}},
-					ObjFields:     fields.Set{"spec.nodeName": "host"},
+					Type:            watch.Modified,
+					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
+					PrevObjFields:   fields.Set{"spec.nodeName": "host"},
+					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}},
+					ObjFields:       fields.Set{"spec.nodeName": "host"},
+					ResourceVersion: 4,
 				},
 				{
-					Type:          watch.Modified,
-					PrevObject:    &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}},
-					PrevObjFields: fields.Set{"spec.nodeName": "host"},
-					Object:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}},
-					ObjFields:     fields.Set{"spec.nodeName": ""},
+					Type:            watch.Modified,
+					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}},
+					PrevObjFields:   fields.Set{"spec.nodeName": "host"},
+					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}},
+					ObjFields:       fields.Set{"spec.nodeName": ""},
+					ResourceVersion: 5,
 				},
 				{
-					Type:          watch.Modified,
-					PrevObject:    &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}},
-					PrevObjFields: fields.Set{"spec.nodeName": ""},
-					Object:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "6"}},
-					ObjFields:     fields.Set{"spec.nodeName": ""},
+					Type:            watch.Modified,
+					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}},
+					PrevObjFields:   fields.Set{"spec.nodeName": ""},
+					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "6"}},
+					ObjFields:       fields.Set{"spec.nodeName": ""},
+					ResourceVersion: 6,
 				},
 			},
 			expected: []watch.Event{
 				{Type: watch.Added, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}}},
 				{Type: watch.Modified, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}}},
-				{Type: watch.Deleted, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}}},
+				{Type: watch.Deleted, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}}},
 			},
 		},
 	}
@@ -157,7 +170,7 @@ TestCase:
 		for j := range testCase.events {
 			testCase.events[j].ResourceVersion = uint64(j) + 1
 		}
-		w := newCacheWatcher(0, 0, testCase.events, filter, forget)
+		w := newCacheWatcher(0, 0, testCase.events, filter, forget, testVersioner{})
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
 			e := <-ch
@@ -174,4 +187,25 @@ TestCase:
 		}
 		w.Stop()
 	}
+}
+
+type testVersioner struct{}
+
+func (testVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
+	return meta.NewAccessor().SetResourceVersion(obj, strconv.FormatUint(resourceVersion, 10))
+}
+func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string) error {
+	return fmt.Errorf("unimplemented")
+}
+func (testVersioner) PrepareObjectForStorage(obj runtime.Object) error {
+	return fmt.Errorf("unimplemented")
+}
+func (testVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
+	return 0, fmt.Errorf("unimplemented")
+}
+func (testVersioner) ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
+	return strconv.ParseUint(resourceVersion, 10, 64)
+}
+func (testVersioner) ParseListResourceVersion(resourceVersion string) (uint64, error) {
+	return strconv.ParseUint(resourceVersion, 10, 64)
 }

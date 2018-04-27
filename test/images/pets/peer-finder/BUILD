@@ -8,8 +8,7 @@ load(
 
 go_binary(
     name = "peer-finder",
-    importpath = "k8s.io/kubernetes/test/images/pets/peer-finder",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(

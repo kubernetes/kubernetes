@@ -26,13 +26,18 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -60,92 +65,166 @@ var (
 		kubectl replace --force -f ./pod.json`))
 )
 
-func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+type ReplaceOptions struct {
+	PrintFlags  *printers.PrintFlags
+	DeleteFlags *DeleteFlags
+	RecordFlags *genericclioptions.RecordFlags
+
+	DeleteOptions *DeleteOptions
+
+	PrintObj func(obj runtime.Object) error
+
+	createAnnotation bool
+	validate         bool
+
+	Schema      validation.Schema
+	Builder     func() *resource.Builder
+	BuilderArgs []string
+
+	Namespace        string
+	EnforceNamespace bool
+
+	Recorder genericclioptions.Recorder
+
+	Out    io.Writer
+	ErrOut io.Writer
+}
+
+func NewReplaceOptions(out, errOut io.Writer) *ReplaceOptions {
+	return &ReplaceOptions{
+		PrintFlags:  printers.NewPrintFlags("replaced"),
+		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
+
+		Out:    out,
+		ErrOut: errOut,
+	}
+}
+
+func NewCmdReplace(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
+	o := NewReplaceOptions(out, errOut)
 
 	cmd := &cobra.Command{
-		Use:     "replace -f FILENAME",
+		Use: "replace -f FILENAME",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Replace a resource by filename or stdin"),
 		Long:    replaceLong,
 		Example: replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			err := RunReplace(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
-	usage := "to use to replace the resource."
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+
+	o.PrintFlags.AddFlags(cmd)
+	o.DeleteFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
+
 	cmd.MarkFlagRequired("filename")
-	cmd.Flags().Bool("force", false, "Delete and re-create the specified resource")
-	cmd.Flags().Bool("cascade", false, "Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).")
-	cmd.Flags().Int("grace-period", -1, "Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
-	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	return cmd
 }
 
-func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
+func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
 	}
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	o.validate = cmdutil.GetFlagBool(cmd, "validate")
+	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
+	}
+
+	deleteOpts := o.DeleteFlags.ToOptions(o.Out, o.ErrOut)
+
+	//Replace will create a resource if it doesn't exist already, so ignore not found error
+	deleteOpts.IgnoreNotFound = true
+	deleteOpts.Reaper = f.Reaper
+	if o.PrintFlags.OutputFormat != nil {
+		deleteOpts.Output = *o.PrintFlags.OutputFormat
+	}
+	if deleteOpts.GracePeriod == 0 {
+		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
+		// into --grace-period=1 and wait until the object is successfully deleted.
+		deleteOpts.GracePeriod = 1
+		deleteOpts.WaitForDeletion = true
+	}
+	o.DeleteOptions = deleteOpts
+
+	schema, err := f.Validator(o.validate)
 	if err != nil {
 		return err
 	}
 
-	force := cmdutil.GetFlagBool(cmd, "force")
-	if cmdutil.IsFilenameSliceEmpty(options.Filenames) {
-		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
+	o.Schema = schema
+	o.Builder = f.NewBuilder
+	o.BuilderArgs = args
+
+	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	if err != nil {
+		return err
 	}
 
-	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-	if force {
-		return forceReplace(f, out, cmd, args, shortOutput, options)
-	}
+	return nil
+}
 
-	if cmdutil.GetFlagInt(cmd, "grace-period") >= 0 {
+func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
+	if o.DeleteOptions.GracePeriod >= 0 && !o.DeleteOptions.ForceDeletion {
 		return fmt.Errorf("--grace-period must have --force specified")
 	}
 
-	if cmdutil.GetFlagDuration(cmd, "timeout") != 0 {
+	if o.DeleteOptions.Timeout != 0 && !o.DeleteOptions.ForceDeletion {
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
-	r := f.NewBuilder().
+	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames) {
+		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
+	}
+
+	return nil
+}
+
+func (o *ReplaceOptions) Run() error {
+	if o.DeleteOptions.ForceDeletion {
+		return o.forceReplace()
+	}
+
+	r := o.Builder().
 		Unstructured().
-		Schema(schema).
+		Schema(o.Schema).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
 		return err
 	}
 
-	mapper := r.Mapper().RESTMapper
-
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
-		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
-				return cmdutil.AddSourceToErr("replacing", info.Source, err)
-			}
+		if err := o.Recorder.Record(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		// Serialize the object with the annotation applied.
@@ -155,24 +234,12 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 
 		info.Refresh(obj, true)
-		f.PrintObjectSpecificMessage(obj, out)
-		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
-		return nil
+		return o.PrintObj(info.Object)
 	})
 }
 
-func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *resource.FilenameOptions) error {
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
-	if err != nil {
-		return err
-	}
-
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-
-	for i, filename := range options.Filenames {
+func (o *ReplaceOptions) forceReplace() error {
+	for i, filename := range o.DeleteOptions.FilenameOptions.Filenames {
 		if filename == "-" {
 			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
 			if err != nil {
@@ -184,44 +251,30 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			if err != nil {
 				return err
 			}
-			options.Filenames[i] = tempFilename
+			o.DeleteOptions.FilenameOptions.Filenames[i] = tempFilename
 		}
 	}
 
-	r := f.NewBuilder().
+	r := o.Builder().
 		Unstructured().
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
-		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(false, o.BuilderArgs...).RequireObject(false).
+		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
 		return err
 	}
 
-	mapper := r.Mapper().RESTMapper
+	var err error
 
-	//Replace will create a resource if it doesn't exist already, so ignore not found error
-	ignoreNotFound := true
-	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
-	gracePeriod := cmdutil.GetFlagInt(cmd, "grace-period")
-	waitForDeletion := false
-	if gracePeriod == 0 {
-		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
-		// into --grace-period=1 and wait until the object is successfully deleted.
-		gracePeriod = 1
-		waitForDeletion = true
-	}
 	// By default use a reaper to delete all related resources.
-	if cmdutil.GetFlagBool(cmd, "cascade") {
+	if o.DeleteOptions.Cascade {
 		glog.Warningf("\"cascade\" is set, kubectl will delete and re-create all resources managed by this resource (e.g. Pods created by a ReplicationController). Consider using \"kubectl rolling-update\" if you want to update a ReplicationController together with its Pods.")
-		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, timeout, gracePeriod, waitForDeletion, shortOutput, mapper, false)
+		err = o.DeleteOptions.ReapResult(r, o.DeleteOptions.Cascade, false)
 	} else {
-		err = DeleteResult(r, f, out, ignoreNotFound, gracePeriod, shortOutput, mapper)
-	}
-	if err != nil {
-		return err
+		err = o.DeleteOptions.DeleteResult(r)
 	}
 
 	if timeout == 0 {
@@ -243,12 +296,12 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		return err
 	}
 
-	r = f.NewBuilder().
+	r = o.Builder().
 		Unstructured().
-		Schema(schema).
+		Schema(o.Schema).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -262,14 +315,12 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
-		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
-				return cmdutil.AddSourceToErr("replacing", info.Source, err)
-			}
+		if err := o.Recorder.Record(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
@@ -279,9 +330,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 
 		count++
 		info.Refresh(obj, true)
-		f.PrintObjectSpecificMessage(obj, out)
-		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
-		return nil
+		return o.PrintObj(info.Object)
 	})
 	if err != nil {
 		return err

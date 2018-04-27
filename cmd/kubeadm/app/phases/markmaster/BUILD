@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["markmaster_test.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
@@ -29,6 +28,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

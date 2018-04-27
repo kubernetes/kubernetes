@@ -9,14 +9,8 @@ load("//pkg/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kubeadm",
-    gc_linkopts = [
-        "-linkmode",
-        "external",
-        "-extldflags",
-        "-static",
-    ],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
+    pure = "on",
     x_defs = version_x_defs(),
 )
 

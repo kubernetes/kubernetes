@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -156,13 +157,6 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
 	}
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
@@ -364,32 +358,55 @@ func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
 func TestAppendDefaultMountOptions(t *testing.T) {
 	tests := []struct {
 		options  []string
+		fsGroup  *int64
 		expected []string
 	}{
 		{
-			options:  []string{"dir_mode=0777"},
-			expected: []string{"dir_mode=0777", fmt.Sprintf("%s=%s", fileMode, defaultFileMode), fmt.Sprintf("%s=%s", vers, defaultVers)},
+			options: []string{"dir_mode=0777"},
+			fsGroup: nil,
+			expected: []string{"dir_mode=0777",
+				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", vers, defaultVers)},
 		},
 		{
-			options:  []string{"file_mode=0777"},
-			expected: []string{"file_mode=0777", fmt.Sprintf("%s=%s", dirMode, defaultDirMode), fmt.Sprintf("%s=%s", vers, defaultVers)},
+			options: []string{"file_mode=0777"},
+			fsGroup: to.Int64Ptr(0),
+			expected: []string{"file_mode=0777",
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				fmt.Sprintf("%s=%s", vers, defaultVers),
+				fmt.Sprintf("%s=0", gid)},
 		},
 		{
-			options:  []string{"vers=2.1"},
-			expected: []string{"vers=2.1", fmt.Sprintf("%s=%s", fileMode, defaultFileMode), fmt.Sprintf("%s=%s", dirMode, defaultDirMode)},
+			options: []string{"vers=2.1"},
+			fsGroup: to.Int64Ptr(1000),
+			expected: []string{"vers=2.1",
+				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				fmt.Sprintf("%s=1000", gid)},
 		},
 		{
-			options:  []string{""},
-			expected: []string{"", fmt.Sprintf("%s=%s", fileMode, defaultFileMode), fmt.Sprintf("%s=%s", dirMode, defaultDirMode), fmt.Sprintf("%s=%s", vers, defaultVers)},
+			options: []string{""},
+			expected: []string{"", fmt.Sprintf("%s=%s",
+				fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				fmt.Sprintf("%s=%s", vers, defaultVers)},
 		},
 		{
 			options:  []string{"file_mode=0777", "dir_mode=0777"},
 			expected: []string{"file_mode=0777", "dir_mode=0777", fmt.Sprintf("%s=%s", vers, defaultVers)},
 		},
+		{
+			options: []string{"gid=2000"},
+			fsGroup: to.Int64Ptr(1000),
+			expected: []string{"gid=2000",
+				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				"vers=3.0"},
+		},
 	}
 
 	for _, test := range tests {
-		result := appendDefaultMountOptions(test.options)
+		result := appendDefaultMountOptions(test.options, test.fsGroup)
 		if !reflect.DeepEqual(result, test.expected) {
 			t.Errorf("input: %q, appendDefaultMountOptions result: %q, expected: %q", test.options, result, test.expected)
 		}

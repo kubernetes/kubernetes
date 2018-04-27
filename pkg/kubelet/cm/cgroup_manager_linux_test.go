@@ -81,20 +81,56 @@ func TestLibcontainerAdapterAdaptToSystemdAsCgroupFs(t *testing.T) {
 		},
 		{
 			input:    "/Burstable",
-			expected: "Burstable.slice/",
+			expected: "/Burstable.slice",
 		},
 		{
 			input:    "/Burstable/pod_123",
-			expected: "Burstable.slice/Burstable-pod_123.slice/",
+			expected: "/Burstable.slice/Burstable-pod_123.slice",
 		},
 		{
 			input:    "/BestEffort/pod_6c1a4e95-6bb6-11e6-bc26-28d2444e470d",
-			expected: "BestEffort.slice/BestEffort-pod_6c1a4e95_6bb6_11e6_bc26_28d2444e470d.slice/",
+			expected: "/BestEffort.slice/BestEffort-pod_6c1a4e95_6bb6_11e6_bc26_28d2444e470d.slice",
+		},
+		{
+			input:    "/kubepods",
+			expected: "/kubepods.slice",
 		},
 	}
 	for _, testCase := range testCases {
 		f := newLibcontainerAdapter(libcontainerSystemd)
 		if actual := f.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
+			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
+		}
+	}
+}
+
+func TestLibcontainerAdapterNotAdaptToSystemd(t *testing.T) {
+	cgroupfs := newLibcontainerAdapter(libcontainerCgroupfs)
+	otherAdatper := newLibcontainerAdapter(libcontainerCgroupManagerType("test"))
+
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "/",
+			expected: "/",
+		},
+		{
+			input:    "/Burstable",
+			expected: "/Burstable",
+		},
+		{
+			input:    "",
+			expected: "",
+		},
+	}
+	for _, testCase := range testCases {
+		if actual := cgroupfs.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
+			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
+		}
+
+		if actual := otherAdatper.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
 	}

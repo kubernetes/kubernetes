@@ -14,8 +14,7 @@ go_test(
         "portfoward_test.go",
         "remotecommand_test.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/client/tests",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",

@@ -49,6 +49,7 @@ func TestSummaryProvider(t *testing.T) {
 			SystemCgroupsName:  "/misc",
 			KubeletCgroupsName: "/kubelet",
 		}
+		cgroupRoot     = "/kubepods"
 		cgroupStatsMap = map[string]struct {
 			cs *statsapi.ContainerStats
 			ns *statsapi.NetworkStats
@@ -57,7 +58,9 @@ func TestSummaryProvider(t *testing.T) {
 			"/runtime": {cs: getContainerStats(), ns: getNetworkStats()},
 			"/misc":    {cs: getContainerStats(), ns: getNetworkStats()},
 			"/kubelet": {cs: getContainerStats(), ns: getNetworkStats()},
+			"/pods":    {cs: getContainerStats(), ns: getNetworkStats()},
 		}
+		rlimitStats = getRlimitStats()
 	)
 
 	assert := assert.New(t)
@@ -66,16 +69,19 @@ func TestSummaryProvider(t *testing.T) {
 	mockStatsProvider.
 		On("GetNode").Return(node, nil).
 		On("GetNodeConfig").Return(nodeConfig).
+		On("GetPodCgroupRoot").Return(cgroupRoot).
 		On("ListPodStats").Return(podStats, nil).
 		On("ImageFsStats").Return(imageFsStats, nil).
 		On("RootFsStats").Return(rootFsStats, nil).
-		On("GetCgroupStats", "/").Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).
-		On("GetCgroupStats", "/runtime").Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil).
-		On("GetCgroupStats", "/misc").Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil).
-		On("GetCgroupStats", "/kubelet").Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil)
+		On("RlimitStats").Return(rlimitStats, nil).
+		On("GetCgroupStats", "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).
+		On("GetCgroupStats", "/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil).
+		On("GetCgroupStats", "/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil).
+		On("GetCgroupStats", "/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil).
+		On("GetCgroupStats", "/kubepods", true).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, nil)
 
 	provider := NewSummaryProvider(mockStatsProvider)
-	summary, err := provider.Get()
+	summary, err := provider.Get(true)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")
@@ -86,7 +92,7 @@ func TestSummaryProvider(t *testing.T) {
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ImageFs: imageFsStats})
 
-	assert.Equal(len(summary.Node.SystemContainers), 3)
+	assert.Equal(len(summary.Node.SystemContainers), 4)
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "kubelet",
 		StartTime:          cgroupStatsMap["/kubelet"].cs.StartTime,
@@ -110,6 +116,14 @@ func TestSummaryProvider(t *testing.T) {
 		Memory:             cgroupStatsMap["/runtime"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
+	})
+	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
+		Name:               "pods",
+		StartTime:          cgroupStatsMap["/pods"].cs.StartTime,
+		CPU:                cgroupStatsMap["/pods"].cs.CPU,
+		Memory:             cgroupStatsMap["/pods"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/pods"].cs.Accelerators,
+		UserDefinedMetrics: cgroupStatsMap["/pods"].cs.UserDefinedMetrics,
 	})
 	assert.Equal(summary.Pods, podStats)
 }
@@ -138,6 +152,13 @@ func getVolumeStats() *statsapi.VolumeStats {
 func getNetworkStats() *statsapi.NetworkStats {
 	f := fuzz.New().NilChance(0)
 	v := &statsapi.NetworkStats{}
+	f.Fuzz(v)
+	return v
+}
+
+func getRlimitStats() *statsapi.RlimitStats {
+	f := fuzz.New().NilChance(0)
+	v := &statsapi.RlimitStats{}
 	f.Fuzz(v)
 	return v
 }

@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kube-openapi/pkg/handler",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/bitbucket.org/ww/goautoneg:go_default_library",
         "//vendor/github.com/NYTimes/gziphandler:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",

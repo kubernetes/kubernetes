@@ -32,7 +32,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
-	"k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )
 
@@ -126,7 +125,7 @@ func (c *Repair) runOnce() error {
 	// Check every Service's ports, and rebuild the state as we think it should be.
 	for i := range list.Items {
 		svc := &list.Items[i]
-		ports := service.CollectServiceNodePorts(svc)
+		ports := collectServiceNodePorts(svc)
 		if len(ports) == 0 {
 			continue
 		}
@@ -195,4 +194,15 @@ func (c *Repair) runOnce() error {
 		return fmt.Errorf("unable to persist the updated port allocations: %v", err)
 	}
 	return nil
+}
+
+func collectServiceNodePorts(service *api.Service) []int {
+	servicePorts := []int{}
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort != 0 {
+			servicePorts = append(servicePorts, int(servicePort.NodePort))
+		}
+	}
+	return servicePorts
 }

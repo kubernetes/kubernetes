@@ -46,7 +46,7 @@ func BenchmarkPodConversion(b *testing.B) {
 	scheme := legacyscheme.Scheme
 	for i := 0; i < b.N; i++ {
 		pod := &items[i%width]
-		versionedObj, err := scheme.UnsafeConvertToVersion(pod, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+		versionedObj, err := scheme.UnsafeConvertToVersion(pod, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -70,7 +70,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 	var result *api.Node
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.UnsafeConvertToVersion(&node, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+		versionedObj, err := scheme.UnsafeConvertToVersion(&node, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -100,7 +100,7 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 	var result *api.ReplicationController
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.UnsafeConvertToVersion(&replicationController, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+		versionedObj, err := scheme.UnsafeConvertToVersion(&replicationController, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}

@@ -36,7 +36,7 @@ filegroup(
         ":package-srcs",
         "//pkg/kubelet/apis/kubeletconfig/fuzzer:all-srcs",
         "//pkg/kubelet/apis/kubeletconfig/scheme:all-srcs",
-        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:all-srcs",
+        "//pkg/kubelet/apis/kubeletconfig/v1beta1:all-srcs",
         "//pkg/kubelet/apis/kubeletconfig/validation:all-srcs",
     ],
     tags = ["automanaged"],
@@ -45,8 +45,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",

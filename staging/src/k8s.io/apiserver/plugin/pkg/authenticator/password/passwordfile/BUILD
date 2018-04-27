@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["passwordfile_test.go"],
-    importpath = "k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 

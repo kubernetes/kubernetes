@@ -1,9 +1,12 @@
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mysql-test-server
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      app: test-server
   template:
     metadata:
       labels:

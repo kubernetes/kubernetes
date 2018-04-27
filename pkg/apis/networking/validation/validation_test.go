@@ -128,6 +128,28 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+								PodSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"e": "f"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
 				Egress: []networking.NetworkPolicyEgressRule{
 					{
 						To: []networking.NetworkPolicyPeer{
@@ -256,7 +278,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	errorCases := map[string]networking.NetworkPolicy{
-		"namespaceSelector and podSelector": {
+		"namespaceSelector and ipBlock": {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: networking.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
@@ -266,15 +288,24 @@ func TestValidateNetworkPolicy(t *testing.T) {
 					{
 						From: []networking.NetworkPolicyPeer{
 							{
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
 								NamespaceSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"c": "d"},
+								},
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
 								},
 							},
 						},
 					},
+				},
+			},
+		},
+		"podSelector and ipBlock": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
 				},
 				Egress: []networking.NetworkPolicyEgressRule{
 					{
@@ -283,8 +314,9 @@ func TestValidateNetworkPolicy(t *testing.T) {
 								PodSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"c": "d"},
 								},
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
 								},
 							},
 						},

@@ -22,7 +22,7 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -33,21 +33,27 @@ type DockerServer struct {
 	// endpoint is the endpoint to serve on.
 	endpoint string
 	// service is the docker service which implements runtime and image services.
-	service DockerService
+	service dockershim.CRIService
 	// server is the grpc server.
 	server *grpc.Server
 }
 
 // NewDockerServer creates the dockershim grpc server.
-func NewDockerServer(endpoint string, s dockershim.DockerService) *DockerServer {
+func NewDockerServer(endpoint string, s dockershim.CRIService) *DockerServer {
 	return &DockerServer{
 		endpoint: endpoint,
-		service:  NewDockerService(s),
+		service:  s,
 	}
 }
 
 // Start starts the dockershim grpc server.
 func (s *DockerServer) Start() error {
+	// Start the internal service.
+	if err := s.service.Start(); err != nil {
+		glog.Errorf("Unable to start docker service")
+		return err
+	}
+
 	glog.V(2).Infof("Start dockershim grpc server")
 	l, err := util.CreateListener(s.endpoint)
 	if err != nil {

@@ -6,9 +6,9 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/status"
 )
 
 // HTTPStatusFromCode converts a gRPC error code into the corresponding HTTP response status.
@@ -64,7 +64,7 @@ var (
 
 type errorBody struct {
 	Error string `protobuf:"bytes,1,name=error" json:"error"`
-	Code  int    `protobuf:"bytes,2,name=code" json:"code"`
+	Code  int32  `protobuf:"varint,2,name=code" json:"code"`
 }
 
 //Make this also conform to proto.Message for builtin JSONPb Marshaler
@@ -78,14 +78,20 @@ func (*errorBody) ProtoMessage()    {}
 //
 // The response body returned by this function is a JSON object,
 // which contains a member whose key is "error" and whose value is err.Error().
-func DefaultHTTPError(ctx context.Context, marshaler Marshaler, w http.ResponseWriter, _ *http.Request, err error) {
+func DefaultHTTPError(ctx context.Context, mux *ServeMux, marshaler Marshaler, w http.ResponseWriter, _ *http.Request, err error) {
 	const fallback = `{"error": "failed to marshal error message"}`
 
 	w.Header().Del("Trailer")
 	w.Header().Set("Content-Type", marshaler.ContentType())
+
+	s, ok := status.FromError(err)
+	if !ok {
+		s = status.New(codes.Unknown, err.Error())
+	}
+
 	body := &errorBody{
-		Error: grpc.ErrorDesc(err),
-		Code:  int(grpc.Code(err)),
+		Error: s.Message(),
+		Code:  int32(s.Code()),
 	}
 
 	buf, merr := marshaler.Marshal(body)
@@ -103,9 +109,9 @@ func DefaultHTTPError(ctx context.Context, marshaler Marshaler, w http.ResponseW
 		grpclog.Printf("Failed to extract ServerMetadata from context")
 	}
 
-	handleForwardResponseServerMetadata(w, md)
+	handleForwardResponseServerMetadata(w, mux, md)
 	handleForwardResponseTrailerHeader(w, md)
-	st := HTTPStatusFromCode(grpc.Code(err))
+	st := HTTPStatusFromCode(s.Code())
 	w.WriteHeader(st)
 	if _, err := w.Write(buf); err != nil {
 		grpclog.Printf("Failed to write response: %v", err)

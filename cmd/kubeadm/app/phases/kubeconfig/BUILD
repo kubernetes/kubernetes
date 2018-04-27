@@ -19,6 +19,7 @@ go_library(
         "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
@@ -41,8 +42,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["kubeconfig_test.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",

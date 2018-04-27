@@ -9,28 +9,83 @@ go_library(
     name = "go_default_library",
     srcs = [
         "container_manager.go",
-        "container_manager_unsupported.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "container_manager_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "container_manager_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "container_manager_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "container_manager_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "container_manager_linux.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "container_manager_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "container_manager_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "container_manager_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "container_manager_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "container_manager_unsupported.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "container_manager_windows.go",
         ],
         "//conditions:default": [],
     }),
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/cm",
-    deps = [
-        "//pkg/kubelet/dockershim/libdocker:go_default_library",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+    deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/cm:go_default_library",
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
             "//pkg/util/version:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
         ],
         "//conditions:default": [],
     }),

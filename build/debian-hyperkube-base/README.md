@@ -12,19 +12,19 @@ If you're editing the Dockerfile or some other thing, please bump the `TAG` in t
 ```console
 # Build for linux/amd64 (default)
 $ make push ARCH=amd64
-# ---> k8s.gcr.io/debian-hyperkube-base-amd64:TAG
+# ---> staging-k8s.gcr.io/debian-hyperkube-base-amd64:TAG
 
 $ make push ARCH=arm
-# ---> k8s.gcr.io/debian-hyperkube-base-arm:TAG
+# ---> staging-k8s.gcr.io/debian-hyperkube-base-arm:TAG
 
 $ make push ARCH=arm64
-# ---> k8s.gcr.io/debian-hyperkube-base-arm64:TAG
+# ---> staging-k8s.gcr.io/debian-hyperkube-base-arm64:TAG
 
 $ make push ARCH=ppc64le
-# ---> k8s.gcr.io/debian-hyperkube-base-ppc64le:TAG
+# ---> staging-k8s.gcr.io/debian-hyperkube-base-ppc64le:TAG
 
 $ make push ARCH=s390x
-# ---> k8s.gcr.io/debian-hyperkube-base-s390x:TAG
+# ---> staging-k8s.gcr.io/debian-hyperkube-base-s390x:TAG
 ```
 
 If you don't want to push the images, run `make build` instead

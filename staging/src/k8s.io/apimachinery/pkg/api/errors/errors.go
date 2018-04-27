@@ -352,12 +352,23 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 		reason = metav1.StatusReasonForbidden
 		// the server message has details about who is trying to perform what action.  Keep its message.
 		message = serverMessage
+	case http.StatusNotAcceptable:
+		reason = metav1.StatusReasonNotAcceptable
+		// the server message has details about what types are acceptable
+		message = serverMessage
+	case http.StatusUnsupportedMediaType:
+		reason = metav1.StatusReasonUnsupportedMediaType
+		// the server message has details about what types are acceptable
+		message = serverMessage
 	case http.StatusMethodNotAllowed:
 		reason = metav1.StatusReasonMethodNotAllowed
 		message = "the server does not allow this method on the requested resource"
 	case http.StatusUnprocessableEntity:
 		reason = metav1.StatusReasonInvalid
 		message = "the server rejected our request due to an error in our request"
+	case http.StatusServiceUnavailable:
+		reason = metav1.StatusReasonServiceUnavailable
+		message = "the server is currently unable to handle the request"
 	case http.StatusGatewayTimeout:
 		reason = metav1.StatusReasonTimeout
 		message = "the server was unable to return a response in the time allotted, but may still be processing the request"
@@ -432,6 +443,16 @@ func IsGone(err error) bool {
 // no longer possible.
 func IsResourceExpired(err error) bool {
 	return ReasonForError(err) == metav1.StatusReasonExpired
+}
+
+// IsNotAcceptable determines if err is an error which indicates that the request failed due to an invalid Accept header
+func IsNotAcceptable(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonNotAcceptable
+}
+
+// IsUnsupportedMediaType determines if err is an error which indicates that the request failed due to an invalid Content-Type header
+func IsUnsupportedMediaType(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonUnsupportedMediaType
 }
 
 // IsMethodNotSupported determines if the err is an error which indicates the provided action could not

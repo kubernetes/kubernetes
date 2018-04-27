@@ -25,9 +25,12 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "SecurityContextDeny"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("SecurityContextDeny", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewSecurityContextDeny(), nil
 	})
 }
@@ -46,7 +49,7 @@ func NewSecurityContextDeny() *Plugin {
 	}
 }
 
-// Validate will deny any pod that defines SELinuxOptions or RunAsUser.
+// Validate will deny any pod that defines SupplementalGroups, SELinuxOptions, RunAsUser or FSGroup
 func (p *Plugin) Validate(a admission.Attributes) (err error) {
 	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
@@ -57,20 +60,19 @@ func (p *Plugin) Validate(a admission.Attributes) (err error) {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SupplementalGroups != nil {
-		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.SupplementalGroups is forbidden"))
-	}
 	if pod.Spec.SecurityContext != nil {
+		if pod.Spec.SecurityContext.SupplementalGroups != nil {
+			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.SupplementalGroups is forbidden"))
+		}
 		if pod.Spec.SecurityContext.SELinuxOptions != nil {
 			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.SELinuxOptions is forbidden"))
 		}
 		if pod.Spec.SecurityContext.RunAsUser != nil {
 			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.RunAsUser is forbidden"))
 		}
-	}
-
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
-		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.FSGroup is forbidden"))
+		if pod.Spec.SecurityContext.FSGroup != nil {
+			return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("pod.Spec.SecurityContext.FSGroup is forbidden"))
+		}
 	}
 
 	for _, v := range pod.Spec.InitContainers {

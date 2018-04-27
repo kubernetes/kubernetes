@@ -4,6 +4,7 @@ approvers:
 - colemickens
 - feiskyer
 - jdumars
+- karataliu
 - khenidak
 reviewers:
 - andyzhangx
@@ -11,4 +12,5 @@ reviewers:
 - colemickens
 - feiskyer
 - jdumars
+- karataliu
 - khenidak

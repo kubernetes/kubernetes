@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["proxy_server_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/proxy",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/proxy:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

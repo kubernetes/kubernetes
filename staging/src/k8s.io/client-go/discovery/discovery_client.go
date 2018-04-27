@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/googleapis/gnostic/OpenAPIv2"
@@ -36,8 +37,19 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-// defaultRetries is the number of times a resource discovery is repeated if an api group disappears on the fly (e.g. ThirdPartyResources).
-const defaultRetries = 2
+const (
+	// defaultRetries is the number of times a resource discovery is repeated if an api group disappears on the fly (e.g. ThirdPartyResources).
+	defaultRetries = 2
+	// protobuf mime type
+	mimePb = "application/com.github.proto-openapi.spec.v2@v1.0+protobuf"
+)
+
+var (
+	// defaultTimeout is the maximum amount of time per request when no timeout has been set on a RESTClient.
+	// Defaults to 32s in order to have a distinguishable length of time, relative to other timeouts that exist.
+	// It's a variable to be able to change it in tests.
+	defaultTimeout = 32 * time.Second
+)
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
@@ -145,9 +157,9 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 		apiGroupList = &metav1.APIGroupList{}
 	}
 
-	// append the group retrieved from /api to the list if not empty
+	// prepend the group retrieved from /api to the list if not empty
 	if len(v.Versions) != 0 {
-		apiGroupList.Groups = append(apiGroupList.Groups, apiGroup)
+		apiGroupList.Groups = append([]metav1.APIGroup{apiGroup}, apiGroupList.Groups...)
 	}
 	return apiGroupList, nil
 }
@@ -329,9 +341,18 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 
 // OpenAPISchema fetches the open api schema using a rest client and parses the proto.
 func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	data, err := d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do().Raw()
+	data, err := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", mimePb).Do().Raw()
 	if err != nil {
-		return nil, err
+		if errors.IsForbidden(err) || errors.IsNotFound(err) || errors.IsNotAcceptable(err) {
+			// single endpoint not found/registered in old server, try to fetch old endpoint
+			// TODO(roycaihw): remove this in 1.11
+			data, err = d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do().Raw()
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 	document := &openapi_v2.Document{}
 	err = proto.Unmarshal(data, document)
@@ -360,6 +381,9 @@ func withRetries(maxRetries int, f func() ([]*metav1.APIResourceList, error)) ([
 func setDiscoveryDefaults(config *restclient.Config) error {
 	config.APIPath = ""
 	config.GroupVersion = nil
+	if config.Timeout == 0 {
+		config.Timeout = defaultTimeout
+	}
 	codec := runtime.NoopEncoder{Decoder: scheme.Codecs.UniversalDecoder()}
 	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 	if len(config.UserAgent) == 0 {

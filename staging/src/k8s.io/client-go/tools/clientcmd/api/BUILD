@@ -12,8 +12,7 @@ go_test(
         "helpers_test.go",
         "types_test.go",
     ],
-    importpath = "k8s.io/client-go/tools/clientcmd/api",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/github.com/ghodss/yaml:go_default_library"],
 )
 

@@ -147,8 +147,8 @@ func TestRandBytes(t *testing.T) {
 		if err != nil {
 			t.Errorf("failed randBytes: %v", err)
 		}
-		if len(actual) != rt*2 {
-			t.Errorf("failed randBytes:\n\texpected: %d\n\t  actual: %d\n", rt*2, len(actual))
+		if len(actual) != rt {
+			t.Errorf("failed randBytes:\n\texpected: %d\n\t  actual: %d\n", rt, len(actual))
 		}
 	}
 }

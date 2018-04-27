@@ -183,7 +183,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 			expectedOutput:        []*v1.Pod{allPods[burstable]},
 		},
 		{
-			testName:              "higer requirements than pod requests",
+			testName:              "higher requirements than pod requests",
 			inputPods:             []*v1.Pod{allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(200, 200, 2),
 			expectErr:             true,

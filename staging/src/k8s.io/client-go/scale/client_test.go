@@ -99,7 +99,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 
 	restMapperRes, err := discovery.GetAPIGroupResources(fakeDiscoveryClient)
 	if err != nil {
-		t.Fatalf("unexpected error while constructing resource list from fake discovery client: %v")
+		t.Fatalf("unexpected error while constructing resource list from fake discovery client: %v", err)
 	}
 	restMapper := discovery.NewRESTMapper(restMapperRes, apimeta.InterfacesForUnstructured)
 

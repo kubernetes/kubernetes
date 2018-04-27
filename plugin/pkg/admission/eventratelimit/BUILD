@@ -12,8 +12,7 @@ go_test(
         "admission_test.go",
         "cache_test.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
         "//plugin/pkg/admission/eventratelimit/apis/eventratelimit:go_default_library",
@@ -46,7 +45,6 @@ go_library(
         "//plugin/pkg/admission/eventratelimit/apis/eventratelimit/validation:go_default_library",
         "//vendor/github.com/hashicorp/golang-lru:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",

@@ -18,6 +18,9 @@ package etcd
 
 import (
 	"fmt"
+	"path/filepath"
+
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -28,12 +31,13 @@ import (
 )
 
 const (
-	etcdVolumeName = "etcd"
+	etcdVolumeName  = "etcd-data"
+	certsVolumeName = "etcd-certs"
 )
 
 // CreateLocalEtcdStaticPodManifestFile will write local etcd static pod manifest file.
 func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating local etcd static pod manifest file")
 	// gets etcd StaticPodSpec, actualized for the current MasterConfiguration
 	spec := GetEtcdPodSpec(cfg)
 	// writes etcd StaticPod to disk
@@ -50,24 +54,41 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 	pathType := v1.HostPathDirectoryOrCreate
 	etcdMounts := map[string]v1.Volume{
-		etcdVolumeName: staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType),
+		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType),
+		certsVolumeName: staticpodutil.NewVolume(certsVolumeName, cfg.CertificatesDir+"/etcd", &pathType),
 	}
 	return staticpodutil.ComponentPod(v1.Container{
-		Name:    kubeadmconstants.Etcd,
-		Command: getEtcdCommand(cfg),
-		Image:   images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.Image),
+		Name:            kubeadmconstants.Etcd,
+		Command:         getEtcdCommand(cfg),
+		Image:           images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.Image),
+		ImagePullPolicy: cfg.ImagePullPolicy,
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
-		VolumeMounts:  []v1.VolumeMount{staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false)},
-		LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.Etcd, 2379, "/health", v1.URISchemeHTTP),
+		VolumeMounts: []v1.VolumeMount{
+			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false),
+			staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false),
+		},
+		LivenessProbe: staticpodutil.EtcdProbe(
+			cfg, kubeadmconstants.Etcd, 2379, cfg.CertificatesDir,
+			kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
+		),
 	}, etcdMounts)
 }
 
 // getEtcdCommand builds the right etcd command from the given config object
 func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	defaultArguments := map[string]string{
-		"listen-client-urls":    "http://127.0.0.1:2379",
-		"advertise-client-urls": "http://127.0.0.1:2379",
+		"listen-client-urls":    "https://127.0.0.1:2379",
+		"advertise-client-urls": "https://127.0.0.1:2379",
 		"data-dir":              cfg.Etcd.DataDir,
+		"cert-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
+		"key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
+		"trusted-ca-file":       filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+		"client-cert-auth":      "true",
+		"peer-cert-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
+		"peer-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
+		"peer-trusted-ca-file":  filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+		"peer-client-cert-auth": "true",
+		"snapshot-count":        "10000",
 	}
 
 	command := []string{"etcd"}

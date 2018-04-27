@@ -17,8 +17,10 @@ limitations under the License.
 package app
 
 import (
+	"flag"
 	"os"
 
+	_ "github.com/golang/glog"
 	"github.com/spf13/pflag"
 
 	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
@@ -31,6 +33,9 @@ func Run() error {
 	pflag.CommandLine.MarkHidden("version")
 	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+
+	pflag.Set("logtostderr", "true")
 
 	cmd := cmd.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()

@@ -17,9 +17,8 @@ limitations under the License.
 package diskmanagers
 
 import (
+	"context"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"

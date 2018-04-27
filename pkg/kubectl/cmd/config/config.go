@@ -37,7 +37,8 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, out, er
 	}
 
 	cmd := &cobra.Command{
-		Use:   "config SUBCOMMAND",
+		Use: "config SUBCOMMAND",
+		DisableFlagsInUseLine: true,
 		Short: i18n.T("Modify kubeconfig files"),
 		Long: templates.LongDesc(`
 			Modify kubeconfig files using subcommands like "kubectl config set current-context my-context"

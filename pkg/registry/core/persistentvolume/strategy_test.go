@@ -29,7 +29,7 @@ import (
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].String(),
 		"PersistentVolume",
 		PersistentVolumeToSelectableFields(&api.PersistentVolume{}),
 		map[string]string{"name": "metadata.name"},

@@ -21,17 +21,12 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-type fakeRL bool
-
-func (fakeRL) Stop()             {}
-func (f fakeRL) TryAccept() bool { return bool(f) }
-func (f fakeRL) Accept()         {}
-
 func TestGetAPIRequestInfo(t *testing.T) {
-	namespaceAll := "" // TODO(sttts): solve import cycle when using metav1.NamespaceAll
+	namespaceAll := metav1.NamespaceAll
 	successCases := []struct {
 		method              string
 		url                 string

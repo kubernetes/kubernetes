@@ -28,14 +28,19 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -48,6 +53,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -90,10 +97,18 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	testCaseBaseName := "load"
 	var testPhaseDurations *timer.TestPhaseTimer
+	var profileGathererStopCh chan struct{}
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
+		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
+		close(profileGathererStopCh)
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		framework.GatherApiserverMemoryProfile(&wg, "load")
+		wg.Wait()
+
 		// Verify latency metrics
 		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset, nodeCount)
 		framework.ExpectNoError(err)
@@ -108,7 +123,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	// We assume a default throughput of 10 pods/second throughput.
 	// We may want to revisit it in the future.
-	// However, this can be overriden by LOAD_TEST_THROUGHPUT env var.
+	// However, this can be overridden by LOAD_TEST_THROUGHPUT env var.
 	throughput := 10
 	if throughputEnv := os.Getenv("LOAD_TEST_THROUGHPUT"); throughputEnv != "" {
 		if newThroughput, err := strconv.Atoi(throughputEnv); err == nil {
@@ -141,6 +156,10 @@ var _ = SIGDescribe("Load capacity", func() {
 		framework.ExpectNoError(err)
 
 		framework.ExpectNoError(framework.ResetMetrics(clientset))
+
+		// Start apiserver CPU profile gatherer with frequency based on cluster size.
+		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
+		profileGathererStopCh = framework.StartApiserverCPUProfileGatherer(profileGatheringDelay)
 	})
 
 	type Load struct {
@@ -153,6 +172,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		secretsPerPod    int
 		configMapsPerPod int
 		daemonsPerNode   int
+		quotas           bool
 	}
 
 	loadTests := []Load{
@@ -170,11 +190,18 @@ var _ = SIGDescribe("Load capacity", func() {
 		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
 		// Special test case which randomizes created resources
 		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind},
+		// Test with quotas
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), quotas: true},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind, quotas: true},
+	}
+
+	isCanonical := func(test *Load) bool {
+		return test.podsPerNode == 30 && test.kind == api.Kind("ReplicationController") && test.daemonsPerNode == 0 && test.secretsPerPod == 0 && test.configMapsPerPod == 0 && !test.quotas
 	}
 
 	for _, testArg := range loadTests {
 		feature := "ManualPerformance"
-		if testArg.podsPerNode == 30 && testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 && testArg.configMapsPerPod == 0 {
+		if isCanonical(&testArg) {
 			feature = "Performance"
 		}
 		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v with %v secrets, %v configmaps and %v daemons",
@@ -185,6 +212,9 @@ var _ = SIGDescribe("Load capacity", func() {
 			testArg.configMapsPerPod,
 			testArg.daemonsPerNode,
 		)
+		if testArg.quotas {
+			name += " with quotas"
+		}
 		itArg := testArg
 		itArg.services = os.Getenv("CREATE_SERVICES") != "false"
 
@@ -197,6 +227,10 @@ var _ = SIGDescribe("Load capacity", func() {
 			totalPods := (itArg.podsPerNode - itArg.daemonsPerNode) * nodeCount
 			configs, secretConfigs, configMapConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod, itArg.configMapsPerPod)
 
+			if itArg.quotas {
+				framework.ExpectNoError(CreateQuotas(f, namespaces, 2*totalPods, testPhaseDurations.StartPhase(115, "quota creation")))
+			}
+
 			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
 			defer serviceCreationPhase.End()
 			if itArg.services {
@@ -204,8 +238,7 @@ var _ = SIGDescribe("Load capacity", func() {
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
 					defer GinkgoRecover()
-					_, err := clientset.CoreV1().Services(services[i].Namespace).Create(services[i])
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
 				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
@@ -215,8 +248,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					framework.Logf("Starting to delete services...")
 					deleteService := func(i int) {
 						defer GinkgoRecover()
-						err := clientset.CoreV1().Services(services[i].Namespace).Delete(services[i].Name, nil)
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(testutils.DeleteResourceWithRetries(clientset, api.Kind("Service"), services[i].Namespace, services[i].Name, nil))
 					}
 					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
 					framework.Logf("Services deleted")
@@ -257,6 +289,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					framework.ExpectNoError(framework.DeleteResourceAndPods(
 						f.ClientSet,
 						f.InternalClientset,
+						f.ScalesGetter,
 						extensions.Kind("DaemonSet"),
 						config.Namespace,
 						config.Name,
@@ -309,9 +342,11 @@ var _ = SIGDescribe("Load capacity", func() {
 	}
 })
 
-func createClients(numberOfClients int) ([]clientset.Interface, []internalclientset.Interface, error) {
+func createClients(numberOfClients int) ([]clientset.Interface, []internalclientset.Interface, []scaleclient.ScalesGetter, error) {
 	clients := make([]clientset.Interface, numberOfClients)
 	internalClients := make([]internalclientset.Interface, numberOfClients)
+	scalesClients := make([]scaleclient.ScalesGetter, numberOfClients)
+
 	for i := 0; i < numberOfClients; i++ {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -327,11 +362,11 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		// each client here.
 		transportConfig, err := config.TransportConfig()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tlsConfig, err := transport.TLSConfigFor(transportConfig)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		config.Transport = utilnet.SetTransportDefaults(&http.Transport{
 			Proxy:               http.ProxyFromEnvironment,
@@ -349,16 +384,38 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 
 		c, err := clientset.NewForConfig(config)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		clients[i] = c
 		internalClient, err := internalclientset.NewForConfig(config)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		internalClients[i] = internalClient
+
+		// create scale client, if GroupVersion or NegotiatedSerializer are not set
+		// assign default values - these fields are mandatory (required by RESTClientFor).
+		if config.GroupVersion == nil {
+			config.GroupVersion = &schema.GroupVersion{}
+		}
+		if config.NegotiatedSerializer == nil {
+			config.NegotiatedSerializer = legacyscheme.Codecs
+		}
+		restClient, err := restclient.RESTClientFor(config)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
+		restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoClient, meta.InterfacesForUnstructured)
+		restMapper.Reset()
+		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
+		scalesClients[i] = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 	}
-	return clients, internalClients, nil
+	return clients, internalClients, scalesClients, nil
 }
 
 func computePodCounts(total int) (int, int, int) {
@@ -405,12 +462,13 @@ func generateConfigs(
 	// Create a number of clients to better simulate real usecase
 	// where not everyone is using exactly the same client.
 	rcsPerClient := 20
-	clients, internalClients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
+	clients, internalClients, scalesClients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
 	framework.ExpectNoError(err)
 
 	for i := 0; i < len(configs); i++ {
 		configs[i].SetClient(clients[i%len(clients)])
 		configs[i].SetInternalClient(internalClients[i%len(internalClients)])
+		configs[i].SetScalesClient(scalesClients[i%len(clients)])
 	}
 	for i := 0; i < len(secretConfigs); i++ {
 		secretConfigs[i].Client = clients[i%len(clients)]
@@ -590,7 +648,15 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 	sleepUpTo(scalingTime)
 	newSize := uint(rand.Intn(config.GetReplicas()) + config.GetReplicas()/2)
 	framework.ExpectNoError(framework.ScaleResource(
-		config.GetClient(), config.GetInternalClient(), config.GetNamespace(), config.GetName(), newSize, true, config.GetKind()),
+		config.GetClient(),
+		config.GetScalesGetter(),
+		config.GetNamespace(),
+		config.GetName(),
+		newSize,
+		true,
+		config.GetKind(),
+		config.GetGroupResource(),
+	),
 		fmt.Sprintf("scaling %v %v", config.GetKind(), config.GetName()))
 
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.GetName()}))
@@ -604,7 +670,7 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 			return true, nil
 		}
 		framework.Logf("Failed to list pods from %v %v due to: %v", config.GetKind(), config.GetName(), err)
-		if framework.IsRetryableAPIError(err) {
+		if testutils.IsRetryableAPIError(err) {
 			return false, nil
 		}
 		return false, fmt.Errorf("Failed to list pods from %v %v with non-retriable error: %v", config.GetKind(), config.GetName(), err)
@@ -634,7 +700,7 @@ func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deleti
 			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 	} else {
 		framework.ExpectNoError(framework.DeleteResourceAndPods(
-			config.GetClient(), config.GetInternalClient(), config.GetKind(), config.GetNamespace(), config.GetName()),
+			config.GetClient(), config.GetInternalClient(), config.GetScalesGetter(), config.GetKind(), config.GetNamespace(), config.GetName()),
 			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 	}
 }
@@ -650,4 +716,20 @@ func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix str
 		namespaces = append(namespaces, namespace)
 	}
 	return namespaces, nil
+}
+
+func CreateQuotas(f *framework.Framework, namespaces []*v1.Namespace, podCount int, testPhase *timer.Phase) error {
+	defer testPhase.End()
+	quotaTemplate := &v1.ResourceQuota{
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{"pods": *resource.NewQuantity(int64(podCount), resource.DecimalSI)},
+		},
+	}
+	for _, ns := range namespaces {
+		quotaTemplate.Name = ns.Name + "-quota"
+		if err := testutils.CreateResourceQuotaWithRetries(f.ClientSet, ns.Name, quotaTemplate); err != nil {
+			return fmt.Errorf("Error creating quota: %v", err)
+		}
+	}
+	return nil
 }

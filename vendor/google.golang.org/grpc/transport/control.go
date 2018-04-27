@@ -1,33 +1,18 @@
 /*
  *
- * Copyright 2014, Google Inc.
- * All rights reserved.
+ * Copyright 2014 gRPC authors.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -37,17 +22,18 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 )
 
 const (
 	// The default value of flow control window size in HTTP2 spec.
 	defaultWindowSize = 65535
 	// The initial window size for flow control.
-	initialWindowSize             = defaultWindowSize      // for an RPC
-	initialConnWindowSize         = defaultWindowSize * 16 // for a connection
+	initialWindowSize             = defaultWindowSize // for an RPC
 	infinity                      = time.Duration(math.MaxInt64)
 	defaultClientKeepaliveTime    = infinity
 	defaultClientKeepaliveTimeout = time.Duration(20 * time.Second)
@@ -58,11 +44,43 @@ const (
 	defaultServerKeepaliveTime    = time.Duration(2 * time.Hour)
 	defaultServerKeepaliveTimeout = time.Duration(20 * time.Second)
 	defaultKeepalivePolicyMinTime = time.Duration(5 * time.Minute)
+	// max window limit set by HTTP2 Specs.
+	maxWindowSize = math.MaxInt32
+	// defaultLocalSendQuota sets is default value for number of data
+	// bytes that each stream can schedule before some of it being
+	// flushed out.
+	defaultLocalSendQuota = 64 * 1024
 )
 
 // The following defines various control items which could flow through
 // the control buffer of transport. They represent different aspects of
 // control tasks, e.g., flow control, settings, streaming resetting, etc.
+
+type headerFrame struct {
+	streamID  uint32
+	hf        []hpack.HeaderField
+	endStream bool
+}
+
+func (*headerFrame) item() {}
+
+type continuationFrame struct {
+	streamID            uint32
+	endHeaders          bool
+	headerBlockFragment []byte
+}
+
+type dataFrame struct {
+	streamID  uint32
+	endStream bool
+	d         []byte
+	f         func()
+}
+
+func (*dataFrame) item() {}
+
+func (*continuationFrame) item() {}
+
 type windowUpdate struct {
 	streamID  uint32
 	increment uint32
@@ -87,6 +105,8 @@ func (*resetStream) item() {}
 type goAway struct {
 	code      http2.ErrCode
 	debugData []byte
+	headsUp   bool
+	closeConn bool
 }
 
 func (*goAway) item() {}
@@ -108,8 +128,9 @@ func (*ping) item() {}
 type quotaPool struct {
 	c chan int
 
-	mu    sync.Mutex
-	quota int
+	mu      sync.Mutex
+	version uint32
+	quota   int
 }
 
 // newQuotaPool creates a quotaPool which has quota q available to consume.
@@ -130,6 +151,10 @@ func newQuotaPool(q int) *quotaPool {
 func (qb *quotaPool) add(v int) {
 	qb.mu.Lock()
 	defer qb.mu.Unlock()
+	qb.lockedAdd(v)
+}
+
+func (qb *quotaPool) lockedAdd(v int) {
 	select {
 	case n := <-qb.c:
 		qb.quota += n
@@ -150,6 +175,35 @@ func (qb *quotaPool) add(v int) {
 	}
 }
 
+func (qb *quotaPool) addAndUpdate(v int) {
+	qb.mu.Lock()
+	defer qb.mu.Unlock()
+	qb.lockedAdd(v)
+	// Update the version only after having added to the quota
+	// so that if acquireWithVesrion sees the new vesrion it is
+	// guaranteed to have seen the updated quota.
+	// Also, still keep this inside of the lock, so that when
+	// compareAndExecute is processing, this function doesn't
+	// get executed partially (quota gets updated but the version
+	// doesn't).
+	atomic.AddUint32(&(qb.version), 1)
+}
+
+func (qb *quotaPool) acquireWithVersion() (<-chan int, uint32) {
+	return qb.c, atomic.LoadUint32(&(qb.version))
+}
+
+func (qb *quotaPool) compareAndExecute(version uint32, success, failure func()) bool {
+	qb.mu.Lock()
+	defer qb.mu.Unlock()
+	if version == atomic.LoadUint32(&(qb.version)) {
+		success()
+		return true
+	}
+	failure()
+	return false
+}
+
 // acquire returns the channel on which available quota amounts are sent.
 func (qb *quotaPool) acquire() <-chan int {
 	return qb.c
@@ -157,16 +211,59 @@ func (qb *quotaPool) acquire() <-chan int {
 
 // inFlow deals with inbound flow control
 type inFlow struct {
+	mu sync.Mutex
 	// The inbound flow control limit for pending data.
 	limit uint32
-
-	mu sync.Mutex
 	// pendingData is the overall data which have been received but not been
 	// consumed by applications.
 	pendingData uint32
 	// The amount of data the application has consumed but grpc has not sent
 	// window update for them. Used to reduce window update frequency.
 	pendingUpdate uint32
+	// delta is the extra window update given by receiver when an application
+	// is reading data bigger in size than the inFlow limit.
+	delta uint32
+}
+
+// newLimit updates the inflow window to a new value n.
+// It assumes that n is always greater than the old limit.
+func (f *inFlow) newLimit(n uint32) uint32 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	d := n - f.limit
+	f.limit = n
+	return d
+}
+
+func (f *inFlow) maybeAdjust(n uint32) uint32 {
+	if n > uint32(math.MaxInt32) {
+		n = uint32(math.MaxInt32)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	// estSenderQuota is the receiver's view of the maximum number of bytes the sender
+	// can send without a window update.
+	estSenderQuota := int32(f.limit - (f.pendingData + f.pendingUpdate))
+	// estUntransmittedData is the maximum number of bytes the sends might not have put
+	// on the wire yet. A value of 0 or less means that we have already received all or
+	// more bytes than the application is requesting to read.
+	estUntransmittedData := int32(n - f.pendingData) // Casting into int32 since it could be negative.
+	// This implies that unless we send a window update, the sender won't be able to send all the bytes
+	// for this message. Therefore we must send an update over the limit since there's an active read
+	// request from the application.
+	if estUntransmittedData > estSenderQuota {
+		// Sender's window shouldn't go more than 2^31 - 1 as speecified in the HTTP spec.
+		if f.limit+n > maxWindowSize {
+			f.delta = maxWindowSize - f.limit
+		} else {
+			// Send a window update for the whole message and not just the difference between
+			// estUntransmittedData and estSenderQuota. This will be helpful in case the message
+			// is padded; We will fallback on the current available window(at least a 1/4th of the limit).
+			f.delta = n
+		}
+		return f.delta
+	}
+	return 0
 }
 
 // onData is invoked when some data frame is received. It updates pendingData.
@@ -174,7 +271,7 @@ func (f *inFlow) onData(n uint32) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.pendingData += n
-	if f.pendingData+f.pendingUpdate > f.limit {
+	if f.pendingData+f.pendingUpdate > f.limit+f.delta {
 		return fmt.Errorf("received %d-bytes data exceeding the limit %d bytes", f.pendingData+f.pendingUpdate, f.limit)
 	}
 	return nil
@@ -189,6 +286,13 @@ func (f *inFlow) onRead(n uint32) uint32 {
 		return 0
 	}
 	f.pendingData -= n
+	if n > f.delta {
+		n -= f.delta
+		f.delta = 0
+	} else {
+		f.delta -= n
+		n = 0
+	}
 	f.pendingUpdate += n
 	if f.pendingUpdate >= f.limit/4 {
 		wu := f.pendingUpdate
@@ -198,10 +302,10 @@ func (f *inFlow) onRead(n uint32) uint32 {
 	return 0
 }
 
-func (f *inFlow) resetPendingData() uint32 {
+func (f *inFlow) resetPendingUpdate() uint32 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	n := f.pendingData
-	f.pendingData = 0
+	n := f.pendingUpdate
+	f.pendingUpdate = 0
 	return n
 }

@@ -17,12 +17,17 @@ limitations under the License.
 package request
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+// LongRunningRequestCheck is a predicate which is true for long-running http requests.
+type LongRunningRequestCheck func(r *http.Request, requestInfo *RequestInfo) bool
 
 type RequestInfoResolver interface {
 	NewRequestInfo(req *http.Request) (*RequestInfo, error)
@@ -178,7 +183,7 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 			}
 		}
 	} else {
-		requestInfo.Namespace = "" // TODO(sttts): solve import cycle when using metav1.NamespaceNone
+		requestInfo.Namespace = metav1.NamespaceNone
 	}
 
 	// parsing successful, so we now know the proper value for .Parts
@@ -228,12 +233,12 @@ type requestInfoKeyType int
 const requestInfoKey requestInfoKeyType = iota
 
 // WithRequestInfo returns a copy of parent in which the request info value is set
-func WithRequestInfo(parent Context, info *RequestInfo) Context {
+func WithRequestInfo(parent context.Context, info *RequestInfo) context.Context {
 	return WithValue(parent, requestInfoKey, info)
 }
 
 // RequestInfoFrom returns the value of the RequestInfo key on the ctx
-func RequestInfoFrom(ctx Context) (*RequestInfo, bool) {
+func RequestInfoFrom(ctx context.Context) (*RequestInfo, bool) {
 	info, ok := ctx.Value(requestInfoKey).(*RequestInfo)
 	return info, ok
 }

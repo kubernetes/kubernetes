@@ -29,8 +29,7 @@ go_test(
         "certs_test.go",
         "webhook_test.go",
     ],
-    importpath = "k8s.io/apiserver/pkg/util/webhook",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",

@@ -21,22 +21,29 @@ import (
 	"sync"
 )
 
+// Wait is an interface that provides the ability to wait and trigger events that
+// are associated with IDs.
 type Wait interface {
+	// Register waits returns a chan that waits on the given ID.
+	// The chan will be triggered when Trigger is called with
+	// the same ID.
 	Register(id uint64) <-chan interface{}
+	// Trigger triggers the waiting chans with the given ID.
 	Trigger(id uint64, x interface{})
 	IsRegistered(id uint64) bool
 }
 
-type List struct {
+type list struct {
 	l sync.Mutex
 	m map[uint64]chan interface{}
 }
 
-func New() *List {
-	return &List{m: make(map[uint64]chan interface{})}
+// New creates a Wait.
+func New() Wait {
+	return &list{m: make(map[uint64]chan interface{})}
 }
 
-func (w *List) Register(id uint64) <-chan interface{} {
+func (w *list) Register(id uint64) <-chan interface{} {
 	w.l.Lock()
 	defer w.l.Unlock()
 	ch := w.m[id]
@@ -49,7 +56,7 @@ func (w *List) Register(id uint64) <-chan interface{} {
 	return ch
 }
 
-func (w *List) Trigger(id uint64, x interface{}) {
+func (w *list) Trigger(id uint64, x interface{}) {
 	w.l.Lock()
 	ch := w.m[id]
 	delete(w.m, id)
@@ -60,7 +67,7 @@ func (w *List) Trigger(id uint64, x interface{}) {
 	}
 }
 
-func (w *List) IsRegistered(id uint64) bool {
+func (w *list) IsRegistered(id uint64) bool {
 	w.l.Lock()
 	defer w.l.Unlock()
 	_, ok := w.m[id]

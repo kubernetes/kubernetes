@@ -31,8 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 )
 
@@ -149,7 +150,7 @@ func (t *TokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, e
 	}, true, nil
 }
 
-// Copied from k8s.io/kubernetes/pkg/bootstrap/api
+// Copied from k8s.io/client-go/tools/bootstrap/token/api
 func getSecretString(secret *api.Secret, key string) string {
 	if secret.Data == nil {
 		return ""
@@ -160,7 +161,7 @@ func getSecretString(secret *api.Secret, key string) string {
 	return ""
 }
 
-// Copied from k8s.io/kubernetes/pkg/bootstrap/api
+// Copied from k8s.io/client-go/tools/bootstrap/token/api
 func isSecretExpired(secret *api.Secret) bool {
 	expiration := getSecretString(secret, bootstrapapi.BootstrapTokenExpirationKey)
 	if len(expiration) > 0 {
@@ -209,7 +210,7 @@ func getGroups(secret *api.Secret) ([]string, error) {
 
 	// validate the names of the extra groups
 	for _, group := range strings.Split(extraGroupsString, ",") {
-		if err := bootstrapapi.ValidateBootstrapGroupName(group); err != nil {
+		if err := bootstraputil.ValidateBootstrapGroupName(group); err != nil {
 			return nil, err
 		}
 		groups.Insert(group)

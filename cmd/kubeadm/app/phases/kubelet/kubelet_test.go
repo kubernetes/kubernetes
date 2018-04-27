@@ -26,7 +26,7 @@ import (
 	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 )
 
 func TestCreateBaseKubeletConfiguration(t *testing.T) {
@@ -35,7 +35,7 @@ func TestCreateBaseKubeletConfiguration(t *testing.T) {
 	cfg := &kubeadmapi.MasterConfiguration{
 		NodeName: nodeName,
 		KubeletConfiguration: kubeadmapi.KubeletConfiguration{
-			BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+			BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "KubeletConfiguration",
 				},

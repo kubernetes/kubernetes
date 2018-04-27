@@ -14,8 +14,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["initializer_test.go"],
-    importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",

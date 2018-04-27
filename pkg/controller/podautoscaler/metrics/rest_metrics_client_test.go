@@ -23,7 +23,6 @@ import (
 
 	autoscalingapi "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
-	kv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,9 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
+	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -50,13 +51,15 @@ type restClientTestCase struct {
 	reportedPodMetrics   [][]int64
 	singleObject         *autoscalingapi.CrossVersionObjectReference
 
-	namespace    string
-	selector     labels.Selector
-	resourceName v1.ResourceName
-	metricName   string
+	namespace           string
+	selector            labels.Selector
+	resourceName        v1.ResourceName
+	metricName          string
+	metricSelector      *metav1.LabelSelector
+	metricLabelSelector labels.Selector
 }
 
-func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clientset, *cmfake.FakeCustomMetricsClient) {
+func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient) {
 	namespace := "test-namespace"
 	tc.namespace = namespace
 	podNamePrefix := "test-pod"
@@ -65,9 +68,12 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 
 	// it's a resource test if we have a resource name
 	isResource := len(tc.resourceName) > 0
+	// it's an external test if we have a metric selector
+	isExternal := tc.metricSelector != nil
 
 	fakeMetricsClient := &metricsfake.Clientset{}
 	fakeCMClient := &cmfake.FakeCustomMetricsClient{}
+	fakeEMClient := &emfake.FakeExternalMetricsClient{}
 
 	if isResource {
 		fakeMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -99,6 +105,24 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				metrics.Items = append(metrics.Items, metric)
 			}
 			return true, metrics, nil
+		})
+	} else if isExternal {
+		fakeEMClient.AddReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			listAction := action.(core.ListAction)
+			assert.Equal(t, tc.metricName, listAction.GetResource().Resource, "the metric requested should have matched the one specified.")
+			assert.Equal(t, tc.metricLabelSelector, listAction.GetListRestrictions().Labels, "the metric selector should have matched the one specified")
+
+			metrics := emapi.ExternalMetricValueList{}
+			for _, metricPoint := range tc.reportedMetricPoints {
+				timestamp := fixedTimestamp.Add(time.Duration(metricPoint.timestamp) * time.Minute)
+				metric := emapi.ExternalMetricValue{
+					Value:      *resource.NewMilliQuantity(int64(metricPoint.level), resource.DecimalSI),
+					Timestamp:  metav1.Time{Time: timestamp},
+					MetricName: tc.metricName,
+				}
+				metrics.Items = append(metrics.Items, metric)
+			}
+			return true, &metrics, nil
 		})
 	} else {
 		fakeCMClient.AddReactor("get", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -163,13 +187,13 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 		})
 	}
 
-	return fakeMetricsClient, fakeCMClient
+	return fakeMetricsClient, fakeCMClient, fakeEMClient
 }
 
 func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo, timestamp time.Time, err error) {
 	if tc.desiredError != nil {
 		assert.Error(t, err, "there should be an error retrieving the metrics")
-		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError), "the error message should be eas expected")
+		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError), "the error message should be as expected")
 		return
 	}
 	assert.NoError(t, err, "there should be no error retrieving the metrics")
@@ -182,11 +206,24 @@ func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo
 }
 
 func (tc *restClientTestCase) runTest(t *testing.T) {
-	testMetricsClient, testCMClient := tc.prepareTestClient(t)
-	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient)
+	var err error
+	testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
+	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
 	isResource := len(tc.resourceName) > 0
+	isExternal := tc.metricSelector != nil
 	if isResource {
-		info, timestamp, err := metricsClient.GetResourceMetric(kv1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetResourceMetric(v1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
+		tc.verifyResults(t, info, timestamp, err)
+	} else if isExternal {
+		tc.metricLabelSelector, err = metav1.LabelSelectorAsSelector(tc.metricSelector)
+		if err != nil {
+			t.Errorf("invalid metric selector: %+v", tc.metricSelector)
+		}
+		val, timestamp, err := metricsClient.GetExternalMetric(tc.metricName, tc.namespace, tc.metricLabelSelector)
+		info := make(PodMetricsInfo, len(val))
+		for i, metricVal := range val {
+			info[fmt.Sprintf("%v-val-%v", tc.metricName, i)] = metricVal
+		}
 		tc.verifyResults(t, info, timestamp, err)
 	} else if tc.singleObject == nil {
 		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector)
@@ -206,6 +243,19 @@ func TestRESTClientCPU(t *testing.T) {
 		resourceName:       v1.ResourceCPU,
 		targetTimestamp:    1,
 		reportedPodMetrics: [][]int64{{5000}, {5000}, {5000}},
+	}
+	tc.runTest(t)
+}
+
+func TestRESTClientExternal(t *testing.T) {
+	tc := restClientTestCase{
+		desiredMetricValues: PodMetricsInfo{
+			"external-val-0": 10000, "external-val-1": 20000, "external-val-2": 10000,
+		},
+		metricSelector:       &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		metricName:           "external",
+		targetTimestamp:      1,
+		reportedMetricPoints: []metricPoint{{10000, 1}, {20000, 1}, {10000, 1}},
 	}
 	tc.runTest(t)
 }
@@ -249,10 +299,44 @@ func TestRESTClientQpsSumEqualZero(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestRESTClientExternalSumEqualZero(t *testing.T) {
+	tc := restClientTestCase{
+		desiredMetricValues: PodMetricsInfo{
+			"external-val-0": 0, "external-val-1": 0, "external-val-2": 0,
+		},
+		metricSelector:       &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		metricName:           "external",
+		targetTimestamp:      0,
+		reportedMetricPoints: []metricPoint{{0, 0}, {0, 0}, {0, 0}},
+	}
+	tc.runTest(t)
+}
+
+func TestRESTClientQpsEmptyMetrics(t *testing.T) {
+	tc := restClientTestCase{
+		metricName:           "qps",
+		desiredError:         fmt.Errorf("no metrics returned from custom metrics API"),
+		reportedMetricPoints: []metricPoint{},
+	}
+
+	tc.runTest(t)
+}
+
+func TestRESTClientExternalEmptyMetrics(t *testing.T) {
+	tc := restClientTestCase{
+		metricName:           "external",
+		metricSelector:       &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		desiredError:         fmt.Errorf("no metrics returned from external metrics API"),
+		reportedMetricPoints: []metricPoint{},
+	}
+
+	tc.runTest(t)
+}
+
 func TestRESTClientCPUEmptyMetrics(t *testing.T) {
 	tc := restClientTestCase{
 		resourceName:         v1.ResourceCPU,
-		desiredError:         fmt.Errorf("no metrics returned from heapster"),
+		desiredError:         fmt.Errorf("no metrics returned from resource metrics API"),
 		reportedMetricPoints: []metricPoint{},
 		reportedPodMetrics:   [][]int64{},
 	}

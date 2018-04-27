@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -100,7 +99,7 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 // GetInstanceTags gets tags from GCE instance with given name.
 func GetInstanceTags(cloudConfig CloudConfig, instanceName string) *compute.Tags {
 	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
-	res, err := gceCloud.GetComputeService().Instances.Get(cloudConfig.ProjectID, cloudConfig.Zone,
+	res, err := gceCloud.ComputeServices().GA.Instances.Get(cloudConfig.ProjectID, cloudConfig.Zone,
 		instanceName).Do()
 	if err != nil {
 		Failf("Failed to get instance tags for %v: %v", instanceName, err)
@@ -113,7 +112,7 @@ func SetInstanceTags(cloudConfig CloudConfig, instanceName, zone string, tags []
 	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
 	// Re-get instance everytime because we need the latest fingerprint for updating metadata
 	resTags := GetInstanceTags(cloudConfig, instanceName)
-	_, err := gceCloud.GetComputeService().Instances.SetTags(
+	_, err := gceCloud.ComputeServices().GA.Instances.SetTags(
 		cloudConfig.ProjectID, zone, instanceName,
 		&compute.Tags{Fingerprint: resTags.Fingerprint, Items: tags}).Do()
 	if err != nil {
@@ -303,6 +302,83 @@ func PackProtocolsPortsFromFirewall(alloweds []*compute.FirewallAllowed) []strin
 	return protocolPorts
 }
 
+type portRange struct {
+	protocol string
+	min, max int
+}
+
+func toPortRange(s string) (pr portRange, err error) {
+	protoPorts := strings.Split(s, "/")
+	// Set protocol
+	pr.protocol = strings.ToUpper(protoPorts[0])
+
+	if len(protoPorts) != 2 {
+		return pr, fmt.Errorf("expected a single '/' in %q", s)
+	}
+
+	ports := strings.Split(protoPorts[1], "-")
+	switch len(ports) {
+	case 1:
+		v, err := strconv.Atoi(ports[0])
+		if err != nil {
+			return pr, err
+		}
+		pr.min, pr.max = v, v
+	case 2:
+		start, err := strconv.Atoi(ports[0])
+		if err != nil {
+			return pr, err
+		}
+		end, err := strconv.Atoi(ports[1])
+		if err != nil {
+			return pr, err
+		}
+		pr.min, pr.max = start, end
+	default:
+		return pr, fmt.Errorf("unexpected range value %q", protoPorts[1])
+	}
+
+	return pr, nil
+}
+
+// isPortsSubset asserts that the "requiredPorts" are covered by the "coverage" ports.
+// requiredPorts - must be single-port, examples: 'tcp/50', 'udp/80'.
+// coverage - single or port-range values, example: 'tcp/50', 'udp/80-1000'.
+// Returns true if every requiredPort exists in the list of coverage rules.
+func isPortsSubset(requiredPorts, coverage []string) error {
+	for _, reqPort := range requiredPorts {
+		rRange, err := toPortRange(reqPort)
+		if err != nil {
+			return err
+		}
+		if rRange.min != rRange.max {
+			return fmt.Errorf("requiring a range is not supported: %q", reqPort)
+		}
+
+		var covered bool
+		for _, c := range coverage {
+			cRange, err := toPortRange(c)
+			if err != nil {
+				return err
+			}
+
+			if rRange.protocol != cRange.protocol {
+				continue
+			}
+
+			if rRange.min >= cRange.min && rRange.min <= cRange.max {
+				covered = true
+				break
+			}
+		}
+
+		if !covered {
+			return fmt.Errorf("%q is not covered by %v", reqPort, coverage)
+		}
+	}
+	return nil
+}
+
 // SameStringArray verifies whether two string arrays have the same strings, return error if not.
 // Order does not matter.
 // When `include` is set to true, verifies whether result includes all elements from expected.
@@ -335,10 +411,19 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 	if !strings.HasSuffix(res.Network, "/"+network) {
 		return fmt.Errorf("incorrect network: %v, expected ends with: %v", res.Network, "/"+network)
 	}
-	if err := SameStringArray(PackProtocolsPortsFromFirewall(res.Allowed),
-		PackProtocolsPortsFromFirewall(exp.Allowed), portsSubset); err != nil {
-		return fmt.Errorf("incorrect allowed protocols ports: %v", err)
+
+	actualPorts := PackProtocolsPortsFromFirewall(res.Allowed)
+	expPorts := PackProtocolsPortsFromFirewall(exp.Allowed)
+	if portsSubset {
+		if err := isPortsSubset(expPorts, actualPorts); err != nil {
+			return fmt.Errorf("incorrect allowed protocol ports: %v", err)
+		}
+	} else {
+		if err := SameStringArray(actualPorts, expPorts, false); err != nil {
+			return fmt.Errorf("incorrect allowed protocols ports: %v", err)
+		}
 	}
+
 	if err := SameStringArray(res.SourceRanges, exp.SourceRanges, false); err != nil {
 		return fmt.Errorf("incorrect source ranges %v, expected %v: %v", res.SourceRanges, exp.SourceRanges, err)
 	}
@@ -370,20 +455,4 @@ func WaitForFirewallRule(gceCloud *gcecloud.GCECloud, fwName string, exist bool,
 		return nil, fmt.Errorf("error waiting for firewall %v exist=%v", fwName, exist)
 	}
 	return fw, nil
-}
-
-func GetClusterID(c clientset.Interface) (string, error) {
-	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
-	if err != nil || cm == nil {
-		return "", fmt.Errorf("error getting cluster ID: %v", err)
-	}
-	clusterID, clusterIDExists := cm.Data[gcecloud.UIDCluster]
-	providerID, providerIDExists := cm.Data[gcecloud.UIDProvider]
-	if !clusterIDExists {
-		return "", fmt.Errorf("cluster ID not set")
-	}
-	if providerIDExists {
-		return providerID, nil
-	}
-	return clusterID, nil
 }

@@ -17,12 +17,12 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
@@ -33,6 +33,7 @@ type NodeInfo struct {
 	dataCenter *vclib.Datacenter
 	vm         *vclib.VirtualMachine
 	vcServer   string
+	vmUUID     string
 }
 
 type NodeManager struct {
@@ -53,6 +54,7 @@ type NodeManager struct {
 type NodeDetails struct {
 	NodeName string
 	vm       *vclib.VirtualMachine
+	VMUUID   string
 }
 
 // TODO: Make it configurable in vsphere.conf
@@ -74,7 +76,14 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 	var globalErr *error
 
 	queueChannel = make(chan *VmSearch, QUEUE_SIZE)
-	nodeUUID := node.Status.NodeInfo.SystemUUID
+	nodeUUID, err := GetNodeUUID(node)
+	if err != nil {
+		glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, err)
+		return err
+	}
+
+	glog.V(4).Infof("Discovering node %s with uuid %s", node.ObjectMeta.Name, nodeUUID)
+
 	vmFound := false
 	globalErr = nil
 
@@ -178,7 +187,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 					glog.V(4).Infof("Found node %s as vm=%+v in vc=%s and datacenter=%s",
 						node.Name, vm, res.vc, res.datacenter.Name())
 
-					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc}
+					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID}
 					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
 					for range queueChannel {
 					}
@@ -251,6 +260,8 @@ func (nm *NodeManager) removeNode(node *v1.Node) {
 // GetNodeInfo returns a NodeInfo which datacenter, vm and vc server ip address.
 // This method returns an error if it is unable find node VCs and DCs listed in vSphere.conf
 // NodeInfo returned may not be updated to reflect current VM location.
+//
+// This method is a getter but it can cause side-effect of updating NodeInfo object.
 func (nm *NodeManager) GetNodeInfo(nodeName k8stypes.NodeName) (NodeInfo, error) {
 	getNodeInfo := func(nodeName k8stypes.NodeName) *NodeInfo {
 		nm.nodeInfoLock.RLock()
@@ -259,42 +270,57 @@ func (nm *NodeManager) GetNodeInfo(nodeName k8stypes.NodeName) (NodeInfo, error)
 		return nodeInfo
 	}
 	nodeInfo := getNodeInfo(nodeName)
+	var err error
 	if nodeInfo == nil {
-		err := nm.RediscoverNode(nodeName)
+		// Rediscover node if no NodeInfo found.
+		glog.V(4).Infof("No VM found for node %q. Initiating rediscovery.", convertToString(nodeName))
+		err = nm.RediscoverNode(nodeName)
 		if err != nil {
-			glog.V(4).Infof("error %q node info for node %q not found", err, convertToString(nodeName))
+			glog.Errorf("Error %q node info for node %q not found", err, convertToString(nodeName))
 			return NodeInfo{}, err
 		}
 		nodeInfo = getNodeInfo(nodeName)
+	} else {
+		// Renew the found NodeInfo to avoid stale vSphere connection.
+		glog.V(4).Infof("Renewing NodeInfo %+v for node %q", nodeInfo, convertToString(nodeName))
+		nodeInfo, err = nm.renewNodeInfo(nodeInfo, true)
+		if err != nil {
+			glog.Errorf("Error %q occurred while renewing NodeInfo for %q", err, convertToString(nodeName))
+			return NodeInfo{}, err
+		}
+		nm.addNodeInfo(convertToString(nodeName), nodeInfo)
 	}
 	return *nodeInfo, nil
 }
 
+// GetNodeDetails returns NodeDetails for all the discovered nodes.
+//
+// This method is a getter but it can cause side-effect of updating NodeInfo objects.
 func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
 	nm.nodeInfoLock.RLock()
 	defer nm.nodeInfoLock.RUnlock()
 	var nodeDetails []NodeDetails
 	vsphereSessionRefreshMap := make(map[string]bool)
 
-	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	for nodeName, nodeInfo := range nm.nodeInfoMap {
-		nodeDetails = append(nodeDetails, NodeDetails{nodeName, nodeInfo.vm})
+		var n *NodeInfo
+		var err error
 		if vsphereSessionRefreshMap[nodeInfo.vcServer] {
-			continue
+			// vSphere connection already refreshed. Just refresh VM and Datacenter.
+			glog.V(4).Infof("Renewing NodeInfo %+v for node %q. No new connection needed.", nodeInfo, nodeName)
+			n, err = nm.renewNodeInfo(nodeInfo, false)
+		} else {
+			// Refresh vSphere connection, VM and Datacenter.
+			glog.V(4).Infof("Renewing NodeInfo %+v for node %q with new vSphere connection.", nodeInfo, nodeName)
+			n, err = nm.renewNodeInfo(nodeInfo, true)
+			vsphereSessionRefreshMap[nodeInfo.vcServer] = true
 		}
-		vsphereInstance := nm.vsphereInstanceMap[nodeInfo.vcServer]
-		if vsphereInstance == nil {
-			err := fmt.Errorf("vSphereInstance for vc server %q not found while looking for vm %q", nodeInfo.vcServer, nodeInfo.vm)
-			return nil, err
-		}
-		err := vsphereInstance.conn.Connect(ctx)
 		if err != nil {
 			return nil, err
 		}
-		vsphereSessionRefreshMap[nodeInfo.vcServer] = true
+		nm.nodeInfoMap[nodeName] = n
+		glog.V(4).Infof("Updated NodeInfo %q for node %q.", nodeInfo, nodeName)
+		nodeDetails = append(nodeDetails, NodeDetails{nodeName, n.vm, n.vmUUID})
 	}
 	return nodeDetails, nil
 }
@@ -316,4 +342,31 @@ func (nm *NodeManager) GetVSphereInstance(nodeName k8stypes.NodeName) (VSphereIn
 		return VSphereInstance{}, fmt.Errorf("vSphereInstance for vc server %q not found while looking for node %q", nodeInfo.vcServer, convertToString(nodeName))
 	}
 	return *vsphereInstance, nil
+}
+
+// renewNodeInfo renews vSphere connection, VirtualMachine and Datacenter for NodeInfo instance.
+func (nm *NodeManager) renewNodeInfo(nodeInfo *NodeInfo, reconnect bool) (*NodeInfo, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	vsphereInstance := nm.vsphereInstanceMap[nodeInfo.vcServer]
+	if vsphereInstance == nil {
+		err := fmt.Errorf("vSphereInstance for vSphere %q not found while refershing NodeInfo for VM %q", nodeInfo.vcServer, nodeInfo.vm)
+		return nil, err
+	}
+	if reconnect {
+		err := vsphereInstance.conn.Connect(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	vm := nodeInfo.vm.RenewVM(vsphereInstance.conn.GoVmomiClient)
+	return &NodeInfo{vm: &vm, dataCenter: vm.Datacenter, vcServer: nodeInfo.vcServer}, nil
+}
+
+func (nodeInfo *NodeInfo) VM() *vclib.VirtualMachine {
+	if nodeInfo == nil {
+		return nil
+	}
+	return nodeInfo.vm
 }

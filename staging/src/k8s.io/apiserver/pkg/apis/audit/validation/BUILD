@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
-    importpath = "k8s.io/apiserver/pkg/apis/audit/validation",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library"],
 )
 

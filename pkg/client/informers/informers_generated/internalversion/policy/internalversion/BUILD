@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "interface.go",
         "poddisruptionbudget.go",
+        "podsecuritypolicy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/policy/internalversion",
     deps = [

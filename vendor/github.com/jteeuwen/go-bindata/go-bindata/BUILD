@@ -14,8 +14,7 @@ go_library(
 
 go_binary(
     name = "go-bindata",
-    importpath = "github.com/jteeuwen/go-bindata/go-bindata",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     visibility = ["//visibility:public"],
 )
 

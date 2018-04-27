@@ -27,9 +27,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 var (
@@ -163,10 +167,21 @@ func makePDNameInternal(host volume.VolumeHost, portal string, iqn string, lun s
 	return path.Join(host.GetPluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
 }
 
+// make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/iface_name/portal-some_iqn-lun-lun_id
+func makeVDPDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string, iface string) string {
+	return path.Join(host.GetVolumeDevicePluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
+}
+
 type ISCSIUtil struct{}
 
+// MakeGlobalPDName returns path of global plugin dir
 func (util *ISCSIUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
-	return makePDNameInternal(iscsi.plugin.host, iscsi.Portals[0], iscsi.Iqn, iscsi.lun, iscsi.Iface)
+	return makePDNameInternal(iscsi.plugin.host, iscsi.Portals[0], iscsi.Iqn, iscsi.Lun, iscsi.Iface)
+}
+
+// MakeGlobalVDPDName returns path of global volume device plugin dir
+func (util *ISCSIUtil) MakeGlobalVDPDName(iscsi iscsiDisk) string {
+	return makeVDPDNameInternal(iscsi.plugin.host, iscsi.Portals[0], iscsi.Iqn, iscsi.Lun, iscsi.Iface)
 }
 
 func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
@@ -184,7 +199,6 @@ func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
 }
 
 func (util *ISCSIUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
-	// NOTE: The iscsi config json is not deleted after logging out from target portals.
 	file := path.Join(mnt, "iscsi.json")
 	fp, err := os.Open(file)
 	if err != nil {
@@ -198,6 +212,7 @@ func (util *ISCSIUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
 	return nil
 }
 
+// AttachDisk returns devicePath of volume if attach succeeded otherwise returns error
 func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	var devicePath string
 	var devicePaths []string
@@ -240,9 +255,9 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			return "", fmt.Errorf("Could not parse iface file for %s", b.Iface)
 		}
 		if iscsiTransport == "tcp" {
-			devicePath = strings.Join([]string{"/dev/disk/by-path/ip", tp, "iscsi", b.Iqn, "lun", b.lun}, "-")
+			devicePath = strings.Join([]string{"/dev/disk/by-path/ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
 		} else {
-			devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", tp, "iscsi", b.Iqn, "lun", b.lun}, "-")
+			devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
 		}
 
 		if exist := waitForPathToExist(&devicePath, 1, iscsiTransport); exist {
@@ -279,6 +294,12 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			lastErr = fmt.Errorf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
 			continue
 		}
+		// in case of node failure/restart, explicitly set to manual login so it doesn't hang on boot
+		out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "node.startup", "-v", "manual")
+		if err != nil {
+			// don't fail if we can't set startup mode, but log warning so there is a clue
+			glog.Warningf("Warning: Failed to set iSCSI login mode to manual. Error: %v", err)
+		}
 		if exist := waitForPathToExist(&devicePath, 10, iscsiTransport); !exist {
 			glog.Errorf("Could not attach disk: Timeout after 10s")
 			// update last error
@@ -301,26 +322,6 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 	//Make sure we use a valid devicepath to find mpio device.
 	devicePath = devicePaths[0]
-
-	// mount it
-	globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
-	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
-	if err != nil && !os.IsNotExist(err) {
-		return "", fmt.Errorf("Heuristic determination of mount point failed:%v", err)
-	}
-	if !notMnt {
-		glog.Infof("iscsi: %s already mounted", globalPDPath)
-		return "", nil
-	}
-
-	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-		glog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
-		return "", err
-	}
-
-	// Persist iscsi disk config to json file for DetachDisk path
-	util.persistISCSI(*(b.iscsiDisk), globalPDPath)
-
 	for _, path := range devicePaths {
 		// There shouldnt be any empty device paths. However adding this check
 		// for safer side to avoid the possibility of an empty entry.
@@ -333,14 +334,67 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			break
 		}
 	}
-	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
-	if err != nil {
-		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
-	}
-
-	return devicePath, err
+	glog.V(5).Infof("iscsi: AttachDisk devicePath: %s", devicePath)
+	// run global mount path related operations based on volumeMode
+	return globalPDPathOperation(b)(b, devicePath, util)
 }
 
+// globalPDPathOperation returns global mount path related operations based on volumeMode.
+// If the volumeMode is 'Filesystem' or not defined, plugin needs to create a dir, persist
+// iscsi configurations, and then format/mount the volume.
+// If the volumeMode is 'Block', plugin creates a dir and persists iscsi configurations.
+// Since volume type is block, plugin doesn't need to format/mount the volume.
+func globalPDPathOperation(b iscsiDiskMounter) func(iscsiDiskMounter, string, *ISCSIUtil) (string, error) {
+	// TODO: remove feature gate check after no longer needed
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		glog.V(5).Infof("iscsi: AttachDisk volumeMode: %s", b.volumeMode)
+		if b.volumeMode == v1.PersistentVolumeBlock {
+			// If the volumeMode is 'Block', plugin don't need to format the volume.
+			return func(b iscsiDiskMounter, devicePath string, util *ISCSIUtil) (string, error) {
+				globalPDPath := b.manager.MakeGlobalVDPDName(*b.iscsiDisk)
+				// Create dir like /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/{ifaceName}/{portal-some_iqn-lun-lun_id}
+				if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+					glog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
+					return "", err
+				}
+				// Persist iscsi disk config to json file for DetachDisk path
+				util.persistISCSI(*(b.iscsiDisk), globalPDPath)
+
+				return devicePath, nil
+			}
+		}
+	}
+	// If the volumeMode is 'Filesystem', plugin needs to format the volume
+	// and mount it to globalPDPath.
+	return func(b iscsiDiskMounter, devicePath string, util *ISCSIUtil) (string, error) {
+		globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
+		notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+		if err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("Heuristic determination of mount point failed:%v", err)
+		}
+		// Return confirmed devicePath to caller
+		if !notMnt {
+			glog.Infof("iscsi: %s already mounted", globalPDPath)
+			return devicePath, nil
+		}
+		// Create dir like /var/lib/kubelet/plugins/kubernetes.io/iscsi/{ifaceName}/{portal-some_iqn-lun-lun_id}
+		if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+			glog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
+			return "", err
+		}
+		// Persist iscsi disk config to json file for DetachDisk path
+		util.persistISCSI(*(b.iscsiDisk), globalPDPath)
+
+		err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
+		if err != nil {
+			glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
+		}
+
+		return devicePath, nil
+	}
+}
+
+// DetachDisk unmounts and detaches a volume from node
 func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	_, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
 	if err != nil {
@@ -395,9 +449,100 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	}
 	portals := removeDuplicate(bkpPortal)
 	if len(portals) == 0 {
-		return fmt.Errorf("iscsi detach disk: failed to detach iscsi disk. Couldn't get connected portals from configurations.")
+		return fmt.Errorf("iscsi detach disk: failed to detach iscsi disk. Couldn't get connected portals from configurations")
 	}
 
+	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
+	if err != nil {
+		return fmt.Errorf("failed to finish detachISCSIDisk, err: %v", err)
+	}
+	return nil
+}
+
+// DetachBlockISCSIDisk removes loopback device for a volume and detaches a volume from node
+func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string) error {
+	if pathExists, pathErr := volumeutil.PathExists(mapPath); pathErr != nil {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
+		return nil
+	}
+	// If we arrive here, device is no longer used, see if need to logout the target
+	// device: 192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
+	device, _, err := extractDeviceAndPrefix(mapPath)
+	if err != nil {
+		return err
+	}
+	var bkpPortal []string
+	var volName, iqn, lun, iface, initiatorName string
+	found := true
+	// load iscsi disk config from json file
+	if err := util.loadISCSI(c.iscsiDisk, mapPath); err == nil {
+		bkpPortal, iqn, lun, iface, volName = c.iscsiDisk.Portals, c.iscsiDisk.Iqn, c.iscsiDisk.Lun, c.iscsiDisk.Iface, c.iscsiDisk.VolName
+		initiatorName = c.iscsiDisk.InitiatorName
+	} else {
+		// If the iscsi disk config is not found, fall back to the original behavior.
+		// This portal/iqn/iface is no longer referenced, log out.
+		// Extract the portal and iqn from device path.
+		bkpPortal = make([]string, 1)
+		bkpPortal[0], iqn, err = extractPortalAndIqn(device)
+		if err != nil {
+			return err
+		}
+		arr := strings.Split(device, "-lun-")
+		if len(arr) < 2 {
+			return fmt.Errorf("failed to retrieve lun from mapPath: %v", mapPath)
+		}
+		lun = arr[1]
+		// Extract the iface from the mountPath and use it to log out. If the iface
+		// is not found, maintain the previous behavior to facilitate kubelet upgrade.
+		// Logout may fail as no session may exist for the portal/IQN on the specified interface.
+		iface, found = extractIface(mapPath)
+	}
+	portals := removeDuplicate(bkpPortal)
+	if len(portals) == 0 {
+		return fmt.Errorf("iscsi detach disk: failed to detach iscsi disk. Couldn't get connected portals from configurations")
+	}
+
+	devicePath := getDevByPath(portals[0], iqn, lun)
+	glog.V(5).Infof("iscsi: devicePath: %s", devicePath)
+	if _, err = os.Stat(devicePath); err != nil {
+		return fmt.Errorf("failed to validate devicePath: %s", devicePath)
+	}
+	// check if the dev is using mpio and if so mount it via the dm-XX device
+	if mappedDevicePath := c.deviceUtil.FindMultipathDeviceForDevice(devicePath); mappedDevicePath != "" {
+		devicePath = mappedDevicePath
+	}
+	// Get loopback device which takes fd lock for devicePath before detaching a volume from node.
+	// TODO: This is a workaround for issue #54108
+	// Currently local attach plugins such as FC, iSCSI, RBD can't obtain devicePath during
+	// GenerateUnmapDeviceFunc() in operation_generator. As a result, these plugins fail to get
+	// and remove loopback device then it will be remained on kubelet node. To avoid the problem,
+	// local attach plugins needs to remove loopback device during TearDownDevice().
+	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
+	loop, err := volumepathhandler.BlockVolumePathHandler.GetLoopDevice(blkUtil, devicePath)
+	if err != nil {
+		if err.Error() != volumepathhandler.ErrDeviceNotFound {
+			return fmt.Errorf("failed to get loopback for device: %v, err: %v", devicePath, err)
+		}
+		glog.Warning("iscsi: loopback for device: %s not found", device)
+	}
+	// Detach a volume from kubelet node
+	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
+	if err != nil {
+		return fmt.Errorf("failed to finish detachISCSIDisk, err: %v", err)
+	}
+	if len(loop) != 0 {
+		// The volume was successfully detached from node. We can safely remove the loopback.
+		err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
+		if err != nil {
+			return fmt.Errorf("failed to remove loopback :%v, err: %v", loop, err)
+		}
+	}
+	return nil
+}
+
+func (util *ISCSIUtil) detachISCSIDisk(exec mount.Exec, portals []string, iqn, iface, volName, initiatorName string, found bool) error {
 	for _, portal := range portals {
 		logoutArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"}
 		deleteArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "-o", "delete"}
@@ -406,13 +551,13 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 			deleteArgs = append(deleteArgs, []string{"-I", iface}...)
 		}
 		glog.Infof("iscsi: log out target %s iqn %s iface %s", portal, iqn, iface)
-		out, err := c.exec.Run("iscsiadm", logoutArgs...)
+		out, err := exec.Run("iscsiadm", logoutArgs...)
 		if err != nil {
 			glog.Errorf("iscsi: failed to detach disk Error: %s", string(out))
 		}
 		// Delete the node record
 		glog.Infof("iscsi: delete node record target %s iqn %s", portal, iqn)
-		out, err = c.exec.Run("iscsiadm", deleteArgs...)
+		out, err = exec.Run("iscsiadm", deleteArgs...)
 		if err != nil {
 			glog.Errorf("iscsi: failed to delete node record Error: %s", string(out))
 		}
@@ -421,13 +566,17 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	// If the iface is not created via iscsi plugin, skip to delete
 	if initiatorName != "" && found && iface == (portals[0]+":"+volName) {
 		deleteArgs := []string{"-m", "iface", "-I", iface, "-o", "delete"}
-		out, err := c.exec.Run("iscsiadm", deleteArgs...)
+		out, err := exec.Run("iscsiadm", deleteArgs...)
 		if err != nil {
 			glog.Errorf("iscsi: failed to delete iface Error: %s", string(out))
 		}
 	}
 
 	return nil
+}
+
+func getDevByPath(portal, iqn, lun string) string {
+	return "/dev/disk/by-path/ip-" + portal + "-iscsi-" + iqn + "-lun-" + lun
 }
 
 func extractTransportname(ifaceOutput string) (iscsiTransport string) {

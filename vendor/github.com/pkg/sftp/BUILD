@@ -9,23 +9,75 @@ go_library(
         "packet.go",
         "release.go",
         "server.go",
-        "server_statvfs_stubs.go",
         "sftp.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "attrs_stubs.go",
+            "server_statvfs_stubs.go",
+            "server_stubs.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "attrs_stubs.go",
             "attrs_unix.go",
             "server_statvfs_darwin.go",
             "server_statvfs_impl.go",
+            "server_stubs.go",
             "server_unix.go",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "attrs_stubs.go",
+            "attrs_unix.go",
+            "server_statvfs_stubs.go",
+            "server_stubs.go",
+            "server_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "attrs_stubs.go",
+            "attrs_unix.go",
+            "server_statvfs_stubs.go",
+            "server_stubs.go",
+            "server_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "attrs_stubs.go",
             "attrs_unix.go",
             "server_statvfs_impl.go",
             "server_statvfs_linux.go",
+            "server_stubs.go",
             "server_unix.go",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:nacl": [
             "attrs_stubs.go",
+            "server_statvfs_stubs.go",
+            "server_stubs.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "attrs_stubs.go",
+            "attrs_unix.go",
+            "server_statvfs_stubs.go",
+            "server_stubs.go",
+            "server_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "attrs_stubs.go",
+            "attrs_unix.go",
+            "server_statvfs_stubs.go",
+            "server_stubs.go",
+            "server_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "server_statvfs_stubs.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "attrs_stubs.go",
+            "attrs_unix.go",
+            "server_statvfs_stubs.go",
+            "server_stubs.go",
+            "server_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "attrs_stubs.go",
+            "server_statvfs_stubs.go",
             "server_stubs.go",
         ],
         "//conditions:default": [],

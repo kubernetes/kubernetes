@@ -26,9 +26,7 @@ import (
 
 type doNothingAdmission struct{}
 
-func (doNothingAdmission) Admit(a admission.Attributes) error { return nil }
 func (doNothingAdmission) Handles(o admission.Operation) bool { return false }
-func (doNothingAdmission) Validate() error                    { return nil }
 
 type fakeServiceResolver struct{}
 

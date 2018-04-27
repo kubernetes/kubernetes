@@ -27,8 +27,7 @@ go_test(
         "validation_test.go",
     ],
     data = ["//api/openapi-spec:swagger-spec"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",

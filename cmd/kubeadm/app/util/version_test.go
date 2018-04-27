@@ -187,7 +187,7 @@ func TestSplitVersion(t *testing.T) {
 		// unknown area, not valid input.
 		{"unknown/latest-1", "", "", false},
 	}
-	// kubeReleaseBucketURL can be overriden during network tests, thus ensure
+	// kubeReleaseBucketURL can be overridden during network tests, thus ensure
 	// it will contain value corresponding to expected outcome for this unit test
 	kubeReleaseBucketURL = "https://dl.k8s.io"
 

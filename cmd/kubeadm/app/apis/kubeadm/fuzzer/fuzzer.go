@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
@@ -36,25 +36,32 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
 			obj.API.BindPort = 20
-			obj.TokenTTL = &metav1.Duration{Duration: 1 * time.Hour}
 			obj.API.AdvertiseAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
 			obj.AuthorizationModes = []string{"foo"}
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
+			obj.Etcd.ServerCertSANs = []string{"foo"}
+			obj.Etcd.PeerCertSANs = []string{"foo"}
 			obj.Token = "foo"
+			obj.CRISocket = "foo"
+			obj.TokenTTL = &metav1.Duration{Duration: 1 * time.Hour}
+			obj.TokenUsages = []string{"foo"}
+			obj.TokenGroups = []string{"foo"}
 			obj.Etcd.Image = "foo"
 			obj.Etcd.DataDir = "foo"
 			obj.ImageRepository = "foo"
 			obj.CIImageRepository = ""
 			obj.UnifiedControlPlaneImage = "foo"
 			obj.FeatureGates = map[string]bool{"foo": true}
+			obj.ClusterName = "foo"
 			obj.APIServerExtraArgs = map[string]string{"foo": "foo"}
 			obj.APIServerExtraVolumes = []kubeadm.HostPathMount{{
 				Name:      "foo",
 				HostPath:  "foo",
 				MountPath: "foo",
+				Writable:  false,
 			}}
 			obj.Etcd.ExtraArgs = map[string]string{"foo": "foo"}
 			obj.Etcd.SelfHosted = &kubeadm.SelfHostedEtcd{
@@ -64,22 +71,20 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				OperatorVersion:    "v0.1.0",
 			}
 			obj.KubeletConfiguration = kubeadm.KubeletConfiguration{
-				BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
-					PodManifestPath: "foo",
-					AllowPrivileged: utilpointer.BoolPtr(true),
-					ClusterDNS:      []string{"foo"},
-					ClusterDomain:   "foo",
-					Authorization:   kubeletconfigv1alpha1.KubeletAuthorization{Mode: "foo"},
-					Authentication: kubeletconfigv1alpha1.KubeletAuthentication{
-						X509: kubeletconfigv1alpha1.KubeletX509Authentication{ClientCAFile: "foo"},
+				BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
+					StaticPodPath: "foo",
+					ClusterDNS:    []string{"foo"},
+					ClusterDomain: "foo",
+					Authorization: kubeletconfigv1beta1.KubeletAuthorization{Mode: "foo"},
+					Authentication: kubeletconfigv1beta1.KubeletAuthentication{
+						X509: kubeletconfigv1beta1.KubeletX509Authentication{ClientCAFile: "foo"},
 					},
-					CAdvisorPort: utilpointer.Int32Ptr(0),
 				},
 			}
-			kubeletconfigv1alpha1.SetDefaults_KubeletConfiguration(obj.KubeletConfiguration.BaseConfig)
+			kubeletconfigv1beta1.SetDefaults_KubeletConfiguration(obj.KubeletConfiguration.BaseConfig)
 			obj.KubeProxy = kubeadm.KubeProxy{
 				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
-					FeatureGates:       "foo",
+					FeatureGates:       map[string]bool{"foo": true},
 					BindAddress:        "foo",
 					HealthzBindAddress: "foo:10256",
 					MetricsBindAddress: "foo:",
@@ -112,6 +117,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					ConfigSyncPeriod: metav1.Duration{Duration: 1},
 				},
 			}
+			obj.AuditPolicyConfiguration = kubeadm.AuditPolicyConfiguration{
+				Path:      "foo",
+				LogDir:    "/foo",
+				LogMaxAge: utilpointer.Int32Ptr(0),
+			}
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
@@ -119,8 +129,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.DiscoveryFile = "foo"
 			obj.DiscoveryToken = "foo"
 			obj.DiscoveryTokenAPIServers = []string{"foo"}
+			obj.DiscoveryTimeout = &metav1.Duration{Duration: 1}
 			obj.TLSBootstrapToken = "foo"
 			obj.Token = "foo"
+			obj.CRISocket = "foo"
+			obj.ClusterName = "foo"
 		},
 	}
 }

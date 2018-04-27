@@ -86,8 +86,19 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	if !mountPoint {
-		glog.V(4).Infof("azureDisk - already mounted to target %s", dir)
-		return nil
+		// testing original mount point, make sure the mount link is valid
+		_, err := (&osIOHandler{}).ReadDir(dir)
+		if err == nil {
+			glog.V(4).Infof("azureDisk - already mounted to target %s", dir)
+			return nil
+		}
+		// mount link is invalid, now unmount and remount later
+		glog.Warningf("azureDisk - ReadDir %s failed with %v, unmount this directory", dir, err)
+		if err := mounter.Unmount(dir); err != nil {
+			glog.Errorf("azureDisk - Unmount directory %s failed with %v", dir, err)
+			return err
+		}
+		mountPoint = true
 	}
 
 	if runtime.GOOS != "windows" {
@@ -105,7 +116,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if m.options.MountOptions != nil {
-		options = volume.JoinMountOptions(m.options.MountOptions, options)
+		options = util.JoinMountOptions(m.options.MountOptions, options)
 	}
 
 	glog.V(4).Infof("azureDisk - Attempting to mount %s on %s", diskName, dir)
@@ -144,7 +155,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 			return fmt.Errorf("azureDisk - SetupAt:Mount:Failure error cleaning up (removing dir:%s) with error:%v original-mountErr:%v", dir, err, mountErr)
 		}
 
-		glog.V(2).Infof("azureDisk - Mount of disk:%s on dir:%s failed with mount error:%v post failure clean up was completed", diskName, dir, err, mountErr)
+		glog.V(2).Infof("azureDisk - Mount of disk:%s on dir:%s failed with mount error:%v post failure clean up was completed", diskName, dir, mountErr)
 		return mountErr
 	}
 

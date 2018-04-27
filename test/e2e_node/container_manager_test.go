@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -76,10 +77,10 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
 	Describe("Validate OOM score adjustments", func() {
 		Context("once the node is setup", func() {
-			It("docker daemon's oom-score-adj should be -999", func() {
-				dockerPids, err := getPidsForProcess(dockerProcessName, dockerPidFile)
-				Expect(err).To(BeNil(), "failed to get list of docker daemon pids")
-				for _, pid := range dockerPids {
+			It("container runtime's oom-score-adj should be -999", func() {
+				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+				Expect(err).To(BeNil(), "failed to get list of container runtime pids")
+				for _, pid := range runtimePids {
 					Eventually(func() error {
 						return validateOOMScoreAdjSetting(pid, -999)
 					}, 5*time.Minute, 30*time.Second).Should(BeNil())
@@ -148,14 +149,22 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 						return validateOOMScoreAdjSetting(shPids[0], 1000)
 					}, 2*time.Minute, time.Second*4).Should(BeNil())
 				})
-				// Log the running containers here to help debugging. Use `docker ps`
-				// directly for now because the test is already docker specific.
+				// Log the running containers here to help debugging.
 				AfterEach(func() {
 					if CurrentGinkgoTestDescription().Failed {
-						By("Dump all running docker containers")
-						output, err := exec.Command("docker", "ps").CombinedOutput()
+						By("Dump all running containers")
+						runtime, _, err := getCRIClient()
 						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("Running docker containers:\n%s", string(output))
+						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
+							State: &runtimeapi.ContainerStateValue{
+								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+							},
+						})
+						Expect(err).NotTo(HaveOccurred())
+						framework.Logf("Running containers:")
+						for _, c := range containers {
+							framework.Logf("%+v", c)
+						}
 					}
 				})
 			})

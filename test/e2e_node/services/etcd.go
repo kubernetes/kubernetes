@@ -77,6 +77,7 @@ func NewEtcd(dataDir string) *EtcdServer {
 		MaxWALFiles:        maxWALFiles,
 		TickMs:             tickMs,
 		ElectionTicks:      electionTicks,
+		AuthToken:          "simple",
 	}
 
 	return &EtcdServer{

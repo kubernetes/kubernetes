@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "metrics.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "proxier.go",
         ],
         "//conditions:default": [],
@@ -15,11 +15,10 @@ go_library(
     deps = [
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/api/service:go_default_library",
             "//pkg/apis/core:go_default_library",
             "//pkg/apis/core/helper:go_default_library",
-            "//pkg/features:go_default_library",
             "//pkg/proxy:go_default_library",
             "//pkg/proxy/healthcheck:go_default_library",
             "//pkg/util/async:go_default_library",
@@ -29,7 +28,6 @@ go_library(
             "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//vendor/k8s.io/client-go/tools/record:go_default_library",
         ],
         "//conditions:default": [],

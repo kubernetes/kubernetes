@@ -23,8 +23,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["taints_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/taints",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

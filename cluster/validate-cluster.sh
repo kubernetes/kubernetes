@@ -97,7 +97,7 @@ while true; do
   # available and then get restarted as the kubelet configures the docker bridge.
   #
   # We are assigning the result of kubectl_retry get nodes operation to the res
-  # varaible in that way, to prevent stopping the whole script on an error.
+  # variable in that way, to prevent stopping the whole script on an error.
   node=$(kubectl_retry get nodes) && res="$?" || res="$?"
   if [ "${res}" -ne "0" ]; then
     if [[ "${attempt}" -gt "${last_run:-$MAX_ATTEMPTS}" ]]; then

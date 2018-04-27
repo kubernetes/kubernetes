@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "connection_reset_error.go",
         "handlers.go",
         "http_request.go",
         "offset_reader.go",
@@ -17,7 +16,42 @@ go_library(
         "timeout_read_closer.go",
         "validation.go",
         "waiter.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "connection_reset_error.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "connection_reset_error.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "connection_reset_error.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "connection_reset_error.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "connection_reset_error.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "connection_reset_error.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "connection_reset_error.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "connection_reset_error.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "connection_reset_error_other.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "connection_reset_error.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "connection_reset_error.go",
+        ],
+        "//conditions:default": [],
+    }),
     importpath = "github.com/aws/aws-sdk-go/aws/request",
     visibility = ["//visibility:public"],
     deps = [

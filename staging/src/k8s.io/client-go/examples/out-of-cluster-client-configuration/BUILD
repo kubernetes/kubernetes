@@ -8,8 +8,7 @@ load(
 
 go_binary(
     name = "out-of-cluster-client-configuration",
-    importpath = "k8s.io/client-go/examples/out-of-cluster-client-configuration",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(

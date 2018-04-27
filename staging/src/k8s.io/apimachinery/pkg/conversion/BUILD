@@ -12,8 +12,7 @@ go_test(
         "converter_test.go",
         "helper_test.go",
     ],
-    importpath = "k8s.io/apimachinery/pkg/conversion",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

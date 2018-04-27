@@ -23,6 +23,7 @@ kube::util::wait_for_url() {
   local prefix=${2:-}
   local wait=${3:-1}
   local times=${4:-30}
+  local maxtime=${5:-1}
 
   which curl >/dev/null || {
     kube::log::usage "curl must be installed"
@@ -30,13 +31,13 @@ kube::util::wait_for_url() {
   }
 
   local i
-  for i in $(seq 1 $times); do
+  for i in $(seq 1 "$times"); do
     local out
-    if out=$(curl --max-time 1 -gkfs $url 2>/dev/null); then
+    if out=$(curl --max-time "$maxtime" -gkfs "$url" 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
-    sleep ${wait}
+    sleep "${wait}"
   done
   kube::log::error "Timed out waiting for ${prefix} to answer at ${url}; tried ${times} waiting ${wait} between each"
   return 1
@@ -148,10 +149,11 @@ kube::util::find-binary-for-platform() {
     "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
   # Also search for binary in bazel build tree.
-  # In some cases we have to name the binary $BINARY_bin, since there was a
-  # directory named $BINARY next to it.
+  # The bazel go rules place binaries in subtrees like
+  # "bazel-bin/source/path/linux_amd64_pure_stripped/binaryname", so make sure
+  # the platform name is matched in the path.
   locations+=($(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
-    \( -name "${lookfor}" -o -name "${lookfor}_bin" \) 2>/dev/null || true) )
+    -path "*/${platform/\//_}*/${lookfor}" 2>/dev/null || true) )
 
   # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
@@ -208,7 +210,7 @@ kube::util::gen-docs() {
 # Puts a placeholder for every generated doc. This makes the link checker work.
 kube::util::set-placeholder-gen-docs() {
   local list_file="${KUBE_ROOT}/docs/.generated_docs"
-  if [ -e ${list_file} ]; then
+  if [[ -e "${list_file}" ]]; then
     # remove all of the old docs; we don't want to check them in.
     while read file; do
       if [[ "${list_file}" != "${KUBE_ROOT}/${file}" ]]; then
@@ -243,11 +245,9 @@ kube::util::remove-gen-docs() {
 kube::util::group-version-to-pkg-path() {
   staging_apis=(
   $(
-    pushd ${KUBE_ROOT}/staging/src/k8s.io/api > /dev/null
-      find . -name types.go | xargs -n1 dirname | sed "s|\./||g" | sort
-    popd > /dev/null
-  )
-  )
+    cd "${KUBE_ROOT}/staging/src/k8s.io/api" &&
+    find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort
+  ))
 
   local group_version="$1"
 
@@ -273,17 +273,8 @@ kube::util::group-version-to-pkg-path() {
     meta/v1)
       echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
       ;;
-    meta/v1)
-      echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
-      ;;
-    meta/v1alpha1)
-      echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
-      ;;
-    meta/v1alpha1)
-      echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
-      ;;
-    unversioned)
-      echo "pkg/api/unversioned"
+    meta/v1beta1)
+      echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1"
       ;;
     *.k8s.io)
       echo "pkg/apis/${group_version%.*k8s.io}"
@@ -437,7 +428,7 @@ kube::util::ensure_clean_working_dir() {
 # Ensure that the given godep version is installed and in the path.  Almost
 # nobody should use any version but the default.
 kube::util::ensure_godep_version() {
-  GODEP_VERSION=${1:-"v79"} # this version is known to work
+  GODEP_VERSION=${1:-"v80"} # this version is known to work
 
   if [[ "$(godep version 2>/dev/null)" == *"godep ${GODEP_VERSION}"* ]]; then
     return
@@ -445,9 +436,19 @@ kube::util::ensure_godep_version() {
 
   kube::log::status "Installing godep version ${GODEP_VERSION}"
   go install ./vendor/github.com/tools/godep/
+  if ! which godep >/dev/null 2>&1; then
+    kube::log::error "Can't find godep - is your GOPATH 'bin' in your PATH?"
+    kube::log::error "  GOPATH: ${GOPATH}"
+    kube::log::error "  PATH:   ${PATH}"
+    return 1
+  fi
 
   if [[ "$(godep version 2>/dev/null)" != *"godep ${GODEP_VERSION}"* ]]; then
-    kube::log::error "Expected godep ${GODEP_VERSION}, got $(godep version)"
+    kube::log::error "Wrong godep version - is your GOPATH 'bin' in your PATH?"
+    kube::log::error "  expected: godep ${GODEP_VERSION}"
+    kube::log::error "  got:      $(godep version)"
+    kube::log::error "  GOPATH: ${GOPATH}"
+    kube::log::error "  PATH:   ${PATH}"
     return 1
   fi
 }
@@ -457,7 +458,12 @@ kube::util::ensure_godep_version() {
 kube::util::ensure_no_staging_repos_in_gopath() {
   kube::util::ensure_single_dir_gopath
   local error=0
-  for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
+  for repo_file in "${KUBE_ROOT}"/staging/src/k8s.io/*; do
+    if [[ ! -d "$repo_file" ]]; then
+      # not a directory or there were no files
+      continue;
+    fi
+    repo="$(basename "$repo_file")"
     if [ -e "${GOPATH}/src/k8s.io/${repo}" ]; then
       echo "k8s.io/${repo} exists in GOPATH. Remove before running godep-save.sh." 1>&2
       error=1
@@ -466,23 +472,6 @@ kube::util::ensure_no_staging_repos_in_gopath() {
   if [ "${error}" = "1" ]; then
     exit 1
   fi
-}
-
-# Installs the specified go package at a particular commit.
-kube::util::go_install_from_commit() {
-  local -r pkg=$1
-  local -r commit=$2
-
-  kube::util::ensure-temp-dir
-  mkdir -p "${KUBE_TEMP}/go/src"
-  GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}"
-  (
-    cd "${KUBE_TEMP}/go/src/${pkg}"
-    git checkout -q "${commit}"
-    GOPATH="${KUBE_TEMP}/go" go install "${pkg}"
-  )
-  PATH="${KUBE_TEMP}/go/bin:${PATH}"
-  hash -r # force bash to clear PATH cache
 }
 
 # Checks that the GOPATH is simple, i.e. consists only of one directory, not multiple.

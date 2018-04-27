@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["projected_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/volume/projected",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/empty_dir:go_default_library",

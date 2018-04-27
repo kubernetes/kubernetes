@@ -46,7 +46,7 @@ func TestKnownFeatures(t *testing.T) {
 	if r[1] != f2 {
 		t.Errorf("KnownFeatures returned %s values, expected %s", r[1], f2)
 	}
-	// check the second value is feature3; prerelease should not shown fo GA features; default should be present
+	// check the second value is feature3; prerelease should not be shown for GA features; default should be present
 	f3 := "feature3=true|false (default=false)"
 	if r[2] != f3 {
 		t.Errorf("KnownFeatures returned %s values, expected %s", r[2], f3)
@@ -168,16 +168,16 @@ func TestResolveFeatureGateDependencies(t *testing.T) {
 			expectedFeatures: map[string]bool{},
 		},
 		{ // others flags
-			inputFeatures:    map[string]bool{"SupportIPVSProxyMode": true},
-			expectedFeatures: map[string]bool{"SupportIPVSProxyMode": true},
+			inputFeatures:    map[string]bool{CoreDNS: true},
+			expectedFeatures: map[string]bool{CoreDNS: true},
 		},
 		{ // just StoreCertsInSecrets flags
-			inputFeatures:    map[string]bool{"StoreCertsInSecrets": true},
-			expectedFeatures: map[string]bool{"StoreCertsInSecrets": true, "SelfHosting": true},
+			inputFeatures:    map[string]bool{StoreCertsInSecrets: true},
+			expectedFeatures: map[string]bool{StoreCertsInSecrets: true, SelfHosting: true},
 		},
 		{ // just HighAvailability flags
-			inputFeatures:    map[string]bool{"HighAvailability": true},
-			expectedFeatures: map[string]bool{"HighAvailability": true, "StoreCertsInSecrets": true, "SelfHosting": true},
+			inputFeatures:    map[string]bool{HighAvailability: true},
+			expectedFeatures: map[string]bool{HighAvailability: true, StoreCertsInSecrets: true, SelfHosting: true},
 		},
 	}
 

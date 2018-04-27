@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["generate_test.go"],
-    importpath = "k8s.io/apiserver/pkg/storage/names",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(

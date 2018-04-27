@@ -109,7 +109,7 @@ var (
 				{
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount / 2)),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse(strconv.FormatInt(standardMemoryAmount/2, 10)),
 							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("5m"),
 						},
 						Limits: v1.ResourceList{
@@ -127,7 +127,7 @@ var (
 				{
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount - 1)),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse(strconv.FormatInt(standardMemoryAmount-1, 10)),
 							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("5m"),
 						},
 					},

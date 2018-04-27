@@ -60,9 +60,14 @@ func newSnapshotReaderCloser(snapshot backend.Snapshot) io.ReadCloser {
 		n, err := snapshot.WriteTo(pw)
 		if err == nil {
 			plog.Infof("wrote database snapshot out [total bytes: %d]", n)
+		} else {
+			plog.Warningf("failed to write database snapshot out [written bytes: %d]: %v", n, err)
 		}
 		pw.CloseWithError(err)
-		snapshot.Close()
+		err = snapshot.Close()
+		if err != nil {
+			plog.Panicf("failed to close database snapshot: %v", err)
+		}
 	}()
 	return pr
 }

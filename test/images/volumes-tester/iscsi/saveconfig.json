@@ -32,7 +32,7 @@
       "dev": "block",
       "name": "block",
       "plugin": "fileio",
-      "size": 1048576,
+      "size": 126877696,
       "write_back": true,
       "wwn": "521c57aa-9d9b-4e5d-ab1a-527487f92a33"
     }

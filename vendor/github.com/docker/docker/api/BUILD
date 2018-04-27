@@ -4,10 +4,39 @@ go_library(
     name = "go_default_library",
     srcs = [
         "common.go",
-        "common_unix.go",
         "names.go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:android": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "common_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "common_windows.go",
         ],
         "//conditions:default": [],

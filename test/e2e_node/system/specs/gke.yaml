@@ -220,7 +220,6 @@ packageSpecs:
   versionRange: '>=4.2.0'
 - name: less
   versionRange: '>=481'
-- name: linux-headers-${KERNEL_RELEASE}
 - name: netcat-openbsd
   versionRange: '>=1.10'
 - name: python
@@ -235,8 +234,6 @@ packageSpecs:
   versionRange: '>=1.28'
 - name: util-linux
   versionRange: '>=2.27.1'
-- name: vim
-  versionRange: '>=7.4.712'
 - name: wget
   versionRange: '>=1.18'
 - name: gce-compute-image-packages

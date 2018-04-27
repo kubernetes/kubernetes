@@ -132,15 +132,6 @@ func (p *serviceEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.Us
 
 var _ quota.Evaluator = &serviceEvaluator{}
 
-// QuotaServiceType returns true if the service type is eligible to track against a quota
-func QuotaServiceType(service *v1.Service) bool {
-	switch service.Spec.Type {
-	case v1.ServiceTypeNodePort, v1.ServiceTypeLoadBalancer:
-		return true
-	}
-	return false
-}
-
 //GetQuotaServiceType returns ServiceType if the service type is eligible to track against a quota, nor return ""
 func GetQuotaServiceType(service *v1.Service) v1.ServiceType {
 	switch service.Spec.Type {

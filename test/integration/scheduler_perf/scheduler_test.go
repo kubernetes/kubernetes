@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/plugin/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler"
 	testutils "k8s.io/kubernetes/test/utils"
 	"math"
 	"strconv"
@@ -49,10 +49,6 @@ var (
 	baseNodeTemplate = &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "sample-node-",
-		},
-		Spec: v1.NodeSpec{
-			// TODO: investigate why this is needed.
-			ExternalID: "foo",
 		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
@@ -144,7 +140,7 @@ func schedulePods(config *testConfig) int32 {
 			glog.Fatalf("%v", err)
 		}
 		// 30,000 pods -> wait till @ least 300 are scheduled to start measuring.
-		// TODO Find out why sometimes there may be scheduling blips in the beggining.
+		// TODO Find out why sometimes there may be scheduling blips in the beginning.
 		if len(scheduled) > config.numPods/100 {
 			break
 		}

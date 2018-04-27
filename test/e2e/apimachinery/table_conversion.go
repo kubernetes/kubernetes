@@ -24,18 +24,27 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/client-go/util/workqueue"
+
 	"k8s.io/kubernetes/pkg/printers"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+var serverPrintVersion = utilversion.MustParseSemantic("v1.10.0")
+
 var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	f := framework.NewDefaultFramework("tables")
+
+	BeforeEach(func() {
+		framework.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())
+	})
 
 	It("should return pod details", func() {
 		ns := f.Namespace.Name
@@ -47,8 +56,8 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		_, err := c.CoreV1().Pods(ns).Create(newTablePod(podName))
 		Expect(err).NotTo(HaveOccurred())
 
-		table := &metav1alpha1.Table{}
-		err = c.CoreV1().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
+		table := &metav1beta1.Table{}
+		err = c.CoreV1().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do().Into(table)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Table: %#v", table)
 
@@ -92,10 +101,10 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			Fail("Unable to create template %d, exiting", i)
 		})
 
-		pagedTable := &metav1alpha1.Table{}
+		pagedTable := &metav1beta1.Table{}
 		err := c.CoreV1().RESTClient().Get().Namespace(ns).Resource("podtemplates").
 			VersionedParams(&metav1.ListOptions{Limit: 2}, metav1.ParameterCodec).
-			SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").
+			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do().Into(pagedTable)
 		Expect(err).NotTo(HaveOccurred())
 		// TODO: kops PR job is still using etcd2, which prevents this feature from working. Remove this check when kops is upgraded to etcd3
@@ -111,7 +120,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 
 		err = c.CoreV1().RESTClient().Get().Namespace(ns).Resource("podtemplates").
 			VersionedParams(&metav1.ListOptions{Continue: pagedTable.Continue}, metav1.ParameterCodec).
-			SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").
+			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do().Into(pagedTable)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(pagedTable.Rows)).To(BeNumerically(">", 0))
@@ -121,8 +130,8 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	It("should return generic metadata details across all namespaces for nodes", func() {
 		c := f.ClientSet
 
-		table := &metav1alpha1.Table{}
-		err := c.CoreV1().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
+		table := &metav1beta1.Table{}
+		err := c.CoreV1().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do().Into(table)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Table: %#v", table)
 
@@ -141,14 +150,22 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	It("should return a 406 for a backend which does not implement metadata", func() {
 		c := f.ClientSet
 
-		table := &metav1alpha1.Table{}
-		err := c.CoreV1().RESTClient().Get().Resource("services").SetHeader("Accept", "application/json;as=Table;v=v1alpha1;g=meta.k8s.io").Do().Into(table)
+		table := &metav1beta1.Table{}
+		sar := &authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				NonResourceAttributes: &authorizationv1.NonResourceAttributes{
+					Path: "/",
+					Verb: "get",
+				},
+			},
+		}
+		err := c.AuthorizationV1().RESTClient().Post().Resource("selfsubjectaccessreviews").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Body(sar).Do().Into(table)
 		Expect(err).To(HaveOccurred())
 		Expect(err.(errors.APIStatus).Status().Code).To(Equal(int32(406)))
 	})
 })
 
-func printTable(table *metav1alpha1.Table) string {
+func printTable(table *metav1beta1.Table) string {
 	buf := &bytes.Buffer{}
 	tw := tabwriter.NewWriter(buf, 5, 8, 1, ' ', 0)
 	err := printers.PrintTable(table, tw, printers.PrintOptions{})

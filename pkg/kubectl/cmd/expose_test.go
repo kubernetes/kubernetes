@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
@@ -28,10 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // This init should be removed after switching this command and its tests to user external types.
@@ -79,7 +79,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "service/foo exposed",
 			status:   200,
 		},
 		{
@@ -110,7 +110,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"func": "stream"},
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "service/foo exposed",
 			status:   200,
 		},
 		{
@@ -142,7 +142,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"run": "this"},
 				},
 			},
-			expected: "service \"mayor\" exposed",
+			expected: "service/mayor exposed",
 			status:   200,
 		},
 		{
@@ -237,7 +237,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: "10.10.10.10",
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "service /foo exposed",
 			status:   200,
 		},
 		{
@@ -269,7 +269,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: api.ClusterIPNone,
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "service/foo exposed",
 			status:   200,
 		},
 		{
@@ -295,7 +295,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: api.ClusterIPNone,
 				},
 			},
-			expected: "service \"foo\" exposed",
+			expected: "service/foo exposed",
 			status:   200,
 		},
 		{
@@ -312,7 +312,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"filename": "../../../examples/guestbook/redis-master-service.yaml", "selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "dry-run": "true"},
+			flags: map[string]string{"filename": "../../../test/e2e/testing-manifests/guestbook/redis-master-service.yaml", "selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "dry-run": "true"},
 			output: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"svc": "test"}},
 				Spec: api.ServiceSpec{
@@ -353,7 +353,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"svc": "frompod"},
 				},
 			},
-			expected: "service \"a-name-that-is-toooo-big-for-a-service-because-it-can-only-hand\" exposed",
+			expected: "service/a-name-that-is-toooo-big-for-a-service-because-it-can-only-hand exposed",
 			status:   200,
 		},
 		{
@@ -466,46 +466,46 @@ func TestRunExposeService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &printers.JSONPrinter{}
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Version: "v1"},
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == test.calls[m] && m == "GET":
-					return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.input)}, nil
-				case p == test.calls[m] && m == "POST":
-					return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.output)}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.Namespace = test.ns
-		buf := bytes.NewBuffer([]byte{})
+		t.Run(test.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		cmd := NewCmdExposeService(f, buf)
-		cmd.SetOutput(buf)
-		for flag, value := range test.flags {
-			cmd.Flags().Set(flag, value)
-		}
-		cmd.Run(cmd, test.args)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
 
-		out := buf.String()
-		if _, ok := test.flags["dry-run"]; ok {
-			buf.Reset()
-			if err := tf.Printer.PrintObj(test.output, buf); err != nil {
-				t.Errorf("%s: Unexpected error: %v", test.name, err)
-				continue
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == test.calls[m] && m == "GET":
+						return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.input)}, nil
+					case p == test.calls[m] && m == "POST":
+						return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.output)}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.Namespace = test.ns
+
+			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdExposeService(tf, ioStreams)
+			cmd.SetOutput(buf)
+			for flag, value := range test.flags {
+				cmd.Flags().Set(flag, value)
+			}
+			cmd.Run(cmd, test.args)
+
+			out := buf.String()
+			if _, ok := test.flags["dry-run"]; ok {
+				test.expected = fmt.Sprintf("service/%s exposed (dry run)", test.flags["name"])
 			}
 
-			test.expected = fmt.Sprintf("service %q exposed (dry run)", test.flags["name"])
-		}
-
-		if !strings.Contains(out, test.expected) {
-			t.Errorf("%s: Unexpected output! Expected\n%s\ngot\n%s", test.name, test.expected, out)
-		}
+			if !strings.Contains(out, test.expected) {
+				t.Errorf("%s: Unexpected output! Expected\n%s\ngot\n%s", test.name, test.expected, out)
+			}
+		})
 	}
 }

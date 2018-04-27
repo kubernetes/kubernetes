@@ -18,12 +18,15 @@ package cmd
 
 import (
 	"errors"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/utils/exec"
@@ -52,8 +55,41 @@ func assertDirEmpty(t *testing.T, path string) {
 	}
 }
 
+func TestNewReset(t *testing.T) {
+	var in io.Reader
+	certsDir := kubeadmapiext.DefaultCertificatesDir
+	criSocketPath := "/var/run/dockershim.sock"
+	skipPreFlight := false
+	forceReset := true
+
+	ignorePreflightErrors := []string{"all"}
+	ignorePreflightErrorsSet, _ := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
+
+	ignorePreflightErrors = []string{}
+	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
+}
+
+func TestNewCmdReset(t *testing.T) {
+	var out io.Writer
+	var in io.Reader
+	cmd := NewCmdReset(in, out)
+
+	tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	args := []string{"--ignore-preflight-errors=all", "--cert-dir=" + tmpDir, "--force"}
+	cmd.SetArgs(args)
+	if err := cmd.Execute(); err != nil {
+		t.Errorf("Cannot execute reset command: %v", err)
+	}
+}
+
 func TestConfigDirCleaner(t *testing.T) {
 	tests := map[string]struct {
+		resetDir        string
 		setupDirs       []string
 		setupFiles      []string
 		verifyExists    []string
@@ -139,6 +175,12 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests",
 			},
 		},
+		"not a directory": {
+			resetDir: "test-path",
+			setupFiles: []string{
+				"test-path",
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -149,7 +191,6 @@ func TestConfigDirCleaner(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unable to create temporary directory: %s", err)
 		}
-		defer os.RemoveAll(tmpDir)
 
 		for _, createDir := range test.setupDirs {
 			err := os.Mkdir(filepath.Join(tmpDir, createDir), 0700)
@@ -164,10 +205,13 @@ func TestConfigDirCleaner(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unable to create test file: %s", err)
 			}
-			defer f.Close()
+			f.Close()
 		}
 
-		resetConfigDir(tmpDir, filepath.Join(tmpDir, "pki"))
+		if test.resetDir == "" {
+			test.resetDir = "pki"
+		}
+		resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir))
 
 		// Verify the files we cleanup implicitly in every test:
 		assertExists(t, tmpDir)
@@ -183,6 +227,8 @@ func TestConfigDirCleaner(t *testing.T) {
 		for _, path := range test.verifyNotExists {
 			assertNotExists(t, filepath.Join(tmpDir, path))
 		}
+
+		os.RemoveAll(tmpDir)
 	}
 }
 
@@ -235,7 +281,7 @@ func TestResetWithDocker(t *testing.T) {
 func TestResetWithCrictl(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// 2: socket path provided, not runnning with crictl (1x CombinedOutput, 2x Run)
+			// 2: socket path provided, not running with crictl (1x CombinedOutput, 2x Run)
 			func() ([]byte, error) { return []byte("1"), nil },
 			// 3: socket path provided, crictl fails, reset with docker (1x CombinedOuput fail, 1x Run)
 			func() ([]byte, error) { return nil, errors.New("crictl list err") },
@@ -243,7 +289,7 @@ func TestResetWithCrictl(t *testing.T) {
 		RunScript: []fakeexec.FakeRunAction{
 			// 1: socket path not provided, running with docker
 			func() ([]byte, []byte, error) { return nil, nil, nil },
-			// 2: socket path provided, now runnning with crictl (1x CombinedOutput, 2x Run)
+			// 2: socket path provided, now running with crictl (1x CombinedOutput, 2x Run)
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			// 3: socket path provided, crictl fails, reset with docker (1x CombinedOuput, 1x Run)
@@ -273,15 +319,15 @@ func TestResetWithCrictl(t *testing.T) {
 		t.Errorf("expected a call to docker, got %v", fcmd.RunLog[0])
 	}
 
-	// 2: socket path provided, now runnning with crictl (1x CombinedOutput, 2x Run)
+	// 2: socket path provided, now running with crictl (1x CombinedOutput, 2x Run)
 	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "/test.sock", "crictl")
 	if fcmd.RunCalls != 3 {
 		t.Errorf("expected 3 calls to Run, got %d", fcmd.RunCalls)
 	}
-	if !strings.Contains(fcmd.RunLog[1][2], "crictl") {
+	if !strings.Contains(fcmd.RunLog[1][0], "crictl") {
 		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
 	}
-	if !strings.Contains(fcmd.RunLog[2][2], "crictl") {
+	if !strings.Contains(fcmd.RunLog[2][0], "crictl") {
 		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
 	}
 
@@ -330,7 +376,7 @@ func TestReset(t *testing.T) {
 	if fcmd.RunCalls != 2 {
 		t.Errorf("expected 2 call to Run, got %d", fcmd.RunCalls)
 	}
-	if !strings.Contains(fcmd.RunLog[0][2], "crictl") {
+	if !strings.Contains(fcmd.RunLog[0][0], "crictl") {
 		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
 	}
 

@@ -211,7 +211,6 @@ func TestHelperCreate(t *testing.T) {
 		}
 		modifier := &Helper{
 			RESTClient:      client,
-			Versioner:       metaAccessor,
 			NamespaceScoped: true,
 		}
 		_, err := modifier.Create("bar", test.Modify, test.Object)
@@ -568,7 +567,6 @@ func TestHelperReplace(t *testing.T) {
 		}
 		modifier := &Helper{
 			RESTClient:      client,
-			Versioner:       metaAccessor,
 			NamespaceScoped: test.NamespaceScoped,
 		}
 		_, err := modifier.Replace(test.Namespace, "foo", test.Overwrite, test.Object)

@@ -21,12 +21,16 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+# include shell2junit library
+source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
+
 # Excluded check patterns are always skipped.
 EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-test-owners.sh"        # TODO(rmmh): figure out how to avoid endless conflicts
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
+  "verify-typecheck.sh"          # runs in separate typecheck job
   )
 
 # Only run whitelisted fast checks in quick mode.
@@ -42,6 +46,7 @@ QUICK_PATTERNS+=(
   "verify-imports.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
+  "verify-spelling.sh"
   "verify-staging-client-go.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"
@@ -68,15 +73,34 @@ function is-quick {
   return 1
 }
 
-function run-cmd {
-  if ${SILENT}; then
-    "$@" &> /dev/null
-  else
-    "$@"
-  fi
+function is-explicitly-chosen {
+  local name="${1#verify-}"
+  name="${name%.*}"
+  for e in ${WHAT}; do
+    if [[ $e == "$name" ]]; then
+      return
+    fi
+  done
+  return 1
 }
 
-# Collect Failed tests in this Array , initalize it to nil
+function run-cmd {
+  local filename="${2##*/verify-}"
+  local testname="${filename%%.*}"
+  local output="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
+  local tr
+
+  if ${SILENT}; then
+    juLog -output="${output}" -class="verify" -name="${testname}" "$@" &> /dev/null
+    tr=$?
+  else
+    juLog -output="${output}" -class="verify" -name="${testname}" "$@"
+    tr=$?
+  fi
+  return ${tr}
+}
+
+# Collect Failed tests in this Array , initialize it to nil
 FAILED_TESTS=()
 
 function print-failed-tests {
@@ -96,13 +120,19 @@ function run-checks {
   for t in $(ls ${pattern})
   do
     local check_name="$(basename "${t}")"
-    if is-excluded "${t}" ; then
-      echo "Skipping ${check_name}"
-      continue
-    fi
-    if ${QUICK} && ! is-quick "${t}" ; then
-      echo "Skipping ${check_name} in quick mode"
-      continue
+    if [[ ! -z ${WHAT:-} ]]; then
+      if ! is-explicitly-chosen "${check_name}"; then
+        continue
+      fi
+    else
+      if is-excluded "${t}" ; then
+        echo "Skipping ${check_name}"
+        continue
+      fi
+      if ${QUICK} && ! is-quick "${t}" ; then
+        echo "Skipping ${check_name} in quick mode"
+        continue
+      fi
     fi
     echo -e "Verifying ${check_name}"
     local start=$(date +%s)
@@ -118,30 +148,15 @@ function run-checks {
   done
 }
 
-SILENT=true
-QUICK=false
-
-while getopts ":vQ" opt; do
-  case ${opt} in
-    v)
-      SILENT=false
-      ;;
-    Q)
-      QUICK=true
-      ;;
-    \?)
-      echo "Invalid flag: -${OPTARG}" >&2
-      exit 1
-      ;;
-  esac
-done
+SILENT=${SILENT:-false}
+QUICK=${QUICK:-false}
 
 if ${SILENT} ; then
-  echo "Running in silent mode, run with -v if you want to see script logs."
+  echo "Running in silent mode, run with SILENT=false if you want to see script logs."
 fi
 
 if ${QUICK} ; then
-  echo "Running in quick mode (-Q flag). Only fast checks will run."
+  echo "Running in quick mode (QUICK=true). Only fast checks will run."
 fi
 
 ret=0
@@ -149,7 +164,7 @@ run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
 run-checks "${KUBE_ROOT}/hack/verify-*.py" python
 
 if [[ ${ret} -eq 1 ]]; then
-    print-failed-tests 
+    print-failed-tests
 fi
 exit ${ret}
 

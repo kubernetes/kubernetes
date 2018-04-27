@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,18 +30,8 @@ import (
 )
 
 func TestResourceVersioner(t *testing.T) {
-	g, err := legacyscheme.Registry.Group(v1.GroupName)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	intf, err := g.DefaultInterfacesFor(v1.SchemeGroupVersion)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	accessor := intf.MetadataAccessor
-
 	pod := internal.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}
-	version, err := accessor.ResourceVersion(&pod)
+	version, err := meta.NewAccessor().ResourceVersion(&pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +40,7 @@ func TestResourceVersioner(t *testing.T) {
 	}
 
 	podList := internal.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}
-	version, err = accessor.ResourceVersion(&podList)
+	version, err = meta.NewAccessor().ResourceVersion(&podList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -63,7 +53,7 @@ func TestCodec(t *testing.T) {
 	pod := internal.Pod{}
 	// We do want to use package registered rather than testapi here, because we
 	// want to test if the package install and package registered work as expected.
-	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersion), &pod)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersions[0]), &pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,7 +61,7 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersion.Version || other.Kind != "Pod" {
+	if other.APIVersion != legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersions[0].Version || other.Kind != "Pod" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
@@ -113,18 +103,13 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect version: %v", mapping)
 		}
 
-		interfaces, _ := legacyscheme.Registry.GroupOrDie(internal.GroupName).InterfacesFor(version)
-		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
-			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
-		}
-
 		rc := &internal.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-		name, err := mapping.MetadataAccessor.Name(rc)
+		name, err := meta.NewAccessor().Name(rc)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if name != "foo" {
-			t.Errorf("unable to retrieve object meta with: %v", mapping.MetadataAccessor)
+			t.Errorf("bad name: %q", name)
 		}
 	}
 }

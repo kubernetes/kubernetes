@@ -29,7 +29,7 @@ func TestKubeletConfigurationPathFields(t *testing.T) {
 	// ensure the intersection of kubeletConfigurationPathFieldPaths and KubeletConfigurationNonPathFields is empty
 	if i := kubeletConfigurationPathFieldPaths.Intersection(kubeletConfigurationNonPathFieldPaths); len(i) > 0 {
 		t.Fatalf("expect the intersection of kubeletConfigurationPathFieldPaths and "+
-			"KubeletConfigurationNonPathFields to be emtpy, got:\n%s",
+			"KubeletConfigurationNonPathFields to be empty, got:\n%s",
 			strings.Join(i.List(), "\n"))
 	}
 
@@ -128,7 +128,7 @@ func TestAllPrimitiveFieldPaths(t *testing.T) {
 var (
 	// KubeletConfiguration fields that contain file paths. If you update this, also update KubeletConfigurationPathRefs!
 	kubeletConfigurationPathFieldPaths = sets.NewString(
-		"PodManifestPath",
+		"StaticPodPath",
 		"Authentication.X509.ClientCAFile",
 		"TLSCertFile",
 		"TLSPrivateKeyFile",
@@ -138,28 +138,27 @@ var (
 	// KubeletConfiguration fields that do not contain file paths.
 	kubeletConfigurationNonPathFieldPaths = sets.NewString(
 		"Address",
-		"AllowPrivileged",
 		"Authentication.Anonymous.Enabled",
 		"Authentication.Webhook.CacheTTL.Duration",
 		"Authentication.Webhook.Enabled",
 		"Authorization.Mode",
 		"Authorization.Webhook.CacheAuthorizedTTL.Duration",
 		"Authorization.Webhook.CacheUnauthorizedTTL.Duration",
-		"CAdvisorPort",
 		"CPUCFSQuota",
 		"CPUManagerPolicy",
 		"CPUManagerReconcilePeriod.Duration",
+		"QOSReserved[*]",
 		"CgroupDriver",
 		"CgroupRoot",
 		"CgroupsPerQOS",
 		"ClusterDNS[*]",
 		"ClusterDomain",
-		"ConfigTrialDuration.Duration",
+		"ContainerLogMaxFiles",
+		"ContainerLogMaxSize",
 		"ContentType",
 		"EnableContentionProfiling",
 		"EnableControllerAttachDetach",
 		"EnableDebuggingHandlers",
-		"EnableServer",
 		"EnforceNodeAllocatable[*]",
 		"EventBurst",
 		"EventRecordQPS",
@@ -176,9 +175,8 @@ var (
 		"HairpinMode",
 		"HealthzBindAddress",
 		"HealthzPort",
-		"HostIPCSources[*]",
-		"HostNetworkSources[*]",
-		"HostPIDSources[*]",
+		"TLSCipherSuites[*]",
+		"TLSMinVersion",
 		"IPTablesDropBit",
 		"IPTablesMasqueradeBit",
 		"ImageGCHighThresholdPercent",
@@ -190,13 +188,15 @@ var (
 		"KubeReserved[*]",
 		"KubeletCgroups",
 		"MakeIPTablesUtilChains",
-		"ManifestURL",
-		"ManifestURLHeader[*][*]",
+		"ServerTLSBootstrap",
+		"StaticPodURL",
+		"StaticPodURLHeader[*][*]",
 		"MaxOpenFiles",
 		"MaxPods",
 		"NodeStatusUpdateFrequency.Duration",
 		"OOMScoreAdj",
 		"PodCIDR",
+		"PodPidsLimit",
 		"PodsPerCore",
 		"Port",
 		"ProtectKernelDefaults",

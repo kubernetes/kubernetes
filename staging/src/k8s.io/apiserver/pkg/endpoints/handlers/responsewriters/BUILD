@@ -12,8 +12,7 @@ go_test(
         "errors_test.go",
         "status_test.go",
     ],
-    importpath = "k8s.io/apiserver/pkg/endpoints/handlers/responsewriters",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

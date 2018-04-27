@@ -19,7 +19,6 @@ package container
 import (
 	"bytes"
 	"fmt"
-	"hash/adler32"
 	"hash/fnv"
 	"strings"
 	"time"
@@ -31,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
@@ -46,9 +45,9 @@ type HandlerRunner interface {
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (contOpts *RunContainerOptions, err error)
+	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (contOpts *RunContainerOptions, cleanupAction func(), err error)
 	GetPodDNS(pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
-	// GetPodCgroupParent returns the CgroupName identifer, and its literal cgroupfs form on the host
+	// GetPodCgroupParent returns the CgroupName identifier, and its literal cgroupfs form on the host
 	// of a pod.
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
@@ -96,17 +95,6 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 // the running container with its desired spec.
 func HashContainer(container *v1.Container) uint64 {
 	hash := fnv.New32a()
-	hashutil.DeepHashObject(hash, *container)
-	return uint64(hash.Sum32())
-}
-
-// HashContainerLegacy returns the hash of the container. It is used to compare
-// the running container with its desired spec.
-// This is used by rktnetes and dockershim (for handling <=1.5 containers).
-// TODO: Remove this function when kubernetes version is >=1.8 AND rktnetes
-// update its hash function.
-func HashContainerLegacy(container *v1.Container) uint64 {
-	hash := adler32.New()
 	hashutil.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
 }
@@ -302,7 +290,7 @@ func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 
 // HasPrivilegedContainer returns true if any of the containers in the pod are privileged.
 func HasPrivilegedContainer(pod *v1.Pod) bool {
-	for _, c := range pod.Spec.Containers {
+	for _, c := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
 		if c.SecurityContext != nil &&
 			c.SecurityContext.Privileged != nil &&
 			*c.SecurityContext.Privileged {

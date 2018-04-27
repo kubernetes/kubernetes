@@ -12,7 +12,6 @@ go_test(
         "defaulttolerationseconds_test.go",
         "main_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/defaulttolerationseconds",
     tags = [
         "etcd",
         "integration",
@@ -20,8 +19,8 @@ go_test(
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
+        "//pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/admission/defaulttolerationseconds:go_default_library",
-        "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
