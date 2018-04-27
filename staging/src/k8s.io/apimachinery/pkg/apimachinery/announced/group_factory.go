@@ -150,11 +150,8 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, sche
 		gmf.GroupArgs.AddInternalObjectsToScheme(scheme)
 	}
 
-	accessor := meta.NewAccessor()
-
 	groupMeta := &apimachinery.GroupMeta{
 		GroupVersions:   externalVersions,
-		SelfLinker:      runtime.SelfLinker(accessor),
 		RootScopedKinds: gmf.GroupArgs.RootScopedKinds,
 	}
 	groupMeta.RESTMapper = gmf.newRESTMapper(scheme, externalVersions, groupMeta)
