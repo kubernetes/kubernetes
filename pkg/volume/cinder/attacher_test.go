@@ -737,7 +737,7 @@ func (instances *instances) List(filter string) ([]types.NodeName, error) {
 }
 
 func (instances *instances) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return errors.New("Not implemented")
+	return cloudprovider.NotImplemented
 }
 
 func (instances *instances) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
