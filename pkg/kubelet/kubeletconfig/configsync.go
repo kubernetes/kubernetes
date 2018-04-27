@@ -71,14 +71,14 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, eventClient v
 
 	node, err := latestNode(cc.informer.GetStore(), nodeName)
 	if err != nil {
-		cc.configOk.SetFailSyncCondition(status.FailSyncReasonInformer)
-		syncerr = fmt.Errorf("%s, error: %v", status.FailSyncReasonInformer, err)
+		cc.configStatus.SetErrorOverride(fmt.Sprintf(status.SyncErrorFmt, status.InternalError))
+		syncerr = fmt.Errorf("%s, error: %v", status.InternalError, err)
 		return
 	}
 
 	// check the Node and download any new config
 	if updated, cur, reason, err := cc.doSyncConfigSource(client, node.Spec.ConfigSource); err != nil {
-		cc.configOk.SetFailSyncCondition(reason)
+		cc.configStatus.SetErrorOverride(fmt.Sprintf(status.SyncErrorFmt, reason))
 		syncerr = fmt.Errorf("%s, error: %v", reason, err)
 		return
 	} else if updated {
@@ -99,8 +99,8 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, eventClient v
 	// If we get here:
 	// - there is no need to restart to update the current config
 	// - there was no error trying to sync configuration
-	// - if, previously, there was an error trying to sync configuration, we need to clear that error from the condition
-	cc.configOk.ClearFailSyncCondition()
+	// - if, previously, there was an error trying to sync configuration, we need to clear that error from the status
+	cc.configStatus.SetErrorOverride("")
 }
 
 // doSyncConfigSource checkpoints and sets the store's current config to the new config or resets config,
@@ -125,7 +125,7 @@ func (cc *Controller) doSyncConfigSource(client clientset.Interface, source *api
 	if err != nil {
 		return false, nil, reason, err
 	}
-	updated, reason, err := cc.setCurrentConfig(remote)
+	updated, reason, err := cc.setAssignedConfig(remote)
 	if err != nil {
 		return false, nil, reason, err
 	}
@@ -137,9 +137,9 @@ func (cc *Controller) doSyncConfigSource(client clientset.Interface, source *api
 func (cc *Controller) checkpointConfigSource(client clientset.Interface, source checkpoint.RemoteConfigSource) (string, error) {
 	// if the checkpoint already exists, skip downloading
 	if ok, err := cc.checkpointStore.Exists(source); err != nil {
-		reason := fmt.Sprintf(status.FailSyncReasonCheckpointExistenceFmt, source.APIPath(), source.UID())
-		return reason, fmt.Errorf("%s, error: %v", reason, err)
+		return status.InternalError, fmt.Errorf("%s, error: %v", status.InternalError, err)
 	} else if ok {
+		// TODO(mtaufen): update this to include ResourceVersion in #63221
 		utillog.Infof("checkpoint already exists for object %s with UID %s, skipping download", source.APIPath(), source.UID())
 		return "", nil
 	}
@@ -153,28 +153,21 @@ func (cc *Controller) checkpointConfigSource(client clientset.Interface, source 
 	// save
 	err = cc.checkpointStore.Save(payload)
 	if err != nil {
-		reason := fmt.Sprintf(status.FailSyncReasonSaveCheckpointFmt, source.APIPath(), payload.UID())
-		return reason, fmt.Errorf("%s, error: %v", reason, err)
+		return status.InternalError, fmt.Errorf("%s, error: %v", status.InternalError, err)
 	}
 
 	return "", nil
 }
 
-// setCurrentConfig the current checkpoint config in the store
-// returns whether the current config changed as a result, or a sanitized failure reason and an error.
-func (cc *Controller) setCurrentConfig(source checkpoint.RemoteConfigSource) (bool, string, error) {
-	failReason := func(s checkpoint.RemoteConfigSource) string {
-		if source == nil {
-			return status.FailSyncReasonSetCurrentLocal
-		}
-		return fmt.Sprintf(status.FailSyncReasonSetCurrentUIDFmt, source.APIPath(), source.UID())
-	}
-	current, err := cc.checkpointStore.Current()
+// setAssignedConfig updates the assigned checkpoint config in the store.
+// Returns whether the current config changed as a result, or a sanitized failure reason and an error.
+func (cc *Controller) setAssignedConfig(source checkpoint.RemoteConfigSource) (bool, string, error) {
+	current, err := cc.checkpointStore.Assigned()
 	if err != nil {
-		return false, failReason(source), err
+		return false, status.InternalError, err
 	}
-	if err := cc.checkpointStore.SetCurrent(source); err != nil {
-		return false, failReason(source), err
+	if err := cc.checkpointStore.SetAssigned(source); err != nil {
+		return false, status.InternalError, err
 	}
 	return !checkpoint.EqualRemoteConfigSources(current, source), "", nil
 }
@@ -184,7 +177,7 @@ func (cc *Controller) setCurrentConfig(source checkpoint.RemoteConfigSource) (bo
 func (cc *Controller) resetConfig() (bool, string, error) {
 	updated, err := cc.checkpointStore.Reset()
 	if err != nil {
-		return false, status.FailSyncReasonReset, err
+		return false, status.InternalError, err
 	}
 	return updated, "", nil
 }
