@@ -62,8 +62,6 @@ type DefaultRESTMapper struct {
 	kindToScope          map[schema.GroupVersionKind]RESTScope
 	singularToPlural     map[schema.GroupVersionResource]schema.GroupVersionResource
 	pluralToSingular     map[schema.GroupVersionResource]schema.GroupVersionResource
-
-	interfacesFunc VersionInterfacesFunc
 }
 
 func (m *DefaultRESTMapper) String() string {
@@ -72,16 +70,12 @@ func (m *DefaultRESTMapper) String() string {
 
 var _ RESTMapper = &DefaultRESTMapper{}
 
-// VersionInterfacesFunc returns the appropriate typer, and metadata accessor for a
-// given api version, or an error if no such api version exists.
-type VersionInterfacesFunc func(version schema.GroupVersion) (*VersionInterfaces, error)
-
 // NewDefaultRESTMapper initializes a mapping between Kind and APIVersion
 // to a resource name and back based on the objects in a runtime.Scheme
 // and the Kubernetes API conventions. Takes a group name, a priority list of the versions
 // to search when an object has no default version (set empty to return an error),
 // and a function that retrieves the correct metadata for a given version.
-func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion, f VersionInterfacesFunc) *DefaultRESTMapper {
+func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion) *DefaultRESTMapper {
 	resourceToKind := make(map[schema.GroupVersionResource]schema.GroupVersionKind)
 	kindToPluralResource := make(map[schema.GroupVersionKind]schema.GroupVersionResource)
 	kindToScope := make(map[schema.GroupVersionKind]RESTScope)
@@ -96,7 +90,6 @@ func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion, f VersionI
 		defaultGroupVersions: defaultGroupVersions,
 		singularToPlural:     singularToPlural,
 		pluralToSingular:     pluralToSingular,
-		interfacesFunc:       f,
 	}
 }
 

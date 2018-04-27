@@ -407,16 +407,6 @@ func (g TestGroup) StorageCodec() runtime.Codec {
 	return legacyscheme.Codecs.CodecForVersions(s, ds, schema.GroupVersions{g.externalGroupVersion}, nil)
 }
 
-// Converter returns the legacyscheme.Scheme for the API version to test against, as set by the
-// KUBE_TEST_API env var.
-func (g TestGroup) Converter() runtime.ObjectConvertor {
-	interfaces, err := legacyscheme.Registry.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
-	if err != nil {
-		panic(err)
-	}
-	return interfaces.ObjectConvertor
-}
-
 // SelfLink returns a self link that will appear to be for the version Version().
 // 'resource' should be the resource path, e.g. "pods" for the Pod type. 'name' should be
 // empty for lists.

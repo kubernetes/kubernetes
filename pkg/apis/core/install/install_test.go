@@ -66,17 +66,6 @@ func TestCodec(t *testing.T) {
 	}
 }
 
-func TestInterfacesFor(t *testing.T) {
-	if _, err := legacyscheme.Registry.GroupOrDie(internal.GroupName).InterfacesFor(internal.SchemeGroupVersion); err == nil {
-		t.Fatalf("unexpected non-error: %v", err)
-	}
-	for i, version := range legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersions {
-		if vi, err := legacyscheme.Registry.GroupOrDie(internal.GroupName).InterfacesFor(version); err != nil || vi == nil {
-			t.Fatalf("%d: unexpected result: %v", i, err)
-		}
-	}
-}
-
 func TestRESTMapper(t *testing.T) {
 	gv := schema.GroupVersion{Group: "", Version: "v1"}
 	rcGVK := gv.WithKind("ReplicationController")

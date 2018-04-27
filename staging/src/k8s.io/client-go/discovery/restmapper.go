@@ -39,7 +39,7 @@ type APIGroupResources struct {
 
 // NewRESTMapper returns a PriorityRESTMapper based on the discovered
 // groups and resources passed in.
-func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.VersionInterfacesFunc) meta.RESTMapper {
+func NewRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper {
 	unionMapper := meta.MultiRESTMapper{}
 
 	var groupPriority []string
@@ -90,7 +90,7 @@ func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.V
 			}
 
 			gv := schema.GroupVersion{Group: group.Group.Name, Version: discoveryVersion.Version}
-			versionMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv}, versionInterfaces)
+			versionMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv})
 
 			for _, resource := range resources {
 				scope := meta.RESTScopeNamespace
@@ -175,19 +175,17 @@ func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 // initialization of the RESTMapper until the first mapping is
 // requested.
 type DeferredDiscoveryRESTMapper struct {
-	initMu           sync.Mutex
-	delegate         meta.RESTMapper
-	cl               CachedDiscoveryInterface
-	versionInterface meta.VersionInterfacesFunc
+	initMu   sync.Mutex
+	delegate meta.RESTMapper
+	cl       CachedDiscoveryInterface
 }
 
 // NewDeferredDiscoveryRESTMapper returns a
 // DeferredDiscoveryRESTMapper that will lazily query the provided
 // client for discovery information to do REST mappings.
-func NewDeferredDiscoveryRESTMapper(cl CachedDiscoveryInterface, versionInterface meta.VersionInterfacesFunc) *DeferredDiscoveryRESTMapper {
+func NewDeferredDiscoveryRESTMapper(cl CachedDiscoveryInterface) *DeferredDiscoveryRESTMapper {
 	return &DeferredDiscoveryRESTMapper{
-		cl:               cl,
-		versionInterface: versionInterface,
+		cl: cl,
 	}
 }
 
@@ -204,7 +202,7 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 		return nil, err
 	}
 
-	d.delegate = NewRESTMapper(groupResources, d.versionInterface)
+	d.delegate = NewRESTMapper(groupResources)
 	return d.delegate, err
 }
 

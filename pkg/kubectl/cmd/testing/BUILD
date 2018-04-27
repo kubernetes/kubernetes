@@ -18,7 +18,6 @@ go_library(
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
-        "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
         "//pkg/printers:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

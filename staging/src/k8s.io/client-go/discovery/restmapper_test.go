@@ -94,7 +94,7 @@ func TestRESTMapper(t *testing.T) {
 		},
 	}
 
-	restMapper := NewRESTMapper(resources, nil)
+	restMapper := NewRESTMapper(resources)
 
 	kindTCs := []struct {
 		input schema.GroupVersionResource
@@ -243,7 +243,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert := assert.New(t)
 
 	cdc := fakeCachedDiscoveryInterface{fresh: false}
-	m := NewDeferredDiscoveryRESTMapper(&cdc, nil)
+	m := NewDeferredDiscoveryRESTMapper(&cdc)
 	assert.False(cdc.fresh, "should NOT be fresh after instantiation")
 	assert.Zero(cdc.invalidateCalls, "should not have called Invalidate()")
 

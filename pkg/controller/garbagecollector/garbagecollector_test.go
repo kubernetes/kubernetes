@@ -59,7 +59,7 @@ func (_ *testRESTMapper) Reset() {}
 func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-	tweakableRM := meta.NewDefaultRESTMapper(nil, nil)
+	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, legacyscheme.Registry.RESTMapper()}}
 	metaOnlyClientPool := dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
