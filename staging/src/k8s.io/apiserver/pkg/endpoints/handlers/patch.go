@@ -42,7 +42,7 @@ import (
 )
 
 // PatchResource returns a function that will handle a resource patch.
-func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, converter runtime.ObjectConvertor, patchTypes []string) http.HandlerFunc {
+func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Patch " + req.URL.Path)
@@ -77,14 +77,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
-		// TODO: this is NOT using the scope's convertor [sic]. Figure
-		// out if this is intentional or not. Perhaps it matters on
-		// subresources? Rename this parameter if this is purposful and
-		// delete it (using scope.Convertor instead) otherwise.
-		//
-		// Already some tests set this converter but apparently not the
-		// scope's unsafeConvertor.
-		schemaReferenceObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion())
+		schemaReferenceObj, err := scope.UnsafeConvertor.ConvertToVersion(r.New(), scope.Kind.GroupVersion())
 		if err != nil {
 			scope.err(err, w, req)
 			return

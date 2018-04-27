@@ -245,6 +245,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		Creater:         scheme,
 		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Linker:          selfLinker,
@@ -3170,6 +3171,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Root:            "/" + prefix,
 		Creater:         scheme,
 		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Linker:          selfLinker,
@@ -3197,12 +3199,13 @@ func TestParentResourceIsRequired(t *testing.T) {
 			"simple":     &SimpleRESTStorage{},
 			"simple/sub": storage,
 		},
-		Root:      "/" + prefix,
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
+		Root:            "/" + prefix,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
 
 		Admit: admissionControl,
 
@@ -3822,11 +3825,12 @@ func TestXGSubresource(t *testing.T) {
 	group := APIGroupVersion{
 		Storage: storage,
 
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
 
 		ParameterCodec: parameterCodec,
 
