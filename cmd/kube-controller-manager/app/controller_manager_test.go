@@ -79,3 +79,43 @@ func TestIsControllerEnabled(t *testing.T) {
 	}
 
 }
+
+func TestKnownControllers(t *testing.T) {
+	expected := []string{
+		"attachdetach",
+		"bootstrapsigner",
+		"clusterrole-aggregation",
+		"cronjob",
+		"csrapproving",
+		"csrcleaner",
+		"csrsigning",
+		"daemonset",
+		"deployment",
+		"disruption",
+		"endpoint",
+		"garbagecollector",
+		"horizontalpodautoscaling",
+		"job",
+		"namespace",
+		"nodeipam",
+		"nodelifecycle",
+		"persistentvolume-binder",
+		"persistentvolume-expander",
+		"podgc",
+		"pv-protection",
+		"pvc-protection",
+		"replicaset",
+		"replicationcontroller",
+		"resourcequota",
+		"route",
+		"service",
+		"serviceaccount",
+		"serviceaccount-token",
+		"statefulset",
+		"tokencleaner",
+		"ttl",
+	}
+
+	actual := KnownControllers()
+	assert.ElementsMatch(t, expected, actual)
+}
