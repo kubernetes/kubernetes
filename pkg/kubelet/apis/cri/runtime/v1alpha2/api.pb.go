@@ -3052,7 +3052,8 @@ func (*RemoveImageResponse) ProtoMessage()               {}
 func (*RemoveImageResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{76} }
 
 type NetworkConfig struct {
-	// CIDR to use for pod IP addresses.
+	// CIDR to use for pod IP addresses. If the CIDR is empty, runtimes
+	// should omit it.
 	PodCidr string `protobuf:"bytes,1,opt,name=pod_cidr,json=podCidr,proto3" json:"pod_cidr,omitempty"`
 }
 
