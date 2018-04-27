@@ -28,9 +28,6 @@ import (
 // Mapper is a convenience struct for holding references to the interfaces
 // needed to create Info for arbitrary objects.
 type Mapper struct {
-	ObjectTyper     runtime.ObjectTyper
-	ObjectConverter runtime.ObjectConvertor
-
 	RESTMapper   meta.RESTMapper
 	ClientMapper ClientMapper
 	Decoder      runtime.Decoder
@@ -60,9 +57,8 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 
 	return &Info{
-		Client:                     client,
-		Mapping:                    mapping,
-		toVersionedObjectConverter: m.ObjectConverter,
+		Client:  client,
+		Mapping: mapping,
 
 		Source:          source,
 		Namespace:       namespace,
@@ -76,8 +72,8 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 // InfoForObject creates an Info object for the given Object. An error is returned
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
-func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []schema.GroupVersionKind) (*Info, error) {
-	groupVersionKinds, _, err := m.ObjectTyper.ObjectKinds(obj)
+func (m *Mapper) InfoForObject(obj runtime.Object, typer runtime.ObjectTyper, preferredGVKs []schema.GroupVersionKind) (*Info, error) {
+	groupVersionKinds, _, err := typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
 	}
@@ -100,9 +96,8 @@ func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []schema.GroupV
 	namespace, _ := metadataAccessor.Namespace(obj)
 	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 	return &Info{
-		Client:                     client,
-		Mapping:                    mapping,
-		toVersionedObjectConverter: m.ObjectConverter,
+		Client:  client,
+		Mapping: mapping,
 
 		Namespace:       namespace,
 		Name:            name,

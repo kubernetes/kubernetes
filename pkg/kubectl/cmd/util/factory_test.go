@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -474,11 +473,9 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
 	b := resource.NewBuilder(
 		&resource.Mapper{
-			RESTMapper:      mapper,
-			ObjectTyper:     legacyscheme.Scheme,
-			ObjectConverter: legacyscheme.Scheme,
-			ClientMapper:    fakeClient(),
-			Decoder:         testapi.Default.Codec(),
+			RESTMapper:   mapper,
+			ClientMapper: fakeClient(),
+			Decoder:      testapi.Default.Codec(),
 		},
 		nil,
 		categories.LegacyCategoryExpander,

@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -68,7 +67,6 @@ type AutoscaleOptions struct {
 	EnforceNamespace bool
 
 	Mapper           meta.RESTMapper
-	Typer            runtime.ObjectTyper
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	GeneratorFunc func(string, *meta.RESTMapping) (kubectl.StructuredGenerator, error)
@@ -133,7 +131,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.Builder = f.NewBuilder()
 	o.CanBeAutoscaled = f.CanBeAutoscaled
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper = f.RESTMapper()
 	o.ClientForMapping = f.ClientForMapping
 	o.BuilderArgs = args
 	o.RecordFlags.Complete(f.Command(cmd, false))
@@ -197,7 +195,7 @@ func (o *AutoscaleOptions) Validate(cmd *cobra.Command) error {
 
 func (o *AutoscaleOptions) Run() error {
 	r := o.Builder.
-		Internal().
+		Internal(legacyscheme.Scheme).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
@@ -231,13 +229,11 @@ func (o *AutoscaleOptions) Run() error {
 		}
 
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:     o.Typer,
-			ObjectConverter: legacyscheme.Scheme,
-			RESTMapper:      o.Mapper,
-			ClientMapper:    resource.ClientMapperFunc(o.ClientForMapping),
-			Decoder:         cmdutil.InternalVersionDecoder(),
+			RESTMapper:   o.Mapper,
+			ClientMapper: resource.ClientMapperFunc(o.ClientForMapping),
+			Decoder:      cmdutil.InternalVersionDecoder(),
 		}
-		hpa, err := resourceMapper.InfoForObject(object, nil)
+		hpa, err := resourceMapper.InfoForObject(object, legacyscheme.Scheme, nil)
 		if err != nil {
 			return err
 		}
@@ -253,7 +249,7 @@ func (o *AutoscaleOptions) Run() error {
 			if err != nil {
 				return err
 			}
-			return printer.PrintObj(hpa.AsVersioned(), o.Out)
+			return printer.PrintObj(hpa.AsVersioned(legacyscheme.Scheme), o.Out)
 		}
 
 		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, hpa.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
@@ -270,7 +266,7 @@ func (o *AutoscaleOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(info.AsVersioned(), o.Out)
+		return printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
 	})
 	if err != nil {
 		return err

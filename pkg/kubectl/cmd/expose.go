@@ -96,7 +96,6 @@ type ExposeServiceOptions struct {
 
 	Namespace string
 	Mapper    meta.RESTMapper
-	Typer     runtime.ObjectTyper
 
 	Builder *resource.Builder
 
@@ -188,7 +187,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	o.MapBasedSelectorForObject = f.MapBasedSelectorForObject
 	o.PortsForObject = f.PortsForObject
 	o.ProtocolsForObject = f.ProtocolsForObject
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper = f.RESTMapper()
 	o.LabelsForObject = f.LabelsForObject
 
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
@@ -201,7 +200,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 
 func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) error {
 	r := o.Builder.
-		Internal().
+		Internal(legacyscheme.Scheme).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
@@ -312,13 +311,11 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:     o.Typer,
-			ObjectConverter: legacyscheme.Scheme,
-			RESTMapper:      o.Mapper,
-			ClientMapper:    resource.ClientMapperFunc(o.ClientForMapping),
-			Decoder:         cmdutil.InternalVersionDecoder(),
+			RESTMapper:   o.Mapper,
+			ClientMapper: resource.ClientMapperFunc(o.ClientForMapping),
+			Decoder:      cmdutil.InternalVersionDecoder(),
 		}
-		info, err = resourceMapper.InfoForObject(object, nil)
+		info, err = resourceMapper.InfoForObject(object, legacyscheme.Scheme, nil)
 		if err != nil {
 			return err
 		}
@@ -339,7 +336,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			return err
 		}
 
-		return o.PrintObj(info.AsVersioned(), o.Out)
+		return o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
 	})
 	if err != nil {
 		return err

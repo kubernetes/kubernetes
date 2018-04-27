@@ -20,8 +20,8 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -38,7 +38,6 @@ type UndoOptions struct {
 
 	Rollbackers []kubectl.Rollbacker
 	Mapper      meta.RESTMapper
-	Typer       runtime.ObjectTyper
 	Infos       []*resource.Info
 	ToRevision  int64
 	DryRun      bool
@@ -102,7 +101,7 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 	}
 
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper = f.RESTMapper()
 	o.Out = out
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
@@ -112,7 +111,7 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 	}
 
 	r := f.NewBuilder().
-		Internal().
+		Internal(legacyscheme.Scheme).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).

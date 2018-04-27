@@ -94,7 +94,7 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.Recursive = cmdutil.GetFlagBool(cmd, "recursive")
 	o.ApiVersion = cmdutil.GetFlagString(cmd, "api-version")
 
-	o.Mapper, _ = f.Object()
+	o.Mapper = f.RESTMapper()
 
 	var err error
 	o.Schema, err = f.OpenAPISchema()

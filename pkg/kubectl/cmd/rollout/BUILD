@@ -19,6 +19,7 @@ go_library(
         "//build/visible_to:pkg_kubectl_cmd_rollout_CONSUMERS",
     ],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/set:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
@@ -29,7 +30,6 @@ go_library(
         "//vendor/github.com/renstrom/dedent:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",

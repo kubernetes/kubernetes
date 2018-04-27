@@ -77,8 +77,6 @@ type Info struct {
 	// Mapping may be nil if the object has no available metadata, but is still parseable
 	// from disk.
 	Mapping *meta.RESTMapping
-	// ObjectConverter allows conversion
-	toVersionedObjectConverter runtime.ObjectConvertor
 
 	// Namespace will be set if the object is namespaced and has a specified value.
 	Namespace string
@@ -183,17 +181,16 @@ func (i *Info) ResourceMapping() *meta.RESTMapping {
 }
 
 // Versioned returns the object as a Go type in the mapping's version or returns an error.
-func (i *Info) Versioned() (runtime.Object, error) {
-	return i.toVersionedObjectConverter.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupVersion())
+func (i *Info) versioned(convertor runtime.ObjectConvertor) (runtime.Object, error) {
+	return convertor.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupVersion())
 }
 
 // AsVersioned returns the object as a Go object in the external form if possible (matching the
 // group version kind of the mapping, or i.Object if it cannot be converted.
-func (i *Info) AsVersioned() runtime.Object {
-	if i.toVersionedObjectConverter == nil {
-		panic("attempt to call AsVersioned object using .Unstructured builder")
-	}
-	if obj, err := i.Versioned(); err == nil {
+// Deprecated this function will be removed once calling code is updated to indicate the correct
+// negoticatedserializers during construction of the builder
+func (i *Info) AsVersioned(convertor runtime.ObjectConvertor) runtime.Object {
+	if obj, err := i.versioned(convertor); err == nil {
 		return obj
 	}
 	return i.Object
@@ -389,18 +386,19 @@ func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
 // the visit.
 // TODO: allow errors to be aggregated?
 type FlattenListVisitor struct {
-	Visitor
-	*Mapper
+	visitor Visitor
+	typer   runtime.ObjectTyper
+	mapper  *Mapper
 }
 
 // NewFlattenListVisitor creates a visitor that will expand list style runtime.Objects
 // into individual items and then visit them individually.
-func NewFlattenListVisitor(v Visitor, mapper *Mapper) Visitor {
-	return FlattenListVisitor{v, mapper}
+func NewFlattenListVisitor(v Visitor, typer runtime.ObjectTyper, mapper *Mapper) Visitor {
+	return FlattenListVisitor{v, typer, mapper}
 }
 
 func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
-	return v.Visitor.Visit(func(info *Info, err error) error {
+	return v.visitor.Visit(func(info *Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -411,7 +409,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if err != nil {
 			return fn(info, nil)
 		}
-		if errs := runtime.DecodeList(items, v.Mapper.Decoder); len(errs) > 0 {
+		if errs := runtime.DecodeList(items, v.mapper.Decoder); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
 
@@ -422,7 +420,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		}
 
 		for i := range items {
-			item, err := v.InfoForObject(items[i], preferredGVKs)
+			item, err := v.mapper.InfoForObject(items[i], v.typer, preferredGVKs)
 			if err != nil {
 				return err
 			}

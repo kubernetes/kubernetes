@@ -26,7 +26,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -49,6 +51,10 @@ type Builder struct {
 	mapper       *Mapper
 	internal     *Mapper
 	unstructured *Mapper
+
+	// objectTyper is statically determinant per-command invocation based on your internal or unstructured choice
+	// it does not ever need to rely upon discovery.
+	objectTyper runtime.ObjectTyper
 
 	errs []error
 
@@ -186,8 +192,8 @@ func (b *Builder) Unstructured() *Builder {
 		return b
 	}
 	b.mapper = b.unstructured
-	// the unstructured mapper doesn't do any conversion
-	b.mapper.ObjectConverter = nil
+
+	b.objectTyper = unstructuredscheme.NewUnstructuredObjectTyper()
 	return b
 }
 
@@ -196,7 +202,7 @@ func (b *Builder) Unstructured() *Builder {
 // to the server will not be seen by the client code and may result in failure. Only
 // use this mode when working offline, or when generating patches to send to the server.
 // Use Unstructured if you are reading an object and performing a POST or PUT.
-func (b *Builder) Internal() *Builder {
+func (b *Builder) Internal(typer runtime.ObjectTyper) *Builder {
 	if b.internal == nil {
 		b.errs = append(b.errs, fmt.Errorf("no internal mapper provided"))
 		return b
@@ -206,6 +212,8 @@ func (b *Builder) Internal() *Builder {
 		return b
 	}
 	b.mapper = b.internal
+
+	b.objectTyper = typer
 	return b
 }
 
@@ -636,6 +644,11 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 		// if we error out here, it is because we could not match a resource or a kind
 		// for the given argument. To maintain consistency with previous behavior,
 		// announce that a resource type could not be found.
+		// if the error is a URL error, then we had trouble doing discovery, so we should return the original
+		// error since it may help a user diagnose what is actually wrong
+		if _, ok := err.(*url.Error); ok {
+			return nil, err
+		}
 		return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
 	}
 
@@ -762,7 +775,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, b.mapper.ObjectConverter, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)
@@ -837,12 +850,11 @@ func (b *Builder) visitByResource() *Result {
 		}
 
 		info := &Info{
-			Client:                     client,
-			Mapping:                    mapping,
-			toVersionedObjectConverter: b.mapper.ObjectConverter,
-			Namespace:                  selectorNamespace,
-			Name:                       tuple.Name,
-			Export:                     b.export,
+			Client:    client,
+			Mapping:   mapping,
+			Namespace: selectorNamespace,
+			Name:      tuple.Name,
+			Export:    b.export,
 		}
 		items = append(items, info)
 	}
@@ -903,12 +915,11 @@ func (b *Builder) visitByName() *Result {
 	visitors := []Visitor{}
 	for _, name := range b.names {
 		info := &Info{
-			Client:                     client,
-			Mapping:                    mapping,
-			toVersionedObjectConverter: b.mapper.ObjectConverter,
-			Namespace:                  selectorNamespace,
-			Name:                       name,
-			Export:                     b.export,
+			Client:    client,
+			Mapping:   mapping,
+			Namespace: selectorNamespace,
+			Name:      name,
+			Export:    b.export,
 		}
 		visitors = append(visitors, info)
 	}
@@ -944,7 +955,7 @@ func (b *Builder) visitByPaths() *Result {
 	if b.latest {
 		// must flatten lists prior to fetching
 		if b.flatten {
-			visitors = NewFlattenListVisitor(visitors, b.mapper)
+			visitors = NewFlattenListVisitor(visitors, b.objectTyper, b.mapper)
 		}
 		// must set namespace prior to fetching
 		if b.defaultNamespace {
@@ -975,7 +986,7 @@ func (b *Builder) Do() *Result {
 		return r
 	}
 	if b.flatten {
-		r.visitor = NewFlattenListVisitor(r.visitor, b.mapper)
+		r.visitor = NewFlattenListVisitor(r.visitor, b.objectTyper, b.mapper)
 	}
 	helpers := []VisitorFunc{}
 	if b.defaultNamespace {

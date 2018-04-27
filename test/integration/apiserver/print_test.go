@@ -147,7 +147,7 @@ func TestServerSidePrint(t *testing.T) {
 	printer := newFakePrinter(printersinternal.AddHandlers)
 
 	factory := util.NewFactory(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
-	mapper, _ := factory.Object()
+	mapper := factory.RESTMapper()
 
 	for gvk, apiType := range legacyscheme.Scheme.AllKnownTypes() {
 		// we do not care about internal objects or lists // TODO make sure this is always true

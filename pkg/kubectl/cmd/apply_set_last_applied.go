@@ -46,7 +46,6 @@ type SetLastAppliedOptions struct {
 	Selector         string
 	InfoList         []*resource.Info
 	Mapper           meta.RESTMapper
-	Typer            runtime.ObjectTyper
 	Namespace        string
 	EnforceNamespace bool
 	DryRun           bool
@@ -117,7 +116,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ShortOutput = o.Output == "name"
 
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper = f.RESTMapper()
 
 	var err error
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
