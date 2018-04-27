@@ -22,8 +22,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -70,10 +72,10 @@ type AutoscaleOptions struct {
 	namespace        string
 	dryRun           bool
 	builder          *resource.Builder
-	mapper           meta.RESTMapper
 	canBeAutoscaled  func(kind schema.GroupKind) error
-	clientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	generatorFunc    func(string, *meta.RESTMapping) (kubectl.StructuredGenerator, error)
+
+	HPAClient autoscalingv1client.HorizontalPodAutoscalersGetter
 
 	genericclioptions.IOStreams
 }
@@ -132,12 +134,6 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
 	o.canBeAutoscaled = f.CanBeAutoscaled
-	o.mapper, err = f.RESTMapper()
-	if err != nil {
-		return err
-	}
-
-	o.clientForMapping = f.ClientForMapping
 	o.args = args
 	o.RecordFlags.Complete(f.Command(cmd, false))
 
@@ -145,6 +141,12 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
+
+	kubeClient, err := f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+	o.HPAClient = kubeClient.AutoscalingV1()
 
 	// get the generator
 	o.generatorFunc = func(name string, mapping *meta.RESTMapping) (kubectl.StructuredGenerator, error) {
@@ -199,7 +201,7 @@ func (o *AutoscaleOptions) Validate() error {
 
 func (o *AutoscaleOptions) Run() error {
 	r := o.builder.
-		Internal(legacyscheme.Scheme).
+		WithScheme(legacyscheme.Scheme).
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, o.FilenameOptions).
@@ -231,20 +233,14 @@ func (o *AutoscaleOptions) Run() error {
 		if err != nil {
 			return err
 		}
+		hpa, ok := object.(*autoscalingv1.HorizontalPodAutoscaler)
+		if !ok {
+			return fmt.Errorf("generator made %T, not autoscalingv1.HorizontalPodAutoscaler", object)
+		}
 
-		resourceMapper := &resource.Mapper{
-			RESTMapper:   o.mapper,
-			ClientMapper: resource.ClientMapperFunc(o.clientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
-		}
-		hpa, err := resourceMapper.InfoForObject(object, legacyscheme.Scheme, nil)
-		if err != nil {
-			return err
-		}
-		if err := o.Recorder.Record(hpa.Object); err != nil {
+		if err := o.Recorder.Record(hpa); err != nil {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
-		object = hpa.Object
 
 		if o.dryRun {
 			count++
@@ -253,14 +249,14 @@ func (o *AutoscaleOptions) Run() error {
 			if err != nil {
 				return err
 			}
-			return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(hpa.Object, hpa.Mapping), o.Out)
+			return printer.PrintObj(hpa, o.Out)
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, hpa.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, hpa, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
-		_, err = resource.NewHelper(hpa.Client, hpa.Mapping).Create(o.namespace, false, object)
+		actualHPA, err := o.HPAClient.HorizontalPodAutoscalers(o.namespace).Create(hpa)
 		if err != nil {
 			return err
 		}
@@ -270,7 +266,7 @@ func (o *AutoscaleOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, hpa.Mapping), o.Out)
+		return printer.PrintObj(actualHPA, o.Out)
 	})
 	if err != nil {
 		return err

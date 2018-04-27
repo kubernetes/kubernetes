@@ -66,7 +66,6 @@ type EditOptions struct {
 
 	cmdutil.ValidateOptions
 
-	ResourceMapper *resource.Mapper
 	OriginalResult *resource.Result
 
 	EditMode EditMode
