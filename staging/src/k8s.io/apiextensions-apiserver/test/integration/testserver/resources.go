@@ -217,9 +217,9 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
 	var resourceClient dynamic.DynamicResourceInterface
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
-		resourceClient = dynamicClientSet.NamespacedResource(gvr, ns)
+		resourceClient = dynamicClientSet.Resource(gvr).Namespace(ns)
 	} else {
-		resourceClient = dynamicClientSet.ClusterResource(gvr)
+		resourceClient = dynamicClientSet.Resource(gvr)
 	}
 
 	initialList, err := resourceClient.List(metav1.ListOptions{})
