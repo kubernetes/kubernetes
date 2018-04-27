@@ -992,6 +992,7 @@ func TestNodeOperators(t *testing.T) {
 			t.Errorf("Failed to find node %v in schedulercache.", node.Name)
 		}
 
+		expected.generation = got.generation
 		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Failed to add node into schedulercache:\n got: %+v \nexpected: %+v", got, expected)
 		}
@@ -1003,6 +1004,7 @@ func TestNodeOperators(t *testing.T) {
 		if !found || len(cachedNodes) != 1 {
 			t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes, cache.nodes)
 		}
+		expected.generation = newNode.generation
 		if !reflect.DeepEqual(newNode, expected) {
 			t.Errorf("Failed to clone node:\n got: %+v, \n expected: %+v", newNode, expected)
 		}
@@ -1010,12 +1012,15 @@ func TestNodeOperators(t *testing.T) {
 		// Case 3: update node attribute successfully.
 		node.Status.Allocatable[v1.ResourceMemory] = mem50m
 		expected.allocatableResource.Memory = mem50m.Value()
-		expected.generation++
 		cache.UpdateNode(nil, node)
 		got, found = cache.nodes[node.Name]
 		if !found {
 			t.Errorf("Failed to find node %v in schedulercache after UpdateNode.", node.Name)
 		}
+		if got.generation <= expected.generation {
+			t.Errorf("generation is not incremented. got: %v, expected: %v", got.generation, expected.generation)
+		}
+		expected.generation = got.generation
 
 		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Failed to update node in schedulercache:\n got: %+v \nexpected: %+v", got, expected)
