@@ -29,7 +29,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -316,12 +315,12 @@ func InClusterConfig() (*Config, error) {
 		return nil, fmt.Errorf("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
 	}
 
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + v1.ServiceAccountTokenKey)
+	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if err != nil {
 		return nil, err
 	}
 	tlsClientConfig := TLSClientConfig{}
-	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + v1.ServiceAccountRootCAKey
+	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	if _, err := certutil.NewPool(rootCAFile); err != nil {
 		glog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
