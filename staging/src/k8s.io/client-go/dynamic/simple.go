@@ -158,8 +158,17 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured) (*u
 		return nil, err
 	}
 
-	result := c.client.client.Put().AbsPath(append(c.makeURLSegments(accessor.GetName()), "status")...).Body(obj).Do()
-	uncastObj, err := result.Get()
+	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	result := c.client.client.Put().AbsPath(append(c.makeURLSegments(accessor.GetName()), "status")...).Body(outBytes).Do()
+	retBytes, err := result.Raw()
+	if err != nil {
+		return nil, err
+	}
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -167,9 +176,6 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured) (*u
 }
 
 func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions) error {
-	if opts == nil {
-		opts = &metav1.DeleteOptions{}
-	}
 	if opts == nil {
 		opts = &metav1.DeleteOptions{}
 	}
