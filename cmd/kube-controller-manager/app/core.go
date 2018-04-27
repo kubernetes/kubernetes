@@ -296,8 +296,8 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
 	nsKubeconfig := ctx.ClientBuilder.ConfigOrDie("namespace-controller")
-	nsKubeconfig.QPS *= 10
-	nsKubeconfig.Burst *= 10
+	nsKubeconfig.QPS *= 20
+	nsKubeconfig.Burst *= 100
 	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
 
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
