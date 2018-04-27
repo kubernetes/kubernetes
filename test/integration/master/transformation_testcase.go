@@ -78,7 +78,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 		}
 	}
 
-	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, e.getEncryptionOptions(), e.storageConfig); err != nil {
+	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(), e.storageConfig); err != nil {
 		return nil, fmt.Errorf("failed to start KubeAPI server: %v", err)
 	}
 
