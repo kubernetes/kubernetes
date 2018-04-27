@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -542,13 +544,10 @@ func TestFindOldReplicaSets(t *testing.T) {
 			requireRS, allRS := FindOldReplicaSets(&test.deployment, test.rsList)
 			sort.Sort(controller.ReplicaSetsByCreationTimestamp(allRS))
 			sort.Sort(controller.ReplicaSetsByCreationTimestamp(test.expected))
-			if !reflect.DeepEqual(allRS, test.expected) {
-				t.Errorf("In test case %q, expected %#v, got %#v", test.Name, test.expected, allRS)
-			}
+			assert.Equalf(t, allRS, test.expected, "In test case %q, expected %#v, got %#v", test.Name, test.expected, allRS)
+
 			// RSs are getting filtered correctly by rs.spec.replicas
-			if !reflect.DeepEqual(requireRS, test.expectedRequire) {
-				t.Errorf("In test case %q, expected %#v, got %#v", test.Name, test.expectedRequire, requireRS)
-			}
+			assert.Equalf(t, requireRS, test.expectedRequire, "In test case %q, expected %#v, got %#v", test.Name, test.expectedRequire, requireRS)
 		})
 	}
 }
@@ -842,9 +841,7 @@ func TestSetCondition(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			SetDeploymentCondition(test.status, test.cond)
-			if !reflect.DeepEqual(test.status, test.expectedStatus) {
-				t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
-			}
+			assert.Equalf(t, test.expectedStatus, test.status, "%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
 		})
 	}
 }
@@ -887,9 +884,7 @@ func TestRemoveCondition(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			RemoveDeploymentCondition(test.status, test.condType)
-			if !reflect.DeepEqual(test.status, test.expectedStatus) {
-				t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
-			}
+			assert.Equalf(t, test.expectedStatus, test.status, "%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
 		})
 	}
 }

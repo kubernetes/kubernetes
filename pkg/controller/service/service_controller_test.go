@@ -18,8 +18,9 @@ package service
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -252,9 +253,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		if err := controller.updateLoadBalancerHosts(services, nodes); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
-			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
-		}
+		assert.Equalf(t, item.expectedUpdateCalls, cloud.UpdateCalls, "expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
 	}
 }
 

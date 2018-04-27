@@ -17,8 +17,9 @@ limitations under the License.
 package controller
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
@@ -165,8 +166,8 @@ func TestClaimPods(t *testing.T) {
 		claimed, err := test.manager.ClaimPods(test.pods)
 		if err != nil {
 			t.Errorf("Test case `%s`, unexpected error: %v", test.name, err)
-		} else if !reflect.DeepEqual(test.claimed, claimed) {
-			t.Errorf("Test case `%s`, claimed wrong pods. Expected %v, got %v", test.name, podToStringSlice(test.claimed), podToStringSlice(claimed))
+		} else {
+			assert.Equalf(t, claimed, test.claimed, "Test case `%s`, claimed wrong pods. Expected %v, got %v", test.name, podToStringSlice(test.claimed), podToStringSlice(claimed))
 		}
 
 	}

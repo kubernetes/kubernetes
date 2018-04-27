@@ -22,11 +22,12 @@ import (
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -1319,9 +1320,7 @@ func TestSetCondition(t *testing.T) {
 
 	for _, test := range tests {
 		SetCondition(test.status, test.cond)
-		if !reflect.DeepEqual(test.status, test.expectedStatus) {
-			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
-		}
+		assert.Equalf(t, test.expectedStatus, test.status, "%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
 	}
 }
 
@@ -1362,9 +1361,7 @@ func TestRemoveCondition(t *testing.T) {
 
 	for _, test := range tests {
 		RemoveCondition(test.status, test.condType)
-		if !reflect.DeepEqual(test.status, test.expectedStatus) {
-			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
-		}
+		assert.Equalf(t, test.expectedStatus, test.status, "%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
 	}
 }
 
@@ -1574,9 +1571,7 @@ func TestGetPodsToDelete(t *testing.T) {
 		if len(podsToDelete) != len(test.expectedPodsToDelete) {
 			t.Errorf("%s: unexpected pods to delete, expected %v, got %v", test.name, test.expectedPodsToDelete, podsToDelete)
 		}
-		if !reflect.DeepEqual(podsToDelete, test.expectedPodsToDelete) {
-			t.Errorf("%s: unexpected pods to delete, expected %v, got %v", test.name, test.expectedPodsToDelete, podsToDelete)
-		}
+		assert.Equalf(t, test.expectedPodsToDelete, podsToDelete, "%s: unexpected pods to delete, expected %v, got %v", test.name, test.expectedPodsToDelete, podsToDelete)
 	}
 }
 

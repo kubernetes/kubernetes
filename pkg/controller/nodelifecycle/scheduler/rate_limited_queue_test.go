@@ -17,9 +17,10 @@ limitations under the License.
 package scheduler
 
 import (
-	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
@@ -215,9 +216,9 @@ func TestTryOrdering(t *testing.T) {
 		order = append(order, value.Value)
 		return true, 0
 	})
-	if !reflect.DeepEqual(order, []string{"first", "third"}) {
-		t.Fatalf("order was wrong: %v", order)
-	}
+
+	assert.Equalf(t, []string{"first", "third"}, order, "order was wrong: %v", order)
+
 	if count != 3 {
 		t.Fatalf("unexpected iterations: %d", count)
 	}
@@ -261,9 +262,8 @@ func TestTryRemovingWhileTry(t *testing.T) {
 		return true, 0
 	})
 
-	if !reflect.DeepEqual(order, []string{"first", "third"}) {
-		t.Fatalf("order was wrong: %v", order)
-	}
+	assert.Equalf(t, []string{"first", "third"}, order, "order was wrong: %v", order)
+
 	if count != 3 {
 		t.Fatalf("unexpected iterations: %d", count)
 	}

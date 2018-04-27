@@ -83,6 +83,7 @@ go_test(
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/storage/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -20,16 +20,16 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/stretchr/testify/assert"
+
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
-
-	"k8s.io/api/core/v1"
 )
 
 var (
@@ -205,9 +205,7 @@ func TestNodeSyncUpdate(t *testing.T) {
 		<-doneChan
 		tc.fake.dumpTrace()
 
-		if !reflect.DeepEqual(tc.fake.events, tc.events) {
-			t.Errorf("%v, %v; fake.events = %#v, want %#v", tc.desc, tc.mode, tc.fake.events, tc.events)
-		}
+		assert.Equalf(t, tc.events, tc.fake.events, "%v, %v; fake.events = %#v, want %#v", tc.desc, tc.mode, tc.fake.events, tc.events)
 
 		var hasError bool
 		for _, r := range tc.fake.results {

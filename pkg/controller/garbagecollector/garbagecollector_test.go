@@ -601,9 +601,7 @@ func TestDeleteOwnerRefPatch(t *testing.T) {
 	if err := json.Unmarshal(patched, &got); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(expected, got) {
-		t.Errorf("expected: %#v,\ngot: %#v", expected, got)
-	}
+	assert.Equalf(t, expected, got, "expected: %#v,\ngot: %#v", expected, got)
 }
 
 func TestUnblockOwnerReference(t *testing.T) {
@@ -782,9 +780,7 @@ func TestGetDeletableResources(t *testing.T) {
 			Error:              test.err,
 		}
 		actual := GetDeletableResources(client)
-		if !reflect.DeepEqual(test.deletableResources, actual) {
-			t.Errorf("expected resources:\n%v\ngot:\n%v", test.deletableResources, actual)
-		}
+		assert.Equalf(t, test.deletableResources, actual, "expected resources:\n%v\ngot:\n%v", test.deletableResources, actual)
 	}
 }
 

@@ -17,8 +17,9 @@ limitations under the License.
 package replication
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 )
@@ -134,9 +135,7 @@ func TestSetCondition(t *testing.T) {
 
 	for _, test := range tests {
 		SetCondition(test.status, test.cond)
-		if !reflect.DeepEqual(test.status, test.expectedStatus) {
-			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
-		}
+		assert.Equalf(t, test.expectedStatus, test.status, "%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
 	}
 }
 
@@ -177,8 +176,6 @@ func TestRemoveCondition(t *testing.T) {
 
 	for _, test := range tests {
 		RemoveCondition(test.status, test.condType)
-		if !reflect.DeepEqual(test.status, test.expectedStatus) {
-			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
-		}
+		assert.Equalf(t, test.expectedStatus, test.status, "%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
 	}
 }
