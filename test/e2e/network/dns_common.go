@@ -55,9 +55,8 @@ type dnsTestCommon struct {
 
 func newDnsTestCommon() dnsTestCommon {
 	return dnsTestCommon{
-		f:    framework.NewDefaultFramework("dns-config-map"),
-		ns:   "kube-system",
-		name: "kube-dns",
+		f:  framework.NewDefaultFramework("dns-config-map"),
+		ns: "kube-system",
 	}
 }
 
@@ -72,6 +71,12 @@ func (t *dnsTestCommon) init() {
 
 	t.dnsPod = &pods.Items[0]
 	framework.Logf("Using DNS pod: %v", t.dnsPod.Name)
+
+	if strings.Contains(t.dnsPod.Name, "coredns") {
+		t.name = "coredns"
+	} else {
+		t.name = "kube-dns"
+	}
 }
 
 func (t *dnsTestCommon) checkDNSRecord(name string, predicate func([]string) bool, timeout time.Duration) {
@@ -102,6 +107,8 @@ func (t *dnsTestCommon) checkDNSRecordFrom(name string, predicate func([]string)
 func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 	cmd := []string{"/usr/bin/dig", "+short"}
 	switch target {
+	case "coredns":
+		cmd = append(cmd, "@"+t.dnsPod.Status.PodIP)
 	case "kube-dns":
 		cmd = append(cmd, "@"+t.dnsPod.Status.PodIP, "-p", "10053")
 	case "dnsmasq":
@@ -158,6 +165,24 @@ func (t *dnsTestCommon) setConfigMap(cm *v1.ConfigMap) {
 		By(fmt.Sprintf("Updating the ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm))
 		_, err := t.c.CoreV1().ConfigMaps(t.ns).Update(cm)
 		Expect(err).NotTo(HaveOccurred())
+	}
+}
+
+func (t *dnsTestCommon) fetchDNSConfigMapData() map[string]string {
+	if t.name == "coredns" {
+		pcm, err := t.c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(t.name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		return pcm.Data
+	}
+	return nil
+}
+
+func (t *dnsTestCommon) restoreDNSConfigMap(configMapData map[string]string) {
+	if t.name == "coredns" {
+		t.setConfigMap(&v1.ConfigMap{Data: configMapData})
+		t.deleteCoreDNSPods()
+	} else {
+		t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
 	}
 }
 
@@ -231,6 +256,21 @@ func (t *dnsTestCommon) deleteUtilPod() {
 	if err := podClient.Delete(t.utilPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 		framework.Logf("Delete of pod %v:%v failed: %v",
 			t.utilPod.Namespace, t.utilPod.Name, err)
+	}
+}
+
+// deleteCoreDNSPods manually deletes the CoreDNS pods to apply the changes to the ConfigMap.
+func (t *dnsTestCommon) deleteCoreDNSPods() {
+
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
+	options := metav1.ListOptions{LabelSelector: label.String()}
+
+	pods, err := t.f.ClientSet.CoreV1().Pods("kube-system").List(options)
+	podClient := t.c.CoreV1().Pods(metav1.NamespaceSystem)
+
+	for _, pod := range pods.Items {
+		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
 	}
 }
 
