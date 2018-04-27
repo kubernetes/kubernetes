@@ -253,7 +253,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 
 	if len(o.From) != 0 {
 		b := f.NewBuilder().
-			Internal().
+			Internal(legacyscheme.Scheme).
 			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -321,7 +321,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 	}
 
 	b := f.NewBuilder().
-		Internal().
+		Internal(legacyscheme.Scheme).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -339,7 +339,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		return err
 	}
 	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-		info.Object = info.AsVersioned()
+		info.Object = info.AsVersioned(legacyscheme.Scheme)
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
@@ -430,7 +430,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(patch.Info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObj(patch.Info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -449,7 +449,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			return fmt.Errorf("at least one environment variable must be provided")
 		}
 
-		if err := o.PrintObj(info.AsVersioned(), o.Out); err != nil {
+		if err := o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
 			return err
 		}
 	}

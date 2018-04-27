@@ -283,7 +283,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	builder := f.NewBuilder().
-		Internal().
+		Internal(legacyscheme.Scheme).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceNames("nodes", args...).
 		SingleResourceType().
@@ -741,7 +741,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 					fmt.Printf("error: %v", err)
 					continue
 				}
-				printer.PrintObj(nodeInfo.AsVersioned(), o.Out)
+				printer.PrintObj(nodeInfo.AsVersioned(legacyscheme.Scheme), o.Out)
 			} else {
 				if !o.DryRun {
 					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
@@ -767,7 +767,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 					fmt.Fprintf(o.ErrOut, "%v", err)
 					continue
 				}
-				printer.PrintObj(nodeInfo.AsVersioned(), o.Out)
+				printer.PrintObj(nodeInfo.AsVersioned(legacyscheme.Scheme), o.Out)
 			}
 		} else {
 			printer, err := o.ToPrinter("skipped")
@@ -775,7 +775,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 				fmt.Fprintf(o.ErrOut, "%v", err)
 				continue
 			}
-			printer.PrintObj(nodeInfo.AsVersioned(), o.Out)
+			printer.PrintObj(nodeInfo.AsVersioned(legacyscheme.Scheme), o.Out)
 		}
 	}
 

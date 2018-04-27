@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -151,7 +152,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	resources := args[:len(args)-1]
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		Internal().
+		Internal(legacyscheme.Scheme).
 		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -173,7 +174,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 func (o *SetServiceAccountOptions) Run() error {
 	patchErrs := []error{}
 	patchFn := func(info *resource.Info) ([]byte, error) {
-		info.Object = info.AsVersioned()
+		info.Object = info.AsVersioned(legacyscheme.Scheme)
 		_, err := o.updatePodSpecForObject(info.Object, func(podSpec *v1.PodSpec) error {
 			podSpec.ServiceAccountName = o.serviceAccountName
 			return nil
@@ -197,7 +198,7 @@ func (o *SetServiceAccountOptions) Run() error {
 			continue
 		}
 		if o.local || o.dryRun {
-			if err := o.PrintObj(patch.Info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObj(patch.Info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -209,7 +210,7 @@ func (o *SetServiceAccountOptions) Run() error {
 		}
 		info.Refresh(patched, true)
 
-		if err := o.PrintObj(info.AsVersioned(), o.Out); err != nil {
+		if err := o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
 			return err
 		}
 	}

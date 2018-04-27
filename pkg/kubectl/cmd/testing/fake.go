@@ -342,19 +342,16 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper, typer := f.Object()
+	mapper, _ := f.Object()
 
 	return resource.NewBuilder(
 		&resource.Mapper{
-			RESTMapper:      mapper,
-			ObjectTyper:     typer,
-			ClientMapper:    resource.ClientMapperFunc(f.ClientForMapping),
-			ObjectConverter: legacyscheme.Scheme,
-			Decoder:         cmdutil.InternalVersionDecoder(),
+			RESTMapper:   mapper,
+			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+			Decoder:      cmdutil.InternalVersionDecoder(),
 		},
 		&resource.Mapper{
 			RESTMapper:   mapper,
-			ObjectTyper:  typer,
 			ClientMapper: resource.ClientMapperFunc(f.UnstructuredClientForMapping),
 			Decoder:      unstructured.UnstructuredJSONScheme,
 		},

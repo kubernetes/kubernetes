@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -95,7 +96,7 @@ func (o *ClusterInfoOptions) Run() error {
 
 	// TODO use generalized labels once they are implemented (#341)
 	b := o.Builder.
-		Internal().
+		Internal(legacyscheme.Scheme).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		LabelSelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).
