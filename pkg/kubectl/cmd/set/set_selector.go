@@ -140,7 +140,7 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	mapper, _ := f.Object()
+	mapper := f.RESTMapper()
 	o.mapper = mapper
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)

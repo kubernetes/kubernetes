@@ -836,7 +836,7 @@ func TestDeletePods(t *testing.T) {
 			o := DrainOptions{
 				PrintFlags: printers.NewPrintFlags("drained"),
 			}
-			o.mapper, _ = tf.Object()
+			o.mapper = tf.RESTMapper()
 			o.Out = os.Stdout
 
 			o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {

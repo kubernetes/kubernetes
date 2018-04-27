@@ -47,7 +47,7 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 // NewBuilder returns a new resource builder for structured api objects.
 func (f *ring2Factory) NewBuilder() *resource.Builder {
 	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping)
-	mapper, _ := f.objectMappingFactory.Object()
+	mapper := f.objectMappingFactory.RESTMapper()
 
 	unstructuredClientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
 
@@ -97,7 +97,7 @@ func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
 		return nil, err
 	}
 	resolver := scaleclient.NewDiscoveryScaleKindResolver(discoClient)
-	mapper, _ := f.objectMappingFactory.Object()
+	mapper := f.objectMappingFactory.RESTMapper()
 	return scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
 }
 

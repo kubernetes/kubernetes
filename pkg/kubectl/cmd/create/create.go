@@ -389,9 +389,10 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 	if err != nil {
 		return err
 	}
-	mapper, typer := f.Object()
+	mapper := f.RESTMapper()
 	if !options.DryRun {
-		gvks, _, err := typer.ObjectKinds(obj)
+		// create subcommands have compiled knowledge of things they create, so type them directly
+		gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
 		if err != nil {
 			return err
 		}

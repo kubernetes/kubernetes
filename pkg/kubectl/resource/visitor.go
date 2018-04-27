@@ -188,7 +188,7 @@ func (i *Info) versioned(convertor runtime.ObjectConvertor) (runtime.Object, err
 // AsVersioned returns the object as a Go object in the external form if possible (matching the
 // group version kind of the mapping, or i.Object if it cannot be converted.
 // Deprecated this function will be removed once calling code is updated to indicate the correct
-// negoticatedserializers during contruction of the builder
+// negoticatedserializers during construction of the builder
 func (i *Info) AsVersioned(convertor runtime.ObjectConvertor) runtime.Object {
 	if obj, err := i.versioned(convertor); err == nil {
 		return obj

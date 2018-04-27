@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -42,7 +41,6 @@ type PauseConfig struct {
 
 	Pauser func(info *resource.Info) ([]byte, error)
 	Mapper meta.RESTMapper
-	Typer  runtime.ObjectTyper
 	Infos  []*resource.Info
 
 	Out io.Writer
@@ -101,7 +99,7 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper = f.RESTMapper()
 
 	o.Pauser = f.Pauser
 	o.Out = out

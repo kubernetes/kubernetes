@@ -205,7 +205,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	o.ResourceNames = resourceNames
 
 	// Complete other options for Run.
-	o.Mapper, _ = f.Object()
+	o.Mapper = f.RESTMapper()
 
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
