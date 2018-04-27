@@ -372,12 +372,12 @@ func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
 type FlattenListVisitor struct {
 	visitor Visitor
 	typer   runtime.ObjectTyper
-	mapper  *Mapper
+	mapper  *mapper
 }
 
 // NewFlattenListVisitor creates a visitor that will expand list style runtime.Objects
 // into individual items and then visit them individually.
-func NewFlattenListVisitor(v Visitor, typer runtime.ObjectTyper, mapper *Mapper) Visitor {
+func NewFlattenListVisitor(v Visitor, typer runtime.ObjectTyper, mapper *mapper) Visitor {
 	return FlattenListVisitor{v, typer, mapper}
 }
 
@@ -393,7 +393,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if err != nil {
 			return fn(info, nil)
 		}
-		if errs := runtime.DecodeList(items, v.mapper.Decoder); len(errs) > 0 {
+		if errs := runtime.DecodeList(items, v.mapper.decoder); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
 
@@ -404,7 +404,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		}
 
 		for i := range items {
-			item, err := v.mapper.InfoForObject(items[i], v.typer, preferredGVKs)
+			item, err := v.mapper.infoForObject(items[i], v.typer, preferredGVKs)
 			if err != nil {
 				return err
 			}
@@ -433,7 +433,7 @@ func ignoreFile(path string, extensions []string) bool {
 }
 
 // FileVisitorForSTDIN return a special FileVisitor just for STDIN
-func FileVisitorForSTDIN(mapper *Mapper, schema validation.Schema) Visitor {
+func FileVisitorForSTDIN(mapper *mapper, schema validation.Schema) Visitor {
 	return &FileVisitor{
 		Path:          constSTDINstr,
 		StreamVisitor: NewStreamVisitor(nil, mapper, constSTDINstr, schema),
@@ -443,7 +443,7 @@ func FileVisitorForSTDIN(mapper *Mapper, schema validation.Schema) Visitor {
 // ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
 // After FileVisitors open the files, they will pass an io.Reader to a StreamVisitor to do the reading. (stdin
 // is also taken care of). Paths argument also accepts a single file, and will return a single visitor
-func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
+func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
 	var visitors []Visitor
 	err := filepath.Walk(paths, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -510,17 +510,17 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 // a stream decoder method on runtime.Codec to properly handle this.
 type StreamVisitor struct {
 	io.Reader
-	*Mapper
+	*mapper
 
 	Source string
 	Schema validation.Schema
 }
 
 // NewStreamVisitor is a helper function that is useful when we want to change the fields of the struct but keep calls the same.
-func NewStreamVisitor(r io.Reader, mapper *Mapper, source string, schema validation.Schema) *StreamVisitor {
+func NewStreamVisitor(r io.Reader, mapper *mapper, source string, schema validation.Schema) *StreamVisitor {
 	return &StreamVisitor{
 		Reader: r,
-		Mapper: mapper,
+		mapper: mapper,
 		Source: source,
 		Schema: schema,
 	}
@@ -545,7 +545,7 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 		if err := ValidateSchema(ext.Raw, v.Schema); err != nil {
 			return fmt.Errorf("error validating %q: %v", v.Source, err)
 		}
-		info, err := v.InfoForData(ext.Raw, v.Source)
+		info, err := v.infoForData(ext.Raw, v.Source)
 		if err != nil {
 			if fnErr := fn(info, err); fnErr != nil {
 				return fnErr

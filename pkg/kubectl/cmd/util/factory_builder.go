@@ -22,7 +22,6 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -46,24 +45,12 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 
 // NewBuilder returns a new resource builder for structured api objects.
 func (f *ring2Factory) NewBuilder() *resource.Builder {
-	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping)
 	mapper, mapperErr := f.objectMappingFactory.RESTMapper()
 
-	unstructuredClientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
-
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
-
 	return resource.NewBuilder(
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ClientMapper: clientMapperFunc,
-			Decoder:      InternalVersionDecoder(),
-		},
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ClientMapper: unstructuredClientMapperFunc,
-			Decoder:      unstructured.UnstructuredJSONScheme,
-		},
+		f.clientAccessFactory.ClientConfig,
+		mapper,
 		categoryExpander,
 	).AddError(mapperErr)
 }

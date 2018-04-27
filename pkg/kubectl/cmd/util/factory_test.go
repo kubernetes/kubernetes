@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,7 +35,6 @@ import (
 	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
@@ -442,10 +440,10 @@ func TestMakePortsString(t *testing.T) {
 	}
 }
 
-func fakeClient() resource.ClientMapper {
-	return resource.ClientMapperFunc(func(*meta.RESTMapping) (resource.RESTClient, error) {
+func fakeClient() resource.FakeClientFunc {
+	return func(version schema.GroupVersion) (resource.RESTClient, error) {
 		return &manualfake.RESTClient{}, nil
-	})
+	}
 }
 
 func TestDiscoveryReplaceAliases(t *testing.T) {
@@ -473,15 +471,7 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 
 	ds := &fakeDiscoveryClient{}
 	mapper := NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
-	b := resource.NewBuilder(
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ClientMapper: fakeClient(),
-			Decoder:      testapi.Default.Codec(),
-		},
-		nil,
-		categories.LegacyCategoryExpander,
-	)
+	b := resource.NewFakeBuilder(fakeClient(), mapper, categories.LegacyCategoryExpander)
 
 	for _, test := range tests {
 		replaced := b.ReplaceAliases(test.arg)

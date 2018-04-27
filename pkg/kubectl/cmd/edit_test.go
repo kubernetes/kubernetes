@@ -32,7 +32,7 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest/fake"
@@ -211,12 +211,12 @@ func TestEdit(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+			tf.UnstructuredClientForMappingFunc = func(gv schema.GroupVersion) (resource.RESTClient, error) {
 				versionedAPIPath := ""
-				if mapping.GroupVersionKind.Group == "" {
-					versionedAPIPath = "/api/" + mapping.GroupVersionKind.Version
+				if gv.Group == "" {
+					versionedAPIPath = "/api/" + gv.Version
 				} else {
-					versionedAPIPath = "/apis/" + mapping.GroupVersionKind.Group + "/" + mapping.GroupVersionKind.Version
+					versionedAPIPath = "/apis/" + gv.Group + "/" + gv.Version
 				}
 				return &fake.RESTClient{
 					VersionedAPIPath:     versionedAPIPath,

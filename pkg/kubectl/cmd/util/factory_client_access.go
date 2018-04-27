@@ -52,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -199,6 +200,13 @@ func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 	return internalclientset.NewForConfig(clientConfig)
 }
 
+func (f *ring0Factory) DynamicClient() (dynamic.DynamicInterface, error) {
+	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	return dynamic.NewForConfig(clientConfig)
+}
 func (f *ring0Factory) checkMatchingServerVersion() error {
 	f.checkServerVersion.Do(func() {
 		if !f.requireMatchedServerVersion {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/docker/distribution/reference"
@@ -40,6 +41,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	uexec "k8s.io/utils/exec"
@@ -90,10 +92,8 @@ var (
 )
 
 type RunObject struct {
-	Versioned runtime.Object
-	Object    runtime.Object
-	Kind      string
-	Mapping   *meta.RESTMapping
+	Object  runtime.Object
+	Mapping *meta.RESTMapping
 }
 
 type RunOptions struct {
@@ -106,6 +106,8 @@ type RunOptions struct {
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
+
+	DynamicClient dynamic.DynamicInterface
 
 	ArgsLenAtDash  int
 	Attach         bool
@@ -193,6 +195,11 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	o.RecordFlags.Complete(f.Command(cmd, false))
 	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
@@ -438,7 +445,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	}
 	if runObject != nil {
-		if err := o.PrintObj(runObject.Versioned); err != nil {
+		if err := o.PrintObj(runObject.Object); err != nil {
 			return err
 		}
 	}
@@ -458,7 +465,7 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 			return err
 		}
 		r := f.NewBuilder().
-			Internal(legacyscheme.Scheme).
+			WithScheme(legacyscheme.Scheme).
 			ContinueOnError().
 			NamespaceParam(namespace).DefaultNamespace().
 			ResourceNames(obj.Mapping.Resource.Resource+"."+obj.Mapping.Resource.Group, name).
@@ -620,7 +627,7 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serv
 		return nil, err
 	}
 
-	if err := o.PrintObj(runObject.Versioned); err != nil {
+	if err := o.PrintObj(runObject.Object); err != nil {
 		return nil, err
 	}
 	// separate yaml objects
@@ -648,60 +655,45 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		return nil, err
 	}
 	// run has compiled knowledge of the thing is is creating
-	groupVersionKinds, _, err := legacyscheme.Scheme.ObjectKinds(obj)
+	gvks, _, err := scheme.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return nil, err
 	}
-	groupVersionKind := groupVersionKinds[0]
+	mapping, err := mapper.RESTMapping(gvks[0].GroupKind(), gvks[0].Version)
+	if err != nil {
+		return nil, err
+	}
 
 	if len(overrides) > 0 {
-		codec := runtime.NewCodec(cmdutil.InternalVersionJSONEncoder(), cmdutil.InternalVersionDecoder())
+		codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Registry.RegisteredGroupVersions()...))
 		obj, err = cmdutil.Merge(codec, obj, overrides)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	mapping, err := mapper.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
-	if err != nil {
-		return nil, err
-	}
-	client, err := f.ClientForMapping(mapping)
-	if err != nil {
-		return nil, err
-	}
-
 	if err := o.Recorder.Record(obj); err != nil {
 		glog.V(4).Infof("error recording current command: %v", err)
 	}
 
-	versioned := obj
+	actualObj := obj
 	if !o.DryRun {
-		resourceMapper := &resource.Mapper{
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), obj, scheme.DefaultJSONEncoder()); err != nil {
+			return nil, err
 		}
-		info, err := resourceMapper.InfoForObject(obj, legacyscheme.Scheme, nil)
+		client, err := f.ClientForMapping(mapping)
 		if err != nil {
 			return nil, err
 		}
-
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
-			return nil, err
-		}
-
-		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
+		actualObj, err = resource.NewHelper(client, mapping).Create(namespace, false, obj)
 		if err != nil {
 			return nil, err
 		}
-
-		versioned = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 	}
+	actualObj = cmdutil.AsDefaultVersionedOrOriginal(actualObj, mapping)
+
 	return &RunObject{
-		Versioned: versioned,
-		Object:    obj,
-		Kind:      groupVersionKind.Kind,
-		Mapping:   mapping,
+		Object:  actualObj,
+		Mapping: mapping,
 	}, nil
 }

@@ -127,7 +127,7 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 	}
 
 	r := f.NewBuilder().
-		Internal(legacyscheme.Scheme).
+		WithScheme(legacyscheme.Scheme).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
