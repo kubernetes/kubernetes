@@ -225,17 +225,6 @@ func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource)
 	return nil
 }
 
-// getKubeletConfigOkCondition returns the first NodeCondition in `cs` with Type == apiv1.NodeKubeletConfigOk,
-// or if no such condition exists, returns nil.
-func getKubeletConfigOkCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
-	for i := range cs {
-		if cs[i].Type == apiv1.NodeKubeletConfigOk {
-			return &cs[i]
-		}
-	}
-	return nil
-}
-
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
 func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Response {
 	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", framework.TestContext.NodeName)

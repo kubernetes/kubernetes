@@ -24,9 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 )
 
-// so far only implements Current(), LastKnownGood(), SetCurrent(), and SetLastKnownGood()
+// so far only implements Assigned(), LastKnownGood(), SetAssigned(), and SetLastKnownGood()
 type fakeStore struct {
-	current       checkpoint.RemoteConfigSource
+	assigned      checkpoint.RemoteConfigSource
 	lastKnownGood checkpoint.RemoteConfigSource
 }
 
@@ -48,20 +48,20 @@ func (s *fakeStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.K
 	return nil, fmt.Errorf("Load method not supported")
 }
 
-func (s *fakeStore) CurrentModified() (time.Time, error) {
-	return time.Time{}, fmt.Errorf("CurrentModified method not supported")
+func (s *fakeStore) AssignedModified() (time.Time, error) {
+	return time.Time{}, fmt.Errorf("AssignedModified method not supported")
 }
 
-func (s *fakeStore) Current() (checkpoint.RemoteConfigSource, error) {
-	return s.current, nil
+func (s *fakeStore) Assigned() (checkpoint.RemoteConfigSource, error) {
+	return s.assigned, nil
 }
 
 func (s *fakeStore) LastKnownGood() (checkpoint.RemoteConfigSource, error) {
 	return s.lastKnownGood, nil
 }
 
-func (s *fakeStore) SetCurrent(source checkpoint.RemoteConfigSource) error {
-	s.current = source
+func (s *fakeStore) SetAssigned(source checkpoint.RemoteConfigSource) error {
+	s.assigned = source
 	return nil
 }
 

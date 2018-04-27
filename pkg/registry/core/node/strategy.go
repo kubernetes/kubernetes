@@ -127,14 +127,23 @@ type nodeStatusStrategy struct {
 var StatusStrategy = nodeStatusStrategy{Strategy}
 
 func (nodeStatusStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	_ = obj.(*api.Node)
+	node := obj.(*api.Node)
 	// Nodes allow *all* fields, including status, to be set on create.
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		node.Status.Config = nil
+	}
 }
 
 func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)
 	oldNode := old.(*api.Node)
 	newNode.Spec = oldNode.Spec
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		newNode.Status.Config = nil
+		oldNode.Status.Config = nil
+	}
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

@@ -70,7 +70,7 @@ func TestNewRemoteConfigSource(t *testing.T) {
 				return
 			}
 			// underlying object should match the object passed in
-			if !apiequality.Semantic.DeepEqual(c.expect.object(), source.object()) {
+			if !apiequality.Semantic.DeepEqual(c.expect.NodeConfigSource(), source.NodeConfigSource()) {
 				t.Errorf("case %q, expect RemoteConfigSource %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(source))
 			}
 		})

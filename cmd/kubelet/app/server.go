@@ -198,24 +198,42 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				}
 			}
 
+			// TODO(#63305): always validate the combination of the local config file and flags, this is the fallback
+			// when the dynamic config controller tells us to use local config (this can be fixed alongside other validation fixes).
+
 			// use dynamic kubelet config, if enabled
 			var kubeletConfigController *dynamickubeletconfig.Controller
 			if dynamicConfigDir := kubeletFlags.DynamicConfigDir.Value(); len(dynamicConfigDir) > 0 {
-				kubeletConfig, kubeletConfigController, err = BootstrapKubeletConfigController(kubeletConfig, dynamicConfigDir)
+				var dynamicKubeletConfig *kubeletconfiginternal.KubeletConfiguration
+				dynamicKubeletConfig, kubeletConfigController, err = BootstrapKubeletConfigController(dynamicConfigDir)
 				if err != nil {
 					glog.Fatal(err)
 				}
-				// We must enforce flag precedence by re-parsing the command line into the new object.
-				// This is necessary to preserve backwards-compatibility across binary upgrades.
-				// See issue #56171 for more details.
-				if err := kubeletConfigFlagPrecedence(kubeletConfig, args); err != nil {
-					glog.Fatal(err)
-				}
-				// update feature gates based on new config
-				if err := utilfeature.DefaultFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
-					glog.Fatal(err)
+				// If we should just use our existing, local config, the controller will return a nil config
+				if dynamicKubeletConfig != nil {
+					kubeletConfig = dynamicKubeletConfig
+					// We must enforce flag precedence by re-parsing the command line into the new object.
+					// This is necessary to preserve backwards-compatibility across binary upgrades.
+					// See issue #56171 for more details.
+					if err := kubeletConfigFlagPrecedence(kubeletConfig, args); err != nil {
+						glog.Fatal(err)
+					}
+					// update feature gates based on new config
+					if err := utilfeature.DefaultFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
+						glog.Fatal(err)
+					}
 				}
 			}
+
+			// TODO(#63305): need to reconcile that validation performed inside the dynamic config controller
+			// will happen against currently set feature gates, rather than future adjustments from combination of files
+			// and flags. There's a potential scenario where a valid config (because it sets new gates) is considered
+			// invalid against current gates (at least until --feature-gates flag is removed).
+			// We should validate against the combination of current feature gates, overrides from feature gates in the file,
+			// and overrides from feature gates set via flags, rather than currently set feature gates.
+			// Once the --feature-gates flag is removed, we should strictly validate against the combination of current
+			// feature gates and feature gates in the file (always need to validate against the combo, because feature-gates
+			// can layer between the file and dynamic config right now - though maybe we should change this).
 
 			// construct a KubeletServer from kubeletFlags and kubeletConfig
 			kubeletServer := &options.KubeletServer{
@@ -1090,8 +1108,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 }
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
-func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.KubeletConfiguration,
-	dynamicConfigDir string) (*kubeletconfiginternal.KubeletConfiguration, *dynamickubeletconfig.Controller, error) {
+func BootstrapKubeletConfigController(dynamicConfigDir string) (*kubeletconfiginternal.KubeletConfiguration, *dynamickubeletconfig.Controller, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		return nil, nil, fmt.Errorf("failed to bootstrap Kubelet config controller, you must enable the DynamicKubeletConfig feature gate")
 	}
@@ -1105,7 +1122,7 @@ func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.Kubel
 		return nil, nil, fmt.Errorf("failed to get absolute path for --dynamic-config-dir=%s", dynamicConfigDir)
 	}
 	// get the latest KubeletConfiguration checkpoint from disk, or return the default config if no valid checkpoints exist
-	c := dynamickubeletconfig.NewController(defaultConfig, dir)
+	c := dynamickubeletconfig.NewController(dir)
 	kc, err := c.Bootstrap()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %v", err)

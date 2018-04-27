@@ -31,7 +31,7 @@ import (
 
 const (
 	metaDir           = "meta"
-	currentFile       = "current"
+	assignedFile      = "assigned"
 	lastKnownGoodFile = "last-known-good"
 
 	checkpointsDir = "checkpoints"
@@ -61,11 +61,11 @@ func (s *fsStore) Initialize() error {
 	if err := utilfiles.EnsureDir(s.fs, s.dir); err != nil {
 		return err
 	}
-	// ensure metadata directory and reference files (tracks current and lkg configs)
+	// ensure metadata directory and reference files (tracks assigned and lkg configs)
 	if err := utilfiles.EnsureDir(s.fs, filepath.Join(s.dir, metaDir)); err != nil {
 		return err
 	}
-	if err := utilfiles.EnsureFile(s.fs, s.metaPath(currentFile)); err != nil {
+	if err := utilfiles.EnsureFile(s.fs, s.metaPath(assignedFile)); err != nil {
 		return err
 	}
 	if err := utilfiles.EnsureFile(s.fs, s.metaPath(lastKnownGoodFile)); err != nil {
@@ -111,8 +111,8 @@ func (s *fsStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.Kub
 	return kc, nil
 }
 
-func (s *fsStore) CurrentModified() (time.Time, error) {
-	path := s.metaPath(currentFile)
+func (s *fsStore) AssignedModified() (time.Time, error) {
+	path := s.metaPath(assignedFile)
 	info, err := s.fs.Stat(path)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to stat %q while checking modification time, error: %v", path, err)
@@ -120,16 +120,16 @@ func (s *fsStore) CurrentModified() (time.Time, error) {
 	return info.ModTime(), nil
 }
 
-func (s *fsStore) Current() (checkpoint.RemoteConfigSource, error) {
-	return readRemoteConfigSource(s.fs, s.metaPath(currentFile))
+func (s *fsStore) Assigned() (checkpoint.RemoteConfigSource, error) {
+	return readRemoteConfigSource(s.fs, s.metaPath(assignedFile))
 }
 
 func (s *fsStore) LastKnownGood() (checkpoint.RemoteConfigSource, error) {
 	return readRemoteConfigSource(s.fs, s.metaPath(lastKnownGoodFile))
 }
 
-func (s *fsStore) SetCurrent(source checkpoint.RemoteConfigSource) error {
-	return writeRemoteConfigSource(s.fs, s.metaPath(currentFile), source)
+func (s *fsStore) SetAssigned(source checkpoint.RemoteConfigSource) error {
+	return writeRemoteConfigSource(s.fs, s.metaPath(assignedFile), source)
 }
 
 func (s *fsStore) SetLastKnownGood(source checkpoint.RemoteConfigSource) error {
