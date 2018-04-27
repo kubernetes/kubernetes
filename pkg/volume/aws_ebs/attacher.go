@@ -19,7 +19,7 @@ package aws_ebs
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"strconv"
 	"time"
 
@@ -249,7 +249,7 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 }
 
 func (detacher *awsElasticBlockStoreDetacher) Detach(volumeName string, nodeName types.NodeName) error {
-	volumeID := aws.KubernetesVolumeID(filepath.Base(volumeName))
+	volumeID := aws.KubernetesVolumeID(path.Base(volumeName))
 
 	if _, err := detacher.awsVolumes.DetachDisk(volumeID, nodeName); err != nil {
 		glog.Errorf("Error detaching volumeID %q: %v", volumeID, err)
