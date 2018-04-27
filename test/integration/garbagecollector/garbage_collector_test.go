@@ -183,7 +183,7 @@ func createRandomCustomResourceDefinition(
 	// Get a client for the custom resource.
 	gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
 
-	resourceClient := dynamicClient.NamespacedResource(gvr, namespace)
+	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
 
 	return definition, resourceClient
 }

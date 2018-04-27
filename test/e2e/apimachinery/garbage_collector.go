@@ -924,7 +924,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		// Get a client for the custom resource.
 		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
-		resourceClient := f.DynamicClient.ClusterResource(gvr)
+		resourceClient := f.DynamicClient.Resource(gvr)
 
 		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
 

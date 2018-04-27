@@ -72,9 +72,9 @@ func NewNamespacedCustomResourceClient(ns string, client dynamic.DynamicInterfac
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
 
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
-		return client.NamespacedResource(gvr, ns)
+		return client.Resource(gvr).Namespace(ns)
 	}
-	return client.ClusterResource(gvr)
+	return client.Resource(gvr)
 }
 
 func NewNamespacedCustomResourceStatusClient(ns string, client dynamic.DynamicInterface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.DynamicResourceInterface {

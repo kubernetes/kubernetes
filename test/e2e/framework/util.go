@@ -508,7 +508,7 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 }
 
 func SkipIfMissingResource(dynamicClient dynamic.DynamicInterface, gvr schema.GroupVersionResource, namespace string) {
-	resourceClient := dynamicClient.NamespacedResource(gvr, namespace)
+	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
 	_, err := resourceClient.List(metav1.ListOptions{})
 	if err != nil {
 		// not all resources support list, so we ignore those
@@ -1258,7 +1258,7 @@ func hasRemainingContent(c clientset.Interface, dynamicClient dynamic.DynamicInt
 	// dump how many of resource type is on the server in a log.
 	for gvr := range groupVersionResources {
 		// get a client for this group version...
-		dynamicClient := dynamicClient.NamespacedResource(gvr, namespace)
+		dynamicClient := dynamicClient.Resource(gvr).Namespace(namespace)
 		if err != nil {
 			// not all resource types support list, so some errors here are normal depending on the resource type.
 			Logf("namespace: %s, unable to get client - gvr: %v, error: %v", namespace, gvr, err)
