@@ -419,7 +419,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		if tc.expectedTries > 0 {
 			if tc.expectedTries != testPatcher.numUpdates {
-				t.Errorf("%s: expected %d tries, got %d", tc.expectedTries, testPatcher.numUpdates)
+				t.Errorf("%s: expected %d tries, got %d", tc.name, tc.expectedTries, testPatcher.numUpdates)
 			}
 		}
 
