@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -49,12 +50,12 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := builder.GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes build output directory: %v", err)
 	}
 
-	rootDir, err := builder.GetK8sRootDir()
+	rootDir, err := utils.GetK8sRootDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes root directory: %v", err)
 	}

@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
 )
@@ -49,7 +50,7 @@ func main() {
 	}
 
 	// Run node e2e test
-	outputDir, err := builder.GetK8sBuildOutputDir()
+	outputDir, err := utils.GetK8sBuildOutputDir()
 	if err != nil {
 		glog.Fatalf("Failed to get build output directory: %v", err)
 	}
@@ -59,7 +60,7 @@ func main() {
 
 	args := []string{*ginkgoFlags, test, "--", *testFlags}
 	if *systemSpecName != "" {
-		rootDir, err := builder.GetK8sRootDir()
+		rootDir, err := utils.GetK8sRootDir()
 		if err != nil {
 			glog.Fatalf("Failed to get k8s root directory: %v", err)
 		}
