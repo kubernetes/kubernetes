@@ -48,10 +48,13 @@ func TestYAML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientPool := dynamic.NewDynamicClientPool(config)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,10 +370,13 @@ func TestYAMLSubresource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientPool := dynamic.NewDynamicClientPool(config)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	noxuDefinition := NewNoxuSubresourcesCRD(apiextensionsv1beta1.ClusterScoped)
-	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

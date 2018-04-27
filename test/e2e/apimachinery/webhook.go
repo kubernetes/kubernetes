@@ -1081,7 +1081,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 	return func() { client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(configName, nil) }
 }
 
-func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
+func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.DynamicResourceInterface) {
 	By("Creating a custom resource that should be denied by the webhook")
 	crInstance := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -1104,7 +1104,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1
 	}
 }
 
-func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
+func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.DynamicResourceInterface) {
 	By("Creating a custom resource that should be mutated by the webhook")
 	cr := &unstructured.Unstructured{
 		Object: map[string]interface{}{

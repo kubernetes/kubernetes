@@ -619,7 +619,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 			// Create and delete custom resource definition.
 			{
 				func() {
-					_, err = testserver.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.ClientPool)
+					err = testserver.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
 					framework.ExpectNoError(err, "failed to create custom resource definition")
 					testserver.DeleteCustomResourceDefinition(crd, apiExtensionClient)
 				},
