@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	scaleclient "k8s.io/client-go/scale"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -295,9 +297,10 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 	output := cmdutil.GetFlagString(cmd, "output")
 	shortOutput := output == "name"
 
-	encoder := scheme.DefaultJSONEncoder()
-	deserializer := scheme.Codecs.UniversalDeserializer()
-	mapper := r.Mapper().RESTMapper
+	mapper, err := f.RESTMapper()
+	if err != nil {
+		return err
+	}
 
 	visitedUids := sets.NewString()
 	visitedNamespaces := sets.NewString()
@@ -321,7 +324,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		// Get the modified configuration of the object. Embed the result
 		// as an annotation in the modified configuration, so that it will appear
 		// in the patch sent to the server.
-		modified, err := kubectl.GetModifiedConfiguration(info.Object, true, encoder)
+		modified, err := kubectl.GetModifiedConfiguration(info.Object, true, unstructured.UnstructuredJSONScheme)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
 		}
@@ -329,19 +332,26 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		// Print object only if output format other than "name" is specified
 		printObject := len(output) > 0 && !shortOutput
 
+		dynamicClient, err := f.DynamicClient()
+		if err != nil {
+			return err
+		}
+
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
 			// Create the resource if it doesn't exist
 			// First, update the annotation used by kubectl apply
-			if err := kubectl.CreateApplyAnnotation(info.Object, encoder); err != nil {
+			if err := kubectl.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
 			if !o.DryRun {
 				// Then create the resource and skip the three-way merge
-				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+				// clear the resource version for creation, if we don't know how to clear the version on this object, send it to the server as is.
+				metadataAccessor.SetResourceVersion(info.Object, "")
+				obj, err := dynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Create(info.Object.(*unstructured.Unstructured))
 				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
@@ -381,13 +391,9 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			if err != nil {
 				return err
 			}
-			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := &patcher{
-				encoder:       encoder,
-				decoder:       deserializer,
 				mapping:       info.Mapping,
-				helper:        helper,
-				clientFunc:    f.UnstructuredClientForMapping,
+				dynamicClient: dynamicClient,
 				clientsetFunc: f.ClientSet,
 				overwrite:     o.Overwrite,
 				backOff:       clockwork.NewRealClock(),
@@ -470,10 +476,14 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		return nil
 	}
 
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
 	p := pruner{
 		mapper:        mapper,
-		clientFunc:    f.UnstructuredClientForMapping,
-		clientsetFunc: f.ClientSet,
+		dynamicClient: dynamicClient,
 
 		labelSelector: o.Selector,
 		visitedUids:   visitedUids,
@@ -560,12 +570,11 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 
 type pruner struct {
 	mapper        meta.RESTMapper
-	clientFunc    resource.ClientMapperFunc
+	dynamicClient dynamic.DynamicInterface
 	clientsetFunc func() (internalclientset.Interface, error)
 
 	visitedUids   sets.String
 	labelSelector string
-	fieldSelector string
 
 	cascade     bool
 	dryRun      bool
@@ -577,21 +586,11 @@ type pruner struct {
 }
 
 func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMapping, includeUninitialized bool) error {
-	c, err := p.clientFunc(mapping)
-	if err != nil {
-		return err
-	}
-
-	objList, err := resource.NewHelper(c, mapping).List(
-		namespace,
-		mapping.GroupVersionKind.Version,
-		false,
-		&metav1.ListOptions{
+	objList, err := p.dynamicClient.Resource(mapping.Resource).Namespace(namespace).List(
+		metav1.ListOptions{
 			LabelSelector:        p.labelSelector,
-			FieldSelector:        p.fieldSelector,
 			IncludeUninitialized: includeUninitialized,
-		},
-	)
+		})
 	if err != nil {
 		return err
 	}
@@ -635,20 +634,12 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, scaleClient scaleclient.ScalesGetter) error {
-	c, err := p.clientFunc(mapping)
-	if err != nil {
-		return err
-	}
-
-	return runDelete(namespace, name, mapping, c, nil, p.cascade, p.gracePeriod, p.clientsetFunc, scaleClient)
+	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.clientsetFunc, scaleClient)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RESTClient, helper *resource.Helper, cascade bool, gracePeriod int, clientsetFunc func() (internalclientset.Interface, error), scaleClient scaleclient.ScalesGetter) error {
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.DynamicInterface, cascade bool, gracePeriod int, clientsetFunc func() (internalclientset.Interface, error), scaleClient scaleclient.ScalesGetter) error {
 	if !cascade {
-		if helper == nil {
-			helper = resource.NewHelper(c, mapping)
-		}
-		return helper.Delete(namespace, name)
+		return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, nil)
 	}
 	cs, err := clientsetFunc()
 	if err != nil {
@@ -659,7 +650,7 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RES
 		if _, ok := err.(*kubectl.NoSuchReaperError); !ok {
 			return err
 		}
-		return resource.NewHelper(c, mapping).Delete(namespace, name)
+		return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, nil)
 	}
 	var options *metav1.DeleteOptions
 	if gracePeriod >= 0 {
@@ -672,20 +663,12 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RES
 }
 
 func (p *patcher) delete(namespace, name string) error {
-	c, err := p.clientFunc(p.mapping)
-	if err != nil {
-		return err
-	}
-	return runDelete(namespace, name, p.mapping, c, p.helper, p.cascade, p.gracePeriod, p.clientsetFunc, p.scaleClient)
+	return runDelete(namespace, name, p.mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.clientsetFunc, p.scaleClient)
 }
 
 type patcher struct {
-	encoder runtime.Encoder
-	decoder runtime.Decoder
-
 	mapping       *meta.RESTMapping
-	helper        *resource.Helper
-	clientFunc    resource.ClientMapperFunc
+	dynamicClient dynamic.DynamicInterface
 	clientsetFunc func() (internalclientset.Interface, error)
 
 	overwrite bool
@@ -702,7 +685,7 @@ type patcher struct {
 
 func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	// Serialize the current configuration of the object from the server.
-	current, err := runtime.Encode(p.encoder, obj)
+	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("serializing current configuration from:\n%v\nfor:", obj), source, err)
 	}
@@ -771,7 +754,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return patch, obj, nil
 	}
 
-	patchedObj, err := p.helper.Patch(namespace, name, patchType, patch)
+	patchedObj, err := p.dynamicClient.Resource(p.mapping.Resource).Namespace(namespace).Patch(name, patchType, patch)
 	return patch, patchedObj, err
 }
 
@@ -782,7 +765,7 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		if i > triesBeforeBackOff {
 			p.backOff.Sleep(backOffPeriod)
 		}
-		current, getErr = p.helper.Get(namespace, name, false)
+		current, getErr = p.dynamicClient.Resource(p.mapping.Resource).Namespace(namespace).Get(name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, nil, getErr
 		}
@@ -800,7 +783,7 @@ func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		return modified, nil, err
 	}
 	err = wait.PollImmediate(kubectl.Interval, p.timeout, func() (bool, error) {
-		if _, err := p.helper.Get(namespace, name, false); !errors.IsNotFound(err) {
+		if _, err := p.dynamicClient.Resource(p.mapping.Resource).Namespace(namespace).Get(name, metav1.GetOptions{}); !errors.IsNotFound(err) {
 			return false, err
 		}
 		return true, nil
@@ -808,15 +791,20 @@ func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	if err != nil {
 		return modified, nil, err
 	}
-	versionedObject, _, err := p.decoder.Decode(modified, nil, nil)
+
+	versionedObject, err := runtime.Decode(unstructured.UnstructuredJSONScheme, modified)
 	if err != nil {
 		return modified, nil, err
 	}
-	createdObject, err := p.helper.Create(namespace, true, versionedObject)
+	// clear the resource version for creation, if we don't know how to clear the version on this object, send it to the server as is.
+	metadataAccessor.SetResourceVersion(versionedObject, "")
+	createdObject, err := p.dynamicClient.Resource(p.mapping.Resource).Namespace(namespace).Create(versionedObject.(*unstructured.Unstructured))
 	if err != nil {
 		// restore the original object if we fail to create the new one
 		// but still propagate and advertise error to user
-		recreated, recreateErr := p.helper.Create(namespace, true, original)
+		// clear the resource version for creation, if we don't know how to clear the version on this object, send it to the server as is.
+		metadataAccessor.SetResourceVersion(original, "")
+		recreated, recreateErr := p.dynamicClient.Resource(p.mapping.Resource).Namespace(namespace).Create(original.(*unstructured.Unstructured))
 		if recreateErr != nil {
 			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
 		} else {

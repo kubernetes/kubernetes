@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/printers"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -60,15 +62,16 @@ type AnnotateOptions struct {
 	outputFormat    string
 
 	// results of arg parsing
-	resources                    []string
-	newAnnotations               map[string]string
-	removeAnnotations            []string
-	Recorder                     genericclioptions.Recorder
-	namespace                    string
-	enforceNamespace             bool
-	builder                      *resource.Builder
-	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	includeUninitialized         bool
+	resources            []string
+	newAnnotations       map[string]string
+	removeAnnotations    []string
+	Recorder             genericclioptions.Recorder
+	namespace            string
+	enforceNamespace     bool
+	builder              *resource.Builder
+	includeUninitialized bool
+
+	DynamicClient dynamic.DynamicInterface
 
 	genericclioptions.IOStreams
 }
@@ -185,7 +188,6 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 	o.includeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 	o.builder = f.NewBuilder()
-	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
 
 	// retrieves resource and annotation args from args
 	// also checks args to verify that all resources are specified before annotations
@@ -195,6 +197,10 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 	o.resources = resources
 	o.newAnnotations, o.removeAnnotations, err = parseAnnotations(annotationArgs)
+	if err != nil {
+		return err
+	}
+	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
@@ -289,16 +295,10 @@ func (o AnnotateOptions) RunAnnotate() error {
 			}
 
 			mapping := info.ResourceMapping()
-			client, err := o.unstructuredClientForMapping(mapping)
-			if err != nil {
-				return err
-			}
-			helper := resource.NewHelper(client, mapping)
-
 			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes)
+				outputObj, err = o.DynamicClient.Resource(mapping.Resource).Namespace(namespace).Patch(name, types.MergePatchType, patchBytes)
 			} else {
-				outputObj, err = helper.Replace(namespace, name, false, obj)
+				outputObj, err = o.DynamicClient.Resource(mapping.Resource).Namespace(namespace).Update(obj.(*unstructured.Unstructured))
 			}
 			if err != nil {
 				return err

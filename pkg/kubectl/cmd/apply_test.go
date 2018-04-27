@@ -29,6 +29,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/cobra"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -40,9 +41,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	fakescale "k8s.io/client-go/scale/fake"
+	"k8s.io/client-go/scale/scheme/extensionsv1beta1"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -240,6 +243,11 @@ func validatePatchApplication(t *testing.T, req *http.Request) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	validatePatchApplicationForBytes(t, patch)
+}
+
+func validatePatchApplicationForBytes(t *testing.T, patch []byte) {
 
 	patchMap := map[string]interface{}{}
 	if err := json.Unmarshal(patch, &patchMap); err != nil {
@@ -458,14 +466,20 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
+	obj, err := runtime.Decode(scheme.Codecs.UniversalDecoder(corev1.SchemeGroupVersion), rcBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj)
+	tf.FakeDynamicClient.PrependReactor("patch", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+		return true, obj, nil
+	})
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == pathRC && m == "GET":
-				bodyRC := ioutil.NopCloser(bytes.NewReader(rcBytes))
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-			case p == pathRC && m == "PATCH":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(rcBytes))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 			default:
@@ -492,6 +506,15 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 	}
+
+	actions := tf.FakeDynamicClient.Actions()
+	if len(actions) != 1 {
+		t.Fatal(spew.Sdump(actions))
+	}
+	patchAction := actions[0].(testcore.PatchAction)
+	if patchAction.GetNamespace() != "test" || patchAction.GetName() != nameRC || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+		t.Fatal(spew.Sdump(actions))
+	}
 }
 
 func TestApplyObject(t *testing.T) {
@@ -503,16 +526,21 @@ func TestApplyObject(t *testing.T) {
 		t.Run("test apply when a local object is specified", func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
+			obj, err := runtime.Decode(scheme.Codecs.UniversalDecoder(corev1.SchemeGroupVersion), currentRC)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj)
+			tf.FakeDynamicClient.PrependReactor("patch", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				validatePatchApplicationForBytes(t, action.(testcore.PatchAction).GetPatch())
+				return true, obj, nil
+			})
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == pathRC && m == "GET":
-						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					default:
@@ -537,6 +565,15 @@ func TestApplyObject(t *testing.T) {
 			}
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+
+			actions := tf.FakeDynamicClient.Actions()
+			if len(actions) != 1 {
+				t.Fatal(spew.Sdump(actions))
+			}
+			patchAction := actions[0].(testcore.PatchAction)
+			if patchAction.GetNamespace() != "test" || patchAction.GetName() != nameRC || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+				t.Fatal(spew.Sdump(actions))
 			}
 		})
 	}
@@ -567,6 +604,15 @@ func TestApplyObjectOutput(t *testing.T) {
 		t.Run("test apply returns correct output", func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
+			obj, err := runtime.Decode(scheme.Codecs.UniversalDecoder(corev1.SchemeGroupVersion), postPatchData)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj)
+			tf.FakeDynamicClient.PrependReactor("patch", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				validatePatchApplicationForBytes(t, action.(testcore.PatchAction).GetPatch())
+				return true, obj, nil
+			})
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
@@ -574,10 +620,6 @@ func TestApplyObjectOutput(t *testing.T) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == pathRC && m == "GET":
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
-						bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -603,6 +645,15 @@ func TestApplyObjectOutput(t *testing.T) {
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
 			}
+
+			actions := tf.FakeDynamicClient.Actions()
+			if len(actions) != 1 {
+				t.Fatal(spew.Sdump(actions))
+			}
+			patchAction := actions[0].(testcore.PatchAction)
+			if patchAction.GetNamespace() != "test" || patchAction.GetName() != nameRC || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+				t.Fatal(spew.Sdump(actions))
+			}
 		})
 	}
 }
@@ -615,29 +666,30 @@ func TestApplyRetry(t *testing.T) {
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply retries on conflict error", func(t *testing.T) {
 			firstPatch := true
-			retry := false
-			getCount := 0
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
+
+			obj, err := runtime.Decode(scheme.Codecs.UniversalDecoder(corev1.SchemeGroupVersion), currentRC)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj)
+			tf.FakeDynamicClient.PrependReactor("patch", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				if firstPatch {
+					firstPatch = false
+					statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+					return true, nil, statusErr
+				}
+
+				validatePatchApplicationForBytes(t, action.(testcore.PatchAction).GetPatch())
+				return true, obj, nil
+			})
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == pathRC && m == "GET":
-						getCount++
-						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-					case p == pathRC && m == "PATCH":
-						if firstPatch {
-							firstPatch = false
-							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
-							bodyBytes, _ := json.Marshal(statusErr)
-							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
-							return &http.Response{StatusCode: http.StatusConflict, Header: defaultHeader(), Body: bodyErr}, nil
-						}
-						retry = true
-						validatePatchApplication(t, req)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					default:
@@ -655,10 +707,6 @@ func TestApplyRetry(t *testing.T) {
 			cmd.Flags().Set("output", "name")
 			cmd.Run(cmd, []string{})
 
-			if !retry || getCount != 2 {
-				t.Fatalf("apply didn't retry when get conflict error")
-			}
-
 			// uses the name from the file, not the response
 			expectRC := "replicationcontroller/" + nameRC + "\n"
 			if buf.String() != expectRC {
@@ -667,12 +715,29 @@ func TestApplyRetry(t *testing.T) {
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
 			}
+
+			actions := tf.FakeDynamicClient.Actions()
+			if len(actions) != 3 {
+				t.Fatal(spew.Sdump(actions))
+			}
+			patchAction := actions[0].(testcore.PatchAction)
+			if patchAction.GetNamespace() != "test" || patchAction.GetName() != nameRC || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+				t.Fatal(spew.Sdump(actions))
+			}
+			getAction := actions[1].(testcore.GetAction)
+			if getAction.GetNamespace() != "test" || getAction.GetName() != nameRC || getAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+				t.Fatal(spew.Sdump(actions))
+			}
+			patchAction = actions[2].(testcore.PatchAction)
+			if patchAction.GetNamespace() != "test" || patchAction.GetName() != nameRC || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+				t.Fatal(spew.Sdump(actions))
+			}
 		})
 	}
 }
 
 func TestApplyNonExistObject(t *testing.T) {
-	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
+	nameRC, _ := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
 
@@ -687,9 +752,6 @@ func TestApplyNonExistObject(t *testing.T) {
 				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
 			case p == pathNameRC && m == "GET":
 				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
-			case p == pathRC && m == "POST":
-				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: bodyRC}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -709,6 +771,15 @@ func TestApplyNonExistObject(t *testing.T) {
 	if buf.String() != expectRC {
 		t.Errorf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 	}
+
+	actions := tf.FakeDynamicClient.Actions()
+	if len(actions) != 1 {
+		t.Fatal(spew.Sdump(actions))
+	}
+	createAction := actions[0].(testcore.CreateAction)
+	if createAction.GetNamespace() != "test" || createAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+		t.Fatal(spew.Sdump(actions))
+	}
 }
 
 func TestApplyEmptyPatch(t *testing.T) {
@@ -716,8 +787,6 @@ func TestApplyEmptyPatch(t *testing.T) {
 	nameRC, _ := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
-
-	verifyPost := false
 
 	var body []byte
 
@@ -737,11 +806,6 @@ func TestApplyEmptyPatch(t *testing.T) {
 				}
 				bodyRC := ioutil.NopCloser(bytes.NewReader(body))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-			case p == pathRC && m == "POST":
-				body, _ = ioutil.ReadAll(req.Body)
-				verifyPost = true
-				bodyRC := ioutil.NopCloser(bytes.NewReader(body))
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: bodyRC}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -761,9 +825,20 @@ func TestApplyEmptyPatch(t *testing.T) {
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 	}
-	if !verifyPost {
-		t.Fatal("No server-side post call detected")
+
+	actions := tf.FakeDynamicClient.Actions()
+	if len(actions) != 1 {
+		t.Fatal(spew.Sdump(actions))
 	}
+	createAction := actions[0].(testcore.CreateAction)
+	if createAction.GetNamespace() != "test" || createAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+		t.Fatal(spew.Sdump(actions))
+	}
+	body, err := runtime.Encode(unstructured.UnstructuredJSONScheme, createAction.GetObject())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tf.FakeDynamicClient.ClearActions()
 
 	// 2. test apply already exist object, will not send empty patch request
 	ioStreams, _, buf, _ = genericclioptions.NewTestIOStreams()
@@ -775,6 +850,12 @@ func TestApplyEmptyPatch(t *testing.T) {
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 	}
+
+	actions = tf.FakeDynamicClient.Actions()
+	if len(actions) != 0 {
+		t.Fatal(spew.Sdump(actions))
+	}
+
 }
 
 func TestApplyMultipleObjectsAsList(t *testing.T) {
@@ -797,6 +878,24 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
+			currentRCObj, err := runtime.Decode(scheme.Codecs.UniversalDecoder(corev1.SchemeGroupVersion), currentRC)
+			if err != nil {
+				t.Fatal(err)
+			}
+			currentSVCObj, err := runtime.Decode(scheme.Codecs.UniversalDecoder(corev1.SchemeGroupVersion), currentSVC)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, currentRCObj)
+			tf.FakeDynamicClient.PrependReactor("patch", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				validatePatchApplicationForBytes(t, action.(testcore.PatchAction).GetPatch())
+				return true, currentRCObj, nil
+			})
+			tf.FakeDynamicClient.PrependReactor("patch", "services", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				validatePatchApplicationForBytes(t, action.(testcore.PatchAction).GetPatch())
+				return true, currentSVCObj, nil
+			})
+
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -804,15 +903,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 					case p == pathRC && m == "GET":
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
-						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					case p == pathSVC && m == "GET":
-						bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodySVC}, nil
-					case p == pathSVC && m == "PATCH":
-						validatePatchApplication(t, req)
 						bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodySVC}, nil
 					default:
@@ -829,8 +920,8 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 			if asList {
 				cmd.Flags().Set("filename", filenameRCSVC)
 			} else {
-				cmd.Flags().Set("filename", filenameRC)
 				cmd.Flags().Set("filename", filenameSVC)
+				cmd.Flags().Set("filename", filenameRC)
 			}
 			cmd.Flags().Set("output", "name")
 
@@ -847,6 +938,19 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 			}
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+
+			actions := tf.FakeDynamicClient.Actions()
+			if len(actions) != 2 {
+				t.Fatal(spew.Sdump(actions))
+			}
+			patchAction := actions[0].(testcore.PatchAction)
+			if patchAction.GetNamespace() != "test" || patchAction.GetName() != nameSVC || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "services"}) {
+				t.Fatal(spew.Sdump(actions))
+			}
+			patchAction = actions[1].(testcore.PatchAction)
+			if patchAction.GetNamespace() != "test" || patchAction.GetName() != nameRC || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+				t.Fatal(spew.Sdump(actions))
 			}
 		})
 	}
@@ -875,7 +979,6 @@ func TestApplyNULLPreservation(t *testing.T) {
 	deploymentName := "nginx-deployment"
 	deploymentPath := "/namespaces/test/deployments/" + deploymentName
 
-	verifiedPatch := false
 	deploymentBytes := readDeploymentFromFile(t, filenameDeployObjServerside)
 
 	for _, fn := range testingOpenAPISchemaFns {
@@ -883,36 +986,34 @@ func TestApplyNULLPreservation(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
+			obj, err := runtime.Decode(scheme.Codecs.UniversalDecoder(extensionsv1beta1.SchemeGroupVersion), deploymentBytes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj)
+			tf.FakeDynamicClient.PrependReactor("patch", "deployments", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				patch := action.(testcore.PatchAction).GetPatch()
+				patchMap := map[string]interface{}{}
+				if err := json.Unmarshal(patch, &patchMap); err != nil {
+					t.Fatal(err)
+				}
+				annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+				if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
+					t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+				}
+				strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
+				if value, ok := strategy["rollingUpdate"]; !ok || value != nil {
+					t.Fatalf("patch did not retain null value in key: rollingUpdate:\n%s\n", patch)
+				}
+
+				return true, obj, nil
+			})
+
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == deploymentPath && m == "GET":
-						body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-					case p == deploymentPath && m == "PATCH":
-						patch, err := ioutil.ReadAll(req.Body)
-						if err != nil {
-							t.Fatal(err)
-						}
-
-						patchMap := map[string]interface{}{}
-						if err := json.Unmarshal(patch, &patchMap); err != nil {
-							t.Fatal(err)
-						}
-						annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-						if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
-							t.Fatalf("patch does not contain annotation:\n%s\n", patch)
-						}
-						strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
-						if value, ok := strategy["rollingUpdate"]; !ok || value != nil {
-							t.Fatalf("patch did not retain null value in key: rollingUpdate:\n%s\n", patch)
-						}
-						verifiedPatch = true
-
-						// The real API server would had returned the patched object but Kubectl
-						// is ignoring the actual return object.
-						// TODO: Make this match actual server behavior by returning the patched object.
 						body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 					default:
@@ -938,8 +1039,14 @@ func TestApplyNULLPreservation(t *testing.T) {
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
 			}
-			if !verifiedPatch {
-				t.Fatal("No server-side patch call detected")
+
+			actions := tf.FakeDynamicClient.Actions()
+			if len(actions) != 1 {
+				t.Fatal(spew.Sdump(actions))
+			}
+			patchAction := actions[0].(testcore.PatchAction)
+			if patchAction.GetNamespace() != "test" || patchAction.GetName() != deploymentName || patchAction.GetResource() != (schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}) {
+				t.Fatal(spew.Sdump(actions))
 			}
 		})
 	}
@@ -951,31 +1058,26 @@ func TestUnstructuredApply(t *testing.T) {
 	name, curr := readAndAnnotateUnstructured(t, filenameWidgetClientside)
 	path := "/namespaces/test/widgets/" + name
 
-	verifiedPatch := false
-
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply works correctly with unstructured objects", func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
+
+			obj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, curr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj)
+			tf.FakeDynamicClient.PrependReactor("patch", "widgets", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				validatePatchApplicationForBytes(t, action.(testcore.PatchAction).GetPatch())
+				return true, obj, nil
+			})
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == path && m == "GET":
-						body := ioutil.NopCloser(bytes.NewReader(curr))
-						return &http.Response{
-							StatusCode: 200,
-							Header:     defaultHeader(),
-							Body:       body}, nil
-					case p == path && m == "PATCH":
-						contentType := req.Header.Get("Content-Type")
-						if contentType != "application/merge-patch+json" {
-							t.Fatalf("Unexpected Content-Type: %s", contentType)
-						}
-						validatePatchApplication(t, req)
-						verifiedPatch = true
-
 						body := ioutil.NopCloser(bytes.NewReader(curr))
 						return &http.Response{
 							StatusCode: 200,
@@ -1003,8 +1105,14 @@ func TestUnstructuredApply(t *testing.T) {
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
 			}
-			if !verifiedPatch {
-				t.Fatal("No server-side patch call detected")
+
+			actions := tf.FakeDynamicClient.Actions()
+			if len(actions) != 1 {
+				t.Fatal(spew.Sdump(actions))
+			}
+			patchAction := actions[0].(testcore.PatchAction)
+			if patchAction.GetNamespace() != "test" || patchAction.GetName() != name || patchAction.GetResource() != (schema.GroupVersionResource{Group: "unit-test.test.com", Version: "v1", Resource: "widgets"}) {
+				t.Fatal(spew.Sdump(actions))
 			}
 		})
 	}
@@ -1021,54 +1129,39 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 	}
 	path := "/namespaces/test/widgets/widget"
 
-	verifiedPatch := false
-
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test repeated apply operations on an unstructured object", func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
+
+			tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, serversideObject)
+			tf.FakeDynamicClient.PrependReactor("patch", "widgets", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				// In idempotent updates, kubectl sends a logically empty
+				// request body with the PATCH request.
+				// Should look like this:
+				// Request Body: {"metadata":{"annotations":{}}}
+				patch := action.(testcore.PatchAction).GetPatch()
+				patchMap := map[string]interface{}{}
+				if err := json.Unmarshal(patch, &patchMap); err != nil {
+					t.Fatal(err)
+				}
+				if len(patchMap) != 1 {
+					t.Fatalf("Unexpected Patch. Has more than 1 entry. path: %s", patch)
+				}
+
+				annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+				if len(annotationsMap) != 0 {
+					t.Fatalf("Unexpected Patch. Found unexpected annotation: %s", patch)
+				}
+
+				return true, serversideObject, nil
+			})
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == path && m == "GET":
-						body := ioutil.NopCloser(bytes.NewReader(serversideData))
-						return &http.Response{
-							StatusCode: 200,
-							Header:     defaultHeader(),
-							Body:       body}, nil
-					case p == path && m == "PATCH":
-						// In idempotent updates, kubectl sends a logically empty
-						// request body with the PATCH request.
-						// Should look like this:
-						// Request Body: {"metadata":{"annotations":{}}}
-
-						patch, err := ioutil.ReadAll(req.Body)
-						if err != nil {
-							t.Fatal(err)
-						}
-
-						contentType := req.Header.Get("Content-Type")
-						if contentType != "application/merge-patch+json" {
-							t.Fatalf("Unexpected Content-Type: %s", contentType)
-						}
-
-						patchMap := map[string]interface{}{}
-						if err := json.Unmarshal(patch, &patchMap); err != nil {
-							t.Fatal(err)
-						}
-						if len(patchMap) != 1 {
-							t.Fatalf("Unexpected Patch. Has more than 1 entry. path: %s", patch)
-						}
-
-						annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-						if len(annotationsMap) != 0 {
-							t.Fatalf("Unexpected Patch. Found unexpected annotation: %s", patch)
-						}
-
-						verifiedPatch = true
-
 						body := ioutil.NopCloser(bytes.NewReader(serversideData))
 						return &http.Response{
 							StatusCode: 200,
@@ -1096,8 +1189,14 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
 			}
-			if !verifiedPatch {
-				t.Fatal("No server-side patch call detected")
+
+			actions := tf.FakeDynamicClient.Actions()
+			if len(actions) != 1 {
+				t.Fatal(spew.Sdump(actions))
+			}
+			patchAction := actions[0].(testcore.PatchAction)
+			if patchAction.GetNamespace() != "test" || patchAction.GetName() != "widget" || patchAction.GetResource() != (schema.GroupVersionResource{Group: "unit-test.test.com", Version: "v1", Resource: "widgets"}) {
+				t.Fatal(spew.Sdump(actions))
 			}
 		})
 	}
@@ -1158,6 +1257,20 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
+			obj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, currentRC)
+			if err != nil {
+				t.Fatal(err)
+			}
+			noAnnotationRCObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, noAnnotationRC)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, noAnnotationRCObj, obj)
+			tf.FakeDynamicClient.PrependReactor("patch", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				checkPatchStringForBytes(t, action.(testcore.PatchAction).GetPatch())
+				return true, obj, nil
+			})
+
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -1173,13 +1286,10 @@ func TestRunApplySetLastApplied(t *testing.T) {
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					case p == noExistPath && m == "GET":
 						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
-					case p == pathRC && m == "PATCH":
-						checkPatchString(t, req)
-						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					case p == "/api/v1/namespaces/test" && m == "GET":
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
 					default:
+						panic("die")
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil
 					}
@@ -1208,12 +1318,8 @@ func TestRunApplySetLastApplied(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {})
 }
 
-func checkPatchString(t *testing.T, req *http.Request) {
+func checkPatchStringForBytes(t *testing.T, patch []byte) {
 	checkString := string(readBytesFromFile(t, filenameRCPatchTest))
-	patch, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	patchMap := map[string]interface{}{}
 	if err := json.Unmarshal(patch, &patchMap); err != nil {
@@ -1254,6 +1360,65 @@ func TestForceApply(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
+			obj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, currentRC)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, obj)
+			tf.FakeDynamicClient.PrependReactor("patch", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				switch action.(testcore.PatchAction).GetName() {
+				case nameRC:
+					counts["patch"]++
+					if counts["patch"] <= 6 {
+						statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+						return true, nil, statusErr
+					}
+					t.Fatalf("unexpected request: %#v after %v tries", spew.Sdump(action), counts["patch"])
+					return false, nil, nil
+				}
+				t.Fatalf("unexpected request: %#v after %v tries", spew.Sdump(action), counts["patch"])
+				return false, nil, nil
+			})
+			tf.FakeDynamicClient.PrependReactor("get", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				fmt.Printf("#### get %q %q\n", nameRC, action.(testcore.GetAction).GetName())
+				switch action.(testcore.GetAction).GetName() {
+				case nameRC:
+					if deleted {
+						counts["getNotFound"]++
+						return true, nil, kubeerr.NewNotFound(schema.GroupResource{Group: "", Resource: "rc"}, nameRC)
+					}
+					counts["getOk"]++
+					if isScaledDownToZero {
+						rcObj := readReplicationControllerFromFile(t, filenameRC)
+						rcObj.Spec.Replicas = 0
+						rcBytes, err := runtime.Encode(testapi.Default.Codec(), rcObj)
+						if err != nil {
+							t.Fatal(err)
+						}
+						obj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, rcBytes)
+						return true, obj, nil
+					} else {
+						fmt.Printf("#### 1b\n")
+						return false, nil, nil
+					}
+				}
+				return false, nil, nil
+			})
+			tf.FakeDynamicClient.PrependReactor("delete", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				return false, nil, nil
+			})
+			tf.FakeDynamicClient.PrependReactor("update", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				counts["put"]++
+				isScaledDownToZero = true
+				return false, nil, nil
+			})
+			tf.FakeDynamicClient.PrependReactor("create", "replicationcontrollers", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				counts["post"]++
+				deleted = false
+				isScaledDownToZero = false
+				return false, nil, nil
+			})
+
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -1293,31 +1458,14 @@ func TestForceApply(t *testing.T) {
 						}
 						bodyRCList := ioutil.NopCloser(bytes.NewReader(listBytes))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRCList}, nil
-					case strings.HasSuffix(p, pathRC) && m == "PATCH":
-						counts["patch"]++
-						if counts["patch"] <= 6 {
-							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
-							bodyBytes, _ := json.Marshal(statusErr)
-							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
-							return &http.Response{StatusCode: http.StatusConflict, Header: defaultHeader(), Body: bodyErr}, nil
-						}
-						t.Fatalf("unexpected request: %#v after %v tries\n%#v", req.URL, counts["patch"], req)
-						return nil, nil
 					case strings.HasSuffix(p, pathRC) && m == "DELETE":
 						counts["delete"]++
 						deleted = true
+
+						// update the dynamic client.  This is called from a reaper so it doesn't get tickled directly
+						tf.FakeDynamicClient.Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"}).Namespace("test").Delete(nameRC, nil)
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte{}))}, nil
-					case strings.HasSuffix(p, pathRC) && m == "PUT":
-						counts["put"]++
-						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-						isScaledDownToZero = true
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-					case strings.HasSuffix(p, pathRCList) && m == "POST":
-						counts["post"]++
-						deleted = false
-						isScaledDownToZero = false
-						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil

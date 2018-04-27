@@ -28,13 +28,17 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/davecgh/go-spew/spew"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	clientgotest "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -210,7 +214,8 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				PrintFlags:    printFlags,
 				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
 
-				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+				IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
+				DynamicClient: tf.FakeDynamicClient,
 
 				Image:     "nginx",
 				Generator: "run/v1",
@@ -270,8 +275,6 @@ func TestGenerateService(t *testing.T) {
 					Selector: map[string]string{
 						"run": "foo",
 					},
-					Type:            api.ServiceTypeClusterIP,
-					SessionAffinity: api.ServiceAffinityNone,
 				},
 			},
 			expectPOST: true,
@@ -302,8 +305,6 @@ func TestGenerateService(t *testing.T) {
 					Selector: map[string]string{
 						"app": "bar",
 					},
-					Type:            api.ServiceTypeClusterIP,
-					SessionAffinity: api.ServiceAffinityNone,
 				},
 			},
 			expectPOST: true,
@@ -327,44 +328,8 @@ func TestGenerateService(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sawPOST := false
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
-
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-			ns := legacyscheme.Codecs
-
-			tf.ClientConfigVal = defaultClientConfig()
-			tf.Client = &fake.RESTClient{
-				GroupVersion:         schema.GroupVersion{Version: "v1"},
-				NegotiatedSerializer: ns,
-				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					switch p, m := req.URL.Path, req.Method; {
-					case test.expectPOST && m == "POST" && p == "/namespaces/namespace/services":
-						sawPOST = true
-						body := objBody(codec, &test.service)
-						data, err := ioutil.ReadAll(req.Body)
-						if err != nil {
-							t.Fatalf("unexpected error: %v", err)
-						}
-						defer req.Body.Close()
-						svc := &api.Service{}
-						if err := runtime.DecodeInto(codec, data, svc); err != nil {
-							t.Fatalf("unexpected error: %v", err)
-						}
-						// Copy things that are defaulted by the system
-						test.service.Annotations = svc.Annotations
-
-						if !reflect.DeepEqual(&test.service, svc) {
-							t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
-						}
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-					default:
-						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
-						return nil, fmt.Errorf("unexpected request")
-					}
-				}),
-			}
 
 			printFlags := printers.NewPrintFlags("created")
 			printer, err := printFlags.ToPrinter()
@@ -379,7 +344,8 @@ func TestGenerateService(t *testing.T) {
 				PrintFlags:    printFlags,
 				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
 
-				IOStreams: ioStreams,
+				IOStreams:     ioStreams,
+				DynamicClient: tf.FakeDynamicClient,
 
 				Port:     test.port,
 				Recorder: genericclioptions.NoopRecorder{},
@@ -413,8 +379,22 @@ func TestGenerateService(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if test.expectPOST != sawPOST {
-				t.Errorf("expectPost: %v, sawPost: %v", test.expectPOST, sawPOST)
+
+			if test.expectPOST {
+				if len(tf.FakeDynamicClient.Actions()) != 1 {
+					t.Fatalf("unexpected actions: %v", spew.Sdump(tf.FakeDynamicClient.Actions()))
+				}
+				createAction, ok := tf.FakeDynamicClient.Actions()[0].(clientgotest.CreateAction)
+				if !ok {
+					t.Fatalf("unexpected actions: %v", spew.Sdump(tf.FakeDynamicClient.Actions()))
+				}
+				service, err := legacyscheme.Scheme.ConvertToVersion(createAction.GetObject(), api.SchemeGroupVersion)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !equality.Semantic.DeepEqual(&test.service, service) {
+					t.Fatal(diff.ObjectDiff(&test.service, service))
+				}
 			}
 		})
 	}

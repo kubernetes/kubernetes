@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/docker/distribution/reference"
@@ -29,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
@@ -39,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	uexec "k8s.io/utils/exec"
@@ -106,6 +108,8 @@ type RunOptions struct {
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
+
+	DynamicClient dynamic.DynamicInterface
 
 	ArgsLenAtDash  int
 	Attach         bool
@@ -193,6 +197,11 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	o.RecordFlags.Complete(f.Command(cmd, false))
 	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
@@ -666,10 +675,6 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return nil, err
 	}
-	client, err := f.ClientForMapping(mapping)
-	if err != nil {
-		return nil, err
-	}
 
 	if err := o.Recorder.Record(obj); err != nil {
 		glog.V(4).Infof("error recording current command: %v", err)
@@ -677,26 +682,29 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 
 	versioned := obj
 	if !o.DryRun {
-		resourceMapper := &resource.Mapper{
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), obj, cmdutil.InternalVersionJSONEncoder()); err != nil {
+			return nil, err
 		}
-		info, err := resourceMapper.InfoForObject(obj, legacyscheme.Scheme, nil)
+
+		asUnstructured := &unstructured.Unstructured{}
+		if err := legacyscheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
+			return nil, err
+		}
+		gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(asUnstructured)
+		if err != nil {
+			return nil, err
+		}
+		objMapping, err := mapper.RESTMapping(gvks[0].GroupKind(), gvks[0].Version)
+		if err != nil {
+			return nil, err
+		}
+		// Serialize the object with the annotation applied.
+		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(namespace).Create(asUnstructured)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
-			return nil, err
-		}
-
-		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
-		if err != nil {
-			return nil, err
-		}
-
-		versioned = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
+		versioned = actualObject
 	}
 	return &RunObject{
 		Versioned: versioned,
