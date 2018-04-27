@@ -337,7 +337,7 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper, _ := f.Object()
+	mapper := f.RESTMapper()
 
 	return resource.NewBuilder(
 		&resource.Mapper{
@@ -425,7 +425,7 @@ func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) 
 	return f.ClientSet()
 }
 
-func (f *TestFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+func (f *TestFactory) RESTMapper() meta.RESTMapper {
 	groupResources := testDynamicResources()
 	mapper := discovery.NewRESTMapper(groupResources)
 	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
@@ -438,10 +438,9 @@ func (f *TestFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	}
 
 	// TODO: should probably be the external scheme
-	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
-	return expander, typer
+	return expander
 }
 
 func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {

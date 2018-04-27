@@ -96,7 +96,6 @@ type ExposeServiceOptions struct {
 
 	Namespace string
 	Mapper    meta.RESTMapper
-	Typer     runtime.ObjectTyper
 
 	Builder *resource.Builder
 
@@ -188,7 +187,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	o.MapBasedSelectorForObject = f.MapBasedSelectorForObject
 	o.PortsForObject = f.PortsForObject
 	o.ProtocolsForObject = f.ProtocolsForObject
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper = f.RESTMapper()
 	o.LabelsForObject = f.LabelsForObject
 
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()

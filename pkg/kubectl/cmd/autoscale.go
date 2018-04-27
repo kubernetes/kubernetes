@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -68,7 +67,6 @@ type AutoscaleOptions struct {
 	EnforceNamespace bool
 
 	Mapper           meta.RESTMapper
-	Typer            runtime.ObjectTyper
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	GeneratorFunc func(string, *meta.RESTMapping) (kubectl.StructuredGenerator, error)
@@ -133,7 +131,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.Builder = f.NewBuilder()
 	o.CanBeAutoscaled = f.CanBeAutoscaled
-	o.Mapper, o.Typer = f.Object()
+	o.Mapper = f.RESTMapper()
 	o.ClientForMapping = f.ClientForMapping
 	o.BuilderArgs = args
 	o.RecordFlags.Complete(f.Command(cmd, false))
