@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -319,7 +320,11 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			indent := ""
 			if !one {
 				indent = " "
-				fmt.Fprintf(o.ErrOut, "Listing labels for %s.%s/%s:\n", info.Mapping.GroupVersionKind.Kind, info.Mapping.GroupVersionKind.Group, info.Name)
+				gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(info.Object)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(o.ErrOut, "Listing labels for %s.%s/%s:\n", gvks[0].Kind, gvks[0].Group, info.Name)
 			}
 			for k, v := range accessor.GetLabels() {
 				fmt.Fprintf(o.Out, "%s%s=%s\n", indent, k, v)

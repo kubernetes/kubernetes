@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -234,9 +235,10 @@ func (o TaintOptions) RunTaint() error {
 			return err
 		}
 
-		obj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+		obj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, v1.SchemeGroupVersion)
 		if err != nil {
-			return err
+			glog.V(1).Info(err)
+			return fmt.Errorf("object was not a node.v1.: %T", info.Object)
 		}
 		name, namespace := info.Name, info.Namespace
 		oldData, err := json.Marshal(obj)
