@@ -18,12 +18,12 @@ package pvprotection
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -268,11 +268,7 @@ func TestPVProtectionController(t *testing.T) {
 			break
 		}
 		actions := client.Actions()
-
-		if !reflect.DeepEqual(actions, test.expectedActions) {
-			t.Errorf("Test %q: action not expected\nExpected:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedActions), spew.Sdump(actions))
-		}
-
+		assert.Equalf(t, test.expectedActions, actions, "Test %q: action not expected\nExpected:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedActions), spew.Sdump(actions))
 	}
 
 }

@@ -18,12 +18,12 @@ package pvcprotection
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -407,9 +407,7 @@ func TestPVCProtectionController(t *testing.T) {
 			}
 
 			expectedAction := test.expectedActions[i]
-			if !reflect.DeepEqual(expectedAction, action) {
-				t.Errorf("Test %q: action %d\nExpected:\n%s\ngot:\n%s", test.name, i, spew.Sdump(expectedAction), spew.Sdump(action))
-			}
+			assert.Equalf(t, expectedAction, action, "Test %q: action %d\nExpected:\n%s\ngot:\n%s", test.name, i, spew.Sdump(expectedAction), spew.Sdump(action))
 		}
 
 		if len(test.expectedActions) > len(actions) {

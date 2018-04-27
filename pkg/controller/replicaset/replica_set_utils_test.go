@@ -20,8 +20,9 @@ package replicaset
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -140,9 +141,7 @@ func TestCalculateStatus(t *testing.T) {
 
 	for _, test := range rsStatusTests {
 		replicaSetStatus := calculateStatus(test.replicaset, test.filteredPods, nil)
-		if !reflect.DeepEqual(replicaSetStatus, test.expectedReplicaSetStatus) {
-			t.Errorf("%s: unexpected replicaset status: expected %v, got %v", test.name, test.expectedReplicaSetStatus, replicaSetStatus)
-		}
+		assert.Equalf(t, test.expectedReplicaSetStatus, replicaSetStatus, "%s: unexpected replicaset status: expected %v, got %v", test.name, test.expectedReplicaSetStatus, replicaSetStatus)
 	}
 }
 
@@ -239,8 +238,6 @@ func TestCalculateStatusConditions(t *testing.T) {
 		if len(replicaSetStatus.Conditions) > 0 {
 			test.expectedReplicaSetConditions[0].LastTransitionTime = replicaSetStatus.Conditions[0].LastTransitionTime
 		}
-		if !reflect.DeepEqual(replicaSetStatus.Conditions, test.expectedReplicaSetConditions) {
-			t.Errorf("%s: unexpected replicaset status: expected %v, got %v", test.name, test.expectedReplicaSetConditions, replicaSetStatus.Conditions)
-		}
+		assert.Equalf(t, test.expectedReplicaSetConditions, replicaSetStatus.Conditions, "%s: unexpected replicaset status: expected %v, got %v", test.name, test.expectedReplicaSetConditions, replicaSetStatus.Conditions)
 	}
 }

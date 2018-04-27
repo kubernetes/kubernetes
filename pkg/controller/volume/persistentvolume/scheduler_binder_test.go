@@ -18,10 +18,10 @@ package persistentvolume
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/golang/glog"
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -185,9 +185,7 @@ func (env *testEnv) validatePodCache(t *testing.T, name, node string, pod *v1.Po
 	cache := env.internalBinder.podBindingCache
 	bindings := cache.GetBindings(pod, node)
 
-	if !reflect.DeepEqual(expectedBindings, bindings) {
-		t.Errorf("Test %q failed: Expected bindings %+v, got %+v", name, expectedBindings, bindings)
-	}
+	assert.Equalf(t, expectedBindings, bindings, "Test %q failed: Expected bindings %+v, got %+v", name, expectedBindings, bindings)
 }
 
 func (env *testEnv) validateAssume(t *testing.T, name string, pod *v1.Pod, bindings []*bindingInfo) {
@@ -240,9 +238,7 @@ func (env *testEnv) validateBind(
 		if err != nil {
 			t.Errorf("Test %q failed: GetPV %q returned error: %v", name, pv.Name, err)
 		}
-		if !reflect.DeepEqual(cachedPV, pv) {
-			t.Errorf("Test %q failed: cached PV check failed [A-expected, B-got]:\n%s", name, diff.ObjectDiff(pv, cachedPV))
-		}
+		assert.Equalf(t, pv, cachedPV, "Test %q failed: cached PV check failed [A-expected, B-got]:\n%s", name, diff.ObjectDiff(pv, cachedPV))
 	}
 
 	// Check reactor for API updates

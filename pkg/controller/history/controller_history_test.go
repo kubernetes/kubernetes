@@ -20,16 +20,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/controller"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,8 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestRealHistory_ListControllerRevisions(t *testing.T) {
@@ -71,9 +70,7 @@ func TestRealHistory_ListControllerRevisions(t *testing.T) {
 		for i := range revisions {
 			got[revisions[i].Name] = true
 		}
-		if !reflect.DeepEqual(test.want, got) {
-			t.Errorf("%s: want %v got %v", test.name, test.want, got)
-		}
+		assert.Equalf(t, test.want, got, "%s: want %v got %v", test.name, test.want, got)
 	}
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
@@ -168,9 +165,7 @@ func TestFakeHistory_ListControllerRevisions(t *testing.T) {
 		for i := range revisions {
 			got[revisions[i].Name] = true
 		}
-		if !reflect.DeepEqual(test.want, got) {
-			t.Errorf("%s: want %v got %v", test.name, test.want, got)
-		}
+		assert.Equalf(t, test.want, got, "%s: want %v got %v", test.name, test.want, got)
 	}
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})

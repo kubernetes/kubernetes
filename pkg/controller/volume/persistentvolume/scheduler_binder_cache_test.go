@@ -17,8 +17,9 @@ limitations under the License.
 package persistentvolume
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,16 +65,12 @@ func TestUpdateGetBindings(t *testing.T) {
 
 		// Verify updated bindings
 		bindings := cache.GetBindings(updatePod, scenario.updateNode)
-		if !reflect.DeepEqual(bindings, scenario.updateBindings) {
-			t.Errorf("Test %v failed: returned bindings after update different. Got %+v, expected %+v", name, bindings, scenario.updateBindings)
-		}
+		assert.Equalf(t, bindings, scenario.updateBindings, "Test %v failed: returned bindings after update different. Got %+v, expected %+v", name, bindings, scenario.updateBindings)
 
 		// Get bindings
 		getPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: scenario.getPod, Namespace: "ns"}}
 		bindings = cache.GetBindings(getPod, scenario.getNode)
-		if !reflect.DeepEqual(bindings, scenario.getBindings) {
-			t.Errorf("Test %v failed: unexpected bindings returned. Got %+v, expected %+v", name, bindings, scenario.updateBindings)
-		}
+		assert.Equalf(t, bindings, scenario.getBindings, "Test %v failed: unexpected bindings returned. Got %+v, expected %+v", name, bindings, scenario.updateBindings)
 	}
 }
 
@@ -97,9 +94,7 @@ func TestDeleteBindings(t *testing.T) {
 
 	// Get bindings
 	bindings = cache.GetBindings(pod, "node1")
-	if !reflect.DeepEqual(bindings, initialBindings) {
-		t.Errorf("Test failed: expected bindings %+v, got %+v", initialBindings, bindings)
-	}
+	assert.Equalf(t, initialBindings, bindings, "Test failed: expected bindings %+v, got %+v", initialBindings, bindings)
 
 	// Delete
 	cache.DeleteBindings(pod)

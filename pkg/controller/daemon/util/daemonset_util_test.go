@@ -18,8 +18,9 @@ package util
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -335,8 +336,6 @@ func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		got := ReplaceDaemonSetPodHostnameNodeAffinity(test.affinity, test.hostname)
-		if !reflect.DeepEqual(test.expected, got) {
-			t.Errorf("Failed to append NodeAffinity, got: %v, expected: %v", got, test.expected)
-		}
+		assert.Equalf(t, test.expected, got, "Failed to append NodeAffinity, got: %v, expected: %v", got, test.expected)
 	}
 }

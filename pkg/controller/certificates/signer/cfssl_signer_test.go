@@ -19,9 +19,10 @@ package signer
 import (
 	"crypto/x509"
 	"io/ioutil"
-	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	capi "k8s.io/api/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
@@ -72,13 +73,9 @@ func TestSigner(t *testing.T) {
 	if crt.Subject.CommonName != "system:node:k-a-node-s36b" {
 		t.Errorf("expected common name of 'system:node:k-a-node-s36b', but got: %v", certs[0].Subject.CommonName)
 	}
-	if !reflect.DeepEqual(crt.Subject.Organization, []string{"system:nodes"}) {
-		t.Errorf("expected organization to be [system:nodes] but got: %v", crt.Subject.Organization)
-	}
+	assert.Equalf(t, []string{"system:nodes"}, crt.Subject.Organization, "expected organization to be [system:nodes] but got: %v", crt.Subject.Organization)
 	if crt.KeyUsage != x509.KeyUsageDigitalSignature|x509.KeyUsageKeyEncipherment {
 		t.Errorf("bad key usage")
 	}
-	if !reflect.DeepEqual(crt.ExtKeyUsage, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}) {
-		t.Errorf("bad extended key usage")
-	}
+	assert.Equalf(t, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}, crt.ExtKeyUsage, "bad extended key usage")
 }
