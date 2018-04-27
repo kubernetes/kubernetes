@@ -438,21 +438,24 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 	return newTaints
 }
 
-// ensureNodeExistsByProviderIDOrInstanceID first checks if the instance exists by the provider id and then by calling instance id with node name
+// ensureNodeExistsByProviderIDOrInstanceID checks if the instance exists by the provider id,
+// If provider id is empty it calls instanceId with node name to get provider id
 func ensureNodeExistsByProviderIDOrInstanceID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
-	exists, err := instances.InstanceExistsByProviderID(context.TODO(), node.Spec.ProviderID)
-	if err != nil {
-		providerIDErr := err
-		_, err = instances.InstanceID(context.TODO(), types.NodeName(node.Name))
-		//TODO(anupn): Changing the check as InstanceID does not return error
-		if err == nil {
-			return false, nil
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		var err error
+		providerID, err = instances.InstanceID(context.TODO(), types.NodeName(node.Name))
+		if err != nil {
+			return false, err
 		}
 
-		return false, fmt.Errorf("InstanceExistsByProviderID: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
+		if providerID == "" {
+			glog.Warningf("Cannot find valid providerID for node name %q, assuming non existence", node.Name)
+			return false, nil
+		}
 	}
 
-	return exists, nil
+	return instances.InstanceExistsByProviderID(context.TODO(), providerID)
 }
 
 func getNodeAddressesByProviderIDOrName(instances cloudprovider.Instances, node *v1.Node) ([]v1.NodeAddress, error) {
