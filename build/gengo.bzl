@@ -15,7 +15,8 @@
 # Bazel macros for using the k8s.io/gengo framework to generate zz_generated.FOO.go files.
 #
 # Usage:
-#   1) Create a rule that builds all the generated files, in //build for example
+#   1) Create a rule that builds all the generated files,
+#      which is significantly faster than doing so one package at a time:
 #       load("//build:gengo.bzl", "k8s_gengo_all")
 #       k8s_gengo_all(
 #           name="deepcopy-sources",
@@ -60,11 +61,11 @@ def _generate_prefix(tool, tool_flags, out, match, header):
   """
   return """
   tool='$(location {tool})'
-  tool_flags='{flags}'
+  tool_flags='{tool_flags}'
   out='{out}'
   match='{match}'
   head='{header}'
-""".format(tool=tool, tool_flags=tool_flags, out=out, match=match)
+""".format(tool=tool, tool_flags=tool_flags, out=out, match=match, header=header)
 
 def _generate_outs(packages):
   """Return the move-out commands which copy files to where bazel expects."""
@@ -81,10 +82,9 @@ def source_files(pkgs):
 
 def k8s_gengo_all(name, base, tool, flags, match, packages, deps):
   """Use TOOL to generate BASE files in all the PACKAGES with a MATCH comment."""
-  # TODO(fejta): gazelle doesn't appear to auto-generate rules for this package
-  packages = [p for p in packages if not p.startswith("vendor/k8s.io/code-generator/_examples/")]
+  # TODO(fejta): gazelle doesn't appear to auto-generate rules for k8s.io/code-generator/_examples
   # Add any missing packages to deps
-  deps = {d: True for d in (deps + packages) if not d.startswith("vendor/k8s.io/code-generator/_examples/")}.keys()
+  deps = {d: True for d in (deps + packages)}.keys()
 
   # Tell bazel all the files we will generate
   go_files = ["%s/%s" % (p, base) for p in packages] # generated files
