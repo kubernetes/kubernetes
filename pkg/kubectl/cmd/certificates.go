@@ -204,7 +204,7 @@ func (o *CertificateOptions) RunCertificateDeny(force bool) error {
 func (options *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet internalclientset.Interface, force bool, modify func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool)) error {
 	var found int
 	r := builder.
-		Internal(legacyscheme.Scheme).
+		WithScheme(legacyscheme.Scheme).
 		ContinueOnError().
 		FilenameParam(false, &options.FilenameOptions).
 		ResourceNames("certificatesigningrequest", options.csrNames...).

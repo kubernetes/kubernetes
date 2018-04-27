@@ -30,11 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -241,10 +242,11 @@ type TestFactory struct {
 	Namespace          string
 	ClientConfigVal    *restclient.Config
 	CommandVal         string
+	FakeDynamicClient  *fakedynamic.FakeDynamicClient
 
 	tempConfigFile *os.File
 
-	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	UnstructuredClientForMappingFunc resource.FakeClientFunc
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
 }
 
@@ -253,8 +255,9 @@ func NewTestFactory() *TestFactory {
 	// to avoid polluting an existing user config.
 	config, configFile := defaultFakeClientConfig()
 	return &TestFactory{
-		Factory:        cmdutil.NewFactory(config),
-		tempConfigFile: configFile,
+		Factory:           cmdutil.NewFactory(config),
+		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(legacyscheme.Scheme),
+		tempConfigFile:    configFile,
 	}
 }
 
@@ -309,7 +312,7 @@ func (f *TestFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.REST
 
 func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	if f.UnstructuredClientForMappingFunc != nil {
-		return f.UnstructuredClientForMappingFunc(mapping)
+		return f.UnstructuredClientForMappingFunc(mapping.GroupVersionKind.GroupVersion())
 	}
 	return f.UnstructuredClient, nil
 }
@@ -340,17 +343,17 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 func (f *TestFactory) NewBuilder() *resource.Builder {
 	mapper, err := f.RESTMapper()
 
-	return resource.NewBuilder(
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
+	return resource.NewFakeBuilder(
+		func(version schema.GroupVersion) (resource.RESTClient, error) {
+			if f.UnstructuredClientForMappingFunc != nil {
+				return f.UnstructuredClientForMappingFunc(version)
+			}
+			if f.UnstructuredClient != nil {
+				return f.UnstructuredClient, nil
+			}
+			return f.Client, nil
 		},
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.UnstructuredClientForMapping),
-			Decoder:      unstructured.UnstructuredJSONScheme,
-		},
+		mapper,
 		f.CategoryExpander(),
 	).AddError(err)
 }
@@ -400,6 +403,13 @@ func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
 	clientset.Policy().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	return clientset, nil
+}
+
+func (f *TestFactory) DynamicClient() (dynamic.DynamicInterface, error) {
+	if f.FakeDynamicClient != nil {
+		return f.FakeDynamicClient, nil
+	}
+	return f.Factory.DynamicClient()
 }
 
 func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {

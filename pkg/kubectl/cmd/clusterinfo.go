@@ -96,7 +96,7 @@ func (o *ClusterInfoOptions) Run() error {
 
 	// TODO use generalized labels once they are implemented (#341)
 	b := o.Builder.
-		Internal(legacyscheme.Scheme).
+		WithScheme(legacyscheme.Scheme).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		LabelSelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).

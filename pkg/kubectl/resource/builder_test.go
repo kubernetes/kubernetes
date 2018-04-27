@@ -47,11 +47,11 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 
 	// install the pod scheme into the legacy scheme for test typer resolution
+	"github.com/davecgh/go-spew/spew"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
@@ -76,14 +76,14 @@ func watchBody(events ...watch.Event) string {
 	return buf.String()
 }
 
-func fakeClient() ClientMapper {
-	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
+func fakeClient() FakeClientFunc {
+	return func(version schema.GroupVersion) (RESTClient, error) {
 		return &fake.RESTClient{}, nil
-	})
+	}
 }
 
-func fakeClientWith(testName string, t *testing.T, data map[string]string) ClientMapper {
-	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
+func fakeClientWith(testName string, t *testing.T, data map[string]string) FakeClientFunc {
+	return func(version schema.GroupVersion) (RESTClient, error) {
 		return &fake.RESTClient{
 			GroupVersion:         corev1GV,
 			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
@@ -106,7 +106,7 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) Clien
 				}, nil
 			}),
 		}, nil
-	})
+	}
 }
 
 func testData() (*v1.PodList, *v1.ServiceList) {
@@ -272,16 +272,9 @@ func newDefaultBuilder() *Builder {
 	return newDefaultBuilderWith(fakeClient())
 }
 
-func newDefaultBuilderWith(client ClientMapper) *Builder {
-	return NewBuilder(
-		&Mapper{
-			RESTMapper:   restmapper,
-			ClientMapper: client,
-			Decoder:      corev1Codec,
-		},
-		nil,
-		categories.LegacyCategoryExpander,
-	).Internal(legacyscheme.Scheme)
+func newDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
+	return NewFakeBuilder(fakeClientFn, restmapper, categories.LegacyCategoryExpander).
+		WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...)
 }
 
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
@@ -407,11 +400,11 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 			switch test.object.(type) {
 			case *v1.Pod:
 				if _, ok := v.Object.(*v1.Pod); !ok || v.Name != test.expectedNames[i] || v.Namespace != "test" {
-					t.Errorf("unexpected info: %#v", v)
+					t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
 				}
 			case *v1.ReplicationController:
 				if _, ok := v.Object.(*v1.ReplicationController); !ok || v.Name != test.expectedNames[i] || v.Namespace != "test" {
-					t.Errorf("unexpected info: %#v", v)
+					t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
 				}
 			}
 		}

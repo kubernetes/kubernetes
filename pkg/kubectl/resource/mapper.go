@@ -27,20 +27,20 @@ import (
 
 // Mapper is a convenience struct for holding references to the interfaces
 // needed to create Info for arbitrary objects.
-type Mapper struct {
+type mapper struct {
 	// localFn indicates the call can't make server requests
 	localFn func() bool
 
-	RESTMapper   meta.RESTMapper
-	ClientMapper ClientMapper
-	Decoder      runtime.Decoder
+	restMapper meta.RESTMapper
+	clientFn   func(version schema.GroupVersion) (RESTClient, error)
+	decoder    runtime.Decoder
 }
 
 // InfoForData creates an Info object for the given data. An error is returned
 // if any of the decoding or client lookup steps fail. Name and namespace will be
 // set into Info if the mapping's MetadataAccessor can retrieve them.
-func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
-	obj, gvk, err := m.Decoder.Decode(data, nil, nil)
+func (m *mapper) infoForData(data []byte, source string) (*Info, error) {
+	obj, gvk, err := m.decoder.Decode(data, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
 	}
@@ -59,13 +59,13 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	}
 
 	if m.localFn == nil || !m.localFn() {
-		mapping, err := m.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		mapping, err := m.restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
 			return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
 		}
 		ret.Mapping = mapping
 
-		client, err := m.ClientMapper.ClientForMapping(mapping)
+		client, err := m.clientFn(gvk.GroupVersion())
 		if err != nil {
 			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 		}
@@ -78,7 +78,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 // InfoForObject creates an Info object for the given Object. An error is returned
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
-func (m *Mapper) InfoForObject(obj runtime.Object, typer runtime.ObjectTyper, preferredGVKs []schema.GroupVersionKind) (*Info, error) {
+func (m *mapper) infoForObject(obj runtime.Object, typer runtime.ObjectTyper, preferredGVKs []schema.GroupVersionKind) (*Info, error) {
 	groupVersionKinds, _, err := typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
@@ -101,13 +101,13 @@ func (m *Mapper) InfoForObject(obj runtime.Object, typer runtime.ObjectTyper, pr
 	}
 
 	if m.localFn == nil || !m.localFn() {
-		mapping, err := m.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		mapping, err := m.restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
 			return nil, fmt.Errorf("unable to recognize %v", err)
 		}
 		ret.Mapping = mapping
 
-		client, err := m.ClientMapper.ClientForMapping(mapping)
+		client, err := m.clientFn(gvk.GroupVersion())
 		if err != nil {
 			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 		}
@@ -151,14 +151,4 @@ func preferredObjectKind(possibilities []schema.GroupVersionKind, preferences []
 
 	// Just pick the first
 	return possibilities[0]
-}
-
-// DisabledClientForMapping allows callers to avoid allowing remote calls when handling
-// resources.
-type DisabledClientForMapping struct {
-	ClientMapper
-}
-
-func (f DisabledClientForMapping) ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error) {
-	return nil, nil
 }

@@ -241,7 +241,7 @@ func (o *EnvOptions) RunEnv() error {
 
 	if len(o.From) != 0 {
 		b := o.builder().
-			Internal(legacyscheme.Scheme).
+			WithScheme(legacyscheme.Scheme).
 			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(o.namespace).DefaultNamespace().
@@ -309,7 +309,7 @@ func (o *EnvOptions) RunEnv() error {
 	}
 
 	b := o.builder().
-		Internal(legacyscheme.Scheme).
+		WithScheme(legacyscheme.Scheme).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
