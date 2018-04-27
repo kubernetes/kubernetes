@@ -58,65 +58,11 @@ type controllerCommon struct {
 	cloud                 *Cloud
 }
 
-// AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI, and lun.
-func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
-	// 1. vmType is standard, attach with availabilitySet.AttachDisk.
+// getNodeVMSet gets the VMSet interface based on config.VMType and the real virtual machine type.
+func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName) (VMSet, error) {
+	// 1. vmType is standard, return cloud.vmSet directly.
 	if c.cloud.VMType == vmTypeStandard {
-		return c.cloud.vmSet.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
-	}
-
-	// 2. vmType is Virtual Machine Scale Set (vmss), convert vmSet to scaleSet.
-	ss, ok := c.cloud.vmSet.(*scaleSet)
-	if !ok {
-		return fmt.Errorf("error of converting vmSet (%q) to scaleSet with vmType %q", c.cloud.vmSet, c.cloud.VMType)
-	}
-
-	// 3. If the node is managed by availability set, then attach with availabilitySet.AttachDisk.
-	managedByAS, err := ss.isNodeManagedByAvailabilitySet(mapNodeNameToVMName(nodeName))
-	if err != nil {
-		return err
-	}
-	if managedByAS {
-		// vm is managed by availability set.
-		return ss.availabilitySet.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
-	}
-
-	// 4. Node is managed by vmss, attach with scaleSet.AttachDisk.
-	return ss.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
-}
-
-// DetachDiskByName detaches a vhd from host. The vhd can be identified by diskName or diskURI.
-func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
-	// 1. vmType is standard, detach with availabilitySet.DetachDiskByName.
-	if c.cloud.VMType == vmTypeStandard {
-		return c.cloud.vmSet.DetachDiskByName(diskName, diskURI, nodeName)
-	}
-
-	// 2. vmType is Virtual Machine Scale Set (vmss), convert vmSet to scaleSet.
-	ss, ok := c.cloud.vmSet.(*scaleSet)
-	if !ok {
-		return fmt.Errorf("error of converting vmSet (%q) to scaleSet with vmType %q", c.cloud.vmSet, c.cloud.VMType)
-	}
-
-	// 3. If the node is managed by availability set, then detach with availabilitySet.DetachDiskByName.
-	managedByAS, err := ss.isNodeManagedByAvailabilitySet(mapNodeNameToVMName(nodeName))
-	if err != nil {
-		return err
-	}
-	if managedByAS {
-		// vm is managed by availability set.
-		return ss.availabilitySet.DetachDiskByName(diskName, diskURI, nodeName)
-	}
-
-	// 4. Node is managed by vmss, detach with scaleSet.DetachDiskByName.
-	return ss.DetachDiskByName(diskName, diskURI, nodeName)
-}
-
-// getNodeDataDisks invokes vmSet interfaces to get data disks for the node.
-func (c *controllerCommon) getNodeDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
-	// 1. vmType is standard, get data disks with availabilitySet.GetDataDisks.
-	if c.cloud.VMType == vmTypeStandard {
-		return c.cloud.vmSet.GetDataDisks(nodeName)
+		return c.cloud.vmSet, nil
 	}
 
 	// 2. vmType is Virtual Machine Scale Set (vmss), convert vmSet to scaleSet.
@@ -125,18 +71,48 @@ func (c *controllerCommon) getNodeDataDisks(nodeName types.NodeName) ([]compute.
 		return nil, fmt.Errorf("error of converting vmSet (%q) to scaleSet with vmType %q", c.cloud.vmSet, c.cloud.VMType)
 	}
 
-	// 3. If the node is managed by availability set, then get with availabilitySet.GetDataDisks.
+	// 3. If the node is managed by availability set, then return ss.availabilitySet.
 	managedByAS, err := ss.isNodeManagedByAvailabilitySet(mapNodeNameToVMName(nodeName))
 	if err != nil {
 		return nil, err
 	}
 	if managedByAS {
 		// vm is managed by availability set.
-		return ss.availabilitySet.GetDataDisks(nodeName)
+		return ss.availabilitySet, nil
 	}
 
-	// 4. Node is managed by vmss, detach with scaleSet.GetDataDisks.
-	return ss.GetDataDisks(nodeName)
+	// 4. Node is managed by vmss
+	return ss, nil
+}
+
+// AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI, and lun.
+func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
+	vmset, err := c.getNodeVMSet(nodeName)
+	if err != nil {
+		return err
+	}
+
+	return vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
+}
+
+// DetachDiskByName detaches a vhd from host. The vhd can be identified by diskName or diskURI.
+func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
+	vmset, err := c.getNodeVMSet(nodeName)
+	if err != nil {
+		return err
+	}
+
+	return vmset.DetachDiskByName(diskName, diskURI, nodeName)
+}
+
+// getNodeDataDisks invokes vmSet interfaces to get data disks for the node.
+func (c *controllerCommon) getNodeDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
+	vmset, err := c.getNodeVMSet(nodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	return vmset.GetDataDisks(nodeName)
 }
 
 // GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI.
