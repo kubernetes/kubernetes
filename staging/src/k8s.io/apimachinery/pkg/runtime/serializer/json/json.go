@@ -17,7 +17,6 @@ limitations under the License.
 package json
 
 import (
-	"encoding/json"
 	"io"
 	"strconv"
 	"unsafe"
@@ -242,7 +241,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 		_, err = w.Write(data)
 		return err
 	}
-	encoder := json.NewEncoder(w)
+	encoder := jsoniter.ConfigCompatibleWithStandardLibrary.NewEncoder(w)
 	return encoder.Encode(obj)
 }
 

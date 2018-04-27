@@ -17,7 +17,6 @@ limitations under the License.
 package json
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,7 +51,7 @@ func (SimpleMetaFactory) Interpret(data []byte) (*schema.GroupVersionKind, error
 		// +optional
 		Kind string `json:"kind,omitempty"`
 	}{}
-	if err := json.Unmarshal(data, &findKind); err != nil {
+	if err := caseSensitiveJsonIterator.Unmarshal(data, &findKind); err != nil {
 		return nil, fmt.Errorf("couldn't get version/kind; json parse error: %v", err)
 	}
 	gv, err := schema.ParseGroupVersion(findKind.APIVersion)
