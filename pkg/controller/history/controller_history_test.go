@@ -1529,6 +1529,57 @@ func TestFindEqualRevisions(t *testing.T) {
 	}
 }
 
+func TestEqualRevision(t *testing.T) {
+	type testcase struct {
+		name string
+		lhs  *apps.ControllerRevision
+		rhs  *apps.ControllerRevision
+		want bool
+	}
+	testFn := func(test *testcase, t *testing.T) {
+		got := EqualRevision(test.lhs, test.rhs)
+		if test.want != got {
+			t.Errorf("%s: want equality %v, got %v", test.name, test.want, got)
+		}
+	}
+	revisionWithHash := func(hash uint32) *apps.ControllerRevision {
+		ss := newStatefulSet(3, "ss", types.UID("ss"), map[string]string{"foo": "bar"})
+		ss.Status.CollisionCount = new(int32)
+		ssRev, err := NewControllerRevision(ss, parentKind, ss.Spec.Template.Labels, rawTemplate(&ss.Spec.Template), 1, ss.Status.CollisionCount)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ssRev.Labels[ControllerRevisionHashLabel] = fmt.Sprintf("%d", hash)
+		return ssRev
+	}
+	tests := []testcase{
+		{
+			name: "not equal with different hashes",
+			lhs:  revisionWithHash(0),
+			rhs:  revisionWithHash(1),
+			want: false,
+		},
+		{
+			name: "equal with same hashes",
+			lhs:  revisionWithHash(0),
+			rhs:  revisionWithHash(0),
+			want: true,
+		},
+		{
+			// This highlights the underlying bug here https://github.com/kubernetes/kubernetes/issues/61998
+			name: "not equal with hashes larger than max int32",
+			lhs:  revisionWithHash(4252813349),
+			rhs:  revisionWithHash(4252813350),
+			want: false,
+		},
+	}
+	for i := range tests {
+		t.Run(tests[i].name, func(t *testing.T) {
+			testFn(&tests[i], t)
+		})
+	}
+}
+
 func TestSortControllerRevisions(t *testing.T) {
 	type testcase struct {
 		name      string

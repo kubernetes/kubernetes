@@ -125,14 +125,14 @@ func EqualRevision(lhs *apps.ControllerRevision, rhs *apps.ControllerRevision) b
 		return lhs == rhs
 	}
 	if hs, found := lhs.Labels[ControllerRevisionHashLabel]; found {
-		hash, err := strconv.ParseInt(hs, 10, 32)
+		hash, err := strconv.ParseUint(hs, 10, 32)
 		if err == nil {
 			lhsHash = new(uint32)
 			*lhsHash = uint32(hash)
 		}
 	}
 	if hs, found := rhs.Labels[ControllerRevisionHashLabel]; found {
-		hash, err := strconv.ParseInt(hs, 10, 32)
+		hash, err := strconv.ParseUint(hs, 10, 32)
 		if err == nil {
 			rhsHash = new(uint32)
 			*rhsHash = uint32(hash)
