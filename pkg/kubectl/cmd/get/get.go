@@ -325,8 +325,8 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 				group := metav1beta1.GroupName
 				version := metav1beta1.SchemeGroupVersion.Version
 
-				tableParam := fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", version, group)
-				req.SetHeader("Accept", tableParam)
+				tableParam := fmt.Sprintf("application/json;as=Table;v=%s;g=%s", version, group)
+				req.SetHeader("Accept", "application/json", tableParam)
 			}
 		}).
 		Do()
