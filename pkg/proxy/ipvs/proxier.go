@@ -1321,6 +1321,11 @@ func (proxier *Proxier) syncProxyRules() {
 		writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 	}
 
+	// Accept all traffic with destination of ipvs virtual service, in case other iptables rules
+	// block the traffic, that may result in ipvs rules invalid.
+	// Those rules must be in the end of KUBE-SERVICE chain
+	proxier.acceptIPVSTraffic()
+
 	// If the masqueradeMark has been added then we want to forward that same
 	// traffic, this allows NodePort traffic to be forwarded even if the default
 	// FORWARD policy is not accept.
@@ -1416,6 +1421,26 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
+}
+
+func (proxier *Proxier) acceptIPVSTraffic() {
+	sets := []*IPSet{proxier.clusterIPSet, proxier.externalIPSet, proxier.lbIngressSet}
+	for _, set := range sets {
+		var matchType string
+		if !set.isEmpty() {
+			switch set.SetType {
+			case utilipset.BitmapPort:
+				matchType = "dst"
+			default:
+				matchType = "dst,dst"
+			}
+			writeLine(proxier.natRules, []string{
+				"-A", string(kubeServicesChain),
+				"-m", "set", "--match-set", set.Name, matchType,
+				"-j", "ACCEPT",
+			}...)
+		}
+	}
 }
 
 // After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we

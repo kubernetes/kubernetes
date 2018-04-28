@@ -981,6 +981,71 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 	checkIptables(t, ipt, epIpt)
 }
 
+func TestAcceptIPVSTraffic(t *testing.T) {
+	ipt, fp := buildFakeProxier(nil)
+
+	ingressIP := "1.2.3.4"
+	externalIP := []string{"5.6.7.8"}
+	svcInfos := []struct {
+		svcType api.ServiceType
+		svcIP   string
+		svcName string
+		epIP    string
+	}{
+		{api.ServiceTypeClusterIP, "10.20.30.40", "svc1", "10.180.0.1"},
+		{api.ServiceTypeLoadBalancer, "10.20.30.41", "svc2", "10.180.0.2"},
+		{api.ServiceTypeNodePort, "10.20.30.42", "svc3", "10.180.0.3"},
+	}
+
+	for _, svcInfo := range svcInfos {
+		makeServiceMap(fp,
+			makeTestService("ns1", svcInfo.svcName, func(svc *api.Service) {
+				svc.Spec.Type = svcInfo.svcType
+				svc.Spec.ClusterIP = svcInfo.svcIP
+				svc.Spec.Ports = []api.ServicePort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: api.ProtocolTCP,
+					NodePort: 80,
+				}}
+				if svcInfo.svcType == api.ServiceTypeLoadBalancer {
+					svc.Status.LoadBalancer.Ingress = []api.LoadBalancerIngress{{
+						IP: ingressIP,
+					}}
+				}
+				if svcInfo.svcType == api.ServiceTypeClusterIP {
+					svc.Spec.ExternalIPs = externalIP
+				}
+			}),
+		)
+
+		makeEndpointsMap(fp,
+			makeTestEndpoints("ns1", "p80", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{
+						IP: svcInfo.epIP,
+					}},
+					Ports: []api.EndpointPort{{
+						Name: "p80",
+						Port: 80,
+					}},
+				}}
+			}),
+		)
+	}
+	fp.syncProxyRules()
+
+	// Check iptables chain and rules
+	epIpt := netlinktest.ExpectedIptablesChain{
+		string(kubeServicesChain): {
+			{JumpChain: "ACCEPT", MatchSet: KubeClusterIPSet},
+			{JumpChain: "ACCEPT", MatchSet: KubeLoadBalancerSet},
+			{JumpChain: "ACCEPT", MatchSet: KubeExternalIPSet},
+		},
+	}
+	checkIptables(t, ipt, epIpt)
+}
+
 func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt, fp := buildFakeProxier(nil)
 
