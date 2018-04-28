@@ -992,6 +992,7 @@ func TestNodeOperators(t *testing.T) {
 			t.Errorf("Failed to find node %v in schedulercache.", node.Name)
 		}
 
+		// Generations are globally unique. We check in our unit tests that they are incremented correctly.
 		expected.generation = got.generation
 		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Failed to add node into schedulercache:\n got: %+v \nexpected: %+v", got, expected)
