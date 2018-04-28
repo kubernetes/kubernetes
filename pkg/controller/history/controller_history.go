@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/cache"
@@ -126,14 +127,18 @@ func EqualRevision(lhs *apps.ControllerRevision, rhs *apps.ControllerRevision) b
 	}
 	if hs, found := lhs.Labels[ControllerRevisionHashLabel]; found {
 		hash, err := strconv.ParseUint(hs, 10, 32)
-		if err == nil {
+		if err != nil {
+			glog.Errorf("Error parsing hash %s as uint32 for controller revision %s: %v", hs, lhs.Name, err)
+		} else {
 			lhsHash = new(uint32)
 			*lhsHash = uint32(hash)
 		}
 	}
 	if hs, found := rhs.Labels[ControllerRevisionHashLabel]; found {
 		hash, err := strconv.ParseUint(hs, 10, 32)
-		if err == nil {
+		if err != nil {
+			glog.Errorf("Error parsing hash %s as uint32 for controller revision %s: %v", hs, rhs.Name, err)
+		} else {
 			rhsHash = new(uint32)
 			*rhsHash = uint32(hash)
 		}
