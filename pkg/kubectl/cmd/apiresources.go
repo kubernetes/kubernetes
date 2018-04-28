@@ -57,6 +57,7 @@ type ApiResourcesOptions struct {
 	Output     string
 	APIGroup   string
 	Namespaced bool
+	Verbs      []string
 	NoHeaders  bool
 
 	genericclioptions.IOStreams
@@ -90,8 +91,9 @@ func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 	}
 	cmdutil.AddOutputFlags(cmd)
 	cmdutil.AddNoHeadersFlags(cmd)
-	cmd.Flags().StringVar(&o.APIGroup, "api-group", "", "The API group to use when talking to the server.")
+	cmd.Flags().StringVar(&o.APIGroup, "api-group", "", "Limit to resources in the specified API group.")
 	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", true, "Namespaced indicates if a resource is namespaced or not.")
+	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
 	return cmd
 }
 
@@ -103,7 +105,7 @@ func (o *ApiResourcesOptions) Complete(cmd *cobra.Command) error {
 
 func (o *ApiResourcesOptions) Validate(cmd *cobra.Command) error {
 	validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
-	supportedOutputTypes := sets.NewString("", "wide")
+	supportedOutputTypes := sets.NewString("", "wide", "name")
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	if !validOutputTypes.Has(outputFormat) {
 		return fmt.Errorf("output must be one of '' or 'wide': %v", outputFormat)
@@ -156,6 +158,10 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 			if nsChanged && o.Namespaced != resource.Namespaced {
 				continue
 			}
+			// filter to resources that support the specified verbs
+			if len(o.Verbs) > 0 && !sets.NewString(resource.Verbs...).HasAll(o.Verbs...) {
+				continue
+			}
 			resources = append(resources, groupResource{
 				APIGroup:    gv.Group,
 				APIResource: resource,
@@ -163,7 +169,7 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 		}
 	}
 
-	if o.NoHeaders == false {
+	if o.NoHeaders == false && o.Output != "name" {
 		if err = printContextHeaders(w, o.Output); err != nil {
 			return err
 		}
@@ -171,7 +177,16 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 
 	sort.Stable(sortableGroupResource(resources))
 	for _, r := range resources {
-		if o.Output == "wide" {
+		switch o.Output {
+		case "name":
+			name := r.APIResource.Name
+			if len(r.APIGroup) > 0 {
+				name += "." + r.APIGroup
+			}
+			if _, err := fmt.Fprintf(w, "%s\n", name); err != nil {
+				return err
+			}
+		case "wide":
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\t%v\n",
 				r.APIResource.Name,
 				strings.Join(r.APIResource.ShortNames, ","),
@@ -181,7 +196,7 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 				r.APIResource.Verbs); err != nil {
 				return err
 			}
-		} else {
+		case "":
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\n",
 				r.APIResource.Name,
 				strings.Join(r.APIResource.ShortNames, ","),
