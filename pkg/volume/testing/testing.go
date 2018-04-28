@@ -439,6 +439,15 @@ func (plugin *FakeVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]st
 	return []string{}, nil
 }
 
+// Expandable volume support
+func (plugin *FakeVolumePlugin) ExpandVolumeDevice(spec *Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
+	return resource.Quantity{}, nil
+}
+
+func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
+	return true
+}
+
 type FakeFileVolumePlugin struct {
 }
 
