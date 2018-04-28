@@ -539,3 +539,32 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 func createNode(name string) *v1.Node {
 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}}
 }
+
+func TestHTTPExtenderSupportsPreemption(t *testing.T) {
+	tests := []struct {
+		name        string
+		preemptVerb string
+		want        bool
+	}{
+		{
+			name:        "test 1",
+			preemptVerb: "preempt",
+			want:        true,
+		},
+		{
+			name:        "test 2",
+			preemptVerb: "not-preempt",
+			want:        false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &HTTPExtender{
+				preemptVerb: tt.preemptVerb,
+			}
+			if got := h.SupportsPreemption(); got != tt.want {
+				t.Errorf("HTTPExtender.SupportsPreemption() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
