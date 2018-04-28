@@ -215,9 +215,11 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 			expectedLBName = testClusterName + "-internal"
 		}
 
-		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lb := result.Values()[0]
-		lbCount := len(result.Values())
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		result, _ := az.LoadBalancerClient.List(ctx, az.Config.ResourceGroup)
+		lb := result[0]
+		lbCount := len(result)
 		expectedNumOfLB := 1
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
@@ -265,15 +267,17 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 
 		// expected is MIN(index, availabilitySetCount)
 		expectedNumOfLB := int(math.Min(float64(index), float64(availabilitySetCount)))
-		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(result.Values())
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		result, _ := az.LoadBalancerClient.List(ctx, az.Config.ResourceGroup)
+		lbCount := len(result)
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
 
 		maxRules := 0
 		minRules := serviceCount
-		for _, lb := range result.Values() {
+		for _, lb := range result {
 			ruleCount := len(*lb.LoadBalancingRules)
 			if ruleCount < minRules {
 				minRules = ruleCount
@@ -328,8 +332,10 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 
 		// expected is MIN(index, 2)
 		expectedNumOfLB := int(math.Min(float64(index), float64(2)))
-		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(result.Values())
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		result, _ := az.LoadBalancerClient.List(ctx, az.Config.ResourceGroup)
+		lbCount := len(result)
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
@@ -366,8 +372,10 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 
 		// expected is MIN(index, az.Config.MaximumLoadBalancerRuleCount)
 		expectedNumOfLBRules := int(math.Min(float64(index), float64(az.Config.MaximumLoadBalancerRuleCount)))
-		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(result.Values())
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		result, _ := az.LoadBalancerClient.List(ctx, az.Config.ResourceGroup)
+		lbCount := len(result)
 		if lbCount != expectedNumOfLBRules {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLBRules, lbCount)
 		}
@@ -436,8 +444,10 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 
 		// expected is MIN(index, availabilitySetCount)
 		expectedNumOfLB := int(math.Min(float64(index), float64(availabilitySetCount)))
-		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(result.Values())
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		result, _ := az.LoadBalancerClient.List(ctx, az.Config.ResourceGroup)
+		lbCount := len(result)
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
