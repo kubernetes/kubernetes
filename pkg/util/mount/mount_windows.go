@@ -308,7 +308,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	glog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, source, target)
 
 	if err := ValidateDiskNumber(source); err != nil {
-		glog.Errorf("diskMount: formatAndMount failed, err: %v\n", err)
+		glog.Errorf("diskMount: formatAndMount failed, err: %v", err)
 		return err
 	}
 
@@ -318,12 +318,12 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	}
 
 	// format disk if it is unformatted(raw)
-	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru", source)
-	cmd += fmt.Sprintf(" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", fstype)
+	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru"+
+		" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", source, fstype)
 	if output, err := mounter.Exec.Run("powershell", "/c", cmd); err != nil {
 		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))
 	}
-	glog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q\n", source, fstype)
+	glog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
 
 	driveLetter, err := getDriveLetterByDiskNumber(source, mounter.Exec)
 	if err != nil {
