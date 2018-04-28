@@ -41,7 +41,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEnsureNodeExistsByProviderIDOrInstanceID(t *testing.T) {
+func TestEnsureNodeExistsByProviderID(t *testing.T) {
 
 	testCases := []struct {
 		testName           string
@@ -149,7 +149,7 @@ func TestEnsureNodeExistsByProviderIDOrInstanceID(t *testing.T) {
 			}
 
 			instances, _ := fc.Instances()
-			exists, err := ensureNodeExistsByProviderIDOrInstanceID(instances, tc.node)
+			exists, err := ensureNodeExistsByProviderID(instances, tc.node)
 			if tc.providerIDErr == nil {
 				assert.NoError(t, err)
 			}
