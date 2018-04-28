@@ -16,6 +16,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
+
 # This command builds and runs a local kubernetes cluster.
 # You may need to run this as root to allow kubelet to open docker's socket,
 # and to write the test CA in /var/run/kubernetes.
