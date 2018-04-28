@@ -48,19 +48,10 @@ func newFakeAzureLBClient() *fakeAzureLBClient {
 	return fLBC
 }
 
-func (fLBC *fakeAzureLBClient) CreateOrUpdate(resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, cancel <-chan struct{}) (<-chan network.LoadBalancer, <-chan error) {
+func (fLBC *fakeAzureLBClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer) (resp *http.Response, err error) {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
-	resultChan := make(chan network.LoadBalancer, 1)
-	errChan := make(chan error, 1)
-	var result network.LoadBalancer
-	var err error
-	defer func() {
-		resultChan <- result
-		errChan <- err
-		close(resultChan)
-		close(errChan)
-	}()
+
 	if _, ok := fLBC.FakeStore[resourceGroupName]; !ok {
 		fLBC.FakeStore[resourceGroupName] = make(map[string]network.LoadBalancer)
 	}
@@ -76,48 +67,27 @@ func (fLBC *fakeAzureLBClient) CreateOrUpdate(resourceGroupName string, loadBala
 		}
 	}
 	fLBC.FakeStore[resourceGroupName][loadBalancerName] = parameters
-	result = fLBC.FakeStore[resourceGroupName][loadBalancerName]
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	err = nil
-	return resultChan, errChan
+
+	return nil, nil
 }
 
-func (fLBC *fakeAzureLBClient) Delete(resourceGroupName string, loadBalancerName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (fLBC *fakeAzureLBClient) Delete(ctx context.Context, resourceGroupName string, loadBalancerName string) (resp *http.Response, err error) {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
-	respChan := make(chan autorest.Response, 1)
-	errChan := make(chan error, 1)
-	var resp autorest.Response
-	var err error
-	defer func() {
-		respChan <- resp
-		errChan <- err
-		close(respChan)
-		close(errChan)
-	}()
+
 	if rgLBs, ok := fLBC.FakeStore[resourceGroupName]; ok {
 		if _, ok := rgLBs[loadBalancerName]; ok {
 			delete(rgLBs, loadBalancerName)
-			resp.Response = &http.Response{
-				StatusCode: http.StatusAccepted,
-			}
-			err = nil
-			return respChan, errChan
+			return nil, nil
 		}
 	}
-	resp.Response = &http.Response{
+
+	return &http.Response{
 		StatusCode: http.StatusNotFound,
-	}
-	err = autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such LB",
-	}
-	return respChan, errChan
+	}, nil
 }
 
-func (fLBC *fakeAzureLBClient) Get(resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error) {
+func (fLBC *fakeAzureLBClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error) {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
 	if _, ok := fLBC.FakeStore[resourceGroupName]; ok {
@@ -131,48 +101,17 @@ func (fLBC *fakeAzureLBClient) Get(resourceGroupName string, loadBalancerName st
 	}
 }
 
-type fakeLoadBalancerListResultPage struct {
-	next   LoadBalancerListResultPage
-	value  network.LoadBalancerListResult
-	values []network.LoadBalancer
-	err    error
-}
-
-func (pg *fakeLoadBalancerListResultPage) Next() error {
-	return nil
-}
-func (pg *fakeLoadBalancerListResultPage) NotDone() bool {
-	return pg.next != nil
-}
-
-func (pg *fakeLoadBalancerListResultPage) Response() network.LoadBalancerListResult {
-	return pg.value
-}
-func (pg *fakeLoadBalancerListResultPage) Values() []network.LoadBalancer {
-	return pg.values
-}
-
-func (fLBC *fakeAzureLBClient) List(resourceGroupName string) (result LoadBalancerListResultPage, err error) {
+func (fLBC *fakeAzureLBClient) List(ctx context.Context, resourceGroupName string) (result []network.LoadBalancer, err error) {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
+
 	var value []network.LoadBalancer
 	if _, ok := fLBC.FakeStore[resourceGroupName]; ok {
 		for _, v := range fLBC.FakeStore[resourceGroupName] {
 			value = append(value, v)
 		}
 	}
-	return &fakeLoadBalancerListResultPage{
-		value: network.LoadBalancerListResult{
-			Value: &value,
-		},
-		values: value,
-	}, nil
-}
-
-func (fLBC *fakeAzureLBClient) ListNextResults(resourceGroupName string, lastResult LoadBalancerListResultPage) (result LoadBalancerListResultPage, err error) {
-	fLBC.mutex.Lock()
-	defer fLBC.mutex.Unlock()
-	return &fakeLoadBalancerListResultPage{}, nil
+	return value, nil
 }
 
 type fakeAzurePIPClient struct {
@@ -200,19 +139,10 @@ func newFakeAzurePIPClient(subscriptionID string) *fakeAzurePIPClient {
 	return fAPC
 }
 
-func (fAPC *fakeAzurePIPClient) CreateOrUpdate(resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress, cancel <-chan struct{}) (<-chan network.PublicIPAddress, <-chan error) {
+func (fAPC *fakeAzurePIPClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) (resp *http.Response, err error) {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
-	resultChan := make(chan network.PublicIPAddress, 1)
-	errChan := make(chan error, 1)
-	var result network.PublicIPAddress
-	var err error
-	defer func() {
-		resultChan <- result
-		errChan <- err
-		close(resultChan)
-		close(errChan)
-	}()
+
 	if _, ok := fAPC.FakeStore[resourceGroupName]; !ok {
 		fAPC.FakeStore[resourceGroupName] = make(map[string]network.PublicIPAddress)
 	}
@@ -229,48 +159,27 @@ func (fAPC *fakeAzurePIPClient) CreateOrUpdate(resourceGroupName string, publicI
 	}
 
 	fAPC.FakeStore[resourceGroupName][publicIPAddressName] = parameters
-	result = fAPC.FakeStore[resourceGroupName][publicIPAddressName]
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	err = nil
-	return resultChan, errChan
+
+	return nil, nil
 }
 
-func (fAPC *fakeAzurePIPClient) Delete(resourceGroupName string, publicIPAddressName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (fAPC *fakeAzurePIPClient) Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) (resp *http.Response, err error) {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
-	respChan := make(chan autorest.Response, 1)
-	errChan := make(chan error, 1)
-	var resp autorest.Response
-	var err error
-	defer func() {
-		respChan <- resp
-		errChan <- err
-		close(respChan)
-		close(errChan)
-	}()
+
 	if rgPIPs, ok := fAPC.FakeStore[resourceGroupName]; ok {
 		if _, ok := rgPIPs[publicIPAddressName]; ok {
 			delete(rgPIPs, publicIPAddressName)
-			resp.Response = &http.Response{
-				StatusCode: http.StatusAccepted,
-			}
-			err = nil
-			return respChan, errChan
+			return nil, nil
 		}
 	}
-	resp.Response = &http.Response{
+
+	return &http.Response{
 		StatusCode: http.StatusNotFound,
-	}
-	err = autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such PIP",
-	}
-	return respChan, errChan
+	}, nil
 }
 
-func (fAPC *fakeAzurePIPClient) Get(resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
+func (fAPC *fakeAzurePIPClient) Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
 	if _, ok := fAPC.FakeStore[resourceGroupName]; ok {
@@ -284,49 +193,18 @@ func (fAPC *fakeAzurePIPClient) Get(resourceGroupName string, publicIPAddressNam
 	}
 }
 
-type fakePublicIPAddressListResultPage struct {
-	next   PublicIPAddressListResultPage
-	value  network.PublicIPAddressListResult
-	values []network.PublicIPAddress
-	err    error
-}
-
-func (pg *fakePublicIPAddressListResultPage) Next() error {
-	return nil
-}
-func (pg *fakePublicIPAddressListResultPage) NotDone() bool {
-	return pg.next != nil
-}
-
-func (pg *fakePublicIPAddressListResultPage) Response() network.PublicIPAddressListResult {
-	return pg.value
-}
-func (pg *fakePublicIPAddressListResultPage) Values() []network.PublicIPAddress {
-	return pg.values
-}
-
-func (fAPC *fakeAzurePIPClient) ListNextResults(resourceGroupName string, lastResults PublicIPAddressListResultPage) (result PublicIPAddressListResultPage, err error) {
+func (fAPC *fakeAzurePIPClient) List(ctx context.Context, resourceGroupName string) (result []network.PublicIPAddress, err error) {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
-	return &fakePublicIPAddressListResultPage{}, nil
-}
 
-func (fAPC *fakeAzurePIPClient) List(resourceGroupName string) (result PublicIPAddressListResultPage, err error) {
-	fAPC.mutex.Lock()
-	defer fAPC.mutex.Unlock()
 	var value []network.PublicIPAddress
 	if _, ok := fAPC.FakeStore[resourceGroupName]; ok {
 		for _, v := range fAPC.FakeStore[resourceGroupName] {
 			value = append(value, v)
 		}
 	}
-	result = &fakePublicIPAddressListResultPage{
-		value: network.PublicIPAddressListResult{
-			Value: &value,
-		},
-		values: value,
-	}
-	return result, nil
+
+	return value, nil
 }
 
 type fakeAzureInterfacesClient struct {
