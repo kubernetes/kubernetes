@@ -454,7 +454,9 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 	}
 	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%s, %q): end", pipResourceGroup, *pip.Name)
 
-	pip, err = az.PublicIPAddressesClient.Get(pipResourceGroup, *pip.Name, "")
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	pip, err = az.PublicIPAddressesClient.Get(ctx, pipResourceGroup, *pip.Name, "")
 	if err != nil {
 		return nil, err
 	}
