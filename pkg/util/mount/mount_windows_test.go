@@ -629,3 +629,94 @@ func TestGetFileType(t *testing.T) {
 		}
 	}
 }
+
+func TestIsLikelyNotMountPoint(t *testing.T) {
+	mounter := Mounter{"fake/path"}
+
+	tests := []struct {
+		fileName       string
+		targetLinkName string
+		setUp          func(base, fileName, targetLinkName string) error
+		expectedResult bool
+		expectError    bool
+	}{
+		{
+			"Dir",
+			"",
+			func(base, fileName, targetLinkName string) error {
+				return os.Mkdir(filepath.Join(base, fileName), 0750)
+			},
+			true,
+			false,
+		},
+		{
+			"InvalidDir",
+			"",
+			func(base, fileName, targetLinkName string) error {
+				return nil
+			},
+			true,
+			true,
+		},
+		{
+			"ValidSymLink",
+			"targetSymLink",
+			func(base, fileName, targetLinkName string) error {
+				targeLinkPath := filepath.Join(base, targetLinkName)
+				if err := os.Mkdir(targeLinkPath, 0750); err != nil {
+					return err
+				}
+
+				filePath := filepath.Join(base, fileName)
+				if err := makeLink(filePath, targeLinkPath); err != nil {
+					return err
+				}
+				return nil
+			},
+			false,
+			false,
+		},
+		{
+			"InvalidSymLink",
+			"targetSymLink2",
+			func(base, fileName, targetLinkName string) error {
+				targeLinkPath := filepath.Join(base, targetLinkName)
+				if err := os.Mkdir(targeLinkPath, 0750); err != nil {
+					return err
+				}
+
+				filePath := filepath.Join(base, fileName)
+				if err := makeLink(filePath, targeLinkPath); err != nil {
+					return err
+				}
+				return removeLink(targeLinkPath)
+			},
+			true,
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		base, err := ioutil.TempDir("", test.fileName)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		defer os.RemoveAll(base)
+
+		if err := test.setUp(base, test.fileName, test.targetLinkName); err != nil {
+			t.Fatalf("unexpected error in setUp(%s, %s): %v", test.fileName, test.targetLinkName, err)
+		}
+
+		filePath := filepath.Join(base, test.fileName)
+		result, err := mounter.IsLikelyNotMountPoint(filePath)
+		assert.Equal(t, result, test.expectedResult, "Expect result not equal with IsLikelyNotMountPoint(%s) return: %q, expected: %q",
+			filePath, result, test.expectedResult)
+
+		if test.expectError {
+			assert.NotNil(t, err, "Expect error during IsLikelyNotMountPoint(%s)", filePath)
+		} else {
+			assert.Nil(t, err, "Expect error is nil during IsLikelyNotMountPoint(%s)", filePath)
+		}
+	}
+}
