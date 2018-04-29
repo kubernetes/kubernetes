@@ -148,8 +148,8 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ssc.queue.ShutDown()
 
-	glog.Infof("Starting stateful set controller")
-	defer glog.Infof("Shutting down statefulset controller")
+	glog.Info("Starting StatefulSet controller")
+	defer glog.Info("Shutting down StatefulSet controller")
 
 	if !controller.WaitForCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
@@ -415,7 +415,7 @@ func (ssc *StatefulSetController) worker() {
 func (ssc *StatefulSetController) sync(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing StatefulSet %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
