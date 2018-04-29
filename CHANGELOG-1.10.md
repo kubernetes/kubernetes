@@ -487,7 +487,7 @@ If no featureGates was specified in `kubeadm-config`, just change `featureGates:
 
 * The word “manifest” has been expunged from the Kubelet API. ([#60314](https://github.com/kubernetes/kubernetes/pull/60314))
 
-* [https://github.com/kubernetes/kubernetes/issues/49213](https://github.com/kubernetes/kubernetes/issues/49213) sig-cluster-lifecycle has decided to phase out the cluster/ directory over the next couple of releases in favor of deployment automations maintained outside of the core repo and outside of kubernetes orgs. [@kubernetes/sig-cluster-lifecycle-misc](https://github.com/orgs/kubernetes/teams/sig-cluster-lifecycle-misc))
+* [https://github.com/kubernetes/kubernetes/issues/49213](https://github.com/kubernetes/kubernetes/issues/49213) sig-cluster-lifecycle has decided to phase out the cluster/ directory over the next couple of releases in favor of deployment automations maintained outside of the core repo and outside of kubernetes orgs. ([@kubernetes/sig-cluster-lifecycle-misc](https://github.com/orgs/kubernetes/teams/sig-cluster-lifecycle-misc))
 
     * Remove deprecated ContainerVM support from GCE kube-up.  ([#58247](https://github.com/kubernetes/kubernetes/pull/58247), [@mikedanese](https://github.com/mikedanese))
 
@@ -661,11 +661,11 @@ Accept: application/com.github.proto-openapi.spec.v2@v1.0+protobuf Accept-Encodi
 
 * Default enabled admission plugins are now `NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota`. Please note that if you previously had not set the `--admission-control` flag, your cluster behavior may change (to be more standard). ([#58684](https://github.com/kubernetes/kubernetes/pull/58684), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
 
-* Encryption key and encryption provider rotation now works properly. ([#58375](https://github.com/kubernetes/kubernetes/pull/58375), [@liggitt](https://github.com/liggitt)
+* Encryption key and encryption provider rotation now works properly. ([#58375](https://github.com/kubernetes/kubernetes/pull/58375), [@liggitt](https://github.com/liggitt))
 
 * RBAC: The system:kubelet-api-admin cluster role can be used to grant full access to the kubelet API  so integrators can grant this role to the --kubelet-client-certificate credential given to the apiserver. ([#57128](https://github.com/kubernetes/kubernetes/pull/57128), [@liggitt](https://github.com/liggitt))
 
-* DenyEscalatingExec admission controller now checks psp HostNetwork as well as hostIPC and hostPID. hostNetwork is also checked to deny exec /attach. ([#56839](https://github.com/kubernetes/kubernetes/pull/56839), [@hzxuzhonghu]=(https://github.com/hzxuzhonghu))
+* DenyEscalatingExec admission controller now checks psp HostNetwork as well as hostIPC and hostPID. hostNetwork is also checked to deny exec /attach. ([#56839](https://github.com/kubernetes/kubernetes/pull/56839), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
 
 * When using Role-Based Access Control, the "admin", "edit", and "view" roles now have the expected permissions on NetworkPolicy resources, rather than reserving those permissions to only cluster-admin. ([#56650](https://github.com/kubernetes/kubernetes/pull/56650), [@danwinship](https://github.com/danwinship))
 
@@ -701,13 +701,13 @@ Accept: application/com.github.proto-openapi.spec.v2@v1.0+protobuf Accept-Encodi
 
 * Fixes a bug in Heapster deployment for google sink. ([#57902](https://github.com/kubernetes/kubernetes/pull/57902), [@kawych](https://github.com/kawych))
 
-* On cluster provision or upgrade, kubeadm now generates certs and secures all connections to the etcd static-pod with mTLS. This includes the etcd serving cert, the etcd peer cert, and the apiserver etcd client cert. Flags and hostMounts are added to the etcd and apiserver static-pods to load these certs. For connections to etcd, https is now used in favor of http. ([#57415](https://github.com/kubernetes/kubernetes/pull/57415), [@stealthybox](https://github.com/stealthybox) These certs are also generated on upgrade.  ([#60385](https://github.com/kubernetes/kubernetes/pull/60385), [@stealthybox](https://github.com/stealthybox))
+* On cluster provision or upgrade, kubeadm now generates certs and secures all connections to the etcd static-pod with mTLS. This includes the etcd serving cert, the etcd peer cert, and the apiserver etcd client cert. Flags and hostMounts are added to the etcd and apiserver static-pods to load these certs. For connections to etcd, https is now used in favor of http. ([#57415](https://github.com/kubernetes/kubernetes/pull/57415), [@stealthybox](https://github.com/stealthybox)) These certs are also generated on upgrade.  ([#60385](https://github.com/kubernetes/kubernetes/pull/60385), [@stealthybox](https://github.com/stealthybox))
 
 * Demoted controlplane passthrough flags apiserver-extra-args, controller-manager-extra-args, scheduler-extra-args to alpha flags ([#59882](https://github.com/kubernetes/kubernetes/pull/59882), [@kris-nova](https://github.com/kris-nova))
 
 * The new flag `--apiserver-advertise-dns-address` is used in the node's kubelet.confg to point to the API server, allowing users to define a DNS entry instead of an IP address. ([#59288](https://github.com/kubernetes/kubernetes/pull/59288), [@stevesloka](https://github.com/stevesloka))
 
-* MasterConfiguration manifiest The criSocket flag is now usable within the `MasterConfiguration` and `NodeConfiguration` manifest files that exist for configuring kubeadm. Before it only existed as a command line flag and was not able to be configured when using the `--config` flag and the manifest files. ([#59057](https://github.com/kubernetes/kubernetes/pull/59057)([#59292](https://github.com/kubernetes/kubernetes/pull/59292), [@JordanFaust](https://github.com/JordanFaust))
+* MasterConfiguration manifiest The criSocket flag is now usable within the `MasterConfiguration` and `NodeConfiguration` manifest files that exist for configuring kubeadm. Before it only existed as a command line flag and was not able to be configured when using the `--config` flag and the manifest files. ([#59057](https://github.com/kubernetes/kubernetes/pull/59057))([#59292](https://github.com/kubernetes/kubernetes/pull/59292), [@JordanFaust](https://github.com/JordanFaust))
 
 * `kubeadm init` can now omit the tainting of the master node if configured to do so in `kubeadm.yaml` using `noTaintMaster: true`. For example, uses can create a file with the content:
 
@@ -1018,7 +1018,7 @@ And point to the file using the --config flag, as in
 
 * Add automatic etcd 3.2->3.1 and 3.1->3.0 minor version rollback support to gcr.io/google_container/etcd images. For HA clusters, all members must be stopped before performing a rollback. ([#59298](https://github.com/kubernetes/kubernetes/pull/59298), [@jpbetz](https://github.com/jpbetz))
 
-* The `meta.k8s.io/v1alpha1` objects for retrieving tabular responses from the server (`Table`) or fetching just the `ObjectMeta` for an object (as `PartialObjectMetadata`) are now beta as part of `meta.k8s.io/v1beta1` and configurations must be changed to use the new API.  Clients may request alternate representations of normal Kubernetes objects by passing an `Accept` header like `application/json;as=Table;g=meta.k8s.io;v=v1beta1` or `application/json;as=PartialObjectMetadata;g=meta.k8s.io;v1=v1beta1`.  Older servers will ignore this representation or return an error if it is not available.  Clients may request fallback to the normal object by adding a non-qualified mime-type to their `Accept` header like `application/json` - the server will then respond with either the alternate representation if it is supported or the fallback mime-type which is the normal object response. ([#59059](https://github.com/kubernetes/kubernetes/pull/59059), [@smarterclayton]([https://github.com/smarterclayton](https://github.com/smarterclayton) ))
+* The `meta.k8s.io/v1alpha1` objects for retrieving tabular responses from the server (`Table`) or fetching just the `ObjectMeta` for an object (as `PartialObjectMetadata`) are now beta as part of `meta.k8s.io/v1beta1` and configurations must be changed to use the new API.  Clients may request alternate representations of normal Kubernetes objects by passing an `Accept` header like `application/json;as=Table;g=meta.k8s.io;v=v1beta1` or `application/json;as=PartialObjectMetadata;g=meta.k8s.io;v1=v1beta1`.  Older servers will ignore this representation or return an error if it is not available.  Clients may request fallback to the normal object by adding a non-qualified mime-type to their `Accept` header like `application/json` - the server will then respond with either the alternate representation if it is supported or the fallback mime-type which is the normal object response. ([#59059](https://github.com/kubernetes/kubernetes/pull/59059), [@smarterclayton](https://github.com/smarterclayton))
 
 * kube-apiserver now uses SSH tunnels for webhooks if the webhook is not directly routable from apiserver's network environment. ([#58644](https://github.com/kubernetes/kubernetes/pull/58644), [@yguo0905](https://github.com/yguo0905))
 
@@ -1036,7 +1036,7 @@ And point to the file using the --config flag, as in
 
 * Fixed kube-proxy to work correctly with iptables 1.6.2 and later. ([#60978](https://github.com/kubernetes/kubernetes/pull/60978), [@danwinship](https://github.com/danwinship))
 
-* Makes the kube-dns addon optional so that users can deploy their own DNS solution. ([#57113](https://github.com/kubernetes/kubernetes/pull/57113), [@wwwtyro]([https://github.com/wwwtyro](https://github.com/wwwtyro) ))
+* Makes the kube-dns addon optional so that users can deploy their own DNS solution. ([#57113](https://github.com/kubernetes/kubernetes/pull/57113), [@wwwtyro](https://github.com/wwwtyro))
 
 * `kubectl port-forward` now supports specifying a service to port forward to, as in `kubectl port-forward svc/myservice 8443:443`. Additional support has also been added for looking up targetPort for a service, as well as enabling using svc/name to select a pod. ([#59809](https://github.com/kubernetes/kubernetes/pull/59809), [@phsiao](https://github.com/phsiao))
 * [Make NodePort IP addres](https://github.com/kubernetes/website/pull/7631/files)[ses configurabl](https://github.com/kubernetes/website/pull/7631/files)[e](https://github.com/kubernetes/website/pull/7631/files). ([#58052](https://github.com/kubernetes/kubernetes/pull/58052), [@m1093782566](https://github.com/m1093782566))
