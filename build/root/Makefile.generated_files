@@ -37,11 +37,6 @@ SHELL := /bin/bash
 .PHONY: generated_files
 generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi gen_bindata
 
-.PHONY: verify_generated_files
-verify_generated_files: verify_gen_deepcopy    \
-                        verify_gen_defaulter   \
-                        verify_gen_conversion
-
 # Code-generation logic.
 #
 # This stuff can be pretty tricky, and there's probably some corner cases that
@@ -245,10 +240,6 @@ RUN_GEN_DEEPCOPY =                                                         \
 gen_deepcopy: $(DEEPCOPY_FILES) $(DEEPCOPY_GEN)
 	$(RUN_GEN_DEEPCOPY)
 
-.PHONY: verify_gen_deepcopy
-verify_gen_deepcopy: $(DEEPCOPY_GEN)
-	$(RUN_GEN_DEEPCOPY) --verify-only
-
 # For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
 #
@@ -382,10 +373,6 @@ RUN_GEN_DEFAULTER :=                                                        \
 .PHONY: gen_defaulter
 gen_defaulter: $(DEFAULTER_FILES) $(DEFAULTER_GEN)
 	$(RUN_GEN_DEFAULTER)
-
-.PHONY: verify_gen_deepcopy
-verify_gen_defaulter: $(DEFAULTER_GEN)
-	$(RUN_GEN_DEFAULTER) --verify-only
 
 # For each dir in DEFAULTER_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -550,10 +537,6 @@ RUN_GEN_CONVERSION =                                                         \
 .PHONY: gen_conversion
 gen_conversion: $(CONVERSION_FILES) $(CONVERSION_GEN)
 	$(RUN_GEN_CONVERSION)
-
-.PHONY: verify_gen_conversion
-verify_gen_conversion: $(CONVERSION_GEN)
-	$(RUN_GEN_CONVERSION) --verify-only
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
 # changes (files added or removed) the deps file will be considered stale.
