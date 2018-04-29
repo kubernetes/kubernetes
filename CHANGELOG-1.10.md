@@ -1346,7 +1346,7 @@ parameters:
 * Wait for kubedns to be ready when collecting the cluster IP. ([#57337](https://github.com/kubernetes/kubernetes/pull/57337), [@wwwtyro](https://github.com/wwwtyro))
 
 ## External Dependencies
-* The supported etcd server version is 3.1.12, as compared to 3.0.17 in v1.9 ([#60988](https://github.com/kubernetes/kubernetes/pull/60988))
+* The supported etcd server version is 3.1.12, as compared to 3.1.10 in v1.9 ([#60998](https://github.com/kubernetes/kubernetes/pull/60998))
 * The validated docker versions are the same as for v1.9: 1.11.2 to 1.13.1 and 17.03.x ([ref](https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/system/docker_validator_test.go))
 * The Go version is go1.9.3, as compared to go1.9.2 in v1.9. ([#59012](https://github.com/kubernetes/kubernetes/pull/59012))
 * The minimum supported go is the same as for v1.9: go1.9.1. ([#55301](https://github.com/kubernetes/kubernetes/pull/55301))
