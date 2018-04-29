@@ -1,5 +1,5 @@
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
   name: prometheus 
   namespace: kube-system
@@ -9,16 +9,18 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: v2.2.1
 spec:
+  serviceName: "prometheus"
   replicas: 1
+  podManagementPolicy: "Parallel"
+  updateStrategy:
+   type: "RollingUpdate"
   selector:
     matchLabels:
       k8s-app: prometheus
-      version: v2.2.1
   template:
     metadata:
       labels:
         k8s-app: prometheus
-        version: v2.2.1
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
@@ -30,7 +32,7 @@ spec:
         imagePullPolicy: "IfNotPresent"
         command: ["chown", "-R", "65534:65534", "/data"]
         volumeMounts:
-        - name: storage-volume
+        - name: prometheus-data
           mountPath: /data
           subPath: ""
       containers:
@@ -87,7 +89,7 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: /etc/config
-            - name: storage-volume
+            - name: prometheus-data
               mountPath: /data
               subPath: ""
       terminationGracePeriodSeconds: 300
@@ -95,6 +97,13 @@ spec:
         - name: config-volume
           configMap:
             name: prometheus-config
-        - name: storage-volume
-          persistentVolumeClaim:
-            claimName: prometheus
+  volumeClaimTemplates:
+  - metadata:
+      name: prometheus-data
+    spec:
+      storageClassName: standard
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: "16Gi"
