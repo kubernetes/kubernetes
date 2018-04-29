@@ -218,7 +218,7 @@ DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 # Shell function for reuse in rules.
 RUN_GEN_DEEPCOPY =                                                         \
     function run_gen_deepcopy() {                                          \
-        if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                 \
+        if [[ -s $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                 \
             pkgs=$$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -);  \
             if [[ "$(DBG_CODEGEN)" == 1 ]]; then                           \
                 echo "DBG: running $(DEEPCOPY_GEN) for $$pkgs";            \
@@ -352,7 +352,7 @@ DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
 
 RUN_GEN_DEFAULTER :=                                                        \
     function run_gen_defaulter() {                                          \
-        if [[ -f $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                 \
+        if [[ -s $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                 \
             pkgs=$$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | paste -sd, -);  \
             if [[ "$(DBG_CODEGEN)" == 1 ]]; then                            \
                 echo "DBG: running $(DEFAULTER_GEN) for $$pkgs";            \
@@ -516,7 +516,7 @@ CONVERSION_EXTRA_PEER_DIRS := k8s.io/kubernetes/pkg/apis/core,k8s.io/kubernetes/
 # Shell function for reuse in rules.
 RUN_GEN_CONVERSION =                                                         \
     function run_gen_conversion() {                                          \
-        if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                 \
+        if [[ -s $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                 \
             pkgs=$$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -);  \
             if [[ "$(DBG_CODEGEN)" == 1 ]]; then                             \
                 echo "DBG: running $(CONVERSION_GEN) for $$pkgs";            \
