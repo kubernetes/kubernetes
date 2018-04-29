@@ -220,7 +220,6 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 
 	// create streaming server if configured.
 	if streamingConfig != nil {
-		var err error
 		ds.streamingServer, err = streaming.NewServer(*streamingConfig, ds.streamingRuntime)
 		if err != nil {
 			return nil, err
