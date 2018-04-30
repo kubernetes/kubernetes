@@ -388,6 +388,10 @@ func (fftc *fakeFileTypeChecker) SafeMakeDir(_, _ string, _ os.FileMode) error {
 	return nil
 }
 
+func (fftc *fakeFileTypeChecker) GetAbsoluteHostPath(_ string) (string, error) {
+	return "", nil
+}
+
 func setUp() error {
 	err := os.MkdirAll("/tmp/ExistingFolder", os.FileMode(0755))
 	if err != nil {
