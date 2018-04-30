@@ -1711,6 +1711,12 @@ type VolumeMount struct {
 type MountPropagationMode string
 
 const (
+	// MountPropagationNone means that the volume in a container will
+	// not receive new mounts from the host or other containers, and filesystems
+	// mounted inside the container won't be propagated to the host or other
+	// containers.
+	// Note that this mode corresponds to "private" in Linux terminology.
+	MountPropagationNone MountPropagationMode = "None"
 	// MountPropagationHostToContainer means that the volume in a container will
 	// receive new mounts from the host or other containers, but filesystems
 	// mounted inside the container won't be propagated to the host or other

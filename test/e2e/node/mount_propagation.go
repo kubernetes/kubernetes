@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func preparePod(name string, node *v1.Node, propagation v1.MountPropagationMode, hostDir string) *v1.Pod {
+func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode, hostDir string) *v1.Pod {
 	const containerName = "cntr"
 	bTrue := true
 	var oneSecond int64 = 1
@@ -49,7 +49,7 @@ func preparePod(name string, node *v1.Node, propagation v1.MountPropagationMode,
 						{
 							Name:             "host",
 							MountPath:        "/mnt/test",
-							MountPropagation: &propagation,
+							MountPropagation: propagation,
 						},
 					},
 					SecurityContext: &v1.SecurityContext{
@@ -105,12 +105,19 @@ var _ = SIGDescribe("Mount propagation", func() {
 		}()
 
 		podClient := f.PodClient()
-		master := podClient.CreateSync(preparePod("master", node, v1.MountPropagationBidirectional, hostDir))
-		slave := podClient.CreateSync(preparePod("slave", node, v1.MountPropagationHostToContainer, hostDir))
+		bidirectional := v1.MountPropagationBidirectional
+		master := podClient.CreateSync(preparePod("master", node, &bidirectional, hostDir))
+
+		hostToContainer := v1.MountPropagationHostToContainer
+		slave := podClient.CreateSync(preparePod("slave", node, &hostToContainer, hostDir))
+
+		none := v1.MountPropagationNone
+		private := podClient.CreateSync(preparePod("private", node, &none, hostDir))
+		defaultPropagation := podClient.CreateSync(preparePod("default", node, nil, hostDir))
 
 		// Check that the pods sees directories of each other. This just checks
 		// that they have the same HostPath, not the mount propagation.
-		podNames := []string{master.Name, slave.Name}
+		podNames := []string{master.Name, slave.Name, private.Name, defaultPropagation.Name}
 		for _, podName := range podNames {
 			for _, dirName := range podNames {
 				cmd := fmt.Sprintf("test -d /mnt/test/%s", dirName)
@@ -147,6 +154,10 @@ var _ = SIGDescribe("Mount propagation", func() {
 			"master": sets.NewString("master", "host"),
 			// Slave sees master's mount + itself.
 			"slave": sets.NewString("master", "slave", "host"),
+			// Private sees only its own mount
+			"private": sets.NewString("private"),
+			// Default (=private) sees only its own mount
+			"default": sets.NewString("default"),
 		}
 		dirNames := append(podNames, "host")
 		for podName, mounts := range expectedMounts {

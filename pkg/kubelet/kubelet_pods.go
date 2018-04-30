@@ -301,12 +301,14 @@ func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.M
 	}
 	switch {
 	case mountMode == nil:
-		// HostToContainer is the default
-		return runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
+		// PRIVATE is the default
+		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
 	case *mountMode == v1.MountPropagationHostToContainer:
 		return runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
 	case *mountMode == v1.MountPropagationBidirectional:
 		return runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL, nil
+	case *mountMode == v1.MountPropagationNone:
+		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
 	default:
 		return 0, fmt.Errorf("invalid MountPropagation mode: %q", mountMode)
 	}
