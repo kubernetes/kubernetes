@@ -1,5 +1,5 @@
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: apps/v1
+kind: StatefulSet 
 metadata:
   name: alertmanager
   namespace: kube-system
@@ -9,16 +9,19 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: v0.14.0
 spec:
+  serviceName: "alertmanager"
   replicas: 1
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       k8s-app: alertmanager
-      version: v0.14.0
   template:
     metadata:
       labels:
         k8s-app: alertmanager
-        version: v0.14.0
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
@@ -42,7 +45,7 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: /etc/config
-            - name: storage-volume
+            - name: alertmanager-data
               mountPath: "/data"
               subPath: ""
           resources:
@@ -73,6 +76,13 @@ spec:
         - name: config-volume
           configMap:
             name: alertmanager-config
-        - name: storage-volume
-          persistentVolumeClaim:
-            claimName: alertmanager
+  volumeClaimTemplates:
+  - metadata:
+      name: alertmanager-data
+    spec:
+      storageClassName: standard
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: "2Gi"
