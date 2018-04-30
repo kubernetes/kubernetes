@@ -11,7 +11,6 @@ go_library(
     srcs = [
         "admission_failure_handler_stub.go",
         "doc.go",
-        "fake_handler_runner.go",
         "handlers.go",
         "interfaces.go",
         "predicate.go",

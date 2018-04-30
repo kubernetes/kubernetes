@@ -40,29 +40,6 @@ var (
 	ethtoolOutputRegex = regexp.MustCompile("peer_ifindex: (\\d+)")
 )
 
-func SetUpContainerPid(containerPid int, containerInterfaceName string) error {
-	pidStr := fmt.Sprintf("%d", containerPid)
-	nsenterArgs := []string{"-t", pidStr, "-n"}
-	return setUpContainerInternal(containerInterfaceName, pidStr, nsenterArgs)
-}
-
-func SetUpContainerPath(netnsPath string, containerInterfaceName string) error {
-	if netnsPath[0] != '/' {
-		return fmt.Errorf("netnsPath path '%s' was invalid", netnsPath)
-	}
-	nsenterArgs := []string{"--net=" + netnsPath}
-	return setUpContainerInternal(containerInterfaceName, netnsPath, nsenterArgs)
-}
-
-func setUpContainerInternal(containerInterfaceName, containerDesc string, nsenterArgs []string) error {
-	e := exec.New()
-	hostIfName, err := findPairInterfaceOfContainerInterface(e, containerInterfaceName, containerDesc, nsenterArgs)
-	if err != nil {
-		return err
-	}
-	return setUpInterface(hostIfName)
-}
-
 func findPairInterfaceOfContainerInterface(e exec.Interface, containerInterfaceName, containerDesc string, nsenterArgs []string) (string, error) {
 	nsenterPath, err := e.LookPath("nsenter")
 	if err != nil {

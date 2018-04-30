@@ -859,21 +859,6 @@ func isKernelPid(pid int) bool {
 	return err != nil
 }
 
-// Helper for getting the docker API version.
-func getDockerAPIVersion(cadvisor cadvisor.Interface) *utilversion.Version {
-	versions, err := cadvisor.VersionInfo()
-	if err != nil {
-		glog.Errorf("Error requesting cAdvisor VersionInfo: %v", err)
-		return utilversion.MustParseSemantic("0.0")
-	}
-	dockerAPIVersion, err := utilversion.ParseGeneric(versions.DockerAPIVersion)
-	if err != nil {
-		glog.Errorf("Error parsing docker version %q: %v", versions.DockerVersion, err)
-		return utilversion.MustParseSemantic("0.0")
-	}
-	return dockerAPIVersion
-}
-
 func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
 	return cm.capacity
 }
