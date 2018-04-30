@@ -57,7 +57,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	options.CreateSubcommandOptions.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)

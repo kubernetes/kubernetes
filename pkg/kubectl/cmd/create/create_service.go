@@ -82,7 +82,7 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericclioptions
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	options.CreateSubcommandOptions.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
@@ -154,7 +154,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	options.CreateSubcommandOptions.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
@@ -223,7 +223,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericcliopti
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	options.CreateSubcommandOptions.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
@@ -294,7 +294,7 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericcliopti
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	options.CreateSubcommandOptions.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)

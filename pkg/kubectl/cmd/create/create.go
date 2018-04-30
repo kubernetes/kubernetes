@@ -28,6 +28,7 @@ import (
 	"net/url"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -47,10 +48,11 @@ type CreateOptions struct {
 
 	DryRun bool
 
-	FilenameOptions  resource.FilenameOptions
-	Selector         string
-	EditBeforeCreate bool
-	Raw              string
+	FilenameOptions     resource.FilenameOptions
+	Selector            string
+	EditBeforeCreate    bool
+	Raw                 string
+	IgnoreAlreadyExists bool
 
 	Recorder genericclioptions.Recorder
 	PrintObj func(obj kruntime.Object) error
@@ -119,6 +121,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
+	cmd.Flags().BoolVar(&o.IgnoreAlreadyExists, "ignore-already-exists", o.IgnoreAlreadyExists, "Treat \"already exists\" as a successful create.")
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
 
@@ -233,6 +236,10 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
+	if o.IgnoreAlreadyExists {
+		r.IgnoreErrors(errors.IsAlreadyExists)
+	}
+
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -339,6 +346,8 @@ type CreateSubcommandOptions struct {
 	DryRun           bool
 	CreateAnnotation bool
 
+	IgnoreAlreadyExists bool
+
 	PrintObj func(obj kruntime.Object) error
 
 	genericclioptions.IOStreams
@@ -349,6 +358,11 @@ func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSu
 		PrintFlags: NewPrintFlags("created"),
 		IOStreams:  ioStreams,
 	}
+}
+
+func (o *CreateSubcommandOptions) AddFlags(cmd *cobra.Command) {
+	o.PrintFlags.AddFlags(cmd)
+	cmd.Flags().BoolVar(&o.IgnoreAlreadyExists, "ignore-already-exists", o.IgnoreAlreadyExists, "Treat \"already exists\" as a successful create.")
 }
 
 func (o *CreateSubcommandOptions) Complete(cmd *cobra.Command, args []string, generator kubectl.StructuredGenerator) error {
@@ -419,7 +433,9 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 
 		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
 		if err != nil {
-			return err
+			if !options.IgnoreAlreadyExists || !errors.IsAlreadyExists(err) {
+				return err
+			}
 		}
 
 		// ensure we pass a versioned object to the printer

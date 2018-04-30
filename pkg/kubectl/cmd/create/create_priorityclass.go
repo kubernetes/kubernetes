@@ -61,7 +61,7 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	options.CreateSubcommandOptions.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
