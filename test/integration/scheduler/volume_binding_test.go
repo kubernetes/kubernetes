@@ -35,11 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 )
 
@@ -78,10 +73,9 @@ type testPV struct {
 }
 
 type testPVC struct {
-	name         string
-	scMode       storagev1.VolumeBindingMode
-	preboundPV   string
-	eventsReason string
+	name       string
+	scMode     storagev1.VolumeBindingMode
+	preboundPV string
 }
 
 func TestVolumeBinding(t *testing.T) {
@@ -100,42 +94,42 @@ func TestVolumeBinding(t *testing.T) {
 		"immediate can bind": {
 			pod:  makePod("pod-i-canbind", config.ns, []string{"pvc-i-canbind"}),
 			pvs:  []*testPV{{"pv-i-canbind", modeImmediate, "", node1}},
-			pvcs: []*testPVC{{"pvc-i-canbind", modeImmediate, "", ""}},
+			pvcs: []*testPVC{{"pvc-i-canbind", modeImmediate, ""}},
 		},
 		"immediate cannot bind": {
 			pod:         makePod("pod-i-cannotbind", config.ns, []string{"pvc-i-cannotbind"}),
-			unboundPvcs: []*testPVC{{"pvc-i-cannotbind", modeImmediate, "", events.ProvisioningFailed}},
+			unboundPvcs: []*testPVC{{"pvc-i-cannotbind", modeImmediate, ""}},
 			shouldFail:  true,
 		},
 		"immediate pvc prebound": {
 			pod:  makePod("pod-i-pvc-prebound", config.ns, []string{"pvc-i-prebound"}),
 			pvs:  []*testPV{{"pv-i-pvc-prebound", modeImmediate, "", node1}},
-			pvcs: []*testPVC{{"pvc-i-prebound", modeImmediate, "pv-i-pvc-prebound", ""}},
+			pvcs: []*testPVC{{"pvc-i-prebound", modeImmediate, "pv-i-pvc-prebound"}},
 		},
 		"immediate pv prebound": {
 			pod:  makePod("pod-i-pv-prebound", config.ns, []string{"pvc-i-pv-prebound"}),
 			pvs:  []*testPV{{"pv-i-prebound", modeImmediate, "pvc-i-pv-prebound", node1}},
-			pvcs: []*testPVC{{"pvc-i-pv-prebound", modeImmediate, "", ""}},
+			pvcs: []*testPVC{{"pvc-i-pv-prebound", modeImmediate, ""}},
 		},
 		"wait can bind": {
 			pod:  makePod("pod-w-canbind", config.ns, []string{"pvc-w-canbind"}),
 			pvs:  []*testPV{{"pv-w-canbind", modeWait, "", node1}},
-			pvcs: []*testPVC{{"pvc-w-canbind", modeWait, "", events.WaitForFirstConsumer}},
+			pvcs: []*testPVC{{"pvc-w-canbind", modeWait, ""}},
 		},
 		"wait cannot bind": {
 			pod:         makePod("pod-w-cannotbind", config.ns, []string{"pvc-w-cannotbind"}),
-			unboundPvcs: []*testPVC{{"pvc-w-cannotbind", modeWait, "", events.WaitForFirstConsumer}},
+			unboundPvcs: []*testPVC{{"pvc-w-cannotbind", modeWait, ""}},
 			shouldFail:  true,
 		},
 		"wait pvc prebound": {
 			pod:  makePod("pod-w-pvc-prebound", config.ns, []string{"pvc-w-prebound"}),
 			pvs:  []*testPV{{"pv-w-pvc-prebound", modeWait, "", node1}},
-			pvcs: []*testPVC{{"pvc-w-prebound", modeWait, "pv-w-pvc-prebound", events.WaitForFirstConsumer}},
+			pvcs: []*testPVC{{"pvc-w-prebound", modeWait, "pv-w-pvc-prebound"}},
 		},
 		"wait pv prebound": {
 			pod:  makePod("pod-w-pv-prebound", config.ns, []string{"pvc-w-pv-prebound"}),
 			pvs:  []*testPV{{"pv-w-prebound", modeWait, "pvc-w-pv-prebound", node1}},
-			pvcs: []*testPVC{{"pvc-w-pv-prebound", modeWait, "", events.WaitForFirstConsumer}},
+			pvcs: []*testPVC{{"pvc-w-pv-prebound", modeWait, ""}},
 		},
 		"wait can bind two": {
 			pod: makePod("pod-w-canbind-2", config.ns, []string{"pvc-w-canbind-2", "pvc-w-canbind-3"}),
@@ -144,8 +138,8 @@ func TestVolumeBinding(t *testing.T) {
 				{"pv-w-canbind-3", modeWait, "", node2},
 			},
 			pvcs: []*testPVC{
-				{"pvc-w-canbind-2", modeWait, "", events.WaitForFirstConsumer},
-				{"pvc-w-canbind-3", modeWait, "", events.WaitForFirstConsumer},
+				{"pvc-w-canbind-2", modeWait, ""},
+				{"pvc-w-canbind-3", modeWait, ""},
 			},
 			unboundPvs: []*testPV{
 				{"pv-w-canbind-5", modeWait, "", node1},
@@ -154,8 +148,8 @@ func TestVolumeBinding(t *testing.T) {
 		"wait cannot bind two": {
 			pod: makePod("pod-w-cannotbind-2", config.ns, []string{"pvc-w-cannotbind-1", "pvc-w-cannotbind-2"}),
 			unboundPvcs: []*testPVC{
-				{"pvc-w-cannotbind-1", modeWait, "", events.WaitForFirstConsumer},
-				{"pvc-w-cannotbind-2", modeWait, "", events.WaitForFirstConsumer},
+				{"pvc-w-cannotbind-1", modeWait, ""},
+				{"pvc-w-cannotbind-2", modeWait, ""},
 			},
 			unboundPvs: []*testPV{
 				{"pv-w-cannotbind-1", modeWait, "", node2},
@@ -170,8 +164,8 @@ func TestVolumeBinding(t *testing.T) {
 				{"pv-i-canbind-2", modeImmediate, "", node1},
 			},
 			pvcs: []*testPVC{
-				{"pvc-w-canbind-4", modeWait, "", events.WaitForFirstConsumer},
-				{"pvc-i-canbind-2", modeImmediate, "", ""},
+				{"pvc-w-canbind-4", modeWait, ""},
+				{"pvc-i-canbind-2", modeImmediate, ""},
 			},
 		},
 	}
@@ -236,11 +230,9 @@ func TestVolumeBinding(t *testing.T) {
 		// Validate PVC/PV binding
 		for _, pvc := range test.pvcs {
 			validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimBound)
-			validatePVCEvent(t, config.client, pvc.name, config.ns, pvc.eventsReason)
 		}
 		for _, pvc := range test.unboundPvcs {
 			validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimPending)
-			validatePVCEvent(t, config.client, pvc.name, config.ns, pvc.eventsReason)
 		}
 		for _, pv := range test.pvs {
 			validatePVPhase(t, config.client, pv.name, v1.VolumeBound)
@@ -383,10 +375,6 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 	ns := context.ns.Name
 	informers := context.informerFactory
 
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(glog.Infof)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
-	eventRecorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "test-persistentvolume-controller"})
 	// Start PV controller for volume binding.
 	params := persistentvolume.ControllerParameters{
 		KubeClient:                clientset,
@@ -398,7 +386,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informers.Storage().V1().StorageClasses(),
 		PodInformer:               informers.Core().V1().Pods(),
-		EventRecorder:             eventRecorder,
+		EventRecorder:             nil, // TODO: add one so we can test PV events
 		EnableDynamicProvisioning: true,
 	}
 	ctrl, err := persistentvolume.NewController(params)
@@ -580,27 +568,6 @@ func validatePVCPhase(t *testing.T, client clientset.Interface, pvcName string, 
 
 	if claim.Status.Phase != phase {
 		t.Errorf("PVC %v/%v phase not %v, got %v", ns, pvcName, phase, claim.Status.Phase)
-	}
-}
-
-func validatePVCEvent(t *testing.T, client clientset.Interface, pvcName string, ns string, reason string) {
-	claim, err := client.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("Failed to get PVC %v/%v: %v", ns, pvcName, err)
-	}
-
-	pvcEvents, err := client.CoreV1().Events(ns).Search(legacyscheme.Scheme, claim)
-	if err != nil {
-		t.Errorf("Failed to get PVC events %v/%v: %v", ns, pvcName, err)
-	}
-
-	if len(pvcEvents.Items) > 0 {
-		for _, e := range pvcEvents.Items {
-			if e.Reason == reason {
-				return
-			}
-		}
-		t.Errorf("Failed to get PVC %v/%v events reason:%s", ns, pvcName, reason)
 	}
 }
 
