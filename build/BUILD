@@ -148,6 +148,7 @@ filegroup(
         "//cmd/kubemark",  # TODO: server platforms only
         "//cmd/linkcheck",
         "//test/e2e:e2e.test",
+        "//test/e2e_kubeadm:e2e_kubeadm.test",  # TODO: server platforms only
         "//test/e2e_node:e2e_node.test",  # TODO: server platforms only
         "//vendor/github.com/onsi/ginkgo/ginkgo",
     ],
