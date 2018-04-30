@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
 )
 
@@ -36,6 +37,7 @@ var (
 
 func init() {
 	webhookadmission.AddToScheme(scheme)
+	v1.AddToScheme(scheme)
 	v1alpha1.AddToScheme(scheme)
 }
 

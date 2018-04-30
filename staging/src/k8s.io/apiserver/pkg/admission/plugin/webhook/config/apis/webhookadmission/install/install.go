@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
 )
 
@@ -31,7 +32,7 @@ func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  webhookadmission.GroupName,
-			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
+			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: webhookadmission.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
