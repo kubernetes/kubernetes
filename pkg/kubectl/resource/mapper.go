@@ -28,6 +28,9 @@ import (
 // Mapper is a convenience struct for holding references to the interfaces
 // needed to create Info for arbitrary objects.
 type Mapper struct {
+	// localFn indicates the call can't make server requests
+	localFn func() bool
+
 	RESTMapper   meta.RESTMapper
 	ClientMapper ClientMapper
 	Decoder      runtime.Decoder
@@ -42,31 +45,34 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
 	}
 
-	mapping, err := m.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
-	}
-
-	client, err := m.ClientMapper.ClientForMapping(mapping)
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
-	}
-
 	name, _ := metadataAccessor.Name(obj)
 	namespace, _ := metadataAccessor.Namespace(obj)
 	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 
-	return &Info{
-		Client:  client,
-		Mapping: mapping,
-
+	ret := &Info{
 		Source:          source,
 		Namespace:       namespace,
 		Name:            name,
 		ResourceVersion: resourceVersion,
 
 		Object: obj,
-	}, nil
+	}
+
+	if m.localFn == nil || !m.localFn() {
+		mapping, err := m.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
+		}
+		ret.Mapping = mapping
+
+		client, err := m.ClientMapper.ClientForMapping(mapping)
+		if err != nil {
+			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
+		}
+		ret.Client = client
+	}
+
+	return ret, nil
 }
 
 // InfoForObject creates an Info object for the given Object. An error is returned
@@ -78,33 +84,37 @@ func (m *Mapper) InfoForObject(obj runtime.Object, typer runtime.ObjectTyper, pr
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
 	}
 
-	groupVersionKind := groupVersionKinds[0]
+	gvk := groupVersionKinds[0]
 	if len(groupVersionKinds) > 1 && len(preferredGVKs) > 0 {
-		groupVersionKind = preferredObjectKind(groupVersionKinds, preferredGVKs)
+		gvk = preferredObjectKind(groupVersionKinds, preferredGVKs)
 	}
 
-	mapping, err := m.RESTMapper.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
-	if err != nil {
-		return nil, fmt.Errorf("unable to recognize %v: %v", groupVersionKind, err)
-	}
-
-	client, err := m.ClientMapper.ClientForMapping(mapping)
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
-	}
 	name, _ := metadataAccessor.Name(obj)
 	namespace, _ := metadataAccessor.Namespace(obj)
 	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
-	return &Info{
-		Client:  client,
-		Mapping: mapping,
-
+	ret := &Info{
 		Namespace:       namespace,
 		Name:            name,
 		ResourceVersion: resourceVersion,
 
 		Object: obj,
-	}, nil
+	}
+
+	if m.localFn == nil || !m.localFn() {
+		mapping, err := m.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, fmt.Errorf("unable to recognize %v", err)
+		}
+		ret.Mapping = mapping
+
+		client, err := m.ClientMapper.ClientForMapping(mapping)
+		if err != nil {
+			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
+		}
+		ret.Client = client
+	}
+
+	return ret, nil
 }
 
 // preferredObjectKind picks the possibility that most closely matches the priority list in this order:

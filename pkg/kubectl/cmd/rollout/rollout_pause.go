@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -43,7 +42,6 @@ type PauseConfig struct {
 	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
 
 	Pauser func(info *resource.Info) ([]byte, error)
-	Mapper meta.RESTMapper
 	Infos  []*resource.Info
 
 	genericclioptions.IOStreams
@@ -104,8 +102,6 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, args 
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
-
-	o.Mapper = f.RESTMapper()
 
 	o.Pauser = f.Pauser
 

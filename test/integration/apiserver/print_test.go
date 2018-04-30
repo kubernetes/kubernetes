@@ -147,8 +147,11 @@ func TestServerSidePrint(t *testing.T) {
 	printer := newFakePrinter(printersinternal.AddHandlers)
 
 	factory := util.NewFactory(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
-	mapper := factory.RESTMapper()
-
+	mapper, err := factory.RESTMapper()
+	if err != nil {
+		t.Errorf("unexpected error getting mapper: %v", err)
+		return
+	}
 	for gvk, apiType := range legacyscheme.Scheme.AllKnownTypes() {
 		// we do not care about internal objects or lists // TODO make sure this is always true
 		if gvk.Version == runtime.APIVersionInternal || strings.HasSuffix(apiType.Name(), "List") {

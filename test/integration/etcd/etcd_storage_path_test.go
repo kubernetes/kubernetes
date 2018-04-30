@@ -811,7 +811,10 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 		t.Fatal(err)
 	}
 
-	mapper := util.NewFactory(clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &clientcmd.ConfigOverrides{})).RESTMapper()
+	mapper, err := util.NewFactory(clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &clientcmd.ConfigOverrides{})).RESTMapper()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	return client, kvClient, mapper
 }

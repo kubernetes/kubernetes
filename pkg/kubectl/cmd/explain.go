@@ -91,12 +91,16 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 }
 
 func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var err error
+
 	o.Recursive = cmdutil.GetFlagBool(cmd, "recursive")
 	o.ApiVersion = cmdutil.GetFlagString(cmd, "api-version")
 
-	o.Mapper = f.RESTMapper()
+	o.Mapper, err = f.RESTMapper()
+	if err != nil {
+		return err
+	}
 
-	var err error
 	o.Schema, err = f.OpenAPISchema()
 	if err != nil {
 		return err

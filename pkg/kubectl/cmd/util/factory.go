@@ -164,7 +164,7 @@ type ClientAccessFactory interface {
 // Generally they provide object typing and functions that build requests based on the negotiated clients.
 type ObjectMappingFactory interface {
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
-	RESTMapper() meta.RESTMapper
+	RESTMapper() (meta.RESTMapper, error)
 	// Returns interface for expanding categories like `all`.
 	CategoryExpander() categories.CategoryExpander
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
