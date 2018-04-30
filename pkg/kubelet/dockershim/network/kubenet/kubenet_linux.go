@@ -547,21 +547,6 @@ func (plugin *kubenetNetworkPlugin) checkRequiredCNIPluginsInOneDir(dir string) 
 	return true
 }
 
-// podIsExited returns true if the pod is exited (all containers inside are exited).
-func podIsExited(p *kubecontainer.Pod) bool {
-	for _, c := range p.Containers {
-		if c.State != kubecontainer.ContainerStateExited {
-			return false
-		}
-	}
-	for _, c := range p.Sandboxes {
-		if c.State != kubecontainer.ContainerStateExited {
-			return false
-		}
-	}
-	return true
-}
-
 func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubecontainer.ContainerID, needNetNs bool) (*libcni.RuntimeConf, error) {
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if needNetNs && err != nil {
