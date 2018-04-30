@@ -36,12 +36,6 @@ import (
 	utilsexec "k8s.io/utils/exec"
 )
 
-var (
-	crictlSandboxesParamsFormat = "%s -r %s sandboxes --quiet | xargs -r"
-	crictlStopParamsFormat      = "%s -r %s stops %s"
-	crictlRemoveParamsFormat    = "%s -r %s rms %s"
-)
-
 // NewCmdReset returns the "kubeadm reset" command
 func NewCmdReset(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
@@ -183,24 +177,31 @@ func resetWithDocker(execer utilsexec.Interface, dockerCheck preflight.Checker) 
 func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, criSocketPath, crictlPath string) {
 	if criSocketPath != "" {
 		fmt.Printf("[reset] Cleaning up running containers using crictl with socket %s\n", criSocketPath)
-		listcmd := fmt.Sprintf(crictlSandboxesParamsFormat, crictlPath, criSocketPath)
-		output, err := execer.Command(listcmd).CombinedOutput()
+		fmt.Println("[reset] Listing running pods using crictl")
+		params := []string{"-r", criSocketPath, "pods", "--quiet"}
+		fmt.Printf("[reset] Executing command %s %s\n", crictlPath, strings.Join(params, " "))
+		output, err := execer.Command(crictlPath, params...).CombinedOutput()
 		if err != nil {
-			fmt.Println("[reset] Failed to list running pods using crictl. Trying using docker instead.")
+			fmt.Printf("[reset] failed to list running pods using crictl: %v. Trying to use docker instead\n", err)
 			resetWithDocker(execer, dockerCheck)
 			return
 		}
 		sandboxes := strings.Split(string(output), " ")
 		for _, s := range sandboxes {
-			stopcmd := fmt.Sprintf(crictlStopParamsFormat, crictlPath, criSocketPath, s)
-			if err := execer.Command(stopcmd).Run(); err != nil {
-				fmt.Println("[reset] Failed to stop the running containers using crictl. Trying using docker instead.")
+			if strings.TrimSpace(s) == "" {
+				continue
+			}
+			params = []string{"-r", criSocketPath, "stopp", s}
+			fmt.Printf("[reset] Executing command %s %s\n", crictlPath, strings.Join(params, " "))
+			if err := execer.Command(crictlPath, params...).Run(); err != nil {
+				fmt.Printf("[reset] failed to stop the running containers using crictl: %v. Trying to use docker instead\n", err)
 				resetWithDocker(execer, dockerCheck)
 				return
 			}
-			removecmd := fmt.Sprintf(crictlRemoveParamsFormat, crictlPath, criSocketPath, s)
-			if err := execer.Command(removecmd).Run(); err != nil {
-				fmt.Println("[reset] Failed to remove the running containers using crictl. Trying using docker instead.")
+			params = []string{"-r", criSocketPath, "rmp", s}
+			fmt.Printf("[reset] executing command %s %s\n", crictlPath, strings.Join(params, " "))
+			if err := execer.Command(crictlPath, params...).Run(); err != nil {
+				fmt.Printf("[reset] failed to remove the running containers using crictl: %v. Trying to use docker instead\n", err)
 				resetWithDocker(execer, dockerCheck)
 				return
 			}
