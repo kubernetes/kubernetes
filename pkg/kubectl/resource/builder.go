@@ -56,6 +56,9 @@ type Builder struct {
 	// it does not ever need to rely upon discovery.
 	objectTyper runtime.ObjectTyper
 
+	// local indicates that we cannot make server calls
+	local bool
+
 	errs []error
 
 	paths  []Visitor
@@ -142,6 +145,14 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 	return b
 }
 
+func (b *Builder) AddError(err error) *Builder {
+	if err == nil {
+		return b
+	}
+	b.errs = append(b.errs, err)
+	return b
+}
+
 // FilenameParam groups input in two categories: URLs and files (files, directories, STDIN)
 // If enforceNamespace is false, namespaces in the specs will be allowed to
 // override the default namespace. If it is true, namespaces that don't match
@@ -192,6 +203,7 @@ func (b *Builder) Unstructured() *Builder {
 		return b
 	}
 	b.mapper = b.unstructured
+	b.mapper.localFn = b.isLocal
 
 	b.objectTyper = unstructuredscheme.NewUnstructuredObjectTyper()
 	return b
@@ -212,6 +224,7 @@ func (b *Builder) Internal(typer runtime.ObjectTyper) *Builder {
 		return b
 	}
 	b.mapper = b.internal
+	b.mapper.localFn = b.isLocal
 
 	b.objectTyper = typer
 	return b
@@ -227,10 +240,15 @@ func (b *Builder) LocalParam(local bool) *Builder {
 
 // Local will avoid asking the server for results.
 func (b *Builder) Local() *Builder {
+	b.local = true
 	mapper := *b.mapper
 	mapper.ClientMapper = DisabledClientForMapping{ClientMapper: mapper.ClientMapper}
 	b.mapper = &mapper
 	return b
+}
+
+func (b *Builder) isLocal() bool {
+	return b.local
 }
 
 // Mapper returns a copy of the current mapper.

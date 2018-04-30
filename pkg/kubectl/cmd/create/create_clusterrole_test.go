@@ -437,8 +437,12 @@ func TestClusterRoleValidate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			test.clusterRoleOptions.Mapper = tf.RESTMapper()
-			err := test.clusterRoleOptions.Validate()
+			var err error
+			test.clusterRoleOptions.Mapper, err = tf.RESTMapper()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = test.clusterRoleOptions.Validate()
 			if test.expectErr && err == nil {
 				t.Errorf("%s: expect error happens, but validate passes.", name)
 			}

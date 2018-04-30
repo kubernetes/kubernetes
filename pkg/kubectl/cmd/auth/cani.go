@@ -127,7 +127,10 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 			break
 		}
 		resourceTokens := strings.SplitN(args[1], "/", 2)
-		restMapper := f.RESTMapper()
+		restMapper, err := f.RESTMapper()
+		if err != nil {
+			return err
+		}
 		o.Resource = o.resourceFor(restMapper, resourceTokens[0])
 		if len(resourceTokens) > 1 {
 			o.ResourceName = resourceTokens[1]

@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -68,7 +67,6 @@ type DrainOptions struct {
 	DeleteLocalData    bool
 	Selector           string
 	PodSelector        string
-	mapper             meta.RESTMapper
 	nodeInfos          []*resource.Info
 	typer              runtime.ObjectTyper
 

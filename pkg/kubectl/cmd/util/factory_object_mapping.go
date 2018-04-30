@@ -69,11 +69,8 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
-// objectLoader attempts to perform discovery against the server, and will fall back to
-// the built in mapper if necessary. It supports unstructured objects either way, since
-// the underlying Scheme supports Unstructured. The mapper will return converters that can
-// convert versioned types to unstructured and back.
-func (f *ring1Factory) restMapper() (meta.RESTMapper, error) {
+// RESTMapper returns a mapper.
+func (f *ring1Factory) RESTMapper() (meta.RESTMapper, error) {
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
 		return nil, err
@@ -83,11 +80,7 @@ func (f *ring1Factory) restMapper() (meta.RESTMapper, error) {
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	// TODO: should this also indicate it recognizes typed objects?
 	expander := NewShortcutExpander(mapper, discoveryClient)
-	return expander, err
-}
-
-func (f *ring1Factory) RESTMapper() meta.RESTMapper {
-	return meta.NewLazyRESTMapperLoader(f.restMapper)
+	return expander, nil
 }
 
 func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {
