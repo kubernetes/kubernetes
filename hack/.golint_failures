@@ -180,7 +180,6 @@ pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
 pkg/kubelet/dockershim/network/cni
 pkg/kubelet/dockershim/network/cni/testing
-pkg/kubelet/dockershim/network/hairpin
 pkg/kubelet/dockershim/network/hostport
 pkg/kubelet/dockershim/network/hostport/testing
 pkg/kubelet/dockershim/network/kubenet
