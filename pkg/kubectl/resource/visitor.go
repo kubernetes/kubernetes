@@ -180,22 +180,6 @@ func (i *Info) ResourceMapping() *meta.RESTMapping {
 	return i.Mapping
 }
 
-// Versioned returns the object as a Go type in the mapping's version or returns an error.
-func (i *Info) versioned(convertor runtime.ObjectConvertor) (runtime.Object, error) {
-	return convertor.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupVersion())
-}
-
-// AsVersioned returns the object as a Go object in the external form if possible (matching the
-// group version kind of the mapping, or i.Object if it cannot be converted.
-// Deprecated this function will be removed once calling code is updated to indicate the correct
-// negoticatedserializers during construction of the builder
-func (i *Info) AsVersioned(convertor runtime.ObjectConvertor) runtime.Object {
-	if obj, err := i.versioned(convertor); err == nil {
-		return obj
-	}
-	return i.Object
-}
-
 // VisitorList implements Visit for the sub visitors it contains. The first error
 // returned from a child Visitor will terminate iteration.
 type VisitorList []Visitor

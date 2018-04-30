@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -203,7 +202,7 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 			}
 			info.Refresh(patchedObj, false)
 		}
-		if err := o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
+		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
 			return err
 		}
 	}

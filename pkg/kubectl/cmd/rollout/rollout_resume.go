@@ -161,7 +161,7 @@ func (o ResumeConfig) RunResume() error {
 				allErrs = append(allErrs, err)
 				continue
 			}
-			printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -176,7 +176,7 @@ func (o ResumeConfig) RunResume() error {
 			allErrs = append(allErrs, err)
 			continue
 		}
-		printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	}
 
 	return utilerrors.NewAggregate(allErrs)

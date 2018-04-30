@@ -224,7 +224,7 @@ func (o *SetResourcesOptions) Run() error {
 	allErrs := []error{}
 	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		transformed := false
-		info.Object = info.AsVersioned(legacyscheme.Scheme)
+		info.Object = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) != 0 {
@@ -277,7 +277,7 @@ func (o *SetResourcesOptions) Run() error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(patch.Info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
+			if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, patch.Info.Mapping), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -290,7 +290,7 @@ func (o *SetResourcesOptions) Run() error {
 		}
 		info.Refresh(obj, true)
 
-		if err := o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
+		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
 			return err
 		}
 	}

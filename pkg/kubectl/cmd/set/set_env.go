@@ -327,7 +327,7 @@ func (o *EnvOptions) RunEnv() error {
 		return err
 	}
 	patches := CalculatePatches(infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-		info.Object = info.AsVersioned(legacyscheme.Scheme)
+		info.Object = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 		_, err := o.updatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
@@ -418,7 +418,7 @@ func (o *EnvOptions) RunEnv() error {
 		}
 
 		if o.Local || o.dryRun {
-			if err := o.PrintObj(patch.Info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
+			if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, patch.Info.Mapping), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -437,7 +437,7 @@ func (o *EnvOptions) RunEnv() error {
 			return fmt.Errorf("at least one environment variable must be provided")
 		}
 
-		if err := o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
+		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
 			return err
 		}
 	}

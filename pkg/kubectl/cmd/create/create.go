@@ -430,7 +430,7 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 		}
 
 		// ensure we pass a versioned object to the printer
-		obj = info.AsVersioned(legacyscheme.Scheme)
+		obj = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 	} else {
 		if meta, err := meta.Accessor(obj); err == nil && nsOverriden {
 			meta.SetNamespace(namespace)
