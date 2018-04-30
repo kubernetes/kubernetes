@@ -242,6 +242,18 @@ func (e *Store) NewList() runtime.Object {
 	return e.NewListFunc()
 }
 
+// NamespaceScoped indicates whether the resource is namespaced
+func (e *Store) NamespaceScoped() bool {
+	if e.CreateStrategy != nil {
+		return e.CreateStrategy.NamespaceScoped()
+	}
+	if e.UpdateStrategy != nil {
+		return e.UpdateStrategy.NamespaceScoped()
+	}
+
+	panic("programmer error: no CRUD for resource, you're crazy, override NamespaceScoped too")
+}
+
 // GetCreateStrategy implements GenericStore.
 func (e *Store) GetCreateStrategy() rest.RESTCreateStrategy {
 	return e.CreateStrategy
