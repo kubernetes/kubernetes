@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"net/http"
 	"strings"
 	"testing"
@@ -25,6 +24,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -56,9 +56,9 @@ func TestPatchObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
+	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	cmd := NewCmdPatch(tf, buf)
+	cmd := NewCmdPatch(tf, stream)
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "name")
@@ -91,9 +91,9 @@ func TestPatchObjectFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
+	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	cmd := NewCmdPatch(tf, buf)
+	cmd := NewCmdPatch(tf, stream)
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "name")
@@ -139,8 +139,8 @@ func TestPatchNoop(t *testing.T) {
 			patchObject.Annotations = map[string]string{}
 		}
 		patchObject.Annotations["foo"] = "bar"
-		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdPatch(tf, buf)
+		stream, _, buf, _ := genericclioptions.NewTestIOStreams()
+		cmd := NewCmdPatch(tf, stream)
 		cmd.Flags().Set("namespace", "test")
 		cmd.Flags().Set("patch", `{"metadata":{"annotations":{"foo":"bar"}}}`)
 		cmd.Run(cmd, []string{"services", "frontend"})
@@ -179,9 +179,9 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
+	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	cmd := NewCmdPatch(tf, buf)
+	cmd := NewCmdPatch(tf, stream)
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "yaml")

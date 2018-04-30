@@ -33,9 +33,7 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 		f := cmdtesting.NewTestFactory()
 		defer f.Cleanup()
 
-		cmd := NewCmdClusterInfoDump(f, genericclioptions.NewTestIOStreamsDiscard())
-		cmd.Flag("output-directory").Value.Set(test)
-		writer := setupOutputWriter(cmd, buf, "/some/file/that/should/be/ignored")
+		writer := setupOutputWriter(test, buf, "/some/file/that/should/be/ignored")
 		if writer != buf {
 			t.Errorf("expected: %v, saw: %v", buf, writer)
 		}
@@ -55,9 +53,7 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	cmd := NewCmdClusterInfoDump(f, genericclioptions.NewTestIOStreamsDiscard())
-	cmd.Flag("output-directory").Value.Set(dir)
-	writer := setupOutputWriter(cmd, buf, file)
+	writer := setupOutputWriter(dir, buf, file)
 	if writer == buf {
 		t.Errorf("expected: %v, saw: %v", buf, writer)
 	}

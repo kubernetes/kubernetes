@@ -68,6 +68,12 @@ type LabelOptions struct {
 
 	Recorder genericclioptions.Recorder
 
+	namespace                    string
+	enforceNamespace             bool
+	includeUninitialized         bool
+	builder                      *resource.Builder
+	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+
 	// Common shared fields
 	genericclioptions.IOStreams
 }
@@ -125,13 +131,9 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Long:    fmt.Sprintf(labelLong, validation.LabelValueMaxLength),
 		Example: labelExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.Complete(f, cmd, args); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
-			}
-			if err := o.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
-			}
-			cmdutil.CheckErr(o.RunLabel(f, cmd))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunLabel())
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: kubectl.ResourceAliases(validArgs),
@@ -188,10 +190,18 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.newLabels, o.removeLabels, err = parseLabels(labelArgs)
 
 	if o.list && len(o.outputFormat) > 0 {
-		return cmdutil.UsageErrorf(cmd, "--list and --output may not be specified together")
+		return fmt.Errorf("--list and --output may not be specified together")
 	}
 
-	return err
+	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	o.includeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
+	o.builder = f.NewBuilder()
+	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
+
+	return nil
 }
 
 // Validate checks to the LabelOptions to see if there is sufficient information run the command.
@@ -209,20 +219,14 @@ func (o *LabelOptions) Validate() error {
 }
 
 // RunLabel does the work
-func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	b := f.NewBuilder().
+func (o *LabelOptions) RunLabel() error {
+	b := o.builder.
 		Unstructured().
 		LocalParam(o.local).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(includeUninitialized).
+		NamespaceParam(o.namespace).DefaultNamespace().
+		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(o.includeUninitialized).
 		Flatten()
 
 	if !o.local {
@@ -294,7 +298,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			}
 
 			mapping := info.ResourceMapping()
-			client, err := f.UnstructuredClientForMapping(mapping)
+			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
