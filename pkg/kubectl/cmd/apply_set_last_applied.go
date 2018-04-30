@@ -46,7 +46,6 @@ type SetLastAppliedOptions struct {
 	FilenameOptions resource.FilenameOptions
 
 	infoList                     []*resource.Info
-	mapper                       meta.RESTMapper
 	namespace                    string
 	enforceNamespace             bool
 	dryRun                       bool
@@ -117,7 +116,6 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.shortOutput = o.output == "name"
 
-	o.mapper = f.RESTMapper()
 	var err error
 	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
 	if err != nil {

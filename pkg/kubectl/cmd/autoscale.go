@@ -127,16 +127,20 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 }
 
 func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
 	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
 	o.canBeAutoscaled = f.CanBeAutoscaled
-	o.mapper = f.RESTMapper()
+	o.mapper, err = f.RESTMapper()
+	if err != nil {
+		return err
+	}
+
 	o.clientForMapping = f.ClientForMapping
 	o.args = args
 	o.RecordFlags.Complete(f.Command(cmd, false))
 
-	var err error
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err

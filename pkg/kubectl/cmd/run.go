@@ -643,7 +643,10 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		return nil, err
 	}
 
-	mapper := f.RESTMapper()
+	mapper, err := f.RESTMapper()
+	if err != nil {
+		return nil, err
+	}
 	// run has compiled knowledge of the thing is is creating
 	groupVersionKinds, _, err := legacyscheme.Scheme.ObjectKinds(obj)
 	if err != nil {

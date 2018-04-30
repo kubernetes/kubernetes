@@ -339,8 +339,12 @@ func TestValidate(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test.roleOptions.Mapper = tf.RESTMapper()
-		err := test.roleOptions.Validate()
+		var err error
+		test.roleOptions.Mapper, err = tf.RESTMapper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = test.roleOptions.Validate()
 		if test.expectErr && err == nil {
 			t.Errorf("%s: expect error happens but validate passes.", name)
 		}

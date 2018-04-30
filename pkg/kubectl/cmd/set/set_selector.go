@@ -59,7 +59,6 @@ type SetSelectorOptions struct {
 	Recorder genericclioptions.Recorder
 
 	builder *resource.Builder
-	mapper  meta.RESTMapper
 
 	genericclioptions.IOStreams
 }
@@ -139,9 +138,6 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
-
-	mapper := f.RESTMapper()
-	o.mapper = mapper
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
