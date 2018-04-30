@@ -107,7 +107,7 @@ func (criCheck CRICheck) Check() (warnings, errors []error) {
 		errors = append(errors, fmt.Errorf("unable to find command crictl: %s", err))
 		return warnings, errors
 	}
-	if err := criCheck.exec.Command(fmt.Sprintf("%s -r %s info", crictlPath, criCheck.socket)).Run(); err != nil {
+	if err := criCheck.exec.Command(crictlPath, "-r", criCheck.socket, "info").Run(); err != nil {
 		errors = append(errors, fmt.Errorf("unable to check if the container runtime at %q is running: %s", criCheck.socket, err))
 		return warnings, errors
 	}
