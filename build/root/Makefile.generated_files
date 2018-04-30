@@ -35,10 +35,7 @@ SHELL := /bin/bash
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi
-
-##TH##FIXME  gen_bindata
-
+generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi gen_bindata
 
 #
 # Helper logic to calculate Go's dependency DAG ourselves.
@@ -67,17 +64,18 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	    echo "DBG: calculating Go dependencies";  \
 	fi
 	hack/run-in-gopath.sh go install ./hack/make-rules/helpers/go2make
-	hack/run-in-gopath.sh go2make                    \
-	    k8s.io/kubernetes/...                        \
-	    --prune  k8s.io/kubernetes/staging           \
-	    --prune  k8s.io/kubernetes/vendor            \
-	    k8s.io/kubernetes/vendor/k8s.io/...          \
+	hack/run-in-gopath.sh go2make                     \
+	    k8s.io/kubernetes/...                         \
+	    --prune  k8s.io/kubernetes/staging            \
+	    --prune  k8s.io/kubernetes/vendor             \
+	    k8s.io/kubernetes/vendor/k8s.io/...           \
+	    github.com/jteeuwen/go-bindata/go-bindata/... \
 	    > $@.tmp
-	if ! cmp -s $@.tmp $@; then                      \
-	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then         \
-	        echo "DBG: $(GO_PKGDEPS_FILE) changed";  \
-	    fi;                                          \
-	    cat $@.tmp > $@;                             \
+	if ! cmp -s $@.tmp $@; then                       \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
+	        echo "DBG: $(GO_PKGDEPS_FILE) changed";   \
+	    fi;                                           \
+	    cat $@.tmp > $@;                              \
 	fi
 	rm -f $@.tmp
 
@@ -459,60 +457,30 @@ $(OPENAPI_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/openapi-gen
 	touch $@
 
 
-##TH### bindata generation
-##TH###
-##TH##
-##TH### The tool used to generate bindata files.
-##TH##BINDATA_GEN := $(BIN_DIR)/go-bindata
-##TH##
-##TH### A wrapper script that generates all bindata files.  It is fast enough that we
-##TH### don't care.
-##TH##BINDATA_SCRIPT := hack/generate-bindata.sh
-##TH##
-##TH### This rule is the user-friendly entrypoint for bindata generation.
-##TH##.PHONY: gen_bindata
-##TH##gen_bindata: $(BINDATA_GEN) FORCE
-##TH##	./hack/run-in-gopath.sh $(BINDATA_SCRIPT)
-##TH##
-##TH### This calculates the dependencies for the generator tool, so we only rebuild
-##TH### it when needed.  It is PHONY so that it always runs, but it only updates the
-##TH### file if the contents have actually changed.  We 'sinclude' this later.
-##TH##.PHONY: $(META_DIR)/$(BINDATA_GEN).mk
-##TH##$(META_DIR)/$(BINDATA_GEN).mk:
-##TH##	mkdir -p $(@D);                                                       \
-##TH##	(echo -n "$(BINDATA_GEN): ";                                          \
-##TH##	 ./hack/run-in-gopath.sh go list                                      \
-##TH##	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-##TH##	     ./vendor/github.com/jteeuwen/go-bindata/go-bindata               \
-##TH##	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
-##TH##	     | xargs ./hack/run-in-gopath.sh go list                          \
-##TH##	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
-##TH##	     | paste -sd' ' -                                                 \
-##TH##	     | sed 's/ / \\=,/g'                                              \
-##TH##	     | tr '=,' '\n\t'                                                 \
-##TH##	     | sed "s|$$(pwd -P)/||";                                         \
-##TH##	) > $@.tmp;                                                           \
-##TH##	if ! cmp -s $@.tmp $@; then                                           \
-##TH##	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                              \
-##TH##	        echo "DBG: $(BINDATA_GEN).mk changed";                        \
-##TH##	    fi;                                                               \
-##TH##	    cat $@.tmp > $@;                                                  \
-##TH##	    rm -f $@.tmp;                                                     \
-##TH##	fi
-##TH##
-##TH### Include dependency info for the generator tool.  This will cause the rule of
-##TH### the same name to be considered and if it is updated, make will restart.
-##TH##sinclude $(META_DIR)/$(BINDATA_GEN).mk
-##TH##
-##TH### How to build the generator tool.  The deps for this are defined in
-##TH### the $(BINDATA_GEN).mk, above.
-##TH###
-##TH### A word on the need to touch: This rule might trigger if, for example, a
-##TH### non-Go file was added or deleted from a directory on which this depends.
-##TH### This target needs to be reconsidered, but Go realizes it doesn't actually
-##TH### have to be rebuilt.  In that case, make will forever see the dependency as
-##TH### newer than the binary, and try to rebuild it over and over.  So we touch it,
-##TH### and make is happy.
-##TH##$(BINDATA_GEN):
-##TH##	hack/make-rules/build.sh ./vendor/github.com/jteeuwen/go-bindata/go-bindata
-##TH##	touch $@
+# bindata generation
+#
+
+# The tool used to generate bindata files.
+BINDATA_GEN := $(BIN_DIR)/go-bindata
+
+# A wrapper script that generates all bindata files.  It is fast enough that we
+# don't care.
+BINDATA_SCRIPT := hack/generate-bindata.sh
+
+# This rule is the user-friendly entrypoint for bindata generation.
+.PHONY: gen_bindata
+gen_bindata: $(BINDATA_GEN) FORCE
+	./hack/run-in-gopath.sh $(BINDATA_SCRIPT)
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(BINDATA_GEN).mk, above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/jteeuwen/go-bindata/go-bindata)
+	hack/make-rules/build.sh ./vendor/github.com/jteeuwen/go-bindata/go-bindata
+	touch $@
