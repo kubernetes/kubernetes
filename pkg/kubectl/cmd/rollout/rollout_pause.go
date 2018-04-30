@@ -156,7 +156,7 @@ func (o PauseConfig) RunPause() error {
 				allErrs = append(allErrs, err)
 				continue
 			}
-			printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 			continue
 		}
 
@@ -172,7 +172,7 @@ func (o PauseConfig) RunPause() error {
 			allErrs = append(allErrs, err)
 			continue
 		}
-		printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	}
 
 	return utilerrors.NewAggregate(allErrs)

@@ -300,7 +300,8 @@ func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 	if info.Name != "update-demo-kitten" || info.Namespace != "" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
-	obj := info.AsVersioned(legacyscheme.Scheme)
+
+	obj := info.Object
 	version, ok := obj.(*v1.ReplicationController)
 	// versioned object does not have defaulting applied
 	if obj == nil || !ok || version.Spec.Replicas != nil {
