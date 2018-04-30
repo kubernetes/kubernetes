@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
@@ -38,7 +37,6 @@ func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  certificates.GroupName,
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
-			RootScopedKinds:            sets.NewString("CertificateSigningRequest"),
 			AddInternalObjectsToScheme: certificates.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1"
@@ -39,7 +38,6 @@ func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  authorization.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1beta1.SchemeGroupVersion.Version},
-			RootScopedKinds:            sets.NewString("SubjectAccessReview", "SelfSubjectAccessReview", "SelfSubjectRulesReview"),
 			AddInternalObjectsToScheme: authorization.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

@@ -347,6 +347,10 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
+func (storage *SimpleRESTStorage) NamespaceScoped() bool {
+	return true
+}
+
 func (storage *SimpleRESTStorage) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	obj, err := storage.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
@@ -615,6 +619,10 @@ type GetWithOptionsRootRESTStorage struct {
 	takesPath       string
 }
 
+func (r *GetWithOptionsRootRESTStorage) NamespaceScoped() bool {
+	return false
+}
+
 func (r *GetWithOptionsRootRESTStorage) Get(ctx context.Context, name string, options runtime.Object) (runtime.Object, error) {
 	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
 		return nil, fmt.Errorf("Unexpected options object: %#v", options)
@@ -800,6 +808,10 @@ func TestNotFound(t *testing.T) {
 }
 
 type UnimplementedRESTStorage struct{}
+
+func (UnimplementedRESTStorage) NamespaceScoped() bool {
+	return true
+}
 
 func (UnimplementedRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
@@ -3772,10 +3784,6 @@ func (storage *SimpleXGSubresourceRESTStorage) Get(ctx context.Context, id strin
 
 func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	return storage.itemGVK
-}
-
-func (*SimpleXGSubresourceRESTStorage) ClusterScoped() bool {
-	return false
 }
 
 func TestXGSubresource(t *testing.T) {

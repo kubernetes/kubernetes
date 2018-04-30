@@ -41,6 +41,10 @@ func NewStorage(s rest.StandardStorage, ruleResolver rbacregistryvalidation.Auth
 	return &Storage{s, ruleResolver}
 }
 
+func (r *Storage) NamespaceScoped() bool {
+	return true
+}
+
 func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)

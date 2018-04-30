@@ -37,6 +37,10 @@ func NewREST(tokenAuthenticator authenticator.Request) *REST {
 	return &REST{tokenAuthenticator: tokenAuthenticator}
 }
 
+func (r *REST) NamespaceScoped() bool {
+	return false
+}
+
 func (r *REST) New() runtime.Object {
 	return &authentication.TokenReview{}
 }

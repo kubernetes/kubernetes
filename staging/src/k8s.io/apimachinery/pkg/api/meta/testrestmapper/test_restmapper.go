@@ -29,6 +29,8 @@ import (
 //  1. legacy kube group preferred version, extensions preferred version, metrics perferred version, legacy
 //     kube any version, extensions any version, metrics any version, all other groups alphabetical preferred version,
 //     all other groups alphabetical.
+// TODO callers of this method should be updated to build their own specific restmapper based on their scheme for their tests
+// TODO the things being tested are related to whether various cases are handled, not tied to the particular types being checked.
 func TestOnlyStaticRESTMapper(m *registered.APIRegistrationManager, scheme *runtime.Scheme, versionPatterns ...schema.GroupVersion) meta.RESTMapper {
 	unionMapper := meta.MultiRESTMapper{}
 	unionedGroups := sets.NewString()
@@ -93,13 +95,6 @@ func prioritiesForGroups(m *registered.APIRegistrationManager, groups ...string)
 }
 
 func newRESTMapper(scheme *runtime.Scheme, groupMeta *apimachinery.GroupMeta) meta.RESTMapper {
-	// the list of kinds that are scoped at the root of the api hierarchy
-	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString()
-	if groupMeta.RootScopedKinds != nil {
-		rootScoped = groupMeta.RootScopedKinds
-	}
-
 	mapper := meta.NewDefaultRESTMapper(groupMeta.GroupVersions)
 	for _, gv := range groupMeta.GroupVersions {
 		for kind := range scheme.KnownTypes(gv) {
@@ -107,7 +102,7 @@ func newRESTMapper(scheme *runtime.Scheme, groupMeta *apimachinery.GroupMeta) me
 				continue
 			}
 			scope := meta.RESTScopeNamespace
-			if rootScoped.Has(kind) {
+			if rootScopedKinds[gv.WithKind(kind).GroupKind()] {
 				scope = meta.RESTScopeRoot
 			}
 			mapper.Add(gv.WithKind(kind), scope)
@@ -115,6 +110,55 @@ func newRESTMapper(scheme *runtime.Scheme, groupMeta *apimachinery.GroupMeta) me
 	}
 
 	return mapper
+}
+
+// hardcoded is good enough for the test we're running
+var rootScopedKinds = map[schema.GroupKind]bool{
+	{Group: "admission.k8s.io", Kind: "AdmissionReview"}: true,
+
+	{Group: "admissionregistration.k8s.io", Kind: "InitializerConfiguration"}:       true,
+	{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"}: true,
+	{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"}:   true,
+
+	{Group: "authentication.k8s.io", Kind: "TokenReview"}: true,
+
+	{Group: "authorization.k8s.io", Kind: "SubjectAccessReview"}:     true,
+	{Group: "authorization.k8s.io", Kind: "SelfSubjectAccessReview"}: true,
+	{Group: "authorization.k8s.io", Kind: "SelfSubjectRulesReview"}:  true,
+
+	{Group: "certificates.k8s.io", Kind: "CertificateSigningRequest"}: true,
+
+	{Group: "", Kind: "Node"}:             true,
+	{Group: "", Kind: "Namespace"}:        true,
+	{Group: "", Kind: "PersistentVolume"}: true,
+	{Group: "", Kind: "ComponentStatus"}:  true,
+
+	{Group: "extensions", Kind: "PodSecurityPolicy"}: true,
+
+	{Group: "policy", Kind: "PodSecurityPolicy"}: true,
+
+	{Group: "extensions", Kind: "PodSecurityPolicy"}: true,
+
+	{Group: "rbac.authorization.k8s.io", Kind: "ClusterRole"}:        true,
+	{Group: "rbac.authorization.k8s.io", Kind: "ClusterRoleBinding"}: true,
+
+	{Group: "scheduling.k8s.io", Kind: "PriorityClass"}: true,
+
+	{Group: "storage.k8s.io", Kind: "StorageClass"}:     true,
+	{Group: "storage.k8s.io", Kind: "VolumeAttachment"}: true,
+
+	{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition"}: true,
+
+	{Group: "apiserver.k8s.io", Kind: "AdmissionConfiguration"}: true,
+
+	{Group: "audit.k8s.io", Kind: "Event"}:  true,
+	{Group: "audit.k8s.io", Kind: "Policy"}: true,
+
+	{Group: "apiregistration.k8s.io", Kind: "APIService"}: true,
+
+	{Group: "metrics.k8s.io", Kind: "NodeMetrics"}: true,
+
+	{Group: "wardle.k8s.io", Kind: "Fischer"}: true,
 }
 
 // hardcoded is good enough for the test we're running

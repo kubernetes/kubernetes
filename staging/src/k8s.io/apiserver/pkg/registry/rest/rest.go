@@ -58,6 +58,13 @@ type Storage interface {
 	New() runtime.Object
 }
 
+// Scoper indicates what scope the resource is at. It must be specified.
+// It is usually provided automatically based on your strategy.
+type Scoper interface {
+	// NamespaceScoped returns true if the storage is namespaced
+	NamespaceScoped() bool
+}
+
 // KindProvider specifies a different kind for its API than for its internal storage.  This is necessary for external
 // objects that are not compiled into the api server.  For such objects, there is no in-memory representation for
 // the object, so they must be represented as generic objects (e.g. runtime.Unknown), but when we present the object as part of
@@ -83,7 +90,6 @@ type CategoriesProvider interface {
 // TODO KindProvider (only used by federation) should be removed and replaced with this, but that presents greater risk late in 1.8.
 type GroupVersionKindProvider interface {
 	GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind
-	ClusterScoped() bool
 }
 
 // Lister is an object that can retrieve resources that match the provided field and label criteria.

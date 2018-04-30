@@ -84,6 +84,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}
 }
 
+func (r *REST) NamespaceScoped() bool {
+	return r.store.NamespaceScoped()
+}
+
 func (r *REST) New() runtime.Object {
 	return r.store.New()
 }

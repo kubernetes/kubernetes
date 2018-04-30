@@ -124,6 +124,10 @@ func scaleFromRC(rc *api.ReplicationController) *autoscaling.Scale {
 // Dummy implementation
 type RcREST struct{}
 
+func (r *RcREST) NamespaceScoped() bool {
+	return true
+}
+
 func (r *RcREST) New() runtime.Object {
 	return &extensions.ReplicationControllerDummy{}
 }

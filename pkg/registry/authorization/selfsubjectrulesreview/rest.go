@@ -38,6 +38,11 @@ func NewREST(ruleResolver authorizer.RuleResolver) *REST {
 	return &REST{ruleResolver}
 }
 
+// NamespaceScoped fulfill rest.Scoper
+func (r *REST) NamespaceScoped() bool {
+	return false
+}
+
 // New creates a new selfsubjectrulesreview object.
 func (r *REST) New() runtime.Object {
 	return &authorizationapi.SelfSubjectRulesReview{}

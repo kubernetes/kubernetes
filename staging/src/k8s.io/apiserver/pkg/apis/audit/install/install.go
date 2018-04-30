@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/audit/v1alpha1"
 	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
@@ -32,10 +31,8 @@ import (
 func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
-			GroupName:              audit.GroupName,
-			VersionPreferenceOrder: []string{v1beta1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
-			// Any Kind that is not namespaced must be cluster scoped.
-			RootScopedKinds:            sets.NewString("Event", "Policy"),
+			GroupName:                  audit.GroupName,
+			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: audit.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

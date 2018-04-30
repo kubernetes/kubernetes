@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
@@ -38,7 +37,6 @@ func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  imagepolicy.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			RootScopedKinds:            sets.NewString("ImageReview"),
 			AddInternalObjectsToScheme: imagepolicy.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

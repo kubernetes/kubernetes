@@ -25,7 +25,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/example:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",

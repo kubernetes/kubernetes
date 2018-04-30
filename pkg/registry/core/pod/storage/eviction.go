@@ -72,11 +72,6 @@ func (r *EvictionREST) GroupVersionKind(containingGV schema.GroupVersion) schema
 	return schema.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "Eviction"}
 }
 
-// ClusterScoped fulfills GroupVersionKindProvider
-func (*EvictionREST) ClusterScoped() bool {
-	return false
-}
-
 // New creates a new eviction resource
 func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}

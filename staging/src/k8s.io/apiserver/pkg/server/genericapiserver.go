@@ -424,7 +424,6 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Defaulter:       apiGroupInfo.Scheme,
 		Typer:           apiGroupInfo.Scheme,
 		Linker:          runtime.SelfLinker(meta.NewAccessor()),
-		RootScopedKinds: apiGroupInfo.GroupMeta.RootScopedKinds,
 
 		Admit:                        s.admissionControl,
 		MinRequestTimeout:            s.minRequestTimeout,

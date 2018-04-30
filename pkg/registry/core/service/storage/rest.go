@@ -70,6 +70,7 @@ type ServiceNodePort struct {
 }
 
 type ServiceStorage interface {
+	rest.Scoper
 	rest.Getter
 	rest.Lister
 	rest.CreaterUpdater
@@ -121,6 +122,10 @@ func (rs *REST) ShortNames() []string {
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (rs *REST) Categories() []string {
 	return []string{"all"}
+}
+
+func (rs *REST) NamespaceScoped() bool {
+	return rs.services.NamespaceScoped()
 }
 
 func (rs *REST) New() runtime.Object {

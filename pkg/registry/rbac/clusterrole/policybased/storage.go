@@ -42,6 +42,10 @@ func NewStorage(s rest.StandardStorage, ruleResolver rbacregistryvalidation.Auth
 	return &Storage{s, ruleResolver}
 }
 
+func (r *Storage) NamespaceScoped() bool {
+	return false
+}
+
 var fullAuthority = []rbac.PolicyRule{
 	rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
 	rbac.NewRule("*").URLs("*").RuleOrDie(),

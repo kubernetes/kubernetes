@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 )
@@ -30,7 +29,6 @@ func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  apiserver.GroupName,
-			RootScopedKinds:            sets.NewString("AdmissionConfiguration"),
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: apiserver.AddToScheme,
 		},
