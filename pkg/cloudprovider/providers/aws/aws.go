@@ -44,7 +44,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 
@@ -4332,13 +4331,4 @@ func setNodeDisk(
 		nodeDiskMap[nodeName] = volumeMap
 	}
 	volumeMap[volumeID] = check
-}
-
-func recordAWSMetric(actionName string, timeTaken float64, err error) {
-	if err != nil {
-		awsAPIErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
-	} else {
-		awsAPIMetric.With(prometheus.Labels{"request": actionName}).Observe(timeTaken)
-	}
-
 }
