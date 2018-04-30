@@ -535,14 +535,10 @@ func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOn
 	if regional && utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
 		disk, err = gce.getRegionalDiskByName(diskName)
 		if err != nil {
-			glog.V(5).Infof("Could not find regional PD named %q to Attach. Will look for a zonal PD", diskName)
-			err = nil
-		} else {
-			mc = newDiskMetricContextRegional("attach", gce.region)
+			return err
 		}
-	}
-
-	if disk == nil {
+		mc = newDiskMetricContextRegional("attach", gce.region)
+	} else {
 		disk, err = gce.getDiskByName(diskName, instance.Zone)
 		if err != nil {
 			return err
