@@ -1318,6 +1318,18 @@ run_kubectl_run_tests() {
   kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: CronJob "pi" is created
   kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+
+  # Pre-condition: cronjob has perl image, not custom image
+  output_message=$(kubectl get cronjob/pi -o jsonpath='{..image}')
+  kube::test::if_has_not_string "${output_message}" "custom-image"
+  kube::test::if_has_string     "${output_message}" "${IMAGE_PERL}"
+  # Set cronjob image
+  kubectl set image cronjob/pi '*=custom-image'
+  # Post-condition: cronjob has custom image, not perl image
+  output_message=$(kubectl get cronjob/pi -o jsonpath='{..image}')
+  kube::test::if_has_string     "${output_message}" "custom-image"
+  kube::test::if_has_not_string "${output_message}" "${IMAGE_PERL}"
+
   # Clean up
   kubectl delete cronjobs pi "${kube_flags[@]}"
 
