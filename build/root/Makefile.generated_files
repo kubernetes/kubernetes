@@ -35,9 +35,9 @@ SHELL := /bin/bash
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_deepcopy gen_defaulter
+generated_files: gen_deepcopy gen_defaulter gen_conversion
 
-##TH##FIXME gen_conversion gen_openapi gen_bindata
+##TH##FIXME  gen_openapi gen_bindata
 
 
 #
@@ -297,211 +297,103 @@ $(DEFAULTER_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter
 	touch $@
 
 
-##TH### Conversion generation
-##TH###
-##TH### Any package that wants conversion functions generated must include one or
-##TH### more comment-tags in any .go file, in column 0, of the form:
-##TH###     // +k8s:conversion-gen=<CONVERSION_TARGET_DIR>
-##TH###
-##TH### The CONVERSION_TARGET_DIR is a project-local path to another directory which
-##TH### should be considered when evaluating peer types for conversions.  Types which
-##TH### are found in the source package (where conversions are being generated)
-##TH### but do not have a peer in one of the target directories will not have
-##TH### conversions generated.
-##TH###
-##TH### TODO: it might be better in the long term to make peer-types explicit in the
-##TH### IDL.
-##TH##
-##TH### The result file, in each pkg, of conversion generation.
-##TH##CONVERSION_BASENAME := $(GENERATED_FILE_PREFIX)conversion
-##TH##CONVERSION_FILENAME := $(CONVERSION_BASENAME).go
-##TH##
-##TH### The tool used to generate conversions.
-##TH##CONVERSION_GEN := $(BIN_DIR)/conversion-gen
-##TH##
-##TH### The name of the metadata file listing conversion peers for each pkg.
-##TH##CONVERSIONS_META := conversions.mk
-##TH##
-##TH### All directories that request any form of conversion generation.
-##TH##ifeq ($(DBG_MAKEFILE),1)
-##TH##    $(warning ***** finding all +k8s:conversion-gen tags)
-##TH##endif
-##TH##CONVERSION_DIRS := $(shell                                              \
-##TH##    grep --color=never '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
-##TH##        | cut -f1 -d:                                                   \
-##TH##        | xargs -n1 dirname                                             \
-##TH##        | LC_ALL=C sort -u                                              \
-##TH##)
-##TH##
-##TH##CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
-##TH##CONVERSION_EXTRA_PEER_DIRS := k8s.io/kubernetes/pkg/apis/core,k8s.io/kubernetes/pkg/apis/core/v1,k8s.io/api/core/v1
-##TH##
-##TH### This rule aggregates the set of files to generate and then generates them all
-##TH### in a single run of the tool.
-##TH##.PHONY: gen_conversion
-##TH##gen_conversion: $(CONVERSION_FILES) $(CONVERSION_GEN)
-##TH##	if [[ -s $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                 \
-##TH##	    pkgs=$$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -);  \
-##TH##	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                             \
-##TH##	        echo "DBG: running $(CONVERSION_GEN) for $$pkgs";            \
-##TH##	    fi;                                                              \
-##TH##	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                        \
-##TH##	        --extra-peer-dirs $(CONVERSION_EXTRA_PEER_DIRS)              \
-##TH##	        --v $(KUBE_VERBOSE)                                          \
-##TH##	        --logtostderr                                                \
-##TH##	        -i "$$pkgs"                                                  \
-##TH##	        -O $(CONVERSION_BASENAME)                                    \
-##TH##	        "$$@";                                                       \
-##TH##	fi
-##TH##
-##TH### Establish a dependency between the deps file and the dir.  Whenever a dir
-##TH### changes (files added or removed) the deps file will be considered stale.
-##TH###
-##TH### This is looser than we really need (e.g. we don't really care about non *.go
-##TH### files or even *_test.go files), but this is much easier to represent.
-##TH###
-##TH### Because we 'sinclude' the deps file, it is considered for rebuilding, as part
-##TH### of make's normal evaluation.  If it gets rebuilt, make will restart.
-##TH###
-##TH### The '$(eval)' is needed because this has a different RHS for each LHS, and
-##TH### would otherwise produce results that make can't parse.
-##TH##$(foreach dir, $(CONVERSION_DIRS), $(eval           \
-##TH##    $(META_DIR)/$(dir)/$(CONVERSIONS_META): $(dir)  \
-##TH##))
-##TH##
-##TH### How to rebuild a deps file.  When make determines that the deps file is stale
-##TH### (see above), it executes this rule, and then re-loads the deps file.
-##TH###
-##TH### This is looser than we really need (e.g. we don't really care about test
-##TH### files), but this is MUCH faster than calling `go list`.
-##TH###
-##TH### We regenerate the output file in order to satisfy make's "newer than" rules,
-##TH### but we only need to rebuild targets if the contents actually changed.  That
-##TH### is what the .stamp file represents.
-##TH##$(foreach dir, $(CONVERSION_DIRS),  \
-##TH##    $(META_DIR)/$(dir)/$(CONVERSIONS_META)):
-##TH##	TAGS=$$(grep --color=never -h '^// *+k8s:conversion-gen=' $</*.go   \
-##TH##	    | cut -f2- -d=                                                  \
-##TH##	    | sed 's|$(PRJ_SRC_PATH)/||'                                    \
-##TH##	    | sed 's|^k8s.io/|vendor/k8s.io/|');                            \
-##TH##	mkdir -p $(@D);                                                     \
-##TH##	echo "conversions__$< := $$(echo $${TAGS})" >$@.tmp;                \
-##TH##	if ! cmp -s $@.tmp $@; then                                         \
-##TH##	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                            \
-##TH##	        echo "DBG: conversions changed for $@";                     \
-##TH##	    fi;                                                             \
-##TH##	    touch $@.stamp;                                                 \
-##TH##	fi;                                                                 \
-##TH##	mv $@.tmp $@
-##TH##
-##TH### Include any deps files as additional Makefile rules.  This triggers make to
-##TH### consider the deps files for rebuild, which makes the whole
-##TH### dependency-management logic work.  'sinclude' is "silent include" which does
-##TH### not fail if the file does not exist.
-##TH##$(foreach dir, $(CONVERSION_DIRS), $(eval            \
-##TH##    sinclude $(META_DIR)/$(dir)/$(CONVERSIONS_META)  \
-##TH##))
-##TH##
-##TH### For each dir in CONVERSION_DIRS, this establishes a dependency between the
-##TH### output file and the input files that should trigger a rebuild.
-##TH###
-##TH### The variable value was set in $(GOFILES_META) and included as part of the
-##TH### dependency management logic.
-##TH###
-##TH### Note that this is a deps-only statement, not a full rule (see below).  This
-##TH### has to be done in a distinct step because wildcards don't work in static
-##TH### pattern rules.
-##TH###
-##TH### The '$(eval)' is needed because this has a different RHS for each LHS, and
-##TH### would otherwise produce results that make can't parse.
-##TH###
-##TH### We depend on the $(GOFILES_META).stamp to detect when the set of input files
-##TH### has changed.  This allows us to detect deleted input files.
-##TH##$(foreach dir, $(CONVERSION_DIRS), $(eval                                    \
-##TH##    $(dir)/$(CONVERSION_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
-##TH##                                   $(gofiles__$(dir))                        \
-##TH##))
-##TH##
-##TH### For each dir in CONVERSION_DIRS, for each target in $(conversions__$(dir)),
-##TH### this establishes a dependency between the output file and the input files
-##TH### that should trigger a rebuild.
-##TH###
-##TH### The variable value was set in $(GOFILES_META) and included as part of the
-##TH### dependency management logic.
-##TH###
-##TH### Note that this is a deps-only statement, not a full rule (see below).  This
-##TH### has to be done in a distinct step because wildcards don't work in static
-##TH### pattern rules.
-##TH###
-##TH### The '$(eval)' is needed because this has a different RHS for each LHS, and
-##TH### would otherwise produce results that make can't parse.
-##TH###
-##TH### We depend on the $(GOFILES_META).stamp to detect when the set of input files
-##TH### has changed.  This allows us to detect deleted input files.
-##TH##$(foreach dir, $(CONVERSION_DIRS),                                               \
-##TH##    $(foreach tgt, $(conversions__$(dir)), $(eval                                \
-##TH##        $(dir)/$(CONVERSION_FILENAME): $(META_DIR)/$(tgt)/$(GOFILES_META).stamp  \
-##TH##                                       $(gofiles__$(tgt))                        \
-##TH##    ))                                                                           \
-##TH##)
-##TH##
-##TH### Unilaterally remove any leftovers from previous runs.
-##TH##$(shell rm -f $(META_DIR)/$(CONVERSION_GEN)*.todo)
-##TH##
-##TH### How to regenerate conversion code.  This is a little slow to run, so we batch
-##TH### it up and trigger the batch from the 'generated_files' target.
-##TH##$(CONVERSION_FILES): $(CONVERSION_GEN)
-##TH##	mkdir -p $$(dirname $(META_DIR)/$(CONVERSION_GEN))
-##TH##	if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
-##TH##	    echo "DBG: conversion needed $(@D): $?";  \
-##TH##	    ls -lf --full-time $@ $? || true;         \
-##TH##	fi
-##TH##	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(CONVERSION_GEN).todo
-##TH##
-##TH### This calculates the dependencies for the generator tool, so we only rebuild
-##TH### it when needed.  It is PHONY so that it always runs, but it only updates the
-##TH### file if the contents have actually changed.  We 'sinclude' this later.
-##TH##.PHONY: $(META_DIR)/$(CONVERSION_GEN).mk
-##TH##$(META_DIR)/$(CONVERSION_GEN).mk:
-##TH##	mkdir -p $(@D);                                                       \
-##TH##	(echo -n "$(CONVERSION_GEN): ";                                       \
-##TH##	 ./hack/run-in-gopath.sh go list                                      \
-##TH##	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-##TH##	     ./vendor/k8s.io/code-generator/cmd/conversion-gen                \
-##TH##	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
-##TH##	     | xargs ./hack/run-in-gopath.sh go list                          \
-##TH##	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
-##TH##	     | paste -sd' ' -                                                 \
-##TH##	     | sed 's/ / \\=,/g'                                              \
-##TH##	     | tr '=,' '\n\t'                                                 \
-##TH##	     | sed "s|$$(pwd -P)/||";                                         \
-##TH##	) > $@.tmp;                                                           \
-##TH##	if ! cmp -s $@.tmp $@; then                                           \
-##TH##	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                              \
-##TH##	        echo "DBG: $(CONVERSION_GEN).mk changed";                     \
-##TH##	    fi;                                                               \
-##TH##	    cat $@.tmp > $@;                                                  \
-##TH##	    rm -f $@.tmp;                                                     \
-##TH##	fi
-##TH##
-##TH### Include dependency info for the generator tool.  This will cause the rule of
-##TH### the same name to be considered and if it is updated, make will restart.
-##TH##sinclude $(META_DIR)/$(CONVERSION_GEN).mk
-##TH##
-##TH### How to build the generator tool.  The deps for this are defined in
-##TH### the $(CONVERSION_GEN).mk, above.
-##TH###
-##TH### A word on the need to touch: This rule might trigger if, for example, a
-##TH### non-Go file was added or deleted from a directory on which this depends.
-##TH### This target needs to be reconsidered, but Go realizes it doesn't actually
-##TH### have to be rebuilt.  In that case, make will forever see the dependency as
-##TH### newer than the binary, and try to rebuild it over and over.  So we touch it,
-##TH### and make is happy.
-##TH##$(CONVERSION_GEN):
-##TH##	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/conversion-gen
-##TH##	touch $@
-##TH##
-##TH###
+# Conversion generation
+#
+# Any package that wants conversion functions generated must include one or
+# more comment-tags in any .go file, in column 0, of the form:
+#     // +k8s:conversion-gen=<CONVERSION_TARGET_DIR>
+#
+# The CONVERSION_TARGET_DIR is a project-local path to another directory which
+# should be considered when evaluating peer types for conversions.  Types which
+# are found in the source package (where conversions are being generated)
+# but do not have a peer in one of the target directories will not have
+# conversions generated.
+#
+# TODO: it might be better in the long term to make peer-types explicit in the
+# IDL.
+
+# The result file, in each pkg, of conversion generation.
+CONVERSION_BASENAME := $(GENERATED_FILE_PREFIX)conversion
+CONVERSION_FILENAME := $(CONVERSION_BASENAME).go
+
+# The tool used to generate conversions.
+CONVERSION_GEN := $(BIN_DIR)/conversion-gen
+
+# The name of the metadata file listing conversion peers for each pkg.
+CONVERSIONS_META := conversions.mk
+
+# All directories that request any form of conversion generation.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:conversion-gen tags)
+endif
+CONVERSION_DIRS := $(shell                                              \
+    grep --color=never '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
+        | cut -f1 -d:                                                   \
+        | xargs -n1 dirname                                             \
+        | LC_ALL=C sort -u                                              \
+)
+
+CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
+CONVERSION_EXTRA_PEER_DIRS := k8s.io/kubernetes/pkg/apis/core,k8s.io/kubernetes/pkg/apis/core/v1,k8s.io/api/core/v1
+
+# Reset the list of packages that need generation.
+$(shell mkdir -p $$(dirname $(META_DIR)/$(CONVERSION_GEN)))
+$(shell rm -f $(META_DIR)/$(CONVERSION_GEN).todo)
+
+# This rule aggregates the set of files to generate and then generates them all
+# in a single run of the tool.
+.PHONY: gen_conversion
+gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
+	if [[ -s $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                 \
+	    pkgs=$$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -);  \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                             \
+	        echo "DBG: running $(CONVERSION_GEN) for $$pkgs";            \
+	    fi;                                                              \
+	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                        \
+	        --extra-peer-dirs $(CONVERSION_EXTRA_PEER_DIRS)              \
+	        --v $(KUBE_VERBOSE)                                          \
+	        --logtostderr                                                \
+	        -i "$$pkgs"                                                  \
+	        -O $(CONVERSION_BASENAME)                                    \
+	        "$$@";                                                       \
+	fi
+
+# For each dir in CONVERSION_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# Note that this is a deps-only statement, not a full rule (see below for that).
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+$(foreach dir, $(CONVERSION_DIRS), $(eval                     \
+    $(dir)/$(CONVERSION_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+))
+
+# How to regenerate conversion code.  This is a little slow to run, so we batch
+# it up and trigger the batch from the 'generated_files' target.
+$(META_DIR)/$(CONVERSION_GEN).todo: $(CONVERSION_FILES)
+
+$(CONVERSION_FILES): $(CONVERSION_GEN)
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
+	    echo "DBG: conversion needed $(@D): $?";  \
+	    ls -lf --full-time $@ $? || true;         \
+	fi
+	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(CONVERSION_GEN).todo
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(GO_PKGDEPS_FILE), above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(CONVERSION_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversion-gen)
+	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/conversion-gen
+	touch $@
+
+
 ##TH### Open-api generation
 ##TH###
 ##TH### Any package that wants open-api functions generated must include a
