@@ -696,7 +696,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 			return nil, err
 		}
 
-		versioned = info.AsVersioned(legacyscheme.Scheme)
+		versioned = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 	}
 	return &RunObject{
 		Versioned: versioned,

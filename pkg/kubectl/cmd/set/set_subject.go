@@ -230,7 +230,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
 		if transformed && err == nil {
 			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
-			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.AsVersioned(legacyscheme.Scheme))
+			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping))
 		}
 		return nil, err
 	})
@@ -263,7 +263,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 		}
 		info.Refresh(obj, true)
 
-		return o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

@@ -339,7 +339,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			return err
 		}
 
-		return o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	})
 	if err != nil {
 		return err

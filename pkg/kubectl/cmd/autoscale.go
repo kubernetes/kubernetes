@@ -253,7 +253,7 @@ func (o *AutoscaleOptions) Run() error {
 			if err != nil {
 				return err
 			}
-			return printer.PrintObj(hpa.AsVersioned(legacyscheme.Scheme), o.Out)
+			return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(hpa.Object, hpa.Mapping), o.Out)
 		}
 
 		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, hpa.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
@@ -270,7 +270,7 @@ func (o *AutoscaleOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+		return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, hpa.Mapping), o.Out)
 	})
 	if err != nil {
 		return err

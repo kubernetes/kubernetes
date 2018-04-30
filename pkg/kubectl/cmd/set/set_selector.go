@@ -204,7 +204,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
 		CalculatePatch(patch, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-			versioned := info.AsVersioned(legacyscheme.Scheme)
+			versioned := cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 			patch.Info.Object = versioned
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
 			if selectErr != nil {
@@ -232,7 +232,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-		return o.PrintObj(patch.Info.AsVersioned(legacyscheme.Scheme), o.Out)
+		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, info.Mapping), o.Out)
 	})
 }
 
