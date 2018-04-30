@@ -35,9 +35,9 @@ SHELL := /bin/bash
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_deepcopy gen_defaulter gen_conversion
+generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi
 
-##TH##FIXME  gen_openapi gen_bindata
+##TH##FIXME  gen_bindata
 
 
 #
@@ -394,110 +394,71 @@ $(CONVERSION_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversi
 	touch $@
 
 
-##TH### Open-api generation
-##TH###
-##TH### Any package that wants open-api functions generated must include a
-##TH### comment-tag in column 0 of one file of the form:
-##TH###     // +k8s:openapi-gen=true
-##TH###
-##TH### The result file, in each pkg, of open-api generation.
-##TH##OPENAPI_BASENAME := $(GENERATED_FILE_PREFIX)openapi
-##TH##OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
-##TH##OPENAPI_OUTPUT_PKG := pkg/generated/openapi
-##TH##
-##TH### The tool used to generate open apis.
-##TH##OPENAPI_GEN := $(BIN_DIR)/openapi-gen
-##TH##
-##TH### Find all the directories that request open-api generation.
-##TH##ifeq ($(DBG_MAKEFILE),1)
-##TH##    $(warning ***** finding all +k8s:openapi-gen tags)
-##TH##endif
-##TH##OPENAPI_DIRS := $(shell                                             \
-##TH##    grep --color=never -l '+k8s:openapi-gen=' $(ALL_K8S_TAG_FILES)  \
-##TH##        | xargs -n1 dirname                                         \
-##TH##        | LC_ALL=C sort -u                                          \
-##TH##)
-##TH##
-##TH##OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
-##TH##
-##TH### This rule is the user-friendly entrypoint for openapi generation.
-##TH##.PHONY: gen_openapi
-##TH##gen_openapi: $(OPENAPI_OUTFILE) $(OPENAPI_GEN)
-##TH##
-##TH### For each dir in OPENAPI_DIRS, this establishes a dependency between the
-##TH### output file and the input files that should trigger a rebuild.
-##TH###
-##TH### Note that this is a deps-only statement, not a full rule (see below).  This
-##TH### has to be done in a distinct step because wildcards don't work in static
-##TH### pattern rules.
-##TH###
-##TH### The '$(eval)' is needed because this has a different RHS for each LHS, and
-##TH### would otherwise produce results that make can't parse.
-##TH###
-##TH### We depend on the $(GOFILES_META).stamp to detect when the set of input files
-##TH### has changed.  This allows us to detect deleted input files.
-##TH##$(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
-##TH##    $(OPENAPI_OUTFILE): $(META_DIR)/$(dir)/$(GOFILES_META).stamp           \
-##TH##                                 $(gofiles__$(dir))                        \
-##TH##))
-##TH##
-##TH### How to regenerate open-api code.  This emits a single file for all results.
-##TH##$(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(OPENAPI_GEN)
-##TH##	function run_gen_openapi() {                                                        \
-##TH##	    ./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
-##TH##	        --v $(KUBE_VERBOSE)                                                         \
-##TH##	        --logtostderr                                                               \
-##TH##	        -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
-##TH##	        -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
-##TH##	        -O $(OPENAPI_BASENAME)                                                      \
-##TH##	        "$$@";                                                                      \
-##TH##	};                                                                                  \
-##TH##	run_gen_openapi
-##TH##
-##TH### This calculates the dependencies for the generator tool, so we only rebuild
-##TH### it when needed.  It is PHONY so that it always runs, but it only updates the
-##TH### file if the contents have actually changed.  We 'sinclude' this later.
-##TH##.PHONY: $(META_DIR)/$(OPENAPI_GEN).mk
-##TH##$(META_DIR)/$(OPENAPI_GEN).mk:
-##TH##	mkdir -p $(@D);                                                       \
-##TH##	(echo -n "$(OPENAPI_GEN): ";                                          \
-##TH##	 ./hack/run-in-gopath.sh go list                                      \
-##TH##	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-##TH##	     ./vendor/k8s.io/code-generator/cmd/openapi-gen                   \
-##TH##	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
-##TH##	     | xargs ./hack/run-in-gopath.sh go list                          \
-##TH##	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
-##TH##	     | paste -sd' ' -                                                 \
-##TH##	     | sed 's/ / \\=,/g'                                              \
-##TH##	     | tr '=,' '\n\t'                                                 \
-##TH##	     | sed "s|$$(pwd -P)/||";                                         \
-##TH##	) > $@.tmp;                                                           \
-##TH##	if ! cmp -s $@.tmp $@; then                                           \
-##TH##	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                              \
-##TH##	        echo "DBG: $(OPENAPI_GEN).mk changed";                        \
-##TH##	    fi;                                                               \
-##TH##	    cat $@.tmp > $@;                                                  \
-##TH##	    rm -f $@.tmp;                                                     \
-##TH##	fi
-##TH##
-##TH### Include dependency info for the generator tool.  This will cause the rule of
-##TH### the same name to be considered and if it is updated, make will restart.
-##TH##sinclude $(META_DIR)/$(OPENAPI_GEN).mk
-##TH##
-##TH### How to build the generator tool.  The deps for this are defined in
-##TH### the $(OPENAPI_GEN).mk, above.
-##TH###
-##TH### A word on the need to touch: This rule might trigger if, for example, a
-##TH### non-Go file was added or deleted from a directory on which this depends.
-##TH### This target needs to be reconsidered, but Go realizes it doesn't actually
-##TH### have to be rebuilt.  In that case, make will forever see the dependency as
-##TH### newer than the binary, and try to rebuild it over and over.  So we touch it,
-##TH### and make is happy.
-##TH##$(OPENAPI_GEN):
-##TH##	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/openapi-gen
-##TH##	touch $@
-##TH##
-##TH###
+# OpenAPI generation
+#
+# Any package that wants open-api functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:openapi-gen=true
+#
+# The result file, in each pkg, of open-api generation.
+OPENAPI_BASENAME := $(GENERATED_FILE_PREFIX)openapi
+OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
+OPENAPI_OUTPUT_PKG := pkg/generated/openapi
+
+# The tool used to generate open apis.
+OPENAPI_GEN := $(BIN_DIR)/openapi-gen
+
+# Find all the directories that request open-api generation.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:openapi-gen tags)
+endif
+OPENAPI_DIRS := $(shell                                             \
+    grep --color=never -l '+k8s:openapi-gen=' $(ALL_K8S_TAG_FILES)  \
+        | xargs -n1 dirname                                         \
+        | LC_ALL=C sort -u                                          \
+)
+
+OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
+
+# This rule is the user-friendly entrypoint for openapi generation.
+.PHONY: gen_openapi
+gen_openapi: $(OPENAPI_OUTFILE) $(OPENAPI_GEN)
+
+# For each dir in OPENAPI_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# Note that this is a deps-only statement, not a full rule (see below for that).
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+$(foreach dir, $(OPENAPI_DIRS), $(eval             \
+    $(OPENAPI_OUTFILE): $($(PRJ_SRC_PATH)/$(dir))  \
+))
+
+# How to regenerate open-api code.  This emits a single file for all results.
+$(OPENAPI_OUTFILE): $(OPENAPI_GEN)
+	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
+	    --v $(KUBE_VERBOSE)                                                         \
+	    --logtostderr                                                               \
+	    -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
+	    -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
+	    -O $(OPENAPI_BASENAME)                                                      \
+	    "$$@"
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(GO_PKGDEPS_FILE), above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to "rebuild" it over and over.  So we touch
+# it, and make is happy.
+$(OPENAPI_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/openapi-gen)
+	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/openapi-gen
+	touch $@
+
+
 ##TH### bindata generation
 ##TH###
 ##TH##
