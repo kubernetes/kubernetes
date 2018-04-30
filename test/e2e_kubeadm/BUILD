@@ -1,3 +1,5 @@
+package(default_visibility = ["//visibility:public"])
+
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_test(
@@ -7,6 +9,7 @@ go_test(
         "kubeadm_test.go",
     ],
     embed = [":go_default_library"],
+    tags = ["e2e"],
     deps = [
         "//test/e2e/framework:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
