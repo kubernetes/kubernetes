@@ -2,6 +2,18 @@ package(default_visibility = ["//visibility:public"])
 
 load("@bazel_tools//tools/build_defs/pkg:rpm.bzl", "pkg_rpm")
 
+filegroup(
+    name = "rpms",
+    srcs = [
+        ":kubeadm",
+        ":kubectl",
+        ":kubelet",
+        ":kubernetes-cni",
+    ],
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
 pkg_rpm(
     name = "kubectl",
     architecture = "x86_64",
