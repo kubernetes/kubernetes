@@ -40,6 +40,10 @@ func NewStorage(serverRetriever func() map[string]*Server) *REST {
 	}
 }
 
+func (*REST) NamespaceScoped() bool {
+	return false
+}
+
 func (rs *REST) New() runtime.Object {
 	return &api.ComponentStatus{}
 }

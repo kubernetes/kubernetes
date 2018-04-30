@@ -121,10 +121,6 @@ func (r *TokenREST) GroupVersionKind(containingGV schema.GroupVersion) schema.Gr
 	}
 }
 
-func (*TokenREST) ClusterScoped() bool {
-	return false
-}
-
 type getter interface {
 	Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
 }

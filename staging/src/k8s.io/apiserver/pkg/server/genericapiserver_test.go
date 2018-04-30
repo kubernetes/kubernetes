@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
@@ -416,32 +415,12 @@ func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized auth
 	return authorizer.DecisionAllow, "", nil
 }
 
-type mockAuthenticator struct {
-	lastURI string
-}
-
-func (authn *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	authn.lastURI = req.RequestURI
-	return &user.DefaultInfo{
-		Name: "foo",
-	}, true, nil
-}
-
-func decodeResponse(resp *http.Response, obj interface{}) error {
-	defer resp.Body.Close()
-
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, obj); err != nil {
-		return err
-	}
-	return nil
-}
-
 type testGetterStorage struct {
 	Version string
+}
+
+func (p *testGetterStorage) NamespaceScoped() bool {
+	return true
 }
 
 func (p *testGetterStorage) New() runtime.Object {
@@ -459,6 +438,10 @@ func (p *testGetterStorage) Get(ctx context.Context, name string, options *metav
 
 type testNoVerbsStorage struct {
 	Version string
+}
+
+func (p *testNoVerbsStorage) NamespaceScoped() bool {
+	return true
 }
 
 func (p *testNoVerbsStorage) New() runtime.Object {

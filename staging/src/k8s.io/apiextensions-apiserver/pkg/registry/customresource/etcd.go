@@ -145,10 +145,6 @@ func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.Gr
 	return autoscalingv1.SchemeGroupVersion.WithKind("Scale")
 }
 
-func (*ScaleREST) ClusterScoped() bool {
-	return false
-}
-
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
 	return &autoscalingv1.Scale{}

@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1"
@@ -39,12 +38,6 @@ func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme
 			GroupName:                  core.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: core.AddToScheme,
-			RootScopedKinds: sets.NewString(
-				"Node",
-				"Namespace",
-				"PersistentVolume",
-				"ComponentStatus",
-			),
 		},
 		announced.VersionToSchemeFunc{
 			v1.SchemeGroupVersion.Version: v1.AddToScheme,
