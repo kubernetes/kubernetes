@@ -102,17 +102,11 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		glog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, csiSource.VolumeHandle))
 	}
 
-	// probe for attachment update here
-	// NOTE: any error from waiting for attachment is logged only.  This is because
-	// the primary intent of the enclosing method is to create VolumeAttachment.
-	// DONOT return that error here as it is mitigated in attacher.WaitForAttach.
-	volAttachmentOK := true
 	if _, err := c.waitForVolumeAttachment(csiSource.VolumeHandle, attachID, csiTimeout); err != nil {
-		volAttachmentOK = false
-		glog.Error(log("attacher.Attach attempted to wait for attachment to be ready, but failed with: %v", err))
+		return "", err
 	}
 
-	glog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment verified=%t: attachment object [%s]", volAttachmentOK, attachID))
+	glog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment object [%s]", attachID))
 
 	return attachID, nil
 }
