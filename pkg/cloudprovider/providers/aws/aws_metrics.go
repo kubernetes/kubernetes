@@ -18,23 +18,23 @@ package aws
 
 import "github.com/prometheus/client_golang/prometheus"
 
-var awsApiMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name: "cloudprovider_aws_api_request_duration_seconds",
-		Help: "Latency of aws api call",
-	},
-	[]string{"request"},
-)
+var (
+	awsAPIMetric = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "cloudprovider_aws_api_request_duration_seconds",
+			Help: "Latency of AWS API calls",
+		},
+		[]string{"request"})
 
-var awsApiErrorMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "cloudprovider_aws_api_request_errors",
-		Help: "AWS Api errors",
-	},
-	[]string{"request"},
+	awsAPIErrorMetric = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "cloudprovider_aws_api_request_errors",
+			Help: "AWS API errors",
+		},
+		[]string{"request"})
 )
 
 func registerMetrics() {
-	prometheus.MustRegister(awsApiMetric)
-	prometheus.MustRegister(awsApiErrorMetric)
+	prometheus.MustRegister(awsAPIMetric)
+	prometheus.MustRegister(awsAPIErrorMetric)
 }

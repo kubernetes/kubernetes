@@ -754,7 +754,7 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 	for {
 		response, err := s.ec2.DescribeInstances(request)
 		if err != nil {
-			recordAwsMetric("describe_instance", 0, err)
+			recordAWSMetric("describe_instance", 0, err)
 			return nil, fmt.Errorf("error listing AWS instances: %q", err)
 		}
 
@@ -769,7 +769,7 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 		request.NextToken = nextToken
 	}
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("describe_instance", timeTaken, nil)
+	recordAWSMetric("describe_instance", timeTaken, nil)
 	return results, nil
 }
 
@@ -787,7 +787,7 @@ func (s *awsSdkEC2) AttachVolume(request *ec2.AttachVolumeInput) (*ec2.VolumeAtt
 	requestTime := time.Now()
 	resp, err := s.ec2.AttachVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("attach_volume", timeTaken, err)
+	recordAWSMetric("attach_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -795,7 +795,7 @@ func (s *awsSdkEC2) DetachVolume(request *ec2.DetachVolumeInput) (*ec2.VolumeAtt
 	requestTime := time.Now()
 	resp, err := s.ec2.DetachVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("detach_volume", timeTaken, err)
+	recordAWSMetric("detach_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -808,7 +808,7 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 		response, err := s.ec2.DescribeVolumes(request)
 
 		if err != nil {
-			recordAwsMetric("describe_volume", 0, err)
+			recordAWSMetric("describe_volume", 0, err)
 			return nil, err
 		}
 
@@ -821,7 +821,7 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 		request.NextToken = nextToken
 	}
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("describe_volume", timeTaken, nil)
+	recordAWSMetric("describe_volume", timeTaken, nil)
 	return results, nil
 }
 
@@ -829,7 +829,7 @@ func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (*ec2.Volume, e
 	requestTime := time.Now()
 	resp, err := s.ec2.CreateVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("create_volume", timeTaken, err)
+	recordAWSMetric("create_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -837,7 +837,7 @@ func (s *awsSdkEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (*ec2.DeleteVol
 	requestTime := time.Now()
 	resp, err := s.ec2.DeleteVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("delete_volume", timeTaken, err)
+	recordAWSMetric("delete_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -845,7 +845,7 @@ func (s *awsSdkEC2) ModifyVolume(request *ec2.ModifyVolumeInput) (*ec2.ModifyVol
 	requestTime := time.Now()
 	resp, err := s.ec2.ModifyVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("modify_volume", timeTaken, err)
+	recordAWSMetric("modify_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -856,7 +856,7 @@ func (s *awsSdkEC2) DescribeVolumeModifications(request *ec2.DescribeVolumesModi
 	for {
 		resp, err := s.ec2.DescribeVolumesModifications(request)
 		if err != nil {
-			recordAwsMetric("describe_volume_modification", 0, err)
+			recordAWSMetric("describe_volume_modification", 0, err)
 			return nil, fmt.Errorf("error listing volume modifictions : %v", err)
 		}
 		results = append(results, resp.VolumesModifications...)
@@ -867,7 +867,7 @@ func (s *awsSdkEC2) DescribeVolumeModifications(request *ec2.DescribeVolumesModi
 		request.NextToken = nextToken
 	}
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("describe_volume_modification", timeTaken, nil)
+	recordAWSMetric("describe_volume_modification", timeTaken, nil)
 	return results, nil
 }
 
@@ -900,7 +900,7 @@ func (s *awsSdkEC2) CreateTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOut
 	requestTime := time.Now()
 	resp, err := s.ec2.CreateTags(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("create_tags", timeTaken, err)
+	recordAWSMetric("create_tags", timeTaken, err)
 	return resp, err
 }
 
@@ -4334,11 +4334,11 @@ func setNodeDisk(
 	volumeMap[volumeID] = check
 }
 
-func recordAwsMetric(actionName string, timeTaken float64, err error) {
+func recordAWSMetric(actionName string, timeTaken float64, err error) {
 	if err != nil {
-		awsApiErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
+		awsAPIErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
 	} else {
-		awsApiMetric.With(prometheus.Labels{"request": actionName}).Observe(timeTaken)
+		awsAPIMetric.With(prometheus.Labels{"request": actionName}).Observe(timeTaken)
 	}
 
 }
