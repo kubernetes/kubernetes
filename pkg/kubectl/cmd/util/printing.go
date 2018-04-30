@@ -245,7 +245,7 @@ func SuggestApiResources(parent string) string {
 func ValidArgList(f ClientAccessFactory) []string {
 	validArgs := []string{}
 
-	humanReadablePrinter := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
+	humanReadablePrinter := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	printersinternal.AddHandlers(humanReadablePrinter)
 	validArgs = humanReadablePrinter.HandledResources()
 

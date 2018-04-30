@@ -71,11 +71,10 @@ var _ PrintHandler = &HumanReadablePrinter{}
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
 // If encoder and decoder are provided, an attempt to convert unstructured types to internal types is made.
-func NewHumanReadablePrinter(encoder runtime.Encoder, decoder runtime.Decoder, options PrintOptions) *HumanReadablePrinter {
+func NewHumanReadablePrinter(decoder runtime.Decoder, options PrintOptions) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 		options:    options,
-		encoder:    encoder,
 		decoder:    decoder,
 	}
 	return printer
@@ -297,7 +296,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand before
 	// trying to print, since the printers are keyed by type. This is extremely expensive.
-	if h.encoder != nil && h.decoder != nil {
+	if h.decoder != nil {
 		obj, _ = decodeUnknownObject(obj, h.decoder)
 	}
 

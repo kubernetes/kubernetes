@@ -296,7 +296,8 @@ func (o *RollingUpdateOptions) Run() error {
 
 		uncastVersionedObj, err := legacyscheme.Scheme.ConvertToVersion(infos[0].Object, v1.SchemeGroupVersion)
 		if err != nil {
-			return err
+			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
+			return fmt.Errorf("%s contains a %v not a ReplicationController", filename, infos[0].Object.GetObjectKind().GroupVersionKind())
 		}
 		switch t := uncastVersionedObj.(type) {
 		case *v1.ReplicationController:

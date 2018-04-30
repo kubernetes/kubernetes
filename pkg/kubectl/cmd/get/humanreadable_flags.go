@@ -66,7 +66,6 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		return nil, printers.NoCompatiblePrinterError{Options: f}
 	}
 
-	encoder := scheme.Codecs.LegacyCodec(scheme.Registry.RegisteredGroupVersions()...)
 	decoder := scheme.Codecs.UniversalDecoder()
 
 	showKind := false
@@ -84,7 +83,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		columnLabels = *f.ColumnLabels
 	}
 
-	p := printers.NewHumanReadablePrinter(encoder, decoder, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(decoder, printers.PrintOptions{
 		Kind:          f.Kind,
 		WithKind:      showKind,
 		NoHeaders:     f.NoHeaders,
