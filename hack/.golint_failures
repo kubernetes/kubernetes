@@ -1,3 +1,4 @@
+
 cluster/images/etcd-version-monitor
 cmd/hyperkube
 cmd/kube-apiserver/app
@@ -695,6 +696,7 @@ test/e2e/ui
 test/e2e/upgrades
 test/e2e/upgrades/apps
 test/e2e/upgrades/storage
+test/e2e_kubeadm
 test/e2e_node
 test/e2e_node/builder
 test/e2e_node/environment
