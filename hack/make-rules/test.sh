@@ -57,6 +57,7 @@ kube::test::find_dirs() {
           -o -path './target/*' \
           -o -path './test/e2e/*' \
           -o -path './test/e2e_node/*' \
+          -o -path './test/e2e_kubeadm/*' \
           -o -path './test/integration/*' \
           -o -path './third_party/*' \
           -o -path './staging/*' \
