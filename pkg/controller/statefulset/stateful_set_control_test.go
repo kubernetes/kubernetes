@@ -125,8 +125,8 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if set.Status.Replicas != 3 {
-		t.Error("Failed to scale statefulset to 3 replicas")
+	if e, a := int32(3), set.Status.Replicas; e != a {
+		t.Errorf("Expected to scale Statefulset to %d, got %d", e, a)
 	}
 }
 
@@ -147,8 +147,8 @@ func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if set.Status.Replicas != 4 {
-		t.Error("Failed to scale statefulset to 4 replicas")
+	if e, a := int32(4), set.Status.Replicas; e != a {
+		t.Errorf("Expected to scale Statefulset to %d, got %d", e, a)
 	}
 }
 
@@ -164,8 +164,8 @@ func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	if err := scaleDownStatefulSetControl(set, ssc, spc, invariants); err != nil {
 		t.Errorf("Failed to scale StatefulSet : %s", err)
 	}
-	if set.Status.Replicas != 0 {
-		t.Error("Failed to scale statefulset to 0 replicas")
+	if e, a := int32(0), set.Status.Replicas; e != a {
+		t.Errorf("Expected to scale Statefulset to %d, got %d", e, a)
 	}
 }
 
@@ -182,8 +182,8 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if set.Status.Replicas != 5 {
-		t.Error("Failed to scale statefulset to 5 replicas")
+	if e, a := int32(5), set.Status.Replicas; e != a {
+		t.Errorf("Expected to scale Statefulset to %d, got %d", e, a)
 	}
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
@@ -235,7 +235,7 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
 	if e, a := int32(5), set.Status.Replicas; e != a {
-		t.Errorf("Expected to scale to %d, got %d", e, a)
+		t.Errorf("Expected to scale Statefulset to %d, got %d", e, a)
 	}
 }
 
@@ -295,8 +295,8 @@ func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if set.Status.Replicas != 3 {
-		t.Error("Failed to scale StatefulSet to 3 replicas")
+	if e, a := int32(3), set.Status.Replicas; e != a {
+		t.Errorf("Expected to scale Statefulset to %d, got %d", e, a)
 	}
 }
 
@@ -315,10 +315,9 @@ func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if set.Status.Replicas != 3 {
-		t.Error("Failed to scale StatefulSet to 3 replicas")
+	if e, a := int32(3), set.Status.Replicas; e != a {
+		t.Errorf("Expected to scale Statefulset to %d, got %d", e, a)
 	}
-
 	// now mutate a pod's identity
 	pods, err := spc.podsLister.List(labels.Everything())
 	if err != nil {
@@ -354,8 +353,8 @@ func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants inva
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if set.Status.Replicas != 3 {
-		t.Error("Failed to scale StatefulSet to 3 replicas")
+	if e, a := int32(3), set.Status.Replicas; e != a {
+		t.Errorf("Expected to scale Statefulset to %d, got %d", e, a)
 	}
 }
 
@@ -433,8 +432,8 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if set.Status.Replicas != 0 {
-		t.Error("Failed to scale statefulset to 0 replicas")
+	if e, a := int32(0), set.Status.Replicas; e != a {
+		t.Errorf("Expected to scale Statefulset to %d, got %d", e, a)
 	}
 }
 
