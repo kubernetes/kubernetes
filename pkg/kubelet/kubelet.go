@@ -93,6 +93,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
@@ -775,6 +776,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if err != nil {
 		return nil, err
 	}
+	klet.pluginWatcher = pluginwatcher.NewWatcher(klet.getPluginsDir())
 
 	// If the experimentalMounterPathFlag is set, we do not want to
 	// check node capabilities since the mount path is not the default
@@ -1150,6 +1152,11 @@ type Kubelet struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	keepTerminatedPodVolumes bool // DEPRECATED
+
+	// pluginwatcher is a utility for Kubelet to register different types of node-level plugins
+	// such as device plugins or CSI plugins. It discovers plugins by monitoring inotify events under the
+	// directory returned by kubelet.getPluginsDir()
+	pluginWatcher pluginwatcher.Watcher
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1262,6 +1269,11 @@ func (kl *Kubelet) initializeModules() error {
 		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
 			glog.Errorf("Failed to create directory %q: %v", ContainerLogsDir, err)
 		}
+	}
+
+	// Start the plugin watcher
+	if err := kl.pluginWatcher.Start(); err != nil {
+		return fmt.Errorf("failed to start Plugin Watcher. err: %v", err)
 	}
 
 	// Start the image manager.
