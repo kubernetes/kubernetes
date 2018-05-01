@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
@@ -346,6 +347,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		resourceKind = kind
 	}
 
+	openAPIResourceSource := openapi.NewResourceSource(a.group.OpenAPISpecSource, fqKindToRegister)
+
 	tableProvider, _ := storage.(rest.TableConvertor)
 
 	var apiResource metav1.APIResource
@@ -474,13 +477,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	kubeVerbs := map[string]struct{}{}
 	reqScope := handlers.RequestScope{
-		Serializer:      a.group.Serializer,
-		ParameterCodec:  a.group.ParameterCodec,
-		Creater:         a.group.Creater,
-		Convertor:       a.group.Convertor,
-		Defaulter:       a.group.Defaulter,
-		Typer:           a.group.Typer,
-		UnsafeConvertor: a.group.UnsafeConvertor,
+		Serializer:            a.group.Serializer,
+		ParameterCodec:        a.group.ParameterCodec,
+		Creater:               a.group.Creater,
+		Convertor:             a.group.Convertor,
+		Defaulter:             a.group.Defaulter,
+		Typer:                 a.group.Typer,
+		UnsafeConvertor:       a.group.UnsafeConvertor,
+		OpenAPIResourceSource: openAPIResourceSource,
 
 		// TODO: Check for the interface on storage
 		TableConvertor: tableProvider,
