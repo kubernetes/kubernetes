@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -67,6 +68,8 @@ func ActiveDNSAddon(featureGates map[string]bool) string {
 type ClusterState struct {
 	// KubeVersion describes the version of the Kubernetes API Server, Controller Manager, Scheduler and Proxy.
 	KubeVersion string
+	// DNSType
+	DNSType string
 	// DNSVersion describes the version of the kube-dns images used and manifest version
 	DNSVersion string
 	// KubeadmVersion describes the version of the kubeadm CLI
@@ -79,7 +82,7 @@ type ClusterState struct {
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, etcdClient etcdutil.ClusterInterrogator, featureGates map[string]bool) ([]Upgrade, error) {
+func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, etcdClient etcdutil.ClusterInterrogator, featureGates map[string]bool, client clientset.Interface) ([]Upgrade, error) {
 	fmt.Println("[upgrade] Fetching available versions to upgrade to")
 
 	// Collect the upgrades kubeadm can do in this list
@@ -117,10 +120,16 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		return upgrades, err
 	}
 
+	dnsType, dnsVersion, err := dns.DeployedDNSAddon(client)
+	if err != nil {
+		return nil, err
+	}
+
 	// Construct a descriptor for the current state of the world
 	beforeState := ClusterState{
 		KubeVersion:     clusterVersionStr,
-		DNSVersion:      dns.GetDNSVersion(clusterVersion, ActiveDNSAddon(featureGates)),
+		DNSType:         dnsType,
+		DNSVersion:      dnsVersion,
 		KubeadmVersion:  kubeadmVersionStr,
 		KubeletVersions: kubeletVersions,
 		EtcdVersion:     etcdVersion,
@@ -163,6 +172,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 					Before:      beforeState,
 					After: ClusterState{
 						KubeVersion:    patchVersionStr,
+						DNSType:        ActiveDNSAddon(featureGates),
 						DNSVersion:     dns.GetDNSVersion(patchVersion, ActiveDNSAddon(featureGates)),
 						KubeadmVersion: newKubeadmVer,
 						EtcdVersion:    getSuggestedEtcdVersion(patchVersionStr),
@@ -179,6 +189,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			Before:      beforeState,
 			After: ClusterState{
 				KubeVersion:    stableVersionStr,
+				DNSType:        ActiveDNSAddon(featureGates),
 				DNSVersion:     dns.GetDNSVersion(stableVersion, ActiveDNSAddon(featureGates)),
 				KubeadmVersion: stableVersionStr,
 				EtcdVersion:    getSuggestedEtcdVersion(stableVersionStr),
@@ -224,6 +235,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				Before:      beforeState,
 				After: ClusterState{
 					KubeVersion:    previousBranchLatestVersionStr,
+					DNSType:        ActiveDNSAddon(featureGates),
 					DNSVersion:     dns.GetDNSVersion(previousBranchLatestVersion, ActiveDNSAddon(featureGates)),
 					KubeadmVersion: previousBranchLatestVersionStr,
 					EtcdVersion:    getSuggestedEtcdVersion(previousBranchLatestVersionStr),
@@ -250,6 +262,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				Before:      beforeState,
 				After: ClusterState{
 					KubeVersion:    unstableKubeVersion,
+					DNSType:        ActiveDNSAddon(featureGates),
 					DNSVersion:     unstableKubeDNSVersion,
 					KubeadmVersion: unstableKubeVersion,
 					EtcdVersion:    getSuggestedEtcdVersion(unstableKubeVersion),

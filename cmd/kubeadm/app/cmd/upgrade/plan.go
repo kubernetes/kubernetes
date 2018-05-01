@@ -29,7 +29,6 @@ import (
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -120,19 +119,19 @@ func RunPlan(flags *planFlags) error {
 
 	// Compute which upgrade possibilities there are
 	glog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.parent.allowExperimentalUpgrades, flags.parent.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.parent.allowExperimentalUpgrades, flags.parent.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates, upgradeVars.client)
 	if err != nil {
 		return fmt.Errorf("[upgrade/versions] FATAL: %v", err)
 	}
 
 	// Tell the user which upgrades are available
-	printAvailableUpgrades(availUpgrades, os.Stdout, upgradeVars.cfg.FeatureGates, isExternalEtcd)
+	printAvailableUpgrades(availUpgrades, os.Stdout, isExternalEtcd)
 	return nil
 }
 
 // printAvailableUpgrades prints a UX-friendly overview of what versions are available to upgrade to
 // TODO look into columnize or some other formatter when time permits instead of using the tabwriter
-func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, featureGates map[string]bool, isExternalEtcd bool) {
+func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalEtcd bool) {
 
 	// Return quickly if no upgrades can be made
 	if len(upgrades) == 0 {
@@ -184,11 +183,37 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, featureGate
 		fmt.Fprintf(tabw, "Controller Manager\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
 		fmt.Fprintf(tabw, "Scheduler\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
 		fmt.Fprintf(tabw, "Kube Proxy\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
-		if features.Enabled(featureGates, features.CoreDNS) {
-			fmt.Fprintf(tabw, "CoreDNS\t%s\t%s\n", upgrade.Before.DNSVersion, upgrade.After.DNSVersion)
-		} else {
-			fmt.Fprintf(tabw, "Kube DNS\t%s\t%s\n", upgrade.Before.DNSVersion, upgrade.After.DNSVersion)
+
+		// TODO There is currently no way to cleanly output upgrades that involve adding, removing, or changing components
+		// https://github.com/kubernetes/kubeadm/issues/810 was created to track addressing this.
+		printCoreDNS, printKubeDNS := false, false
+		coreDNSBeforeVersion, coreDNSAfterVersion, kubeDNSBeforeVersion, kubeDNSAfterVersion := "", "", "", ""
+
+		switch upgrade.Before.DNSType {
+		case constants.CoreDNS:
+			printCoreDNS = true
+			coreDNSBeforeVersion = upgrade.Before.DNSVersion
+		case constants.KubeDNS:
+			printKubeDNS = true
+			kubeDNSBeforeVersion = upgrade.Before.DNSVersion
 		}
+
+		switch upgrade.After.DNSType {
+		case constants.CoreDNS:
+			printCoreDNS = true
+			coreDNSAfterVersion = upgrade.After.DNSVersion
+		case constants.KubeDNS:
+			printKubeDNS = true
+			kubeDNSAfterVersion = upgrade.After.DNSVersion
+		}
+
+		if printCoreDNS {
+			fmt.Fprintf(tabw, "CoreDNS\t%s\t%s\n", coreDNSBeforeVersion, coreDNSAfterVersion)
+		}
+		if printKubeDNS {
+			fmt.Fprintf(tabw, "Kube DNS\t%s\t%s\n", kubeDNSBeforeVersion, kubeDNSAfterVersion)
+		}
+
 		if !isExternalEtcd {
 			fmt.Fprintf(tabw, "Etcd\t%s\t%s\n", upgrade.Before.EtcdVersion, upgrade.After.EtcdVersion)
 		}
