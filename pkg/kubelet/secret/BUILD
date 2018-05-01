@@ -8,7 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["secret_manager_test.go"],
+    srcs = ["caching_secret_manager_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
@@ -25,6 +25,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "caching_secret_manager.go",
         "fake_manager.go",
         "secret_manager.go",
     ],
