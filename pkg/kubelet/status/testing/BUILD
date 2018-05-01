@@ -7,7 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["fake_pod_deletion_safety.go"],
+    srcs = [
+        "fake_pod_deletion_safety.go",
+        "fake_pod_try_cleanup.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/status/testing",
     deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )

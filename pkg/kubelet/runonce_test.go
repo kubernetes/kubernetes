@@ -75,7 +75,7 @@ func TestRunOnce(t *testing.T) {
 		recorder:         &record.FakeRecorder{},
 		cadvisor:         cadvisor,
 		nodeInfo:         testNodeInfo{},
-		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
+		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}, &statustest.FakePodTryCleanupResourcesProvider{}),
 		podManager:       podManager,
 		os:               &containertest.FakeOS{},
 		containerRuntime: fakeRuntime,
