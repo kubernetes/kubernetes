@@ -468,7 +468,6 @@ func podFitsOnNode(
 		eCacheAvailable  bool
 		failedPredicates []algorithm.PredicateFailureReason
 	)
-	predicateResults := make(map[string]HostPredicate)
 
 	podsAdded := false
 	// We run predicates twice in some cases. If the node has greater or equal priority
@@ -509,48 +508,11 @@ func podFitsOnNode(
 			)
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
-				// Use an in-line function to guarantee invocation of ecache.Unlock()
-				// when the in-line function returns.
-				func() {
-					var invalid bool
-					if eCacheAvailable {
-						// Lock ecache here to avoid a race condition against cache invalidation invoked
-						// in event handlers. This race has existed despite locks in equivClassCacheimplementation.
-						ecache.Lock()
-						defer ecache.Unlock()
-						// PredicateWithECache will return its cached predicate results.
-						fit, reasons, invalid = ecache.PredicateWithECache(
-							pod.GetName(), info.Node().GetName(),
-							predicateKey, equivCacheInfo.hash, false)
-					}
-
-					if !eCacheAvailable || invalid {
-						// we need to execute predicate functions since equivalence cache does not work
-						fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
-						if err != nil {
-							return
-						}
-
-						if eCacheAvailable {
-							// Store data to update equivClassCacheafter this loop.
-							if res, exists := predicateResults[predicateKey]; exists {
-								res.Fit = res.Fit && fit
-								res.FailReasons = append(res.FailReasons, reasons...)
-								predicateResults[predicateKey] = res
-							} else {
-								predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
-							}
-							// Skip update if NodeInfo is stale.
-							if cache != nil && cache.IsUpToDate(info) {
-								result := predicateResults[predicateKey]
-								ecache.UpdateCachedPredicateItem(
-									pod.GetName(), info.Node().GetName(),
-									predicateKey, result.Fit, result.FailReasons, equivCacheInfo.hash, false)
-							}
-						}
-					}
-				}()
-
+				if eCacheAvailable {
+					fit, reasons, err = ecache.RunPredicate(predicate, predicateKey, pod, metaToUse, nodeInfoToUse, equivCacheInfo, cache)
+				} else {
+					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
+				}
 				if err != nil {
 					return false, []algorithm.PredicateFailureReason{}, err
 				}
