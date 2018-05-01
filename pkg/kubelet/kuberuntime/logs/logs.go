@@ -25,6 +25,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/pkg/jsonlog"
@@ -357,6 +358,10 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
 	s, err := r.ContainerStatus(id)
 	if err != nil {
+		// TODO: CRI needs to return typed errors to avoid this hack
+		if strings.Contains(err.Error(), "No such container") {
+			return false, nil
+		}
 		return false, err
 	}
 	// Only keep following container log when it is running.
@@ -372,7 +377,7 @@ func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
 // waitLogs wait for the next log write. It returns a boolean and an error. The boolean
 // indicates whether a new log is found; the error is error happens during waiting new logs.
 func waitLogs(id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, error) {
-	// no need to wait if the pod is not running
+	// no need to wait if the container is not running
 	if running, err := isContainerRunning(id, runtimeService); !running {
 		return false, err
 	}
