@@ -523,7 +523,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 					t.Logf("unable to get mapping for %s: %v", gk.String(), err)
 					continue
 				}
-				groupResource := schema.GroupResource{Group: mapping.GroupVersionKind.Group, Resource: mapping.Resource}
+				groupResource := mapping.Resource.GroupResource()
 
 				if getForAction.GetResource().Resource == groupResource.String() {
 					matchedTarget = &tc.metricsTarget[i]

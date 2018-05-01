@@ -461,7 +461,7 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 			Internal(legacyscheme.Scheme).
 			ContinueOnError().
 			NamespaceParam(namespace).DefaultNamespace().
-			ResourceNames(obj.Mapping.Resource, name).
+			ResourceNames(obj.Mapping.Resource.Resource+"."+obj.Mapping.Resource.Group, name).
 			Flatten().
 			Do()
 		// Note: we pass in "true" for the "quiet" parameter because

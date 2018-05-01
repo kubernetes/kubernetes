@@ -161,7 +161,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				if err != nil {
 					return true, nil, fmt.Errorf("unable to get mapping for %s: %v", gk.String(), err)
 				}
-				groupResource := schema.GroupResource{Group: mapping.GroupVersionKind.Group, Resource: mapping.Resource}
+				groupResource := mapping.Resource.GroupResource()
 
 				assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
 				assert.Equal(t, tc.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")

@@ -576,31 +576,6 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	return
 }
 
-// MustPrintWithKinds determines if printer is dealing
-// with multiple resource kinds, in which case it will
-// return true, indicating resource kind will be
-// included as part of printer output
-func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort) bool {
-	var lastMap *meta.RESTMapping
-
-	for ix := range objs {
-		var mapping *meta.RESTMapping
-		if sorter != nil {
-			mapping = infos[sorter.OriginalPosition(ix)].Mapping
-		} else {
-			mapping = infos[ix].Mapping
-		}
-
-		// display "kind" only if we have mixed resources
-		if lastMap != nil && mapping.Resource != lastMap.Resource {
-			return true
-		}
-		lastMap = mapping
-	}
-
-	return false
-}
-
 // IsSiblingCommandExists receives a pointer to a cobra command and a target string.
 // Returns true if the target string is found in the list of sibling commands.
 func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
