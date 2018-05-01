@@ -34,6 +34,7 @@ import (
 	"github.com/pborman/uuid"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/openapi"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
@@ -58,6 +59,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	utildownloader "k8s.io/apiserver/pkg/util/downloader"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -526,6 +528,13 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 
 	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
+
+	// This downloader will only get the OpenAPI spec for the types that this server actually serves
+	// and not any delegates, because the handler registered at routes.OpenAPIv2Path serves a spec that
+	// is built from s.Handler.GoRestfulContainer, which only knows about the APIs registered to this server.
+	specDownloader := utildownloader.NewHandlerDownloader(s.UnprotectedHandler(), routes.OpenAPIv2Path, openapi.ContentTypePBv2)
+	specParser := openapi.NewParserPBv2()
+	s.openAPISpecSource = openapi.NewSpecCacher(specDownloader, specParser)
 
 	installAPI(s, c.Config)
 

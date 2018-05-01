@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -118,6 +119,10 @@ type GenericAPIServer struct {
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	swaggerConfig *swagger.Config
 	openAPIConfig *openapicommon.Config
+
+	// openAPISpecSource stores a cached copy of the OpenAPI spec, if one exists, which is concurrently
+	// accessed by api handlers. If Get returns an error, the spec has not been generated yet.
+	openAPISpecSource openapi.SpecSource
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guarantee of ordering between them.  The map key is a name used for error reporting.
@@ -415,15 +420,16 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		GroupVersion:     groupVersion,
 		MetaGroupVersion: apiGroupInfo.MetaGroupVersion,
 
-		ParameterCodec:  apiGroupInfo.ParameterCodec,
-		Serializer:      apiGroupInfo.NegotiatedSerializer,
-		Creater:         apiGroupInfo.Scheme,
-		Convertor:       apiGroupInfo.Scheme,
-		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
-		Defaulter:       apiGroupInfo.Scheme,
-		Typer:           apiGroupInfo.Scheme,
-		Linker:          apiGroupInfo.GroupMeta.SelfLinker,
-		Mapper:          apiGroupInfo.GroupMeta.RESTMapper,
+		ParameterCodec:    apiGroupInfo.ParameterCodec,
+		Serializer:        apiGroupInfo.NegotiatedSerializer,
+		Creater:           apiGroupInfo.Scheme,
+		Convertor:         apiGroupInfo.Scheme,
+		UnsafeConvertor:   runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
+		Defaulter:         apiGroupInfo.Scheme,
+		Typer:             apiGroupInfo.Scheme,
+		Linker:            apiGroupInfo.GroupMeta.SelfLinker,
+		Mapper:            apiGroupInfo.GroupMeta.RESTMapper,
+		OpenAPISpecSource: s.openAPISpecSource,
 
 		Admit:                        s.admissionControl,
 		MinRequestTimeout:            s.minRequestTimeout,
