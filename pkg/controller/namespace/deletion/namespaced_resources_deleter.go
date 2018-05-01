@@ -342,7 +342,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 	// namespace itself.
 	background := metav1.DeletePropagationBackground
 	opts := &metav1.DeleteOptions{PropagationPolicy: &background}
-	err := d.dynamicClient.NamespacedResource(gvr, namespace).DeleteCollection(opts, metav1.ListOptions{})
+	err := d.dynamicClient.Resource(gvr).Namespace(namespace).DeleteCollection(opts, metav1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -378,7 +378,7 @@ func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResou
 		return nil, false, nil
 	}
 
-	unstructuredList, err := d.dynamicClient.NamespacedResource(gvr, namespace).List(metav1.ListOptions{IncludeUninitialized: true})
+	unstructuredList, err := d.dynamicClient.Resource(gvr).Namespace(namespace).List(metav1.ListOptions{IncludeUninitialized: true})
 	if err == nil {
 		return unstructuredList, true, nil
 	}
@@ -412,7 +412,7 @@ func (d *namespacedResourcesDeleter) deleteEachItem(gvr schema.GroupVersionResou
 	for _, item := range unstructuredList.Items {
 		background := metav1.DeletePropagationBackground
 		opts := &metav1.DeleteOptions{PropagationPolicy: &background}
-		if err = d.dynamicClient.NamespacedResource(gvr, namespace).Delete(item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+		if err = d.dynamicClient.Resource(gvr).Namespace(namespace).Delete(item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}

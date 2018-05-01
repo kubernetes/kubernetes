@@ -83,7 +83,7 @@ func CreateTestCRD(f *Framework) (*TestCrd, error) {
 	}
 
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
-	resourceClient := dynamicClient.NamespacedResource(gvr, f.Namespace.Name)
+	resourceClient := dynamicClient.Resource(gvr).Namespace(f.Namespace.Name)
 
 	testcrd.ApiExtensionClient = apiExtensionClient
 	testcrd.Crd = crd

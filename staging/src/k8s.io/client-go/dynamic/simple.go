@@ -32,8 +32,7 @@ import (
 )
 
 type DynamicInterface interface {
-	ClusterResource(resource schema.GroupVersionResource) DynamicResourceInterface
-	NamespacedResource(resource schema.GroupVersionResource, namespace string) DynamicResourceInterface
+	Resource(resource schema.GroupVersionResource) NamespaceableDynamicResourceInterface
 
 	// Deprecated, this isn't how we want to do it
 	ClusterSubresource(resource schema.GroupVersionResource, subresource string) DynamicResourceInterface
@@ -51,6 +50,11 @@ type DynamicResourceInterface interface {
 	List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*unstructured.Unstructured, error)
+}
+
+type NamespaceableDynamicResourceInterface interface {
+	Namespace(string) DynamicResourceInterface
+	DynamicResourceInterface
 }
 
 type dynamicClient struct {
@@ -86,11 +90,8 @@ type dynamicResourceClient struct {
 	subresource string
 }
 
-func (c *dynamicClient) ClusterResource(resource schema.GroupVersionResource) DynamicResourceInterface {
+func (c *dynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableDynamicResourceInterface {
 	return &dynamicResourceClient{client: c, resource: resource}
-}
-func (c *dynamicClient) NamespacedResource(resource schema.GroupVersionResource, namespace string) DynamicResourceInterface {
-	return &dynamicResourceClient{client: c, resource: resource, namespace: namespace}
 }
 
 func (c *dynamicClient) ClusterSubresource(resource schema.GroupVersionResource, subresource string) DynamicResourceInterface {
@@ -98,6 +99,12 @@ func (c *dynamicClient) ClusterSubresource(resource schema.GroupVersionResource,
 }
 func (c *dynamicClient) NamespacedSubresource(resource schema.GroupVersionResource, subresource, namespace string) DynamicResourceInterface {
 	return &dynamicResourceClient{client: c, resource: resource, namespace: namespace, subresource: subresource}
+}
+
+func (c *dynamicResourceClient) Namespace(ns string) DynamicResourceInterface {
+	ret := *c
+	ret.namespace = ns
+	return &ret
 }
 
 func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {

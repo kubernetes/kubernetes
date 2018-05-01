@@ -391,7 +391,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	if !ok {
 		framework.Failf("could not find group version resource for dynamic client and wardle/flunders.")
 	}
-	dynamicClient := f.DynamicClient.NamespacedResource(gvr, namespace)
+	dynamicClient := f.DynamicClient.Resource(gvr).Namespace(namespace)
 
 	// kubectl create -f flunders-1.yaml
 	// Request Body: {"apiVersion":"wardle.k8s.io/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}
