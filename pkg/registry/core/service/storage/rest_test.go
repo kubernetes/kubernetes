@@ -65,6 +65,10 @@ type serviceStorage struct {
 	Err                error
 }
 
+func (s *serviceStorage) NamespaceScoped() bool {
+	return true
+}
+
 func (s *serviceStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	s.GottenID = name
 	return s.Service, s.Err

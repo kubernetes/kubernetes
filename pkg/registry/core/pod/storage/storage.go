@@ -127,6 +127,11 @@ type BindingREST struct {
 	store *genericregistry.Store
 }
 
+// NamespaceScoped fulfill rest.Scoper
+func (r *BindingREST) NamespaceScoped() bool {
+	return r.store.NamespaceScoped()
+}
+
 // New creates a new binding resource
 func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}

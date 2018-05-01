@@ -46,8 +46,6 @@ type GroupMetaFactoryArgs struct {
 	// example: 'servicecatalog.k8s.io'
 	GroupName              string
 	VersionPreferenceOrder []string
-	// RootScopedKinds are resources that are not namespaced.
-	RootScopedKinds sets.String // nil is allowed
 
 	// May be nil if there are no internal objects.
 	AddInternalObjectsToScheme SchemeFunc
@@ -149,8 +147,7 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, sche
 	}
 
 	groupMeta := &apimachinery.GroupMeta{
-		GroupVersions:   externalVersions,
-		RootScopedKinds: gmf.GroupArgs.RootScopedKinds,
+		GroupVersions: externalVersions,
 	}
 
 	if err := m.RegisterGroup(*groupMeta); err != nil {
