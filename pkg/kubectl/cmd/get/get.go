@@ -109,6 +109,9 @@ var (
 		# List a single replication controller with specified NAME in ps output format.
 		kubectl get replicationcontroller web
 
+		# List deployments in JSON output format, in the "v1" version of the "apps" API group:
+		kubectl get deployments.v1.apps -o json
+
 		# List a single pod in JSON output format.
 		kubectl get -o json pod web-pod-13je7
 
@@ -122,10 +125,7 @@ var (
 		kubectl get rc,services
 
 		# List one or more resources by their type and names.
-		kubectl get rc/web service/frontend pods/web-pod-13je7
-
-		# List all resources with different types.
-		kubectl get all`))
+		kubectl get rc/web service/frontend pods/web-pod-13je7`))
 )
 
 const (
@@ -151,7 +151,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
-		Use: "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
+		Use: "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE[.VERSION][.GROUP] [NAME | -l label] | TYPE[.VERSION][.GROUP]/NAME ...) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Display one or many resources"),
 		Long:    getLong + "\n\n" + cmdutil.SuggestApiResources(parent),
