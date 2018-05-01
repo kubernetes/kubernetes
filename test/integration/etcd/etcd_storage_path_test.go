@@ -588,10 +588,9 @@ func TestEtcdStoragePath(t *testing.T) {
 			continue
 		}
 
-		gvResource := gvk.GroupVersion().WithResource(mapping.Resource)
-		etcdSeen[gvResource] = empty{}
+		etcdSeen[mapping.Resource] = empty{}
 
-		testData, hasTest := etcdStorageData[gvResource]
+		testData, hasTest := etcdStorageData[mapping.Resource]
 
 		if !hasTest {
 			t.Errorf("no test data for %s from %s.  Please add a test for your new type to etcdStorageData.", kind, pkgPath)
@@ -659,7 +658,7 @@ func TestEtcdStoragePath(t *testing.T) {
 			}
 
 			addGVKToEtcdBucket(cohabitatingResources, actualGVK, getEtcdBucket(testData.expectedEtcdPath))
-			pathSeen[testData.expectedEtcdPath] = append(pathSeen[testData.expectedEtcdPath], gvResource)
+			pathSeen[testData.expectedEtcdPath] = append(pathSeen[testData.expectedEtcdPath], mapping.Resource)
 		}()
 	}
 
@@ -955,7 +954,7 @@ func (c *allClient) create(stub, ns string, mapping *meta.RESTMapping, all *[]cl
 		return err
 	}
 	namespaced := mapping.Scope.Name() == meta.RESTScopeNameNamespace
-	output, err := req.NamespaceIfScoped(ns, namespaced).Resource(mapping.Resource).Body(strings.NewReader(stub)).Do().Get()
+	output, err := req.NamespaceIfScoped(ns, namespaced).Resource(mapping.Resource.Resource).Body(strings.NewReader(stub)).Do().Get()
 	if err != nil {
 		return err
 	}
@@ -977,7 +976,7 @@ func (c *allClient) destroy(obj runtime.Object, mapping *meta.RESTMapping) error
 	if err != nil {
 		return err
 	}
-	return req.NamespaceIfScoped(ns, namespaced).Resource(mapping.Resource).Name(name).Do().Error()
+	return req.NamespaceIfScoped(ns, namespaced).Resource(mapping.Resource.Resource).Name(name).Do().Error()
 }
 
 func (c *allClient) cleanup(all *[]cleanupData) error {

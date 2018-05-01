@@ -109,7 +109,7 @@ func RunHistory(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 			return err
 		}
 
-		header := fmt.Sprintf("%s %q", mapping.Resource, info.Name)
+		header := fmt.Sprintf("%s %q", mapping.Resource.Resource, info.Name)
 		if revision > 0 {
 			header = fmt.Sprintf("%s with revision #%d", header, revision)
 		}

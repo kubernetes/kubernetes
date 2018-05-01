@@ -91,9 +91,10 @@ type RESTScope interface {
 // RESTMapping contains the information needed to deal with objects of a specific
 // resource and kind in a RESTful manner.
 type RESTMapping struct {
-	// Resource is a string representing the name of this resource as a REST client would see it
-	Resource string
+	// Resource is the GroupVersionResource (location) for this endpoint
+	Resource schema.GroupVersionResource
 
+	// GroupVersionKind is the GroupVersionKind (data format) to submit to this endpoint
 	GroupVersionKind schema.GroupVersionKind
 
 	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy

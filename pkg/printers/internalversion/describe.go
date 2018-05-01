@@ -204,7 +204,7 @@ type genericDescriber struct {
 
 func (g *genericDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (output string, err error) {
 	apiResource := &metav1.APIResource{
-		Name:       g.mapping.Resource,
+		Name:       g.mapping.Resource.Resource,
 		Namespaced: g.mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 		Kind:       g.mapping.GroupVersionKind.Kind,
 	}

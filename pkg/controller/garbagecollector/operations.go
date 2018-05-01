@@ -48,7 +48,7 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind string) (*metav1.APIRes
 	}
 	glog.V(5).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
 	resource := metav1.APIResource{
-		Name:       mapping.Resource,
+		Name:       mapping.Resource.Resource,
 		Namespaced: mapping.Scope == meta.RESTScopeNamespace,
 		Kind:       kind,
 	}

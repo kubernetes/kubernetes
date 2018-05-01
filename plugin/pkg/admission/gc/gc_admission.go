@@ -186,9 +186,9 @@ func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.O
 			Verb: "update",
 			// ownerReference can only refer to an object in the same namespace, so attributes.GetNamespace() equals to the owner's namespace
 			Namespace:       attributes.GetNamespace(),
-			APIGroup:        groupVersion.Group,
-			APIVersion:      groupVersion.Version,
-			Resource:        mapping.Resource,
+			APIGroup:        mapping.Resource.Group,
+			APIVersion:      mapping.Resource.Version,
+			Resource:        mapping.Resource.Resource,
 			Subresource:     "finalizers",
 			Name:            ref.Name,
 			ResourceRequest: true,

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -196,7 +197,7 @@ func (r *Result) ResourceMapping() (*meta.RESTMapping, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	mappings := map[string]*meta.RESTMapping{}
+	mappings := map[schema.GroupVersionResource]*meta.RESTMapping{}
 	for i := range r.sources {
 		m, ok := r.sources[i].(ResourceMapping)
 		if !ok {

@@ -594,7 +594,7 @@ func TestResourceByName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "pods" {
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -726,7 +726,7 @@ func TestResourceByNameWithoutRequireObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.GroupVersionKind.Kind != "Pod" || mapping.Resource != "pods" {
+	if mapping.GroupVersionKind.Kind != "Pod" || mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -753,7 +753,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "pods" {
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -1124,7 +1124,7 @@ func TestListObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "pods" {
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }

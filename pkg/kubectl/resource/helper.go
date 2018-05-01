@@ -43,7 +43,7 @@ type Helper struct {
 // NewHelper creates a Helper from a ResourceMapping
 func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 	return &Helper{
-		Resource:        mapping.Resource,
+		Resource:        mapping.Resource.Resource,
 		RESTClient:      client,
 		NamespaceScoped: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 	}
