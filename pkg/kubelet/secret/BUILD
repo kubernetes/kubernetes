@@ -30,12 +30,14 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/secret",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/core/v1:go_default_library",
         "//pkg/kubelet/util/manager:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
