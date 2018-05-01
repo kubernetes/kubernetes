@@ -345,10 +345,7 @@ func TestCacheInvalidation(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
-	manager := &cachingSecretManager{
-		secretStore:    store,
-		registeredPods: make(map[objectKey]*v1.Pod),
-	}
+	manager := newCacheBasedSecretManager(store)
 
 	// Create a pod with some secrets.
 	s1 := secretsToAttach{
@@ -403,10 +400,7 @@ func TestCacheRefcounts(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
-	manager := &cachingSecretManager{
-		secretStore:    store,
-		registeredPods: make(map[objectKey]*v1.Pod),
-	}
+	manager := newCacheBasedSecretManager(store)
 
 	s1 := secretsToAttach{
 		imagePullSecretNames: []string{"s1"},
@@ -490,10 +484,7 @@ func TestCacheRefcounts(t *testing.T) {
 func TestCachingSecretManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	secretStore := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	manager := &cachingSecretManager{
-		secretStore:    secretStore,
-		registeredPods: make(map[objectKey]*v1.Pod),
-	}
+	manager := newCacheBasedSecretManager(secretStore)
 
 	// Create a pod with some secrets.
 	s1 := secretsToAttach{
