@@ -620,7 +620,7 @@ func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutos
 func (a *HorizontalController) scaleForResourceMappings(namespace, name string, mappings []*apimeta.RESTMapping) (*autoscalingv1.Scale, schema.GroupResource, error) {
 	var firstErr error
 	for i, mapping := range mappings {
-		targetGR := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource).GroupResource()
+		targetGR := mapping.Resource.GroupResource()
 		scale, err := a.scaleNamespacer.Scales(namespace).Get(targetGR, name)
 		if err == nil {
 			return scale, targetGR, nil

@@ -738,11 +738,16 @@ type editResults struct {
 }
 
 func (r *editResults) addError(err error, info *resource.Info) string {
+	resourceString := info.Mapping.Resource.Resource
+	if len(info.Mapping.Resource.Group) > 0 {
+		resourceString = resourceString + "." + info.Mapping.Resource.Group
+	}
+
 	switch {
 	case apierrors.IsInvalid(err):
 		r.edit = append(r.edit, info)
 		reason := editReason{
-			head: fmt.Sprintf("%s %q was not valid", info.Mapping.Resource, info.Name),
+			head: fmt.Sprintf("%s %q was not valid", resourceString, info.Name),
 		}
 		if err, ok := err.(apierrors.APIStatus); ok {
 			if details := err.Status().Details; details != nil {
@@ -752,13 +757,13 @@ func (r *editResults) addError(err error, info *resource.Info) string {
 			}
 		}
 		r.header.reasons = append(r.header.reasons, reason)
-		return fmt.Sprintf("error: %s %q is invalid", info.Mapping.Resource, info.Name)
+		return fmt.Sprintf("error: %s %q is invalid", resourceString, info.Name)
 	case apierrors.IsNotFound(err):
 		r.notfound++
-		return fmt.Sprintf("error: %s %q could not be found on the server", info.Mapping.Resource, info.Name)
+		return fmt.Sprintf("error: %s %q could not be found on the server", resourceString, info.Name)
 	default:
 		r.retryable++
-		return fmt.Sprintf("error: %s %q could not be patched: %v", info.Mapping.Resource, info.Name, err)
+		return fmt.Sprintf("error: %s %q could not be patched: %v", resourceString, info.Name, err)
 	}
 }
 

@@ -42,6 +42,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -302,7 +303,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		if err != nil {
 			return err
 		}
-		if info.Mapping.Resource != "nodes" {
+		if info.Mapping.Resource.GroupResource() != (schema.GroupResource{Group: "", Resource: "nodes"}) {
 			return fmt.Errorf("error: expected resource of type node, got %q", info.Mapping.Resource)
 		}
 

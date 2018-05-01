@@ -505,7 +505,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 		}
 
 		mappings = append(mappings, &RESTMapping{
-			Resource:         res.Resource,
+			Resource:         res,
 			GroupVersionKind: gvk,
 			Scope:            scope,
 		})
