@@ -586,8 +586,10 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 					doneCh <- true
 					return
 				} else if apierrors.IsTooManyRequests(err) {
-					time.Sleep(5 * time.Second)
-				} else {
+					retryInterval := 5
+					fmt.Fprintf(o.ErrOut, "Cannot evict pod as it would violate the pod's disruption budget. Retry in %v seconds\n", retryInterval)
+					time.Sleep(time.Duration(retryInterval) * time.Second)
+				} else if !apierrors.IsNotFound(err) {
 					errCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
 					return
 				}
