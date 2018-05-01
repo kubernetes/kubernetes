@@ -141,7 +141,10 @@ func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName type
 		}
 
 		awsDiskInfo.ec2Instance = instanceInfo
-		awsDiskInfo.nodeName = mapInstanceToNodeName(instanceInfo, c.cfg.Global.ExplicitNodeNames)
+		awsDiskInfo.nodeName, err = mapInstanceToNodeName(instanceInfo, c.cfg.Global.ExplicitNodeNames)
+		if err != nil {
+			return awsDiskInfo, false, err
+		}
 		awsDiskInfo.hasAttachment = true
 		if awsDiskInfo.nodeName == nodeName {
 			return awsDiskInfo, true, nil

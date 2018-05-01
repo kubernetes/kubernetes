@@ -1544,22 +1544,26 @@ type awsInstance struct {
 }
 
 // newAWSInstance creates a new awsInstance object
-func newAWSInstance(ec2Service EC2, instance *ec2.Instance, explicitNames bool) *awsInstance {
+func newAWSInstance(ec2Service EC2, instance *ec2.Instance, explicitNames bool) (*awsInstance, error) {
 	az := ""
 	if instance.Placement != nil {
 		az = aws.StringValue(instance.Placement.AvailabilityZone)
 	}
+	nodeName, err := mapInstanceToNodeName(instance, explicitNames)
+	if err != nil {
+		return nil, err
+	}
 	self := &awsInstance{
 		ec2:              ec2Service,
 		awsID:            aws.StringValue(instance.InstanceId),
-		nodeName:         mapInstanceToNodeName(instance, explicitNames),
+		nodeName:         nodeName,
 		availabilityZone: az,
 		instanceType:     aws.StringValue(instance.InstanceType),
 		vpcID:            aws.StringValue(instance.VpcId),
 		subnetID:         aws.StringValue(instance.SubnetId),
 	}
 
-	return self
+	return self, nil
 }
 
 // Gets the awsInstanceType that models the instance type of this instance
@@ -1933,7 +1937,7 @@ func (c *Cloud) buildSelfAWSInstance() (*awsInstance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error finding instance %s: %q", instanceID, err)
 	}
-	return newAWSInstance(c.ec2, instance, c.cfg.Global.ExplicitNodeNames), nil
+	return newAWSInstance(c.ec2, instance, c.cfg.Global.ExplicitNodeNames)
 }
 
 // Gets the awsInstance with for the node with the specified nodeName, or the 'self' instance if nodeName == ""
@@ -1947,7 +1951,7 @@ func (c *Cloud) getAwsInstance(nodeName types.NodeName) (*awsInstance, error) {
 			return nil, err
 		}
 
-		awsInstance = newAWSInstance(c.ec2, instance, c.cfg.Global.ExplicitNodeNames)
+		return newAWSInstance(c.ec2, instance, c.cfg.Global.ExplicitNodeNames)
 	}
 
 	return awsInstance, nil
@@ -2099,7 +2103,10 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", nil
 	}
 
-	awsInstance := newAWSInstance(c.ec2, diskInfo.ec2Instance, c.cfg.Global.ExplicitNodeNames)
+	awsInstance, err := newAWSInstance(c.ec2, diskInfo.ec2Instance, c.cfg.Global.ExplicitNodeNames)
+	if err != nil {
+		return "", err
+	}
 
 	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, diskInfo.ec2Instance, diskInfo.disk.awsID, false)
 	if err != nil {
@@ -2314,8 +2321,10 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 				return false, errors.New(attachErr)
 			}
 			devicePath := aws.StringValue(attachment.Device)
-			nodeName := mapInstanceToNodeName(attachedInstance, c.cfg.Global.ExplicitNodeNames)
-
+			nodeName, err := mapInstanceToNodeName(attachedInstance, c.cfg.Global.ExplicitNodeNames)
+			if err != nil {
+				return false, err
+			}
 			danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
 			return false, danglingErr
 		}
@@ -2431,8 +2440,10 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 
 	// Note that we check that the volume is attached to the correct node, not that it is attached to _a_ node
 	for _, awsInstance := range awsInstances {
-		nodeName := mapInstanceToNodeName(awsInstance, c.cfg.Global.ExplicitNodeNames)
-
+		nodeName, err := mapInstanceToNodeName(awsInstance, c.cfg.Global.ExplicitNodeNames)
+		if err != nil {
+			return nil, err
+		}
 		diskNames := nodeDisks[nodeName]
 		if len(diskNames) == 0 {
 			continue
@@ -4287,21 +4298,21 @@ func mapNodeNameToPrivateDNSName(nodeName types.NodeName) string {
 }
 
 // mapInstanceToNodeName maps a EC2 instance to a k8s NodeName, by extracting the PrivateDNSName
-func mapInstanceToNodeName(i *ec2.Instance, explicitNames bool) types.NodeName {
+func mapInstanceToNodeName(i *ec2.Instance, explicitNames bool) (types.NodeName, error) {
 	if explicitNames {
 		for _, tag := range i.Tags {
 			key := aws.StringValue(tag.Key)
 			if key == TagNameKubernetesNodeNamePrefix {
 				value := aws.StringValue(tag.Value)
 				if len(value) > 0 {
-					return types.NodeName(aws.StringValue(tag.Value))
+					return types.NodeName(aws.StringValue(tag.Value)), nil
 				}
-				glog.Infof("Tag %s was found for instance %s, but had no value", TagNameKubernetesNodeNamePrefix, aws.StringValue(i.InstanceId))
+				return types.NodeName(""), fmt.Errorf("tag %s was found for instance %s, but had no value", TagNameKubernetesNodeNamePrefix, aws.StringValue(i.InstanceId))
 			}
 		}
-		glog.Infof("Tag %s not found for instance %s", TagNameKubernetesNodeNamePrefix, aws.StringValue(i.InstanceId))
+		return types.NodeName(""), fmt.Errorf("tag %s not found for instance %s", TagNameKubernetesNodeNamePrefix, aws.StringValue(i.InstanceId))
 	}
-	return types.NodeName(aws.StringValue(i.PrivateDnsName))
+	return types.NodeName(aws.StringValue(i.PrivateDnsName)), nil
 }
 
 // Returns the instance with the specified node name
@@ -4350,7 +4361,7 @@ func (c *Cloud) getFullInstance(nodeName types.NodeName) (*awsInstance, *ec2.Ins
 	if err != nil {
 		return nil, nil, err
 	}
-	awsInstance := newAWSInstance(c.ec2, instance, c.cfg.Global.ExplicitNodeNames)
+	awsInstance, err := newAWSInstance(c.ec2, instance, c.cfg.Global.ExplicitNodeNames)
 	return awsInstance, instance, err
 }
 
