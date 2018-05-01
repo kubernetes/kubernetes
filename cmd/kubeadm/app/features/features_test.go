@@ -168,8 +168,8 @@ func TestResolveFeatureGateDependencies(t *testing.T) {
 			expectedFeatures: map[string]bool{},
 		},
 		{ // others flags
-			inputFeatures:    map[string]bool{CoreDNS: true},
-			expectedFeatures: map[string]bool{CoreDNS: true},
+			inputFeatures:    map[string]bool{CoreDNS: false},
+			expectedFeatures: map[string]bool{CoreDNS: false},
 		},
 		{ // just StoreCertsInSecrets flags
 			inputFeatures:    map[string]bool{StoreCertsInSecrets: true},
@@ -186,6 +186,19 @@ func TestResolveFeatureGateDependencies(t *testing.T) {
 		if !reflect.DeepEqual(test.inputFeatures, test.expectedFeatures) {
 			t.Errorf("ResolveFeatureGateDependencies failed, expected: %v, got: %v", test.inputFeatures, test.expectedFeatures)
 
+		}
+	}
+}
+
+// TestEnabledDefaults tests that Enabled returns the default values for
+// each feature gate when no feature gates are specified.
+func TestEnabledDefaults(t *testing.T) {
+	for featureName, feature := range InitFeatureGates {
+		featureList := make(map[string]bool)
+
+		enabled := Enabled(featureList, featureName)
+		if enabled != feature.Default {
+			t.Errorf("Enabled returned %v instead of default value %v for feature %s", enabled, feature.Default, featureName)
 		}
 	}
 }

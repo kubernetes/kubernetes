@@ -48,6 +48,28 @@ const (
 	kubeDNSFederation          = "federations"
 )
 
+// DeployedDNSAddon returns the type of DNS addon currently deployed
+func DeployedDNSAddon(client clientset.Interface) (string, string, error) {
+	deploymentsClient := client.AppsV1().Deployments(metav1.NamespaceSystem)
+	deployments, err := deploymentsClient.List(metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
+	if err != nil {
+		return "", "", fmt.Errorf("couldn't retrieve DNS addon deployments: %v", err)
+	}
+
+	switch len(deployments.Items) {
+	case 0:
+		return "", "", nil
+	case 1:
+		addonName := deployments.Items[0].Name
+		addonImage := deployments.Items[0].Spec.Template.Spec.Containers[0].Image
+		addonImageParts := strings.Split(addonImage, ":")
+		addonVersion := addonImageParts[len(addonImageParts)-1]
+		return addonName, addonVersion, nil
+	default:
+		return "", "", fmt.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
+	}
+}
+
 // EnsureDNSAddon creates the kube-dns or CoreDNS addon
 func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
