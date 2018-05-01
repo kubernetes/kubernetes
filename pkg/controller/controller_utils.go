@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -612,6 +613,7 @@ type FakePodControl struct {
 	Err             error
 	CreateLimit     int
 	CreateCallCount int
+	OwnPodNames     []string
 }
 
 var _ PodControlInterface = &FakePodControl{}
@@ -619,7 +621,17 @@ var _ PodControlInterface = &FakePodControl{}
 func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
 	f.Lock()
 	defer f.Unlock()
-	f.Patches = append(f.Patches, data)
+	existed := false
+	for _, value := range f.Patches {
+		if bytes.EqualFold(value, data) {
+			existed = true
+			break
+		}
+	}
+	if !existed {
+		f.Patches = append(f.Patches, data)
+	}
+	//f.Patches = append(f.Patches, data)
 	if f.Err != nil {
 		return f.Err
 	}
@@ -689,6 +701,7 @@ func (f *FakePodControl) Clear() {
 	f.Patches = [][]byte{}
 	f.CreateLimit = 0
 	f.CreateCallCount = 0
+	f.OwnPodNames = []string{}
 }
 
 // ByLogging allows custom sorting of pods so the best one can be picked for getting its logs.
