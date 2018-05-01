@@ -9218,7 +9218,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_podstatus">v1.PodStatus</h3>
 <div class="paragraph">
-<p>PodStatus represents information about the status of a pod. Status may trail the actual state of a system.</p>
+<p>PodStatus represents information about the status of a pod. Status may trail the actual state of a system, especially if the node that hosts the pod cannot contact the control plane.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -9240,7 +9240,11 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">phase</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Current condition of the pod. More info: <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase">https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle. The conditions array, the reason and message fields, and the individual container status arrays contain more detail about the pod&#8217;s status. There are five possible phase values:<br>
+<br>
+Pending: The pod has been accepted by the Kubernetes system, but one or more of the container images has not been created. This includes time before being scheduled as well as time spent downloading images over the network, which could take a while. Running: The pod has been bound to a node, and all of the containers have been created. At least one container is still running, or is in the process of starting or restarting. Succeeded: All containers in the pod have terminated in success, and will not be restarted. Failed: All containers in the pod have terminated, and at least one container has terminated in failure. The container either exited with non-zero status or was terminated by the system. Unknown: For some reason the state of the pod could not be obtained, typically due to an error in communicating with the host of the pod.<br>
+<br>
+More info: <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase">https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
