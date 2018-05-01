@@ -27,11 +27,10 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller/nodeipam"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/test/integration/util"
@@ -45,7 +44,7 @@ func setupAllocator(apiURL string, config *Config, clusterCIDR, serviceCIDR *net
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          apiURL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
 		QPS:           float32(config.KubeQPS),
 		Burst:         config.KubeQPS,
 	})

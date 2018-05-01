@@ -54,8 +54,8 @@ import (
 )
 
 func init() {
-	legacyscheme.Scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &TestPrintType{})
-	legacyscheme.Scheme.AddKnownTypes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0], &TestPrintType{})
+	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}, &TestPrintType{})
+	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &TestPrintType{})
 }
 
 var testData = TestStruct{
@@ -92,7 +92,7 @@ func TestVersionedPrinter(t *testing.T) {
 		}),
 		legacyscheme.Scheme,
 		legacyscheme.Scheme,
-		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
+		schema.GroupVersion{Group: "", Version: "v1"},
 	)
 	if err := p.PrintObj(original, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -240,7 +240,7 @@ func TestPrinter(t *testing.T) {
 		},
 	}
 	emptyListTest := &api.PodList{}
-	testapi, err := legacyscheme.Scheme.ConvertToVersion(podTest, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
+	testapi, err := legacyscheme.Scheme.ConvertToVersion(podTest, schema.GroupVersion{Group: "", Version: "v1"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -587,7 +587,7 @@ func TestTemplateStrings(t *testing.T) {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := printers.NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
+	printer := printers.NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, schema.GroupVersion{Group: "", Version: "v1"})
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}

@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -52,7 +51,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, "v1"),
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -80,7 +79,7 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, schema.GroupVersion{Group:"", Version: "v1"}.String()),
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -105,7 +104,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, "v1"),
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -144,7 +143,7 @@ func TestMerge(t *testing.T) {
 			obj: &api.Service{
 				Spec: api.ServiceSpec{},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, "v1"),
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
@@ -166,7 +165,7 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, "v1"),
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",

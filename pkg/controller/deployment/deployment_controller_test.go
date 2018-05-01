@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -78,7 +77,7 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 
 func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *extensions.Deployment {
 	d := extensions.Deployment{
-		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(extensions.GroupName).GroupVersions[0].String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: "extensions/v1beta1"},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:         uuid.NewUUID(),
 			Name:        name,
