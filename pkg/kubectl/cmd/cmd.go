@@ -345,7 +345,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
 				NewCmdCp(f, ioStreams),
-				auth.NewCmdAuth(f, out, err),
+				auth.NewCmdAuth(f, ioStreams),
 			},
 		},
 		{
@@ -391,7 +391,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	}
 
 	cmds.AddCommand(alpha)
-	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), out, err))
+	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
 	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, ioStreams))
 	cmds.AddCommand(NewCmdApiVersions(f, ioStreams))
