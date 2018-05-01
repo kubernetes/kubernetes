@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -337,7 +338,7 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper := f.RESTMapper()
+	mapper, err := f.RESTMapper()
 
 	return resource.NewBuilder(
 		&resource.Mapper{
@@ -351,7 +352,7 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 			Decoder:      unstructured.UnstructuredJSONScheme,
 		},
 		f.CategoryExpander(),
-	)
+	).AddError(err)
 }
 
 func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
@@ -425,7 +426,7 @@ func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) 
 	return f.ClientSet()
 }
 
-func (f *TestFactory) RESTMapper() meta.RESTMapper {
+func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
 	groupResources := testDynamicResources()
 	mapper := discovery.NewRESTMapper(groupResources)
 	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
@@ -433,14 +434,14 @@ func (f *TestFactory) RESTMapper() meta.RESTMapper {
 	mapper = meta.FirstHitRESTMapper{
 		MultiRESTMapper: meta.MultiRESTMapper{
 			mapper,
-			legacyscheme.Registry.RESTMapper(),
+			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme),
 		},
 	}
 
 	// TODO: should probably be the external scheme
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
-	return expander
+	return expander, nil
 }
 
 func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {

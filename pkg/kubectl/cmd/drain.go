@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -68,7 +67,6 @@ type DrainOptions struct {
 	DeleteLocalData    bool
 	Selector           string
 	PodSelector        string
-	mapper             meta.RESTMapper
 	nodeInfos          []*resource.Info
 	typer              runtime.ObjectTyper
 
@@ -741,7 +739,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 					fmt.Printf("error: %v", err)
 					continue
 				}
-				printer.PrintObj(nodeInfo.AsVersioned(legacyscheme.Scheme), o.Out)
+				printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
 			} else {
 				if !o.DryRun {
 					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
@@ -767,7 +765,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 					fmt.Fprintf(o.ErrOut, "%v", err)
 					continue
 				}
-				printer.PrintObj(nodeInfo.AsVersioned(legacyscheme.Scheme), o.Out)
+				printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
 			}
 		} else {
 			printer, err := o.ToPrinter("skipped")
@@ -775,7 +773,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 				fmt.Fprintf(o.ErrOut, "%v", err)
 				continue
 			}
-			printer.PrintObj(nodeInfo.AsVersioned(legacyscheme.Scheme), o.Out)
+			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
 		}
 	}
 

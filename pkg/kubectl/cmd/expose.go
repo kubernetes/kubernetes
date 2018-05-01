@@ -187,7 +187,10 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	o.MapBasedSelectorForObject = f.MapBasedSelectorForObject
 	o.PortsForObject = f.PortsForObject
 	o.ProtocolsForObject = f.ProtocolsForObject
-	o.Mapper = f.RESTMapper()
+	o.Mapper, err = f.RESTMapper()
+	if err != nil {
+		return err
+	}
 	o.LabelsForObject = f.LabelsForObject
 
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
@@ -336,7 +339,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			return err
 		}
 
-		return o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	})
 	if err != nil {
 		return err

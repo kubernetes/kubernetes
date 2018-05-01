@@ -65,6 +65,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta/table:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/api/meta/testrestmapper:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -43,7 +42,6 @@ type PauseConfig struct {
 	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
 
 	Pauser func(info *resource.Info) ([]byte, error)
-	Mapper meta.RESTMapper
 	Infos  []*resource.Info
 
 	genericclioptions.IOStreams
@@ -105,8 +103,6 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, args 
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
-	o.Mapper = f.RESTMapper()
-
 	o.Pauser = f.Pauser
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -160,7 +156,7 @@ func (o PauseConfig) RunPause() error {
 				allErrs = append(allErrs, err)
 				continue
 			}
-			printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 			continue
 		}
 
@@ -176,7 +172,7 @@ func (o PauseConfig) RunPause() error {
 			allErrs = append(allErrs, err)
 			continue
 		}
-		printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	}
 
 	return utilerrors.NewAggregate(allErrs)

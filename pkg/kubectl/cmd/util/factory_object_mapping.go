@@ -27,8 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +35,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -72,26 +69,18 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
-// objectLoader attempts to perform discovery against the server, and will fall back to
-// the built in mapper if necessary. It supports unstructured objects either way, since
-// the underlying Scheme supports Unstructured. The mapper will return converters that can
-// convert versioned types to unstructured and back.
-func (f *ring1Factory) restMapper() (meta.RESTMapper, error) {
+// RESTMapper returns a mapper.
+func (f *ring1Factory) RESTMapper() (meta.RESTMapper, error) {
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
-		glog.V(3).Infof("Unable to get a discovery client to find server resources, falling back to hardcoded types: %v", err)
-		return legacyscheme.Registry.RESTMapper(), nil
+		return nil, err
 	}
 
 	// allow conversion between typed and unstructured objects
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	// TODO: should this also indicate it recognizes typed objects?
 	expander := NewShortcutExpander(mapper, discoveryClient)
-	return expander, err
-}
-
-func (f *ring1Factory) RESTMapper() meta.RESTMapper {
-	return meta.NewLazyRESTMapperLoader(f.restMapper)
+	return expander, nil
 }
 
 func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {

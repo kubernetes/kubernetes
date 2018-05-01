@@ -174,7 +174,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 func (o *SetServiceAccountOptions) Run() error {
 	patchErrs := []error{}
 	patchFn := func(info *resource.Info) ([]byte, error) {
-		info.Object = info.AsVersioned(legacyscheme.Scheme)
+		info.Object = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 		_, err := o.updatePodSpecForObject(info.Object, func(podSpec *v1.PodSpec) error {
 			podSpec.ServiceAccountName = o.serviceAccountName
 			return nil
@@ -198,7 +198,7 @@ func (o *SetServiceAccountOptions) Run() error {
 			continue
 		}
 		if o.local || o.dryRun {
-			if err := o.PrintObj(patch.Info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
+			if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, patch.Info.Mapping), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -210,7 +210,7 @@ func (o *SetServiceAccountOptions) Run() error {
 		}
 		info.Refresh(patched, true)
 
-		if err := o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
+		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
 			return err
 		}
 	}

@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -43,7 +42,6 @@ type ResumeConfig struct {
 	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
 
 	Resumer func(object *resource.Info) ([]byte, error)
-	Mapper  meta.RESTMapper
 	Infos   []*resource.Info
 
 	genericclioptions.IOStreams
@@ -102,8 +100,6 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, arg
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
-
-	o.Mapper = f.RESTMapper()
 
 	o.Resumer = f.Resumer
 
@@ -165,7 +161,7 @@ func (o ResumeConfig) RunResume() error {
 				allErrs = append(allErrs, err)
 				continue
 			}
-			printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -180,7 +176,7 @@ func (o ResumeConfig) RunResume() error {
 			allErrs = append(allErrs, err)
 			continue
 		}
-		printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
+		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	}
 
 	return utilerrors.NewAggregate(allErrs)

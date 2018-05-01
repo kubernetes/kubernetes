@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -46,7 +45,6 @@ type SetLastAppliedOptions struct {
 	FilenameOptions resource.FilenameOptions
 
 	infoList                     []*resource.Info
-	mapper                       meta.RESTMapper
 	namespace                    string
 	enforceNamespace             bool
 	dryRun                       bool
@@ -117,7 +115,6 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.shortOutput = o.output == "name"
 
-	o.mapper = f.RESTMapper()
 	var err error
 	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
 	if err != nil {
@@ -205,7 +202,7 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 			}
 			info.Refresh(patchedObj, false)
 		}
-		if err := o.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out); err != nil {
+		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
 			return err
 		}
 	}
