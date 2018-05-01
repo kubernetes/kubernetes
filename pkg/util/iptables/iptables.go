@@ -18,10 +18,12 @@ package iptables
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	godbus "github.com/godbus/dbus"
 	"github.com/golang/glog"
@@ -413,11 +415,18 @@ func iptablesCommand(protocol Protocol) string {
 }
 
 func (runner *runner) run(op operation, args []string) ([]byte, error) {
+	return runner.runContext(nil, op, args)
+}
+
+func (runner *runner) runContext(ctx context.Context, op operation, args []string) ([]byte, error) {
 	iptablesCmd := iptablesCommand(runner.protocol)
 	fullArgs := append(runner.waitFlag, string(op))
 	fullArgs = append(fullArgs, args...)
 	glog.V(5).Infof("running iptables %s %v", string(op), args)
-	return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
+	if ctx == nil {
+		return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
+	}
+	return runner.exec.CommandContext(ctx, iptablesCmd, fullArgs...).CombinedOutput()
 	// Don't log err here - callers might not think it is an error.
 }
 
@@ -426,9 +435,8 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
 	if runner.hasCheck {
 		return runner.checkRuleUsingCheck(makeFullArgs(table, chain, args...))
-	} else {
-		return runner.checkRuleWithoutCheck(table, chain, args...)
 	}
+	return runner.checkRuleWithoutCheck(table, chain, args...)
 }
 
 var hexnumRE = regexp.MustCompile("0x0+([0-9])")
@@ -489,7 +497,13 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 
 // Executes the rule check using the "-C" flag
 func (runner *runner) checkRuleUsingCheck(args []string) (bool, error) {
-	out, err := runner.run(opCheckRule, args)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	out, err := runner.runContext(ctx, opCheckRule, args)
+	if ctx.Err() == context.DeadlineExceeded {
+		return false, fmt.Errorf("timed out while checking rules")
+	}
 	if err == nil {
 		return true, nil
 	}
