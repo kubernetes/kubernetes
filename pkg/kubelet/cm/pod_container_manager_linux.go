@@ -123,6 +123,26 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	return cgroupName, cgroupfsName
 }
 
+// Kill one process ID
+func (m *podContainerManagerImpl) killOnePid(pid int) error {
+	// os.FindProcess never returns an error on POSIX
+	// https://go-review.googlesource.com/c/go/+/19093
+	p, _ := os.FindProcess(pid)
+	if err := p.Kill(); err != nil {
+		// If the process already exited, that's fine.
+		if strings.Contains(err.Error(), "process already finished") {
+			// Hate parsing strings, but
+			// vendor/github.com/opencontainers/runc/libcontainer/
+			// also does this.
+			glog.V(3).Infof("process with pid %v no longer exists", pid)
+			return nil
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
 // Scan through the whole cgroup directory and kill all processes either
 // attached to the pod cgroup or to a container cgroup under the pod cgroup
 func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName) error {
@@ -141,13 +161,8 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 		}
 		errlist = []error{}
 		for _, pid := range pidsToKill {
-			p, err := os.FindProcess(pid)
-			if err != nil {
-				// Process not running anymore, do nothing
-				continue
-			}
 			glog.V(3).Infof("Attempt to kill process with pid: %v", pid)
-			if err := p.Kill(); err != nil {
+			if err := m.killOnePid(pid); err != nil {
 				glog.V(3).Infof("failed to kill process with pid: %v", pid)
 				errlist = append(errlist, err)
 			}
