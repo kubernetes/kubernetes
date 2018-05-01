@@ -8,12 +8,16 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["codec_test.go"],
+    srcs = [
+        "codec_test.go",
+        "sparse_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
