@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -38,12 +39,18 @@ func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 	return isAttached
 }
 
-// initializeGCETestSpec creates a PV, PVC, and ClientPod that will run until killed by test or clean up.
-func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+func initializeGCETestPVPVC(c clientset.Interface, ns string, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, isPrebound bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	By("Creating the PV and PVC")
 	pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, isPrebound)
 	Expect(err).NotTo(HaveOccurred())
 	framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
+
+	return pv, pvc
+}
+
+// initializeGCETestSpec creates a PV, PVC, and ClientPod that will run until killed by test or clean up.
+func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	pv, pvc := initializeGCETestPVPVC(c, ns, pvConfig, pvcConfig, isPrebound)
 
 	By("Creating the Client Pod")
 	clientPod, err := framework.CreateClientPod(c, ns, pvc)
@@ -158,5 +165,100 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 
 		By("Verifying Persistent Disk detaches")
 		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")
+	})
+
+})
+
+var _ = utils.SIGDescribe("PersistentVolumes GCEPD Multizone", func() {
+	var (
+		c        clientset.Interface
+		diskName string
+		err      error
+		ns       string
+		pv       *v1.PersistentVolume
+		pvc      *v1.PersistentVolumeClaim
+	)
+
+	f := framework.NewDefaultFramework("pv")
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce", "gke")
+
+		c = f.ClientSet
+		ns = f.Namespace.Name
+
+		framework.SkipUnlessMultizone(c)
+
+		// Enforce binding only within test space via selector labels
+		volLabel := labels.Set{framework.VolumeSelectorKey: ns}
+		selector := metav1.SetAsLabelSelector(volLabel)
+
+		By("Initializing Test Spec")
+		diskName, err = framework.CreatePDWithRetry()
+		Expect(err).NotTo(HaveOccurred())
+		pvConfig := framework.PersistentVolumeConfig{
+			NamePrefix: "gce-",
+			Labels:     volLabel,
+			PVSource: v1.PersistentVolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+					PDName:   diskName,
+					FSType:   "ext3",
+					ReadOnly: false,
+				},
+			},
+			Prebind:       nil,
+			ReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+		}
+		emptyStorageClass := ""
+		pvcConfig := framework.PersistentVolumeClaimConfig{
+			Selector:         selector,
+			StorageClassName: &emptyStorageClass,
+		}
+		pv, pvc = initializeGCETestPVPVC(c, ns, pvConfig, pvcConfig, false)
+	})
+
+	AfterEach(func() {
+		framework.Logf("AfterEach: Cleaning up test resources")
+		if c != nil {
+			if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
+				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+			}
+			pv, pvc = nil, nil
+			if diskName != "" {
+				framework.ExpectNoError(framework.DeletePDWithRetry(diskName))
+			}
+		}
+	})
+
+	It("should successfully clean up a PV when PDs with the same disk name exists in multiple zones", func() {
+		zones, err := framework.GetClusterZones(c)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(zones.Len()).To(BeNumerically(">", 1))
+
+		By("Create a PD with the same disk name in a different zone")
+		zoneTaken := pv.Labels[apis.LabelZoneFailureDomain]
+		var zone string
+		for zone = range zones {
+			if zone != zoneTaken {
+				_, err = framework.CreatePDWithRetryAndZone(diskName, zone)
+				Expect(err).NotTo(HaveOccurred())
+				break
+			}
+		}
+		defer framework.DeletePDWithRetryAndZone(diskName, zone)
+
+		By("Delete PVC")
+		err = framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
+		Expect(err).NotTo(HaveOccurred())
+		err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, framework.Poll, framework.PVDeletingTimeout)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Verify the correct disk is deleted")
+		exists, err := framework.PDExists(diskName, zoneTaken)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(exists).To(BeFalse())
+
+		exists, err = framework.PDExists(diskName, zone)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(exists).To(BeTrue())
 	})
 })

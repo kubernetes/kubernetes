@@ -30,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
@@ -76,6 +78,10 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 
 		It("should provision storage in the allowedTopologies with delayed binding [Slow]", func() {
 			testRegionalAllowedTopologiesWithDelayedBinding(c, ns)
+		})
+
+		It("should create and delete pods successfully in the presence of PD name collisions [Slow]", func() {
+			testDiskNameCollision(f, c, ns)
 		})
 
 		It("should failover to a different zone when all nodes in one zone become unreachable [Slow] [Disruptive]", func() {
@@ -139,6 +145,69 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 		claim.Spec.StorageClassName = &class.Name
 		testDynamicProvisioning(test, c, claim, class)
 	}
+}
+
+// Verifies PD attach and detach succeed when there is a disk name collision between
+// a zonal PD and a regional PD.
+func testDiskNameCollision(f *framework.Framework, c clientset.Interface, ns string) {
+	diskName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
+
+	zones, err := framework.GetClusterZones(c)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(zones.Len()).To(BeNumerically(">", 1))
+
+	By("creating zonal and regional disks")
+	zonePrimary, _ := zones.PopAny()
+	zoneSecondary, _ := zones.PopAny()
+	replicaZones := make(sets.String)
+	replicaZones.Insert(zonePrimary, zoneSecondary)
+
+	_, err = framework.CreatePDWithRetryAndZone(diskName, zonePrimary)
+	framework.ExpectNoError(err)
+	defer framework.DeletePDWithRetry(diskName)
+
+	_, err = framework.CreateRegionalPDWithRetry(diskName, replicaZones)
+	framework.ExpectNoError(err)
+	defer framework.DeleteRegionalPDWithRetry(diskName)
+
+	By("creating PV, PVC, and pod for zonal disk")
+	pvConfig, pvcConfig := createBasePVPVCConfig(diskName, ns)
+
+	pvConfig.Labels[apis.LabelZoneFailureDomain] = zonePrimary
+	pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
+			framework.Failf("Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+		}
+	}()
+	framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
+
+	pod := framework.MakeWritePod(ns, pvc)
+	pod, err = c.CoreV1().Pods(ns).Create(pod)
+
+	By("creating PV, PVC, and pod for regional disk")
+	pvConfig.Labels[apis.LabelZoneFailureDomain] = util.ZonesSetToLabelValue(replicaZones)
+	pvRegional, pvcRegional, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
+			framework.Failf("Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+		}
+	}()
+	framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pvRegional, pvcRegional))
+
+	podRegional, err := framework.CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvcRegional}, true,
+		"if [ -f /mnt/volume1/SUCCESS ]; then echo FileExists; fi")
+
+	By("verify pod with regional disk cannot access data written previously")
+	logs, err := framework.GetPodLogs(c, ns, podRegional.Name, "")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(logs)).To(Equal(0), fmt.Sprintf("expected no log messages from container but got: %s", logs))
+
+	By("delete pods")
+	framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+	framework.ExpectNoError(framework.DeletePodWithWait(f, c, podRegional))
 }
 
 func testZonalFailover(c clientset.Interface, ns string) {
@@ -561,4 +630,32 @@ func verifyZonesInPV(volume *v1.PersistentVolume, zones sets.String, match bool)
 
 	return fmt.Errorf("Zones in StorageClass are %v, but zones in PV are %v", zones, pvZones)
 
+}
+
+func createBasePVPVCConfig(diskName string, ns string) (framework.PersistentVolumeConfig, framework.PersistentVolumeClaimConfig) {
+	volLabel := labels.Set{
+		framework.VolumeSelectorKey: ns,
+	}
+	selector := metav1.SetAsLabelSelector(volLabel)
+
+	pvConfig := framework.PersistentVolumeConfig{
+		NamePrefix: "gce-",
+		Labels:     volLabel,
+		PVSource: v1.PersistentVolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName:   diskName,
+				FSType:   "ext3",
+				ReadOnly: false,
+			},
+		},
+		Prebind:       nil,
+		ReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+	}
+	emptyStorageClass := ""
+	pvcConfig := framework.PersistentVolumeClaimConfig{
+		Selector:         selector,
+		StorageClassName: &emptyStorageClass,
+	}
+
+	return pvConfig, pvcConfig
 }

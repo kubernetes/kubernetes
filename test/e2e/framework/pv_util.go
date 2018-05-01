@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
@@ -647,10 +648,19 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 	}
 }
 
-func createPDWithRetry(zone string) (string, error) {
+func createPDWithRetry(name string, zones sets.String) (string, error) {
 	var err error
 	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
-		newDiskName, err := createPD(zone)
+		var newDiskName string
+		switch zones.Len() {
+		case 2:
+			newDiskName, err = createRegionalPD(name, zones)
+		case 1:
+			zone, _ := zones.PopAny()
+			newDiskName, err = createPD(name, zone)
+		default:
+			newDiskName, err = createPD(name, "")
+		}
 		if err != nil {
 			Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
 			continue
@@ -662,17 +672,27 @@ func createPDWithRetry(zone string) (string, error) {
 }
 
 func CreatePDWithRetry() (string, error) {
-	return createPDWithRetry("")
+	return createPDWithRetry("" /* name */, make(sets.String) /* zone */)
 }
 
-func CreatePDWithRetryAndZone(zone string) (string, error) {
-	return createPDWithRetry(zone)
+func CreatePDWithRetryAndZone(name, zone string) (string, error) {
+	zones := make(sets.String)
+	zones.Insert(zone)
+	return createPDWithRetry(name, zones)
 }
 
-func DeletePDWithRetry(diskName string) error {
+func CreateRegionalPDWithRetry(name string, zones sets.String) (string, error) {
+	return createPDWithRetry(name, zones)
+}
+
+func deletePDWithRetry(diskName, zone string, regional bool) error {
 	var err error
 	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
-		err = deletePD(diskName)
+		if regional {
+			err = deleteRegionalPD(diskName)
+		} else {
+			err = deletePD(diskName, zone)
+		}
 		if err != nil {
 			Logf("Couldn't delete PD %q, sleeping %v: %v", diskName, PDRetryPollTime, err)
 			continue
@@ -681,6 +701,18 @@ func DeletePDWithRetry(diskName string) error {
 		return nil
 	}
 	return fmt.Errorf("unable to delete PD %q: %v", diskName, err)
+}
+
+func DeletePDWithRetry(diskName string) error {
+	return deletePDWithRetry(diskName, "", false /* regional */)
+}
+
+func DeletePDWithRetryAndZone(diskName, zone string) error {
+	return deletePDWithRetry(diskName, zone, false /* regional */)
+}
+
+func DeleteRegionalPDWithRetry(diskName string) error {
+	return deletePDWithRetry(diskName, "", true /* regional */)
 }
 
 func newAWSClient(zone string) *ec2.EC2 {
@@ -699,13 +731,42 @@ func newAWSClient(zone string) *ec2.EC2 {
 	return ec2.New(session.New(), cfg)
 }
 
-func createPD(zone string) (string, error) {
+func PDExists(name, zone string) (bool, error) {
 	if zone == "" {
 		zone = TestContext.CloudConfig.Zone
 	}
 
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
-		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
+		gceCloud, err := GetGCECloud()
+		if err != nil {
+			return false, err
+		}
+
+		if zone == "" && TestContext.CloudConfig.MultiZone {
+			zones, err := gceCloud.GetAllZonesFromCloudProvider()
+			if err != nil {
+				return false, err
+			}
+			zone, _ = zones.PopAny()
+		}
+
+		return gceCloud.DiskExists(name, zone)
+	}
+
+	return false, fmt.Errorf("provider does not support volume existence check")
+}
+
+// The disk name parameter is only used by gce/gke tests.
+func createPD(name, zone string) (string, error) {
+	if zone == "" {
+		zone = TestContext.CloudConfig.Zone
+	}
+
+	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		pdName := name
+		if name == "" {
+			pdName = fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
+		}
 
 		gceCloud, err := GetGCECloud()
 		if err != nil {
@@ -760,14 +821,36 @@ func createPD(zone string) (string, error) {
 	}
 }
 
-func deletePD(pdName string) error {
+func createRegionalPD(name string, zones sets.String) (string, error) {
+	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		pdName := name
+		if name == "" {
+			pdName = fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
+		}
+
+		gceCloud, err := GetGCECloud()
+		if err != nil {
+			return "", err
+		}
+
+		tags := map[string]string{}
+		err = gceCloud.CreateRegionalDisk(pdName, gcecloud.DiskTypeSSD, zones, 10 /* sizeGb */, tags)
+		if err != nil {
+			return "", err
+		}
+		return pdName, nil
+	}
+	return "", fmt.Errorf("provider does not support regional volume creation")
+}
+
+func deletePD(pdName, zone string) error {
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
 		gceCloud, err := GetGCECloud()
 		if err != nil {
 			return err
 		}
 
-		err = gceCloud.DeleteDisk(pdName)
+		err = gceCloud.DeleteDisk(pdName, zone)
 
 		if err != nil {
 			if gerr, ok := err.(*googleapi.Error); ok && len(gerr.Errors) > 0 && gerr.Errors[0].Reason == "notFound" {
@@ -808,6 +891,29 @@ func deletePD(pdName string) error {
 	} else {
 		return fmt.Errorf("provider does not support volume deletion")
 	}
+}
+
+func deleteRegionalPD(pdName string) error {
+	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		gceCloud, err := GetGCECloud()
+		if err != nil {
+			return err
+		}
+
+		err = gceCloud.DeleteRegionalDisk(pdName)
+
+		if err != nil {
+			if gerr, ok := err.(*googleapi.Error); ok && len(gerr.Errors) > 0 && gerr.Errors[0].Reason == "notFound" {
+				// PD already exists, ignore error.
+				return nil
+			}
+
+			Logf("error deleting PD %q: %v", pdName, err)
+		}
+		return err
+	}
+
+	return fmt.Errorf("provider does not support regional volume deletion")
 }
 
 // Returns a pod definition based on the namespace. The pod references the PVC's
@@ -1080,7 +1186,7 @@ func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.Persist
 }
 
 func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
-	diskName, err := CreatePDWithRetryAndZone(zone)
+	diskName, err := CreatePDWithRetryAndZone("" /* name */, zone)
 	if err != nil {
 		return nil, err
 	}

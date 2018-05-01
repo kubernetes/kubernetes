@@ -26,8 +26,9 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/volume/util"
+	"net/http"
 )
 
 // TODO TODO write a test for GetDiskByNameUnknownZone and make sure casting logic works
@@ -39,12 +40,11 @@ func TestCreateDisk_Basic(t *testing.T) {
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
 	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
+
 	gce := GCECloud{
 		manager:            fakeManager,
 		managedZones:       []string{"zone1"},
 		projectID:          gceProjectId,
-		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true },
 	}
@@ -148,11 +148,10 @@ func TestCreateDisk_DiskAlreadyExists(t *testing.T) {
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
 	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
+
 	gce := GCECloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true },
 	}
@@ -168,8 +167,7 @@ func TestCreateDisk_DiskAlreadyExists(t *testing.T) {
 
 	/* Assert */
 	if err != nil {
-		t.Error(
-			"Expected success when a disk with the given name already exists, but an error is returned.")
+		t.Errorf("Expected success when a disk with the given name already exists, but an error is returned: %v", err)
 	}
 }
 
@@ -254,11 +252,10 @@ func TestCreateDisk_MultiZone(t *testing.T) {
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1", "zone2", "zone3"}
 	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
+
 	gce := GCECloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true },
 	}
@@ -279,27 +276,11 @@ func TestCreateDisk_MultiZone(t *testing.T) {
 
 func TestDeleteDisk_Basic(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
-	gceRegion := "fake-region"
-	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
-		manager:            fakeManager,
-		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true },
-	}
-	diskName := "disk"
-	diskType := DiskTypeSSD
-	zone := "zone1"
-	const sizeGb int64 = 128
-
-	gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
+	gce, fakeManager, test := initTest()
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
 
 	/* Act */
-	err := gce.DeleteDisk(diskName)
+	err := gce.DeleteDisk(test.diskName, test.zone)
 
 	/* Assert */
 	if err != nil {
@@ -313,53 +294,39 @@ func TestDeleteDisk_Basic(t *testing.T) {
 
 func TestDeleteDisk_NotFound(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
-	gceRegion := "fake-region"
-	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
-		manager:            fakeManager,
-		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true },
-	}
-	diskName := "disk"
+	gce, _, test := initTest()
 
 	/* Act */
-	err := gce.DeleteDisk(diskName)
+	err := gce.DeleteDisk(test.diskName, test.zone)
 
 	/* Assert */
 	if err != nil {
-		t.Error("Expected successful operation when disk is not found, but an error is returned.")
+		t.Errorf("Expected successful operation when disk is not found, but an error is returned: %v", err)
+	}
+}
+
+func TestDeleteDisk_NotFoundNoZone(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+
+	/* Act */
+	err := gce.DeleteDisk(test.diskName, "")
+
+	/* Assert */
+	if err != nil {
+		t.Errorf("Expected successful operation when disk is not found, but an error is returned: %v", err)
 	}
 }
 
 func TestDeleteDisk_ResourceBeingUsed(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
-	gceRegion := "fake-region"
-	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
-		manager:            fakeManager,
-		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true },
-	}
-	diskName := "disk"
-	diskType := DiskTypeSSD
-	zone := "zone1"
-	const sizeGb int64 = 128
+	gce, fakeManager, test := initTest()
 
-	gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
 	fakeManager.resourceInUse = true
 
 	/* Act */
-	err := gce.DeleteDisk(diskName)
+	err := gce.DeleteDisk(test.diskName, test.zone)
 
 	/* Assert */
 	if err == nil {
@@ -368,32 +335,17 @@ func TestDeleteDisk_ResourceBeingUsed(t *testing.T) {
 }
 
 func TestDeleteDisk_SameDiskMultiZone(t *testing.T) {
-	/* Assert */
-	gceProjectId := "test-project"
-	gceRegion := "fake-region"
-	zonesWithNodes := []string{"zone1", "zone2", "zone3"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
-		manager:            fakeManager,
-		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true },
-	}
-	diskName := "disk"
-	diskType := DiskTypeSSD
-	const sizeGb int64 = 128
-
+	/* Arrange */
+	gce, _, test := initTest()
 	for _, zone := range gce.managedZones {
-		gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
+		gce.CreateDisk(test.diskName, test.diskType, zone, test.sizeGb, nil)
 	}
 
 	/* Act */
 	// DeleteDisk will call FakeServiceManager.GetDiskFromCloudProvider() with all zones,
 	// and FakeServiceManager.GetDiskFromCloudProvider() always returns a disk,
 	// so DeleteDisk thinks a disk with diskName exists in all zones.
-	err := gce.DeleteDisk(diskName)
+	err := gce.DeleteDisk(test.diskName, "")
 
 	/* Assert */
 	if err == nil {
@@ -403,126 +355,188 @@ func TestDeleteDisk_SameDiskMultiZone(t *testing.T) {
 
 func TestDeleteDisk_DiffDiskMultiZone(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
-	gceRegion := "fake-region"
-	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
-		manager:            fakeManager,
-		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true },
-	}
-	diskName := "disk"
-	diskType := DiskTypeSSD
-	const sizeGb int64 = 128
+	gce, _, test := initTest()
 
 	for _, zone := range gce.managedZones {
-		diskName = zone + "disk"
-		gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
+		// Ignore diskName inside the test struct as we need different disk names here.
+		diskName := zone + "_disk"
+		gce.CreateDisk(diskName, test.diskType, zone, test.sizeGb, nil)
 	}
 
 	/* Act & Assert */
 	var err error
 	for _, zone := range gce.managedZones {
-		diskName = zone + "disk"
-		err = gce.DeleteDisk(diskName)
+		diskName := zone + "_disk"
+		err = gce.DeleteDisk(diskName, "")
 		if err != nil {
 			t.Errorf("Error deleting disk in zone '%v'; error: \"%v\"", zone, err)
 		}
 	}
 }
 
-func TestGetAutoLabelsForPD_Basic(t *testing.T) {
+func TestDeleteRegionalDisk_Basic(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
-	gceRegion := "us-central1"
-	zone := "us-central1-c"
-	zonesWithNodes := []string{zone}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	diskName := "disk"
-	diskType := DiskTypeSSD
-	const sizeGb int64 = 128
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
-		manager:            fakeManager,
-		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true },
-	}
-
-	gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
+	gce, fakeManager, test := initTest()
+	gce.CreateRegionalDisk(test.diskName, test.diskType, test.replicaZones, test.sizeGb, nil)
 
 	/* Act */
-	labels, err := gce.GetAutoLabelsForPD(diskName, zone)
+	err := gce.DeleteRegionalDisk(test.diskName)
 
 	/* Assert */
 	if err != nil {
 		t.Error(err)
 	}
-	if labels[kubeletapis.LabelZoneFailureDomain] != zone {
-		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[kubeletapis.LabelZoneFailureDomain], zone)
+	if !fakeManager.deleteDiskCalled {
+		t.Error("Never called GCE disk delete.")
 	}
-	if labels[kubeletapis.LabelZoneRegion] != gceRegion {
+
+}
+
+func TestDeleteRegionalDisk_NotFound(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+
+	/* Act */
+	err := gce.DeleteRegionalDisk(test.diskName)
+
+	/* Assert */
+	if err != nil {
+		t.Errorf("Expected successful operation when disk is not found, but an error is returned: %v", err)
+	}
+}
+
+func TestDeleteRegionalDisk_ResourceBeingUsed(t *testing.T) {
+	/* Arrange */
+	gce, fakeManager, test := initTest()
+
+	gce.CreateRegionalDisk(test.diskName, test.diskType, test.replicaZones, test.sizeGb, nil)
+	fakeManager.resourceInUse = true
+
+	/* Act */
+	err := gce.DeleteRegionalDisk(test.diskName)
+
+	/* Assert */
+	if err == nil {
+		t.Error("Expected error when disk is in use, but none returned.")
+	}
+}
+
+func TestDeleteDisk_ZonalRegional(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
+	gce.CreateRegionalDisk(test.diskName, test.diskType, test.replicaZones, test.sizeGb, nil)
+
+	/* Act */
+	err := gce.DeleteRegionalDisk(test.diskName)
+
+	/* Assert */
+	if err != nil {
+		t.Errorf("Expected successful deletion of regional disk when a zonal disk with the same name exists, but an error is returned: %v", err)
+	}
+}
+
+func TestGetAutoLabelsForPD_Basic(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
+
+	/* Act */
+	labels, err := gce.GetAutoLabelsForPD(test.diskName, test.zone)
+
+	/* Assert */
+	if err != nil {
+		t.Error(err)
+	}
+	if labels[kubeletapis.LabelZoneFailureDomain] != test.zone {
+		t.Errorf("Failure domain is '%v', but zone is '%v'",
+			labels[kubeletapis.LabelZoneFailureDomain], test.zone)
+	}
+	if labels[kubeletapis.LabelZoneRegion] != test.gceRegion {
+		t.Errorf("Region is '%v', but region is 'us-central1'", labels[kubeletapis.LabelZoneRegion])
+	}
+}
+
+func TestGetAutoLabelsForPD_BasicRegional(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+	gce.CreateRegionalDisk(test.diskName, test.diskType, test.replicaZones, test.sizeGb, nil)
+
+	/* Act */
+	labels, err := gce.GetAutoLabelsForPD(test.diskName, test.replicaZonesLabel)
+
+	/* Assert */
+	if err != nil {
+		t.Error(err)
+	}
+
+	zoneSet, err := util.LabelZonesToSet(labels[kubeletapis.LabelZoneFailureDomain])
+	if err != nil {
+		t.Errorf("Expected no error but an error is returned: %v", err)
+	}
+	if !zoneSet.Equal(test.replicaZones) {
+		t.Errorf("Failure domain is '%v', but zone is '%v'",
+			labels[kubeletapis.LabelZoneFailureDomain], test.replicaZonesLabel)
+	}
+	if labels[kubeletapis.LabelZoneRegion] != test.gceRegion {
 		t.Errorf("Region is '%v', but region is 'us-central1'", labels[kubeletapis.LabelZoneRegion])
 	}
 }
 
 func TestGetAutoLabelsForPD_NoZone(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
-	gceRegion := "europe-west1"
-	zone := "europe-west1-d"
-	zonesWithNodes := []string{zone}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	diskName := "disk"
-	diskType := DiskTypeStandard
-	const sizeGb int64 = 128
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
-		manager:            fakeManager,
-		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true },
-	}
-	gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
+	gce, _, test := initTest()
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
 
 	/* Act */
-	labels, err := gce.GetAutoLabelsForPD(diskName, "")
+	labels, err := gce.GetAutoLabelsForPD(test.diskName, "")
 
 	/* Assert */
 	if err != nil {
 		t.Error(err)
 	}
-	if labels[kubeletapis.LabelZoneFailureDomain] != zone {
+	if labels[kubeletapis.LabelZoneFailureDomain] != test.zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[kubeletapis.LabelZoneFailureDomain], zone)
+			labels[kubeletapis.LabelZoneFailureDomain], test.zone)
 	}
-	if labels[kubeletapis.LabelZoneRegion] != gceRegion {
+	if labels[kubeletapis.LabelZoneRegion] != test.gceRegion {
+		t.Errorf("Region is '%v', but region is 'europe-west1'", labels[kubeletapis.LabelZoneRegion])
+	}
+}
+
+func TestGetAutoLabelsForPD_NoZoneRegional(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+	gce.CreateRegionalDisk(test.diskName, test.diskType, test.replicaZones, test.sizeGb, nil)
+
+	/* Act */
+	labels, err := gce.GetAutoLabelsForPD(test.diskName, "")
+
+	/* Assert */
+	if err != nil {
+		t.Error(err)
+	}
+
+	zoneSet, err := util.LabelZonesToSet(labels[kubeletapis.LabelZoneFailureDomain])
+	if err != nil {
+		t.Errorf("Expected no error but an error is returned: %v", err)
+	}
+	if !zoneSet.Equal(test.replicaZones) {
+		t.Errorf("Failure domain is '%v', but zone is '%v'",
+			labels[kubeletapis.LabelZoneFailureDomain], test.replicaZonesLabel)
+	}
+	if labels[kubeletapis.LabelZoneRegion] != test.gceRegion {
 		t.Errorf("Region is '%v', but region is 'europe-west1'", labels[kubeletapis.LabelZoneRegion])
 	}
 }
 
 func TestGetAutoLabelsForPD_DiskNotFound(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
-	gceRegion := "fake-region"
-	zone := "asia-northeast1-a"
-	zonesWithNodes := []string{zone}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	diskName := "disk"
-	gce := GCECloud{manager: fakeManager,
-		managedZones:       zonesWithNodes,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true }}
+	gce, _, test := initTest()
 
 	/* Act */
-	_, err := gce.GetAutoLabelsForPD(diskName, zone)
+
+	_, err := gce.GetAutoLabelsForPD(test.diskName, test.zone)
 
 	/* Assert */
 	if err == nil {
@@ -530,24 +544,25 @@ func TestGetAutoLabelsForPD_DiskNotFound(t *testing.T) {
 	}
 }
 
-func TestGetAutoLabelsForPD_DiskNotFoundAndNoZone(t *testing.T) {
+func TestGetAutoLabelsForPD_DiskNotFoundRegional(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
-	gceRegion := "fake-region"
-	zonesWithNodes := []string{}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	diskName := "disk"
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
-		manager:            fakeManager,
-		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true },
-	}
+	gce, _, test := initTest()
 
 	/* Act */
-	_, err := gce.GetAutoLabelsForPD(diskName, "")
+	_, err := gce.GetAutoLabelsForPD(test.diskName, test.replicaZonesLabel)
+
+	/* Assert */
+	if err == nil {
+		t.Error("Expected error when the specified disk does not exist, but none returned.")
+	}
+}
+
+func TestGetAutoLabelsForPD_DiskNotFoundNoZone(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+
+	/* Act */
+	_, err := gce.GetAutoLabelsForPD(test.diskName, "")
 
 	/* Assert */
 	if err == nil {
@@ -557,71 +572,192 @@ func TestGetAutoLabelsForPD_DiskNotFoundAndNoZone(t *testing.T) {
 
 func TestGetAutoLabelsForPD_DupDisk(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
-	gceRegion := "us-west1"
-	zonesWithNodes := []string{"us-west1-b", "asia-southeast1-a"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	diskName := "disk"
-	diskType := DiskTypeStandard
-	zone := "us-west1-b"
-	const sizeGb int64 = 128
-
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
-		manager:            fakeManager,
-		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          createNodeZones(zonesWithNodes),
-		nodeInformerSynced: func() bool { return true },
-	}
+	gce, _, test := initTest()
 	for _, zone := range gce.managedZones {
-		gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
+		gce.CreateDisk(test.diskName, test.diskType, zone, test.sizeGb, nil)
 	}
 
 	/* Act */
-	labels, err := gce.GetAutoLabelsForPD(diskName, zone)
+	labels, err := gce.GetAutoLabelsForPD(test.diskName, test.zone)
 
 	/* Assert */
 	if err != nil {
-		t.Error("Disk name and zone uniquely identifies a disk, yet an error is returned.")
+		t.Errorf("Disk name and zone uniquely identifies a disk, yet an error is returned: %v", err)
 	}
-	if labels[kubeletapis.LabelZoneFailureDomain] != zone {
+	if labels[kubeletapis.LabelZoneFailureDomain] != test.zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[kubeletapis.LabelZoneFailureDomain], zone)
+			labels[kubeletapis.LabelZoneFailureDomain], test.zone)
 	}
-	if labels[kubeletapis.LabelZoneRegion] != gceRegion {
+	if labels[kubeletapis.LabelZoneRegion] != test.gceRegion {
 		t.Errorf("Region is '%v', but region is 'us-west1'", labels[kubeletapis.LabelZoneRegion])
 	}
 }
 
 func TestGetAutoLabelsForPD_DupDiskNoZone(t *testing.T) {
 	/* Arrange */
+	gce, _, test := initTest()
+	for _, zone := range gce.managedZones {
+		gce.CreateDisk(test.diskName, test.diskType, zone, test.sizeGb, nil)
+	}
+
+	/* Act */
+	_, err := gce.GetAutoLabelsForPD(test.diskName, "")
+
+	/* Assert */
+	if err == nil {
+		t.Error("Expected error when the disk is duplicated and zone is not specified, but none returned.")
+	}
+}
+
+func TestGetAutoLabelsForPD_ZonalRegionalGetZonal(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
+	gce.CreateRegionalDisk(test.diskName, test.diskType, test.replicaZones, test.sizeGb, nil)
+
+	/* Act */
+	labels, err := gce.GetAutoLabelsForPD(test.diskName, test.zone)
+
+	/* Assert */
+	if err != nil {
+		t.Errorf("Disk name and zone uniquely identifies a disk, yet an error is returned: %v", err)
+	}
+	if labels[kubeletapis.LabelZoneFailureDomain] != test.zone {
+		t.Errorf("Failure domain is '%v', but zone is '%v'",
+			labels[kubeletapis.LabelZoneFailureDomain], test.zone)
+	}
+	if labels[kubeletapis.LabelZoneRegion] != test.gceRegion {
+		t.Errorf("Region is '%v', but region is 'us-west1'", labels[kubeletapis.LabelZoneRegion])
+	}
+}
+
+func TestGetAutoLabelsForPD_ZonalRegionalGetRegional(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
+	gce.CreateRegionalDisk(test.diskName, test.diskType, test.replicaZones, test.sizeGb, nil)
+
+	/* Act */
+	labels, err := gce.GetAutoLabelsForPD(test.diskName, test.replicaZonesLabel)
+
+	/* Assert */
+	if err != nil {
+		t.Errorf("Disk name and zone label uniquely identifies a disk, yet an error is returned: %v", err)
+	}
+
+	zoneSet, err := util.LabelZonesToSet(labels[kubeletapis.LabelZoneFailureDomain])
+	if err != nil {
+		t.Errorf("Expected no error but an error is returned: %v", err)
+	}
+	if !zoneSet.Equal(test.replicaZones) {
+		t.Errorf("Failure domain is '%v', but zone is '%v'",
+			labels[kubeletapis.LabelZoneFailureDomain], test.replicaZonesLabel)
+	}
+	if labels[kubeletapis.LabelZoneRegion] != test.gceRegion {
+		t.Errorf("Region is '%v', but region is 'us-west1'", labels[kubeletapis.LabelZoneRegion])
+	}
+}
+
+func TestGetAutoLabelsForPD_ZonalRegionalNoZone(t *testing.T) {
+	/* Arrange */
+	gce, _, test := initTest()
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
+	gce.CreateRegionalDisk(test.diskName, test.diskType, test.replicaZones, test.sizeGb, nil)
+
+	/* Act */
+	_, err := gce.GetAutoLabelsForPD(test.diskName, "")
+
+	/* Assert */
+	if err == nil {
+		t.Error("Expected error when there is a naming collision between zonal and regional disks, but none returned.")
+	}
+}
+
+func TestDiskExists_Positive(t *testing.T) {
+	// Arrange
+	gce, _, test := initTest()
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
+
+	// Act
+	exists, err := gce.DiskExists(test.diskName, test.zone)
+
+	// Assert
+	if err != nil {
+		t.Error(err)
+	}
+	if !exists {
+		t.Error("Expected disk to exist, but it does not.")
+	}
+}
+
+func TestDiskExists_Negative(t *testing.T) {
+	// Arrange
+	gce, _, test := initTest()
+
+	// Act
+	exists, err := gce.DiskExists(test.diskName, test.zone)
+
+	// Assert
+	if err != nil {
+		t.Error(err)
+	}
+	if exists {
+		t.Error("Expected disk to not exist, but it does.")
+	}
+}
+
+func TestDiskExists_WrongZone(t *testing.T) {
+	// Arrange
+	gce, _, test := initTest()
+	gce.CreateDisk(test.diskName, test.diskType, test.zone, test.sizeGb, nil)
+
+	// Act
+	exists, err := gce.DiskExists(test.diskName, "some-zone")
+
+	// Assert
+	if err != nil {
+		t.Error(err)
+	}
+	if exists {
+		t.Error("Expected disk to not exist, but it does.")
+	}
+}
+
+// TODO (verult) refactor the rest of tests to use this
+// diskParams contains a list of common attributes used by tests.
+// It is pre-populated by the initTest() function.
+type diskParams struct {
+	gceRegion         string
+	diskName          string
+	diskType          string
+	sizeGb            int64
+	zone              string      // for zonal disks
+	replicaZones      sets.String // for regional disks
+	replicaZonesLabel string      // for regional disks
+}
+
+// initTest generates the GCE cloud client and a set of common disk parameters
+// to be used by tests.
+func initTest() (*GCECloud, *FakeServiceManager, *diskParams) {
 	gceProjectId := "test-project"
-	gceRegion := "fake-region"
+	gceRegion := "us-west1"
 	zonesWithNodes := []string{"us-west1-b", "asia-southeast1-a"}
+	replicaZones := sets.NewString(zonesWithNodes...)
+	replicaZonesLabel := util.ZonesSetToLabelValue(replicaZones)
 	fakeManager := newFakeManager(gceProjectId, gceRegion)
 	diskName := "disk"
 	diskType := DiskTypeStandard
 	const sizeGb int64 = 128
 
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := &GCECloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
-		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true },
 	}
-	for _, zone := range gce.managedZones {
-		gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
-	}
 
-	/* Act */
-	_, err := gce.GetAutoLabelsForPD(diskName, "")
-
-	/* Assert */
-	if err == nil {
-		t.Error("Expected error when the disk is duplicated and zone is not specified, but none returned.")
+	return gce, fakeManager, &diskParams{
+		gceRegion, diskName, diskType, sizeGb, zonesWithNodes[0], replicaZones, replicaZonesLabel,
 	}
 }
 
@@ -748,6 +884,7 @@ func (manager *FakeServiceManager) CreateRegionalDiskOnCloudProvider(
 
 func (manager *FakeServiceManager) AttachDiskOnCloudProvider(
 	disk *GCEDisk,
+	deviceName string,
 	readWrite string,
 	instanceZone string,
 	instanceName string) error {
@@ -786,14 +923,8 @@ func (manager *FakeServiceManager) DetachDiskOnCloudProvider(
 func (manager *FakeServiceManager) GetDiskFromCloudProvider(
 	zone string, diskName string) (*GCEDisk, error) {
 
-	if manager.zonalDisks[zone] == "" {
-		return nil, cloudprovider.DiskNotFound
-	}
-
-	if manager.resourceInUse {
-		errorItem := googleapi.ErrorItem{Reason: "resourceInUseByAnotherResource"}
-		err := &googleapi.Error{Errors: []googleapi.ErrorItem{errorItem}}
-		return nil, err
+	if manager.zonalDisks[zone] != diskName {
+		return nil, &googleapi.Error{Code: http.StatusNotFound}
 	}
 
 	return &GCEDisk{
@@ -812,7 +943,7 @@ func (manager *FakeServiceManager) GetRegionalDiskFromCloudProvider(
 	diskName string) (*GCEDisk, error) {
 
 	if _, ok := manager.regionalDisks[diskName]; !ok {
-		return nil, cloudprovider.DiskNotFound
+		return nil, &googleapi.Error{Code: http.StatusNotFound}
 	}
 
 	if manager.resourceInUse {
@@ -851,6 +982,16 @@ func (manager *FakeServiceManager) DeleteDiskOnCloudProvider(
 	disk string) error {
 
 	manager.deleteDiskCalled = true
+
+	if manager.zonalDisks[zone] != disk {
+		return &googleapi.Error{Code: http.StatusNotFound}
+	}
+
+	if manager.resourceInUse {
+		errorItem := googleapi.ErrorItem{Reason: "resourceInUseByAnotherResource"}
+		return &googleapi.Error{Errors: []googleapi.ErrorItem{errorItem}}
+	}
+
 	delete(manager.zonalDisks, zone)
 
 	switch t := manager.targetAPI; t {
@@ -869,6 +1010,16 @@ func (manager *FakeServiceManager) DeleteRegionalDiskOnCloudProvider(
 	disk string) error {
 
 	manager.deleteDiskCalled = true
+
+	if _, ok := manager.regionalDisks[disk]; !ok {
+		return &googleapi.Error{Code: http.StatusNotFound}
+	}
+
+	if manager.resourceInUse {
+		errorItem := googleapi.ErrorItem{Reason: "resourceInUseByAnotherResource"}
+		return &googleapi.Error{Errors: []googleapi.ErrorItem{errorItem}}
+	}
+
 	delete(manager.regionalDisks, disk)
 
 	switch t := manager.targetAPI; t {

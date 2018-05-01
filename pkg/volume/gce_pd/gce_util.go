@@ -52,6 +52,7 @@ const (
 	// Replication type constants must be lower case.
 	replicationTypeNone       = "none"
 	replicationTypeRegionalPD = "regional-pd"
+	volNameRegionalSuffix = "_regional"
 
 	// scsi_id output should be in the form of:
 	// 0Google PersistentDisk <disk name>
@@ -75,7 +76,18 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 		return err
 	}
 
-	if err = cloud.DeleteDisk(d.pdName); err != nil {
+	if d.zones.Len() > 1 {
+		// Regional PD
+		err = cloud.DeleteRegionalDisk(d.pdName)
+	} else {
+		zone, ok := d.zones.PopAny()
+		if !ok {
+			zone = ""
+		}
+		err = cloud.DeleteDisk(d.pdName, zone)
+	}
+
+	if err != nil {
 		glog.V(2).Infof("Error deleting GCE PD volume %s: %v", d.pdName, err)
 		// GCE cloud provider returns volume.deletedVolumeInUseError when
 		// necessary, no handling needed here.
@@ -147,9 +159,11 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *
 		return "", 0, nil, "", err
 	}
 
+	var zoneStr string
 	switch replicationType {
 	case replicationTypeRegionalPD:
-		selectedZones, err := volumeutil.SelectZonesForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name, maxRegionalPDZones)
+		selectedZones, err := volumeutil.SelectZonesForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name, gcecloud.NumZonesRegionalDisk)
+		zoneStr = volumeutil.ZonesSetToLabelValue(selectedZones)
 		if err != nil {
 			glog.V(2).Infof("Error selecting zones for regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
@@ -163,10 +177,12 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *
 			glog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
+
 		glog.V(2).Infof("Successfully created Regional GCE PD volume %s", name)
 
 	case replicationTypeNone:
 		selectedZone, err := volumeutil.SelectZoneForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name)
+		zoneStr = selectedZone
 		if err != nil {
 			return "", 0, nil, "", err
 		}
@@ -185,7 +201,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *
 		return "", 0, nil, "", fmt.Errorf("replication-type of '%s' is not supported", replicationType)
 	}
 
-	labels, err := cloud.GetAutoLabelsForPD(name, "" /* zone */)
+	labels, err := cloud.GetAutoLabelsForPD(name, zoneStr)
 	if err != nil {
 		// We don't really want to leak the volume here...
 		glog.Errorf("error getting labels for volume %q: %v", name, err)
@@ -265,10 +281,10 @@ func parseScsiSerial(output string) (string, error) {
 }
 
 // Returns list of all /dev/disk/by-id/* paths for given PD.
-func getDiskByIdPaths(pdName string, partition string) []string {
+func getDiskByIdPaths(deviceName string, partition string) []string {
 	devicePaths := []string{
-		path.Join(diskByIdPath, diskGooglePrefix+pdName),
-		path.Join(diskByIdPath, diskScsiGooglePrefix+pdName),
+		path.Join(diskByIdPath, diskGooglePrefix+deviceName),
+		path.Join(diskByIdPath, diskScsiGooglePrefix+deviceName),
 	}
 
 	if partition != "" {
@@ -355,4 +371,17 @@ func isRegionalPD(spec *volume.Spec) bool {
 		return len(zones) > 1
 	}
 	return false
+}
+
+func getDeviceName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	deviceName := volumeSource.PDName
+	if spec.PersistentVolume != nil && isRegionalPD(spec) {
+		deviceName += volNameRegionalSuffix
+	}
+	return deviceName, nil
 }

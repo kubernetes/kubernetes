@@ -27,6 +27,8 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -80,18 +82,21 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 type fakePDManager struct {
+	labels        map[string]string
+	expectedZones sets.String
 }
 
 func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
-	labels = make(map[string]string)
-	labels["fakepdmanager"] = "yes"
-	labels[kubeletapis.LabelZoneFailureDomain] = "zone1__zone2"
-	return "test-gce-volume-name", 100, labels, "", nil
+	return "test-gce-volume-name", 100, fake.labels, "", nil
 }
 
 func (fake *fakePDManager) DeleteVolume(cd *gcePersistentDiskDeleter) error {
 	if cd.pdName != "test-gce-volume-name" {
 		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.pdName)
+	}
+
+	if !cd.zones.Equal(fake.expectedZones) {
+		return fmt.Errorf("Deleter got the wrong zoneSet: %v", cd.zones)
 	}
 	return nil
 }
@@ -105,19 +110,103 @@ func getNodeSelectorRequirementWithKey(key string, term v1.NodeSelectorTerm) (*v
 	return nil, fmt.Errorf("key %s not found", key)
 }
 
-func TestPlugin(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+type deviceNameTestCase struct {
+	spec               *volume.Spec
+	expectedDeviceName string
+}
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+func TestDeviceName(t *testing.T) {
+	plug, teardown, _ := getPDPlugin(t, nil)
+	defer teardown()
+
+	tests := []deviceNameTestCase{
+		{
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "pd",
+							FSType: "ext4",
+						},
+					},
+				},
+			},
+			expectedDeviceName: "pd",
+		},
+		{
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							kubeletapis.LabelZoneFailureDomain: "zone1",
+						},
+					},
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+								PDName:   "pd",
+								ReadOnly: false,
+							},
+						},
+					},
+				}},
+			expectedDeviceName: "pd",
+		},
+		{
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							kubeletapis.LabelZoneFailureDomain: "zone1__zone2",
+						},
+					},
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+								PDName:   "pd",
+								ReadOnly: false,
+							},
+						},
+					},
+				},
+			},
+			expectedDeviceName: "pd_regional",
+		},
 	}
+	fakeManager := &fakePDManager{}
+	fakeMounter := &mount.FakeMounter{}
+
+	for _, test := range tests {
+		mounter, err := plug.(*gcePersistentDiskPlugin).newMounterInternal(test.spec, types.UID("poduid"), fakeManager, fakeMounter)
+		if err != nil {
+			t.Errorf("Failed to make a new Mounter: %v", err)
+		}
+		if mounter == nil {
+			t.Errorf("Got a nil Mounter")
+		}
+
+		if err := mounter.SetUp(nil); err != nil {
+			t.Errorf("Expected success, got: %v", err)
+		}
+
+		l := len(fakeMounter.MountPoints)
+		if l != 1 {
+			t.Errorf("Expected 1 mount point, got: %d", l)
+		}
+
+		mp := fakeMounter.MountPoints[0]
+		if path.Base(mp.Device) != test.expectedDeviceName {
+			t.Errorf("Expected device path to end with %v, got: %v", test.expectedDeviceName, path.Base(mp.Device))
+		}
+		fakeMounter.MountPoints = nil
+	}
+}
+
+func TestPlugin(t *testing.T) {
+	plug, teardown, rootDir := getPDPlugin(t, nil)
+	defer teardown()
+
 	spec := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
@@ -137,7 +226,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Mounter")
 	}
 
-	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~gce-pd/vol1")
+	volPath := path.Join(rootDir, "pods/poduid/volumes/kubernetes.io~gce-pd/vol1")
 	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
@@ -177,7 +266,15 @@ func TestPlugin(t *testing.T) {
 		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
-	provisioner, err := plug.(*gcePersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
+
+	fakePDManager := &fakePDManager{
+		labels: map[string]string{
+			"fakepdmanager":             "yes",
+			kubeletapis.LabelZoneFailureDomain: "zone1__zone2",
+		},
+		expectedZones: sets.NewString("zone1", "zone2"),
+	}
+	provisioner, err := plug.(*gcePersistentDiskPlugin).newProvisionerInternal(options, fakePDManager)
 	if err != nil {
 		t.Errorf("Error creating new provisioner:%v", err)
 	}
@@ -231,7 +328,46 @@ func TestPlugin(t *testing.T) {
 	volSpec := &volume.Spec{
 		PersistentVolume: persistentSpec,
 	}
-	deleter, err := plug.(*gcePersistentDiskPlugin).newDeleterInternal(volSpec, &fakePDManager{})
+	deleter, err := plug.(*gcePersistentDiskPlugin).newDeleterInternal(volSpec, fakePDManager)
+	if err != nil {
+		t.Errorf("Error creating new deleter:%v", err)
+	}
+	err = deleter.Delete()
+	if err != nil {
+		t.Errorf("Deleter() failed: %v", err)
+	}
+}
+
+func TestDeleterNoZone(t *testing.T) {
+	plug, teardown, _ := getPDPlugin(t, nil)
+	defer teardown()
+
+	fakePDManager := &fakePDManager{
+		labels: map[string]string{
+			"fakepdmanager": "yes",
+		},
+		expectedZones: make(sets.String),
+	}
+
+	options := volume.VolumeOptions{
+		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+	}
+	provisioner, err := plug.(*gcePersistentDiskPlugin).newProvisionerInternal(options, fakePDManager)
+	if err != nil {
+		t.Errorf("Error creating new provisioner:%v", err)
+	}
+
+	persistentSpec, err := provisioner.Provision(nil, nil)
+	if err != nil {
+		t.Errorf("Provision() failed: %v", err)
+	}
+
+	volSpec := &volume.Spec{
+		PersistentVolume: persistentSpec,
+	}
+
+	deleter, err := plug.(*gcePersistentDiskPlugin).newDeleterInternal(volSpec, fakePDManager)
 	if err != nil {
 		t.Errorf("Error creating new deleter:%v", err)
 	}
@@ -270,15 +406,8 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset(pv, claim)
-
-	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, client, nil))
-	plug, _ := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
+	plug, teardownFunc, _ := getPDPlugin(t, client)
+	defer teardownFunc()
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
@@ -291,4 +420,16 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
 	}
+}
+
+func getPDPlugin(t *testing.T, client clientset.Interface) (plugin volume.VolumePlugin, teardown func(), rootDir string) {
+	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, client, nil))
+	plug, _ := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
+
+	return plug, func() { os.RemoveAll(tmpDir) }, tmpDir
 }
