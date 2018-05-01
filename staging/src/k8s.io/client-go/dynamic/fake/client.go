@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/testing"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/api/meta"
 )
 
 // FakeClient is a fake implementation of dynamic.Interface.
@@ -86,10 +87,17 @@ func (c *FakeResourceClient) List(opts metav1.ListOptions) (runtime.Object, erro
 	if label == nil {
 		label = labels.Everything()
 	}
+	items, err := meta.ExtractList(obj)
+	if err != nil {
+		return nil, err
+	}
 	list := &unstructured.UnstructuredList{}
-	for _, item := range obj.(*unstructured.UnstructuredList).Items {
-		if label.Matches(labels.Set(item.GetLabels())) {
-			list.Items = append(list.Items, item)
+	for _, item := range items {
+		accessor, _ := meta.Accessor(item)
+		unstructedObject := &unstructured.Unstructured{}
+		unstructured.UnstructuredObjectConverter{}.Convert(item, unstructedObject, nil)
+		if label.Matches(labels.Set(accessor.GetLabels())) {
+			list.Items = append(list.Items, *unstructedObject)
 		}
 	}
 	return list, err
