@@ -14,6 +14,7 @@ go_library(
         "current_context.go",
         "delete_cluster.go",
         "delete_context.go",
+        "flags.go",
         "get_clusters.go",
         "get_contexts.go",
         "navigation_step_parser.go",
@@ -30,6 +31,7 @@ go_library(
     deps = [
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
         "//pkg/printers:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -64,6 +66,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubectl/genericclioptions:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",

@@ -18,7 +18,6 @@ package auth
 
 import (
 	"errors"
-	"io"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -29,21 +28,25 @@ import (
 	internalrbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/registry/rbac/reconciliation"
 )
 
 // ReconcileOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ReconcileOptions struct {
+	PrintFlags      *printers.PrintFlags
+	FilenameOptions *resource.FilenameOptions
+
 	Visitor         resource.Visitor
 	RBACClient      internalrbacclient.RbacInterface
 	NamespaceClient internalcoreclient.NamespaceInterface
 
-	Print func(*resource.Info) error
+	PrintObject printers.ResourcePrinterFunc
 
-	Out io.Writer
-	Err io.Writer
+	genericclioptions.IOStreams
 }
 
 var (
@@ -57,12 +60,16 @@ var (
 		kubectl auth reconcile -f my-rbac-rules.yaml`)
 )
 
-func NewCmdReconcile(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
-	fileOptions := &resource.FilenameOptions{}
-	o := &ReconcileOptions{
-		Out: out,
-		Err: err,
+func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOptions {
+	return &ReconcileOptions{
+		FilenameOptions: &resource.FilenameOptions{},
+		PrintFlags:      printers.NewPrintFlags("reconciled"),
+		IOStreams:       ioStreams,
 	}
+}
+
+func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewReconcileOptions(streams)
 
 	cmd := &cobra.Command{
 		Use: "reconcile -f FILENAME",
@@ -71,21 +78,21 @@ func NewCmdReconcile(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 		Long:    reconcileLong,
 		Example: reconcileExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(cmd, f, args, fileOptions))
+			cmdutil.CheckErr(o.Complete(cmd, f, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunReconcile())
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
-	usage := "identifying the resource to reconcile."
-	cmdutil.AddFilenameOptionFlags(cmd, fileOptions, usage)
+	o.PrintFlags.AddFlags(cmd)
+
+	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to reconcile.")
 	cmd.MarkFlagRequired("filename")
 
 	return cmd
 }
 
-func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string, options *resource.FilenameOptions) error {
+func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
 	if len(args) > 0 {
 		return errors.New("no arguments are allowed")
 	}
@@ -99,7 +106,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 		WithScheme(legacyscheme.Scheme).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		FilenameParam(enforceNamespace, o.FilenameOptions).
 		Flatten().
 		Do()
 
@@ -115,17 +122,12 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	o.RBACClient = client.Rbac()
 	o.NamespaceClient = client.Core().Namespaces()
 
-	dryRun := false
-	output := cmdutil.GetFlagString(cmd, "output")
-	shortOutput := output == "name"
-	o.Print = func(info *resource.Info) error {
-		if len(output) > 0 && !shortOutput {
-			return cmdutil.PrintObject(cmd, info.Object, o.Out)
-		}
-		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "reconciled")
-		return nil
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
 	}
 
+	o.PrintObject = printer.PrintObj
 	return nil
 }
 
@@ -139,13 +141,13 @@ func (o *ReconcileOptions) Validate() error {
 	if o.NamespaceClient == nil {
 		return errors.New("ReconcileOptions.NamespaceClient must be set")
 	}
-	if o.Print == nil {
+	if o.PrintObject == nil {
 		return errors.New("ReconcileOptions.Print must be set")
 	}
 	if o.Out == nil {
 		return errors.New("ReconcileOptions.Out must be set")
 	}
-	if o.Err == nil {
+	if o.ErrOut == nil {
 		return errors.New("ReconcileOptions.Err must be set")
 	}
 	return nil
@@ -156,10 +158,6 @@ func (o *ReconcileOptions) RunReconcile() error {
 		if err != nil {
 			return err
 		}
-
-		// shallowInfoCopy this is used to later twiddle the Object for printing
-		// we really need more straightforward printing options
-		shallowInfoCopy := *info
 
 		switch t := info.Object.(type) {
 		case *rbac.Role:
@@ -176,8 +174,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			shallowInfoCopy.Object = result.Role.GetObject()
-			o.Print(&shallowInfoCopy)
+			o.PrintObject(result.Role.GetObject(), o.Out)
 
 		case *rbac.ClusterRole:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
@@ -192,8 +189,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			shallowInfoCopy.Object = result.Role.GetObject()
-			o.Print(&shallowInfoCopy)
+			o.PrintObject(result.Role.GetObject(), o.Out)
 
 		case *rbac.RoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
@@ -209,8 +205,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			shallowInfoCopy.Object = result.RoleBinding.GetObject()
-			o.Print(&shallowInfoCopy)
+			o.PrintObject(result.RoleBinding.GetObject(), o.Out)
 
 		case *rbac.ClusterRoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
@@ -225,8 +220,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			if err != nil {
 				return err
 			}
-			shallowInfoCopy.Object = result.RoleBinding.GetObject()
-			o.Print(&shallowInfoCopy)
+			o.PrintObject(result.RoleBinding.GetObject(), o.Out)
 
 		default:
 			glog.V(1).Infof("skipping %#v", info.Object.GetObjectKind())

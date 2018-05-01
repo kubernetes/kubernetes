@@ -119,7 +119,7 @@ func TestRunAccessCheck(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			test.o.Out = ioutil.Discard
-			test.o.Err = ioutil.Discard
+			test.o.ErrOut = ioutil.Discard
 
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()

@@ -90,8 +90,10 @@ func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 			cmdutil.CheckErr(o.RunApiResources(cmd, f))
 		},
 	}
-	cmdutil.AddOutputFlags(cmd)
-	cmdutil.AddNoHeadersFlags(cmd)
+
+	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
+	cmd.Flags().StringP("output", "o", "", "Output format. One of: wide|name.")
+
 	cmd.Flags().StringVar(&o.APIGroup, "api-group", "", "Limit to resources in the specified API group.")
 	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", true, "Namespaced indicates if a resource is namespaced or not.")
 	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
