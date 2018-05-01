@@ -100,7 +100,7 @@ func getSelfLink(name, namespace string) string {
 	if len(namespace) == 0 {
 		namespace = metav1.NamespaceDefault
 	}
-	selfLink = fmt.Sprintf("/api/"+legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].Version+"/namespaces/%s/pods/%s", namespace, name)
+	selfLink = fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", namespace, name)
 	return selfLink
 }
 

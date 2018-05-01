@@ -27,7 +27,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/storage",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",

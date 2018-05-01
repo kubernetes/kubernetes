@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -40,7 +41,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -119,7 +119,7 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		&restclient.Config{
 			QPS: -1, Host: s.URL,
 			ContentConfig: restclient.ContentConfig{
-				GroupVersion: testapi.Groups[v1.GroupName].GroupVersion(),
+				GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
 			},
 		},
 	)

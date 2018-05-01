@@ -34,7 +34,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/common",
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",

@@ -40,7 +40,7 @@ import (
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
 	// to "v1"?
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -997,7 +997,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String(),
+								APIVersion: "v1",
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -1006,7 +1006,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAMESPACE",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String(),
+								APIVersion: "v1",
 								FieldPath:  "metadata.namespace",
 							},
 						},
@@ -1015,7 +1015,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NODE_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String(),
+								APIVersion: "v1",
 								FieldPath:  "spec.nodeName",
 							},
 						},
@@ -1024,7 +1024,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_SERVICE_ACCOUNT_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String(),
+								APIVersion: "v1",
 								FieldPath:  "spec.serviceAccountName",
 							},
 						},
@@ -1033,7 +1033,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_IP",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String(),
+								APIVersion: "v1",
 								FieldPath:  "status.podIP",
 							},
 						},
@@ -1042,7 +1042,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "HOST_IP",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String(),
+								APIVersion: "v1",
 								FieldPath:  "status.hostIP",
 							},
 						},
@@ -1073,7 +1073,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String(),
+								APIVersion: "v1",
 								FieldPath:  "metadata.name",
 							},
 						},

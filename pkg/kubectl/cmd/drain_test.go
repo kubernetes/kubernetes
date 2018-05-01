@@ -158,7 +158,7 @@ func TestCordon(t *testing.T) {
 			new_node := &corev1.Node{}
 			updated := false
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					m := &MyReq{req}
@@ -610,7 +610,7 @@ func TestDrain(t *testing.T) {
 				ns := legacyscheme.Codecs
 
 				tf.Client = &fake.RESTClient{
-					GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
+					GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 					NegotiatedSerializer: ns,
 					Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 						m := &MyReq{req}

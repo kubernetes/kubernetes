@@ -84,7 +84,7 @@ func init() {
 	}
 
 	if _, ok := Groups[api.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: api.GroupName, Version: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: api.GroupName, Version: "v1"}
 		Groups[api.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 			internalGroupVersion: api.SchemeGroupVersion,

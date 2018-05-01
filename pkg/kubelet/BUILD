@@ -162,7 +162,6 @@ go_test(
     }),
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",

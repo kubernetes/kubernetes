@@ -89,7 +89,7 @@ func TestSetControllerConversion(t *testing.T) {
 	extGroup := testapi.Extensions
 	defaultGroup := testapi.Default
 
-	fuzzInternalObject(t, extGroup.InternalGroupVersion(), rs, rand.Int63())
+	fuzzInternalObject(t, schema.GroupVersion{Group: "extensions", Version: runtime.APIVersionInternal}, rs, rand.Int63())
 
 	// explicitly set the selector to something that is convertible to old-style selectors
 	// (since normally we'll fuzz the selectors with things that aren't convertible)

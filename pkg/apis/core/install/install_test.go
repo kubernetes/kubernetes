@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	internal "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -52,7 +53,7 @@ func TestCodec(t *testing.T) {
 	pod := internal.Pod{}
 	// We do want to use package registered rather than testapi here, because we
 	// want to test if the package install and package registered work as expected.
-	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersions[0]), &pod)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: "", Version: "v1"}), &pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,7 +61,7 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersions[0].Version || other.Kind != "Pod" {
+	if other.APIVersion != "v1" || other.Kind != "Pod" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }

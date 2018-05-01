@@ -47,7 +47,6 @@ go_test(
     srcs = ["disruption_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
