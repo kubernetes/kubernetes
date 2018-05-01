@@ -903,7 +903,11 @@ func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bo
 		return false
 	}
 	if len(runtimeStatus.ContainerStatuses) > 0 {
-		glog.V(3).Infof("Pod %q is terminated, but some containers have not been cleaned up: %+v", format.Pod(pod), runtimeStatus.ContainerStatuses)
+		var statusStr string
+		for _, status := range runtimeStatus.ContainerStatuses {
+			statusStr += fmt.Sprintf("%+v ", *status)
+		}
+		glog.V(3).Infof("Pod %q is terminated, but some containers have not been cleaned up: %s", format.Pod(pod), statusStr)
 		return false
 	}
 	if kl.podVolumesExist(pod.UID) && !kl.keepTerminatedPodVolumes {
