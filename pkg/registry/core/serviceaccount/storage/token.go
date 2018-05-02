@@ -79,7 +79,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 			}
 			pod = podObj.(*api.Pod)
 			if name != pod.Spec.ServiceAccountName {
-				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with serviceaccount %q", name, pod.Spec.ServiceAccountName))
+				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with different serviceaccount name.", name))
 			}
 			uid = pod.UID
 		case gvk.Group == "" && gvk.Kind == "Secret":
@@ -94,7 +94,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 			return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token to object of type %s", gvk.String()))
 		}
 		if ref.UID != "" && uid != ref.UID {
-			return nil, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, ref.Name, fmt.Errorf("the UID in the bound object reference (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", ref.UID, uid))
+			return nil, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, ref.Name, fmt.Errorf("the UID in the bound object reference (%s) does not match the UID in record. The object might have been deleted and then recreated", ref.UID))
 		}
 	}
 	if len(out.Spec.Audiences) == 0 {
