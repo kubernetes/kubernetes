@@ -14,39 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhookadmission
+package v1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
-)
-
-// GroupName is the group name use in this package
+// GroupName is the group name use in this package.
 const GroupName = "apiserver.config.k8s.io"
 
-// SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
+// SchemeGroupVersion is group version used to register these objects.
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 
-// Kind takes an unqualified kind and returns a Group qualified GroupKind
-func Kind(kind string) schema.GroupKind {
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
+var (
+	// SchemeBuilder points to a list of functions added to Scheme.
+	SchemeBuilder      runtime.SchemeBuilder
+	localSchemeBuilder = &SchemeBuilder
+	// AddToScheme adds this group to a scheme.
+	AddToScheme = localSchemeBuilder.AddToScheme
+)
 
-// Resource takes an unqualified resource and returns a Group qualified GroupResource
-func Resource(resource string) schema.GroupResource {
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
+func init() {
+	// We only register manually written functions here. The registration of the
+	// generated functions takes place in the generated files. The separation
+	// makes the code compile even when the generated files are missing.
+	localSchemeBuilder.Register(addKnownTypes)
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
-	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&EncryptionConfiguration{},
-		&WebhookAdmission{},
 	)
 	return nil
 }

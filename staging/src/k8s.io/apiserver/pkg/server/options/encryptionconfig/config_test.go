@@ -33,8 +33,8 @@ const (
 	sampleContextText = "0123456789"
 
 	correctConfigWithIdentityFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -64,8 +64,8 @@ resources:
 `
 
 	correctConfigWithAesGcmFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -94,8 +94,8 @@ resources:
 `
 
 	correctConfigWithAesCbcFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -124,8 +124,8 @@ resources:
 `
 
 	correctConfigWithSecretboxFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -154,8 +154,8 @@ resources:
 `
 
 	correctConfigWithKMSFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -184,8 +184,8 @@ resources:
 `
 
 	incorrectConfigNoSecretForKey = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - namespaces
@@ -197,8 +197,8 @@ resources:
 `
 
 	incorrectConfigInvalidKey = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - namespaces
@@ -213,8 +213,8 @@ resources:
 `
 
 	incorrectConfigNoEndpointForKMS = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
