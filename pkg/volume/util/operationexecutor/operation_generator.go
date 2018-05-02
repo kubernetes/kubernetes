@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -623,13 +624,29 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 				return nil, nil
 			}
 
-			diskFormatter := &mount.SafeFormatAndMount{
-				Interface: mounter,
-				Exec:      og.volumePluginMgr.Host.GetExec(expandableVolumePlugin.GetPluginName()),
-			}
+			var resizeStatus bool
+			var resizeErr error
 
-			resizer := resizefs.NewResizeFs(diskFormatter)
-			resizeStatus, resizeErr := resizer.Resize(devicePath, deviceMountPath)
+			if fsResizablePlugin, callExpandFs := expandableVolumePlugin.(volume.FSResizableVolumePlugin); callExpandFs {
+				// special case for flex volumes
+				if _, resizeErr = fsResizablePlugin.ExpandVolumeDevice(volumeToMount.VolumeSpec, pvSpecCap, pvcStatusCap); resizeErr == nil {
+					resizeErr = fsResizablePlugin.ExpandFS(volumeToMount.VolumeSpec, devicePath, deviceMountPath)
+				}
+
+				if resizeErr == nil {
+					resizeStatus = true
+				}
+			} else {
+				// generic case
+				diskFormatter := &mount.SafeFormatAndMount{
+					Interface: mounter,
+					Exec:      og.volumePluginMgr.Host.GetExec(expandableVolumePlugin.GetPluginName()),
+				}
+
+				resizer := resizefs.NewResizeFs(diskFormatter)
+				resizeStatus, resizeErr = resizer.Resize(devicePath, deviceMountPath)
+
+			}
 
 			if resizeErr != nil {
 				return volumeToMount.GenerateError("MountVolume.resizeFileSystem failed", resizeErr)
@@ -1245,26 +1262,55 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 
 	volumePlugin, err := og.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 
-	if err != nil {
+	if err != nil && volumeSpec.PersistentVolume.Spec.FlexVolume == nil {
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
+	} else if volumeSpec.PersistentVolume.Spec.FlexVolume != nil {
+		// A flex volume is expandable but since it resides on the kubelet not the controller
+		// and is dynamically probed plugin, FindExpandablePluginBySpec will never find it
+		// Therefore fake the volume expansion on the controller.
+		glog.V(4).Infof("Faking expansion for flex volume %s", pvcWithResizeRequest.QualifiedName())
 	}
-	if volumePlugin == nil {
+
+	if volumePlugin == nil && volumeSpec.PersistentVolume.Spec.FlexVolume == nil {
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", pvcWithResizeRequest.QualifiedName())
+	}
+
+	getPluginName := func() string {
+		if volumePlugin != nil {
+			return volumePlugin.GetPluginName()
+		}
+
+		if volumeSpec.PersistentVolume.Spec.FlexVolume != nil {
+			return "flexvolume-" + volumeSpec.PersistentVolume.Spec.FlexVolume.Driver
+		}
+
+		return ""
 	}
 
 	expandVolumeFunc := func() (error, error) {
 		newSize := pvcWithResizeRequest.ExpectedSize
 		pvSize := pvcWithResizeRequest.PersistentVolume.Spec.Capacity[v1.ResourceStorage]
 		if pvSize.Cmp(newSize) < 0 {
-			updatedSize, expandErr := volumePlugin.ExpandVolumeDevice(
-				volumeSpec,
-				pvcWithResizeRequest.ExpectedSize,
-				pvcWithResizeRequest.CurrentSize)
+			glog.Warningf("calling ExpandVolume for volume %s", pvcWithResizeRequest.QualifiedName())
 
-			if expandErr != nil {
-				detailedErr := fmt.Errorf("Error expanding volume %q of plugin %s : %v", pvcWithResizeRequest.QualifiedName(), volumePlugin.GetPluginName(), expandErr)
-				return detailedErr, detailedErr
+			var updatedSize resource.Quantity
+
+			if volumePlugin != nil {
+				var expandErr error
+				updatedSize, expandErr = volumePlugin.ExpandVolumeDevice(
+					volumeSpec,
+					pvcWithResizeRequest.ExpectedSize,
+					pvcWithResizeRequest.CurrentSize)
+
+				if expandErr != nil {
+					detailedErr := fmt.Errorf("Error expanding volume %q of plugin %s : %v", pvcWithResizeRequest.QualifiedName(), volumePlugin.GetPluginName(), expandErr)
+					return detailedErr, detailedErr
+				}
+			} else {
+				// this is the case for flex volume, which doesn't reside on the controller
+				updatedSize = newSize
 			}
+
 			glog.Infof("ExpandVolume succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
 			newSize = updatedSize
 			// k8s doesn't have transactions, we can't guarantee that after updating PV - updating PVC will be
@@ -1282,7 +1328,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		// No Cloudprovider resize needed, lets mark resizing as done
 		// Rest of the volume expand controller code will assume PVC as *not* resized until pvc.Status.Size
 		// reflects user requested size.
-		if !volumePlugin.RequiresFSResize() {
+		if volumePlugin != nil && !volumePlugin.RequiresFSResize() {
 			glog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
 			err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)
 
@@ -1312,7 +1358,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     expandVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(volumePlugin.GetPluginName(), "expand_volume"),
+		CompleteFunc:      util.OperationCompleteHook(getPluginName(), "expand_volume"),
 	}, nil
 }
 
@@ -1349,6 +1395,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 
 	fsResizeFunc := func() (error, error) {
 		resizeSimpleError, resizeDetailedError := og.resizeFileSystem(volumeToMount, volumeToMount.DevicePath, deviceMountPath, volumePlugin.GetPluginName())
+
 		if resizeSimpleError != nil || resizeDetailedError != nil {
 			return resizeSimpleError, resizeDetailedError
 		}

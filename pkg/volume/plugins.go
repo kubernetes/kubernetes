@@ -216,6 +216,13 @@ type ExpandableVolumePlugin interface {
 	RequiresFSResize() bool
 }
 
+// FSResizableVolumePlugin is an extension of ExpandableVolumePlugin and is used for volumes (flex)
+// that require extra steps on nodes for expansion to complete
+type FSResizableVolumePlugin interface {
+	ExpandableVolumePlugin
+	ExpandFS(spec *Spec, devicePath, deviceMountPath string) error
+}
+
 // VolumePluginWithAttachLimits is an extended interface of VolumePlugin that restricts number of
 // volumes that can be attached to a node.
 type VolumePluginWithAttachLimits interface {
@@ -806,6 +813,34 @@ func (pm *VolumePluginMgr) FindMapperPluginByName(name string) (BlockVolumePlugi
 	if blockVolumePlugin, ok := volumePlugin.(BlockVolumePlugin); ok {
 		return blockVolumePlugin, nil
 	}
+	return nil, nil
+}
+
+// FindFSResizablePluginBySpec fetches a persistent volume plugin by spec
+func (pm *VolumePluginMgr) FindFSResizablePluginBySpec(spec *Spec) (FSResizableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+		return fsResizablePlugin, nil
+	}
+
+	return nil, nil
+}
+
+// FindFSResizablePluginByName fetches a persistent volume plugin by name
+func (pm *VolumePluginMgr) FindFSResizablePluginByName(name string) (FSResizableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+		return fsResizablePlugin, nil
+	}
+
 	return nil, nil
 }
 
