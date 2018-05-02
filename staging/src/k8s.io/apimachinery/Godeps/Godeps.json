@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/apimachinery",
 	"GoVersion": "go1.9",
-	"GodepVersion": "v79",
+	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
 	],
@@ -24,7 +24,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "944e07253867aacae43c04b2e6a239005443f33a"
+			"Rev": "ed7cfbae1fffc071f71e068df27bf4f0521402d8"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
@@ -172,7 +172,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "a07b7bbb58e7fdc5144f8d7046331d29fc9ad3b3"
+			"Rev": "50ae88d24ede7b8bad68e23c805b5d3da5c8abaf"
 		}
 	]
 }

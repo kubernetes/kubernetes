@@ -54,7 +54,7 @@ var InitFeatureGates = FeatureList{
 	StoreCertsInSecrets: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 	// We don't want to advertise this feature gate exists in v1.9 to avoid confusion as it is not yet working
 	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190, HiddenInHelpText: true},
-	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}, MinimumVersion: v190},
 	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
 	Auditing:             {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 }

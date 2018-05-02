@@ -89,7 +89,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 		mediaType += ";stream=watch"
 	}
 
-	ctx := scope.ContextFunc(req)
+	ctx := req.Context()
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
 		scope.err(fmt.Errorf("missing requestInfo"), w, req)

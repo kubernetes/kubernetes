@@ -24,6 +24,11 @@ service Registration {
 	rpc Register(RegisterRequest) returns (Empty) {}
 }
 
+message DevicePluginOptions {
+        // Indicates if PreStartContainer call is required before each container start
+	bool pre_start_required = 1;
+}
+
 message RegisterRequest {
 	// Version of the API the Device Plugin was built against
 	string version = 1;
@@ -32,6 +37,8 @@ message RegisterRequest {
 	string endpoint = 2;
 	// Schedulable resource name. As of now it's expected to be a DNS Label
 	string resource_name = 3;
+        // Options to be communicated with Device Manager
+        DevicePluginOptions options = 4;
 }
 
 message Empty {
@@ -39,6 +46,10 @@ message Empty {
 
 // DevicePlugin is the service advertised by Device Plugins
 service DevicePlugin {
+	// GetDevicePluginOptions returns options to be communicated with Device
+        // Manager
+	rpc GetDevicePluginOptions(Empty) returns (DevicePluginOptions) {}
+
 	// ListAndWatch returns a stream of List of Devices
 	// Whenever a Device state change or a Device disapears, ListAndWatch
 	// returns the new list
@@ -48,6 +59,11 @@ service DevicePlugin {
 	// Plugin can run device specific operations and instruct Kubelet
 	// of the steps to make the Device available in the container
 	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
+
+        // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+        // before each container start. Device plugin can run device specific operations
+        // such as reseting the device before making devices available to the container
+	rpc PreStartContainer(PreStartContainerRequest) returns (PreStartContainerResponse) {}
 }
 
 // ListAndWatch returns a stream of List of Devices
@@ -71,6 +87,18 @@ message Device {
 	string health = 2;
 }
 
+// - PreStartContainer is expected to be called before each container start if indicated by plugin during registration phase.
+// - PreStartContainer allows kubelet to pass reinitialized devices to containers.
+// - PreStartContainer allows Device Plugin to run device specific operations on
+//   the Devices requested
+message PreStartContainerRequest {
+        repeated string devicesIDs = 1;
+}
+
+// PreStartContainerResponse will be send by plugin in response to PreStartContainerRequest
+message PreStartContainerResponse {
+}
+
 // - Allocate is expected to be called during pod creation since allocation
 //   failures for any container would result in pod startup failure.
 // - Allocate allows kubelet to exposes additional artifacts in a pod's
@@ -78,6 +106,10 @@ message Device {
 // - Allocate allows Device Plugin to run device specific operations on
 //   the Devices requested
 message AllocateRequest {
+	repeated ContainerAllocateRequest container_requests = 1;
+}
+
+message ContainerAllocateRequest {
 	repeated string devicesIDs = 1;
 }
 
@@ -90,6 +122,10 @@ message AllocateRequest {
 // The Device plugin should send a ListAndWatch update and fail the
 // Allocation request
 message AllocateResponse {
+	repeated ContainerAllocateResponse container_responses = 1;
+}
+
+message ContainerAllocateResponse {
   	// List of environment variable to be set in the container to access one of more devices.
 	map<string, string> envs = 1;
 	// Mounts for the container.

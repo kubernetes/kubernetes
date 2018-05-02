@@ -17,8 +17,9 @@ limitations under the License.
 package etcd
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -72,6 +73,6 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }

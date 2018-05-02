@@ -24,7 +24,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -71,7 +71,7 @@ func TestLoad(t *testing.T) {
 		// invalid object
 		{
 			"missing kind",
-			newString(`{"apiVersion":"kubeletconfig/v1alpha1"}`),
+			newString(`{"apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
 			nil,
 			"failed to decode",
 		},
@@ -83,7 +83,7 @@ func TestLoad(t *testing.T) {
 		},
 		{
 			"unregistered kind",
-			newString(`{"kind":"BogusKind","apiVersion":"kubeletconfig/v1alpha1"}`),
+			newString(`{"kind":"BogusKind","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
 			nil,
 			"failed to decode",
 		},
@@ -98,13 +98,13 @@ func TestLoad(t *testing.T) {
 		{
 			"default from yaml",
 			newString(`kind: KubeletConfiguration
-apiVersion: kubeletconfig/v1alpha1`),
+apiVersion: kubelet.config.k8s.io/v1beta1`),
 			newConfig(t),
 			"",
 		},
 		{
 			"default from json",
-			newString(`{"kind":"KubeletConfiguration","apiVersion":"kubeletconfig/v1alpha1"}`),
+			newString(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
 			newConfig(t),
 			"",
 		},
@@ -113,21 +113,21 @@ apiVersion: kubeletconfig/v1alpha1`),
 		{
 			"yaml, relative path is resolved",
 			newString(fmt.Sprintf(`kind: KubeletConfiguration
-apiVersion: kubeletconfig/v1alpha1
-podManifestPath: %s`, relativePath)),
+apiVersion: kubelet.config.k8s.io/v1beta1
+staticPodPath: %s`, relativePath)),
 			func() *kubeletconfig.KubeletConfiguration {
 				kc := newConfig(t)
-				kc.PodManifestPath = filepath.Join(configDir, relativePath)
+				kc.StaticPodPath = filepath.Join(configDir, relativePath)
 				return kc
 			}(),
 			"",
 		},
 		{
 			"json, relative path is resolved",
-			newString(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubeletconfig/v1alpha1","podManifestPath":"%s"}`, relativePath)),
+			newString(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","staticPodPath":"%s"}`, relativePath)),
 			func() *kubeletconfig.KubeletConfiguration {
 				kc := newConfig(t)
-				kc.PodManifestPath = filepath.Join(configDir, relativePath)
+				kc.StaticPodPath = filepath.Join(configDir, relativePath)
 				return kc
 			}(),
 			"",
@@ -155,7 +155,6 @@ podManifestPath: %s`, relativePath)),
 				t.Fatalf("expect %#v but got %#v", *c.expect, *kc)
 			}
 		})
-
 	}
 }
 
@@ -204,7 +203,7 @@ func newConfig(t *testing.T) *kubeletconfig.KubeletConfiguration {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// get the built-in default configuration
-	external := &kubeletconfigv1alpha1.KubeletConfiguration{}
+	external := &kubeletconfigv1beta1.KubeletConfiguration{}
 	kubeletScheme.Default(external)
 	kc := &kubeletconfig.KubeletConfiguration{}
 	err = kubeletScheme.Convert(external, kc, nil)

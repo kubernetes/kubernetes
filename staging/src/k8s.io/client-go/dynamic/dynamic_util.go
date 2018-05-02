@@ -26,18 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// VersionInterfaces provides an object converter and metadata
-// accessor appropriate for use with unstructured objects.
-func VersionInterfaces(schema.GroupVersion) (*meta.VersionInterfaces, error) {
-	return &meta.VersionInterfaces{
-		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
-		MetadataAccessor: meta.NewAccessor(),
-	}, nil
-}
-
 // NewDiscoveryRESTMapper returns a RESTMapper based on discovery information.
-func NewDiscoveryRESTMapper(resources []*metav1.APIResourceList, versionFunc meta.VersionInterfacesFunc) (*meta.DefaultRESTMapper, error) {
-	rm := meta.NewDefaultRESTMapper(nil, versionFunc)
+func NewDiscoveryRESTMapper(resources []*metav1.APIResourceList) (*meta.DefaultRESTMapper, error) {
+	rm := meta.NewDefaultRESTMapper(nil)
 	for _, resourceList := range resources {
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {

@@ -48,8 +48,11 @@ var (
 		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`)
 
 	view_example = templates.Examples(`
-		# Show Merged kubeconfig settings.
+		# Show merged kubeconfig settings.
 		kubectl config view
+
+		# Show merged kubeconfig settings and raw certificate data.
+		kubectl config view --raw
 
 		# Get the password for the e2e user
 		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
@@ -80,9 +83,8 @@ func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess cli
 			}
 
 			printOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
-			printer, err := f.PrinterForOptions(printOpts)
+			printer, err := cmdutil.PrinterForOptions(printOpts)
 			cmdutil.CheckErr(err)
-			printer = printers.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
 
 			cmdutil.CheckErr(options.Run(out, printer))
 		},
@@ -94,9 +96,9 @@ func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess cli
 	options.Merge.Default(true)
 	mergeFlag := cmd.Flags().VarPF(&options.Merge, "merge", "", "Merge the full hierarchy of kubeconfig files")
 	mergeFlag.NoOptDefVal = "true"
-	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "Display raw byte data")
-	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
-	cmd.Flags().BoolVar(&options.Minify, "minify", false, "Remove all information not used by current-context from the output")
+	cmd.Flags().BoolVar(&options.RawByteData, "raw", options.RawByteData, "Display raw byte data")
+	cmd.Flags().BoolVar(&options.Flatten, "flatten", options.Flatten, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
+	cmd.Flags().BoolVar(&options.Minify, "minify", options.Minify, "Remove all information not used by current-context from the output")
 	return cmd
 }
 
@@ -120,7 +122,12 @@ func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error 
 		clientcmdapi.ShortenConfig(config)
 	}
 
-	err = printer.PrintObj(config, out)
+	convertedObj, err := latest.Scheme.ConvertToVersion(config, latest.ExternalVersion)
+	if err != nil {
+		return err
+	}
+
+	err = printer.PrintObj(convertedObj, out)
 	if err != nil {
 		return err
 	}

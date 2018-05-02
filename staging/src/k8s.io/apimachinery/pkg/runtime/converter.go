@@ -411,8 +411,7 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 	var u map[string]interface{}
 	var err error
 	if unstr, ok := obj.(Unstructured); ok {
-		// UnstructuredContent() mutates the object so we need to make a copy first
-		u = unstr.DeepCopyObject().(Unstructured).UnstructuredContent()
+		u = unstr.UnstructuredContent()
 	} else {
 		t := reflect.TypeOf(obj)
 		value := reflect.ValueOf(obj)
@@ -449,12 +448,20 @@ func DeepCopyJSON(x map[string]interface{}) map[string]interface{} {
 func DeepCopyJSONValue(x interface{}) interface{} {
 	switch x := x.(type) {
 	case map[string]interface{}:
+		if x == nil {
+			// Typed nil - an interface{} that contains a type map[string]interface{} with a value of nil
+			return x
+		}
 		clone := make(map[string]interface{}, len(x))
 		for k, v := range x {
 			clone[k] = DeepCopyJSONValue(v)
 		}
 		return clone
 	case []interface{}:
+		if x == nil {
+			// Typed nil - an interface{} that contains a type []interface{} with a value of nil
+			return x
+		}
 		clone := make([]interface{}, len(x))
 		for i, v := range x {
 			clone[i] = DeepCopyJSONValue(v)

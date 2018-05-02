@@ -36,7 +36,6 @@ go_library(
 go_binary(
     name = "ginkgo",
     embed = [":go_default_library"],
-    importpath = "github.com/onsi/ginkgo/ginkgo",
     visibility = ["//visibility:public"],
 )
 

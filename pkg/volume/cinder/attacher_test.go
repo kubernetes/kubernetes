@@ -712,10 +712,6 @@ func (instances *instances) NodeAddressesByProviderID(ctx context.Context, provi
 	return []v1.NodeAddress{}, errors.New("Not implemented")
 }
 
-func (instances *instances) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	return "", errors.New("Not implemented")
-}
-
 func (instances *instances) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	return instances.instanceID, nil
 }

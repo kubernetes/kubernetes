@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["patch_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/util/jsonmergepatch",
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",

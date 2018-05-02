@@ -15,36 +15,47 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "globalflags_linux.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "globalflags_other.go",
+            "osflags_windows.go",
         ],
         "//conditions:default": [],
     }),
@@ -57,7 +68,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/types:go_default_library",
@@ -102,7 +113,6 @@ go_test(
     name = "go_default_test",
     srcs = ["options_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubelet/app/options",
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",

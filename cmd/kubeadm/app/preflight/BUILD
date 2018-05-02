@@ -51,8 +51,9 @@ go_library(
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
-        "//cmd/kube-scheduler/app:go_default_library",
+        "//cmd/kube-scheduler/app/options:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
@@ -63,6 +64,7 @@ go_library(
         "//test/e2e_node/system:go_default_library",
         "//vendor/github.com/PuerkitoBio/purell:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
@@ -77,7 +79,6 @@ go_test(
         "utils_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/preflight",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//vendor/github.com/renstrom/dedent:go_default_library",

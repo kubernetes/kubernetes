@@ -21,12 +21,23 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 type FileType int
@@ -420,5 +431,151 @@ func TestTarDestinationName(t *testing.T) {
 		if !strings.HasPrefix(hdr.Name, path.Base(dir2)) {
 			t.Errorf("expected %q as destination filename prefix, saw: %q", path.Base(dir2), hdr.Name)
 		}
+	}
+}
+
+func TestBadTar(t *testing.T) {
+	dir, err := ioutil.TempDir(os.TempDir(), "dest")
+	if err != nil {
+		t.Errorf("unexpected error: %v ", err)
+		t.FailNow()
+	}
+	defer os.RemoveAll(dir)
+
+	// More or less cribbed from https://golang.org/pkg/archive/tar/#example__minimal
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	var files = []struct {
+		name string
+		body string
+	}{
+		{"/prefix/../../../tmp/foo", "Up to temp"},
+		{"/prefix/foo/bar/../../home/bburns/names.txt", "Down and back"},
+	}
+	for _, file := range files {
+		hdr := &tar.Header{
+			Name: file.name,
+			Mode: 0600,
+			Size: int64(len(file.body)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Errorf("unexpected error: %v ", err)
+			t.FailNow()
+		}
+		if _, err := tw.Write([]byte(file.body)); err != nil {
+			t.Errorf("unexpected error: %v ", err)
+			t.FailNow()
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Errorf("unexpected error: %v ", err)
+		t.FailNow()
+	}
+
+	if err := untarAll(&buf, dir, "/prefix"); err != nil {
+		t.Errorf("unexpected error: %v ", err)
+		t.FailNow()
+	}
+
+	for _, file := range files {
+		_, err := os.Stat(path.Join(dir, path.Clean(file.name[len("/prefix"):])))
+		if err != nil {
+			t.Errorf("Error finding file: %v", err)
+		}
+	}
+
+}
+
+func TestClean(t *testing.T) {
+	tests := []struct {
+		input   string
+		cleaned string
+	}{
+		{
+			"../../../tmp/foo",
+			"/tmp/foo",
+		},
+		{
+			"/../../../tmp/foo",
+			"/tmp/foo",
+		},
+	}
+
+	for _, test := range tests {
+		out := clean(test.input)
+		if out != test.cleaned {
+			t.Errorf("Expected: %s, saw %s", test.cleaned, out)
+		}
+	}
+}
+
+func TestCopyToPod(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	tf.Namespace = "test"
+	ns := legacyscheme.Codecs
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			responsePod := &v1.Pod{}
+			return &http.Response{StatusCode: http.StatusNotFound, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, responsePod))))}, nil
+		}),
+	}
+
+	tf.ClientConfigVal = defaultClientConfig()
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdCp(tf, ioStreams)
+
+	srcFile, err := ioutil.TempDir("", "test")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		t.FailNow()
+	}
+	defer os.RemoveAll(srcFile)
+
+	tests := map[string]struct {
+		dest        string
+		expectedErr bool
+	}{
+		"copy to directory": {
+			dest:        "/tmp/",
+			expectedErr: false,
+		},
+		"copy to root": {
+			dest:        "/",
+			expectedErr: false,
+		},
+		"copy to empty file name": {
+			dest:        "",
+			expectedErr: true,
+		},
+	}
+
+	for name, test := range tests {
+		opts := NewCopyOptions(ioStreams)
+		src := fileSpec{
+			File: srcFile,
+		}
+		dest := fileSpec{
+			PodNamespace: "pod-ns",
+			PodName:      "pod-name",
+			File:         test.dest,
+		}
+		opts.Complete(tf, cmd)
+		t.Run(name, func(t *testing.T) {
+			err = opts.copyToPod(src, dest)
+			//If error is NotFound error , it indicates that the
+			//request has been sent correctly.
+			//Treat this as no error.
+			if test.expectedErr && errors.IsNotFound(err) {
+				t.Errorf("expected error but didn't get one")
+			}
+			if !test.expectedErr && !errors.IsNotFound(err) {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
 }

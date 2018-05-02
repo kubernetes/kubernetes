@@ -36,8 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 const (
@@ -149,7 +149,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
@@ -227,7 +227,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
@@ -306,7 +306,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
@@ -396,7 +396,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
@@ -479,7 +479,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{UID: "001", Name: "volume-name"},
 		Spec: v1.PersistentVolumeSpec{
 			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G")},
-			PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{}},
+			PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "fake-device1"}},
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadOnlyMany,
@@ -491,7 +491,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	volumeSpec := &volume.Spec{
 		PersistentVolume: gcepv,
 	}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
@@ -570,7 +570,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{UID: "001", Name: "volume-name"},
 		Spec: v1.PersistentVolumeSpec{
 			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G")},
-			PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{}},
+			PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "fake-device1"}},
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadOnlyMany,
@@ -582,7 +582,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	volumeSpec := &volume.Spec{
 		PersistentVolume: gcepv,
 	}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
@@ -662,7 +662,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{UID: "001", Name: "volume-name"},
 		Spec: v1.PersistentVolumeSpec{
 			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G")},
-			PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{}},
+			PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "fake-device1"}},
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadOnlyMany,
@@ -674,7 +674,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 	volumeSpec := &volume.Spec{
 		PersistentVolume: gcepv,
 	}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
@@ -764,7 +764,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{UID: "001", Name: "volume-name"},
 		Spec: v1.PersistentVolumeSpec{
 			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G")},
-			PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{}},
+			PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "fake-device1"}},
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadOnlyMany,
@@ -776,7 +776,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	volumeSpec := &volume.Spec{
 		PersistentVolume: gcepv,
 	}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
@@ -908,7 +908,7 @@ func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			volumeToUnmount := operationexecutor.MountedVolume{
 				PluginName: "fake-file-plugin",
 				VolumeSpec: tmpSpec}
-			err := oex.UnmountVolume(volumeToUnmount, asw)
+			err := oex.UnmountVolume(volumeToUnmount, asw, "" /* podsDir */)
 			// Assert
 			if assert.Error(t, err) {
 				assert.Contains(t, err.Error(), tc.expectedErrMsg)
@@ -1029,11 +1029,10 @@ func createTestClient() *fake.Clientset {
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{
-							Name:       "fake-plugin/volume-name",
+							Name:       "fake-plugin/fake-device1",
 							DevicePath: "fake/path",
 						},
 					}},
-				Spec: v1.NodeSpec{ExternalID: string(nodeName)},
 			}, nil
 		})
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {

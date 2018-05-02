@@ -27,6 +27,7 @@ import (
 	"github.com/emicklei/go-restful-swagger12"
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apimachinery"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
@@ -95,9 +95,7 @@ type GenericAPIServer struct {
 	// admissionControl is used to build the RESTStorage that backs an API Group.
 	admissionControl admission.Interface
 
-	// requestContextMapper provides a way to get the context for a request.  It may be nil.
-	requestContextMapper apirequest.RequestContextMapper
-
+	// SecureServingInfo holds configuration of the TLS server.
 	SecureServingInfo *SecureServingInfo
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
@@ -146,7 +144,7 @@ type GenericAPIServer struct {
 	// if the client requests it via Accept-Encoding
 	enableAPIResponseCompression bool
 
-	// delegationTarget is the next delegate in the chain or nil
+	// delegationTarget is the next delegate in the chain. This is never nil.
 	delegationTarget DelegationTarget
 
 	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
@@ -158,10 +156,6 @@ type GenericAPIServer struct {
 type DelegationTarget interface {
 	// UnprotectedHandler returns a handler that is NOT protected by a normal chain
 	UnprotectedHandler() http.Handler
-
-	// RequestContextMapper returns the existing RequestContextMapper.  Because we cannot rewire all existing
-	// uses of this function, this will be used in any delegating API server
-	RequestContextMapper() apirequest.RequestContextMapper
 
 	// PostStartHooks returns the post-start hooks that need to be combined
 	PostStartHooks() map[string]postStartHookEntry
@@ -200,12 +194,11 @@ func (s *GenericAPIServer) NextDelegate() DelegationTarget {
 	return s.delegationTarget
 }
 
-var EmptyDelegate = emptyDelegate{
-	requestContextMapper: apirequest.NewRequestContextMapper(),
+type emptyDelegate struct {
 }
 
-type emptyDelegate struct {
-	requestContextMapper apirequest.RequestContextMapper
+func NewEmptyDelegate() DelegationTarget {
+	return emptyDelegate{}
 }
 
 func (s emptyDelegate) UnprotectedHandler() http.Handler {
@@ -223,25 +216,11 @@ func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
 func (s emptyDelegate) ListedPaths() []string {
 	return []string{}
 }
-func (s emptyDelegate) RequestContextMapper() apirequest.RequestContextMapper {
-	return s.requestContextMapper
-}
 func (s emptyDelegate) NextDelegate() DelegationTarget {
 	return nil
 }
 
-// RequestContextMapper is exposed so that third party resource storage can be build in a different location.
-// TODO refactor third party resource storage
-func (s *GenericAPIServer) RequestContextMapper() apirequest.RequestContextMapper {
-	return s.requestContextMapper
-}
-
-// MinRequestTimeout is exposed so that third party resource storage can be build in a different location.
-// TODO refactor third party resource storage
-func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
-	return s.minRequestTimeout
-}
-
+// preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
 type preparedGenericAPIServer struct {
 	*GenericAPIServer
 }
@@ -259,12 +238,6 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 
 	s.installHealthz()
 
-	return preparedGenericAPIServer{s}
-}
-
-// Run spawns the secure http server. It only returns if stopCh is closed
-// or the secure port cannot be listened on initially.
-func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	// Register audit backend preShutdownHook.
 	if s.AuditBackend != nil {
 		s.AddPreShutdownHook("audit-backend", func() error {
@@ -273,6 +246,12 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		})
 	}
 
+	return preparedGenericAPIServer{s}
+}
+
+// Run spawns the secure http server. It only returns if stopCh is closed
+// or the secure port cannot be listened on initially.
+func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	err := s.NonBlockingRun(stopCh)
 	if err != nil {
 		return err
@@ -349,7 +328,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		}
 
 		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
-			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
+			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
 		}
 	}
 
@@ -371,7 +350,8 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	}
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
-	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions, s.requestContextMapper).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions).WebService())
+
 	return nil
 }
 
@@ -379,10 +359,10 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
 	// Catching these here places the error  much closer to its origin
-	if len(apiGroupInfo.GroupMeta.GroupVersion.Group) == 0 {
+	if len(apiGroupInfo.GroupMeta.GroupVersions[0].Group) == 0 {
 		return fmt.Errorf("cannot register handler with an empty group for %#v", *apiGroupInfo)
 	}
-	if len(apiGroupInfo.GroupMeta.GroupVersion.Version) == 0 {
+	if len(apiGroupInfo.GroupMeta.GroupVersions[0].Version) == 0 {
 		return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
 	}
 
@@ -405,17 +385,17 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		})
 	}
 	preferredVersionForDiscovery := metav1.GroupVersionForDiscovery{
-		GroupVersion: apiGroupInfo.GroupMeta.GroupVersion.String(),
-		Version:      apiGroupInfo.GroupMeta.GroupVersion.Version,
+		GroupVersion: apiGroupInfo.GroupMeta.GroupVersions[0].String(),
+		Version:      apiGroupInfo.GroupMeta.GroupVersions[0].Version,
 	}
 	apiGroup := metav1.APIGroup{
-		Name:             apiGroupInfo.GroupMeta.GroupVersion.Group,
+		Name:             apiGroupInfo.GroupMeta.GroupVersions[0].Group,
 		Versions:         apiVersionsForDiscovery,
 		PreferredVersion: preferredVersionForDiscovery,
 	}
 
 	s.DiscoveryGroupManager.AddGroup(apiGroup)
-	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup, s.requestContextMapper).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup).WebService())
 
 	return nil
 }
@@ -443,11 +423,9 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
 		Defaulter:       apiGroupInfo.Scheme,
 		Typer:           apiGroupInfo.Scheme,
-		Linker:          apiGroupInfo.GroupMeta.SelfLinker,
-		Mapper:          apiGroupInfo.GroupMeta.RESTMapper,
+		Linker:          runtime.SelfLinker(meta.NewAccessor()),
 
 		Admit:                        s.admissionControl,
-		Context:                      s.RequestContextMapper(),
 		MinRequestTimeout:            s.minRequestTimeout,
 		EnableAPIResponseCompression: s.enableAPIResponseCompression,
 	}

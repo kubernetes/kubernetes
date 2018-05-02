@@ -21,6 +21,7 @@ go_library(
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/remotecommand:go_default_library",
@@ -35,7 +36,6 @@ go_test(
         "server_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/server/streaming",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",

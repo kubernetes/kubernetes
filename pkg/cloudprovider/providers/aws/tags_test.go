@@ -19,13 +19,12 @@ package aws
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"strings"
 	"testing"
 )
 
 func TestFilterTags(t *testing.T) {
 	awsServices := NewFakeAWSServices(TestClusterId)
-	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
 	if err != nil {
 		t.Errorf("Error building aws cloud: %v", err)
 		return

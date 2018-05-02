@@ -178,7 +178,7 @@ func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeNam
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)
 	}
-	if _, err := instances.ExternalID(context.TODO(), nodeName); err != nil {
+	if _, err := instances.InstanceID(context.TODO(), nodeName); err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			return false, nil
 		}
@@ -189,16 +189,15 @@ func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeNam
 
 // ShutdownInCloudProvider returns true if the node is shutdowned in
 // cloud provider.
-func ShutdownInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
+func ShutdownInCloudProvider(ctx context.Context, cloud cloudprovider.Interface, node *v1.Node) (bool, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)
 	}
-	providerID, err := cloudprovider.GetInstanceProviderID(context.TODO(), cloud, nodeName)
-	if err != nil {
-		return false, err
+	shutdown, err := instances.InstanceShutdownByProviderID(ctx, node.Spec.ProviderID)
+	if err == cloudprovider.NotImplemented {
+		return false, nil
 	}
-	shutdown, err := instances.InstanceShutdownByProviderID(context.TODO(), providerID)
 	return shutdown, err
 }
 

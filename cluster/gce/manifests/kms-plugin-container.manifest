@@ -1,0 +1,8 @@
+{
+  "name": "kms-plugin",
+  "image": "gcr.io/google-containers/k8s-cloud-kms-plugin:v0.1.1",
+  "command": ["/k8s-cloud-kms-plugin", "--key-uri={{kms_key_uri}}", "--path-to-unix-socket={{kms_path_to_socket}}", "--gce-config={{gce_conf_path}}", "--logtostderr", "2>\&1"],
+  "livenessProbe": { "httpGet": {"host": "127.0.0.1", "port": 8081, "path": "/healthz"}, "initialDelaySeconds": 3, "timeoutSeconds": 3},
+  "ports":[{ "name": "healthz", "containerPort": 8081, "hostPort": 8081}, { "name": "metrics", "containerPort": 8082, "hostPort": 8082}],
+  "volumeMounts": [{{cloud_config_mount}}, {{kms_socket_mount}}]
+}

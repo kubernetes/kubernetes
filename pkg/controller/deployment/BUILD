@@ -29,7 +29,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -57,7 +56,6 @@ go_test(
         "sync_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/deployment",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps/install:go_default_library",

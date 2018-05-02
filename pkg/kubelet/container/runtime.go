@@ -95,7 +95,7 @@ type Runtime interface {
 	// it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
 	KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error
 	// GetPodStatus retrieves the status of the pod, including the
-	// information of all containers in the pod that are visble in Runtime.
+	// information of all containers in the pod that are visible in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
 	// Returns the filesystem path of the pod's network namespace; if the
 	// runtime does not handle namespace creation itself, or cannot return
@@ -198,7 +198,7 @@ type PodPair struct {
 
 // ContainerID is a type that identifies a container.
 type ContainerID struct {
-	// The type of the container runtime. e.g. 'docker', 'rkt'.
+	// The type of the container runtime. e.g. 'docker'.
 	Type string
 	// The identification of the container, this is comsumable by
 	// the underlying container runtime. (Note that the container
@@ -444,8 +444,6 @@ type RunContainerOptions struct {
 	// this directory will be used to create and mount the log file to
 	// container.TerminationMessagePath
 	PodContainerDir string
-	// The parent cgroup to pass to Docker
-	CgroupParent string
 	// The type of container rootfs
 	ReadOnly bool
 	// hostname for pod containers
@@ -470,6 +468,9 @@ type VolumeInfo struct {
 	// Whether the volume permission is set to read-only or not
 	// This value is passed from volume.spec
 	ReadOnly bool
+	// Inner volume spec name, which is the PV name if used, otherwise
+	// it is the same as the outer volume spec name.
+	InnerVolumeSpecName string
 }
 
 type VolumeMap map[string]VolumeInfo

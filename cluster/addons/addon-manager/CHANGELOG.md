@@ -1,3 +1,7 @@
+### Version 8.6  (Tue February 20 2018 Zihong Zheng <zihongz@google.com>)
+ - Allow reconcile/ensure loop to work with resource under non-kube-system namespace.
+ - Update kubectl to v1.9.3.
+
 ### Version 8.4  (Thu November 30 2017 zou nengren @zouyee)
  - Update kubectl to v1.8.4.
 

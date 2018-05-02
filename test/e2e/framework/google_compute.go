@@ -35,8 +35,12 @@ func lookupClusterImageSources() (string, string, error) {
 	gcloudf := func(argv ...string) ([]string, error) {
 		args := []string{"compute"}
 		args = append(args, argv...)
-		args = append(args, "--project", TestContext.CloudConfig.ProjectID,
-			"--zone", TestContext.CloudConfig.Zone)
+		args = append(args, "--project", TestContext.CloudConfig.ProjectID)
+		if TestContext.CloudConfig.MultiMaster {
+			args = append(args, "--region", TestContext.CloudConfig.Region)
+		} else {
+			args = append(args, "--zone", TestContext.CloudConfig.Zone)
+		}
 		outputBytes, err := exec.Command("gcloud", args...).CombinedOutput()
 		str := strings.Replace(string(outputBytes), ",", "\n", -1)
 		str = strings.Replace(str, ";", "\n", -1)
@@ -123,4 +127,34 @@ func LogClusterImageSources() {
 	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
 		Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
+}
+
+func CreateManagedInstanceGroup(size int64, zone, template string) error {
+	// TODO(verult): make this hit the compute API directly instead of
+	// shelling out to gcloud.
+	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
+		"create",
+		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--zone=%s", zone),
+		TestContext.CloudConfig.NodeInstanceGroup,
+		fmt.Sprintf("--size=%d", size),
+		fmt.Sprintf("--template=%s", template))
+	if err != nil {
+		return fmt.Errorf("gcloud compute instance-groups managed create call failed with err: %v", err)
+	}
+	return nil
+}
+
+func DeleteManagedInstanceGroup(zone string) error {
+	// TODO(verult): make this hit the compute API directly instead of
+	// shelling out to gcloud.
+	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
+		"delete",
+		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--zone=%s", zone),
+		TestContext.CloudConfig.NodeInstanceGroup)
+	if err != nil {
+		return fmt.Errorf("gcloud compute instance-groups managed delete call failed with err: %v", err)
+	}
+	return nil
 }

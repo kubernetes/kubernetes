@@ -278,7 +278,7 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 	if err != nil {
 		return fmt.Errorf("failed to tail %d lines of log file %q: %v", opts.tail, path, err)
 	}
-	if _, err := f.Seek(start, os.SEEK_SET); err != nil {
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
 		return fmt.Errorf("failed to seek %d in log file %q: %v", start, path, err)
 	}
 
@@ -303,7 +303,7 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 			if opts.follow {
 				// Reset seek so that if this is an incomplete line,
 				// it will be read again.
-				if _, err := f.Seek(-int64(len(l)), os.SEEK_CUR); err != nil {
+				if _, err := f.Seek(-int64(len(l)), io.SeekCurrent); err != nil {
 					return fmt.Errorf("failed to reset seek in log file %q: %v", path, err)
 				}
 				if watcher == nil {
@@ -354,9 +354,28 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 	}
 }
 
+func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
+	s, err := r.ContainerStatus(id)
+	if err != nil {
+		return false, err
+	}
+	// Only keep following container log when it is running.
+	if s.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
+		glog.V(5).Infof("Container %q is not running (state=%q)", id, s.State)
+		// Do not return error because it's normal that the container stops
+		// during waiting.
+		return false, nil
+	}
+	return true, nil
+}
+
 // waitLogs wait for the next log write. It returns a boolean and an error. The boolean
 // indicates whether a new log is found; the error is error happens during waiting new logs.
 func waitLogs(id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, error) {
+	// no need to wait if the pod is not running
+	if running, err := isContainerRunning(id, runtimeService); !running {
+		return false, err
+	}
 	errRetry := 5
 	for {
 		select {
@@ -374,16 +393,8 @@ func waitLogs(id string, w *fsnotify.Watcher, runtimeService internalapi.Runtime
 			}
 			errRetry--
 		case <-time.After(stateCheckPeriod):
-			s, err := runtimeService.ContainerStatus(id)
-			if err != nil {
+			if running, err := isContainerRunning(id, runtimeService); !running {
 				return false, err
-			}
-			// Only keep following container log when it is running.
-			if s.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
-				glog.Errorf("Container %q is not running (state=%q)", id, s.State)
-				// Do not return error because it's normal that the container stops
-				// during waiting.
-				return false, nil
 			}
 		}
 	}

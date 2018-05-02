@@ -16,7 +16,6 @@ go_test(
     name = "go_default_test",
     srcs = ["sync_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync",
     deps = [
         "//pkg/controller/nodeipam/ipam/cidrset:go_default_library",
         "//pkg/controller/nodeipam/ipam/test:go_default_library",

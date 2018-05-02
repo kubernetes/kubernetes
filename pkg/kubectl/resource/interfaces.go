@@ -22,6 +22,8 @@ import (
 	client "k8s.io/client-go/rest"
 )
 
+type RESTMapperFunc func() (meta.RESTMapper, error)
+
 // RESTClient is a client helper for dealing with RESTful resources
 // in a generic way.
 type RESTClient interface {

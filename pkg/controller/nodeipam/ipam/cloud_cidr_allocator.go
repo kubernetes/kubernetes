@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	informers "k8s.io/client-go/informers/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -41,8 +42,15 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
+	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
+
+// nodeProcessingInfo tracks information related to current nodes in processing
+type nodeProcessingInfo struct {
+	retries int
+}
 
 // cloudCIDRAllocator allocates node CIDRs according to IP address aliases
 // assigned by the cloud provider. In this case, the allocation and
@@ -67,7 +75,7 @@ type cloudCIDRAllocator struct {
 
 	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
-	nodesInProcessing sets.String
+	nodesInProcessing map[string]*nodeProcessingInfo
 }
 
 var _ CIDRAllocator = (*cloudCIDRAllocator)(nil)
@@ -82,7 +90,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	glog.V(0).Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	gceCloud, ok := cloud.(*gce.GCECloud)
 	if !ok {
@@ -97,7 +105,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 		nodesSynced:       nodeInformer.Informer().HasSynced,
 		nodeUpdateChannel: make(chan string, cidrUpdateQueueSize),
 		recorder:          recorder,
-		nodesInProcessing: sets.NewString(),
+		nodesInProcessing: map[string]*nodeProcessingInfo{},
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -108,8 +116,9 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 			}
 			// Even if PodCIDR is assigned, but NetworkUnavailable condition is
 			// set to true, we need to process the node to set the condition.
+			networkUnavailableTaint := &v1.Taint{Key: algorithm.TaintNodeNetworkUnavailable, Effect: v1.TaintEffectNoSchedule}
 			_, cond := v1node.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
-			if cond == nil || cond.Status != v1.ConditionFalse {
+			if cond == nil || cond.Status != v1.ConditionFalse || utiltaints.TaintExists(newNode.Spec.Taints, networkUnavailableTaint) {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
 			return nil
@@ -147,9 +156,15 @@ func (ca *cloudCIDRAllocator) worker(stopChan <-chan struct{}) {
 				return
 			}
 			if err := ca.updateCIDRAllocation(workItem); err != nil {
-				// Requeue the failed node for update again.
-				ca.nodeUpdateChannel <- workItem
+				if ca.canRetry(workItem) {
+					time.AfterFunc(updateRetryTimeout, func() {
+						// Requeue the failed node for update again.
+						ca.nodeUpdateChannel <- workItem
+					})
+					continue
+				}
 			}
+			ca.removeNodeFromProcessing(workItem)
 		case <-stopChan:
 			return
 		}
@@ -159,17 +174,28 @@ func (ca *cloudCIDRAllocator) worker(stopChan <-chan struct{}) {
 func (ca *cloudCIDRAllocator) insertNodeToProcessing(nodeName string) bool {
 	ca.lock.Lock()
 	defer ca.lock.Unlock()
-	if ca.nodesInProcessing.Has(nodeName) {
+	if _, found := ca.nodesInProcessing[nodeName]; found {
 		return false
 	}
-	ca.nodesInProcessing.Insert(nodeName)
+	ca.nodesInProcessing[nodeName] = &nodeProcessingInfo{}
+	return true
+}
+
+func (ca *cloudCIDRAllocator) canRetry(nodeName string) bool {
+	ca.lock.Lock()
+	defer ca.lock.Unlock()
+	count := ca.nodesInProcessing[nodeName].retries + 1
+	if count > updateMaxRetries {
+		return false
+	}
+	ca.nodesInProcessing[nodeName].retries = count
 	return true
 }
 
 func (ca *cloudCIDRAllocator) removeNodeFromProcessing(nodeName string) {
 	ca.lock.Lock()
 	defer ca.lock.Unlock()
-	ca.nodesInProcessing.Delete(nodeName)
+	delete(ca.nodesInProcessing, nodeName)
 }
 
 // WARNING: If you're adding any return calls or defer any more work from this
@@ -191,10 +217,11 @@ func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 
 // updateCIDRAllocation assigns CIDR to Node and sends an update to the API server.
 func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
-	defer ca.removeNodeFromProcessing(nodeName)
-
 	node, err := ca.nodeLister.Get(nodeName)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil // node no longer available, skip processing
+		}
 		glog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDR: %v", nodeName, err)
 		return err
 	}

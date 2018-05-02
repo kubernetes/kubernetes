@@ -17,14 +17,15 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"golang.org/x/net/context"
 
+	"github.com/golang/glog"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
@@ -51,7 +52,7 @@ func (ds *dockerService) ListImages(_ context.Context, r *runtimeapi.ListImagesR
 	for _, i := range images {
 		apiImage, err := imageToRuntimeAPIImage(&i)
 		if err != nil {
-			// TODO: log an error message?
+			glog.V(5).Infof("Failed to convert docker API image %+v to runtime API image: %v", i, err)
 			continue
 		}
 		result = append(result, apiImage)
@@ -76,7 +77,11 @@ func (ds *dockerService) ImageStatus(_ context.Context, r *runtimeapi.ImageStatu
 		return nil, err
 	}
 
-	return &runtimeapi.ImageStatusResponse{Image: imageStatus}, nil
+	res := runtimeapi.ImageStatusResponse{Image: imageStatus}
+	if r.GetVerbose() {
+		res.Info = imageInspect.Config.Labels
+	}
+	return &res, nil
 }
 
 // PullImage pulls an image with authentication config.

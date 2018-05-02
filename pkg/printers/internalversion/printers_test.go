@@ -55,7 +55,7 @@ import (
 
 func init() {
 	legacyscheme.Scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &TestPrintType{})
-	legacyscheme.Scheme.AddKnownTypes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion, &TestPrintType{})
+	legacyscheme.Scheme.AddKnownTypes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0], &TestPrintType{})
 }
 
 var testData = TestStruct{
@@ -91,30 +91,11 @@ func TestVersionedPrinter(t *testing.T) {
 			return nil
 		}),
 		legacyscheme.Scheme,
-		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		legacyscheme.Scheme,
+		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
 	)
 	if err := p.PrintObj(original, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestPrintDefault(t *testing.T) {
-	printerTests := []struct {
-		Name   string
-		Format string
-	}{
-		{"test wide", "wide"},
-		{"test blank format", ""},
-	}
-
-	for _, test := range printerTests {
-		printer, err := printers.GetStandardPrinter(nil, nil, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, printers.PrintOptions{AllowMissingKeys: false})
-		if err != nil {
-			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
-		}
-		if printer.IsGeneric() {
-			t.Errorf("in %s, printer should not be generic: %#v", test.Name, printer)
-		}
 	}
 }
 
@@ -259,7 +240,7 @@ func TestPrinter(t *testing.T) {
 		},
 	}
 	emptyListTest := &api.PodList{}
-	testapi, err := legacyscheme.Scheme.ConvertToVersion(podTest, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+	testapi, err := legacyscheme.Scheme.ConvertToVersion(podTest, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -278,17 +259,17 @@ func TestPrinter(t *testing.T) {
 		{"test jsonpath", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.metadata.name}", AllowMissingKeys: true}, podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo"},
 		{"test jsonpath list", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.items[*].metadata.name}", AllowMissingKeys: true}, podListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo bar"},
 		{"test jsonpath empty list", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.items[*].metadata.name}", AllowMissingKeys: true}, emptyListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, ""},
-		{"test name", &printers.PrintOptions{OutputFormatType: "name", AllowMissingKeys: true}, podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "pods/foo\n"},
+		{"test name", &printers.PrintOptions{OutputFormatType: "name", AllowMissingKeys: true}, podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "pod/foo\n"},
 		{"emits versioned objects", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{.kind}}", AllowMissingKeys: true}, testapi, []schema.GroupVersion{v1.SchemeGroupVersion}, "Pod"},
 	}
 	for _, test := range printerTests {
 		buf := bytes.NewBuffer([]byte{})
-		printer, err := printers.GetStandardPrinter(legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
+		printer, err := printers.GetStandardPrinter(legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
 		if err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
 		if printer.IsGeneric() && len(test.OutputVersions) > 0 {
-			printer = printers.NewVersionedPrinter(printer, legacyscheme.Scheme, test.OutputVersions...)
+			printer = printers.NewVersionedPrinter(printer, legacyscheme.Scheme, legacyscheme.Scheme, test.OutputVersions...)
 		}
 		if err := printer.PrintObj(test.Input, buf); err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
@@ -308,12 +289,12 @@ func TestBadPrinter(t *testing.T) {
 	}{
 		{"empty template", &printers.PrintOptions{OutputFormatType: "template", AllowMissingKeys: false}, fmt.Errorf("template format specified but no template given")},
 		{"bad template", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{ .Name", AllowMissingKeys: false}, fmt.Errorf("error parsing template {{ .Name, template: output:1: unclosed action\n")},
-		{"bad templatefile", &printers.PrintOptions{OutputFormatType: "templatefile", AllowMissingKeys: false}, fmt.Errorf("templatefile format specified but no template file given")},
+		{"bad templatefile", &printers.PrintOptions{OutputFormatType: "templatefile", AllowMissingKeys: false}, fmt.Errorf("template format specified but no template given")},
 		{"bad jsonpath", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.Name", AllowMissingKeys: false}, fmt.Errorf("error parsing jsonpath {.Name, unclosed action\n")},
 		{"unknown format", &printers.PrintOptions{OutputFormatType: "anUnknownFormat", OutputFormatArgument: "", AllowMissingKeys: false}, fmt.Errorf("output format \"anUnknownFormat\" not recognized")},
 	}
 	for _, test := range badPrinterTests {
-		_, err := printers.GetStandardPrinter(legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
+		_, err := printers.GetStandardPrinter(legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
 		if err == nil || err.Error() != test.Error.Error() {
 			t.Errorf("in %s, expect %s, got %s", test.Name, test.Error, err)
 		}
@@ -374,13 +355,15 @@ func TestJSONPrinter(t *testing.T) {
 
 func TestFormatResourceName(t *testing.T) {
 	tests := []struct {
-		kind, name string
-		want       string
+		kind schema.GroupKind
+		name string
+		want string
 	}{
-		{"", "", ""},
-		{"", "name", "name"},
-		{"kind", "", "kind/"}, // should not happen in practice
-		{"kind", "name", "kind/name"},
+		{schema.GroupKind{}, "", ""},
+		{schema.GroupKind{}, "name", "name"},
+		{schema.GroupKind{Kind: "Kind"}, "", "kind/"}, // should not happen in practice
+		{schema.GroupKind{Kind: "Kind"}, "name", "kind/name"},
+		{schema.GroupKind{Group: "group", Kind: "Kind"}, "name", "kind.group/name"},
 	}
 	for _, tt := range tests {
 		if got := printers.FormatResourceName(tt.kind, tt.name, true); got != tt.want {
@@ -393,7 +376,7 @@ func PrintCustomType(obj *TestPrintType, w io.Writer, options printers.PrintOpti
 	data := obj.Data
 	kind := options.Kind
 	if options.WithKind {
-		data = kind + "/" + data
+		data = kind.String() + "/" + data
 	}
 	_, err := fmt.Fprintf(w, "%s", data)
 	return err
@@ -415,24 +398,6 @@ func TestCustomTypePrinting(t *testing.T) {
 		t.Fatalf("An error occurred printing the custom type: %#v", err)
 	}
 	expectedOutput := "DATA\ntest object"
-	if buffer.String() != expectedOutput {
-		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
-	}
-}
-
-func TestCustomTypePrintingWithKind(t *testing.T) {
-	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
-	printer.Handler(columns, nil, PrintCustomType)
-	printer.EnsurePrintWithKind("test")
-
-	obj := TestPrintType{"test object"}
-	buffer := &bytes.Buffer{}
-	err := printer.PrintObj(&obj, buffer)
-	if err != nil {
-		t.Fatalf("An error occurred printing the custom type: %#v", err)
-	}
-	expectedOutput := "DATA\ntest/test object"
 	if buffer.String() != expectedOutput {
 		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
 	}
@@ -461,7 +426,7 @@ func TestUnknownTypePrinting(t *testing.T) {
 
 func TestTemplatePanic(t *testing.T) {
 	tmpl := `{{and ((index .currentState.info "foo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
-	printer, err := printers.NewTemplatePrinter([]byte(tmpl))
+	printer, err := printers.NewGoTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
@@ -489,7 +454,7 @@ func TestNamePrinter(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			"pods/foo\n"},
+			"pod/foo\n"},
 		"List": {
 			&v1.List{
 				TypeMeta: metav1.TypeMeta{
@@ -504,10 +469,10 @@ func TestNamePrinter(t *testing.T) {
 					},
 				},
 			},
-			"pods/foo\npods/bar\n"},
+			"pod/foo\npod/bar\n"},
 	}
 	printOpts := &printers.PrintOptions{OutputFormatType: "name", AllowMissingKeys: false}
-	printer, _ := printers.GetStandardPrinter(legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *printOpts)
+	printer, _ := printers.GetStandardPrinter(legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *printOpts)
 	for name, item := range tests {
 		buff := &bytes.Buffer{}
 		err := printer.PrintObj(item.obj, buff)
@@ -617,12 +582,12 @@ func TestTemplateStrings(t *testing.T) {
 	}
 	// The point of this test is to verify that the below template works.
 	tmpl := `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
-	p, err := printers.NewTemplatePrinter([]byte(tmpl))
+	p, err := printers.NewGoTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := printers.NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+	printer := printers.NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}
@@ -651,23 +616,23 @@ func TestPrinters(t *testing.T) {
 		jsonpathPrinter  printers.ResourcePrinter
 	)
 
-	templatePrinter, err = printers.NewTemplatePrinter([]byte("{{.name}}"))
+	templatePrinter, err = printers.NewGoTemplatePrinter([]byte("{{.name}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatePrinter = printers.NewVersionedPrinter(templatePrinter, legacyscheme.Scheme, v1.SchemeGroupVersion)
+	templatePrinter = printers.NewVersionedPrinter(templatePrinter, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
-	templatePrinter2, err = printers.NewTemplatePrinter([]byte("{{len .items}}"))
+	templatePrinter2, err = printers.NewGoTemplatePrinter([]byte("{{len .items}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatePrinter2 = printers.NewVersionedPrinter(templatePrinter2, legacyscheme.Scheme, v1.SchemeGroupVersion)
+	templatePrinter2 = printers.NewVersionedPrinter(templatePrinter2, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
 	jsonpathPrinter, err = printers.NewJSONPathPrinter("{.metadata.name}")
 	if err != nil {
 		t.Fatal(err)
 	}
-	jsonpathPrinter = printers.NewVersionedPrinter(jsonpathPrinter, legacyscheme.Scheme, v1.SchemeGroupVersion)
+	jsonpathPrinter = printers.NewVersionedPrinter(jsonpathPrinter, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
 	allPrinters := map[string]printers.ResourcePrinter{
 		"humanReadable": printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
@@ -682,7 +647,6 @@ func TestPrinters(t *testing.T) {
 		"name": &printers.NamePrinter{
 			Typer:    legacyscheme.Scheme,
 			Decoders: []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme},
-			Mapper:   legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...),
 		},
 	}
 	AddHandlers((allPrinters["humanReadable"]).(*printers.HumanReadablePrinter))
@@ -1118,6 +1082,54 @@ func TestPrintNodeExternalIP(t *testing.T) {
 	}
 }
 
+func TestPrintNodeInternalIP(t *testing.T) {
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+		Wide: true,
+	})
+	AddHandlers(printer)
+	table := []struct {
+		node       api.Node
+		internalIP string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "1.1.1.1"}}},
+			},
+			internalIP: "1.1.1.1",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
+				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}}},
+			},
+			internalIP: "<none>",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
+				Status: api.NodeStatus{Addresses: []api.NodeAddress{
+					{Type: api.NodeInternalIP, Address: "2.2.2.2"},
+					{Type: api.NodeExternalIP, Address: "3.3.3.3"},
+					{Type: api.NodeInternalIP, Address: "4.4.4.4"},
+				}},
+			},
+			internalIP: "2.2.2.2",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.internalIP) {
+			t.Fatalf("Expect printing node %s with internal ip %#v, got: %#v", test.node.Name, test.internalIP, buffer.String())
+		}
+	}
+}
+
 func contains(fields []string, field string) bool {
 	for _, v := range fields {
 		if v == field {
@@ -1534,15 +1546,15 @@ func TestPrintPodTable(t *testing.T) {
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest1\t1/2\tRunning\t6\t<unknown>\n",
 		},
 		{
-			obj: runningPod, opts: printers.PrintOptions{WithKind: true, Kind: "pods"},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\npods/test1\t1/2\tRunning\t6\t<unknown>\n",
+			obj: runningPod, opts: printers.PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}},
+			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\npod/test1\t1/2\tRunning\t6\t<unknown>\n",
 		},
 		{
 			obj: runningPod, opts: printers.PrintOptions{ShowLabels: true},
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tLABELS\ntest1\t1/2\tRunning\t6\t<unknown>\ta=1,b=2\n",
 		},
 		{
-			obj: &api.PodList{Items: []api.Pod{*runningPod, *failedPod}}, opts: printers.PrintOptions{ShowAll: true, ColumnLabels: []string{"a"}},
+			obj: &api.PodList{Items: []api.Pod{*runningPod, *failedPod}}, opts: printers.PrintOptions{ColumnLabels: []string{"a"}},
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tA\ntest1\t1/2\tRunning\t6\t<unknown>\t1\ntest2\t1/2\tFailed\t6\t<unknown>\t\n",
 		},
 		{
@@ -1551,11 +1563,11 @@ func TestPrintPodTable(t *testing.T) {
 		},
 		{
 			obj: failedPod, opts: printers.PrintOptions{},
-			expect:       "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\n",
+			expect:       "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest2\t1/2\tFailed\t6\t<unknown>\n",
 			ignoreLegacy: true, // filtering is not done by the printer in the legacy path
 		},
 		{
-			obj: failedPod, opts: printers.PrintOptions{ShowAll: true},
+			obj: failedPod, opts: printers.PrintOptions{},
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest2\t1/2\tFailed\t6\t<unknown>\n",
 		},
 	}
@@ -1668,10 +1680,26 @@ func TestPrintPod(t *testing.T) {
 			},
 			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
 		},
+		{
+			// Test pod has 2 containers, one is running and the other is completed.
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase:  "Running",
+					Reason: "",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}}},
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					},
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", 6, "<unknown>"}}},
+		},
 	}
 
 	for i, test := range tests {
-		rows, err := printPod(&test.pod, printers.PrintOptions{ShowAll: true})
+		rows, err := printPod(&test.pod, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1781,7 +1809,7 @@ func TestPrintPodList(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rows, err := printPodList(&test.pods, printers.PrintOptions{ShowAll: true})
+		rows, err := printPodList(&test.pods, printers.PrintOptions{})
 
 		if err != nil {
 			t.Fatal(err)
@@ -2168,6 +2196,161 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			"some-hpa\tReplicationController/some-rc\t<none>\t<unset>\t10\t4\t<unknown>\n",
+		},
+		// external source type, target average value (no current)
+		{
+			autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:         "some-external-metric",
+								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+			"some-hpa\tReplicationController/some-rc\t<unknown>/100m (avg)\t2\t10\t4\t<unknown>\n",
+		},
+		// external source type, target average value
+		{
+			autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:         "some-external-metric",
+								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscaling.MetricStatus{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricStatus{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:          "some-external-metric",
+								CurrentAverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+			"some-hpa\tReplicationController/some-rc\t50m/100m (avg)\t2\t10\t4\t<unknown>\n",
+		},
+		// external source type, target value (no current)
+		{
+			autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:  "some-service-metric",
+								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+		},
+		// external source type, target value
+		{
+			autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:  "some-external-metric",
+								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscaling.MetricStatus{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricStatus{
+								MetricName:   "some-external-metric",
+								CurrentValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
 		},
 		// pods source type (no current)
 		{
@@ -2819,7 +3002,7 @@ func TestAllowMissingKeys(t *testing.T) {
 	}
 	for _, test := range tests {
 		buf := bytes.NewBuffer([]byte{})
-		printer, err := printers.GetStandardPrinter(legacyscheme.Registry.RESTMapper(legacyscheme.Registry.EnabledVersions()...), legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
+		printer, err := printers.GetStandardPrinter(legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
 		if err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
@@ -2855,6 +3038,7 @@ func TestPrintControllerRevision(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							Controller: boolP(true),
+							APIVersion: "apps/v1",
 							Kind:       "DaemonSet",
 							Name:       "foo",
 						},
@@ -2862,7 +3046,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 1,
 			},
-			"test1\tDaemonSet/foo\t1\t0s\n",
+			"test1\tdaemonset.apps/foo\t1\t0s\n",
 		},
 		{
 			apps.ControllerRevision{

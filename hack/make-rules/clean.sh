@@ -25,6 +25,7 @@ CLEAN_PATTERNS=(
   "_tmp"
   "doc_tmp"
   ".*/zz_generated.openapi.go"
+  "pkg/generated/bindata.go"
   "test/e2e/generated/bindata.go"
 )
 

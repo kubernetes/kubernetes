@@ -41,7 +41,6 @@ go_test(
     name = "go_default_test",
     srcs = ["pv_protection_controller_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/volume/pvprotection",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/volume/util:go_default_library",

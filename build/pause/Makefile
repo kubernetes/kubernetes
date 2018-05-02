@@ -91,7 +91,7 @@ container: .container-$(ARCH)
 
 push: .push-$(ARCH)
 .push-$(ARCH): .container-$(ARCH)
-	gcloud docker -- push $(IMAGE_WITH_ARCH):$(TAG)
+	docker push $(IMAGE_WITH_ARCH):$(TAG)
 	touch $@
 
 # Useful for testing, not automatically included in container image

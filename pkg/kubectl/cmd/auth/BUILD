@@ -16,6 +16,7 @@ go_library(
         "//build/visible_to:pkg_kubectl_cmd_auth_CONSUMERS",
     ],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion:go_default_library",
@@ -51,8 +52,8 @@ go_test(
     name = "go_default_test",
     srcs = ["cani_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/auth",
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

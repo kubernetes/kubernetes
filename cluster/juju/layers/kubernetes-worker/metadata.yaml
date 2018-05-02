@@ -37,6 +37,10 @@ resources:
     type: file
     filename: cni.tgz
     description: CNI plugins for amd64
+  cni-arm64:
+    type: file
+    filename: cni.tgz
+    description: CNI plugins for arm64
   cni-s390x:
     type: file
     filename: cni.tgz

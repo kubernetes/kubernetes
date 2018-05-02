@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "informer-gen",
     embed = [":go_default_library"],
-    importpath = "k8s.io/code-generator/cmd/informer-gen",
 )
 
 go_library(

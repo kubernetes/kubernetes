@@ -23,6 +23,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
 type addressManager struct {
@@ -31,13 +32,13 @@ type addressManager struct {
 	name        string
 	serviceName string
 	targetIP    string
-	addressType lbScheme
+	addressType cloud.LbScheme
 	region      string
 	subnetURL   string
 	tryRelease  bool
 }
 
-func newAddressManager(svc CloudAddressService, serviceName, region, subnetURL, name, targetIP string, addressType lbScheme) *addressManager {
+func newAddressManager(svc CloudAddressService, serviceName, region, subnetURL, name, targetIP string, addressType cloud.LbScheme) *addressManager {
 	return &addressManager{
 		svc:         svc,
 		logPrefix:   fmt.Sprintf("AddressManager(%q)", name),

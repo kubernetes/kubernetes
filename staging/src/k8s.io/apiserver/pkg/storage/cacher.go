@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -24,7 +25,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -553,6 +553,10 @@ func (c *Cacher) GuaranteedUpdate(
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
+}
+
+func (c *Cacher) Count(pathPrefix string) (int64, error) {
+	return c.storage.Count(pathPrefix)
 }
 
 func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {

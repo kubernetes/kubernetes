@@ -93,8 +93,8 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (volSpec 
 	capacity := v.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	// vSphere works with kilobytes, convert to KiB with rounding up
-	volSizeKB := int(volume.RoundUpSize(volSizeBytes, 1024))
-	name := volume.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 255)
+	volSizeKB := int(volumeutil.RoundUpSize(volSizeBytes, 1024))
+	name := volumeutil.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 255)
 	volumeOptions := &vclib.VolumeOptions{
 		CapacityKB: volSizeKB,
 		Tags:       *v.options.CloudTags,

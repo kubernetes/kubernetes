@@ -32,7 +32,7 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -133,7 +133,7 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 	}
 	// TODO: remove feature gate check after no longer needed
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode, err := volumehelper.GetVolumeMode(spec)
+		volumeMode, err := util.GetVolumeMode(spec)
 		if err != nil {
 			return nil, err
 		}
@@ -297,7 +297,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 //   globalMapPathUUID : plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
 func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(fcPluginName)
-	blkutil := util.NewBlockVolumePathHandler()
+	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 	globalMapPathUUID, err := blkutil.FindGlobalMapPathUUIDFromPod(pluginDir, mapPath, podUID)
 	if err != nil {
 		return nil, err

@@ -18,23 +18,43 @@ package aws
 
 import "github.com/prometheus/client_golang/prometheus"
 
-var awsApiMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name: "cloudprovider_aws_api_request_duration_seconds",
-		Help: "Latency of aws api call",
-	},
-	[]string{"request"},
+var (
+	awsAPIMetric = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "cloudprovider_aws_api_request_duration_seconds",
+			Help: "Latency of AWS API calls",
+		},
+		[]string{"request"})
+
+	awsAPIErrorMetric = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "cloudprovider_aws_api_request_errors",
+			Help: "AWS API errors",
+		},
+		[]string{"request"})
+
+	awsAPIThrottlesMetric = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "cloudprovider_aws_api_throttled_requests_total",
+			Help: "AWS API throttled requests",
+		},
+		[]string{"operation_name"})
 )
 
-var awsApiErrorMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "cloudprovider_aws_api_request_errors",
-		Help: "AWS Api errors",
-	},
-	[]string{"request"},
-)
+func recordAWSMetric(actionName string, timeTaken float64, err error) {
+	if err != nil {
+		awsAPIErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
+	} else {
+		awsAPIMetric.With(prometheus.Labels{"request": actionName}).Observe(timeTaken)
+	}
+}
+
+func recordAWSThrottlesMetric(operation string) {
+	awsAPIThrottlesMetric.With(prometheus.Labels{"operation_name": operation}).Inc()
+}
 
 func registerMetrics() {
-	prometheus.MustRegister(awsApiMetric)
-	prometheus.MustRegister(awsApiErrorMetric)
+	prometheus.MustRegister(awsAPIMetric)
+	prometheus.MustRegister(awsAPIErrorMetric)
+	prometheus.MustRegister(awsAPIThrottlesMetric)
 }

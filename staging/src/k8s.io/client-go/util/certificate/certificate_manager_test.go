@@ -206,7 +206,7 @@ func TestSetRotationDeadline(t *testing.T) {
 				t.Errorf("%d metrics were recorded, wanted %d", g.calls, 1)
 			}
 			if g.lastValue != float64(tc.notAfter.Unix()) {
-				t.Errorf("%d value for metric was recorded, wanted %d", g.lastValue, tc.notAfter.Unix())
+				t.Errorf("%f value for metric was recorded, wanted %d", g.lastValue, tc.notAfter.Unix())
 			}
 		})
 	}

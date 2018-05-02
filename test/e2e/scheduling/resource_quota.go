@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -41,83 +42,7 @@ const (
 )
 
 var classGold string = "gold"
-
-var _ = SIGDescribe("ResourceQuota", func() {
-	f := framework.NewDefaultFramework("resourcequota")
-
-	BeforeEach(func() {
-		// only run the tests when LocalStorageCapacityIsolation feature is enabled
-		framework.SkipUnlessLocalEphemeralStorageEnabled()
-	})
-
-	It("should create a ResourceQuota and capture the life of a pod.", func() {
-		By("Creating a ResourceQuota")
-		quotaName := "test-quota"
-		resourceQuota := newTestResourceQuotaForEphemeralStorage(quotaName)
-		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
-		Expect(err).NotTo(HaveOccurred())
-
-		defer func() {
-			By("Removing resourceQuota")
-			err = deleteResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota.Name)
-			Expect(err).NotTo(HaveOccurred())
-		}()
-
-		By("Ensuring resource quota status is calculated")
-		usedResources := v1.ResourceList{}
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
-		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Creating a Pod that fits quota")
-		podName := "test-pod"
-		requests := v1.ResourceList{}
-		requests[v1.ResourceEphemeralStorage] = resource.MustParse("300Mi")
-		pod := newTestPodForQuota(f, podName, requests, v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
-		podToUpdate := pod
-
-		defer func() {
-			By("Deleting the pod")
-			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
-			Expect(err).NotTo(HaveOccurred())
-		}()
-
-		By("Ensuring ResourceQuota status captures the pod usage")
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
-		usedResources[v1.ResourcePods] = resource.MustParse("1")
-		usedResources[v1.ResourceEphemeralStorage] = requests[v1.ResourceEphemeralStorage]
-		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Not allowing a pod to be created that exceeds remaining quota")
-		requests = v1.ResourceList{}
-		requests[v1.ResourceEphemeralStorage] = resource.MustParse("300Mi")
-		pod = newTestPodForQuota(f, "fail-pod", requests, v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		Expect(err).To(HaveOccurred())
-
-		By("Ensuring a pod cannot update its resource requirements")
-		// a pod cannot dynamically update its resource requirements.
-		requests = v1.ResourceList{}
-		requests[v1.ResourceEphemeralStorage] = resource.MustParse("100Mi")
-		podToUpdate.Spec.Containers[0].Resources.Requests = requests
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(podToUpdate)
-		Expect(err).To(HaveOccurred())
-
-		By("Ensuring attempts to update pod resource requirements did not change quota usage")
-		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring resource quota status released the pod usage")
-		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
-		usedResources[v1.ResourcePods] = resource.MustParse("0")
-		usedResources[v1.ResourceEphemeralStorage] = resource.MustParse("0")
-		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
-		Expect(err).NotTo(HaveOccurred())
-	})
-})
+var extendedResourceName string = "example.com/dongle"
 
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")
@@ -368,9 +293,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		By("Creating a Pod that fits quota")
 		podName := "test-pod"
 		requests := v1.ResourceList{}
+		limits := v1.ResourceList{}
 		requests[v1.ResourceCPU] = resource.MustParse("500m")
 		requests[v1.ResourceMemory] = resource.MustParse("252Mi")
-		pod := newTestPodForQuota(f, podName, requests, v1.ResourceList{})
+		requests[v1.ResourceEphemeralStorage] = resource.MustParse("30Gi")
+		requests[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
+		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
+		pod := newTestPodForQuota(f, podName, requests, limits)
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 		podToUpdate := pod
@@ -380,6 +309,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourcePods] = resource.MustParse("1")
 		usedResources[v1.ResourceCPU] = requests[v1.ResourceCPU]
 		usedResources[v1.ResourceMemory] = requests[v1.ResourceMemory]
+		usedResources[v1.ResourceEphemeralStorage] = requests[v1.ResourceEphemeralStorage]
+		usedResources[v1.ResourceName(v1.DefaultResourceRequestsPrefix+extendedResourceName)] = requests[v1.ResourceName(extendedResourceName)]
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -391,11 +322,24 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 
+		By("Not allowing a pod to be created that exceeds remaining quota(validation on extended resources)")
+		requests = v1.ResourceList{}
+		limits = v1.ResourceList{}
+		requests[v1.ResourceCPU] = resource.MustParse("500m")
+		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
+		requests[v1.ResourceEphemeralStorage] = resource.MustParse("30Gi")
+		requests[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
+		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
+		pod = newTestPodForQuota(f, "fail-pod-for-extended-resource", requests, limits)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).To(HaveOccurred())
+
 		By("Ensuring a pod cannot update its resource requirements")
 		// a pod cannot dynamically update its resource requirements.
 		requests = v1.ResourceList{}
 		requests[v1.ResourceCPU] = resource.MustParse("100m")
 		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
+		requests[v1.ResourceEphemeralStorage] = resource.MustParse("10Gi")
 		podToUpdate.Spec.Containers[0].Resources.Requests = requests
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(podToUpdate)
 		Expect(err).To(HaveOccurred())
@@ -413,6 +357,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourcePods] = resource.MustParse("0")
 		usedResources[v1.ResourceCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceEphemeralStorage] = resource.MustParse("0")
+		usedResources[v1.ResourceName(v1.DefaultResourceRequestsPrefix+extendedResourceName)] = resource.MustParse("0")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -804,10 +750,11 @@ func newTestResourceQuotaWithScope(name string, scope v1.ResourceQuotaScope) *v1
 	}
 }
 
-// newTestResourceQuotaForEphemeralStorage returns a quota that enforces default constraints for testing alpha feature LocalStorageCapacityIsolation
+// newTestResourceQuotaForEphemeralStorage returns a quota that enforces default constraints for testing feature LocalStorageCapacityIsolation
 func newTestResourceQuotaForEphemeralStorage(name string) *v1.ResourceQuota {
 	hard := v1.ResourceList{}
 	hard[v1.ResourceEphemeralStorage] = resource.MustParse("500Mi")
+	hard[v1.ResourceQuotas] = resource.MustParse("1")
 	return &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       v1.ResourceQuotaSpec{Hard: hard},
@@ -829,10 +776,13 @@ func newTestResourceQuota(name string) *v1.ResourceQuota {
 	hard[v1.ResourceSecrets] = resource.MustParse("10")
 	hard[v1.ResourcePersistentVolumeClaims] = resource.MustParse("10")
 	hard[v1.ResourceRequestsStorage] = resource.MustParse("10Gi")
+	hard[v1.ResourceEphemeralStorage] = resource.MustParse("50Gi")
 	hard[core.V1ResourceByStorageClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("10")
 	hard[core.V1ResourceByStorageClass(classGold, v1.ResourceRequestsStorage)] = resource.MustParse("10Gi")
 	// test quota on discovered resource type
 	hard[v1.ResourceName("count/replicasets.extensions")] = resource.MustParse("5")
+	// test quota on extended resource
+	hard[v1.ResourceName(v1.DefaultResourceRequestsPrefix+extendedResourceName)] = resource.MustParse("3")
 	return &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       v1.ResourceQuotaSpec{Hard: hard},
@@ -849,7 +799,7 @@ func newTestPodForQuota(f *framework.Framework, name string, requests v1.Resourc
 			Containers: []v1.Container{
 				{
 					Name:  "pause",
-					Image: framework.GetPauseImageName(f.ClientSet),
+					Image: imageutils.GetPauseImageName(),
 					Resources: v1.ResourceRequirements{
 						Requests: requests,
 						Limits:   limits,

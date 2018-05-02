@@ -20,7 +20,6 @@ go_test(
     name = "go_default_test",
     srcs = ["images_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/images",
     deps = ["//cmd/kubeadm/app/constants:go_default_library"],
 )
 

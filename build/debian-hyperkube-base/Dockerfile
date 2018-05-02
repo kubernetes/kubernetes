@@ -34,11 +34,13 @@ RUN echo CACHEBUST>/dev/null && clean-install \
     git \
     glusterfs-client \
     iptables \
+    ipset \
     jq \
     kmod \
     openssh-client \
     nfs-common \
     socat \
+    udev \
     util-linux
 
 COPY cni-bin/bin /opt/cni/bin

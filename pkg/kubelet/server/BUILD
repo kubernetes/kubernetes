@@ -19,6 +19,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1/validation:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/prober:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
@@ -57,7 +58,6 @@ go_test(
         "server_websocket_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/server",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",

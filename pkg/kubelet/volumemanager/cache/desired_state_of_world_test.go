@@ -23,8 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // Calls AddPodToVolume() to add new pod to new volume
@@ -54,7 +54,7 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
@@ -99,7 +99,7 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
@@ -144,7 +144,7 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 	if err != nil {
@@ -197,7 +197,7 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	}
 
 	volume1Spec := &volume.Spec{Volume: &pod1.Spec.Volumes[0]}
-	pod1Name := volumehelper.GetUniquePodName(pod1)
+	pod1Name := util.GetUniquePodName(pod1)
 
 	pod2 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -219,7 +219,7 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	}
 
 	volume2Spec := &volume.Spec{Volume: &pod2.Spec.Volumes[0]}
-	pod2Name := volumehelper.GetUniquePodName(pod2)
+	pod2Name := util.GetUniquePodName(pod2)
 
 	pod3 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -241,7 +241,7 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	}
 
 	volume3Spec := &volume.Spec{Volume: &pod3.Spec.Volumes[0]}
-	pod3Name := volumehelper.GetUniquePodName(pod3)
+	pod3Name := util.GetUniquePodName(pod3)
 
 	generatedVolume1Name, err := dsw.AddPodToVolume(
 		pod1Name, pod1, volume1Spec, volume1Spec.Name(), "" /* volumeGidValue */)

@@ -14,19 +14,13 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/integration/scheduler_perf",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
-        "//pkg/scheduler/factory:go_default_library",
-        "//test/integration/framework:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//test/integration/util:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
 )
 
@@ -39,7 +33,6 @@ go_test(
         "scheduler_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/integration/scheduler_perf",
     tags = ["integration"],
     deps = [
         "//pkg/kubelet/apis:go_default_library",

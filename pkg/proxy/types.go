@@ -48,23 +48,26 @@ func (spn ServicePortName) String() string {
 type ServicePort interface {
 	// String returns service string.  An example format can be: `IP:Port/Protocol`.
 	String() string
-	// ClusterIP returns service cluster IP.
-	ClusterIP() string
-	// Protocol returns service protocol.
-	Protocol() api.Protocol
-	// HealthCheckNodePort returns service health check node port if present.  If return 0, it means not present.
-	HealthCheckNodePort() int
+	// ClusterIPString returns service cluster IP in string format.
+	ClusterIPString() string
+	// GetProtocol returns service protocol.
+	GetProtocol() api.Protocol
+	// GetHealthCheckNodePort returns service health check node port if present.  If return 0, it means not present.
+	GetHealthCheckNodePort() int
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.
+// TODO: Rename functions to be consistent with ServicePort.
 type Endpoint interface {
 	// String returns endpoint string.  An example format can be: `IP:Port`.
 	// We take the returned value as ServiceEndpoint.Endpoint.
 	String() string
-	// IsLocal returns true if the endpoint is running in same host as kube-proxy, otherwise returns false.
-	IsLocal() bool
-	// IP returns IP part of endpoints.
+	// GetIsLocal returns true if the endpoint is running in same host as kube-proxy, otherwise returns false.
+	GetIsLocal() bool
+	// IP returns IP part of the endpoint.
 	IP() string
+	// Port returns the Port part of the endpoint.
+	Port() (int, error)
 	// Equal checks if two endpoints are equal.
 	Equal(Endpoint) bool
 }

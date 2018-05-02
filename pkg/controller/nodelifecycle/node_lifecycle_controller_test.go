@@ -17,6 +17,7 @@ limitations under the License.
 package nodelifecycle
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -1441,7 +1442,7 @@ func TestCloudProviderNodeShutdown(t *testing.T) {
 			nodeController.cloud = &fakecloud.FakeCloud{}
 			nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
 			nodeController.recorder = testutil.NewFakeRecorder()
-			nodeController.nodeShutdownInCloudProvider = func(nodeName types.NodeName) (bool, error) {
+			nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
 				return tc.shutdown, nil
 			}
 
@@ -1516,7 +1517,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
 		return false, nil
 	}
-	nodeController.nodeShutdownInCloudProvider = func(nodeName types.NodeName) (bool, error) {
+	nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
 		return false, nil
 	}
 	// monitorNodeStatus should allow this node to be immediately deleted
@@ -1658,9 +1659,6 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
-						},
 					},
 				},
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
@@ -1735,9 +1733,6 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 						},
 					},
-					Spec: v1.NodeSpec{
-						ExternalID: "node0",
-					},
 				},
 			},
 		},
@@ -1765,9 +1760,6 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
-						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
 						},
 					},
 				},
@@ -1870,9 +1862,6 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
-						},
 					},
 				},
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
@@ -1903,9 +1892,6 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
-						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
 						},
 					},
 				},
@@ -2323,9 +2309,6 @@ func TestNodeEventGeneration(t *testing.T) {
 					UID:               "1234567890",
 					CreationTimestamp: metav1.Date(2015, 8, 10, 0, 0, 0, 0, time.UTC),
 				},
-				Spec: v1.NodeSpec{
-					ExternalID: "node0",
-				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
@@ -2357,7 +2340,7 @@ func TestNodeEventGeneration(t *testing.T) {
 	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
 		return false, nil
 	}
-	nodeController.nodeShutdownInCloudProvider = func(nodeName types.NodeName) (bool, error) {
+	nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
 		return false, nil
 	}
 	nodeController.now = func() metav1.Time { return fakeNow }

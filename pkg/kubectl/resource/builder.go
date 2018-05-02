@@ -26,7 +26,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -49,6 +51,13 @@ type Builder struct {
 	mapper       *Mapper
 	internal     *Mapper
 	unstructured *Mapper
+
+	// objectTyper is statically determinant per-command invocation based on your internal or unstructured choice
+	// it does not ever need to rely upon discovery.
+	objectTyper runtime.ObjectTyper
+
+	// local indicates that we cannot make server calls
+	local bool
 
 	errs []error
 
@@ -136,6 +145,14 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 	return b
 }
 
+func (b *Builder) AddError(err error) *Builder {
+	if err == nil {
+		return b
+	}
+	b.errs = append(b.errs, err)
+	return b
+}
+
 // FilenameParam groups input in two categories: URLs and files (files, directories, STDIN)
 // If enforceNamespace is false, namespaces in the specs will be allowed to
 // override the default namespace. If it is true, namespaces that don't match
@@ -186,6 +203,9 @@ func (b *Builder) Unstructured() *Builder {
 		return b
 	}
 	b.mapper = b.unstructured
+	b.mapper.localFn = b.isLocal
+
+	b.objectTyper = unstructuredscheme.NewUnstructuredObjectTyper()
 	return b
 }
 
@@ -194,7 +214,7 @@ func (b *Builder) Unstructured() *Builder {
 // to the server will not be seen by the client code and may result in failure. Only
 // use this mode when working offline, or when generating patches to send to the server.
 // Use Unstructured if you are reading an object and performing a POST or PUT.
-func (b *Builder) Internal() *Builder {
+func (b *Builder) Internal(typer runtime.ObjectTyper) *Builder {
 	if b.internal == nil {
 		b.errs = append(b.errs, fmt.Errorf("no internal mapper provided"))
 		return b
@@ -204,6 +224,9 @@ func (b *Builder) Internal() *Builder {
 		return b
 	}
 	b.mapper = b.internal
+	b.mapper.localFn = b.isLocal
+
+	b.objectTyper = typer
 	return b
 }
 
@@ -217,10 +240,15 @@ func (b *Builder) LocalParam(local bool) *Builder {
 
 // Local will avoid asking the server for results.
 func (b *Builder) Local() *Builder {
+	b.local = true
 	mapper := *b.mapper
 	mapper.ClientMapper = DisabledClientForMapping{ClientMapper: mapper.ClientMapper}
 	b.mapper = &mapper
 	return b
+}
+
+func (b *Builder) isLocal() bool {
+	return b.local
 }
 
 // Mapper returns a copy of the current mapper.
@@ -286,6 +314,9 @@ func (b *Builder) Path(recursive bool, paths ...string) *Builder {
 		}
 
 		b.paths = append(b.paths, visitors...)
+	}
+	if len(b.paths) == 0 && len(b.errs) == 0 {
+		b.errs = append(b.errs, fmt.Errorf("error reading %v: recognized file extensions are %v", paths, FileExtensions))
 	}
 	return b
 }
@@ -598,23 +629,48 @@ func (b *Builder) SingleResourceType() *Builder {
 	return b
 }
 
-// mappingFor returns the RESTMapping for the Kind referenced by the resource.
-// prefers a fully specified GroupVersionResource match.  If we don't have one match on GroupResource
-func (b *Builder) mappingFor(resourceArg string) (*meta.RESTMapping, error) {
-	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(resourceArg)
+// mappingFor returns the RESTMapping for the Kind given, or the Kind referenced by the resource.
+// Prefers a fully specified GroupVersionResource match. If one is not found, we match on a fully
+// specified GroupVersionKind, or fallback to a match on GroupKind.
+func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error) {
+	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(resourceOrKindArg)
 	gvk := schema.GroupVersionKind{}
 	if fullySpecifiedGVR != nil {
-		gvk, _ = b.mapper.KindFor(*fullySpecifiedGVR)
+		gvk, _ = b.mapper.RESTMapper.KindFor(*fullySpecifiedGVR)
 	}
 	if gvk.Empty() {
-		var err error
-		gvk, err = b.mapper.KindFor(groupResource.WithVersion(""))
-		if err != nil {
-			return nil, err
+		gvk, _ = b.mapper.RESTMapper.KindFor(groupResource.WithVersion(""))
+	}
+	if !gvk.Empty() {
+		return b.mapper.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	}
+
+	fullySpecifiedGVK, groupKind := schema.ParseKindArg(resourceOrKindArg)
+	if fullySpecifiedGVK == nil {
+		gvk := groupKind.WithVersion("")
+		fullySpecifiedGVK = &gvk
+	}
+
+	if !fullySpecifiedGVK.Empty() {
+		if mapping, err := b.mapper.RESTMapper.RESTMapping(fullySpecifiedGVK.GroupKind(), fullySpecifiedGVK.Version); err == nil {
+			return mapping, nil
 		}
 	}
 
-	return b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := b.mapper.RESTMapper.RESTMapping(groupKind, gvk.Version)
+	if err != nil {
+		// if we error out here, it is because we could not match a resource or a kind
+		// for the given argument. To maintain consistency with previous behavior,
+		// announce that a resource type could not be found.
+		// if the error is a URL error, then we had trouble doing discovery, so we should return the original
+		// error since it may help a user diagnose what is actually wrong
+		if _, ok := err.(*url.Error); ok {
+			return nil, err
+		}
+		return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
+	}
+
+	return mapping, nil
 }
 
 func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
@@ -641,7 +697,7 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 
 func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) {
 	mappings := make(map[string]*meta.RESTMapping)
-	canonical := make(map[string]struct{})
+	canonical := make(map[schema.GroupVersionResource]struct{})
 	for _, r := range b.resourceTuples {
 		if _, ok := mappings[r.Resource]; ok {
 			continue
@@ -651,7 +707,6 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 			return nil, err
 		}
 
-		mappings[mapping.Resource] = mapping
 		mappings[r.Resource] = mapping
 		canonical[mapping.Resource] = struct{}{}
 	}
@@ -727,7 +782,7 @@ func (b *Builder) visitBySelector() *Result {
 
 	visitors := []Visitor{}
 	for _, mapping := range mappings {
-		client, err := b.mapper.ClientForMapping(mapping)
+		client, err := b.mapper.ClientMapper.ClientForMapping(mapping)
 		if err != nil {
 			result.err = err
 			return result
@@ -773,11 +828,11 @@ func (b *Builder) visitByResource() *Result {
 	}
 	clients := make(map[string]RESTClient)
 	for _, mapping := range mappings {
-		s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
+		s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource.Resource)
 		if _, ok := clients[s]; ok {
 			continue
 		}
-		client, err := b.mapper.ClientForMapping(mapping)
+		client, err := b.mapper.ClientMapper.ClientForMapping(mapping)
 		if err != nil {
 			result.err = err
 			return result
@@ -792,7 +847,7 @@ func (b *Builder) visitByResource() *Result {
 		if !ok {
 			return result.withError(fmt.Errorf("resource %q is not recognized: %v", tuple.Resource, mappings))
 		}
-		s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
+		s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource.Resource)
 		client, ok := clients[s]
 		if !ok {
 			return result.withError(fmt.Errorf("could not find a client for resource %q", tuple.Resource))
@@ -855,7 +910,7 @@ func (b *Builder) visitByName() *Result {
 	}
 	mapping := mappings[0]
 
-	client, err := b.mapper.ClientForMapping(mapping)
+	client, err := b.mapper.ClientMapper.ClientForMapping(mapping)
 	if err != nil {
 		result.err = err
 		return result
@@ -917,7 +972,7 @@ func (b *Builder) visitByPaths() *Result {
 	if b.latest {
 		// must flatten lists prior to fetching
 		if b.flatten {
-			visitors = NewFlattenListVisitor(visitors, b.mapper)
+			visitors = NewFlattenListVisitor(visitors, b.objectTyper, b.mapper)
 		}
 		// must set namespace prior to fetching
 		if b.defaultNamespace {
@@ -948,7 +1003,7 @@ func (b *Builder) Do() *Result {
 		return r
 	}
 	if b.flatten {
-		r.visitor = NewFlattenListVisitor(r.visitor, b.mapper)
+		r.visitor = NewFlattenListVisitor(r.visitor, b.objectTyper, b.mapper)
 	}
 	helpers := []VisitorFunc{}
 	if b.defaultNamespace {

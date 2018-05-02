@@ -14,7 +14,6 @@ go_test(
     ],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/util/cert",
 )
 
 go_library(
@@ -24,9 +23,6 @@ go_library(
         "csr.go",
         "io.go",
         "pem.go",
-    ],
-    data = [
-        "testdata/dontUseThisKey.pem",
     ],
     importpath = "k8s.io/client-go/util/cert",
 )

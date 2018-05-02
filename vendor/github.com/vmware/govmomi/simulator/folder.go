@@ -197,13 +197,9 @@ func (f *Folder) CreateDatacenter(ctx *Context, c *types.CreateDatacenter) soap.
 	r := &methods.CreateDatacenterBody{}
 
 	if f.hasChildType("Datacenter") && f.hasChildType("Folder") {
-		dc := &mo.Datacenter{}
+		dc := NewDatacenter(f)
 
 		dc.Name = c.Name
-
-		f.putChild(dc)
-
-		createDatacenterFolders(dc, true)
 
 		r.Res = &types.CreateDatacenterResponse{
 			Returnval: dc.Self,

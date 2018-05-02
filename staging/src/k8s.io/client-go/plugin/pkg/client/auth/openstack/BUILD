@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["openstack_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/plugin/pkg/client/auth/openstack",
 )
 
 go_library(

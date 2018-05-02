@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 	cadvisorfs "github.com/google/cadvisor/fs"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -35,6 +34,7 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -53,6 +53,8 @@ type criStatsProvider struct {
 	runtimeService internalapi.RuntimeService
 	// imageService is used to get the stats of the image filesystem.
 	imageService internalapi.ImageManagerService
+	// logMetrics provides the metrics for container logs
+	logMetricsService LogMetricsService
 }
 
 // newCRIStatsProvider returns a containerStatsProvider implementation that
@@ -62,12 +64,14 @@ func newCRIStatsProvider(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
+	logMetricsService LogMetricsService,
 ) containerStatsProvider {
 	return &criStatsProvider{
-		cadvisor:         cadvisor,
-		resourceAnalyzer: resourceAnalyzer,
-		runtimeService:   runtimeService,
-		imageService:     imageService,
+		cadvisor:          cadvisor,
+		resourceAnalyzer:  resourceAnalyzer,
+		runtimeService:    runtimeService,
+		imageService:      imageService,
+		logMetricsService: logMetricsService,
 	}
 }
 
@@ -94,7 +98,6 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	for _, s := range podSandboxes {
 		podSandboxMap[s.Id] = s
 	}
-
 	// fsIDtoInfo is a map from filesystem id to its stats. This will be used
 	// as a cache to avoid querying cAdvisor for the filesystem stats with the
 	// same filesystem id many times.
@@ -115,23 +118,22 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		containerMap[c.Id] = c
 	}
 
-	caInfos, err := getCRICadvisorStats(p.cadvisor)
+	allInfos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
+		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
+	caInfos := getCRICadvisorStats(allInfos)
 
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
 		container, found := containerMap[containerID]
 		if !found {
-			glog.Errorf("Unable to find container id %q in container stats list", containerID)
 			continue
 		}
 
 		podSandboxID := container.PodSandboxId
 		podSandbox, found := podSandboxMap[podSandboxID]
 		if !found {
-			glog.Errorf("Unable to find pod sandbox id %q in pod stats list", podSandboxID)
 			continue
 		}
 
@@ -141,15 +143,11 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		if !found {
 			ps = buildPodStats(podSandbox)
 			// Fill stats from cadvisor is available for full set of required pod stats
-			caPodSandbox, found := caInfos[podSandboxID]
-			if !found {
-				glog.V(4).Infof("Unable to find cadvisor stats for sandbox %q", podSandboxID)
-			} else {
-				p.addCadvisorPodStats(ps, &caPodSandbox)
-			}
+			p.addCadvisorPodNetworkStats(ps, podSandboxID, caInfos)
+			p.addCadvisorPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos)
 			sandboxIDToPodStats[podSandboxID] = ps
 		}
-		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo)
+		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata().GetUid())
 		// If cadvisor stats is available for the container, use it to populate
 		// container stats
 		caStats, caFound := caInfos[containerID]
@@ -265,11 +263,30 @@ func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo 
 	return s
 }
 
-func (p *criStatsProvider) addCadvisorPodStats(
+func (p *criStatsProvider) addCadvisorPodNetworkStats(
 	ps *statsapi.PodStats,
-	caPodSandbox *cadvisorapiv2.ContainerInfo,
+	podSandboxID string,
+	caInfos map[string]cadvisorapiv2.ContainerInfo,
 ) {
-	ps.Network = cadvisorInfoToNetworkStats(ps.PodRef.Name, caPodSandbox)
+	caPodSandbox, found := caInfos[podSandboxID]
+	if found {
+		ps.Network = cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
+	} else {
+		glog.V(4).Infof("Unable to find cadvisor stats for sandbox %q", podSandboxID)
+	}
+}
+
+func (p *criStatsProvider) addCadvisorPodCPUMemoryStats(
+	ps *statsapi.PodStats,
+	podUID types.UID,
+	allInfos map[string]cadvisorapiv2.ContainerInfo,
+) {
+	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
+	if podCgroupInfo != nil {
+		cpu, memory := cadvisorInfoToCPUandMemoryStats(podCgroupInfo)
+		ps.CPU = cpu
+		ps.Memory = memory
+	}
 }
 
 func (p *criStatsProvider) makeContainerStats(
@@ -277,31 +294,15 @@ func (p *criStatsProvider) makeContainerStats(
 	container *runtimeapi.Container,
 	rootFsInfo *cadvisorapiv2.FsInfo,
 	fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
+	uid string,
 ) *statsapi.ContainerStats {
 	result := &statsapi.ContainerStats{
 		Name: stats.Attributes.Metadata.Name,
 		// The StartTime in the summary API is the container creation time.
 		StartTime: metav1.NewTime(time.Unix(0, container.CreatedAt)),
-		// Work around heapster bug. https://github.com/kubernetes/kubernetes/issues/54962
-		// TODO(random-liu): Remove this after heapster is updated to newer than 1.5.0-beta.0.
-		CPU: &statsapi.CPUStats{
-			UsageNanoCores: proto.Uint64(0),
-		},
-		Memory: &statsapi.MemoryStats{
-			RSSBytes: proto.Uint64(0),
-		},
-		Rootfs: &statsapi.FsStats{},
-		Logs: &statsapi.FsStats{
-			Time:           metav1.NewTime(rootFsInfo.Timestamp),
-			AvailableBytes: &rootFsInfo.Available,
-			CapacityBytes:  &rootFsInfo.Capacity,
-			InodesFree:     rootFsInfo.InodesFree,
-			Inodes:         rootFsInfo.Inodes,
-			// UsedBytes and InodesUsed are unavailable from CRI stats.
-			//
-			// TODO(yguo0905): Get this information from kubelet and
-			// populate the two fields here.
-		},
+		CPU:       &statsapi.CPUStats{},
+		Memory:    &statsapi.MemoryStats{},
+		Rootfs:    &statsapi.FsStats{},
 		// UserDefinedMetrics is not supported by CRI.
 	}
 	if stats.Cpu != nil {
@@ -343,7 +344,8 @@ func (p *criStatsProvider) makeContainerStats(
 			result.Rootfs.Inodes = imageFsInfo.Inodes
 		}
 	}
-
+	containerLogPath := kuberuntime.BuildContainerLogsDirectory(types.UID(uid), container.GetMetadata().GetName())
+	result.Logs = p.getContainerLogStats(containerLogPath, rootFsInfo)
 	return result
 }
 
@@ -400,12 +402,8 @@ func (p *criStatsProvider) addCadvisorContainerStats(
 	}
 }
 
-func getCRICadvisorStats(ca cadvisor.Interface) (map[string]cadvisorapiv2.ContainerInfo, error) {
+func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) map[string]cadvisorapiv2.ContainerInfo {
 	stats := make(map[string]cadvisorapiv2.ContainerInfo)
-	infos, err := getCadvisorContainerInfo(ca)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
-	}
 	infos = removeTerminatedContainerInfo(infos)
 	for key, info := range infos {
 		// On systemd using devicemapper each mount into the container has an
@@ -421,5 +419,27 @@ func getCRICadvisorStats(ca cadvisor.Interface) (map[string]cadvisorapiv2.Contai
 		}
 		stats[path.Base(key)] = info
 	}
-	return stats, nil
+	return stats
+}
+
+// TODO Cache the metrics in container log manager
+func (p *criStatsProvider) getContainerLogStats(path string, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
+	m := p.logMetricsService.createLogMetricsProvider(path)
+	logMetrics, err := m.GetMetrics()
+	if err != nil {
+		glog.Errorf("Unable to fetch container log stats for path %s: %v ", path, err)
+		return nil
+	}
+	result := &statsapi.FsStats{
+		Time:           metav1.NewTime(rootFsInfo.Timestamp),
+		AvailableBytes: &rootFsInfo.Available,
+		CapacityBytes:  &rootFsInfo.Capacity,
+		InodesFree:     rootFsInfo.InodesFree,
+		Inodes:         rootFsInfo.Inodes,
+	}
+	usedbytes := uint64(logMetrics.Used.Value())
+	result.UsedBytes = &usedbytes
+	inodesUsed := uint64(logMetrics.InodesUsed.Value())
+	result.InodesUsed = &inodesUsed
+	return result
 }

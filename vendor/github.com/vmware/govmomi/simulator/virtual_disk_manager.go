@@ -152,6 +152,12 @@ func (m *VirtualDiskManager) MoveVirtualDiskTask(req *types.MoveVirtualDisk_Task
 
 func (m *VirtualDiskManager) CopyVirtualDiskTask(req *types.CopyVirtualDisk_Task) soap.HasFault {
 	task := CreateTask(m, "copyVirtualDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
+		if req.DestSpec != nil {
+			if Map.IsVPX() {
+				return nil, new(types.NotImplemented)
+			}
+		}
+
 		fm := Map.FileManager()
 
 		dest := m.names(req.DestName)

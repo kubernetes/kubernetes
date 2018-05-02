@@ -65,7 +65,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 	// Get all the zones that the nodes are in
 	expectedZones, err := gceCloud.GetAllZonesFromCloudProvider()
 	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("Expected zones: %v\n", expectedZones)
+	framework.Logf("Expected zones: %v", expectedZones)
 
 	// Get all the zones in this current region
 	region := gceCloud.Region()

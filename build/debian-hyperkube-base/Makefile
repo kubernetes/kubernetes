@@ -19,7 +19,7 @@
 
 REGISTRY?=staging-k8s.gcr.io
 IMAGE?=debian-hyperkube-base
-TAG=0.8
+TAG=0.10
 ARCH?=amd64
 CACHEBUST?=1
 
@@ -57,4 +57,4 @@ endif
 	rm -rf $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
+	docker push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)

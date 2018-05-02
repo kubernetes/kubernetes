@@ -27,16 +27,8 @@ import (
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/golang/glog"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-)
-
-const (
-	hypervIsolationAnnotationKey = "experimental.windows.kubernetes.io/isolation-type"
-
-	// Refer https://aka.ms/hyperv-container.
-	hypervIsolation = "hyperv"
 )
 
 func DefaultMemorySwap() int64 {
@@ -50,19 +42,10 @@ func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) 
 	return nil, nil
 }
 
-func shouldIsolatedByHyperV(annotations map[string]string) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HyperVContainer) {
-		return false
-	}
-
-	v, ok := annotations[hypervIsolationAnnotationKey]
-	return ok && v == hypervIsolation
-}
-
 // applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
 func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
-	if shouldIsolatedByHyperV(annotations) {
-		createConfig.HostConfig.Isolation = hypervIsolation
+	if kubeletapis.ShouldIsolatedByHyperV(annotations) {
+		createConfig.HostConfig.Isolation = kubeletapis.HypervIsolationValue
 
 		if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" {
 			createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode("none")
@@ -77,9 +60,22 @@ func (ds *dockerService) updateCreateConfig(
 	podSandboxID string, securityOptSep rune, apiVersion *semver.Version) error {
 	if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode != "" {
 		createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode(networkMode)
-	} else if !shouldIsolatedByHyperV(sandboxConfig.Annotations) {
+	} else if !kubeletapis.ShouldIsolatedByHyperV(sandboxConfig.Annotations) {
 		// Todo: Refactor this call in future for calling methods directly in security_context.go
 		modifyHostOptionsForContainer(nil, podSandboxID, createConfig.HostConfig)
+	}
+
+	// Apply Windows-specific options if applicable.
+	if wc := config.GetWindows(); wc != nil {
+		rOpts := wc.GetResources()
+		if rOpts != nil {
+			createConfig.HostConfig.Resources = dockercontainer.Resources{
+				Memory:     rOpts.MemoryLimitInBytes,
+				CPUShares:  rOpts.CpuShares,
+				CPUCount:   rOpts.CpuCount,
+				CPUPercent: rOpts.CpuMaximum,
+			}
+		}
 	}
 
 	applyExperimentalCreateConfig(createConfig, sandboxConfig.Annotations)
@@ -119,7 +115,7 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 		// Todo: Add a kernel version check for more validation
 
 		if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" {
-			if r.HostConfig.Isolation == hypervIsolation {
+			if r.HostConfig.Isolation == kubeletapis.HypervIsolationValue {
 				// Hyper-V only supports one container per Pod yet and the container will have a different
 				// IP address from sandbox. Return the first non-sandbox container IP as POD IP.
 				// TODO(feiskyer): remove this workaround after Hyper-V supports multiple containers per Pod.

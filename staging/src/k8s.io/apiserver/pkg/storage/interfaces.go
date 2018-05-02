@@ -17,7 +17,8 @@ limitations under the License.
 package storage
 
 import (
-	"golang.org/x/net/context"
+	"context"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -195,4 +196,7 @@ type Interface interface {
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
 		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
+
+	// Count returns number of different entries under the key (generally being path prefix).
+	Count(key string) (int64, error)
 }

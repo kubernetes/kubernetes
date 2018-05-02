@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,8 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/version"
-	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func TestClient(t *testing.T) {
@@ -284,23 +283,6 @@ func TestPatch(t *testing.T) {
 			t.Log(err)
 		} else {
 			t.Logf("%v", string(jsonObj))
-		}
-
-		obj, err := result.Get()
-		if err != nil {
-			t.Fatal(err)
-		}
-		metadata, err := meta.Accessor(obj)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// this call waits for the resourceVersion to be reached in the cache before returning.  We need to do this because
-		// the patch gets its initial object from the storage, and the cache serves that.  If it is out of date,
-		// then our initial patch is applied to an old resource version, which conflicts and then the updated object shows
-		// a conflicting diff, which permanently fails the patch.  This gives expected stability in the patch without
-		// retrying on an known number of conflicts below in the test.
-		if _, err := c.Core().Pods(ns.Name).Get(name, metav1.GetOptions{ResourceVersion: metadata.GetResourceVersion()}); err != nil {
-			t.Fatal(err)
 		}
 
 		return nil
@@ -612,7 +594,7 @@ func TestMultiWatch(t *testing.T) {
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{{
 					Name:  "pause",
-					Image: e2e.GetPauseImageName(client),
+					Image: imageutils.GetPauseImageName(),
 				}},
 			},
 		})
@@ -718,7 +700,7 @@ func TestMultiWatch(t *testing.T) {
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{{
 								Name:  "nothing",
-								Image: e2e.GetPauseImageName(client),
+								Image: imageutils.GetPauseImageName(),
 							}},
 						},
 					})
@@ -749,7 +731,7 @@ func TestMultiWatch(t *testing.T) {
 			if err != nil {
 				panic(fmt.Sprintf("Couldn't get %v: %v", name, err))
 			}
-			pod.Spec.Containers[0].Image = e2e.GetPauseImageName(client)
+			pod.Spec.Containers[0].Image = imageutils.GetPauseImageName()
 			sentTimes <- timePair{time.Now(), name}
 			if _, err := client.Core().Pods(ns.Name).Update(pod); err != nil {
 				panic(fmt.Sprintf("Couldn't make %v: %v", name, err))

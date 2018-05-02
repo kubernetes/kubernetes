@@ -12,7 +12,6 @@ go_test(
         "defaulttolerationseconds_test.go",
         "main_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/defaulttolerationseconds",
     tags = [
         "etcd",
         "integration",

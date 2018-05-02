@@ -64,8 +64,7 @@ func newTestPlugin(t *testing.T) (*csiPlugin, string) {
 func makeTestPV(name string, sizeGig int, driverName, volID string) *api.PersistentVolume {
 	return &api.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      name,
-			Namespace: testns,
+			Name: name,
 		},
 		Spec: api.PersistentVolumeSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},

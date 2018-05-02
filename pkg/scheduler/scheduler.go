@@ -107,7 +107,7 @@ type Config struct {
 	Ecache     *core.EquivalenceCache
 	NodeLister algorithm.NodeLister
 	Algorithm  algorithm.ScheduleAlgorithm
-	Binder     Binder
+	GetBinder  func(pod *v1.Pod) Binder
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
@@ -137,6 +137,9 @@ type Config struct {
 
 	// VolumeBinder handles PVC/PV binding for the pod.
 	VolumeBinder *volumebinder.VolumeBinder
+
+	// Disable pod preemption or not.
+	DisablePreemption bool
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
@@ -207,8 +210,9 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 // If it succeeds, it adds the name of the node where preemption has happened to the pod annotations.
 // It returns the node name and an error if any.
 func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
-	if !util.PodPriorityEnabled() {
-		glog.V(3).Infof("Pod priority feature is not enabled. No preemption is performed.")
+	if !util.PodPriorityEnabled() || sched.config.DisablePreemption {
+		glog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
+			" No preemption is performed.")
 		return "", nil
 	}
 	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)
@@ -328,7 +332,7 @@ func (sched *Scheduler) bindVolumesWorker() {
 		// The Pod is always sent back to the scheduler afterwards.
 		err := sched.config.VolumeBinder.Binder.BindPodVolumes(assumed)
 		if err != nil {
-			glog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name, err)
+			glog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", assumed.Namespace, assumed.Name, err)
 			reason = "VolumeBindingFailed"
 			eventType = v1.EventTypeWarning
 		} else {
@@ -403,7 +407,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	bindingStart := time.Now()
 	// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 	// it's atomic with setting host.
-	err := sched.config.Binder.Bind(b)
+	err := sched.config.GetBinder(assumed).Bind(b)
 	if err := sched.config.SchedulerCache.FinishBinding(assumed); err != nil {
 		glog.Errorf("scheduler cache FinishBinding failed: %v", err)
 	}
@@ -423,7 +427,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	}
 
 	metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
-	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", assumed.Name, b.Target.Name)
+	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, b.Target.Name)
 	return nil
 }
 

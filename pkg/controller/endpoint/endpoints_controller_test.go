@@ -48,7 +48,7 @@ var emptyNodeName string
 func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int) {
 	for i := 0; i < nPods+nNotReady; i++ {
 		p := &v1.Pod{
-			TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+			TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String()},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      fmt.Sprintf("pod%d", i),
@@ -81,7 +81,7 @@ func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotRea
 func addNotReadyPodsWithSpecifiedRestartPolicyAndPhase(store cache.Store, namespace string, nPods int, nPorts int, restartPolicy v1.RestartPolicy, podPhase v1.PodPhase) {
 	for i := 0; i < nPods; i++ {
 		p := &v1.Pod{
-			TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+			TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String()},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      fmt.Sprintf("pod%d", i),
@@ -138,7 +138,7 @@ type endpointController struct {
 }
 
 func newController(url string) *endpointController {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0]}})
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(), client)
@@ -753,7 +753,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			Ports:     []v1.EndpointPort{{Port: 0, Protocol: "TCP"}},
+			Ports:     []v1.EndpointPort{},
 		}},
 	})
 	endpointsHandler.ValidateRequestCount(t, 1)

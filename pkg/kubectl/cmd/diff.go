@@ -431,7 +431,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
 			info.Object = nil
 		}
@@ -439,7 +439,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 		obj := InfoObject{
 			Info:    info,
 			Parser:  parser,
-			Encoder: f.JSONEncoder(),
+			Encoder: cmdutil.InternalVersionJSONEncoder(),
 		}
 
 		return differ.Diff(obj, printer)

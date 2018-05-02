@@ -11,7 +11,6 @@ go_library(
 go_binary(
     name = "gen",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/gen",
     visibility = ["//visibility:public"],
 )
 

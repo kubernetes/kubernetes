@@ -20,24 +20,22 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 )
 
 // Install registers the API group and adds types to a scheme
-func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
+func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  apiserver.GroupName,
-			RootScopedKinds:            sets.NewString("APIService"),
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: apiserver.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
 			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
 		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
+	).Register(registry, scheme); err != nil {
 		panic(err)
 	}
 }

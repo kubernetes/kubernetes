@@ -113,9 +113,7 @@ func addComputeResource(s *types.ComputeResourceSummary, h *HostSystem) {
 // CreateDefaultESX creates a standalone ESX
 // Adds objects of type: Datacenter, Network, ComputeResource, ResourcePool and HostSystem
 func CreateDefaultESX(f *Folder) {
-	dc := &esx.Datacenter
-	f.putChild(dc)
-	createDatacenterFolders(dc, false)
+	dc := NewDatacenter(f)
 
 	host := NewHostSystem(esx.HostSystem)
 

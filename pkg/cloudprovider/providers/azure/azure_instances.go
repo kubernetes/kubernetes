@@ -19,6 +19,8 @@ package azure
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -29,9 +31,39 @@ import (
 
 // NodeAddresses returns the addresses of the specified instance.
 func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
+	addressGetter := func(nodeName types.NodeName) ([]v1.NodeAddress, error) {
+		ip, publicIP, err := az.GetIPForMachineWithRetry(nodeName)
+		if err != nil {
+			glog.V(2).Infof("NodeAddresses(%s) abort backoff", nodeName)
+			return nil, err
+		}
+
+		addresses := []v1.NodeAddress{
+			{Type: v1.NodeInternalIP, Address: ip},
+			{Type: v1.NodeHostName, Address: string(name)},
+		}
+		if len(publicIP) > 0 {
+			addresses = append(addresses, v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
+				Address: publicIP,
+			})
+		}
+		return addresses, nil
+	}
+
 	if az.UseInstanceMetadata {
+		isLocalInstance, err := az.isCurrentInstance(name)
+		if err != nil {
+			return nil, err
+		}
+
+		// Not local instance, get addresses from Azure ARM API.
+		if !isLocalInstance {
+			return addressGetter(name)
+		}
+
 		ipAddress := IPAddress{}
-		err := az.metadata.Object("instance/network/interface/0/ipv4/ipAddress/0", &ipAddress)
+		err = az.metadata.Object("instance/network/interface/0/ipv4/ipAddress/0", &ipAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -49,16 +81,7 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 		return addresses, nil
 	}
 
-	ip, err := az.GetIPForMachineWithRetry(name)
-	if err != nil {
-		glog.V(2).Infof("NodeAddresses(%s) abort backoff", name)
-		return nil, err
-	}
-
-	return []v1.NodeAddress{
-		{Type: v1.NodeInternalIP, Address: ip},
-		{Type: v1.NodeHostName, Address: string(name)},
-	}, nil
+	return addressGetter(name)
 }
 
 // NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
@@ -71,11 +94,6 @@ func (az *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID strin
 	}
 
 	return az.NodeAddresses(ctx, name)
-}
-
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (az *Cloud) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	return az.InstanceID(ctx, name)
 }
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
@@ -97,32 +115,69 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 	return true, nil
 }
 
-func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
-	nodeName := mapNodeNameToVMName(name)
-	metadataName, err := az.metadata.Text("instance/compute/name")
-	return (metadataName == nodeName), err
-}
-
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, cloudprovider.NotImplemented
 }
 
+func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
+	nodeName := mapNodeNameToVMName(name)
+	metadataName, err := az.metadata.Text("instance/compute/name")
+	if err != nil {
+		return false, err
+	}
+
+	if az.VMType == vmTypeVMSS {
+		// VMSS vmName is not same with hostname, use hostname instead.
+		metadataName, err = os.Hostname()
+		if err != nil {
+			return false, err
+		}
+	}
+
+	metadataName = strings.ToLower(metadataName)
+	return (metadataName == nodeName), err
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
+	nodeName := mapNodeNameToVMName(name)
+
 	if az.UseInstanceMetadata {
 		isLocalInstance, err := az.isCurrentInstance(name)
 		if err != nil {
 			return "", err
 		}
-		if isLocalInstance {
-			nodeName := mapNodeNameToVMName(name)
-			return az.getMachineID(nodeName), nil
+
+		// Not local instance, get instanceID from Azure ARM API.
+		if !isLocalInstance {
+			return az.vmSet.GetInstanceIDByNodeName(nodeName)
 		}
+
+		// Compose instanceID based on nodeName for standard instance.
+		if az.VMType == vmTypeStandard {
+			return az.getStandardMachineID(nodeName), nil
+		}
+
+		// Get scale set name and instanceID from vmName for vmss.
+		metadataName, err := az.metadata.Text("instance/compute/name")
+		if err != nil {
+			return "", err
+		}
+		ssName, instanceID, err := extractVmssVMName(metadataName)
+		if err != nil {
+			if err == ErrorNotVmssInstance {
+				// Compose machineID for standard Node.
+				return az.getStandardMachineID(nodeName), nil
+			}
+			return "", err
+		}
+		// Compose instanceID based on ssName and instanceID for vmss instance.
+		return az.getVmssMachineID(ssName, instanceID), nil
 	}
 
-	return az.vmSet.GetInstanceIDByNodeName(string(name))
+	return az.vmSet.GetInstanceIDByNodeName(nodeName)
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID

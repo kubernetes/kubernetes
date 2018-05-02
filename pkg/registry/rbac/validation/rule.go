@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -46,7 +47,7 @@ type AuthorizationRuleResolver interface {
 }
 
 // ConfirmNoEscalation determines if the roles for a given user in a given namespace encompass the provided role.
-func ConfirmNoEscalation(ctx genericapirequest.Context, ruleResolver AuthorizationRuleResolver, rules []rbac.PolicyRule) error {
+func ConfirmNoEscalation(ctx context.Context, ruleResolver AuthorizationRuleResolver, rules []rbac.PolicyRule) error {
 	ruleResolutionErrors := []error{}
 
 	user, ok := genericapirequest.UserFrom(ctx)
@@ -315,7 +316,7 @@ func (r *StaticRoles) GetClusterRole(name string) (*rbac.ClusterRole, error) {
 			return clusterRole, nil
 		}
 	}
-	return nil, errors.New("role not found")
+	return nil, errors.New("clusterrole not found")
 }
 
 func (r *StaticRoles) ListRoleBindings(namespace string) ([]*rbac.RoleBinding, error) {

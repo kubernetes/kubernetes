@@ -35,7 +35,6 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -79,7 +78,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedI
 	}
 
 	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Registry)
-	resourceEncoding.SetVersionEncoding(api.GroupName, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion, schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(api.GroupName, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0], schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, *testapi.Autoscaling.GroupVersion(), schema.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
 	// FIXME (soltysh): this GroupVersionResource override should be configurable
@@ -92,7 +91,10 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedI
 	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), schema.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), legacyscheme.Codecs, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
 
-	err := options.NewEtcdOptions(storageConfig).ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
+	etcdOptions := options.NewEtcdOptions(storageConfig)
+	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
+	etcdOptions.EnableWatchCache = false
+	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,10 +105,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedI
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
-	config.GenericConfig.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
-	config.GenericConfig.EnableMetrics = true
-	config.ExtraConfig.EnableCoreControllers = false
 	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
 		Dial:            func(network, addr string) (net.Conn, error) { return nil, nil },
@@ -184,7 +183,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, sharedInformers, assert := setUp(t)
 
-	master, err := config.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
+	master, err := config.Complete(sharedInformers).New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
@@ -277,7 +276,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(genericapirequest.WithRequestContext(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux, master.GenericAPIServer.RequestContextMapper()))
+	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
 	// /api exists in release-1.1
 	resp, err := http.Get(server.URL + "/api")

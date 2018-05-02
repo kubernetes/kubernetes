@@ -33,6 +33,55 @@ func ValidateNetworkPolicyName(name string, prefix bool) []string {
 	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateNetworkPolicyPort validates a NetworkPolicyPort
+func ValidateNetworkPolicyPort(port *networking.NetworkPolicyPort, portPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if port.Protocol != nil && *port.Protocol != api.ProtocolTCP && *port.Protocol != api.ProtocolUDP {
+		allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), *port.Protocol, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
+	}
+	if port.Port != nil {
+		if port.Port.Type == intstr.Int {
+			for _, msg := range validation.IsValidPortNum(int(port.Port.IntVal)) {
+				allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.IntVal, msg))
+			}
+		} else {
+			for _, msg := range validation.IsValidPortName(port.Port.StrVal) {
+				allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.StrVal, msg))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateNetworkPolicyPeer validates a NetworkPolicyPeer
+func ValidateNetworkPolicyPeer(peer *networking.NetworkPolicyPeer, peerPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	numPeers := 0
+
+	if peer.PodSelector != nil {
+		numPeers++
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(peer.PodSelector, peerPath.Child("podSelector"))...)
+	}
+	if peer.NamespaceSelector != nil {
+		numPeers++
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(peer.NamespaceSelector, peerPath.Child("namespaceSelector"))...)
+	}
+	if peer.IPBlock != nil {
+		numPeers++
+		allErrs = append(allErrs, ValidateIPBlock(peer.IPBlock, peerPath.Child("ipBlock"))...)
+	}
+
+	if numPeers == 0 {
+		allErrs = append(allErrs, field.Required(peerPath, "must specify a peer"))
+	} else if numPeers > 1 && peer.IPBlock != nil {
+		allErrs = append(allErrs, field.Forbidden(peerPath, "may not specify both ipBlock and another peer"))
+	}
+
+	return allErrs
+}
+
 // ValidateNetworkPolicySpec tests if required fields in the networkpolicy spec are set.
 func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -43,41 +92,11 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *fiel
 		ingressPath := fldPath.Child("ingress").Index(i)
 		for i, port := range ingress.Ports {
 			portPath := ingressPath.Child("ports").Index(i)
-			if port.Protocol != nil && *port.Protocol != api.ProtocolTCP && *port.Protocol != api.ProtocolUDP {
-				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), *port.Protocol, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
-			}
-			if port.Port != nil {
-				if port.Port.Type == intstr.Int {
-					for _, msg := range validation.IsValidPortNum(int(port.Port.IntVal)) {
-						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.IntVal, msg))
-					}
-				} else {
-					for _, msg := range validation.IsValidPortName(port.Port.StrVal) {
-						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.StrVal, msg))
-					}
-				}
-			}
+			allErrs = append(allErrs, ValidateNetworkPolicyPort(&port, portPath)...)
 		}
 		for i, from := range ingress.From {
 			fromPath := ingressPath.Child("from").Index(i)
-			numFroms := 0
-			if from.PodSelector != nil {
-				numFroms++
-				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(from.PodSelector, fromPath.Child("podSelector"))...)
-			}
-			if from.NamespaceSelector != nil {
-				numFroms++
-				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(from.NamespaceSelector, fromPath.Child("namespaceSelector"))...)
-			}
-			if from.IPBlock != nil {
-				numFroms++
-				allErrs = append(allErrs, ValidateIPBlock(from.IPBlock, fromPath.Child("ipBlock"))...)
-			}
-			if numFroms == 0 {
-				allErrs = append(allErrs, field.Required(fromPath, "must specify a from type"))
-			} else if numFroms > 1 {
-				allErrs = append(allErrs, field.Forbidden(fromPath, "may not specify more than 1 from type"))
-			}
+			allErrs = append(allErrs, ValidateNetworkPolicyPeer(&from, fromPath)...)
 		}
 	}
 	// Validate egress rules
@@ -85,41 +104,11 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *fiel
 		egressPath := fldPath.Child("egress").Index(i)
 		for i, port := range egress.Ports {
 			portPath := egressPath.Child("ports").Index(i)
-			if port.Protocol != nil && *port.Protocol != api.ProtocolTCP && *port.Protocol != api.ProtocolUDP {
-				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), *port.Protocol, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
-			}
-			if port.Port != nil {
-				if port.Port.Type == intstr.Int {
-					for _, msg := range validation.IsValidPortNum(int(port.Port.IntVal)) {
-						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.IntVal, msg))
-					}
-				} else {
-					for _, msg := range validation.IsValidPortName(port.Port.StrVal) {
-						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.StrVal, msg))
-					}
-				}
-			}
+			allErrs = append(allErrs, ValidateNetworkPolicyPort(&port, portPath)...)
 		}
 		for i, to := range egress.To {
 			toPath := egressPath.Child("to").Index(i)
-			numTo := 0
-			if to.PodSelector != nil {
-				numTo++
-				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(to.PodSelector, toPath.Child("podSelector"))...)
-			}
-			if to.NamespaceSelector != nil {
-				numTo++
-				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(to.NamespaceSelector, toPath.Child("namespaceSelector"))...)
-			}
-			if to.IPBlock != nil {
-				numTo++
-				allErrs = append(allErrs, ValidateIPBlock(to.IPBlock, toPath.Child("ipBlock"))...)
-			}
-			if numTo == 0 {
-				allErrs = append(allErrs, field.Required(toPath, "must specify a to type"))
-			} else if numTo > 1 {
-				allErrs = append(allErrs, field.Forbidden(toPath, "may not specify more than 1 to type"))
-			}
+			allErrs = append(allErrs, ValidateNetworkPolicyPeer(&to, toPath)...)
 		}
 	}
 	// Validate PolicyTypes

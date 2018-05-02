@@ -26,6 +26,7 @@ import (
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
@@ -150,7 +151,7 @@ func (gce *GCECloud) GetBetaRegionAddressByIP(region, ipAddress string) (*comput
 // TODO(#51665): retire this function once Network Tiers becomes Beta in GCP.
 func (gce *GCECloud) getNetworkTierFromAddress(name, region string) (string, error) {
 	if !gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
-		return NetworkTierDefault.ToGCEValue(), nil
+		return cloud.NetworkTierDefault.ToGCEValue(), nil
 	}
 	addr, err := gce.GetAlphaRegionAddress(name, region)
 	if err != nil {

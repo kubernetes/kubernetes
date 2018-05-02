@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["hash_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util/hash",
     deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 

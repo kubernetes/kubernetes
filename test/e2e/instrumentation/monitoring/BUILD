@@ -14,7 +14,9 @@ go_library(
         "custom_metrics_stackdriver.go",
         "influxdb.go",
         "metrics_grabber.go",
+        "prometheus.go",
         "stackdriver.go",
+        "stackdriver_metadata_agent.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/instrumentation/monitoring",
     deps = [
@@ -27,6 +29,7 @@ go_library(
         "//vendor/github.com/influxdata/influxdb/client/v2:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/prometheus/common/model:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
         "//vendor/google.golang.org/api/monitoring/v3:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -40,8 +43,8 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
     ],
 )
 

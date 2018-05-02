@@ -17,25 +17,25 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface for things that know how to store services.
 type Registry interface {
-	ListServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ServiceList, error)
-	CreateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc) (*api.Service, error)
-	GetService(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Service, error)
-	DeleteService(ctx genericapirequest.Context, name string) error
-	UpdateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error)
-	WatchServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
-	ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error)
+	ListServices(ctx context.Context, options *metainternalversion.ListOptions) (*api.ServiceList, error)
+	CreateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc) (*api.Service, error)
+	GetService(ctx context.Context, name string, options *metav1.GetOptions) (*api.Service, error)
+	DeleteService(ctx context.Context, name string) error
+	UpdateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error)
+	WatchServices(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	ExportService(ctx context.Context, name string, options metav1.ExportOptions) (*api.Service, error)
 }
 
 // storage puts strong typing around storage calls
@@ -49,7 +49,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.ServiceList, error) {
+func (s *storage) ListServices(ctx context.Context, options *metainternalversion.ListOptions) (*api.ServiceList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (s *storage) ListServices(ctx genericapirequest.Context, options *metainter
 	return obj.(*api.ServiceList), nil
 }
 
-func (s *storage) CreateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc) (*api.Service, error) {
+func (s *storage) CreateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc) (*api.Service, error) {
 	obj, err := s.Create(ctx, svc, createValidation, false)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (s *storage) CreateService(ctx genericapirequest.Context, svc *api.Service,
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) GetService(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
+func (s *storage) GetService(ctx context.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -73,12 +73,12 @@ func (s *storage) GetService(ctx genericapirequest.Context, name string, options
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) DeleteService(ctx genericapirequest.Context, name string) error {
+func (s *storage) DeleteService(ctx context.Context, name string) error {
 	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }
 
-func (s *storage) UpdateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error) {
+func (s *storage) UpdateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error) {
 	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc), createValidation, updateValidation)
 	if err != nil {
 		return nil, err
@@ -86,13 +86,13 @@ func (s *storage) UpdateService(ctx genericapirequest.Context, svc *api.Service,
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) WatchServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchServices(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
 // If StandardStorage implements rest.Exporter, returns exported service.
 // Otherwise export is not supported.
-func (s *storage) ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
+func (s *storage) ExportService(ctx context.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
 	exporter, isExporter := s.StandardStorage.(rest.Exporter)
 	if !isExporter {
 		return nil, fmt.Errorf("export is not supported")

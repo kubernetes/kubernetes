@@ -19,7 +19,7 @@ package kubeadm
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
@@ -64,8 +64,15 @@ type MasterConfiguration struct {
 	// Token is used for establishing bidirectional trust between nodes and masters.
 	// Used for joining nodes in the cluster.
 	Token string
-	// TokenTTL is a ttl for Token. Defaults to 24h.
+	// TokenTTL defines the ttl for Token. Defaults to 24h.
 	TokenTTL *metav1.Duration
+	// TokenUsages describes the ways in which this token can be used.
+	TokenUsages []string
+	// Extra groups that this token will authenticate as when used for authentication
+	TokenGroups []string
+
+	// CRISocket is used to retrieve container runtime info.
+	CRISocket string
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -121,8 +128,10 @@ type MasterConfiguration struct {
 
 // API struct contains elements of API server address.
 type API struct {
-	// AdvertiseAddress sets the address for the API server to advertise.
+	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string
+	// ControlPlaneEndpoint sets the DNS address for the API server
+	ControlPlaneEndpoint string
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
 	BindPort int32
@@ -173,6 +182,12 @@ type Etcd struct {
 	Image string
 	// SelfHosted holds configuration for self-hosting etcd.
 	SelfHosted *SelfHostedEtcd
+	// ServerCertSANs sets extra Subject Alternative Names for the etcd server
+	// signing cert. This is currently used for the etcd static-pod.
+	ServerCertSANs []string
+	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer
+	// signing cert. This is currently used for the etcd static-pod.
+	PeerCertSANs []string
 }
 
 // SelfHostedEtcd describes options required to configure self-hosted etcd.
@@ -209,6 +224,8 @@ type NodeConfiguration struct {
 	// will be fetched. Currently we only pay attention to one API server but
 	// hope to support >1 in the future.
 	DiscoveryTokenAPIServers []string
+	// DiscoveryTimeout modifies the discovery timeout
+	DiscoveryTimeout *metav1.Duration
 	// NodeName is the name of the node to join the cluster. Defaults
 	// to the name of the host.
 	NodeName string
@@ -217,6 +234,8 @@ type NodeConfiguration struct {
 	TLSBootstrapToken string
 	// Token is used for both discovery and TLS bootstrapping.
 	Token string
+	// CRISocket is used to retrieve container runtime info.
+	CRISocket string
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery
@@ -239,7 +258,7 @@ type NodeConfiguration struct {
 
 // KubeletConfiguration contains elements describing initial remote configuration of kubelet.
 type KubeletConfiguration struct {
-	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration
+	BaseConfig *kubeletconfigv1beta1.KubeletConfiguration
 }
 
 // GetControlPlaneImageRepository returns name of image repository
@@ -264,6 +283,8 @@ type HostPathMount struct {
 	HostPath string
 	// MountPath is the path inside the pod where hostPath will be mounted.
 	MountPath string
+	// Writable controls write access to the volume
+	Writable bool
 }
 
 // KubeProxy contains elements describing the proxy configuration.

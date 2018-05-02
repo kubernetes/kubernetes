@@ -18,8 +18,9 @@ limitations under the License.
 package webhook
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/golang/glog"
 
 	authentication "k8s.io/api/authentication/v1beta1"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
@@ -84,6 +85,8 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 			return err
 		})
 		if err != nil {
+			// An error here indicates bad configuration or an outage. Log for debugging.
+			glog.Errorf("Failed to make webhook authenticator request: %v", err)
 			return nil, false, err
 		}
 		r.Status = result.Status
@@ -113,13 +116,10 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 // authentication/v1beta1. We construct a registry that acknowledges
 // authentication/v1beta1 as an enabled version to pass a check enforced in
 // NewGenericWebhook.
-var registry = registered.NewOrDie("")
+var registry = registered.NewAPIRegistrationManager()
 
 func init() {
 	registry.RegisterVersions(groupVersions)
-	if err := registry.EnableVersions(groupVersions...); err != nil {
-		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
-	}
 }
 
 // tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,

@@ -15,7 +15,6 @@ go_test(
         "restmapper_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/api/meta",
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -39,13 +38,11 @@ go_library(
         "multirestmapper.go",
         "priority.go",
         "restmapper.go",
-        "unstructured.go",
     ],
     importpath = "k8s.io/apimachinery/pkg/api/meta",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -65,6 +62,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/api/meta/table:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/api/meta/testrestmapper:all-srcs",
+    ],
     tags = ["automanaged"],
 )

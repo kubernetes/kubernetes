@@ -24,8 +24,10 @@ import (
 	"net/url"
 
 	lru "github.com/hashicorp/golang-lru"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/client-go/rest"
@@ -48,14 +50,19 @@ type ClientManager struct {
 	cache                *lru.Cache
 }
 
-// NewClientManager creates a ClientManager.
+// NewClientManager creates a clientManager.
 func NewClientManager() (ClientManager, error) {
 	cache, err := lru.New(defaultCacheSize)
 	if err != nil {
 		return ClientManager{}, err
 	}
+	admissionScheme := runtime.NewScheme()
+	admissionv1beta1.AddToScheme(admissionScheme)
 	return ClientManager{
 		cache: cache,
+		negotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
+			Serializer: serializer.NewCodecFactory(admissionScheme).LegacyCodec(admissionv1beta1.SchemeGroupVersion),
+		}),
 	}, nil
 }
 
@@ -79,22 +86,17 @@ func (cm *ClientManager) SetServiceResolver(sr ServiceResolver) {
 	}
 }
 
-// SetNegotiatedSerializer sets the NegotiatedSerializer.
-func (cm *ClientManager) SetNegotiatedSerializer(n runtime.NegotiatedSerializer) {
-	cm.negotiatedSerializer = n
-}
-
 // Validate checks if ClientManager is properly set up.
 func (cm *ClientManager) Validate() error {
 	var errs []error
 	if cm.negotiatedSerializer == nil {
-		errs = append(errs, fmt.Errorf("the ClientManager requires a negotiatedSerializer"))
+		errs = append(errs, fmt.Errorf("the clientManager requires a negotiatedSerializer"))
 	}
 	if cm.serviceResolver == nil {
-		errs = append(errs, fmt.Errorf("the ClientManager requires a serviceResolver"))
+		errs = append(errs, fmt.Errorf("the clientManager requires a serviceResolver"))
 	}
 	if cm.authInfoResolver == nil {
-		errs = append(errs, fmt.Errorf("the ClientManager requires an authInfoResolver"))
+		errs = append(errs, fmt.Errorf("the clientManager requires an authInfoResolver"))
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -111,7 +113,12 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 	}
 
 	complete := func(cfg *rest.Config) (*rest.RESTClient, error) {
-		cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
+		// Combine CAData from the config with any existing CA bundle provided
+		if len(cfg.TLSClientConfig.CAData) > 0 {
+			cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, '\n')
+		}
+		cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, h.ClientConfig.CABundle...)
+
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
 		client, err := rest.UnversionedRESTClientFor(cfg)
@@ -133,7 +140,10 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		if svc.Path != nil {
 			cfg.APIPath = *svc.Path
 		}
-		cfg.TLSClientConfig.ServerName = serverName
+		// Set the server name if not already set
+		if len(cfg.TLSClientConfig.ServerName) == 0 {
+			cfg.TLSClientConfig.ServerName = serverName
+		}
 
 		delegateDialer := cfg.Dial
 		if delegateDialer == nil {
@@ -168,7 +178,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 	}
 
 	cfg := rest.CopyConfig(restConfig)
-	cfg.Host = u.Host
+	cfg.Host = u.Scheme + "://" + u.Host
 	cfg.APIPath = u.Path
 
 	return complete(cfg)

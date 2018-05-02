@@ -114,7 +114,9 @@ zz_generated.openapi.go
 
 # make-related metadata
 /.make/
+
 # Just in time generated data in the source, should never be committed
+/pkg/generated/bindata.go
 /test/e2e/generated/bindata.go
 
 # This file used by some vendor repos (e.g. github.com/go-openapi/...) to store secret variables and should not be ignored

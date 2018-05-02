@@ -17,16 +17,17 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
 	"path"
+	"sync"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 )
 
 // Stub implementation for DevicePlugin.
@@ -35,6 +36,7 @@ type Stub struct {
 	socket string
 
 	stop   chan interface{}
+	wg     sync.WaitGroup
 	update chan []*pluginapi.Device
 
 	server *grpc.Server
@@ -70,7 +72,8 @@ func (m *Stub) SetAllocFunc(f stubAllocFunc) {
 	m.allocFunc = f
 }
 
-// Start starts the gRPC server of the device plugin
+// Start starts the gRPC server of the device plugin. Can only
+// be called once.
 func (m *Stub) Start() error {
 	err := m.cleanup()
 	if err != nil {
@@ -82,10 +85,14 @@ func (m *Stub) Start() error {
 		return err
 	}
 
+	m.wg.Add(1)
 	m.server = grpc.NewServer([]grpc.ServerOption{}...)
 	pluginapi.RegisterDevicePluginServer(m.server, m)
 
-	go m.server.Serve(sock)
+	go func() {
+		defer m.wg.Done()
+		m.server.Serve(sock)
+	}()
 	_, conn, err := dial(m.socket)
 	if err != nil {
 		return err
@@ -96,16 +103,23 @@ func (m *Stub) Start() error {
 	return nil
 }
 
-// Stop stops the gRPC server
+// Stop stops the gRPC server. Can be called without a prior Start
+// and more than once. Not safe to be called concurrently by different
+// goroutines!
 func (m *Stub) Stop() error {
+	if m.server == nil {
+		return nil
+	}
 	m.server.Stop()
-	close(m.stop)
+	m.wg.Wait()
+	m.server = nil
+	close(m.stop) // This prevents re-starting the server.
 
 	return m.cleanup()
 }
 
 // Register registers the device plugin for the given resourceName with Kubelet.
-func (m *Stub) Register(kubeletEndpoint, resourceName string) error {
+func (m *Stub) Register(kubeletEndpoint, resourceName string, preStartContainerFlag bool) error {
 	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithInsecure(), grpc.WithBlock(),
 		grpc.WithTimeout(10*time.Second),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
@@ -120,6 +134,7 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string) error {
 		Version:      pluginapi.Version,
 		Endpoint:     path.Base(m.socket),
 		ResourceName: resourceName,
+		Options:      &pluginapi.DevicePluginOptions{PreStartRequired: preStartContainerFlag},
 	}
 
 	_, err = client.Register(context.Background(), reqt)
@@ -127,6 +142,17 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string) error {
 		return err
 	}
 	return nil
+}
+
+// GetDevicePluginOptions returns DevicePluginOptions settings for the device plugin.
+func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
+	return &pluginapi.DevicePluginOptions{}, nil
+}
+
+// PreStartContainer resets the devices received
+func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
+	log.Printf("PreStartContainer, %+v", r)
+	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
 // ListAndWatch lists devices and update that list according to the Update call

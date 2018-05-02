@@ -17,6 +17,7 @@ limitations under the License.
 package flunder
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -26,21 +27,24 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/sample-apiserver/pkg/apis/wardle/validation"
 
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 )
 
+// NewStrategy creates and returns a flunderStrategy instance
 func NewStrategy(typer runtime.ObjectTyper) flunderStrategy {
 	return flunderStrategy{typer, names.SimpleNameGenerator}
 }
 
+// GetAttrs returns labels.Set, fields.Set, the presence of Initializers if any
+// and error in case the given runtime.Object is not a Flunder
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	apiserver, ok := obj.(*wardle.Flunder)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a Flunder.")
+		return nil, nil, false, fmt.Errorf("given object is not a Flunder")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), FlunderToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	return labels.Set(apiserver.ObjectMeta.Labels), SelectableFields(apiserver), apiserver.Initializers != nil, nil
 }
 
 // MatchFlunder is the filter used by the generic etcd backend to watch events
@@ -53,8 +57,8 @@ func MatchFlunder(label labels.Selector, field fields.Selector) storage.Selectio
 	}
 }
 
-// FlunderToSelectableFields returns a field set that represents the object.
-func FlunderToSelectableFields(obj *wardle.Flunder) fields.Set {
+// SelectableFields returns a field set that represents the object.
+func SelectableFields(obj *wardle.Flunder) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
 }
 
@@ -67,14 +71,15 @@ func (flunderStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (flunderStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (flunderStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
-func (flunderStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (flunderStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
-func (flunderStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
-	return field.ErrorList{}
+func (flunderStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	flunder := obj.(*wardle.Flunder)
+	return validation.ValidateFlunder(flunder)
 }
 
 func (flunderStrategy) AllowCreateOnUpdate() bool {
@@ -88,6 +93,6 @@ func (flunderStrategy) AllowUnconditionalUpdate() bool {
 func (flunderStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (flunderStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (flunderStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }

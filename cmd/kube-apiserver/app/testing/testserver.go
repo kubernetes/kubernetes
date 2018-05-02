@@ -37,6 +37,12 @@ import (
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
 
+// TestServerInstanceOptions Instance options the TestServer
+type TestServerInstanceOptions struct {
+	// DisableStorageCleanup Disable the automatic storage cleanup
+	DisableStorageCleanup bool
+}
+
 // TestServer return values supplied by kube-test-ApiServer
 type TestServer struct {
 	ClientConfig *restclient.Config        // Rest client config
@@ -52,22 +58,36 @@ type Logger interface {
 	Logf(format string, args ...interface{})
 }
 
+// NewDefaultTestServerOptions Default options for TestServer instances
+func NewDefaultTestServerOptions() *TestServerInstanceOptions {
+	return &TestServerInstanceOptions{
+		DisableStorageCleanup: false,
+	}
+}
+
 // StartTestServer starts a etcd server and kube-apiserver. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // 		 enough time to remove temporary files.
-func StartTestServer(t Logger, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+	if instanceOptions == nil {
+		instanceOptions = NewDefaultTestServerOptions()
+	}
 
 	// TODO : Remove TrackStorageCleanup below when PR
 	// https://github.com/kubernetes/kubernetes/pull/50690
 	// merges as that shuts down storage properly
-	registry.TrackStorageCleanup()
+	if !instanceOptions.DisableStorageCleanup {
+		registry.TrackStorageCleanup()
+	}
 
 	stopCh := make(chan struct{})
 	tearDown := func() {
-		registry.CleanupStorage()
+		if !instanceOptions.DisableStorageCleanup {
+			registry.CleanupStorage()
+		}
 		close(stopCh)
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
@@ -102,9 +122,14 @@ func StartTestServer(t Logger, customFlags []string, storageConfig *storagebacke
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	fs.Parse(customFlags)
+	completedOptions, err := app.Complete(s)
+	if err != nil {
+		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
+	}
 
+	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
-	server, err := app.CreateServerChain(s, stopCh)
+	server, err := app.CreateServerChain(completedOptions, stopCh)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 
@@ -143,9 +168,8 @@ func StartTestServer(t Logger, customFlags []string, storageConfig *storagebacke
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t Logger, flags []string, storageConfig *storagebackend.Config) *TestServer {
-
-	result, err := StartTestServer(t, flags, storageConfig)
+func StartTestServerOrDie(t Logger, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
+	result, err := StartTestServer(t, instanceOptions, flags, storageConfig)
 	if err == nil {
 		return &result
 	}

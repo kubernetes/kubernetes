@@ -81,6 +81,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(obj *apiextensions.JSONSchemaPropsOrBool, c fuzz.Continue) {
 			if c.RandBool() {
+				obj.Allows = true
 				obj.Schema = &apiextensions.JSONSchemaProps{}
 				c.Fuzz(obj.Schema)
 			} else {

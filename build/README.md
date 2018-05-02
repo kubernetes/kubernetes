@@ -5,8 +5,8 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 ## Requirements
 
 1. Docker, using one of the following configurations:
-  * **Mac OS X** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/docker-for-mac/).
-     **Note**: You will want to set the Docker VM to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
+  * **macOS** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/docker-for-mac/).
+     **Note**: You will want to set the Docker VM to have at least 4.5GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
   * **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
   * **Remote Docker engine** Use a big machine in the cloud to build faster. This is a little trickier so look at the section later on.
 2. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
@@ -106,5 +106,24 @@ In addition, there are some other tar files that are created:
 * `kubernetes-server-*.tar.gz` Server binaries for a specific platform.
 
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
+
+## Reproducibility
+`make release`, its variant `make quick-release`, and Bazel all provide a
+hermetic build environment which should provide some level of reproducibility
+for builds. `make` itself is **not** hermetic.
+
+The Kubernetes build environment supports the [`SOURCE_DATE_EPOCH` environment
+variable](https://reproducible-builds.org/specs/source-date-epoch/) specified by
+the Reproducible Builds project, which can be set to a UNIX epoch timestamp.
+This will be used for the build timestamps embedded in compiled Go binaries,
+and maybe someday also Docker images.
+
+One reasonable setting for this variable is to use the commit timestamp from the
+tip of the tree being built; this is what the Kubernetes CI system uses. For
+example, you could use the following one-liner:
+
+```bash
+SOURCE_DATE_EPOCH=$(git show -s --format=format:%ct HEAD)
+```
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/README.md?pixel)]()

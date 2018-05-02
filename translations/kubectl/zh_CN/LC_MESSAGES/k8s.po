@@ -69,7 +69,7 @@ msgid ""
 "\t\t  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL"
 msgstr ""
 "\n"
-"\t\t  # 如果你还没有一个 .dockercfg 文件, 你可以创建一个 dockercfg 的 secret 直接使用:\n"
+"\t\t  # 如果你还没有一个 .dockercfg 文件, 你可以直接使用下面的命令创建一个 dockercfg 的 secret:\n"
 "\t\t  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL"
 
 #: pkg/kubectl/cmd/top_node.go:65

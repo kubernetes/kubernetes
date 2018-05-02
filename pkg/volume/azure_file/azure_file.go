@@ -18,6 +18,7 @@ package azure_file
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"runtime"
 
@@ -31,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ProbeVolumePlugins is the primary endpoint for volume plugins
@@ -122,7 +123,7 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 		secretName:      secretName,
 		shareName:       share,
 		readOnly:        readOnly,
-		mountOptions:    volume.MountOptionFromSpec(spec),
+		mountOptions:    volutil.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -168,7 +169,7 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, err
 	}
 
-	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volume.RoundUpToGiB(newSize))); err != nil {
+	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volutil.RoundUpToGiB(newSize))); err != nil {
 		return oldSize, err
 	}
 
@@ -241,8 +242,20 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	if !notMnt {
-		return nil
+		// testing original mount point, make sure the mount link is valid
+		if _, err := ioutil.ReadDir(dir); err == nil {
+			glog.V(4).Infof("azureFile - already mounted to target %s", dir)
+			return nil
+		}
+		// mount link is invalid, now unmount and remount later
+		glog.Warningf("azureFile - ReadDir %s failed with %v, unmount this directory", dir, err)
+		if err := b.mounter.Unmount(dir); err != nil {
+			glog.Errorf("azureFile - Unmount directory %s failed with %v", dir, err)
+			return err
+		}
+		notMnt = true
 	}
+
 	var accountKey, accountName string
 	if accountName, accountKey, err = b.util.GetAzureCredentials(b.plugin.host, b.secretNamespace, b.secretName); err != nil {
 		return err
@@ -262,7 +275,7 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 		if b.readOnly {
 			options = append(options, "ro")
 		}
-		mountOptions = volume.JoinMountOptions(b.mountOptions, options)
+		mountOptions = volutil.JoinMountOptions(b.mountOptions, options)
 		mountOptions = appendDefaultMountOptions(mountOptions, fsGroup)
 	}
 
@@ -306,7 +319,7 @@ func (c *azureFileUnmounter) TearDown() error {
 }
 
 func (c *azureFileUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return volutil.UnmountPath(dir, c.mounter)
 }
 
 func getVolumeSource(spec *volume.Spec) (string, bool, error) {

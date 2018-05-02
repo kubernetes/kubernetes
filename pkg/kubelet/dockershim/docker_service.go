@@ -17,26 +17,28 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	"k8s.io/api/core/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/cni"
-	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
-	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
@@ -110,23 +112,19 @@ type NetworkPluginSettings struct {
 	NonMasqueradeCIDR string
 	// PluginName is the name of the plugin, runtime shim probes for
 	PluginName string
-	// PluginBinDir is the directory in which the binaries for the plugin with
-	// PluginName is kept. The admin is responsible for provisioning these
-	// binaries before-hand.
-	PluginBinDir string
+	// PluginBinDirsString is a list of directiores delimited by commas, in
+	// which the binaries for the plugin with PluginName may be found.
+	PluginBinDirString string
+	// PluginBinDirs is an array of directories in which the binaries for
+	// the plugin with PluginName may be found. The admin is responsible for
+	// provisioning these binaries before-hand.
+	PluginBinDirs []string
 	// PluginConfDir is the directory in which the admin places a CNI conf.
 	// Depending on the plugin, this may be an optional field, eg: kubenet
 	// generates its own plugin conf.
 	PluginConfDir string
 	// MTU is the desired MTU for network devices created by the plugin.
 	MTU int
-
-	// RuntimeHost is an interface that serves as a trap-door from plugin back
-	// into the kubelet.
-	// TODO: This shouldn't be required, remove once we move host ports into CNI
-	// and figure out bandwidth shaping. See corresponding comments above
-	// network.Host interface.
-	LegacyRuntimeHost network.LegacyHost
 }
 
 // namespaceGetter is a wrapper around the dockerService that implements
@@ -153,7 +151,6 @@ func (p *portMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.
 // and dockerServices which implements the rest of the network host interfaces.
 // The legacy host methods are slated for deletion.
 type dockerNetworkHost struct {
-	network.LegacyHost
 	*namespaceGetter
 	*portMappingGetter
 }
@@ -196,7 +193,8 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 	client := NewDockerClientFromConfig(config)
 
 	c := libdocker.NewInstrumentedInterface(client)
-	checkpointHandler, err := NewPersistentCheckpointHandler(dockershimRootDir)
+
+	checkpointManager, err := checkpointmanager.NewCheckpointManager(filepath.Join(dockershimRootDir, sandboxCheckpointDir))
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +208,7 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 			execHandler: &NativeExecHandler{},
 		},
 		containerManager:  cm.NewContainerManager(cgroupsName, client),
-		checkpointHandler: checkpointHandler,
+		checkpointManager: checkpointManager,
 		disableSharedPID:  disableSharedPID,
 		networkReady:      make(map[string]bool),
 	}
@@ -228,11 +226,20 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 			return nil, err
 		}
 	}
+
+	// Determine the hairpin mode.
+	if err := effectiveHairpinMode(pluginSettings); err != nil {
+		// This is a non-recoverable error. Returning it up the callstack will just
+		// lead to retries of the same failure, so just fail hard.
+		return nil, err
+	}
+	glog.Infof("Hairpin mode set to %q", pluginSettings.HairpinMode)
+
 	// dockershim currently only supports CNI plugins.
-	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDir)
-	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDir))
+	pluginSettings.PluginBinDirs = cni.SplitDirs(pluginSettings.PluginBinDirString)
+	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDirs)
+	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDirs))
 	netHost := &dockerNetworkHost{
-		pluginSettings.LegacyRuntimeHost,
 		&namespaceGetter{ds},
 		&portMappingGetter{ds},
 	}
@@ -289,7 +296,7 @@ type dockerService struct {
 	containerManager cm.ContainerManager
 	// cgroup driver used by Docker runtime.
 	cgroupDriver      string
-	checkpointHandler CheckpointHandler
+	checkpointManager checkpointmanager.CheckpointManager
 	// caches the version of the runtime.
 	// To be compatible with multiple docker versions, we need to perform
 	// version checking for some operations. Use this cache to avoid querying
@@ -361,7 +368,8 @@ func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 // GetPodPortMappings returns the port mappings of the given podSandbox ID.
 func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.PortMapping, error) {
 	// TODO: get portmappings from docker labels for backward compatibility
-	checkpoint, err := ds.checkpointHandler.GetCheckpoint(podSandboxID)
+	checkpoint := NewPodSandboxCheckpoint("", "", &CheckpointData{})
+	err := ds.checkpointManager.GetCheckpoint(podSandboxID, checkpoint)
 	// Return empty portMappings if checkpoint is not found
 	if err != nil {
 		if err == utilstore.ErrKeyNotFound {
@@ -369,9 +377,9 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 		}
 		return nil, err
 	}
-
-	portMappings := make([]*hostport.PortMapping, 0, len(checkpoint.Data.PortMappings))
-	for _, pm := range checkpoint.Data.PortMappings {
+	_, _, _, checkpointedPortMappings, _ := checkpoint.GetData()
+	portMappings := make([]*hostport.PortMapping, 0, len(checkpointedPortMappings))
+	for _, pm := range checkpointedPortMappings {
 		proto := toAPIProtocol(*pm.Protocol)
 		portMappings = append(portMappings, &hostport.PortMapping{
 			HostPort:      *pm.HostPort,
@@ -505,4 +513,29 @@ func toAPIProtocol(protocol Protocol) v1.Protocol {
 	}
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return v1.ProtocolTCP
+}
+
+// effectiveHairpinMode determines the effective hairpin mode given the
+// configured mode, and whether cbr0 should be configured.
+func effectiveHairpinMode(s *NetworkPluginSettings) error {
+	// The hairpin mode setting doesn't matter if:
+	// - We're not using a bridge network. This is hard to check because we might
+	//   be using a plugin.
+	// - It's set to hairpin-veth for a container runtime that doesn't know how
+	//   to set the hairpin flag on the veth's of containers. Currently the
+	//   docker runtime is the only one that understands this.
+	// - It's set to "none".
+	if s.HairpinMode == kubeletconfig.PromiscuousBridge || s.HairpinMode == kubeletconfig.HairpinVeth {
+		if s.HairpinMode == kubeletconfig.PromiscuousBridge && s.PluginName != "kubenet" {
+			// This is not a valid combination, since promiscuous-bridge only works on kubenet. Users might be using the
+			// default values (from before the hairpin-mode flag existed) and we
+			// should keep the old behavior.
+			glog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", s.HairpinMode, kubeletconfig.HairpinVeth)
+			s.HairpinMode = kubeletconfig.HairpinVeth
+			return nil
+		}
+	} else if s.HairpinMode != kubeletconfig.HairpinNone {
+		return fmt.Errorf("unknown value: %q", s.HairpinMode)
+	}
+	return nil
 }

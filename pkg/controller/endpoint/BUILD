@@ -41,7 +41,6 @@ go_test(
     name = "go_default_test",
     srcs = ["endpoints_controller_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/endpoint",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",

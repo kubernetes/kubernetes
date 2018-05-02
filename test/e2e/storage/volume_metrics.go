@@ -293,6 +293,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 				pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
 				Expect(err).NotTo(HaveOccurred(), "Error creating pv pvc: %v", err)
 				waitForPVControllerSync(metricsGrabber, boundPVKey, classKey)
+				waitForPVControllerSync(metricsGrabber, boundPVCKey, namespaceKey)
 				validator([]map[string]int64{{className: 1}, nil, {ns: 1}, nil})
 
 			})

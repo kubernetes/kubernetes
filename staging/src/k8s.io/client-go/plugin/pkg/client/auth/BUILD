@@ -29,6 +29,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/azure:all-srcs",
+        "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/exec:all-srcs",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp:all-srcs",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/oidc:all-srcs",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/openstack:all-srcs",

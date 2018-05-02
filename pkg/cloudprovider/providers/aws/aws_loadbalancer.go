@@ -1027,10 +1027,10 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 					if elbProtocolsAreEqual(actual.InstanceProtocol, expected.InstanceProtocol) {
 						continue
 					}
-					if orZero(actual.InstancePort) != orZero(expected.InstancePort) {
+					if aws.Int64Value(actual.InstancePort) != aws.Int64Value(expected.InstancePort) {
 						continue
 					}
-					if orZero(actual.LoadBalancerPort) != orZero(expected.LoadBalancerPort) {
+					if aws.Int64Value(actual.LoadBalancerPort) != aws.Int64Value(expected.LoadBalancerPort) {
 						continue
 					}
 					if awsArnEquals(actual.SSLCertificateId, expected.SSLCertificateId) {

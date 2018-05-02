@@ -1341,7 +1341,7 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">globalDefault</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">globalDefault specifies whether this PriorityClass should be considered as the default priority for pods that do not have any priority class.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">globalDefault specifies whether this PriorityClass should be considered as the default priority for pods that do not have any priority class. Only one PriorityClass can be marked as <code>globalDefault</code>. However, if more than one PriorityClasses exists with their <code>globalDefault</code> field set to true, the smallest value of such global default PriorityClasses will be used as the default priority.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>

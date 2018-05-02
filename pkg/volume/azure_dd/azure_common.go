@@ -23,7 +23,8 @@ import (
 	"path"
 	libstrings "strings"
 
-	storage "github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,9 +36,9 @@ import (
 )
 
 const (
-	defaultFSType             = "ext4"
-	defaultStorageAccountType = storage.StandardLRS
-	defaultAzureDiskKind      = v1.AzureSharedBlobDisk
+	defaultStorageAccountType       = storage.StandardLRS
+	defaultAzureDiskKind            = v1.AzureSharedBlobDisk
+	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingNone
 )
 
 type dataDisk struct {
@@ -107,14 +108,6 @@ func getVolumeSource(spec *volume.Spec) (*v1.AzureDiskVolumeSource, error) {
 	return nil, fmt.Errorf("azureDisk - Spec does not reference an Azure disk volume type")
 }
 
-func normalizeFsType(fsType string) string {
-	if fsType == "" {
-		return defaultFSType
-	}
-
-	return fsType
-}
-
 func normalizeKind(kind string) (v1.AzureDataDiskKind, error) {
 	if kind == "" {
 		return defaultAzureDiskKind, nil
@@ -141,7 +134,7 @@ func normalizeStorageAccountType(storageAccountType string) (storage.SkuName, er
 
 func normalizeCachingMode(cachingMode v1.AzureDataDiskCachingMode) (v1.AzureDataDiskCachingMode, error) {
 	if cachingMode == "" {
-		return v1.AzureDataDiskCachingReadWrite, nil
+		return defaultAzureDataDiskCachingMode, nil
 	}
 
 	if !supportedCachingModes.Has(string(cachingMode)) {

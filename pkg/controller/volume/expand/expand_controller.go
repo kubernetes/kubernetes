@@ -42,8 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 const (
@@ -116,9 +116,9 @@ func NewExpandController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
-	blkutil := util.NewBlockVolumePathHandler()
+	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
 	expc.opExecutor = operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
@@ -227,6 +227,10 @@ func (expc *expandController) GetVolumeDevicePluginDir(pluginName string) string
 	return ""
 }
 
+func (expc *expandController) GetPodsDir() string {
+	return ""
+}
+
 func (expc *expandController) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	return ""
 }
@@ -297,4 +301,8 @@ func (expc *expandController) GetNodeLabels() (map[string]string, error) {
 
 func (expc *expandController) GetNodeName() types.NodeName {
 	return ""
+}
+
+func (expc *expandController) GetEventRecorder() record.EventRecorder {
+	return expc.recorder
 }

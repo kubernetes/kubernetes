@@ -11,9 +11,9 @@ go_test(
     srcs = [
         "helpers_test.go",
         "unstructured_list_test.go",
+        "unstructured_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
@@ -49,6 +49,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme:all-srcs",
+    ],
     tags = ["automanaged"],
 )

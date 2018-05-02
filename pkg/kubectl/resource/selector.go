@@ -88,9 +88,8 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 			}
 			return err
 		}
-		accessor := r.Mapping.MetadataAccessor
-		resourceVersion, _ := accessor.ResourceVersion(list)
-		nextContinueToken, _ := accessor.Continue(list)
+		resourceVersion, _ := metadataAccessor.ResourceVersion(list)
+		nextContinueToken, _ := metadataAccessor.Continue(list)
 		info := &Info{
 			Client:  r.Client,
 			Mapping: r.Mapping,

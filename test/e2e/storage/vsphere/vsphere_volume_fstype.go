@@ -151,7 +151,7 @@ func createVolume(client clientset.Interface, namespace string, scParameters map
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass))
+	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	Expect(err).NotTo(HaveOccurred())
 
 	var pvclaims []*v1.PersistentVolumeClaim

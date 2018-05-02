@@ -102,9 +102,9 @@ func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) *cob
 		},
 		Aliases: []string{"pods", "po"},
 	}
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.PrintContainers, "containers", false, "If present, print usage of containers within a pod.")
-	cmd.Flags().BoolVar(&options.AllNamespaces, "all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&options.PrintContainers, "containers", options.PrintContainers, "If present, print usage of containers within a pod.")
+	cmd.Flags().BoolVar(&options.AllNamespaces, "all-namespaces", options.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	options.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
@@ -127,7 +127,11 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	}
 
 	o.DiscoveryClient = clientset.DiscoveryClient
-	o.MetricsClient, err = f.MetricsClientSet()
+	config, err := f.ClientConfig()
+	if err != nil {
+		return err
+	}
+	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {
 		return err
 	}

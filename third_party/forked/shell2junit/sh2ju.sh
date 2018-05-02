@@ -59,7 +59,7 @@ function juLogClean() {
 function juLog() {
   suite="";
   errfile=/tmp/evErr.$$.log
-  date=`which gdate || which date`
+  date=`which gdate 2>/dev/null || which date`
   asserts=00; errors=0; total=0; content=""
 
   # parse arguments
@@ -130,27 +130,19 @@ function juLog() {
   # calculate vars
   asserts=$(($asserts+1))
   errors=$(($errors+$err))
-  time=`echo "${end} - ${ini}" | bc -l`
-  total=`echo "${total} + ${time}" | bc -l`
+  time=`echo "${end} ${ini}" | awk '{print $1 - $2}'`
+  total=`echo "${total} ${time}" | awk '{print $1 + $2}'`
 
   # write the junit xml report
   ## failure tag
   [[ ${err} = 0 ]] && failure="" || failure="
-      <failure type=\"ScriptError\" message=\"Script Error\">
-      <![CDATA[
-      ${errMsg}
-      ]]>
-      </failure>
+      <failure type=\"ScriptError\" message=\"Script Error\"><![CDATA[${errMsg}]]></failure>
   "
   ## testcase tag
   content="${content}
     <testcase assertions=\"1\" name=\"${name}\" time=\"${time}\" classname=\"${class}\">
     ${failure}
-    <system-err>
-<![CDATA[
-${errMsg}
-]]>
-    </system-err>
+    <system-err><![CDATA[${errMsg}]]></system-err>
     </testcase>
   "
   ## testsuite block

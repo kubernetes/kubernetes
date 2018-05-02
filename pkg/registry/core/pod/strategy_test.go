@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"net/url"
 	"reflect"
 	"testing"
@@ -268,7 +269,7 @@ type mockPodGetter struct {
 	pod *api.Pod
 }
 
-func (g mockPodGetter) Get(genericapirequest.Context, string, *metav1.GetOptions) (runtime.Object, error) {
+func (g mockPodGetter) Get(context.Context, string, *metav1.GetOptions) (runtime.Object, error) {
 	return g.pod, nil
 }
 
@@ -370,7 +371,7 @@ func TestCheckLogLocation(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].String(),
 		"Pod",
 		PodToSelectableFields(&api.Pod{}),
 		nil,

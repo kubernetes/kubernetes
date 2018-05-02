@@ -110,19 +110,19 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 		},
 		{
 			use:     "apiserver",
-			short:   "Generates the API server static Pod manifest.",
+			short:   "Generates the API server static Pod manifest",
 			long:    apiServerControlplaneLongDesc,
 			cmdFunc: controlplanephase.CreateAPIServerStaticPodManifestFile,
 		},
 		{
 			use:     "controller-manager",
-			short:   "Generates the controller-manager static Pod manifest.",
+			short:   "Generates the controller-manager static Pod manifest",
 			long:    controllerManagerControlplaneLongDesc,
 			cmdFunc: controlplanephase.CreateControllerManagerStaticPodManifestFile,
 		},
 		{
 			use:     "scheduler",
-			short:   "Generates the scheduler static Pod manifest.",
+			short:   "Generates the scheduler static Pod manifest",
 			long:    schedulerControlplaneLongDesc,
 			cmdFunc: controlplanephase.CreateSchedulerStaticPodManifestFile,
 		},
@@ -143,7 +143,7 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 		cmd.Flags().StringVar(&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion, `Choose a specific Kubernetes version for the control plane`)
 
 		if properties.use == "all" || properties.use == "apiserver" {
-			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address or DNS name the API server is accessible on")
+			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address of the API server is accessible on")
 			cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, "The port the API server is accessible on")
 			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, "The range of IP address used for service VIPs")
 			cmd.Flags().StringVar(&featureGatesString, "feature-gates", featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
@@ -160,7 +160,7 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 			cmd.Flags().Var(utilflag.NewMapStringString(&cfg.SchedulerExtraArgs), "scheduler-extra-args", "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
 		}
 
-		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental")
 
 		subCmds = append(subCmds, cmd)
 	}

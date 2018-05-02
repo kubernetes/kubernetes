@@ -13,7 +13,6 @@ go_test(
         "selector_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/fields",
 )
 
 go_library(

@@ -377,7 +377,17 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		if err != nil {
 			return fmt.Errorf("couldn't compute key: %v", err)
 		}
-		toReplace = append(toReplace, &storeElement{Key: key, Object: object})
+		objLabels, objFields, objUninitialized, err := w.getAttrsFunc(object)
+		if err != nil {
+			return err
+		}
+		toReplace = append(toReplace, &storeElement{
+			Key:           key,
+			Object:        object,
+			Labels:        objLabels,
+			Fields:        objFields,
+			Uninitialized: objUninitialized,
+		})
 	}
 
 	w.Lock()

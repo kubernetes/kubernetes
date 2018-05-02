@@ -105,7 +105,7 @@ func GetHollowKubeletConfig(
 	podsPerCore int) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
-	manifestFilePath := utils.MakeTempDirOrDie("manifest", testRootDir)
+	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
 	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	// Flags struct
@@ -125,11 +125,11 @@ func GetHollowKubeletConfig(
 		panic(err)
 	}
 
-	c.ManifestURL = ""
+	c.StaticPodURL = ""
 	c.Address = "0.0.0.0" /* bind address */
 	c.Port = int32(kubeletPort)
 	c.ReadOnlyPort = int32(kubeletReadOnlyPort)
-	c.PodManifestPath = manifestFilePath
+	c.StaticPodPath = podFilePath
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second

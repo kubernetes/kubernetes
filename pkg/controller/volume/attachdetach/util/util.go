@@ -25,7 +25,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // CreateVolumeSpec creates and returns a mutatable volume.Spec object for the
@@ -150,7 +150,7 @@ func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOf
 	nodeName := types.NodeName(pod.Spec.NodeName)
 	keepTerminatedPodVolume := desiredStateOfWorld.GetKeepTerminatedPodVolumesForNode(nodeName)
 
-	if volumehelper.IsPodTerminated(pod, pod.Status) {
+	if util.IsPodTerminated(pod, pod.Status) {
 		// if pod is terminate we let kubelet policy dictate if volume
 		// should be detached or not
 		return keepTerminatedPodVolume
@@ -216,7 +216,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 			continue
 		}
 
-		uniquePodName := volumehelper.GetUniquePodName(pod)
+		uniquePodName := util.GetUniquePodName(pod)
 		if addVolumes {
 			// Add volume to desired state of world
 			_, err := desiredStateOfWorld.AddPod(
@@ -232,7 +232,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 
 		} else {
 			// Remove volume from desired state of world
-			uniqueVolumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
+			uniqueVolumeName, err := util.GetUniqueVolumeNameFromSpec(
 				attachableVolumePlugin, volumeSpec)
 			if err != nil {
 				glog.V(10).Infof(

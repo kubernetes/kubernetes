@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +30,7 @@ import (
 )
 
 const (
-	csiPluginName              = "kubernetes.io/csi"
-	csiVolAttribsAnnotationKey = "csi.volume.kubernetes.io/volume-attributes"
+	csiPluginName = "kubernetes.io/csi"
 
 	// TODO (vladimirvivien) implement a more dynamic way to discover
 	// the unix domain socket path for each installed csi driver.
@@ -42,11 +40,6 @@ const (
 	csiTimeout      = 15 * time.Second
 	volNameSep      = "^"
 	volDataFileName = "vol_data.json"
-)
-
-var (
-	// csiVersion supported csi version
-	csiVersion = &csipb.Version{Major: 0, Minor: 1, Patch: 0}
 )
 
 type csiPlugin struct {
@@ -105,6 +98,10 @@ func (p *csiPlugin) NewMounter(
 	if err != nil {
 		return nil, err
 	}
+	readOnly, err := getReadOnlyFromSpec(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	// before it is used in any paths such as socket etc
 	addr := fmt.Sprintf(csiAddrTemplate, pvSource.Driver)
@@ -127,6 +124,7 @@ func (p *csiPlugin) NewMounter(
 		volumeID:     pvSource.VolumeHandle,
 		specVolumeID: spec.Name(),
 		csiClient:    client,
+		readOnly:     readOnly,
 	}
 	return mounter, nil
 }
@@ -222,6 +220,15 @@ func getCSISourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, er
 	}
 
 	return nil, fmt.Errorf("CSIPersistentVolumeSource not defined in spec")
+}
+
+func getReadOnlyFromSpec(spec *volume.Spec) (bool, error) {
+	if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.CSI != nil {
+		return spec.ReadOnly, nil
+	}
+
+	return false, fmt.Errorf("CSIPersistentVolumeSource not defined in spec")
 }
 
 // log prepends log string with `kubernetes.io/csi`

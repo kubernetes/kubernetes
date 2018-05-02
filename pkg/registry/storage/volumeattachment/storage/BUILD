@@ -18,7 +18,6 @@ go_test(
     name = "go_default_test",
     srcs = ["storage_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/storage/volumeattachment/storage",
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/storage:go_default_library",

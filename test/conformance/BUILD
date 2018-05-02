@@ -10,7 +10,6 @@ go_library(
 go_binary(
     name = "conformance",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/conformance",
     visibility = ["//visibility:public"],
 )
 
@@ -54,5 +53,4 @@ go_test(
     srcs = ["walk_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/conformance",
 )

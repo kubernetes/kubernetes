@@ -41,8 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 const (
@@ -55,7 +55,8 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	cpm := podtest.NewMockCheckpointManager()
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
 	node, pod, pv, claim := createObjects()
 	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
@@ -97,7 +98,8 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	cpm := podtest.NewMockCheckpointManager()
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
 	node, pod, pv, claim := createObjects()
 	claim.Status = v1.PersistentVolumeClaimStatus{
@@ -135,7 +137,8 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	cpm := podtest.NewMockCheckpointManager()
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
 	node, pod, _, claim := createObjects()
 
@@ -168,7 +171,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pvA",
 				Annotations: map[string]string{
-					volumehelper.VolumeGidAnnotationKey: tc.gidAnnotation,
+					util.VolumeGidAnnotationKey: tc.gidAnnotation,
 				},
 			},
 			Spec: v1.PersistentVolumeSpec{
@@ -187,9 +190,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
 
 		stopCh := runVolumeManager(manager)
-		defer func() {
-			close(stopCh)
-		}()
+		defer close(stopCh)
 
 		podManager.SetPods([]*v1.Pod{pod})
 
@@ -245,11 +246,10 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 		Status: v1.NodeStatus{
 			VolumesAttached: []v1.AttachedVolume{
 				{
-					Name:       "fake/pvA",
+					Name:       "fake/fake-device",
 					DevicePath: "fake/path",
 				},
 			}},
-		Spec: v1.NodeSpec{ExternalID: testHostname},
 	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("PV Protection [Feature:StorageProtection]", func() {
+var _ = utils.SIGDescribe("PV Protection", func() {
 	var (
 		client    clientset.Interface
 		nameSpace string
@@ -64,11 +64,10 @@ var _ = utils.SIGDescribe("PV Protection [Feature:StorageProtection]", func() {
 			},
 		}
 
+		emptyStorageClass := ""
 		pvcConfig = framework.PersistentVolumeClaimConfig{
-			Annotations: map[string]string{
-				v1.BetaStorageClassAnnotation: "",
-			},
-			Selector: selector,
+			Selector:         selector,
+			StorageClassName: &emptyStorageClass,
 		}
 
 		By("Creating a PV")

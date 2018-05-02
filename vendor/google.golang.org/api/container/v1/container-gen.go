@@ -1,4 +1,4 @@
-// Package container provides access to the Google Container Engine API.
+// Package container provides access to the Google Kubernetes Engine API.
 //
 // See https://cloud.google.com/container-engine/
 //
@@ -1522,10 +1522,17 @@ type NodeConfig struct {
 	// server.
 	// Additionally, to avoid ambiguity, keys must not conflict with any
 	// other
-	// metadata keys for the project or be one of the four reserved
-	// keys:
-	// "instance-template", "kube-env", "startup-script", and
-	// "user-data"
+	// metadata keys for the project or be one of the reserved keys:
+	//  "cluster-location"
+	//  "cluster-name"
+	//  "cluster-uid"
+	//  "configure-sh"
+	//  "gci-update-strategy"
+	//  "gci-ensure-gke-docker"
+	//  "instance-template"
+	//  "kube-env"
+	//  "startup-script"
+	//  "user-data"
 	//
 	// Values are free-form strings, and only have meaning as interpreted
 	// by

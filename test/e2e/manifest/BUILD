@@ -40,6 +40,5 @@ go_test(
     name = "go_default_test",
     srcs = ["manifest_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/e2e/manifest",
     deps = ["//vendor/k8s.io/api/extensions/v1beta1:go_default_library"],
 )

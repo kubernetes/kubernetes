@@ -51,7 +51,7 @@ var _ = SIGDescribe("CronJob", func() {
 	successCommand := []string{"/bin/true"}
 
 	BeforeEach(func() {
-		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResourceBeta, f.Namespace.Name)
+		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResourceBeta, f.Namespace.Name)
 	})
 
 	// multiple jobs running at once
@@ -207,7 +207,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Deleting the job")
 		job := cronJob.Status.Active[0]
-		reaper, err := kubectl.ReaperFor(batchinternal.Kind("Job"), f.InternalClientset)
+		reaper, err := kubectl.ReaperFor(batchinternal.Kind("Job"), f.InternalClientset, f.ScalesGetter)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
 		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, metav1.NewDeleteOptions(0))

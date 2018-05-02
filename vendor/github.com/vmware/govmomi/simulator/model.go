@@ -164,6 +164,8 @@ func (m *Model) Create() error {
 
 	// After all hosts are created, this var is used to mount the host datastores.
 	var hosts []*object.HostSystem
+	hostMap := make(map[string][]*object.HostSystem)
+
 	// We need to defer VM creation until after the datastores are created.
 	var vms []func() error
 	// 1 DVS per DC, added to all hosts
@@ -416,12 +418,14 @@ func (m *Model) Create() error {
 				addMachine(name, nil, vapp.ResourcePool, folders)
 			}
 		}
+
+		hostMap[dcName] = hosts
+		hosts = nil
 	}
 
 	if m.ServiceContent.RootFolder == esx.RootFolder.Reference() {
 		// ESX model
 		host := object.NewHostSystem(client, esx.HostSystem.Reference())
-		hosts = append(hosts, host)
 
 		dc := object.NewDatacenter(client, esx.Datacenter.Reference())
 		folders, err := dc.Folders(ctx)
@@ -429,13 +433,17 @@ func (m *Model) Create() error {
 			return err
 		}
 
+		hostMap[dc.Reference().Value] = append(hosts, host)
+
 		addMachine(host.Reference().Value, host, nil, folders)
 	}
 
-	for i := 0; i < m.Datastore; i++ {
-		err := m.createLocalDatastore(m.fmtName("LocalDS_", i), hosts)
-		if err != nil {
-			return err
+	for dc, dchosts := range hostMap {
+		for i := 0; i < m.Datastore; i++ {
+			err := m.createLocalDatastore(dc, m.fmtName("LocalDS_", i), dchosts)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -449,13 +457,9 @@ func (m *Model) Create() error {
 	return nil
 }
 
-var tempDir = func() (string, error) {
-	return ioutil.TempDir("", "govcsim-")
-}
-
-func (m *Model) createLocalDatastore(name string, hosts []*object.HostSystem) error {
+func (m *Model) createLocalDatastore(dc string, name string, hosts []*object.HostSystem) error {
 	ctx := context.Background()
-	dir, err := tempDir()
+	dir, err := ioutil.TempDir("", fmt.Sprintf("govcsim-%s-%s-", dc, name))
 	if err != nil {
 		return err
 	}

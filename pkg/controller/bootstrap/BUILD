@@ -16,7 +16,6 @@ go_test(
         "util_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/bootstrap",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",

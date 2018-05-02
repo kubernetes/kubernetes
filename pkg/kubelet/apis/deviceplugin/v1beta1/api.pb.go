@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,12 +25,17 @@ limitations under the License.
 		api.proto
 
 	It has these top-level messages:
+		DevicePluginOptions
 		RegisterRequest
 		Empty
 		ListAndWatchResponse
 		Device
+		PreStartContainerRequest
+		PreStartContainerResponse
 		AllocateRequest
+		ContainerAllocateRequest
 		AllocateResponse
+		ContainerAllocateResponse
 		Mount
 		DeviceSpec
 */
@@ -63,6 +68,22 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
+type DevicePluginOptions struct {
+	// Indicates if PreStartContainer call is required before each container start
+	PreStartRequired bool `protobuf:"varint,1,opt,name=pre_start_required,json=preStartRequired,proto3" json:"pre_start_required,omitempty"`
+}
+
+func (m *DevicePluginOptions) Reset()                    { *m = DevicePluginOptions{} }
+func (*DevicePluginOptions) ProtoMessage()               {}
+func (*DevicePluginOptions) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{0} }
+
+func (m *DevicePluginOptions) GetPreStartRequired() bool {
+	if m != nil {
+		return m.PreStartRequired
+	}
+	return false
+}
+
 type RegisterRequest struct {
 	// Version of the API the Device Plugin was built against
 	Version string `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
@@ -71,11 +92,13 @@ type RegisterRequest struct {
 	Endpoint string `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
 	// Schedulable resource name. As of now it's expected to be a DNS Label
 	ResourceName string `protobuf:"bytes,3,opt,name=resource_name,json=resourceName,proto3" json:"resource_name,omitempty"`
+	// Options to be communicated with Device Manager
+	Options *DevicePluginOptions `protobuf:"bytes,4,opt,name=options" json:"options,omitempty"`
 }
 
 func (m *RegisterRequest) Reset()                    { *m = RegisterRequest{} }
 func (*RegisterRequest) ProtoMessage()               {}
-func (*RegisterRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{0} }
+func (*RegisterRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{1} }
 
 func (m *RegisterRequest) GetVersion() string {
 	if m != nil {
@@ -98,12 +121,19 @@ func (m *RegisterRequest) GetResourceName() string {
 	return ""
 }
 
+func (m *RegisterRequest) GetOptions() *DevicePluginOptions {
+	if m != nil {
+		return m.Options
+	}
+	return nil
+}
+
 type Empty struct {
 }
 
 func (m *Empty) Reset()                    { *m = Empty{} }
 func (*Empty) ProtoMessage()               {}
-func (*Empty) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{1} }
+func (*Empty) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
 
 // ListAndWatch returns a stream of List of Devices
 // Whenever a Device state change or a Device disapears, ListAndWatch
@@ -114,7 +144,7 @@ type ListAndWatchResponse struct {
 
 func (m *ListAndWatchResponse) Reset()                    { *m = ListAndWatchResponse{} }
 func (*ListAndWatchResponse) ProtoMessage()               {}
-func (*ListAndWatchResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
+func (*ListAndWatchResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{3} }
 
 func (m *ListAndWatchResponse) GetDevices() []*Device {
 	if m != nil {
@@ -139,7 +169,7 @@ type Device struct {
 
 func (m *Device) Reset()                    { *m = Device{} }
 func (*Device) ProtoMessage()               {}
-func (*Device) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{3} }
+func (*Device) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{4} }
 
 func (m *Device) GetID() string {
 	if m != nil {
@@ -155,6 +185,33 @@ func (m *Device) GetHealth() string {
 	return ""
 }
 
+// - PreStartContainer is expected to be called before each container start if indicated by plugin during registration phase.
+// - PreStartContainer allows kubelet to pass reinitialized devices to containers.
+// - PreStartContainer allows Device Plugin to run device specific operations on
+//   the Devices requested
+type PreStartContainerRequest struct {
+	DevicesIDs []string `protobuf:"bytes,1,rep,name=devicesIDs" json:"devicesIDs,omitempty"`
+}
+
+func (m *PreStartContainerRequest) Reset()                    { *m = PreStartContainerRequest{} }
+func (*PreStartContainerRequest) ProtoMessage()               {}
+func (*PreStartContainerRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{5} }
+
+func (m *PreStartContainerRequest) GetDevicesIDs() []string {
+	if m != nil {
+		return m.DevicesIDs
+	}
+	return nil
+}
+
+// PreStartContainerResponse will be send by plugin in response to PreStartContainerRequest
+type PreStartContainerResponse struct {
+}
+
+func (m *PreStartContainerResponse) Reset()                    { *m = PreStartContainerResponse{} }
+func (*PreStartContainerResponse) ProtoMessage()               {}
+func (*PreStartContainerResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{6} }
+
 // - Allocate is expected to be called during pod creation since allocation
 //   failures for any container would result in pod startup failure.
 // - Allocate allows kubelet to exposes additional artifacts in a pod's
@@ -162,14 +219,29 @@ func (m *Device) GetHealth() string {
 // - Allocate allows Device Plugin to run device specific operations on
 //   the Devices requested
 type AllocateRequest struct {
-	DevicesIDs []string `protobuf:"bytes,1,rep,name=devicesIDs" json:"devicesIDs,omitempty"`
+	ContainerRequests []*ContainerAllocateRequest `protobuf:"bytes,1,rep,name=container_requests,json=containerRequests" json:"container_requests,omitempty"`
 }
 
 func (m *AllocateRequest) Reset()                    { *m = AllocateRequest{} }
 func (*AllocateRequest) ProtoMessage()               {}
-func (*AllocateRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{4} }
+func (*AllocateRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{7} }
 
-func (m *AllocateRequest) GetDevicesIDs() []string {
+func (m *AllocateRequest) GetContainerRequests() []*ContainerAllocateRequest {
+	if m != nil {
+		return m.ContainerRequests
+	}
+	return nil
+}
+
+type ContainerAllocateRequest struct {
+	DevicesIDs []string `protobuf:"bytes,1,rep,name=devicesIDs" json:"devicesIDs,omitempty"`
+}
+
+func (m *ContainerAllocateRequest) Reset()                    { *m = ContainerAllocateRequest{} }
+func (*ContainerAllocateRequest) ProtoMessage()               {}
+func (*ContainerAllocateRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{8} }
+
+func (m *ContainerAllocateRequest) GetDevicesIDs() []string {
 	if m != nil {
 		return m.DevicesIDs
 	}
@@ -185,6 +257,21 @@ func (m *AllocateRequest) GetDevicesIDs() []string {
 // The Device plugin should send a ListAndWatch update and fail the
 // Allocation request
 type AllocateResponse struct {
+	ContainerResponses []*ContainerAllocateResponse `protobuf:"bytes,1,rep,name=container_responses,json=containerResponses" json:"container_responses,omitempty"`
+}
+
+func (m *AllocateResponse) Reset()                    { *m = AllocateResponse{} }
+func (*AllocateResponse) ProtoMessage()               {}
+func (*AllocateResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{9} }
+
+func (m *AllocateResponse) GetContainerResponses() []*ContainerAllocateResponse {
+	if m != nil {
+		return m.ContainerResponses
+	}
+	return nil
+}
+
+type ContainerAllocateResponse struct {
 	// List of environment variable to be set in the container to access one of more devices.
 	Envs map[string]string `protobuf:"bytes,1,rep,name=envs" json:"envs,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Mounts for the container.
@@ -195,32 +282,32 @@ type AllocateResponse struct {
 	Annotations map[string]string `protobuf:"bytes,4,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
-func (m *AllocateResponse) Reset()                    { *m = AllocateResponse{} }
-func (*AllocateResponse) ProtoMessage()               {}
-func (*AllocateResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{5} }
+func (m *ContainerAllocateResponse) Reset()                    { *m = ContainerAllocateResponse{} }
+func (*ContainerAllocateResponse) ProtoMessage()               {}
+func (*ContainerAllocateResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{10} }
 
-func (m *AllocateResponse) GetEnvs() map[string]string {
+func (m *ContainerAllocateResponse) GetEnvs() map[string]string {
 	if m != nil {
 		return m.Envs
 	}
 	return nil
 }
 
-func (m *AllocateResponse) GetMounts() []*Mount {
+func (m *ContainerAllocateResponse) GetMounts() []*Mount {
 	if m != nil {
 		return m.Mounts
 	}
 	return nil
 }
 
-func (m *AllocateResponse) GetDevices() []*DeviceSpec {
+func (m *ContainerAllocateResponse) GetDevices() []*DeviceSpec {
 	if m != nil {
 		return m.Devices
 	}
 	return nil
 }
 
-func (m *AllocateResponse) GetAnnotations() map[string]string {
+func (m *ContainerAllocateResponse) GetAnnotations() map[string]string {
 	if m != nil {
 		return m.Annotations
 	}
@@ -240,7 +327,7 @@ type Mount struct {
 
 func (m *Mount) Reset()                    { *m = Mount{} }
 func (*Mount) ProtoMessage()               {}
-func (*Mount) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{6} }
+func (*Mount) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{11} }
 
 func (m *Mount) GetContainerPath() string {
 	if m != nil {
@@ -278,7 +365,7 @@ type DeviceSpec struct {
 
 func (m *DeviceSpec) Reset()                    { *m = DeviceSpec{} }
 func (*DeviceSpec) ProtoMessage()               {}
-func (*DeviceSpec) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{7} }
+func (*DeviceSpec) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{12} }
 
 func (m *DeviceSpec) GetContainerPath() string {
 	if m != nil {
@@ -302,12 +389,17 @@ func (m *DeviceSpec) GetPermissions() string {
 }
 
 func init() {
+	proto.RegisterType((*DevicePluginOptions)(nil), "v1beta1.DevicePluginOptions")
 	proto.RegisterType((*RegisterRequest)(nil), "v1beta1.RegisterRequest")
 	proto.RegisterType((*Empty)(nil), "v1beta1.Empty")
 	proto.RegisterType((*ListAndWatchResponse)(nil), "v1beta1.ListAndWatchResponse")
 	proto.RegisterType((*Device)(nil), "v1beta1.Device")
+	proto.RegisterType((*PreStartContainerRequest)(nil), "v1beta1.PreStartContainerRequest")
+	proto.RegisterType((*PreStartContainerResponse)(nil), "v1beta1.PreStartContainerResponse")
 	proto.RegisterType((*AllocateRequest)(nil), "v1beta1.AllocateRequest")
+	proto.RegisterType((*ContainerAllocateRequest)(nil), "v1beta1.ContainerAllocateRequest")
 	proto.RegisterType((*AllocateResponse)(nil), "v1beta1.AllocateResponse")
+	proto.RegisterType((*ContainerAllocateResponse)(nil), "v1beta1.ContainerAllocateResponse")
 	proto.RegisterType((*Mount)(nil), "v1beta1.Mount")
 	proto.RegisterType((*DeviceSpec)(nil), "v1beta1.DeviceSpec")
 }
@@ -387,6 +479,9 @@ var _Registration_serviceDesc = grpc.ServiceDesc{
 // Client API for DevicePlugin service
 
 type DevicePluginClient interface {
+	// GetDevicePluginOptions returns options to be communicated with Device
+	// Manager
+	GetDevicePluginOptions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DevicePluginOptions, error)
 	// ListAndWatch returns a stream of List of Devices
 	// Whenever a Device state change or a Device disapears, ListAndWatch
 	// returns the new list
@@ -395,6 +490,10 @@ type DevicePluginClient interface {
 	// Plugin can run device specific operations and instruct Kubelet
 	// of the steps to make the Device available in the container
 	Allocate(ctx context.Context, in *AllocateRequest, opts ...grpc.CallOption) (*AllocateResponse, error)
+	// PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+	// before each container start. Device plugin can run device specific operations
+	// such as reseting the device before making devices available to the container
+	PreStartContainer(ctx context.Context, in *PreStartContainerRequest, opts ...grpc.CallOption) (*PreStartContainerResponse, error)
 }
 
 type devicePluginClient struct {
@@ -403,6 +502,15 @@ type devicePluginClient struct {
 
 func NewDevicePluginClient(cc *grpc.ClientConn) DevicePluginClient {
 	return &devicePluginClient{cc}
+}
+
+func (c *devicePluginClient) GetDevicePluginOptions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DevicePluginOptions, error) {
+	out := new(DevicePluginOptions)
+	err := grpc.Invoke(ctx, "/v1beta1.DevicePlugin/GetDevicePluginOptions", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *devicePluginClient) ListAndWatch(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DevicePlugin_ListAndWatchClient, error) {
@@ -446,9 +554,21 @@ func (c *devicePluginClient) Allocate(ctx context.Context, in *AllocateRequest, 
 	return out, nil
 }
 
+func (c *devicePluginClient) PreStartContainer(ctx context.Context, in *PreStartContainerRequest, opts ...grpc.CallOption) (*PreStartContainerResponse, error) {
+	out := new(PreStartContainerResponse)
+	err := grpc.Invoke(ctx, "/v1beta1.DevicePlugin/PreStartContainer", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for DevicePlugin service
 
 type DevicePluginServer interface {
+	// GetDevicePluginOptions returns options to be communicated with Device
+	// Manager
+	GetDevicePluginOptions(context.Context, *Empty) (*DevicePluginOptions, error)
 	// ListAndWatch returns a stream of List of Devices
 	// Whenever a Device state change or a Device disapears, ListAndWatch
 	// returns the new list
@@ -457,10 +577,32 @@ type DevicePluginServer interface {
 	// Plugin can run device specific operations and instruct Kubelet
 	// of the steps to make the Device available in the container
 	Allocate(context.Context, *AllocateRequest) (*AllocateResponse, error)
+	// PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+	// before each container start. Device plugin can run device specific operations
+	// such as reseting the device before making devices available to the container
+	PreStartContainer(context.Context, *PreStartContainerRequest) (*PreStartContainerResponse, error)
 }
 
 func RegisterDevicePluginServer(s *grpc.Server, srv DevicePluginServer) {
 	s.RegisterService(&_DevicePlugin_serviceDesc, srv)
+}
+
+func _DevicePlugin_GetDevicePluginOptions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DevicePluginServer).GetDevicePluginOptions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1beta1.DevicePlugin/GetDevicePluginOptions",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DevicePluginServer).GetDevicePluginOptions(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _DevicePlugin_ListAndWatch_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -502,13 +644,39 @@ func _DevicePlugin_Allocate_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DevicePlugin_PreStartContainer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreStartContainerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DevicePluginServer).PreStartContainer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1beta1.DevicePlugin/PreStartContainer",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DevicePluginServer).PreStartContainer(ctx, req.(*PreStartContainerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _DevicePlugin_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1beta1.DevicePlugin",
 	HandlerType: (*DevicePluginServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "GetDevicePluginOptions",
+			Handler:    _DevicePlugin_GetDevicePluginOptions_Handler,
+		},
+		{
 			MethodName: "Allocate",
 			Handler:    _DevicePlugin_Allocate_Handler,
+		},
+		{
+			MethodName: "PreStartContainer",
+			Handler:    _DevicePlugin_PreStartContainer_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -519,6 +687,34 @@ var _DevicePlugin_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Metadata: "api.proto",
+}
+
+func (m *DevicePluginOptions) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DevicePluginOptions) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.PreStartRequired {
+		dAtA[i] = 0x8
+		i++
+		if m.PreStartRequired {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i++
+	}
+	return i, nil
 }
 
 func (m *RegisterRequest) Marshal() (dAtA []byte, err error) {
@@ -553,6 +749,16 @@ func (m *RegisterRequest) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintApi(dAtA, i, uint64(len(m.ResourceName)))
 		i += copy(dAtA[i:], m.ResourceName)
+	}
+	if m.Options != nil {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.Options.Size()))
+		n1, err := m.Options.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n1
 	}
 	return i, nil
 }
@@ -635,6 +841,57 @@ func (m *Device) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *PreStartContainerRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PreStartContainerRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.DevicesIDs) > 0 {
+		for _, s := range m.DevicesIDs {
+			dAtA[i] = 0xa
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			dAtA[i] = uint8(l)
+			i++
+			i += copy(dAtA[i:], s)
+		}
+	}
+	return i, nil
+}
+
+func (m *PreStartContainerResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PreStartContainerResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	return i, nil
+}
+
 func (m *AllocateRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -646,6 +903,36 @@ func (m *AllocateRequest) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *AllocateRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerRequests) > 0 {
+		for _, msg := range m.ContainerRequests {
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintApi(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *ContainerAllocateRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ContainerAllocateRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -679,6 +966,36 @@ func (m *AllocateResponse) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *AllocateResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerResponses) > 0 {
+		for _, msg := range m.ContainerResponses {
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintApi(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *ContainerAllocateResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ContainerAllocateResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -847,6 +1164,15 @@ func encodeVarintApi(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+func (m *DevicePluginOptions) Size() (n int) {
+	var l int
+	_ = l
+	if m.PreStartRequired {
+		n += 2
+	}
+	return n
+}
+
 func (m *RegisterRequest) Size() (n int) {
 	var l int
 	_ = l
@@ -860,6 +1186,10 @@ func (m *RegisterRequest) Size() (n int) {
 	}
 	l = len(m.ResourceName)
 	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Options != nil {
+		l = m.Options.Size()
 		n += 1 + l + sovApi(uint64(l))
 	}
 	return n
@@ -897,7 +1227,37 @@ func (m *Device) Size() (n int) {
 	return n
 }
 
+func (m *PreStartContainerRequest) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.DevicesIDs) > 0 {
+		for _, s := range m.DevicesIDs {
+			l = len(s)
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *PreStartContainerResponse) Size() (n int) {
+	var l int
+	_ = l
+	return n
+}
+
 func (m *AllocateRequest) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.ContainerRequests) > 0 {
+		for _, e := range m.ContainerRequests {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ContainerAllocateRequest) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.DevicesIDs) > 0 {
@@ -910,6 +1270,18 @@ func (m *AllocateRequest) Size() (n int) {
 }
 
 func (m *AllocateResponse) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.ContainerResponses) > 0 {
+		for _, e := range m.ContainerResponses {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ContainerAllocateResponse) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.Envs) > 0 {
@@ -991,6 +1363,16 @@ func sovApi(x uint64) (n int) {
 func sozApi(x uint64) (n int) {
 	return sovApi(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+func (this *DevicePluginOptions) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DevicePluginOptions{`,
+		`PreStartRequired:` + fmt.Sprintf("%v", this.PreStartRequired) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *RegisterRequest) String() string {
 	if this == nil {
 		return "nil"
@@ -999,6 +1381,7 @@ func (this *RegisterRequest) String() string {
 		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
 		`Endpoint:` + fmt.Sprintf("%v", this.Endpoint) + `,`,
 		`ResourceName:` + fmt.Sprintf("%v", this.ResourceName) + `,`,
+		`Options:` + strings.Replace(fmt.Sprintf("%v", this.Options), "DevicePluginOptions", "DevicePluginOptions", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1033,17 +1416,56 @@ func (this *Device) String() string {
 	}, "")
 	return s
 }
+func (this *PreStartContainerRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PreStartContainerRequest{`,
+		`DevicesIDs:` + fmt.Sprintf("%v", this.DevicesIDs) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PreStartContainerResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PreStartContainerResponse{`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *AllocateRequest) String() string {
 	if this == nil {
 		return "nil"
 	}
 	s := strings.Join([]string{`&AllocateRequest{`,
+		`ContainerRequests:` + strings.Replace(fmt.Sprintf("%v", this.ContainerRequests), "ContainerAllocateRequest", "ContainerAllocateRequest", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ContainerAllocateRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ContainerAllocateRequest{`,
 		`DevicesIDs:` + fmt.Sprintf("%v", this.DevicesIDs) + `,`,
 		`}`,
 	}, "")
 	return s
 }
 func (this *AllocateResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&AllocateResponse{`,
+		`ContainerResponses:` + strings.Replace(fmt.Sprintf("%v", this.ContainerResponses), "ContainerAllocateResponse", "ContainerAllocateResponse", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ContainerAllocateResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
@@ -1067,7 +1489,7 @@ func (this *AllocateResponse) String() string {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
 	}
 	mapStringForAnnotations += "}"
-	s := strings.Join([]string{`&AllocateResponse{`,
+	s := strings.Join([]string{`&ContainerAllocateResponse{`,
 		`Envs:` + mapStringForEnvs + `,`,
 		`Mounts:` + strings.Replace(fmt.Sprintf("%v", this.Mounts), "Mount", "Mount", 1) + `,`,
 		`Devices:` + strings.Replace(fmt.Sprintf("%v", this.Devices), "DeviceSpec", "DeviceSpec", 1) + `,`,
@@ -1107,6 +1529,76 @@ func valueToStringApi(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *DevicePluginOptions) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DevicePluginOptions: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DevicePluginOptions: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PreStartRequired", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.PreStartRequired = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *RegisterRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -1223,6 +1715,39 @@ func (m *RegisterRequest) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.ResourceName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Options", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Options == nil {
+				m.Options = &DevicePluginOptions{}
+			}
+			if err := m.Options.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -1484,6 +2009,135 @@ func (m *Device) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *PreStartContainerRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PreStartContainerRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PreStartContainerRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DevicesIDs", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DevicesIDs = append(m.DevicesIDs, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PreStartContainerResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PreStartContainerResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PreStartContainerResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *AllocateRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1511,6 +2165,87 @@ func (m *AllocateRequest) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: AllocateRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerRequests", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerRequests = append(m.ContainerRequests, &ContainerAllocateRequest{})
+			if err := m.ContainerRequests[len(m.ContainerRequests)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ContainerAllocateRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerAllocateRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerAllocateRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1590,6 +2325,87 @@ func (m *AllocateResponse) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: AllocateResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerResponses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerResponses = append(m.ContainerResponses, &ContainerAllocateResponse{})
+			if err := m.ContainerResponses[len(m.ContainerResponses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ContainerAllocateResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerAllocateResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerAllocateResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -2280,43 +3096,53 @@ var (
 func init() { proto.RegisterFile("api.proto", fileDescriptorApi) }
 
 var fileDescriptorApi = []byte{
-	// 594 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x54, 0x4b, 0x6f, 0xd3, 0x4c,
-	0x14, 0x8d, 0x93, 0x36, 0x8f, 0xdb, 0xf4, 0xa1, 0xf9, 0xaa, 0x4f, 0xc6, 0x80, 0x55, 0xb9, 0x02,
-	0x15, 0xa4, 0xa6, 0x0f, 0x24, 0x8a, 0x58, 0x20, 0x19, 0xa5, 0x48, 0x95, 0x0a, 0x54, 0x66, 0xc1,
-	0x32, 0x9a, 0x38, 0x97, 0x78, 0x84, 0x3d, 0x63, 0x3c, 0x63, 0x4b, 0xd9, 0xf1, 0x13, 0x58, 0xf0,
-	0xa3, 0xba, 0x64, 0xc9, 0x92, 0x86, 0x15, 0xff, 0x02, 0x65, 0xfc, 0x48, 0x64, 0xd1, 0x05, 0x12,
-	0x3b, 0xdf, 0x73, 0xef, 0xb1, 0xcf, 0x9c, 0xb9, 0xc7, 0xd0, 0xa3, 0x31, 0x1b, 0xc4, 0x89, 0x50,
-	0x82, 0x74, 0xb2, 0x93, 0x31, 0x2a, 0x7a, 0x62, 0x1d, 0x4e, 0x99, 0x0a, 0xd2, 0xf1, 0xc0, 0x17,
-	0xd1, 0xd1, 0x54, 0x4c, 0xc5, 0x91, 0xee, 0x8f, 0xd3, 0x0f, 0xba, 0xd2, 0x85, 0x7e, 0xca, 0x79,
-	0x4e, 0x08, 0xdb, 0x1e, 0x4e, 0x99, 0x54, 0x98, 0x78, 0xf8, 0x29, 0x45, 0xa9, 0x88, 0x09, 0x9d,
-	0x0c, 0x13, 0xc9, 0x04, 0x37, 0x8d, 0x3d, 0xe3, 0xa0, 0xe7, 0x95, 0x25, 0xb1, 0xa0, 0x8b, 0x7c,
-	0x12, 0x0b, 0xc6, 0x95, 0xd9, 0xd4, 0xad, 0xaa, 0x26, 0xfb, 0xb0, 0x99, 0xa0, 0x14, 0x69, 0xe2,
-	0xe3, 0x88, 0xd3, 0x08, 0xcd, 0x96, 0x1e, 0xe8, 0x97, 0xe0, 0x1b, 0x1a, 0xa1, 0xd3, 0x81, 0xf5,
-	0xf3, 0x28, 0x56, 0x33, 0xc7, 0x85, 0xdd, 0x4b, 0x26, 0x95, 0xcb, 0x27, 0xef, 0xa9, 0xf2, 0x03,
-	0x0f, 0x65, 0x2c, 0xb8, 0x44, 0xf2, 0x08, 0x3a, 0x13, 0xcc, 0x98, 0x8f, 0xd2, 0x34, 0xf6, 0x5a,
-	0x07, 0x1b, 0xa7, 0xdb, 0x83, 0xe2, 0x60, 0x83, 0xa1, 0xc6, 0xbd, 0xb2, 0xef, 0x1c, 0x43, 0x3b,
-	0x87, 0xc8, 0x16, 0x34, 0x2f, 0x86, 0x85, 0xd6, 0x26, 0x1b, 0x92, 0xff, 0xa1, 0x1d, 0x20, 0x0d,
-	0x55, 0x50, 0x88, 0x2c, 0x2a, 0xe7, 0x04, 0xb6, 0xdd, 0x30, 0x14, 0x3e, 0x55, 0x58, 0x9e, 0xd5,
-	0x06, 0x28, 0xde, 0x77, 0x31, 0xcc, 0x3f, 0xd9, 0xf3, 0x56, 0x10, 0xe7, 0x57, 0x13, 0x76, 0x96,
-	0x9c, 0x42, 0xe4, 0x19, 0xac, 0x21, 0xcf, 0x4a, 0x85, 0xfb, 0x95, 0xc2, 0xfa, 0xe0, 0xe0, 0x9c,
-	0x67, 0xf2, 0x9c, 0xab, 0x64, 0xe6, 0x69, 0x02, 0x79, 0x08, 0xed, 0x48, 0xa4, 0x5c, 0x49, 0xb3,
-	0xa9, 0xa9, 0x5b, 0x15, 0xf5, 0xf5, 0x02, 0xf6, 0x8a, 0x2e, 0x39, 0x5c, 0xba, 0xd0, 0xd2, 0x83,
-	0xff, 0xd5, 0x5c, 0x78, 0x17, 0xa3, 0x5f, 0x39, 0x41, 0x2e, 0x61, 0x83, 0x72, 0x2e, 0x14, 0x55,
-	0x4c, 0x70, 0x69, 0xae, 0x69, 0xca, 0xe3, 0xdb, 0x65, 0xb9, 0xcb, 0xe1, 0x5c, 0xdd, 0x2a, 0xdd,
-	0x3a, 0x83, 0x5e, 0xa5, 0x9b, 0xec, 0x40, 0xeb, 0x23, 0xce, 0x0a, 0x6f, 0x17, 0x8f, 0x64, 0x17,
-	0xd6, 0x33, 0x1a, 0xa6, 0x58, 0x78, 0x9b, 0x17, 0xcf, 0x9b, 0xcf, 0x0c, 0xeb, 0x05, 0xec, 0xd4,
-	0xdf, 0xfc, 0x37, 0x7c, 0x27, 0x80, 0x75, 0x6d, 0x03, 0x79, 0x00, 0x5b, 0xbe, 0xe0, 0x8a, 0x32,
-	0x8e, 0xc9, 0x28, 0xa6, 0x2a, 0x28, 0xf8, 0x9b, 0x15, 0x7a, 0x45, 0x55, 0x40, 0xee, 0x42, 0x2f,
-	0x10, 0x52, 0xe5, 0x13, 0xc5, 0x3a, 0x2e, 0x80, 0xb2, 0x99, 0x20, 0x9d, 0x8c, 0x04, 0x0f, 0x67,
-	0x7a, 0x15, 0xbb, 0x5e, 0x77, 0x01, 0xbc, 0xe5, 0xe1, 0xcc, 0x49, 0x00, 0x96, 0x3e, 0xfe, 0x93,
-	0xcf, 0xed, 0xc1, 0x46, 0x8c, 0x49, 0xc4, 0xa4, 0xd4, 0x57, 0x90, 0xef, 0xfe, 0x2a, 0x74, 0xfa,
-	0x0a, 0xfa, 0x79, 0xd0, 0x12, 0xed, 0x0f, 0x79, 0x0a, 0xdd, 0x32, 0x78, 0xc4, 0xac, 0xee, 0xaa,
-	0x96, 0x45, 0x6b, 0xb9, 0x21, 0x79, 0x6e, 0x1a, 0xa7, 0x5f, 0x0d, 0xe8, 0xe7, 0xe2, 0xaf, 0xc2,
-	0x74, 0xca, 0x38, 0x71, 0xa1, 0xbf, 0x1a, 0x25, 0x52, 0xa3, 0x58, 0xf7, 0xab, 0xfa, 0x4f, 0x89,
-	0x73, 0x1a, 0xc7, 0x06, 0x71, 0xa1, 0x5b, 0x2e, 0xc9, 0x8a, 0x96, 0x5a, 0x56, 0xac, 0x3b, 0xb7,
-	0x6e, 0x94, 0xd3, 0x78, 0x79, 0xef, 0xfa, 0xc6, 0x36, 0xbe, 0xdf, 0xd8, 0x8d, 0xcf, 0x73, 0xdb,
-	0xb8, 0x9e, 0xdb, 0xc6, 0xb7, 0xb9, 0x6d, 0xfc, 0x98, 0xdb, 0xc6, 0x97, 0x9f, 0x76, 0x63, 0xdc,
-	0xd6, 0x3f, 0x9b, 0x27, 0xbf, 0x03, 0x00, 0x00, 0xff, 0xff, 0x65, 0x2a, 0x0d, 0x36, 0xb1, 0x04,
-	0x00, 0x00,
+	// 760 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x55, 0xcd, 0x4e, 0xdb, 0x4a,
+	0x14, 0x8e, 0x13, 0xc8, 0xcf, 0x49, 0x80, 0x30, 0x20, 0x64, 0x0c, 0xd7, 0xca, 0xf5, 0xd5, 0xbd,
+	0xe2, 0x4a, 0x10, 0x20, 0x48, 0xdc, 0x2b, 0x16, 0x55, 0x53, 0x42, 0x5b, 0xa4, 0xb6, 0x44, 0x46,
+	0x55, 0x37, 0x95, 0x22, 0xc7, 0x99, 0xc6, 0x56, 0x93, 0x19, 0xd7, 0x33, 0x89, 0x94, 0x5d, 0x17,
+	0x7d, 0x80, 0x3e, 0x44, 0x1f, 0xa3, 0x0f, 0xc0, 0xb2, 0xcb, 0x2e, 0x4b, 0xfa, 0x22, 0x95, 0xc7,
+	0x1e, 0x3b, 0x32, 0x01, 0x5a, 0xa9, 0x3b, 0xcf, 0x77, 0xce, 0xf7, 0xcd, 0x39, 0x67, 0x4e, 0xbe,
+	0x40, 0xc9, 0xf2, 0xdc, 0xba, 0xe7, 0x53, 0x4e, 0x51, 0x61, 0x7c, 0xd8, 0xc5, 0xdc, 0x3a, 0xd4,
+	0xf6, 0xfa, 0x2e, 0x77, 0x46, 0xdd, 0xba, 0x4d, 0x87, 0xfb, 0x7d, 0xda, 0xa7, 0xfb, 0x22, 0xde,
+	0x1d, 0xbd, 0x11, 0x27, 0x71, 0x10, 0x5f, 0x21, 0xcf, 0x38, 0x85, 0xb5, 0x16, 0x1e, 0xbb, 0x36,
+	0x6e, 0x0f, 0x46, 0x7d, 0x97, 0x5c, 0x78, 0xdc, 0xa5, 0x84, 0xa1, 0x5d, 0x40, 0x9e, 0x8f, 0x3b,
+	0x8c, 0x5b, 0x3e, 0xef, 0xf8, 0xf8, 0xdd, 0xc8, 0xf5, 0x71, 0x4f, 0x55, 0x6a, 0xca, 0x4e, 0xd1,
+	0xac, 0x7a, 0x3e, 0xbe, 0x0c, 0x02, 0x66, 0x84, 0x1b, 0x9f, 0x14, 0x58, 0x31, 0x71, 0xdf, 0x65,
+	0x1c, 0xfb, 0x01, 0x88, 0x19, 0x47, 0x2a, 0x14, 0xc6, 0xd8, 0x67, 0x2e, 0x25, 0x82, 0x56, 0x32,
+	0xe5, 0x11, 0x69, 0x50, 0xc4, 0xa4, 0xe7, 0x51, 0x97, 0x70, 0x35, 0x2b, 0x42, 0xf1, 0x19, 0xfd,
+	0x05, 0x4b, 0x3e, 0x66, 0x74, 0xe4, 0xdb, 0xb8, 0x43, 0xac, 0x21, 0x56, 0x73, 0x22, 0xa1, 0x22,
+	0xc1, 0x17, 0xd6, 0x10, 0xa3, 0x63, 0x28, 0xd0, 0xb0, 0x4e, 0x75, 0xa1, 0xa6, 0xec, 0x94, 0x1b,
+	0xdb, 0xf5, 0xa8, 0xfb, 0xfa, 0x9c, 0x5e, 0x4c, 0x99, 0x6c, 0x14, 0x60, 0xf1, 0x6c, 0xe8, 0xf1,
+	0x89, 0xd1, 0x84, 0xf5, 0x67, 0x2e, 0xe3, 0x4d, 0xd2, 0x7b, 0x65, 0x71, 0xdb, 0x31, 0x31, 0xf3,
+	0x28, 0x61, 0x18, 0xfd, 0x0b, 0x85, 0x9e, 0x10, 0x60, 0xaa, 0x52, 0xcb, 0xed, 0x94, 0x1b, 0x2b,
+	0x29, 0x61, 0x53, 0xc6, 0x8d, 0x03, 0xc8, 0x87, 0x10, 0x5a, 0x86, 0xec, 0x79, 0x2b, 0xea, 0x31,
+	0xeb, 0xb6, 0xd0, 0x06, 0xe4, 0x1d, 0x6c, 0x0d, 0xb8, 0x13, 0x35, 0x17, 0x9d, 0x8c, 0x13, 0x50,
+	0xdb, 0xd1, 0xe0, 0x4e, 0x29, 0xe1, 0x96, 0x4b, 0x92, 0x61, 0xe9, 0x00, 0x91, 0xf0, 0x79, 0x2b,
+	0xbc, 0xbb, 0x64, 0xce, 0x20, 0xc6, 0x16, 0x6c, 0xce, 0xe1, 0x86, 0x55, 0x1b, 0x36, 0xac, 0x34,
+	0x07, 0x03, 0x6a, 0x5b, 0x1c, 0x4b, 0xbd, 0x36, 0x20, 0x5b, 0xe6, 0x89, 0xe7, 0xc3, 0x8c, 0xcb,
+	0x9e, 0xfe, 0x8c, 0x7b, 0x8a, 0xa5, 0x52, 0x74, 0x73, 0xd5, 0x4e, 0x15, 0xc8, 0x82, 0xea, 0x6f,
+	0x4b, 0xbf, 0xb7, 0xfa, 0x3e, 0x54, 0x13, 0x4a, 0x34, 0xea, 0x4b, 0x58, 0x9b, 0xad, 0x30, 0x44,
+	0x65, 0x89, 0xc6, 0x5d, 0x25, 0x86, 0xa9, 0x26, 0xb2, 0xd3, 0x83, 0x60, 0xc6, 0x87, 0x1c, 0x6c,
+	0xde, 0xca, 0x40, 0x0f, 0x61, 0x01, 0x93, 0xb1, 0xbc, 0x63, 0xf7, 0xfe, 0x3b, 0xea, 0x67, 0x64,
+	0xcc, 0xce, 0x08, 0xf7, 0x27, 0xa6, 0x60, 0xa2, 0x7f, 0x20, 0x3f, 0xa4, 0x23, 0xc2, 0x99, 0x9a,
+	0x15, 0x1a, 0xcb, 0xb1, 0xc6, 0xf3, 0x00, 0x36, 0xa3, 0x28, 0xda, 0x4b, 0xf6, 0x28, 0x27, 0x12,
+	0xd7, 0x52, 0x7b, 0x74, 0xe9, 0x61, 0x3b, 0xde, 0x25, 0xf4, 0x12, 0xca, 0x16, 0x21, 0x94, 0x5b,
+	0x72, 0xa7, 0x03, 0xca, 0xd1, 0x4f, 0xd4, 0xd7, 0x4c, 0x58, 0x61, 0x99, 0xb3, 0x3a, 0xda, 0x7f,
+	0x50, 0x8a, 0x1b, 0x40, 0x55, 0xc8, 0xbd, 0xc5, 0x93, 0x68, 0x4d, 0x83, 0x4f, 0xb4, 0x0e, 0x8b,
+	0x63, 0x6b, 0x30, 0xc2, 0xd1, 0x9a, 0x86, 0x87, 0x93, 0xec, 0xff, 0x8a, 0xf6, 0x00, 0xaa, 0x69,
+	0xe5, 0x5f, 0xe1, 0x1b, 0x0e, 0x2c, 0x8a, 0x79, 0xa0, 0xbf, 0x61, 0x39, 0x79, 0x64, 0xcf, 0xe2,
+	0x4e, 0xc4, 0x5f, 0x8a, 0xd1, 0xb6, 0xc5, 0x1d, 0xb4, 0x05, 0x25, 0x87, 0x32, 0x1e, 0x66, 0x44,
+	0x8e, 0x10, 0x00, 0x32, 0xe8, 0x63, 0xab, 0xd7, 0xa1, 0x64, 0x30, 0x11, 0x6e, 0x50, 0x34, 0x8b,
+	0x01, 0x70, 0x41, 0x06, 0x13, 0xc3, 0x07, 0x48, 0x06, 0xfa, 0x5b, 0xae, 0xab, 0x41, 0xd9, 0xc3,
+	0xfe, 0xd0, 0x65, 0x4c, 0xbc, 0x45, 0x68, 0x3f, 0xb3, 0x50, 0xe3, 0x31, 0x54, 0x42, 0xaf, 0xf3,
+	0xc5, 0x7c, 0xd0, 0x31, 0x14, 0xa5, 0xf7, 0x21, 0x35, 0x7e, 0xb4, 0x94, 0x1d, 0x6a, 0xc9, 0xaa,
+	0x84, 0x16, 0x94, 0x69, 0x7c, 0xce, 0x42, 0x65, 0xd6, 0xae, 0xd0, 0x53, 0xd8, 0x78, 0x82, 0xf9,
+	0x3c, 0x37, 0x4e, 0x91, 0xb5, 0x3b, 0xfd, 0xce, 0xc8, 0xa0, 0x26, 0x54, 0x66, 0xfd, 0xed, 0x06,
+	0xff, 0x8f, 0xf8, 0x3c, 0xcf, 0x06, 0x8d, 0xcc, 0x81, 0x82, 0x9a, 0x50, 0x94, 0xeb, 0x36, 0xd3,
+	0x55, 0xea, 0x97, 0xaf, 0x6d, 0xce, 0x89, 0x48, 0x11, 0xf4, 0x1a, 0x56, 0x6f, 0x98, 0x16, 0x4a,
+	0xdc, 0xe7, 0x36, 0x33, 0xd4, 0x8c, 0xbb, 0x52, 0xa4, 0xfa, 0xa3, 0xed, 0xab, 0x6b, 0x5d, 0xf9,
+	0x7a, 0xad, 0x67, 0xde, 0x4f, 0x75, 0xe5, 0x6a, 0xaa, 0x2b, 0x5f, 0xa6, 0xba, 0xf2, 0x6d, 0xaa,
+	0x2b, 0x1f, 0xbf, 0xeb, 0x99, 0x6e, 0x5e, 0xfc, 0xbb, 0x1d, 0xfd, 0x08, 0x00, 0x00, 0xff, 0xff,
+	0xb9, 0xc2, 0x87, 0x92, 0x22, 0x07, 0x00, 0x00,
 }

@@ -34,12 +34,12 @@ type FakeRuntimeHelper struct {
 	Err             error
 }
 
-func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
+func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, func(), error) {
 	var opts kubecontainer.RunContainerOptions
 	if len(container.TerminationMessagePath) != 0 {
 		opts.PodContainerDir = f.PodContainerDir
 	}
-	return &opts, nil
+	return &opts, nil, nil
 }
 
 func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) string {

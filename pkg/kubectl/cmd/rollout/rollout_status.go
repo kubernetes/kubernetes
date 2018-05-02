@@ -18,12 +18,14 @@ package rollout
 
 import (
 	"fmt"
-	"io"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -47,8 +49,32 @@ var (
 		kubectl rollout status deployment/nginx`)
 )
 
-func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+type RolloutStatusOptions struct {
+	FilenameOptions *resource.FilenameOptions
+	genericclioptions.IOStreams
+
+	Namespace        string
+	EnforceNamespace bool
+	BuilderArgs      []string
+
+	Watch    bool
+	Revision int64
+
+	StatusViewer func(*meta.RESTMapping) (kubectl.StatusViewer, error)
+
+	Builder *resource.Builder
+}
+
+func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatusOptions {
+	return &RolloutStatusOptions{
+		FilenameOptions: &resource.FilenameOptions{},
+		IOStreams:       streams,
+		Watch:           true,
+	}
+}
+
+func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewRolloutStatusOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -60,38 +86,52 @@ func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    status_long,
 		Example: status_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(RunStatus(f, cmd, out, args, options))
+			cmdutil.CheckErr(o.Complete(f, args))
+			cmdutil.CheckErr(o.Validate(cmd, args))
+			cmdutil.CheckErr(o.Run())
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
 
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
-	cmd.Flags().BoolP("watch", "w", true, "Watch the status of the rollout until it's done.")
-	cmd.Flags().Int64("revision", 0, "Pin to a specific revision for showing its status. Defaults to 0 (last revision).")
+	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, usage)
+	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "Watch the status of the rollout until it's done.")
+	cmd.Flags().Int64Var(&o.Revision, "revision", o.Revision, "Pin to a specific revision for showing its status. Defaults to 0 (last revision).")
 	return cmd
 }
 
-func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *resource.FilenameOptions) error {
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
-		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
-	}
+func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error {
+	o.Builder = f.NewBuilder()
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	var err error
+	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	r := f.NewBuilder().
-		Internal().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
-		ResourceTypeOrNameArgs(true, args...).
+	o.BuilderArgs = args
+	o.StatusViewer = f.StatusViewer
+	return nil
+}
+
+func (o *RolloutStatusOptions) Validate(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
+		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
+	}
+	return nil
+}
+
+func (o *RolloutStatusOptions) Run() error {
+	r := o.Builder.
+		Internal(legacyscheme.Scheme).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
+		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		SingleResourceType().
 		Latest().
 		Do()
-	err = r.Err()
+	err := r.Err()
 	if err != nil {
 		return err
 	}
@@ -110,17 +150,17 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 	if err != nil {
 		return err
 	}
-	rv, err := mapping.MetadataAccessor.ResourceVersion(obj)
+	rv, err := meta.NewAccessor().ResourceVersion(obj)
 	if err != nil {
 		return err
 	}
 
-	statusViewer, err := f.StatusViewer(mapping)
+	statusViewer, err := o.StatusViewer(mapping)
 	if err != nil {
 		return err
 	}
 
-	revision := cmdutil.GetFlagInt64(cmd, "revision")
+	revision := o.Revision
 	if revision < 0 {
 		return fmt.Errorf("revision must be a positive integer: %v", revision)
 	}
@@ -130,12 +170,12 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "%s", status)
+	fmt.Fprintf(o.Out, "%s", status)
 	if done {
 		return nil
 	}
 
-	shouldWatch := cmdutil.GetFlagBool(cmd, "watch")
+	shouldWatch := o.Watch
 	if !shouldWatch {
 		return nil
 	}
@@ -155,7 +195,7 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 			if err != nil {
 				return false, err
 			}
-			fmt.Fprintf(out, "%s", status)
+			fmt.Fprintf(o.Out, "%s", status)
 			// Quit waiting if the rollout is done
 			if done {
 				return true, nil

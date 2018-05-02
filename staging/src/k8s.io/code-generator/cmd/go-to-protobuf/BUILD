@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "go-to-protobuf",
     embed = [":go_default_library"],
-    importpath = "k8s.io/code-generator/cmd/go-to-protobuf",
 )
 
 go_library(

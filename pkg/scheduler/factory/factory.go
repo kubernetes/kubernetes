@@ -20,6 +20,8 @@ package factory
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"reflect"
 	"time"
 
@@ -50,7 +52,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -70,11 +71,11 @@ const (
 )
 
 var (
-	serviceAffinitySet            = sets.NewString("ServiceAffinity")
-	matchInterPodAffinitySet      = sets.NewString("MatchInterPodAffinity")
-	generalPredicatesSets         = sets.NewString("GeneralPredicates")
-	noDiskConflictSet             = sets.NewString("NoDiskConflict")
-	maxPDVolumeCountPredicateKeys = []string{"MaxGCEPDVolumeCount", "MaxAzureDiskVolumeCount", "MaxEBSVolumeCount"}
+	serviceAffinitySet            = sets.NewString(predicates.CheckServiceAffinityPred)
+	matchInterPodAffinitySet      = sets.NewString(predicates.MatchInterPodAffinityPred)
+	generalPredicatesSets         = sets.NewString(predicates.GeneralPred)
+	noDiskConflictSet             = sets.NewString(predicates.NoDiskConflictPred)
+	maxPDVolumeCountPredicateKeys = []string{predicates.MaxGCEPDVolumeCountPred, predicates.MaxAzureDiskVolumeCountPred, predicates.MaxEBSVolumeCountPred}
 )
 
 // configFactory is the default implementation of the scheduler.Configurator interface.
@@ -113,7 +114,7 @@ type configFactory struct {
 	schedulerCache schedulercache.Cache
 
 	// SchedulerName of a scheduler is used to select which pods will be
-	// processed by this scheduler, based on pods's "spec.SchedulerName".
+	// processed by this scheduler, based on pods's "spec.schedulerName".
 	schedulerName string
 
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
@@ -132,6 +133,9 @@ type configFactory struct {
 
 	// always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
+
+	// Disable pod preemption or not.
+	disablePreemption bool
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
@@ -151,6 +155,7 @@ func NewConfigFactory(
 	storageClassInformer storageinformers.StorageClassInformer,
 	hardPodAffinitySymmetricWeight int32,
 	enableEquivalenceClassCache bool,
+	disablePreemption bool,
 ) scheduler.Configurator {
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
@@ -178,6 +183,7 @@ func NewConfigFactory(
 		schedulerName:                  schedulerName,
 		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
 		enableEquivalenceClassCache:    enableEquivalenceClassCache,
+		disablePreemption:              disablePreemption,
 	}
 
 	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -212,10 +218,10 @@ func NewConfigFactory(
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Pod:
-					return unassignedNonTerminatedPod(t)
+					return unassignedNonTerminatedPod(t) && responsibleForPod(t, schedulerName)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return unassignedNonTerminatedPod(pod)
+						return unassignedNonTerminatedPod(pod) && responsibleForPod(pod, schedulerName)
 					}
 					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
 					return false
@@ -292,8 +298,31 @@ func NewConfigFactory(
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Setup volume binder
-		c.volumeBinder = volumebinder.NewVolumeBinder(client, pvcInformer, pvInformer, nodeInformer, storageClassInformer)
+		c.volumeBinder = volumebinder.NewVolumeBinder(client, pvcInformer, pvInformer, storageClassInformer)
 	}
+
+	// Setup cache comparer
+	comparer := &cacheComparer{
+		podLister:  podInformer.Lister(),
+		nodeLister: nodeInformer.Lister(),
+		pdbLister:  pdbInformer.Lister(),
+		cache:      c.schedulerCache,
+		podQueue:   c.podQueue,
+	}
+
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, compareSignal)
+
+	go func() {
+		for {
+			select {
+			case <-c.StopEverything:
+				return
+			case <-ch:
+				comparer.Compare()
+			}
+		}
+	}()
 
 	return c
 }
@@ -377,25 +406,8 @@ func (c *configFactory) invalidatePredicatesForPvUpdate(oldPV, newPV *v1.Persist
 	for k, v := range newPV.Labels {
 		// If PV update modifies the zone/region labels.
 		if isZoneRegionLabel(k) && !reflect.DeepEqual(v, oldPV.Labels[k]) {
-			invalidPredicates.Insert("NoVolumeZoneConflict")
+			invalidPredicates.Insert(predicates.NoVolumeZoneConflictPred)
 			break
-		}
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		oldAffinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(oldPV.Annotations)
-		if err != nil {
-			glog.Errorf("cannot get node affinity fo *v1.PersistentVolume: %v", oldPV)
-			return
-		}
-		newAffinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(newPV.Annotations)
-		if err != nil {
-			glog.Errorf("cannot get node affinity fo *v1.PersistentVolume: %v", newPV)
-			return
-		}
-
-		// If node affinity of PV is changed.
-		if !reflect.DeepEqual(oldAffinity, newAffinity) {
-			invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
 		}
 	}
 	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
@@ -434,19 +446,19 @@ func (c *configFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
 
 	// PV types which impact MaxPDVolumeCountPredicate
 	if pv.Spec.AWSElasticBlockStore != nil {
-		invalidPredicates.Insert("MaxEBSVolumeCount")
+		invalidPredicates.Insert(predicates.MaxEBSVolumeCountPred)
 	}
 	if pv.Spec.GCEPersistentDisk != nil {
-		invalidPredicates.Insert("MaxGCEPDVolumeCount")
+		invalidPredicates.Insert(predicates.MaxGCEPDVolumeCountPred)
 	}
 	if pv.Spec.AzureDisk != nil {
-		invalidPredicates.Insert("MaxAzureDiskVolumeCount")
+		invalidPredicates.Insert(predicates.MaxAzureDiskVolumeCountPred)
 	}
 
 	// If PV contains zone related label, it may impact cached NoVolumeZoneConflict
 	for k := range pv.Labels {
 		if isZoneRegionLabel(k) {
-			invalidPredicates.Insert("NoVolumeZoneConflict")
+			invalidPredicates.Insert(predicates.NoVolumeZoneConflictPred)
 			break
 		}
 	}
@@ -520,7 +532,7 @@ func (c *configFactory) invalidatePredicatesForPvc(pvc *v1.PersistentVolumeClaim
 	invalidPredicates := sets.NewString(maxPDVolumeCountPredicateKeys...)
 
 	// The bound volume's label may change
-	invalidPredicates.Insert("NoVolumeZoneConflict")
+	invalidPredicates.Insert(predicates.NoVolumeZoneConflictPred)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Add/delete impacts the available PVs to choose from
@@ -779,19 +791,19 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 		invalidPredicates := sets.NewString()
 
 		if !reflect.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
-			invalidPredicates.Insert("GeneralPredicates") // "PodFitsResources"
+			invalidPredicates.Insert(predicates.GeneralPred) // "PodFitsResources"
 		}
 		if !reflect.DeepEqual(oldNode.GetLabels(), newNode.GetLabels()) {
-			invalidPredicates.Insert("GeneralPredicates", "ServiceAffinity") // "PodSelectorMatches"
+			invalidPredicates.Insert(predicates.GeneralPred, predicates.CheckServiceAffinityPred) // "PodSelectorMatches"
 			for k, v := range oldNode.GetLabels() {
 				// any label can be topology key of pod, we have to invalidate in all cases
 				if v != newNode.GetLabels()[k] {
-					invalidPredicates.Insert("MatchInterPodAffinity")
+					invalidPredicates.Insert(predicates.MatchInterPodAffinityPred)
 				}
 				// NoVolumeZoneConflict will only be affected by zone related label change
 				if isZoneRegionLabel(k) {
 					if v != newNode.GetLabels()[k] {
-						invalidPredicates.Insert("NoVolumeZoneConflict")
+						invalidPredicates.Insert(predicates.NoVolumeZoneConflictPred)
 					}
 				}
 			}
@@ -807,7 +819,7 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 		}
 		if !reflect.DeepEqual(oldTaints, newTaints) ||
 			!reflect.DeepEqual(oldNode.Spec.Taints, newNode.Spec.Taints) {
-			invalidPredicates.Insert("PodToleratesNodeTaints")
+			invalidPredicates.Insert(predicates.PodToleratesNodeTaintsPred)
 		}
 
 		if !reflect.DeepEqual(oldNode.Status.Conditions, newNode.Status.Conditions) {
@@ -820,19 +832,22 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 				newConditions[cond.Type] = cond.Status
 			}
 			if oldConditions[v1.NodeMemoryPressure] != newConditions[v1.NodeMemoryPressure] {
-				invalidPredicates.Insert("CheckNodeMemoryPressure")
+				invalidPredicates.Insert(predicates.CheckNodeMemoryPressurePred)
 			}
 			if oldConditions[v1.NodeDiskPressure] != newConditions[v1.NodeDiskPressure] {
-				invalidPredicates.Insert("CheckNodeDiskPressure")
+				invalidPredicates.Insert(predicates.CheckNodeDiskPressurePred)
+			}
+			if oldConditions[v1.NodePIDPressure] != newConditions[v1.NodePIDPressure] {
+				invalidPredicates.Insert(predicates.CheckNodePIDPressurePred)
 			}
 			if oldConditions[v1.NodeReady] != newConditions[v1.NodeReady] ||
 				oldConditions[v1.NodeOutOfDisk] != newConditions[v1.NodeOutOfDisk] ||
 				oldConditions[v1.NodeNetworkUnavailable] != newConditions[v1.NodeNetworkUnavailable] {
-				invalidPredicates.Insert("CheckNodeCondition")
+				invalidPredicates.Insert(predicates.CheckNodeConditionPred)
 			}
 		}
 		if newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable {
-			invalidPredicates.Insert("CheckNodeCondition")
+			invalidPredicates.Insert(predicates.CheckNodeConditionPred)
 		}
 		c.equivalencePodCache.InvalidateCachedPredicateItem(newNode.GetName(), invalidPredicates)
 	}
@@ -969,6 +984,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 
 	extenders := make([]algorithm.SchedulerExtender, 0)
 	if len(policy.ExtenderConfigs) != 0 {
+		ignoredExtendedResources := sets.NewString()
 		for ii := range policy.ExtenderConfigs {
 			glog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
 			extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
@@ -976,7 +992,13 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 				return nil, err
 			}
 			extenders = append(extenders, extender)
+			for _, r := range policy.ExtenderConfigs[ii].ManagedResources {
+				if r.IgnoredByScheduler {
+					ignoredExtendedResources.Insert(string(r.Name))
+				}
+			}
 		}
+		predicates.RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources)
 	}
 	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
 	// Give it higher precedence than scheduler CLI configuration when it is provided.
@@ -992,14 +1014,22 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
-// getBinder returns an extender that supports bind or a default binder.
-func (c *configFactory) getBinder(extenders []algorithm.SchedulerExtender) scheduler.Binder {
+// getBinderFunc returns an func which returns an extender that supports bind or a default binder based on the given pod.
+func (c *configFactory) getBinderFunc(extenders []algorithm.SchedulerExtender) func(pod *v1.Pod) scheduler.Binder {
+	var extenderBinder algorithm.SchedulerExtender
 	for i := range extenders {
 		if extenders[i].IsBinder() {
-			return extenders[i]
+			extenderBinder = extenders[i]
+			break
 		}
 	}
-	return &binder{c.client}
+	defaultBinder := &binder{c.client}
+	return func(pod *v1.Pod) scheduler.Binder {
+		if extenderBinder != nil && extenderBinder.IsInterested(pod) {
+			return extenderBinder
+		}
+		return defaultBinder
+	}
 }
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
@@ -1031,18 +1061,25 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}
 
 	// Init equivalence class cache
-	if c.enableEquivalenceClassCache && getEquivalencePodFuncFactory != nil {
-		pluginArgs, err := c.getPluginArgs()
-		if err != nil {
-			return nil, err
-		}
-		c.equivalencePodCache = core.NewEquivalenceCache(
-			getEquivalencePodFuncFactory(*pluginArgs),
-		)
+	if c.enableEquivalenceClassCache {
+		c.equivalencePodCache = core.NewEquivalenceCache()
 		glog.Info("Created equivalence class cache")
 	}
 
-	algo := core.NewGenericScheduler(c.schedulerCache, c.equivalencePodCache, c.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, c.volumeBinder, c.pVCLister, c.alwaysCheckAllPredicates)
+	algo := core.NewGenericScheduler(
+		c.schedulerCache,
+		c.equivalencePodCache,
+		c.podQueue,
+		predicateFuncs,
+		predicateMetaProducer,
+		priorityConfigs,
+		priorityMetaProducer,
+		extenders,
+		c.volumeBinder,
+		c.pVCLister,
+		c.alwaysCheckAllPredicates,
+		c.disablePreemption,
+	)
 
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{
@@ -1051,7 +1088,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister:          &nodeLister{c.nodeLister},
 		Algorithm:           algo,
-		Binder:              c.getBinder(extenders),
+		GetBinder:           c.getBinderFunc(extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},
 		PodPreemptor:        &podPreemptor{c.client},
 		WaitForCacheSync: func() bool {
@@ -1158,6 +1195,11 @@ func assignedNonTerminatedPod(pod *v1.Pod) bool {
 	return true
 }
 
+// responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
+func responsibleForPod(pod *v1.Pod, schedulerName string) bool {
+	return schedulerName == pod.Spec.SchedulerName
+}
+
 // assignedPodLister filters the pods returned from a PodLister to
 // only include those that have a node name set.
 type assignedPodLister struct {
@@ -1230,10 +1272,9 @@ func (i *podInformer) Lister() corelisters.PodLister {
 }
 
 // NewPodInformer creates a shared index informer that returns only non-terminal pods.
-func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration, schedulerName string) coreinformers.PodInformer {
+func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer {
 	selector := fields.ParseSelectorOrDie(
-		"spec.schedulerName=" + schedulerName +
-			",status.phase!=" + string(v1.PodSucceeded) +
+		"status.phase!=" + string(v1.PodSucceeded) +
 			",status.phase!=" + string(v1.PodFailed))
 	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
 	return &podInformer{

@@ -22,7 +22,6 @@ filegroup(
         "//pkg/api/service:all-srcs",
         "//pkg/api/testapi:all-srcs",
         "//pkg/api/testing:all-srcs",
-        "//pkg/api/unversioned:all-srcs",
         "//pkg/api/v1/endpoints:all-srcs",
         "//pkg/api/v1/node:all-srcs",
         "//pkg/api/v1/pod:all-srcs",
@@ -76,7 +75,6 @@ filegroup(
         "//pkg/client/metrics/prometheus:all-srcs",
         "//pkg/client/testdata:all-srcs",
         "//pkg/client/tests:all-srcs",
-        "//pkg/client/unversioned:all-srcs",
         "//pkg/cloudprovider:all-srcs",
         "//pkg/controller:all-srcs",
         "//pkg/credentialprovider:all-srcs",
@@ -103,6 +101,7 @@ filegroup(
         "//pkg/version:all-srcs",
         "//pkg/volume:all-srcs",
         "//pkg/watch/json:all-srcs",
+        "//pkg/windows/service:all-srcs",
     ],
     tags = ["automanaged"],
 )

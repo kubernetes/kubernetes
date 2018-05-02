@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+var metadataAccessor = meta.NewAccessor()
+
 // Helper provides methods for retrieving or mutating a RESTful
 // resource.
 type Helper struct {
@@ -34,9 +36,6 @@ type Helper struct {
 	Resource string
 	// A RESTClient capable of mutating this resource.
 	RESTClient RESTClient
-	// An interface for reading or writing the resource version of this
-	// type.
-	Versioner runtime.ResourceVersioner
 	// True if the resource type is scoped to namespaces
 	NamespaceScoped bool
 }
@@ -44,9 +43,8 @@ type Helper struct {
 // NewHelper creates a Helper from a ResourceMapping
 func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 	return &Helper{
-		Resource:        mapping.Resource,
+		Resource:        mapping.Resource.Resource,
 		RESTClient:      client,
-		Versioner:       mapping.MetadataAccessor,
 		NamespaceScoped: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 	}
 }
@@ -113,13 +111,13 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
 	if modify {
 		// Attempt to version the object based on client logic.
-		version, err := m.Versioner.ResourceVersion(obj)
+		version, err := metadataAccessor.ResourceVersion(obj)
 		if err != nil {
 			// We don't know how to clear the version on this object, so send it to the server as is
 			return m.createResource(m.RESTClient, m.Resource, namespace, obj)
 		}
 		if version != "" {
-			if err := m.Versioner.SetResourceVersion(obj, ""); err != nil {
+			if err := metadataAccessor.SetResourceVersion(obj, ""); err != nil {
 				return nil, err
 			}
 		}
@@ -145,7 +143,7 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 	c := m.RESTClient
 
 	// Attempt to version the object based on client logic.
-	version, err := m.Versioner.ResourceVersion(obj)
+	version, err := metadataAccessor.ResourceVersion(obj)
 	if err != nil {
 		// We don't know how to version this object, so send it to the server as is
 		return m.replaceResource(c, m.Resource, namespace, name, obj)
@@ -157,11 +155,11 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 			// The object does not exist, but we want it to be created
 			return m.replaceResource(c, m.Resource, namespace, name, obj)
 		}
-		serverVersion, err := m.Versioner.ResourceVersion(serverObj)
+		serverVersion, err := metadataAccessor.ResourceVersion(serverObj)
 		if err != nil {
 			return nil, err
 		}
-		if err := m.Versioner.SetResourceVersion(obj, serverVersion); err != nil {
+		if err := metadataAccessor.SetResourceVersion(obj, serverVersion); err != nil {
 			return nil, err
 		}
 	}

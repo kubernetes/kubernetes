@@ -66,7 +66,9 @@ service RuntimeService {
     rpc UpdateContainerResources(UpdateContainerResourcesRequest) returns (UpdateContainerResourcesResponse) {}
     // ReopenContainerLog asks runtime to reopen the stdout/stderr log file
     // for the container. This is often called after the log file has been
-    // rotated.
+    // rotated. If the container is not running, container runtime can choose
+    // to either create a new log file and return nil, or return an error.
+    // Once it returns error, new container log file MUST NOT be created.
     rpc ReopenContainerLog(ReopenContainerLogRequest) returns (ReopenContainerLogResponse) {}
 
     // ExecSync runs a command in a container synchronously.
@@ -169,7 +171,9 @@ enum MountPropagation {
 message Mount {
     // Path of the mount within the container.
     string container_path = 1;
-    // Path of the mount on the host.
+    // Path of the mount on the host. If the hostPath doesn't exist, then runtimes
+    // should report error. If the hostpath is a symbolic link, runtimes should
+    // follow the symlink and mount the real destination to container.
     string host_path = 2;
     // If set, the mount is read-only.
     bool readonly = 3;
@@ -233,6 +237,9 @@ message LinuxSandboxSecurityContext {
     SELinuxOption selinux_options = 2;
     // UID to run sandbox processes as, when applicable.
     Int64Value run_as_user = 3;
+    // GID to run sandbox processes as, when applicable. run_as_group should only
+    // be specified when run_as_user is specified; otherwise, the runtime MUST error.
+    Int64Value run_as_group = 8;
     // If set, the root filesystem of the sandbox is read-only.
     bool readonly_rootfs = 4;
     // List of groups applied to the first process run in the sandbox, in
@@ -245,7 +252,7 @@ message LinuxSandboxSecurityContext {
     // privileged containers are expected to be run.
     bool privileged = 6;
     // Seccomp profile for the sandbox, candidate values are:
-    // * docker/default: the default profile for the docker container runtime
+    // * runtime/default: the default profile for the container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
@@ -414,7 +421,7 @@ message PodSandboxStatus {
 message PodSandboxStatusResponse {
     // Status of the PodSandbox.
     PodSandboxStatus status = 1;
-    // Info is extra information of the PodSandbox. The key could be abitrary string, and
+    // Info is extra information of the PodSandbox. The key could be arbitrary string, and
     // value should be in json format. The information could include anything useful for
     // debug, e.g. network namespace for linux container based container runtime.
     // It should only be returned non-empty when Verbose is true.
@@ -549,6 +556,10 @@ message LinuxContainerSecurityContext {
     // UID to run the container process as. Only one of run_as_user and
     // run_as_username can be specified at a time.
     Int64Value run_as_user = 5;
+    // GID to run the container process as. run_as_group should only be specified
+    // when run_as_user or run_as_username is specified; otherwise, the runtime
+    // MUST error.
+    Int64Value run_as_group = 12;
     // User name to run the container process as. If specified, the user MUST
     // exist in the container image (i.e. in the /etc/passwd inside the image),
     // and be resolved there by the runtime; otherwise, the runtime MUST error.
@@ -566,7 +577,7 @@ message LinuxContainerSecurityContext {
     //    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
     string apparmor_profile = 9;
     // Seccomp profile for the container, candidate values are:
-    // * docker/default: the default profile for the docker container runtime
+    // * runtime/default: the default profile for the container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
@@ -852,7 +863,7 @@ message ContainerStatus {
 message ContainerStatusResponse {
     // Status of the container.
     ContainerStatus status = 1;
-    // Info is extra information of the Container. The key could be abitrary string, and
+    // Info is extra information of the Container. The key could be arbitrary string, and
     // value should be in json format. The information could include anything useful for
     // debug, e.g. pid for linux container based container runtime.
     // It should only be returned non-empty when Verbose is true.
@@ -993,7 +1004,7 @@ message ImageStatusRequest {
 message ImageStatusResponse {
     // Status of the image.
     Image image = 1;
-    // Info is extra information of the Image. The key could be abitrary string, and
+    // Info is extra information of the Image. The key could be arbitrary string, and
     // value should be in json format. The information could include anything useful
     // for debug, e.g. image config for oci image based container runtime.
     // It should only be returned non-empty when Verbose is true.
@@ -1088,7 +1099,7 @@ message StatusRequest {
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
-    // Info is extra information of the Runtime. The key could be abitrary string, and
+    // Info is extra information of the Runtime. The key could be arbitrary string, and
     // value should be in json format. The information could include anything useful for
     // debug, e.g. plugins used by the container runtime.
     // It should only be returned non-empty when Verbose is true.

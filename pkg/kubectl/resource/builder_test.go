@@ -34,6 +34,7 @@ import (
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,15 +47,19 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+
+	// install the pod scheme into the legacy scheme for test typer resolution
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 var (
 	corev1GV     = schema.GroupVersion{Version: "v1"}
 	corev1Codec  = scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
 	metaAccessor = meta.NewAccessor()
-	restmapper   = scheme.Registry.RESTMapper()
+	restmapper   = testrestmapper.TestOnlyStaticRESTMapper(scheme.Registry, scheme.Scheme)
 )
 
 func stringBody(body string) io.ReadCloser {
@@ -271,13 +276,12 @@ func newDefaultBuilderWith(client ClientMapper) *Builder {
 	return NewBuilder(
 		&Mapper{
 			RESTMapper:   restmapper,
-			ObjectTyper:  scheme.Scheme,
 			ClientMapper: client,
 			Decoder:      corev1Codec,
 		},
 		nil,
 		categories.LegacyCategoryExpander,
-	).Internal()
+	).Internal(legacyscheme.Scheme)
 }
 
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
@@ -296,7 +300,8 @@ func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 	if info.Name != "update-demo-kitten" || info.Namespace != "" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
-	obj := info.AsVersioned()
+
+	obj := info.Object
 	version, ok := obj.(*v1.ReplicationController)
 	// versioned object does not have defaulting applied
 	if obj == nil || !ok || version.Spec.Replicas != nil {
@@ -375,9 +380,9 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 		directory     string
 		expectedNames []string
 	}{
-		{"pod", &v1.Pod{}, false, "../../../examples/pod", []string{"nginx"}},
+		{"pod", &v1.Pod{}, false, "../../../test/e2e/testing-manifests/pod", []string{"nginx"}},
 		{"recursive-pod", &v1.Pod{}, true, fmt.Sprintf("%s/recursive/pod", tmpDir), []string{"busybox0", "busybox1"}},
-		{"rc", &v1.ReplicationController{}, false, "../../../examples/guestbook/legacy/redis-master-controller.yaml", []string{"redis-master"}},
+		{"rc", &v1.ReplicationController{}, false, "../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml", []string{"redis-master"}},
 		{"recursive-rc", &v1.ReplicationController{}, true, fmt.Sprintf("%s/recursive/rc", tmpDir), []string{"busybox0", "busybox1"}},
 		{"hardlink", &v1.Pod{}, false, fmt.Sprintf("%s/inode/hardlink/busybox-link.json", tmpDir), []string{"busybox0"}},
 		{"hardlink", &v1.Pod{}, true, fmt.Sprintf("%s/inode/hardlink/busybox-link.json", tmpDir), []string{"busybox0"}},
@@ -459,7 +464,7 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 
 func TestDirectoryBuilder(t *testing.T) {
 	b := newDefaultBuilder().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy"}}).
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../test/e2e/testing-manifests/guestbook/legacy"}}).
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
@@ -589,7 +594,7 @@ func TestResourceByName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "pods" {
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -721,7 +726,7 @@ func TestResourceByNameWithoutRequireObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.GroupVersionKind.Kind != "Pod" || mapping.Resource != "pods" {
+	if mapping.GroupVersionKind.Kind != "Pod" || mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -748,7 +753,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "pods" {
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -1029,7 +1034,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 func TestSingleItemImpliedObject(t *testing.T) {
 	obj, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml"}}).
 		Flatten().
 		Do().Object()
 
@@ -1049,7 +1054,7 @@ func TestSingleItemImpliedObject(t *testing.T) {
 func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
 	obj, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/pod"}}).
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../test/e2e/testing-manifests/pod"}}).
 		Flatten().
 		Do().Object()
 
@@ -1067,7 +1072,7 @@ func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
 }
 
 func TestSingleItemImpliedRootScopedObject(t *testing.T) {
-	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.NodeSpec{ExternalID: "test"}}
+	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
 	r := streamTestObject(node)
 	infos, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
@@ -1119,7 +1124,7 @@ func TestListObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "pods" {
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -1160,7 +1165,7 @@ func TestWatch(t *testing.T) {
 		}),
 	})).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/redis-master-service.yaml"}}).Flatten().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../test/e2e/testing-manifests/guestbook/redis-master-service.yaml"}}).Flatten().
 		Do().Watch("12")
 
 	if err != nil {
@@ -1187,8 +1192,8 @@ func TestWatch(t *testing.T) {
 func TestWatchMultipleError(t *testing.T) {
 	_, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).Flatten().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).Flatten().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml"}}).Flatten().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml"}}).Flatten().
 		Do().Watch("")
 
 	if err == nil {

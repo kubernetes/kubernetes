@@ -40,8 +40,8 @@ const (
 	// KubeLoadBalancerSet is used to store service load balancer ingress ip + port, it is the service lb portal.
 	KubeLoadBalancerSet = "KUBE-LOAD-BALANCER"
 
-	// KubeLoadBalancerMasqSet is used to store service load balancer ingress ip + port for masquerade purpose.
-	KubeLoadBalancerMasqSet = "KUBE-LOAD-BALANCER-MASQ"
+	// KubeLoadBalancerIngressLocalSet is used to store service load balancer ingress ip + port with externalTrafficPolicy=local.
+	KubeLoadBalancerIngressLocalSet = "KUBE-LB-INGRESS-LOCAL"
 
 	// KubeLoadBalancerSourceIPSet is used to store service load balancer ingress ip + port + source IP for packet filter purpose.
 	KubeLoadBalancerSourceIPSet = "KUBE-LOAD-BALANCER-SOURCE-IP"
@@ -49,11 +49,17 @@ const (
 	// KubeLoadBalancerSourceCIDRSet is used to store service load balancer ingress ip + port + source cidr for packet filter purpose.
 	KubeLoadBalancerSourceCIDRSet = "KUBE-LOAD-BALANCER-SOURCE-CIDR"
 
-	// KubeNodePortSetTCP is used to store nodeport TCP port for masquerade purpose.
+	// KubeNodePortSetTCP is used to store the nodeport TCP port for masquerade purpose.
 	KubeNodePortSetTCP = "KUBE-NODE-PORT-TCP"
 
-	// KubeNodePortSetUDP is used to store nodeport UDP port for masquerade purpose.
+	// KubeNodePortLocalSetTCP is used to store the nodeport TCP port with externalTrafficPolicy=local.
+	KubeNodePortLocalSetTCP = "KUBE-NODE-PORT-LOCAL-TCP"
+
+	// KubeNodePortSetUDP is used to store the nodeport UDP port for masquerade purpose.
 	KubeNodePortSetUDP = "KUBE-NODE-PORT-UDP"
+
+	// KubeNodePortLocalSetUDP is used to store the nodeport UDP port with externalTrafficPolicy=local.
+	KubeNodePortLocalSetUDP = "KUBE-NODE-PORT-LOCAL-UDP"
 )
 
 // IPSetVersioner can query the current ipset version.

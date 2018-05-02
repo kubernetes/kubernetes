@@ -165,13 +165,6 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
-	}
 
 	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
 	if err != nil {

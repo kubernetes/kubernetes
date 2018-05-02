@@ -38,6 +38,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/aws/credentials/stscreds:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/ec2metadata:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/session:go_default_library",
@@ -46,6 +47,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/service/elb:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/elbv2:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/kms:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/service/sts:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
@@ -74,7 +76,6 @@ go_test(
         "tags_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
     deps = [
         "//pkg/kubelet/apis:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

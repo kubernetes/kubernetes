@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -138,13 +139,6 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
-	}
 
 	fakeManager = &fakePDManager{}
 	unmounter, err := plug.(*gcePersistentDiskPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
@@ -183,7 +177,7 @@ func TestPlugin(t *testing.T) {
 	}
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
-	if size != 100*volume.GB {
+	if size != 100*util.GB {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
 	}
 

@@ -94,6 +94,7 @@ go_library(
         "//pkg/scheduler/schedulercache:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
@@ -140,7 +141,6 @@ go_library(
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/k8s.io/client-go/tools/record:go_default_library",
@@ -192,7 +192,6 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/cm",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/eviction/api:go_default_library",

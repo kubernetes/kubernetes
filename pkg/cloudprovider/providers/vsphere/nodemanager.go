@@ -17,12 +17,12 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
@@ -76,7 +76,11 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 	var globalErr *error
 
 	queueChannel = make(chan *VmSearch, QUEUE_SIZE)
-	nodeUUID := GetUUIDFromProviderID(node.Spec.ProviderID)
+	nodeUUID, err := GetNodeUUID(node)
+	if err != nil {
+		glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, err)
+		return err
+	}
 
 	glog.V(4).Infof("Discovering node %s with uuid %s", node.ObjectMeta.Name, nodeUUID)
 

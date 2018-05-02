@@ -18,16 +18,20 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"github.com/golang/glog"
+	"github.com/spf13/cobra"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-
-	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -45,8 +49,48 @@ var (
 		kubectl autoscale rc foo --max=5 --cpu-percent=80`))
 )
 
-func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+type AutoscaleOptions struct {
+	FilenameOptions *resource.FilenameOptions
+
+	RecordFlags *genericclioptions.RecordFlags
+	Recorder    genericclioptions.Recorder
+
+	PrintFlags *printers.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
+
+	Name       string
+	Generator  string
+	Min        int32
+	Max        int32
+	CpuPercent int32
+
+	createAnnotation bool
+	args             []string
+	enforceNamespace bool
+	namespace        string
+	dryRun           bool
+	builder          *resource.Builder
+	mapper           meta.RESTMapper
+	canBeAutoscaled  func(kind schema.GroupKind) error
+	clientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	generatorFunc    func(string, *meta.RESTMapping) (kubectl.StructuredGenerator, error)
+
+	genericclioptions.IOStreams
+}
+
+func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOptions {
+	return &AutoscaleOptions{
+		PrintFlags:      printers.NewPrintFlags("autoscaled"),
+		FilenameOptions: &resource.FilenameOptions{},
+		RecordFlags:     genericclioptions.NewRecordFlags(),
+		Recorder:        genericclioptions.NoopRecorder{},
+
+		IOStreams: ioStreams,
+	}
+}
+
+func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewAutoscaleOptions(ioStreams)
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -58,78 +102,128 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    autoscaleLong,
 		Example: autoscaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunAutoscale(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
-	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().String("generator", cmdutil.HorizontalPodAutoscalerV1GeneratorName, i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
-	cmd.Flags().Int32("min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
-	cmd.Flags().Int32("max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
+
+	// bind flag structs
+	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
+
+	cmd.Flags().StringVar(&o.Generator, "generator", cmdutil.HorizontalPodAutoscalerV1GeneratorName, i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
+	cmd.Flags().Int32Var(&o.Min, "min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
+	cmd.Flags().Int32Var(&o.Max, "max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
-	cmd.Flags().Int32("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
-	cmd.Flags().String("name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
+	cmd.Flags().Int32Var(&o.CpuPercent, "cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
+	cmd.Flags().StringVar(&o.Name, "name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
 	cmdutil.AddDryRunFlag(cmd)
-	usage := "identifying the resource to autoscale."
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to autoscale.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 
-func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
-	namespace, enforceNamespace, err := f.DefaultNamespace()
+func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
+	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+	o.builder = f.NewBuilder()
+	o.canBeAutoscaled = f.CanBeAutoscaled
+	o.mapper, err = f.RESTMapper()
 	if err != nil {
 		return err
 	}
 
-	// validate flags
-	if err := validateFlags(cmd); err != nil {
+	o.clientForMapping = f.ClientForMapping
+	o.args = args
+	o.RecordFlags.Complete(f.Command(cmd, false))
+
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
 		return err
 	}
 
-	r := f.NewBuilder().
-		Internal().
+	// get the generator
+	o.generatorFunc = func(name string, mapping *meta.RESTMapping) (kubectl.StructuredGenerator, error) {
+		switch o.Generator {
+		case cmdutil.HorizontalPodAutoscalerV1GeneratorName:
+			return &kubectl.HorizontalPodAutoscalerGeneratorV1{
+				Name:               name,
+				MinReplicas:        o.Min,
+				MaxReplicas:        o.Max,
+				CPUPercent:         o.CpuPercent,
+				ScaleRefName:       name,
+				ScaleRefKind:       mapping.GroupVersionKind.Kind,
+				ScaleRefApiVersion: mapping.GroupVersionKind.GroupVersion().String(),
+			}, nil
+		default:
+			return nil, cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", o.Generator)
+		}
+	}
+
+	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+
+	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		if o.dryRun {
+			o.PrintFlags.Complete("%s (dry run)")
+		}
+
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+
+		return printer.PrintObj, nil
+	}
+
+	return nil
+}
+
+func (o *AutoscaleOptions) Validate() error {
+	if o.Max < 1 {
+		return fmt.Errorf("--max=MAXPODS is required and must be at least 1, max: %d", o.Max)
+	}
+	if o.Max < o.Min {
+		return fmt.Errorf("--max=MAXPODS must be larger or equal to --min=MINPODS, max: %d, min: %d", o.Max, o.Min)
+	}
+
+	return nil
+}
+
+func (o *AutoscaleOptions) Run() error {
+	r := o.builder.
+		Internal(legacyscheme.Scheme).
 		ContinueOnError().
-		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
-		ResourceTypeOrNameArgs(false, args...).
+		NamespaceParam(o.namespace).DefaultNamespace().
+		FilenameParam(o.enforceNamespace, o.FilenameOptions).
+		ResourceTypeOrNameArgs(false, o.args...).
 		Flatten().
 		Do()
-	err = r.Err()
-	if err != nil {
+	if err := r.Err(); err != nil {
 		return err
 	}
 
 	count := 0
-	err = r.Visit(func(info *resource.Info, err error) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
 
 		mapping := info.ResourceMapping()
-		if err := f.CanBeAutoscaled(mapping.GroupVersionKind.GroupKind()); err != nil {
+		if err := o.canBeAutoscaled(mapping.GroupVersionKind.GroupKind()); err != nil {
 			return err
 		}
 
-		// get the generator
-		var generator kubectl.StructuredGenerator
-		switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-		case cmdutil.HorizontalPodAutoscalerV1GeneratorName:
-			generator = &kubectl.HorizontalPodAutoscalerGeneratorV1{
-				Name:               info.Name,
-				MinReplicas:        cmdutil.GetFlagInt32(cmd, "min"),
-				MaxReplicas:        cmdutil.GetFlagInt32(cmd, "max"),
-				CPUPercent:         cmdutil.GetFlagInt32(cmd, "cpu-percent"),
-				ScaleRefName:       info.Name,
-				ScaleRefKind:       mapping.GroupVersionKind.Kind,
-				ScaleRefApiVersion: mapping.GroupVersionKind.GroupVersion().String(),
-			}
-		default:
-			return errUnsupportedGenerator(cmd, generatorName)
+		generator, err := o.generatorFunc(info.Name, mapping)
+		if err != nil {
+			return err
 		}
 
 		// Generate new object
@@ -138,43 +232,45 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return err
 		}
 
-		mapper, typer := f.Object()
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:  typer,
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      f.Decoder(true),
+			RESTMapper:   o.mapper,
+			ClientMapper: resource.ClientMapperFunc(o.clientForMapping),
+			Decoder:      cmdutil.InternalVersionDecoder(),
 		}
-		hpa, err := resourceMapper.InfoForObject(object, nil)
+		hpa, err := resourceMapper.InfoForObject(object, legacyscheme.Scheme, nil)
 		if err != nil {
 			return err
 		}
-		if cmdutil.ShouldRecord(cmd, hpa) {
-			if err := cmdutil.RecordChangeCause(hpa.Object, f.Command(cmd, false)); err != nil {
+		if err := o.Recorder.Record(hpa.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
+		}
+		object = hpa.Object
+
+		if o.dryRun {
+			count++
+
+			printer, err := o.ToPrinter("created")
+			if err != nil {
 				return err
 			}
-			object = hpa.Object
-		}
-		if cmdutil.GetDryRunFlag(cmd) {
-			return f.PrintObject(cmd, false, mapper, object, out)
+			return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(hpa.Object, hpa.Mapping), o.Out)
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa, f.JSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, hpa.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
-		object, err = resource.NewHelper(hpa.Client, hpa.Mapping).Create(namespace, false, object)
+		_, err = resource.NewHelper(hpa.Client, hpa.Mapping).Create(o.namespace, false, object)
 		if err != nil {
 			return err
 		}
 
 		count++
-		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return f.PrintObject(cmd, false, mapper, object, out)
+		printer, err := o.ToPrinter("autoscaled")
+		if err != nil {
+			return err
 		}
-
-		f.PrintSuccess(false, out, info.Mapping.Resource, info.Name, cmdutil.GetDryRunFlag(cmd), "autoscaled")
-		return nil
+		return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, hpa.Mapping), o.Out)
 	})
 	if err != nil {
 		return err
@@ -183,16 +279,4 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		return fmt.Errorf("no objects passed to autoscale")
 	}
 	return nil
-}
-
-func validateFlags(cmd *cobra.Command) error {
-	errs := []error{}
-	max, min := cmdutil.GetFlagInt32(cmd, "max"), cmdutil.GetFlagInt32(cmd, "min")
-	if max < 1 {
-		errs = append(errs, fmt.Errorf("--max=MAXPODS is required and must be at least 1, max: %d", max))
-	}
-	if max < min {
-		errs = append(errs, fmt.Errorf("--max=MAXPODS must be larger or equal to --min=MINPODS, max: %d, min: %d", max, min))
-	}
-	return utilerrors.NewAggregate(errs)
 }

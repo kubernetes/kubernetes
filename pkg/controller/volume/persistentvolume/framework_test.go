@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
 
 // This is a unit test framework for persistent volume controller.
@@ -1262,7 +1263,7 @@ func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
 
 // Recycler interfaces
 
-func (plugin *mockVolumePlugin) Recycle(pvName string, spec *vol.Spec, eventRecorder vol.RecycleEventRecorder) error {
+func (plugin *mockVolumePlugin) Recycle(pvName string, spec *vol.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	if len(plugin.recycleCalls) == 0 {
 		return fmt.Errorf("Mock plugin error: no recycleCalls configured")
 	}

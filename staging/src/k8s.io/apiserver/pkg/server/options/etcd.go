@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -64,7 +65,7 @@ var storageTypes = sets.NewString(
 )
 
 func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
-	return &EtcdOptions{
+	options := &EtcdOptions{
 		StorageConfig:           *backendConfig,
 		DefaultStorageMediaType: "application/json",
 		DeleteCollectionWorkers: 1,
@@ -72,6 +73,8 @@ func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 		EnableWatchCache:        true,
 		DefaultWatchCacheSize:   100,
 	}
+	options.StorageConfig.CountMetricPollPeriod = time.Minute
+	return options
 }
 
 func (s *EtcdOptions) Validate() []error {
@@ -88,6 +91,21 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, must be 'etcd3' or 'etcd2'. If not specified, it will default to 'etcd3'"))
 	}
 
+	for _, override := range s.EtcdServersOverrides {
+		tokens := strings.Split(override, "#")
+		if len(tokens) != 2 {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated"))
+			continue
+		}
+
+		apiresource := strings.Split(tokens[0], "/")
+		if len(apiresource) != 2 {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated"))
+			continue
+		}
+
+	}
+
 	return allErrors
 }
 
@@ -99,7 +117,7 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
-		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
+		"format: group/resource#servers, where servers are URLs, semicolon separated.")
 
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
 		"The media type to use to store objects in storage. "+
@@ -155,6 +173,8 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.StorageConfig.CompactionInterval, "etcd-compaction-interval", s.StorageConfig.CompactionInterval,
 		"The interval of compaction requests. If 0, the compaction request from apiserver is disabled.")
 
+	fs.DurationVar(&s.StorageConfig.CountMetricPollPeriod, "etcd-count-metric-poll-period", s.StorageConfig.CountMetricPollPeriod, ""+
+		"Frequency of polling etcd for number of resources per type. 0 disables the metric collection.")
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
@@ -197,6 +217,7 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		EnableGarbageCollection: f.Options.EnableGarbageCollection,
 		DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,
 		ResourcePrefix:          resource.Group + "/" + resource.Resource,
+		CountMetricPollPeriod:   f.Options.StorageConfig.CountMetricPollPeriod,
 	}
 	if f.Options.EnableWatchCache {
 		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
@@ -229,6 +250,7 @@ func (f *storageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,
 		EnableGarbageCollection: f.Options.EnableGarbageCollection,
 		ResourcePrefix:          f.StorageFactory.ResourcePrefix(resource),
+		CountMetricPollPeriod:   f.Options.StorageConfig.CountMetricPollPeriod,
 	}
 	if f.Options.EnableWatchCache {
 		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)

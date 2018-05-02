@@ -18,19 +18,21 @@ package set
 
 import (
 	"fmt"
-	"io"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -55,14 +57,11 @@ type updateSubjects func(existings []rbac.Subject, targets []rbac.Subject) (bool
 // SubjectOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
 // referencing the cmd.Flags
 type SubjectOptions struct {
+	PrintFlags *printers.PrintFlags
+
 	resource.FilenameOptions
 
-	Mapper            meta.RESTMapper
-	Typer             runtime.ObjectTyper
 	Infos             []*resource.Info
-	Encoder           runtime.Encoder
-	Out               io.Writer
-	Err               io.Writer
 	Selector          string
 	ContainerSelector string
 	Output            string
@@ -74,15 +73,23 @@ type SubjectOptions struct {
 	Groups          []string
 	ServiceAccounts []string
 
-	PrintObject func(mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	namespace string
+
+	PrintObj printers.ResourcePrinterFunc
+
+	genericclioptions.IOStreams
 }
 
-func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
-	options := &SubjectOptions{
-		Out: out,
-		Err: errOut,
-	}
+func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
+	return &SubjectOptions{
+		PrintFlags: printers.NewPrintFlags("subjects updated"),
 
+		IOStreams: streams,
+	}
+}
+
+func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewSubjectOptions(streams)
 	cmd := &cobra.Command{
 		Use: "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
 		DisableFlagsInUseLine: true,
@@ -90,46 +97,51 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 		Long:    subject_long,
 		Example: subject_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.Run(f, addSubjects))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run(addSubjects))
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
-	usage := "the resource to update the subjects"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set subject will NOT contact api-server but run locally.")
+	o.PrintFlags.AddFlags(cmd)
+
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "the resource to update the subjects")
+	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set subject will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringArrayVar(&options.Users, "user", []string{}, "Usernames to bind to the role")
-	cmd.Flags().StringArrayVar(&options.Groups, "group", []string{}, "Groups to bind to the role")
-	cmd.Flags().StringArrayVar(&options.ServiceAccounts, "serviceaccount", []string{}, "Service accounts to bind to the role")
+	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the role")
+	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the role")
+	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the role")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 
 func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, o.Typer = f.Object()
-	o.Encoder = f.JSONEncoder()
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	o.PrintObject = func(mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-		return f.PrintObject(cmd, o.Local, mapper, obj, out)
-	}
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = printer.PrintObj
+
+	var enforceNamespace bool
+	o.namespace, enforceNamespace, err = f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		Internal().
+		Internal(legacyscheme.Scheme).
 		LocalParam(o.Local).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
+		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		IncludeUninitialized(includeUninitialized).
 		Flatten()
@@ -181,9 +193,8 @@ func (o *SubjectOptions) Validate() error {
 	return nil
 }
 
-func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
-	var err error
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
+func (o *SubjectOptions) Run(fn updateSubjects) error {
+	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		subjects := []rbac.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
 			subject := rbac.Subject{
@@ -206,10 +217,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 			namespace := tokens[0]
 			name := tokens[1]
 			if len(namespace) == 0 {
-				namespace, _, err = f.DefaultNamespace()
-				if err != nil {
-					return nil, err
-				}
+				namespace = o.namespace
 			}
 			subject := rbac.Subject{
 				Kind:      rbac.ServiceAccountKind,
@@ -222,7 +230,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
 		if transformed && err == nil {
 			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
-			return runtime.Encode(o.Encoder, info.AsVersioned())
+			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping))
 		}
 		return nil, err
 	})
@@ -242,7 +250,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObject(o.Mapper, info.Object, o.Out); err != nil {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
@@ -255,11 +263,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 		info.Refresh(obj, true)
 
-		shortOutput := o.Output == "name"
-		if len(o.Output) > 0 && !shortOutput {
-			return o.PrintObject(o.Mapper, info.AsVersioned(), o.Out)
-		}
-		f.PrintSuccess(shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
+		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

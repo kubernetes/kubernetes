@@ -30,6 +30,7 @@ EXCLUDED_PATTERNS=(
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-test-owners.sh"        # TODO(rmmh): figure out how to avoid endless conflicts
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
+  "verify-typecheck.sh"          # runs in separate typecheck job
   )
 
 # Only run whitelisted fast checks in quick mode.
@@ -45,6 +46,7 @@ QUICK_PATTERNS+=(
   "verify-imports.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
+  "verify-spelling.sh"
   "verify-staging-client-go.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"
@@ -65,6 +67,17 @@ function is-excluded {
 function is-quick {
   for e in ${QUICK_CHECKS[@]}; do
     if [[ $1 -ef "$e" ]]; then
+      return
+    fi
+  done
+  return 1
+}
+
+function is-explicitly-chosen {
+  local name="${1#verify-}"
+  name="${name%.*}"
+  for e in ${WHAT}; do
+    if [[ $e == "$name" ]]; then
       return
     fi
   done
@@ -107,13 +120,19 @@ function run-checks {
   for t in $(ls ${pattern})
   do
     local check_name="$(basename "${t}")"
-    if is-excluded "${t}" ; then
-      echo "Skipping ${check_name}"
-      continue
-    fi
-    if ${QUICK} && ! is-quick "${t}" ; then
-      echo "Skipping ${check_name} in quick mode"
-      continue
+    if [[ ! -z ${WHAT:-} ]]; then
+      if ! is-explicitly-chosen "${check_name}"; then
+        continue
+      fi
+    else
+      if is-excluded "${t}" ; then
+        echo "Skipping ${check_name}"
+        continue
+      fi
+      if ${QUICK} && ! is-quick "${t}" ; then
+        echo "Skipping ${check_name} in quick mode"
+        continue
+      fi
     fi
     echo -e "Verifying ${check_name}"
     local start=$(date +%s)

@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -85,9 +86,7 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 
 // ScaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
 // none are running, otherwise it does what a synchronous scale operation would do.
-//TODO(p0lyn0mial): remove internalClientset.
-//TODO(p0lyn0mial): update the callers.
-func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns string, l map[string]string, replicas uint) error {
+func ScaleRCByLabels(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns string, l map[string]string, replicas uint) error {
 	listOpts := metav1.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l)).String()}
 	rcs, err := clientset.CoreV1().ReplicationControllers(ns).List(listOpts)
 	if err != nil {
@@ -99,7 +98,7 @@ func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalcl
 	Logf("Scaling %v RCs with labels %v in ns %v to %v replicas.", len(rcs.Items), l, ns, replicas)
 	for _, labelRC := range rcs.Items {
 		name := labelRC.Name
-		if err := ScaleRC(clientset, internalClientset, scalesGetter, ns, name, replicas, false); err != nil {
+		if err := ScaleRC(clientset, scalesGetter, ns, name, replicas, false); err != nil {
 			return err
 		}
 		rc, err := clientset.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
@@ -107,7 +106,7 @@ func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalcl
 			return err
 		}
 		if replicas == 0 {
-			ps, err := podStoreForSelector(clientset, rc.Namespace, labels.SelectorFromSet(rc.Spec.Selector))
+			ps, err := testutils.NewPodStore(clientset, rc.Namespace, labels.SelectorFromSet(rc.Spec.Selector), fields.Everything())
 			if err != nil {
 				return err
 			}
@@ -155,12 +154,12 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 	return DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
 }
 
-func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
-	return DeleteResourceAndPods(clientset, internalClientset, api.Kind("ReplicationController"), ns, name)
+func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, scaleClient scaleclient.ScalesGetter, ns, name string) error {
+	return DeleteResourceAndPods(clientset, internalClientset, scaleClient, api.Kind("ReplicationController"), ns, name)
 }
 
-func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
-	return ScaleResource(clientset, internalClientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.Resource("replicationcontrollers"))
+func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
+	return ScaleResource(clientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.Resource("replicationcontrollers"))
 }
 
 func RunRC(config testutils.RCConfig) error {

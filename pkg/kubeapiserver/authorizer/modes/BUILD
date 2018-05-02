@@ -10,13 +10,13 @@ go_test(
     name = "go_default_test",
     srcs = ["modes_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["modes.go"],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes",
+    deps = ["//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
 )
 
 filegroup(

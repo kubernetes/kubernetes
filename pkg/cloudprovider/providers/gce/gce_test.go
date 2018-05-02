@@ -531,51 +531,39 @@ func getTestOperation() *computev1.Operation {
 }
 
 func TestNewAlphaFeatureGate(t *testing.T) {
-	knownAlphaFeatures["foo"] = true
-	knownAlphaFeatures["bar"] = true
-
 	testCases := []struct {
 		alphaFeatures  []string
 		expectEnabled  []string
 		expectDisabled []string
-		expectError    bool
 	}{
 		// enable foo bar
 		{
 			alphaFeatures:  []string{"foo", "bar"},
 			expectEnabled:  []string{"foo", "bar"},
 			expectDisabled: []string{"aaa"},
-			expectError:    false,
 		},
 		// no alpha feature
 		{
 			alphaFeatures:  []string{},
 			expectEnabled:  []string{},
 			expectDisabled: []string{"foo", "bar"},
-			expectError:    false,
 		},
 		// unsupported alpha feature
 		{
 			alphaFeatures:  []string{"aaa", "foo"},
-			expectError:    true,
 			expectEnabled:  []string{"foo"},
-			expectDisabled: []string{"aaa"},
+			expectDisabled: []string{},
 		},
 		// enable foo
 		{
 			alphaFeatures:  []string{"foo"},
 			expectEnabled:  []string{"foo"},
 			expectDisabled: []string{"bar"},
-			expectError:    false,
 		},
 	}
 
 	for _, tc := range testCases {
-		featureGate, err := NewAlphaFeatureGate(tc.alphaFeatures)
-
-		if (tc.expectError && err == nil) || (!tc.expectError && err != nil) {
-			t.Errorf("Expect error to be %v, but got error %v", tc.expectError, err)
-		}
+		featureGate := NewAlphaFeatureGate(tc.alphaFeatures)
 
 		for _, key := range tc.expectEnabled {
 			if !featureGate.Enabled(key) {
@@ -588,8 +576,6 @@ func TestNewAlphaFeatureGate(t *testing.T) {
 			}
 		}
 	}
-	delete(knownAlphaFeatures, "foo")
-	delete(knownAlphaFeatures, "bar")
 }
 
 func TestGetRegionInURL(t *testing.T) {

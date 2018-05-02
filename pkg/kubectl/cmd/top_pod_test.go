@@ -35,6 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -133,89 +134,94 @@ func TestTopPod(t *testing.T) {
 	}
 	initTestErrorHandler(t)
 	for _, testCase := range testCases {
-		t.Logf("Running test case: %s", testCase.name)
-		metricsList := testPodMetricsData()
-		var expectedMetrics []metricsv1alpha1api.PodMetrics
-		var expectedContainerNames, nonExpectedMetricsNames []string
-		for n, m := range metricsList {
-			if n < len(testCase.namespaces) {
-				m.Namespace = testCase.namespaces[n]
-				expectedMetrics = append(expectedMetrics, m)
-				for _, c := range m.Containers {
-					expectedContainerNames = append(expectedContainerNames, c.Name)
-				}
-			} else {
-				nonExpectedMetricsNames = append(nonExpectedMetricsNames, m.Name)
-			}
-		}
-
-		var response interface{}
-		if len(expectedMetrics) == 1 {
-			response = expectedMetrics[0]
-		} else {
-			response = metricsv1alpha1api.PodMetricsList{
-				ListMeta: metav1.ListMeta{
-					ResourceVersion: "2",
-				},
-				Items: expectedMetrics,
-			}
-		}
-
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
-		tf.Client = &fake.RESTClient{
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
-				case p == "/api":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
-				case p == "/apis":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
-				case p == testCase.expectedPath && m == "GET" && (testCase.expectedQuery == "" || q == testCase.expectedQuery):
-					body, err := marshallBody(response)
-					if err != nil {
-						t.Errorf("%s: unexpected error: %v", testCase.name, err)
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Logf("Running test case: %s", testCase.name)
+			metricsList := testPodMetricsData()
+			var expectedMetrics []metricsv1alpha1api.PodMetrics
+			var expectedContainerNames, nonExpectedMetricsNames []string
+			for n, m := range metricsList {
+				if n < len(testCase.namespaces) {
+					m.Namespace = testCase.namespaces[n]
+					expectedMetrics = append(expectedMetrics, m)
+					for _, c := range m.Containers {
+						expectedContainerNames = append(expectedContainerNames, c.Name)
 					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				default:
-					t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v\nExpected path: %#v\nExpected query: %#v",
-						testCase.name, req, req.URL, testCase.expectedPath, testCase.expectedQuery)
-					return nil, nil
-				}
-			}),
-		}
-		tf.Namespace = testNS
-		tf.ClientConfig = defaultClientConfig()
-		buf := bytes.NewBuffer([]byte{})
-
-		cmd := NewCmdTopPod(f, nil, buf)
-		for name, value := range testCase.flags {
-			cmd.Flags().Set(name, value)
-		}
-		cmd.Run(cmd, testCase.args)
-
-		// Check the presence of pod names&namespaces/container names in the output.
-		result := buf.String()
-		if testCase.containers {
-			for _, containerName := range expectedContainerNames {
-				if !strings.Contains(result, containerName) {
-					t.Errorf("%s: missing metrics for container %s: \n%s", testCase.name, containerName, result)
+				} else {
+					nonExpectedMetricsNames = append(nonExpectedMetricsNames, m.Name)
 				}
 			}
-		}
-		for _, m := range expectedMetrics {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("%s: missing metrics for %s: \n%s", testCase.name, m.Name, result)
+
+			var response interface{}
+			if len(expectedMetrics) == 1 {
+				response = expectedMetrics[0]
+			} else {
+				response = metricsv1alpha1api.PodMetricsList{
+					ListMeta: metav1.ListMeta{
+						ResourceVersion: "2",
+					},
+					Items: expectedMetrics,
+				}
 			}
-			if testCase.listsNamespaces && !strings.Contains(result, m.Namespace) {
-				t.Errorf("%s: missing metrics for %s/%s: \n%s", testCase.name, m.Namespace, m.Name, result)
+
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
+			ns := legacyscheme.Codecs
+
+			tf.Client = &fake.RESTClient{
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
+					case p == "/api":
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+					case p == "/apis":
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
+					case p == testCase.expectedPath && m == "GET" && (testCase.expectedQuery == "" || q == testCase.expectedQuery):
+						body, err := marshallBody(response)
+						if err != nil {
+							t.Errorf("%s: unexpected error: %v", testCase.name, err)
+						}
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					default:
+						t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v\nExpected path: %#v\nExpected query: %#v",
+							testCase.name, req, req.URL, testCase.expectedPath, testCase.expectedQuery)
+						return nil, nil
+					}
+				}),
 			}
-		}
-		for _, name := range nonExpectedMetricsNames {
-			if strings.Contains(result, name) {
-				t.Errorf("%s: unexpected metrics for %s: \n%s", testCase.name, name, result)
+			tf.Namespace = testNS
+			tf.ClientConfigVal = defaultClientConfig()
+			buf := bytes.NewBuffer([]byte{})
+
+			cmd := NewCmdTopPod(tf, nil, buf)
+			for name, value := range testCase.flags {
+				cmd.Flags().Set(name, value)
 			}
-		}
+			cmd.Run(cmd, testCase.args)
+
+			// Check the presence of pod names&namespaces/container names in the output.
+			result := buf.String()
+			if testCase.containers {
+				for _, containerName := range expectedContainerNames {
+					if !strings.Contains(result, containerName) {
+						t.Errorf("%s: missing metrics for container %s: \n%s", testCase.name, containerName, result)
+					}
+				}
+			}
+			for _, m := range expectedMetrics {
+				if !strings.Contains(result, m.Name) {
+					t.Errorf("%s: missing metrics for %s: \n%s", testCase.name, m.Name, result)
+				}
+				if testCase.listsNamespaces && !strings.Contains(result, m.Namespace) {
+					t.Errorf("%s: missing metrics for %s/%s: \n%s", testCase.name, m.Namespace, m.Name, result)
+				}
+			}
+			for _, name := range nonExpectedMetricsNames {
+				if strings.Contains(result, name) {
+					t.Errorf("%s: unexpected metrics for %s: \n%s", testCase.name, name, result)
+				}
+			}
+		})
 	}
 }
 
@@ -224,7 +230,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 	testCases := []struct {
 		name            string
 		namespace       string
-		flags           map[string]string
+		options         *TopPodOptions
 		args            []string
 		expectedPath    string
 		expectedQuery   string
@@ -234,7 +240,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 	}{
 		{
 			name:            "all namespaces",
-			flags:           map[string]string{"all-namespaces": "true"},
+			options:         &TopPodOptions{AllNamespaces: true},
 			expectedPath:    topMetricsAPIPathPrefix + "/pods",
 			namespaces:      []string{testNS, "secondtestns", "thirdtestns"},
 			listsNamespaces: true,
@@ -252,14 +258,14 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 		},
 		{
 			name:          "pod with label selector",
-			flags:         map[string]string{"selector": "key=value"},
+			options:       &TopPodOptions{Selector: "key=value"},
 			expectedPath:  topMetricsAPIPathPrefix + "/namespaces/" + testNS + "/pods",
 			expectedQuery: "labelSelector=" + url.QueryEscape("key=value"),
 			namespaces:    []string{testNS, testNS},
 		},
 		{
 			name:         "pod with container metrics",
-			flags:        map[string]string{"containers": "true"},
+			options:      &TopPodOptions{PrintContainers: true},
 			args:         []string{"pod1"},
 			expectedPath: topMetricsAPIPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
 			namespaces:   []string{testNS},
@@ -268,90 +274,108 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 	}
 	initTestErrorHandler(t)
 	for _, testCase := range testCases {
-		t.Logf("Running test case: %s", testCase.name)
-		metricsList := testV1beta1PodMetricsData()
-		var expectedMetrics []metricsv1beta1api.PodMetrics
-		var expectedContainerNames, nonExpectedMetricsNames []string
-		for n, m := range metricsList {
-			if n < len(testCase.namespaces) {
-				m.Namespace = testCase.namespaces[n]
-				expectedMetrics = append(expectedMetrics, m)
-				for _, c := range m.Containers {
-					expectedContainerNames = append(expectedContainerNames, c.Name)
+		t.Run(testCase.name, func(t *testing.T) {
+			metricsList := testV1beta1PodMetricsData()
+			var expectedMetrics []metricsv1beta1api.PodMetrics
+			var expectedContainerNames, nonExpectedMetricsNames []string
+			for n, m := range metricsList {
+				if n < len(testCase.namespaces) {
+					m.Namespace = testCase.namespaces[n]
+					expectedMetrics = append(expectedMetrics, m)
+					for _, c := range m.Containers {
+						expectedContainerNames = append(expectedContainerNames, c.Name)
+					}
+				} else {
+					nonExpectedMetricsNames = append(nonExpectedMetricsNames, m.Name)
 				}
+			}
+
+			fakemetricsClientset := &metricsfake.Clientset{}
+
+			if len(expectedMetrics) == 1 {
+				fakemetricsClientset.AddReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+					return true, &expectedMetrics[0], nil
+				})
 			} else {
-				nonExpectedMetricsNames = append(nonExpectedMetricsNames, m.Name)
+				fakemetricsClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+					res := &metricsv1beta1api.PodMetricsList{
+						ListMeta: metav1.ListMeta{
+							ResourceVersion: "2",
+						},
+						Items: expectedMetrics,
+					}
+					return true, res, nil
+				})
 			}
-		}
 
-		fakemetricsClientset := &metricsfake.Clientset{}
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		if len(expectedMetrics) == 1 {
-			fakemetricsClientset.AddReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-				return true, &expectedMetrics[0], nil
-			})
-		} else {
-			fakemetricsClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-				res := &metricsv1beta1api.PodMetricsList{
-					ListMeta: metav1.ListMeta{
-						ResourceVersion: "2",
-					},
-					Items: expectedMetrics,
+			ns := legacyscheme.Codecs
+
+			tf.Client = &fake.RESTClient{
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p := req.URL.Path; {
+					case p == "/api":
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+					case p == "/apis":
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+					default:
+						t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v",
+							testCase.name, req, req.URL)
+						return nil, nil
+					}
+				}),
+			}
+			tf.Namespace = testNS
+			tf.ClientConfigVal = defaultClientConfig()
+			buf := bytes.NewBuffer([]byte{})
+
+			cmd := NewCmdTopPod(tf, nil, buf)
+			var cmdOptions *TopPodOptions
+			if testCase.options != nil {
+				cmdOptions = testCase.options
+			} else {
+				cmdOptions = &TopPodOptions{}
+			}
+
+			// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
+			// TODO then check the particular Run functionality and harvest results from fake clients.  We probably end up skipping the factory altogether.
+			if err := cmdOptions.Complete(tf, cmd, testCase.args, buf); err != nil {
+				t.Fatal(err)
+			}
+			cmdOptions.MetricsClient = fakemetricsClientset
+			if err := cmdOptions.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if err := cmdOptions.RunTopPod(); err != nil {
+				t.Fatal(err)
+			}
+
+			// Check the presence of pod names&namespaces/container names in the output.
+			result := buf.String()
+			if testCase.containers {
+				for _, containerName := range expectedContainerNames {
+					if !strings.Contains(result, containerName) {
+						t.Errorf("missing metrics for container %s: \n%s", containerName, result)
+					}
 				}
-				return true, res, nil
-			})
-		}
-
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
-		tf.Client = &fake.RESTClient{
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p := req.URL.Path; {
-				case p == "/api":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
-				case p == "/apis":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
-				default:
-					t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v",
-						testCase.name, req, req.URL)
-					return nil, nil
+			}
+			for _, m := range expectedMetrics {
+				if !strings.Contains(result, m.Name) {
+					t.Errorf("missing metrics for %s: \n%s", m.Name, result)
 				}
-			}),
-		}
-		tf.MetricsClientSet = fakemetricsClientset
-		tf.Namespace = testNS
-		tf.ClientConfig = defaultClientConfig()
-		buf := bytes.NewBuffer([]byte{})
-
-		cmd := NewCmdTopPod(f, nil, buf)
-		for name, value := range testCase.flags {
-			cmd.Flags().Set(name, value)
-		}
-		cmd.Run(cmd, testCase.args)
-
-		// Check the presence of pod names&namespaces/container names in the output.
-		result := buf.String()
-		if testCase.containers {
-			for _, containerName := range expectedContainerNames {
-				if !strings.Contains(result, containerName) {
-					t.Errorf("%s: missing metrics for container %s: \n%s", testCase.name, containerName, result)
+				if testCase.listsNamespaces && !strings.Contains(result, m.Namespace) {
+					t.Errorf("missing metrics for %s/%s: \n%s", m.Namespace, m.Name, result)
 				}
 			}
-		}
-		for _, m := range expectedMetrics {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("%s: missing metrics for %s: \n%s", testCase.name, m.Name, result)
+			for _, name := range nonExpectedMetricsNames {
+				if strings.Contains(result, name) {
+					t.Errorf("unexpected metrics for %s: \n%s", name, result)
+				}
 			}
-			if testCase.listsNamespaces && !strings.Contains(result, m.Namespace) {
-				t.Errorf("%s: missing metrics for %s/%s: \n%s", testCase.name, m.Namespace, m.Name, result)
-			}
-		}
-		for _, name := range nonExpectedMetricsNames {
-			if strings.Contains(result, name) {
-				t.Errorf("%s: unexpected metrics for %s: \n%s", testCase.name, name, result)
-			}
-		}
+		})
 	}
 }
 
@@ -453,97 +477,102 @@ func TestTopPodCustomDefaults(t *testing.T) {
 	}
 	initTestErrorHandler(t)
 	for _, testCase := range testCases {
-		t.Logf("Running test case: %s", testCase.name)
-		metricsList := testPodMetricsData()
-		var expectedMetrics []metricsv1alpha1api.PodMetrics
-		var expectedContainerNames, nonExpectedMetricsNames []string
-		for n, m := range metricsList {
-			if n < len(testCase.namespaces) {
-				m.Namespace = testCase.namespaces[n]
-				expectedMetrics = append(expectedMetrics, m)
-				for _, c := range m.Containers {
-					expectedContainerNames = append(expectedContainerNames, c.Name)
-				}
-			} else {
-				nonExpectedMetricsNames = append(nonExpectedMetricsNames, m.Name)
-			}
-		}
-
-		var response interface{}
-		if len(expectedMetrics) == 1 {
-			response = expectedMetrics[0]
-		} else {
-			response = metricsv1alpha1api.PodMetricsList{
-				ListMeta: metav1.ListMeta{
-					ResourceVersion: "2",
-				},
-				Items: expectedMetrics,
-			}
-		}
-
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
-		tf.Client = &fake.RESTClient{
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
-				case p == "/api":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
-				case p == "/apis":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
-				case p == testCase.expectedPath && m == "GET" && (testCase.expectedQuery == "" || q == testCase.expectedQuery):
-					body, err := marshallBody(response)
-					if err != nil {
-						t.Errorf("%s: unexpected error: %v", testCase.name, err)
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Logf("Running test case: %s", testCase.name)
+			metricsList := testPodMetricsData()
+			var expectedMetrics []metricsv1alpha1api.PodMetrics
+			var expectedContainerNames, nonExpectedMetricsNames []string
+			for n, m := range metricsList {
+				if n < len(testCase.namespaces) {
+					m.Namespace = testCase.namespaces[n]
+					expectedMetrics = append(expectedMetrics, m)
+					for _, c := range m.Containers {
+						expectedContainerNames = append(expectedContainerNames, c.Name)
 					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				default:
-					t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v\nExpected path: %#v\nExpected query: %#v",
-						testCase.name, req, req.URL, testCase.expectedPath, testCase.expectedQuery)
-					return nil, nil
-				}
-			}),
-		}
-		tf.Namespace = testNS
-		tf.ClientConfig = defaultClientConfig()
-		buf := bytes.NewBuffer([]byte{})
-
-		opts := &TopPodOptions{
-			HeapsterOptions: HeapsterTopOptions{
-				Namespace: "custom-namespace",
-				Scheme:    "https",
-				Service:   "custom-heapster-service",
-			},
-			DiscoveryClient: &fakeDiscovery{},
-		}
-		cmd := NewCmdTopPod(f, opts, buf)
-		for name, value := range testCase.flags {
-			cmd.Flags().Set(name, value)
-		}
-		cmd.Run(cmd, testCase.args)
-
-		// Check the presence of pod names&namespaces/container names in the output.
-		result := buf.String()
-		if testCase.containers {
-			for _, containerName := range expectedContainerNames {
-				if !strings.Contains(result, containerName) {
-					t.Errorf("%s: missing metrics for container %s: \n%s", testCase.name, containerName, result)
+				} else {
+					nonExpectedMetricsNames = append(nonExpectedMetricsNames, m.Name)
 				}
 			}
-		}
-		for _, m := range expectedMetrics {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("%s: missing metrics for %s: \n%s", testCase.name, m.Name, result)
+
+			var response interface{}
+			if len(expectedMetrics) == 1 {
+				response = expectedMetrics[0]
+			} else {
+				response = metricsv1alpha1api.PodMetricsList{
+					ListMeta: metav1.ListMeta{
+						ResourceVersion: "2",
+					},
+					Items: expectedMetrics,
+				}
 			}
-			if testCase.listsNamespaces && !strings.Contains(result, m.Namespace) {
-				t.Errorf("%s: missing metrics for %s/%s: \n%s", testCase.name, m.Namespace, m.Name, result)
+
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
+			ns := legacyscheme.Codecs
+
+			tf.Client = &fake.RESTClient{
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
+					case p == "/api":
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+					case p == "/apis":
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
+					case p == testCase.expectedPath && m == "GET" && (testCase.expectedQuery == "" || q == testCase.expectedQuery):
+						body, err := marshallBody(response)
+						if err != nil {
+							t.Errorf("%s: unexpected error: %v", testCase.name, err)
+						}
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					default:
+						t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v\nExpected path: %#v\nExpected query: %#v",
+							testCase.name, req, req.URL, testCase.expectedPath, testCase.expectedQuery)
+						return nil, nil
+					}
+				}),
 			}
-		}
-		for _, name := range nonExpectedMetricsNames {
-			if strings.Contains(result, name) {
-				t.Errorf("%s: unexpected metrics for %s: \n%s", testCase.name, name, result)
+			tf.Namespace = testNS
+			tf.ClientConfigVal = defaultClientConfig()
+			buf := bytes.NewBuffer([]byte{})
+
+			opts := &TopPodOptions{
+				HeapsterOptions: HeapsterTopOptions{
+					Namespace: "custom-namespace",
+					Scheme:    "https",
+					Service:   "custom-heapster-service",
+				},
+				DiscoveryClient: &fakeDiscovery{},
 			}
-		}
+			cmd := NewCmdTopPod(tf, opts, buf)
+			for name, value := range testCase.flags {
+				cmd.Flags().Set(name, value)
+			}
+			cmd.Run(cmd, testCase.args)
+
+			// Check the presence of pod names&namespaces/container names in the output.
+			result := buf.String()
+			if testCase.containers {
+				for _, containerName := range expectedContainerNames {
+					if !strings.Contains(result, containerName) {
+						t.Errorf("%s: missing metrics for container %s: \n%s", testCase.name, containerName, result)
+					}
+				}
+			}
+			for _, m := range expectedMetrics {
+				if !strings.Contains(result, m.Name) {
+					t.Errorf("%s: missing metrics for %s: \n%s", testCase.name, m.Name, result)
+				}
+				if testCase.listsNamespaces && !strings.Contains(result, m.Namespace) {
+					t.Errorf("%s: missing metrics for %s/%s: \n%s", testCase.name, m.Namespace, m.Name, result)
+				}
+			}
+			for _, name := range nonExpectedMetricsNames {
+				if strings.Contains(result, name) {
+					t.Errorf("%s: unexpected metrics for %s: \n%s", testCase.name, name, result)
+				}
+			}
+		})
 	}
 }
 

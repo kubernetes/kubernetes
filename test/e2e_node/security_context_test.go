@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -37,6 +39,78 @@ var _ = framework.KubeDescribe("Security Context", func() {
 	var podClient *framework.PodClient
 	BeforeEach(func() {
 		podClient = f.PodClient()
+	})
+
+	Context("when pod PID namespace is configurable [Feature:ShareProcessNamespace]", func() {
+		It("containers in pods using isolated PID namespaces should all receive PID 1", func() {
+			By("Create a pod with isolated PID namespaces.")
+			f.PodClient().CreateSync(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "isolated-pid-ns-test-pod"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    "test-container-1",
+							Image:   "busybox",
+							Command: []string{"/bin/top"},
+						},
+						{
+							Name:    "test-container-2",
+							Image:   "busybox",
+							Command: []string{"/bin/sleep"},
+							Args:    []string{"10000"},
+						},
+					},
+				},
+			})
+
+			By("Check if both containers receive PID 1.")
+			pid1 := f.ExecCommandInContainer("isolated-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
+			pid2 := f.ExecCommandInContainer("isolated-pid-ns-test-pod", "test-container-2", "/bin/pidof", "sleep")
+			if pid1 != "1" || pid2 != "1" {
+				framework.Failf("PIDs of different containers are not all 1: test-container-1=%v, test-container-2=%v", pid1, pid2)
+			}
+		})
+
+		It("processes in containers sharing a pod namespace should be able to see each other [Alpha]", func() {
+			By("Check whether shared PID namespace is supported.")
+			isEnabled, err := isSharedPIDNamespaceSupported()
+			framework.ExpectNoError(err)
+			if !isEnabled {
+				framework.Skipf("Skipped because shared PID namespace is not supported by this docker version.")
+			}
+			// It's not enough to set this flag in the kubelet because the apiserver needs it too
+			if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) {
+				framework.Skipf("run test with --feature-gates=PodShareProcessNamespace=true to test PID namespace sharing")
+			}
+
+			By("Create a pod with shared PID namespace.")
+			f.PodClient().CreateSync(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "shared-pid-ns-test-pod"},
+				Spec: v1.PodSpec{
+					ShareProcessNamespace: &[]bool{true}[0],
+					Containers: []v1.Container{
+						{
+							Name:    "test-container-1",
+							Image:   "busybox",
+							Command: []string{"/bin/top"},
+						},
+						{
+							Name:    "test-container-2",
+							Image:   "busybox",
+							Command: []string{"/bin/sleep"},
+							Args:    []string{"10000"},
+						},
+					},
+				},
+			})
+
+			By("Check if the process in one container is visible to the process in the other.")
+			pid1 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
+			pid2 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-2", "/bin/pidof", "top")
+			if pid1 != pid2 {
+				framework.Failf("PIDs are not the same in different containers: test-container-1=%v, test-container-2=%v", pid1, pid2)
+			}
+		})
 	})
 
 	Context("when creating a pod in the host PID namespace", func() {

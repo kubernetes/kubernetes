@@ -267,7 +267,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 
 	for k, tc := range testCases {
 		getter := serviceaccountcontroller.NewGetterFromClient(tc.Client)
-		authenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, tc.Client != nil, getter)
+		authenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
 
 		// An invalid, non-JWT token should always fail
 		if _, ok, err := authenticator.AuthenticateToken("invalid token"); err != nil || ok {

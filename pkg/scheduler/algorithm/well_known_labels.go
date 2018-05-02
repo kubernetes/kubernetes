@@ -36,25 +36,35 @@ const (
 	// It is deprecated since 1.9
 	DeprecatedTaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
 
+	// TaintNodeUnschedulable will be added when node becomes unschedulable
+	// and feature-gate for TaintNodesByCondition flag is enabled,
+	// and removed when node becomes scheduable.
+	TaintNodeUnschedulable = "node.kubernetes.io/unschedulable"
+
 	// TaintNodeOutOfDisk will be added when node becomes out of disk
-	// and feature-gate for TaintBasedEvictions flag is enabled,
+	// and feature-gate for TaintNodesByCondition flag is enabled,
 	// and removed when node has enough disk.
 	TaintNodeOutOfDisk = "node.kubernetes.io/out-of-disk"
 
 	// TaintNodeMemoryPressure will be added when node has memory pressure
-	// and feature-gate for TaintBasedEvictions flag is enabled,
+	// and feature-gate for TaintNodesByCondition flag is enabled,
 	// and removed when node has enough memory.
 	TaintNodeMemoryPressure = "node.kubernetes.io/memory-pressure"
 
 	// TaintNodeDiskPressure will be added when node has disk pressure
-	// and feature-gate for TaintBasedEvictions flag is enabled,
+	// and feature-gate for TaintNodesByCondition flag is enabled,
 	// and removed when node has enough disk.
 	TaintNodeDiskPressure = "node.kubernetes.io/disk-pressure"
 
 	// TaintNodeNetworkUnavailable will be added when node's network is unavailable
-	// and feature-gate for TaintBasedEvictions flag is enabled,
+	// and feature-gate for TaintNodesByCondition flag is enabled,
 	// and removed when network becomes ready.
 	TaintNodeNetworkUnavailable = "node.kubernetes.io/network-unavailable"
+
+	// TaintNodePIDPressure will be added when node has pid pressure
+	// and feature-gate for TaintNodesByCondition flag is enabled,
+	// and removed when node has enough disk.
+	TaintNodePIDPressure = "node.kubernetes.io/pid-pressure"
 
 	// TaintExternalCloudProvider sets this taint on a node to mark it as unusable,
 	// when kubelet is started with the "external" cloud provider, until a controller

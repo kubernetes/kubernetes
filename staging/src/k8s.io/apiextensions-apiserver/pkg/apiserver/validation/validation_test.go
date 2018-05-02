@@ -58,7 +58,7 @@ func TestRoundTrip(t *testing.T) {
 
 		// internal -> go-openapi
 		openAPITypes := &spec.Schema{}
-		if err := convertJSONSchemaProps(internal, openAPITypes); err != nil {
+		if err := ConvertJSONSchemaProps(internal, openAPITypes); err != nil {
 			t.Fatal(err)
 		}
 

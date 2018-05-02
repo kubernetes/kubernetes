@@ -10,3 +10,4 @@ before_install:
 
 script:
   - make check test
+  - GOOS=windows make install

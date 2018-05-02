@@ -22,4 +22,4 @@ build:
 	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push:
-	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)
+	docker push $(PREFIX)/$(IMAGE):$(TAG)

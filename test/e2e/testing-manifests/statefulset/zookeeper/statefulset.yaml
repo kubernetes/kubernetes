@@ -5,6 +5,9 @@ metadata:
 spec:
   serviceName: "zk"
   replicas: 3
+  selector:
+    matchLabels:
+      app: zk
   template:
     metadata:
       labels:

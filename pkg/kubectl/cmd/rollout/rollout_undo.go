@@ -19,14 +19,14 @@ package rollout
 import (
 	"io"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/spf13/cobra"
 )
@@ -36,15 +36,15 @@ import (
 type UndoOptions struct {
 	resource.FilenameOptions
 
+	PrintFlags *printers.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
+
 	Rollbackers []kubectl.Rollbacker
-	Mapper      meta.RESTMapper
-	Typer       runtime.ObjectTyper
 	Infos       []*resource.Info
 	ToRevision  int64
 	DryRun      bool
 
-	PrintSuccess func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	Out          io.Writer
+	Out io.Writer
 }
 
 var (
@@ -63,7 +63,9 @@ var (
 )
 
 func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &UndoOptions{}
+	o := &UndoOptions{
+		PrintFlags: printers.NewPrintFlags(""),
+	}
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -76,11 +78,11 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: undo_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := options.CompleteUndo(f, cmd, out, args)
+			err := o.CompleteUndo(f, cmd, out, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = options.RunUndo()
+			err = o.RunUndo()
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -92,7 +94,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd.Flags().Int64("to-revision", 0, "The revision to rollback to. Default to 0 (last revision).")
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -102,9 +104,7 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
-	o.PrintSuccess = f.PrintSuccess
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
-	o.Mapper, o.Typer = f.Object()
 	o.Out = out
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
@@ -113,8 +113,21 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		return err
 	}
 
+	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		if o.DryRun {
+			o.PrintFlags.Complete("%s (dry run)")
+		}
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+
+		return printer.PrintObj, nil
+	}
+
 	r := f.NewBuilder().
-		Internal().
+		Internal(legacyscheme.Scheme).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -150,7 +163,12 @@ func (o *UndoOptions) RunUndo() error {
 			allErrs = append(allErrs, cmdutil.AddSourceToErr("undoing", info.Source, err))
 			continue
 		}
-		o.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, result)
+		printer, err := o.ToPrinter(result)
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
+		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

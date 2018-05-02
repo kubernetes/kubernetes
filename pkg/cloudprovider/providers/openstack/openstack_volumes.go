@@ -310,7 +310,8 @@ func (os *OpenStack) OperationPending(diskName string) (bool, string, error) {
 	}
 	volumeStatus := volume.Status
 	if volumeStatus == volumeErrorStatus {
-		return false, volumeStatus, nil
+		err = fmt.Errorf("status of volume %s is %s", diskName, volumeStatus)
+		return false, volumeStatus, err
 	}
 	if volumeStatus == volumeAvailableStatus || volumeStatus == volumeInUseStatus || volumeStatus == volumeDeletedStatus {
 		return false, volume.Status, nil
@@ -412,7 +413,7 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 
 	volSizeBytes := newSize.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGB := int(k8s_volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	volSizeGB := int(volumeutil.RoundUpSize(volSizeBytes, 1024*1024*1024))
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", volSizeGB))
 
 	// if volume size equals to or greater than the newSize, return nil
@@ -622,7 +623,7 @@ func (os *OpenStack) DiskIsAttachedByName(nodeName types.NodeName, volumeID stri
 	if err != nil {
 		return false, "", err
 	}
-	srv, err := getServerByName(cClient, nodeName, false)
+	srv, err := getServerByName(cClient, nodeName)
 	if err != nil {
 		if err == ErrNotFound {
 			// instance not found anymore in cloudprovider, assume that cinder is detached
@@ -659,7 +660,7 @@ func (os *OpenStack) DisksAreAttachedByName(nodeName types.NodeName, volumeIDs [
 	if err != nil {
 		return attached, err
 	}
-	srv, err := getServerByName(cClient, nodeName, false)
+	srv, err := getServerByName(cClient, nodeName)
 	if err != nil {
 		if err == ErrNotFound {
 			// instance not found anymore, mark all volumes as detached

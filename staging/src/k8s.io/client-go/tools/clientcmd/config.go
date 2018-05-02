@@ -68,7 +68,9 @@ func (o *PathOptions) GetEnvVarFiles() []string {
 		return []string{}
 	}
 
-	return filepath.SplitList(envVarValue)
+	fileList := filepath.SplitList(envVarValue)
+	// prevent the same path load multiple times
+	return deduplicate(fileList)
 }
 
 func (o *PathOptions) GetLoadingPrecedence() []string {

@@ -158,6 +158,9 @@ func TestGenerationNumber(t *testing.T) {
 	modifiedSno.Status.ObservedGeneration = 10
 	ctx := genericapirequest.NewDefaultContext()
 	rs, err := createReplicaSet(storage.ReplicaSet, modifiedSno, t)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	etcdRS, err := storage.ReplicaSet.Get(ctx, rs.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -165,14 +168,13 @@ func TestGenerationNumber(t *testing.T) {
 	storedRS, _ := etcdRS.(*extensions.ReplicaSet)
 
 	// Generation initialization
-	if storedRS.Generation != 1 && storedRS.Status.ObservedGeneration != 0 {
+	if storedRS.Generation != 1 || storedRS.Status.ObservedGeneration != 0 {
 		t.Fatalf("Unexpected generation number %v, status generation %v", storedRS.Generation, storedRS.Status.ObservedGeneration)
 	}
 
 	// Updates to spec should increment the generation number
 	storedRS.Spec.Replicas += 1
-	storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
-	if err != nil {
+	if _, _, err := storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	etcdRS, err = storage.ReplicaSet.Get(ctx, rs.Name, &metav1.GetOptions{})
@@ -186,8 +188,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to status should not increment either spec or status generation numbers
 	storedRS.Status.Replicas += 1
-	storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
-	if err != nil {
+	if _, _, err := storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	etcdRS, err = storage.ReplicaSet.Get(ctx, rs.Name, &metav1.GetOptions{})

@@ -431,7 +431,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	// if not, we reject the request.
 	hasNoCoveringQuota := limitedResourceNamesSet.Difference(restrictedResourcesSet)
 	if len(hasNoCoveringQuota) > 0 {
-		return quotas, fmt.Errorf("insufficient quota to consume: %v", strings.Join(hasNoCoveringQuota.List(), ","))
+		return quotas, admission.NewForbidden(a, fmt.Errorf("insufficient quota to consume: %v", strings.Join(hasNoCoveringQuota.List(), ",")))
 	}
 
 	if len(interestingQuotaIndexes) == 0 {

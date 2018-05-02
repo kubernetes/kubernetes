@@ -31,6 +31,7 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	ioutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -111,6 +112,12 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 	if err != nil {
 		return nil, err
 	}
+
+	if iscsiDisk != nil {
+
+		//Add volume metrics
+		iscsiDisk.MetricsProvider = volume.NewMetricsStatFS(iscsiDisk.GetPath())
+	}
 	return &iscsiDiskMounter{
 		iscsiDisk:    iscsiDisk,
 		fsType:       fsType,
@@ -118,7 +125,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 		exec:         exec,
 		deviceUtil:   ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
-		mountOptions: volume.MountOptionFromSpec(spec),
+		mountOptions: ioutil.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -163,10 +170,11 @@ func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volum
 func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.Unmounter, error) {
 	return &iscsiDiskUnmounter{
 		iscsiDisk: &iscsiDisk{
-			podUID:  podUID,
-			VolName: volName,
-			manager: manager,
-			plugin:  plugin,
+			podUID:          podUID,
+			VolName:         volName,
+			manager:         manager,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedNameForDisk(iscsiPluginName), volName)),
 		},
 		mounter: mounter,
 		exec:    exec,
@@ -235,7 +243,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 
 func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(iscsiPluginName)
-	blkutil := ioutil.NewBlockVolumePathHandler()
+	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 	globalMapPathUUID, err := blkutil.FindGlobalMapPathUUIDFromPod(pluginDir, mapPath, podUID)
 	if err != nil {
 		return nil, err
@@ -263,7 +271,7 @@ type iscsiDisk struct {
 	plugin         *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 func (iscsi *iscsiDisk) GetPath() string {

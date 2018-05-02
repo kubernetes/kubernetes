@@ -89,7 +89,7 @@ func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource schema.Group
 
 	if !groupExists {
 		// return the most preferred external version for the group
-		return groupMeta.GroupVersion, nil
+		return groupMeta.GroupVersions[0], nil
 	}
 
 	resourceOverride, resourceExists := groupEncoding.ExternalResourceEncodings[resource.Resource]

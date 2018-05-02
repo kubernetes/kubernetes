@@ -17,9 +17,10 @@ limitations under the License.
 package cronjob
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -39,7 +40,7 @@ var Strategy = cronJobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns Orphan because that was the default
 // behavior before the server-side garbage collection was implemented.
-func (cronJobStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+func (cronJobStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
 	return rest.OrphanDependents
 }
 
@@ -49,7 +50,7 @@ func (cronJobStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a scheduled job before creation.
-func (cronJobStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	cronJob := obj.(*batch.CronJob)
 	cronJob.Status = batch.CronJobStatus{}
 
@@ -57,7 +58,7 @@ func (cronJobStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runti
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (cronJobStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
 	newCronJob.Status = oldCronJob.Status
@@ -67,7 +68,7 @@ func (cronJobStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old 
 }
 
 // Validate validates a new scheduled job.
-func (cronJobStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
 	return validation.ValidateCronJob(cronJob)
 }
@@ -86,7 +87,7 @@ func (cronJobStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (cronJobStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateCronJobUpdate(obj.(*batch.CronJob), old.(*batch.CronJob))
 }
 
@@ -96,12 +97,12 @@ type cronJobStatusStrategy struct {
 
 var StatusStrategy = cronJobStatusStrategy{Strategy}
 
-func (cronJobStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (cronJobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.CronJob)
 	oldJob := old.(*batch.CronJob)
 	newJob.Spec = oldJob.Spec
 }
 
-func (cronJobStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (cronJobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }

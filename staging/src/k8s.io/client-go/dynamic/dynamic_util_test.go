@@ -43,7 +43,7 @@ func TestDiscoveryRESTMapper(t *testing.T) {
 		Kind:    "test_kind",
 	}
 
-	mapper, err := NewDiscoveryRESTMapper(resources, VersionInterfaces)
+	mapper, err := NewDiscoveryRESTMapper(resources)
 	if err != nil {
 		t.Fatalf("unexpected error creating mapper: %s", err)
 	}

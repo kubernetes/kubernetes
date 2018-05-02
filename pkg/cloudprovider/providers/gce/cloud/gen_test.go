@@ -38,7 +38,8 @@ func TestAddressesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyAlpha := meta.RegionalKey("key-alpha", "location")
@@ -172,7 +173,8 @@ func TestBackendServicesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyAlpha := meta.GlobalKey("key-alpha")
@@ -270,7 +272,8 @@ func TestDisksGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyAlpha := meta.ZonalKey("key-alpha", "location")
@@ -368,7 +371,8 @@ func TestFirewallsGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -430,7 +434,8 @@ func TestForwardingRulesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyAlpha := meta.RegionalKey("key-alpha", "location")
@@ -528,7 +533,8 @@ func TestGlobalAddressesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -590,7 +596,8 @@ func TestGlobalForwardingRulesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -652,7 +659,8 @@ func TestHealthChecksGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyAlpha := meta.GlobalKey("key-alpha")
@@ -750,7 +758,8 @@ func TestHttpHealthChecksGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -812,7 +821,8 @@ func TestHttpsHealthChecksGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -874,7 +884,8 @@ func TestInstanceGroupsGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.ZonalKey("key-ga", "location")
@@ -936,7 +947,8 @@ func TestInstancesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyAlpha := meta.ZonalKey("key-alpha", "location")
@@ -1070,7 +1082,8 @@ func TestNetworkEndpointGroupsGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyAlpha := meta.ZonalKey("key-alpha", "location")
@@ -1132,7 +1145,8 @@ func TestProjectsGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -1162,7 +1176,8 @@ func TestRegionBackendServicesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyAlpha := meta.RegionalKey("key-alpha", "location")
@@ -1260,7 +1275,8 @@ func TestRegionDisksGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyAlpha := meta.RegionalKey("key-alpha", "location")
@@ -1322,7 +1338,8 @@ func TestRegionsGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -1369,7 +1386,8 @@ func TestRoutesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -1431,7 +1449,8 @@ func TestSslCertificatesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -1493,7 +1512,8 @@ func TestTargetHttpProxiesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -1555,7 +1575,8 @@ func TestTargetHttpsProxiesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -1617,7 +1638,8 @@ func TestTargetPoolsGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.RegionalKey("key-ga", "location")
@@ -1679,7 +1701,8 @@ func TestUrlMapsGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")
@@ -1741,7 +1764,8 @@ func TestZonesGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 	keyGA := meta.GlobalKey("key-ga")

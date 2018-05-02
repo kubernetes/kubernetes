@@ -27,6 +27,9 @@ go_library(
         "@io_bazel_rules_go//go/platform:solaris": [
             "lookup_unix.go",
         ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "lookup_windows.go",
+        ],
         "//conditions:default": [],
     }),
     importpath = "github.com/opencontainers/runc/libcontainer/user",

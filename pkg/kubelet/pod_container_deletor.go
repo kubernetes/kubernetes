@@ -45,10 +45,8 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 	buffer := make(chan kubecontainer.ContainerID, containerDeletorBufferLimit)
 	go wait.Until(func() {
 		for {
-			select {
-			case id := <-buffer:
-				runtime.DeleteContainer(id)
-			}
+			id := <-buffer
+			runtime.DeleteContainer(id)
 		}
 	}, 0, wait.NeverStop)
 
@@ -101,6 +99,7 @@ func (p *podContainerDeletor) deleteContainersInPod(filterContainerID string, po
 	containersToKeep := p.containersToKeep
 	if removeAll {
 		containersToKeep = 0
+		filterContainerID = ""
 	}
 
 	for _, candidate := range getContainersToDeleteInPod(filterContainerID, podStatus, containersToKeep) {

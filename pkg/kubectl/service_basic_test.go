@@ -18,6 +18,7 @@ package kubectl
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -150,5 +151,171 @@ func TestServiceBasicGenerate(t *testing.T) {
 		if !reflect.DeepEqual(obj.(*v1.Service), test.expected) {
 			t.Errorf("test: %v\nexpected:\n%#v\nsaw:\n%#v", test.name, test.expected, obj.(*v1.Service))
 		}
+	}
+}
+
+func TestParsePorts(t *testing.T) {
+	tests := []struct {
+		portString       string
+		expectPort       int32
+		expectTargetPort intstr.IntOrString
+		expectErr        string
+	}{
+		{
+			portString:       "3232",
+			expectPort:       3232,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 3232},
+		},
+		{
+			portString:       "1:65535",
+			expectPort:       1,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 65535},
+		},
+		{
+			portString:       "-5:1234",
+			expectPort:       0,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			expectErr:        "must be between 1 and 65535, inclusive",
+		},
+		{
+			portString:       "5:65536",
+			expectPort:       0,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			expectErr:        "must be between 1 and 65535, inclusive",
+		},
+		{
+			portString:       "test-5:443",
+			expectPort:       0,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			expectErr:        "invalid syntax",
+		},
+		{
+			portString:       "5:test-443",
+			expectPort:       5,
+			expectTargetPort: intstr.IntOrString{Type: intstr.String, StrVal: "test-443"},
+		},
+		{
+			portString:       "5:test*443",
+			expectPort:       0,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			expectErr:        "must contain only alpha-numeric characters (a-z, 0-9), and hyphens (-)",
+		},
+		{
+			portString:       "5:",
+			expectPort:       0,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			expectErr:        "must contain at least one letter or number (a-z, 0-9)",
+		},
+		{
+			portString:       "5:test--443",
+			expectPort:       0,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			expectErr:        "must not contain consecutive hyphens",
+		},
+		{
+			portString:       "5:test443-",
+			expectPort:       0,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			expectErr:        "must not begin or end with a hyphen",
+		},
+		{
+			portString:       "3232:1234:4567",
+			expectPort:       3232,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 1234},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.portString, func(t *testing.T) {
+			port, targetPort, err := parsePorts(test.portString)
+			if len(test.expectErr) != 0 {
+				if !strings.Contains(err.Error(), test.expectErr) {
+					t.Errorf("parse ports string: %s. Expected err: %s, Got err: %v.", test.portString, test.expectErr, err)
+				}
+			}
+			if !reflect.DeepEqual(targetPort, test.expectTargetPort) || port != test.expectPort {
+				t.Errorf("parse ports string: %s. Expected port:%d, targetPort:%v, Got port:%d, targetPort:%v.", test.portString, test.expectPort, test.expectTargetPort, port, targetPort)
+			}
+		})
+	}
+}
+
+func TestValidateServiceCommonGeneratorV1(t *testing.T) {
+	tests := []struct {
+		name      string
+		s         ServiceCommonGeneratorV1
+		expectErr string
+	}{
+		{
+			name: "validate-ok",
+			s: ServiceCommonGeneratorV1{
+				Name:      "validate-ok",
+				Type:      v1.ServiceTypeClusterIP,
+				TCP:       []string{"123", "234:1234"},
+				ClusterIP: "",
+			},
+		},
+		{
+			name: "Name-none",
+			s: ServiceCommonGeneratorV1{
+				Type:      v1.ServiceTypeClusterIP,
+				TCP:       []string{"123", "234:1234"},
+				ClusterIP: "",
+			},
+			expectErr: "name must be specified",
+		},
+		{
+			name: "Type-none",
+			s: ServiceCommonGeneratorV1{
+				Name:      "validate-ok",
+				TCP:       []string{"123", "234:1234"},
+				ClusterIP: "",
+			},
+			expectErr: "type must be specified",
+		},
+		{
+			name: "invalid-ClusterIPNone",
+			s: ServiceCommonGeneratorV1{
+				Name:      "validate-ok",
+				Type:      v1.ServiceTypeNodePort,
+				TCP:       []string{"123", "234:1234"},
+				ClusterIP: v1.ClusterIPNone,
+			},
+			expectErr: "ClusterIP=None can only be used with ClusterIP service type",
+		},
+		{
+			name: "TCP-none",
+			s: ServiceCommonGeneratorV1{
+				Name:      "validate-ok",
+				Type:      v1.ServiceTypeClusterIP,
+				ClusterIP: "",
+			},
+			expectErr: "at least one tcp port specifier must be provided",
+		},
+		{
+			name: "invalid-ExternalName",
+			s: ServiceCommonGeneratorV1{
+				Name:         "validate-ok",
+				Type:         v1.ServiceTypeExternalName,
+				TCP:          []string{"123", "234:1234"},
+				ClusterIP:    "",
+				ExternalName: "@oi:test",
+			},
+			expectErr: "invalid service external name",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.s.validate()
+			if err != nil {
+				if !strings.Contains(err.Error(), test.expectErr) {
+					t.Errorf("validate:%s Expected err: %s, Got err: %v", test.name, test.expectErr, err)
+				}
+			}
+			if err == nil && len(test.expectErr) != 0 {
+				t.Errorf("validate:%s Expected success, Got err: %v", test.name, err)
+			}
+		})
 	}
 }

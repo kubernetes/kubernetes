@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -171,36 +172,50 @@ func (p *testPatcher) New() runtime.Object {
 	return &example.Pod{}
 }
 
-func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	currentPod := p.startingPod
-	if p.numUpdates > 0 {
-		currentPod = p.updatePod
-	}
-	p.numUpdates++
+func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	// Simulate GuaranteedUpdate behavior (retries internally on etcd changes if the incoming resource doesn't pin resourceVersion)
+	for {
+		currentPod := p.startingPod
+		if p.numUpdates > 0 {
+			currentPod = p.updatePod
+		}
+		p.numUpdates++
 
-	obj, err := objInfo.UpdatedObject(ctx, currentPod)
-	if err != nil {
-		return nil, false, err
-	}
-	inPod := obj.(*example.Pod)
-	if inPod.ResourceVersion != p.updatePod.ResourceVersion {
-		return nil, false, apierrors.NewConflict(example.Resource("pods"), inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
-	}
+		// Remember the current resource version
+		currentResourceVersion := currentPod.ResourceVersion
 
-	if currentPod == nil {
-		if err := createValidation(currentPod); err != nil {
+		obj, err := objInfo.UpdatedObject(ctx, currentPod)
+		if err != nil {
 			return nil, false, err
 		}
-	} else {
-		if err := updateValidation(currentPod, inPod); err != nil {
-			return nil, false, err
+		inPod := obj.(*example.Pod)
+		if inPod.ResourceVersion == "" || inPod.ResourceVersion == "0" {
+			inPod.ResourceVersion = p.updatePod.ResourceVersion
 		}
-	}
+		if inPod.ResourceVersion != p.updatePod.ResourceVersion {
+			// If the patch didn't have an opinion on the resource version, retry like GuaranteedUpdate does
+			if inPod.ResourceVersion == currentResourceVersion {
+				continue
+			}
+			// If the patch changed the resource version and it mismatches, conflict
+			return nil, false, apierrors.NewConflict(example.Resource("pods"), inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
+		}
 
-	return inPod, false, nil
+		if currentPod == nil {
+			if err := createValidation(currentPod); err != nil {
+				return nil, false, err
+			}
+		} else {
+			if err := updateValidation(currentPod, inPod); err != nil {
+				return nil, false, err
+			}
+		}
+
+		return inPod, false, nil
+	}
 }
 
-func (p *testPatcher) Get(ctx request.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (p *testPatcher) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	p.t.Fatal("Unexpected call to testPatcher.Get")
 	return nil, errors.New("Unexpected call to testPatcher.Get")
 }
@@ -251,15 +266,21 @@ type patchTestCase struct {
 
 	// startingPod is used as the starting point for the first Update
 	startingPod *example.Pod
-	// changedPod is the "destination" pod for the patch.  The test will create a patch from the startingPod to the changedPod
-	// to use when calling the patch operation
-	changedPod *example.Pod
+	// changedPod can be set as the "destination" pod for the patch, and the test will compute a patch from the startingPod to the changedPod,
+	// or patches can be set directly using strategicMergePatch, mergePatch, and jsonPatch
+	changedPod          *example.Pod
+	strategicMergePatch string
+	mergePatch          string
+	jsonPatch           string
+
 	// updatePod is the pod that is used for conflict comparison and as the starting point for the second Update
 	updatePod *example.Pod
 
 	// expectedPod is the pod that you expect to get back after the patch is complete
 	expectedPod   *example.Pod
 	expectedError string
+	// if set, indicates the number of times patching was expected to be attempted
+	expectedTries int
 }
 
 func (tc *patchTestCase) Run(t *testing.T) {
@@ -292,7 +313,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	convertor := runtime.UnsafeObjectConvertor(scheme)
 	kind := examplev1.SchemeGroupVersion.WithKind("Pod")
 	resource := examplev1.SchemeGroupVersion.WithResource("pods")
-	versionedObj := &examplev1.Pod{}
+	schemaReferenceObj := &examplev1.Pod{}
 
 	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
 		// This needs to be reset on each iteration.
@@ -302,53 +323,88 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			updatePod:   tc.updatePod,
 		}
 
-		// TODO SUPPORT THIS!
-		if patchType == types.JSONPatchType {
-			continue
-		}
 		t.Logf("Working with patchType %v", patchType)
-
-		originalObjJS, err := runtime.Encode(codec, tc.startingPod)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			continue
-		}
-		changedJS, err := runtime.Encode(codec, tc.changedPod)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			continue
-		}
 
 		patch := []byte{}
 		switch patchType {
 		case types.StrategicMergePatchType:
-			patch, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, changedJS, versionedObj)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", tc.name, err)
-				continue
+			patch = []byte(tc.strategicMergePatch)
+			if len(patch) == 0 {
+				originalObjJS, err := runtime.Encode(codec, tc.startingPod)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+				changedJS, err := runtime.Encode(codec, tc.changedPod)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+				patch, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, changedJS, schemaReferenceObj)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
 			}
 
 		case types.MergePatchType:
-			patch, err = jsonpatch.CreateMergePatch(originalObjJS, changedJS)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", tc.name, err)
+			patch = []byte(tc.mergePatch)
+			if len(patch) == 0 {
+				originalObjJS, err := runtime.Encode(codec, tc.startingPod)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+				changedJS, err := runtime.Encode(codec, tc.changedPod)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+				patch, err = jsonpatch.CreateMergePatch(originalObjJS, changedJS)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+			}
+
+		case types.JSONPatchType:
+			patch = []byte(tc.jsonPatch)
+			if len(patch) == 0 {
+				// TODO SUPPORT THIS!
 				continue
 			}
 
+		default:
+			t.Error("unsupported patch type")
 		}
 
-		resultObj, err := patchResource(
-			ctx,
-			admissionMutation,
-			rest.ValidateAllObjectFunc,
-			admissionValidation,
-			1*time.Second,
-			versionedObj,
-			testPatcher,
-			name,
-			patchType,
-			patch,
-			namer, creater, defaulter, convertor, kind, resource, codec, utiltrace.New("Patch"+name))
+		p := patcher{
+			namer:           namer,
+			creater:         creater,
+			defaulter:       defaulter,
+			unsafeConvertor: convertor,
+			kind:            kind,
+			resource:        resource,
+
+			createValidation: rest.ValidateAllObjectFunc,
+			updateValidation: admissionValidation,
+			admissionCheck:   admissionMutation,
+
+			codec: codec,
+
+			timeout: 1 * time.Second,
+
+			schemaReferenceObj: schemaReferenceObj,
+
+			restPatcher: testPatcher,
+			name:        name,
+			patchType:   patchType,
+			patchJS:     patch,
+
+			trace: utiltrace.New("Patch" + name),
+		}
+
+		resultObj, err := p.patchResource(ctx)
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -358,6 +414,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
 				continue
+			}
+		}
+
+		if tc.expectedTries > 0 {
+			if tc.expectedTries != testPatcher.numUpdates {
+				t.Errorf("%s: expected %d tries, got %d", tc.name, tc.expectedTries, testPatcher.numUpdates)
 			}
 		}
 
@@ -406,11 +468,11 @@ func TestNumberConversion(t *testing.T) {
 		},
 	}
 	versionedObjToUpdate := &examplev1.Pod{}
-	versionedObj := &examplev1.Pod{}
+	schemaReferenceObj := &examplev1.Pod{}
 
 	patchJS := []byte(`{"spec":{"terminationGracePeriodSeconds":42,"activeDeadlineSeconds":120}}`)
 
-	err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
+	err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, schemaReferenceObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -522,6 +584,73 @@ func TestPatchResourceWithVersionConflict(t *testing.T) {
 	tc.Run(t)
 }
 
+func TestPatchResourceWithStaleVersionConflict(t *testing.T) {
+	namespace := "bar"
+	name := "foo"
+	uid := types.UID("uid")
+
+	tc := &patchTestCase{
+		name: "TestPatchResourceWithStaleVersionConflict",
+
+		startingPod: &example.Pod{},
+		updatePod:   &example.Pod{},
+
+		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 2, new 1`,
+		expectedTries: 1,
+	}
+
+	// starting pod is at rv=2
+	tc.startingPod.Name = name
+	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
+	tc.startingPod.ResourceVersion = "2"
+	tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
+	// same pod is still in place when attempting to persist the update
+	tc.updatePod = tc.startingPod
+
+	// patches are submitted with a stale rv=1
+	tc.mergePatch = `{"metadata":{"resourceVersion":"1"},"spec":{"nodeName":"foo"}}`
+	tc.strategicMergePatch = `{"metadata":{"resourceVersion":"1"},"spec":{"nodeName":"foo"}}`
+
+	tc.Run(t)
+}
+
+func TestPatchResourceWithRacingVersionConflict(t *testing.T) {
+	namespace := "bar"
+	name := "foo"
+	uid := types.UID("uid")
+
+	tc := &patchTestCase{
+		name: "TestPatchResourceWithRacingVersionConflict",
+
+		startingPod: &example.Pod{},
+		updatePod:   &example.Pod{},
+
+		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 3, new 2`,
+		expectedTries: 2,
+	}
+
+	// starting pod is at rv=2
+	tc.startingPod.Name = name
+	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
+	tc.startingPod.ResourceVersion = "2"
+	tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
+
+	// pod with rv=3 is found when attempting to persist the update
+	tc.updatePod.Name = name
+	tc.updatePod.Namespace = namespace
+	tc.updatePod.UID = uid
+	tc.updatePod.ResourceVersion = "3"
+	tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
+
+	// patches are submitted with a rv=2
+	tc.mergePatch = `{"metadata":{"resourceVersion":"2"},"spec":{"nodeName":"foo"}}`
+	tc.strategicMergePatch = `{"metadata":{"resourceVersion":"2"},"spec":{"nodeName":"foo"}}`
+
+	tc.Run(t)
+}
+
 func TestPatchResourceWithConflict(t *testing.T) {
 	namespace := "bar"
 	name := "foo"
@@ -533,9 +662,10 @@ func TestPatchResourceWithConflict(t *testing.T) {
 		startingPod: &example.Pod{},
 		changedPod:  &example.Pod{},
 		updatePod:   &example.Pod{},
-
-		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 2, new 1`,
+		expectedPod: &example.Pod{},
 	}
+
+	// See issue #63104 for discussion of how much sense this makes.
 
 	tc.startingPod.Name = name
 	tc.startingPod.Namespace = namespace
@@ -557,6 +687,13 @@ func TestPatchResourceWithConflict(t *testing.T) {
 	tc.updatePod.ResourceVersion = "2"
 	tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
 	tc.updatePod.Spec.NodeName = "anywhere"
+
+	tc.expectedPod.Name = name
+	tc.expectedPod.Namespace = namespace
+	tc.expectedPod.UID = uid
+	tc.expectedPod.ResourceVersion = "2"
+	tc.expectedPod.APIVersion = examplev1.SchemeGroupVersion.String()
+	tc.expectedPod.Spec.NodeName = "there"
 
 	tc.Run(t)
 }

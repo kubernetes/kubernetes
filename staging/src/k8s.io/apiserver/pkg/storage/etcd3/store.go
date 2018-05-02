@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -29,7 +30,6 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -410,6 +410,15 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	}
 	// update version with cluster level revision
 	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "")
+}
+
+func (s *store) Count(key string) (int64, error) {
+	key = path.Join(s.pathPrefix, key)
+	getResp, err := s.client.KV.Get(context.Background(), key, clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)), clientv3.WithCountOnly())
+	if err != nil {
+		return 0, err
+	}
+	return getResp.Count, nil
 }
 
 // continueToken is a simple structured object for encoding the state of a continue token.

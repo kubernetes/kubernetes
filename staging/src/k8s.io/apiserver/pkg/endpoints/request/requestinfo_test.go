@@ -25,12 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-type fakeRL bool
-
-func (fakeRL) Stop()             {}
-func (f fakeRL) TryAccept() bool { return bool(f) }
-func (f fakeRL) Accept()         {}
-
 func TestGetAPIRequestInfo(t *testing.T) {
 	namespaceAll := metav1.NamespaceAll
 	successCases := []struct {

@@ -45,6 +45,5 @@ go_test(
         "runner_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/plugins",
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )

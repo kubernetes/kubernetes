@@ -29,7 +29,6 @@ go_test(
     name = "go_default_test",
     srcs = ["file_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/file",
     deps = [
         "//vendor/github.com/spf13/afero:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

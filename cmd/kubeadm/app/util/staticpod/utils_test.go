@@ -17,6 +17,9 @@ limitations under the License.
 package staticpod
 
 import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
@@ -24,9 +27,11 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestComponentResources(t *testing.T) {
@@ -53,6 +58,22 @@ func TestComponentProbe(t *testing.T) {
 			cfg: &kubeadmapi.MasterConfiguration{
 				API: kubeadmapi.API{
 					AdvertiseAddress: "",
+				},
+			},
+			component: kubeadmconstants.KubeAPIServer,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "127.0.0.1",
+		},
+		{
+			name: "default apiserver advertise address with http",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					AdvertiseAddress: "1.2.3.4",
+				},
+				FeatureGates: map[string]bool{
+					features.SelfHosting: true,
 				},
 			},
 			component: kubeadmconstants.KubeAPIServer,
@@ -144,48 +165,6 @@ func TestComponentProbe(t *testing.T) {
 			scheme:    v1.URISchemeHTTP,
 			expected:  "2001:db8::1",
 		},
-		{
-			name: "valid etcd probe using listen-client-urls IPv4 addresses",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{
-					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://1.2.3.4:2379,http://4.3.2.1:2379"},
-				},
-			},
-			component: kubeadmconstants.Etcd,
-			port:      1,
-			path:      "foo",
-			scheme:    v1.URISchemeHTTP,
-			expected:  "1.2.3.4",
-		},
-		{
-			name: "valid etcd probe using listen-client-urls IPv6 addresses",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{
-					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://[2001:db8::1]:2379,http://[2001:db8::2]:2379"},
-				},
-			},
-			component: kubeadmconstants.Etcd,
-			port:      1,
-			path:      "foo",
-			scheme:    v1.URISchemeHTTP,
-			expected:  "2001:db8::1",
-		},
-		{
-			name: "valid IPv4 etcd probe using hostname for listen-client-urls",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{
-					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://localhost:2379"},
-				},
-			},
-			component: kubeadmconstants.Etcd,
-			port:      1,
-			path:      "foo",
-			scheme:    v1.URISchemeHTTP,
-			expected:  "127.0.0.1",
-		},
 	}
 	for _, rt := range tests {
 		actual := ComponentProbe(rt.cfg, rt.component, rt.port, rt.path, rt.scheme)
@@ -208,6 +187,77 @@ func TestComponentProbe(t *testing.T) {
 			t.Errorf("%s test case failed:\n\texpected: %v\n\t  actual: %v",
 				rt.name, rt.scheme,
 				actual.Handler.HTTPGet.Scheme)
+		}
+	}
+}
+
+func TestEtcdProbe(t *testing.T) {
+	var tests = []struct {
+		name      string
+		cfg       *kubeadmapi.MasterConfiguration
+		component string
+		port      int
+		certsDir  string
+		cacert    string
+		cert      string
+		key       string
+		expected  string
+	}{
+		{
+			name: "valid etcd probe using listen-client-urls IPv4 addresses",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					ExtraArgs: map[string]string{
+						"listen-client-urls": "http://1.2.3.4:2379,http://4.3.2.1:2379"},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      1,
+			certsDir:  "secretsA",
+			cacert:    "ca1",
+			cert:      "cert1",
+			key:       "key1",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=1.2.3.4:1 --cacert=secretsA/ca1 --cert=secretsA/cert1 --key=secretsA/key1 get foo",
+		},
+		{
+			name: "valid etcd probe using listen-client-urls IPv6 addresses",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					ExtraArgs: map[string]string{
+						"listen-client-urls": "http://[2001:db8::1]:2379,http://[2001:db8::2]:2379"},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      1,
+			certsDir:  "secretsB",
+			cacert:    "ca2",
+			cert:      "cert2",
+			key:       "key2",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=2001:db8::1:1 --cacert=secretsB/ca2 --cert=secretsB/cert2 --key=secretsB/key2 get foo",
+		},
+		{
+			name: "valid IPv4 etcd probe using hostname for listen-client-urls",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					ExtraArgs: map[string]string{
+						"listen-client-urls": "http://localhost:2379"},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      1,
+			certsDir:  "secretsC",
+			cacert:    "ca3",
+			cert:      "cert3",
+			key:       "key3",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=127.0.0.1:1 --cacert=secretsC/ca3 --cert=secretsC/cert3 --key=secretsC/key3 get foo",
+		},
+	}
+	for _, rt := range tests {
+		actual := EtcdProbe(rt.cfg, rt.component, rt.port, rt.certsDir, rt.cacert, rt.cert, rt.key)
+		if actual.Handler.Exec.Command[2] != rt.expected {
+			t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
+				rt.name, rt.expected,
+				actual.Handler.Exec.Command[2])
 		}
 	}
 }
@@ -405,6 +455,76 @@ func TestGetExtraParameters(t *testing.T) {
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
 			t.Errorf("failed getExtraParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+		}
+	}
+}
+
+const (
+	validPod = `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - image: gcr.io/google_containers/etcd-amd64:3.1.11
+status: {}
+`
+	invalidPod = `---{ broken yaml @@@`
+)
+
+func TestReadStaticPodFromDisk(t *testing.T) {
+	tests := []struct {
+		description   string
+		podYaml       string
+		expectErr     bool
+		writeManifest bool
+	}{
+		{
+			description:   "valid pod is marshaled",
+			podYaml:       validPod,
+			writeManifest: true,
+			expectErr:     false,
+		},
+		{
+			description:   "invalid pod fails to unmarshal",
+			podYaml:       invalidPod,
+			writeManifest: true,
+			expectErr:     true,
+		},
+		{
+			description:   "non-existent file returns error",
+			podYaml:       ``,
+			writeManifest: false,
+			expectErr:     true,
+		},
+	}
+
+	for _, rt := range tests {
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+
+		manifestPath := filepath.Join(tmpdir, "pod.yaml")
+		if rt.writeManifest {
+			err := ioutil.WriteFile(manifestPath, []byte(rt.podYaml), 0644)
+			if err != nil {
+				t.Fatalf("Failed to write pod manifest\n%s\n\tfatal error: %v", rt.description, err)
+			}
+		}
+
+		_, actualErr := ReadStaticPodFromDisk(manifestPath)
+		if (actualErr != nil) != rt.expectErr {
+			t.Errorf(
+				"ReadStaticPodFromDisk failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+				rt.description,
+				rt.expectErr,
+				(actualErr != nil),
+				actualErr,
+			)
 		}
 	}
 }

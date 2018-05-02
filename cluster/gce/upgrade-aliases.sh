@@ -53,7 +53,7 @@ function detect-k8s-subnetwork() {
   local subnetwork_url=$(gcloud compute instances describe \
     ${KUBE_MASTER} --project=${PROJECT} --zone=${ZONE} \
     --format='value(networkInterfaces[0].subnetwork)')
-  if [ -n ${subnetwork_url} ]; then
+  if [[ -n ${subnetwork_url} ]]; then
     IP_ALIAS_SUBNETWORK=$(echo ${subnetwork_url##*/})
   fi
 }
@@ -161,8 +161,8 @@ export KUBE_GCE_ENABLE_IP_ALIASES=true
 export SECONDARY_RANGE_NAME="pods-default"
 export STORAGE_BACKEND="etcd3"
 export STORAGE_MEDIA_TYPE="application/vnd.kubernetes.protobuf"
-export ETCD_IMAGE=3.2.14
-export ETCD_VERSION=3.2.14
+export ETCD_IMAGE=3.2.18-0
+export ETCD_VERSION=3.2.18
 
 # Upgrade master with updated kube envs
 ${KUBE_ROOT}/cluster/gce/upgrade.sh -M -l

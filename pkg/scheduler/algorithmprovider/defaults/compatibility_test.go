@@ -480,7 +480,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "CheckVolumeBinding"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
-
 		  ],"priorities": [
 			{"name": "EqualPriority",   "weight": 2},
 			{"name": "ImageLocalityPriority",   "weight": 2},
@@ -505,6 +504,81 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "PodToleratesNodeTaints"},
 					{Name: "CheckNodeMemoryPressure"},
 					{Name: "CheckNodeDiskPressure"},
+					{Name: "CheckNodeCondition"},
+					{Name: "MaxEBSVolumeCount"},
+					{Name: "MaxGCEPDVolumeCount"},
+					{Name: "MaxAzureDiskVolumeCount"},
+					{Name: "MatchInterPodAffinity"},
+					{Name: "GeneralPredicates"},
+					{Name: "CheckVolumeBinding"},
+					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
+					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+				},
+				Priorities: []schedulerapi.PriorityPolicy{
+					{Name: "EqualPriority", Weight: 2},
+					{Name: "ImageLocalityPriority", Weight: 2},
+					{Name: "LeastRequestedPriority", Weight: 2},
+					{Name: "BalancedResourceAllocation", Weight: 2},
+					{Name: "SelectorSpreadPriority", Weight: 2},
+					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
+					{Name: "NodeAffinityPriority", Weight: 2},
+					{Name: "TaintTolerationPriority", Weight: 2},
+					{Name: "InterPodAffinityPriority", Weight: 2},
+					{Name: "MostRequestedPriority", Weight: 2},
+				},
+			},
+		},
+		// Do not change this JSON after the corresponding release has been tagged.
+		// A failure indicates backwards compatibility with the specified release was broken.
+		"1.10": {
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+			{"name": "MatchNodeSelector"},
+			{"name": "PodFitsResources"},
+			{"name": "PodFitsHostPorts"},
+			{"name": "HostName"},
+			{"name": "NoDiskConflict"},
+			{"name": "NoVolumeZoneConflict"},
+			{"name": "PodToleratesNodeTaints"},
+			{"name": "CheckNodeMemoryPressure"},
+			{"name": "CheckNodeDiskPressure"},
+			{"name": "CheckNodePIDPressure"},
+			{"name": "CheckNodeCondition"},
+			{"name": "MaxEBSVolumeCount"},
+			{"name": "MaxGCEPDVolumeCount"},
+			{"name": "MaxAzureDiskVolumeCount"},
+			{"name": "MatchInterPodAffinity"},
+			{"name": "GeneralPredicates"},
+			{"name": "CheckVolumeBinding"},
+			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
+			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
+		  ],"priorities": [
+			{"name": "EqualPriority",   "weight": 2},
+			{"name": "ImageLocalityPriority",   "weight": 2},
+			{"name": "LeastRequestedPriority",   "weight": 2},
+			{"name": "BalancedResourceAllocation",   "weight": 2},
+			{"name": "SelectorSpreadPriority",   "weight": 2},
+			{"name": "NodePreferAvoidPodsPriority",   "weight": 2},
+			{"name": "NodeAffinityPriority",   "weight": 2},
+			{"name": "TaintTolerationPriority",   "weight": 2},
+			{"name": "InterPodAffinityPriority",   "weight": 2},
+			{"name": "MostRequestedPriority",   "weight": 2}
+		  ]
+		}`,
+			ExpectedPolicy: schedulerapi.Policy{
+				Predicates: []schedulerapi.PredicatePolicy{
+					{Name: "MatchNodeSelector"},
+					{Name: "PodFitsResources"},
+					{Name: "PodFitsHostPorts"},
+					{Name: "HostName"},
+					{Name: "NoDiskConflict"},
+					{Name: "NoVolumeZoneConflict"},
+					{Name: "PodToleratesNodeTaints"},
+					{Name: "CheckNodeMemoryPressure"},
+					{Name: "CheckNodeDiskPressure"},
+					{Name: "CheckNodePIDPressure"},
 					{Name: "CheckNodeCondition"},
 					{Name: "MaxEBSVolumeCount"},
 					{Name: "MaxGCEPDVolumeCount"},
@@ -561,7 +635,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersions[0]}})
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 		if _, err := factory.NewConfigFactory(
@@ -579,6 +653,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			informerFactory.Storage().V1().StorageClasses(),
 			v1.DefaultHardPodAffinitySymmetricWeight,
 			enableEquivalenceCache,
+			false,
 		).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue

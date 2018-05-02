@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -34,12 +35,87 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/stretchr/testify/assert"
 )
 
 var testClusterName = "testCluster"
+
+func TestParseConfig(t *testing.T) {
+	azureConfig := `{
+		"aadClientCertPassword": "aadClientCertPassword",
+		"aadClientCertPath": "aadClientCertPath",
+		"aadClientId": "aadClientId",
+		"aadClientSecret": "aadClientSecret",
+		"cloud":"AzurePublicCloud",
+		"cloudProviderBackoff": true,
+		"cloudProviderBackoffDuration": 1,
+		"cloudProviderBackoffExponent": 1,
+		"cloudProviderBackoffJitter": 1,
+		"cloudProviderBackoffRetries": 1,
+		"cloudProviderRatelimit": true,
+		"cloudProviderRateLimitBucket": 1,
+		"CloudProviderRateLimitBucketWrite": 1,
+		"cloudProviderRateLimitQPS": 1,
+		"CloudProviderRateLimitQPSWrite": 1,
+		"location": "location",
+		"maximumLoadBalancerRuleCount": 1,
+		"primaryAvailabilitySetName": "primaryAvailabilitySetName",
+		"primaryScaleSetName": "primaryScaleSetName",
+		"resourceGroup": "resourceGroup",
+		"routeTableName": "routeTableName",
+		"securityGroupName": "securityGroupName",
+		"subnetName": "subnetName",
+		"subscriptionId": "subscriptionId",
+		"tenantId": "tenantId",
+		"useInstanceMetadata": true,
+		"useManagedIdentityExtension": true,
+		"vnetName": "vnetName",
+		"vnetResourceGroup": "vnetResourceGroup",
+		vmType: "standard"
+	}`
+	expected := &Config{
+		AzureAuthConfig: auth.AzureAuthConfig{
+			AADClientCertPassword:       "aadClientCertPassword",
+			AADClientCertPath:           "aadClientCertPath",
+			AADClientID:                 "aadClientId",
+			AADClientSecret:             "aadClientSecret",
+			Cloud:                       "AzurePublicCloud",
+			SubscriptionID:              "subscriptionId",
+			TenantID:                    "tenantId",
+			UseManagedIdentityExtension: true,
+		},
+		CloudProviderBackoff:              true,
+		CloudProviderBackoffDuration:      1,
+		CloudProviderBackoffExponent:      1,
+		CloudProviderBackoffJitter:        1,
+		CloudProviderBackoffRetries:       1,
+		CloudProviderRateLimit:            true,
+		CloudProviderRateLimitBucket:      1,
+		CloudProviderRateLimitBucketWrite: 1,
+		CloudProviderRateLimitQPS:         1,
+		CloudProviderRateLimitQPSWrite:    1,
+		Location:                          "location",
+		MaximumLoadBalancerRuleCount:      1,
+		PrimaryAvailabilitySetName:        "primaryAvailabilitySetName",
+		PrimaryScaleSetName:               "primaryScaleSetName",
+		ResourceGroup:                     "resourceGroup",
+		RouteTableName:                    "routeTableName",
+		SecurityGroupName:                 "securityGroupName",
+		SubnetName:                        "subnetName",
+		UseInstanceMetadata:               true,
+		VMType:                            "standard",
+		VnetName:                          "vnetName",
+		VnetResourceGroup:                 "vnetResourceGroup",
+	}
+
+	buffer := bytes.NewBufferString(azureConfig)
+	config, err := parseConfig(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, config)
+}
 
 // Test flipServiceInternalAnnotation
 func TestFlipServiceInternalAnnotation(t *testing.T) {
@@ -140,8 +216,8 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 		}
 
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lb := (*result.Value)[0]
-		lbCount := len(*result.Value)
+		lb := result.Values()[0]
+		lbCount := len(result.Values())
 		expectedNumOfLB := 1
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
@@ -190,14 +266,14 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 		// expected is MIN(index, availabilitySetCount)
 		expectedNumOfLB := int(math.Min(float64(index), float64(availabilitySetCount)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(*result.Value)
+		lbCount := len(result.Values())
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
 
 		maxRules := 0
 		minRules := serviceCount
-		for _, lb := range *result.Value {
+		for _, lb := range result.Values() {
 			ruleCount := len(*lb.LoadBalancingRules)
 			if ruleCount < minRules {
 				minRules = ruleCount
@@ -253,7 +329,7 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 		// expected is MIN(index, 2)
 		expectedNumOfLB := int(math.Min(float64(index), float64(2)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(*result.Value)
+		lbCount := len(result.Values())
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
@@ -291,7 +367,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 		// expected is MIN(index, az.Config.MaximumLoadBalancerRuleCount)
 		expectedNumOfLBRules := int(math.Min(float64(index), float64(az.Config.MaximumLoadBalancerRuleCount)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(*result.Value)
+		lbCount := len(result.Values())
 		if lbCount != expectedNumOfLBRules {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLBRules, lbCount)
 		}
@@ -361,7 +437,7 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 		// expected is MIN(index, availabilitySetCount)
 		expectedNumOfLB := int(math.Min(float64(index), float64(availabilitySetCount)))
 		result, _ := az.LoadBalancerClient.List(az.Config.ResourceGroup)
-		lbCount := len(*result.Value)
+		lbCount := len(result.Values())
 		if lbCount != expectedNumOfLB {
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
@@ -864,6 +940,7 @@ func getTestCloud() (az *Cloud) {
 			RouteTableName:               "rt",
 			PrimaryAvailabilitySetName:   "as",
 			MaximumLoadBalancerRuleCount: 250,
+			VMType: vmTypeStandard,
 		},
 	}
 	az.DisksClient = newFakeDisksClient()
@@ -990,8 +1067,10 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 			},
 		}
 
-		_, errChan := az.VirtualMachinesClient.CreateOrUpdate(az.Config.ResourceGroup, vmName, newVM, nil)
-		if err := <-errChan; err != nil {
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		_, err := az.VirtualMachinesClient.CreateOrUpdate(ctx, az.Config.ResourceGroup, vmName, newVM)
+		if err != nil {
 		}
 		// add to kubernetes
 		newNode := &v1.Node{
@@ -1237,12 +1316,12 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 		t.Errorf("Expected publicIP resource exists, when it is not an internal service")
 	}
 
-	if publicIP.Tags == nil || (*publicIP.Tags)["service"] == nil {
+	if publicIP.Tags == nil || publicIP.Tags["service"] == nil {
 		t.Errorf("Expected publicIP resource has tags[service]")
 	}
 
 	serviceName := getServiceName(service)
-	if serviceName != *(*publicIP.Tags)["service"] {
+	if serviceName != *(publicIP.Tags["service"]) {
 		t.Errorf("Expected publicIP resource has matching tags[service]")
 	}
 	// We cannot use service.Spec.LoadBalancerIP to compare with

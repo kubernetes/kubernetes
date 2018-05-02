@@ -17,6 +17,7 @@ limitations under the License.
 package tokenreview
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -36,11 +37,15 @@ func NewREST(tokenAuthenticator authenticator.Request) *REST {
 	return &REST{tokenAuthenticator: tokenAuthenticator}
 }
 
+func (r *REST) NamespaceScoped() bool {
+	return false
+}
+
 func (r *REST) New() runtime.Object {
 	return &authentication.TokenReview{}
 }
 
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	tokenReview, ok := obj.(*authentication.TokenReview)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a TokenReview: %#v", obj))

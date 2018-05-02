@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -155,6 +155,10 @@ message Webhook {
 
   // Rules describes what operations on what resources/subresources the webhook cares about.
   // The webhook cares about an operation if it matches _any_ Rule.
+  // However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks
+  // from putting the cluster in a state which cannot be recovered from without completely
+  // disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
+  // on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
   repeated RuleWithOperations rules = 3;
 
   // FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -246,9 +250,7 @@ message WebhookClientConfig {
   // 
   // If the webhook is running within the cluster, then you should use `service`.
   // 
-  // If there is only one port open for the service, that port will be
-  // used. If there are multiple ports open, port 443 will be used if it
-  // is open, otherwise it is an error.
+  // Port 443 will be used if it is open, otherwise it is an error.
   // 
   // +optional
   optional ServiceReference service = 1;

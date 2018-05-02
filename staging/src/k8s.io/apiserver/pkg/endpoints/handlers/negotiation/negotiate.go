@@ -119,32 +119,6 @@ func isPrettyPrint(req *http.Request) bool {
 	return false
 }
 
-// negotiate the most appropriate content type given the accept header and a list of
-// alternatives.
-func negotiate(header string, alternatives []string) (goautoneg.Accept, bool) {
-	alternates := make([][]string, 0, len(alternatives))
-	for _, alternate := range alternatives {
-		alternates = append(alternates, strings.SplitN(alternate, "/", 2))
-	}
-	for _, clause := range goautoneg.ParseAccept(header) {
-		for _, alternate := range alternates {
-			if clause.Type == alternate[0] && clause.SubType == alternate[1] {
-				return clause, true
-			}
-			if clause.Type == alternate[0] && clause.SubType == "*" {
-				clause.SubType = alternate[1]
-				return clause, true
-			}
-			if clause.Type == "*" && clause.SubType == "*" {
-				clause.Type = alternate[0]
-				clause.SubType = alternate[1]
-				return clause, true
-			}
-		}
-	}
-	return goautoneg.Accept{}, false
-}
-
 // EndpointRestrictions is an interface that allows content-type negotiation
 // to verify server support for specific options
 type EndpointRestrictions interface {

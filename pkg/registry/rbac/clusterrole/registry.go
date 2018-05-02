@@ -17,6 +17,8 @@ limitations under the License.
 package clusterrole
 
 import (
+	"context"
+
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -27,12 +29,12 @@ import (
 
 // Registry is an interface for things that know how to store ClusterRoles.
 type Registry interface {
-	ListClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleList, error)
-	CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc) error
-	UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
-	GetClusterRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error)
-	DeleteClusterRole(ctx genericapirequest.Context, name string) error
-	WatchClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	ListClusterRoles(ctx context.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleList, error)
+	CreateClusterRole(ctx context.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc) error
+	UpdateClusterRole(ctx context.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	GetClusterRole(ctx context.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error)
+	DeleteClusterRole(ctx context.Context, name string) error
+	WatchClusterRoles(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +48,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleList, error) {
+func (s *storage) ListClusterRoles(ctx context.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -55,21 +57,21 @@ func (s *storage) ListClusterRoles(ctx genericapirequest.Context, options *metai
 	return obj.(*rbac.ClusterRoleList), nil
 }
 
-func (s *storage) CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc) error {
+func (s *storage) CreateClusterRole(ctx context.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc) error {
 	_, err := s.Create(ctx, clusterRole, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+func (s *storage) UpdateClusterRole(ctx context.Context, clusterRole *rbac.ClusterRole, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
 	_, _, err := s.Update(ctx, clusterRole.Name, rest.DefaultUpdatedObjectInfo(clusterRole), createValidation, updateValidation)
 	return err
 }
 
-func (s *storage) WatchClusterRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchClusterRoles(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetClusterRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error) {
+func (s *storage) GetClusterRole(ctx context.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -77,7 +79,7 @@ func (s *storage) GetClusterRole(ctx genericapirequest.Context, name string, opt
 	return obj.(*rbac.ClusterRole), nil
 }
 
-func (s *storage) DeleteClusterRole(ctx genericapirequest.Context, name string) error {
+func (s *storage) DeleteClusterRole(ctx context.Context, name string) error {
 	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }

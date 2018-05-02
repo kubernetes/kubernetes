@@ -17,12 +17,12 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/object"
-	"golang.org/x/net/context"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"

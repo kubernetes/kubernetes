@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
 )
 
@@ -170,8 +171,8 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGB := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
-	name := volume.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // Cinder volume name can have up to 255 characters
+	volSizeGB := int(volutil.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	name := volutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // Cinder volume name can have up to 255 characters
 	vtype := ""
 	availability := ""
 	// Apply ProvisionerParameters (case-insensitive). We leave validation of
@@ -203,7 +204,7 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 		// if we did not get any zones, lets leave it blank and gophercloud will
 		// use zone "nova" as default
 		if len(zones) > 0 {
-			availability = volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
+			availability = volutil.ChooseZoneForVolume(zones, c.options.PVC.Name)
 		}
 	}
 

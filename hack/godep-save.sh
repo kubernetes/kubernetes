@@ -20,7 +20,6 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-source "${KUBE_ROOT}/hack/lib/util.sh"
 
 kube::log::status "Ensuring prereqs"
 kube::util::ensure_single_dir_gopath
@@ -59,6 +58,9 @@ REQUIRED_BINS=(
   "github.com/onsi/ginkgo/ginkgo"
   "github.com/jteeuwen/go-bindata/go-bindata"
   "github.com/tools/godep"
+  "github.com/client9/misspell/cmd/misspell"
+  "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
+  "github.com/kubernetes/repo-infra/kazel"
   "./..."
 )
 
@@ -81,10 +83,23 @@ done
 rm -rf vendor/github.com/docker/docker/project/
 
 kube::log::status "Updating BUILD files"
+# Assume that anything imported through godep doesn't need Bazel to build.
+# Prune out any Bazel build files, since these can break the build due to
+# missing dependencies that aren't included by godep.
+find vendor/ -type f \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE \) \
+  -exec rm -f {} \;
 hack/update-bazel.sh >/dev/null
 
 kube::log::status "Updating LICENSES file"
 hack/update-godep-licenses.sh >/dev/null
+
+kube::log::status "Creating OWNERS file"
+rm -f "Godeps/OWNERS" "vendor/OWNERS"
+cat <<__EOF__ > "Godeps/OWNERS"
+approvers:
+- dep-approvers
+__EOF__
+cp "Godeps/OWNERS" "vendor/OWNERS"
 
 # Clean up
 rm -rf "${BACKUP}"

@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["writer_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/util/flushwriter",
 )
 
 go_library(

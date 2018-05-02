@@ -13,7 +13,6 @@ go_test(
         "reconcile_rolebindings_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/rbac/reconciliation",
     deps = [
         "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/rbac:go_default_library",

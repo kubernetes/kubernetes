@@ -49,6 +49,14 @@ const (
 
 	vmTypeVMSS     = "vmss"
 	vmTypeStandard = "standard"
+
+	loadBalancerSkuBasic    = "basic"
+	loadBalancerSkuStandard = "standard"
+)
+
+var (
+	// Master nodes are not added to standard load balancer by default.
+	defaultExcludeMasterFromStandardLB = true
 )
 
 // Config holds the configuration parsed from the --cloud-config flag
@@ -97,19 +105,27 @@ type Config struct {
 	CloudProviderBackoffJitter float64 `json:"cloudProviderBackoffJitter" yaml:"cloudProviderBackoffJitter"`
 	// Enable rate limiting
 	CloudProviderRateLimit bool `json:"cloudProviderRateLimit" yaml:"cloudProviderRateLimit"`
-	// Rate limit QPS
+	// Rate limit QPS (Read)
 	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
 	// Rate limit Bucket Size
 	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
+	// Rate limit QPS (Write)
+	CloudProviderRateLimitQPSWrite float32 `json:"cloudProviderRateLimitQPSWrite" yaml:"cloudProviderRateLimitQPSWrite"`
+	// Rate limit Bucket Size
+	CloudProviderRateLimitBucketWrite int `json:"cloudProviderRateLimitBucketWrite" yaml:"cloudProviderRateLimitBucketWrite"`
 
 	// Use instance metadata service where possible
 	UseInstanceMetadata bool `json:"useInstanceMetadata" yaml:"useInstanceMetadata"`
 
-	// Use managed service identity for the virtual machine to access Azure ARM APIs
-	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension"`
+	// Sku of Load Balancer and Public IP. Candidate values are: basic and standard.
+	// If not set, it will be default to basic.
+	LoadBalancerSku string `json:"loadBalancerSku" yaml:"loadBalancerSku"`
+	// ExcludeMasterFromStandardLB excludes master nodes from standard load balancer.
+	// If not set, it will be default to true.
+	ExcludeMasterFromStandardLB *bool `json:"excludeMasterFromStandardLB" yaml:"excludeMasterFromStandardLB"`
 
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
-	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
+	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount" yaml:"maximumLoadBalancerRuleCount"`
 }
 
 // Cloud holds the config and clients
@@ -156,6 +172,11 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
+	if config.VMType == "" {
+		// default to standard vmType if not set.
+		config.VMType = vmTypeStandard
+	}
+
 	env, err := auth.ParseAzureEnvironment(config.Cloud)
 	if err != nil {
 		return nil, err
@@ -168,6 +189,10 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 
 	// operationPollRateLimiter.Accept() is a no-op if rate limits are configured off.
 	operationPollRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	operationPollRateLimiterWrite := flowcontrol.NewFakeAlwaysRateLimiter()
+
+	// If reader is provided (and no writer) we will
+	// use the same value for both.
 	if config.CloudProviderRateLimit {
 		// Assign rate limit defaults if no configuration was passed in
 		if config.CloudProviderRateLimitQPS == 0 {
@@ -176,19 +201,41 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		if config.CloudProviderRateLimitBucket == 0 {
 			config.CloudProviderRateLimitBucket = rateLimitBucketDefault
 		}
+		if config.CloudProviderRateLimitQPSWrite == 0 {
+			config.CloudProviderRateLimitQPSWrite = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimitBucketWrite == 0 {
+			config.CloudProviderRateLimitBucketWrite = rateLimitBucketDefault
+		}
+
 		operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
 			config.CloudProviderRateLimitQPS,
 			config.CloudProviderRateLimitBucket)
-		glog.V(2).Infof("Azure cloudprovider using rate limit config: QPS=%g, bucket=%d",
+
+		operationPollRateLimiterWrite = flowcontrol.NewTokenBucketRateLimiter(
+			config.CloudProviderRateLimitQPSWrite,
+			config.CloudProviderRateLimitBucketWrite)
+
+		glog.V(2).Infof("Azure cloudprovider (read ops) using rate limit config: QPS=%g, bucket=%d",
 			config.CloudProviderRateLimitQPS,
 			config.CloudProviderRateLimitBucket)
+
+		glog.V(2).Infof("Azure cloudprovider (write ops) using rate limit config: QPS=%g, bucket=%d",
+			config.CloudProviderRateLimitQPSWrite,
+			config.CloudProviderRateLimitBucketWrite)
+	}
+
+	// Do not add master nodes to standard LB by default.
+	if config.ExcludeMasterFromStandardLB == nil {
+		config.ExcludeMasterFromStandardLB = &defaultExcludeMasterFromStandardLB
 	}
 
 	azClientConfig := &azClientConfig{
 		subscriptionID:          config.SubscriptionID,
 		resourceManagerEndpoint: env.ResourceManagerEndpoint,
 		servicePrincipalToken:   servicePrincipalToken,
-		rateLimiter:             operationPollRateLimiter,
+		rateLimiterReader:       operationPollRateLimiter,
+		rateLimiterWriter:       operationPollRateLimiterWrite,
 	}
 	az := Cloud{
 		Config:      *config,

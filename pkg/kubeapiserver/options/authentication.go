@@ -18,14 +18,17 @@ package options
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
@@ -61,6 +64,8 @@ type OIDCAuthenticationOptions struct {
 	UsernamePrefix string
 	GroupsClaim    string
 	GroupsPrefix   string
+	SigningAlgs    []string
+	RequiredClaims map[string]string
 }
 
 type PasswordFileAuthenticationOptions struct {
@@ -68,8 +73,10 @@ type PasswordFileAuthenticationOptions struct {
 }
 
 type ServiceAccountAuthenticationOptions struct {
-	KeyFiles []string
-	Lookup   bool
+	KeyFiles     []string
+	Lookup       bool
+	Issuer       string
+	APIAudiences []string
 }
 
 type TokenFileAuthenticationOptions struct {
@@ -156,6 +163,12 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
 	}
 
+	if s.ServiceAccounts != nil && len(s.ServiceAccounts.Issuer) > 0 && strings.Contains(s.ServiceAccounts.Issuer, ":") {
+		if _, err := url.Parse(s.ServiceAccounts.Issuer); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
+		}
+	}
+
 	return allErrors
 }
 
@@ -208,6 +221,15 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"If provided, all groups will be prefixed with this value to prevent conflicts with "+
 			"other authentication strategies.")
 
+		fs.StringSliceVar(&s.OIDC.SigningAlgs, "oidc-signing-algs", []string{"RS256"}, ""+
+			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
+			"'alg' header value not in this list will be rejected. "+
+			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
+
+		fs.Var(flag.NewMapStringStringNoSplit(&s.OIDC.RequiredClaims), "oidc-required-claim", ""+
+			"A key=value pair that describes a required claim in the ID Token. "+
+			"If set, the claim is verified to be present in the ID Token with a matching value. "+
+			"Repeat this flag to specify multiple claims.")
 	}
 
 	if s.PasswordFile != nil {
@@ -223,11 +245,21 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	if s.ServiceAccounts != nil {
 		fs.StringArrayVar(&s.ServiceAccounts.KeyFiles, "service-account-key-file", s.ServiceAccounts.KeyFiles, ""+
 			"File containing PEM-encoded x509 RSA or ECDSA private or public keys, used to verify "+
-			"ServiceAccount tokens. If unspecified, --tls-private-key-file is used. "+
-			"The specified file can contain multiple keys, and the flag can be specified multiple times with different files.")
+			"ServiceAccount tokens. The specified file can contain multiple keys, and the flag can "+
+			"be specified multiple times with different files. If unspecified, "+
+			"--tls-private-key-file is used. Must be specified when "+
+			"--service-account-signing-key is provided")
 
 		fs.BoolVar(&s.ServiceAccounts.Lookup, "service-account-lookup", s.ServiceAccounts.Lookup,
 			"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
+
+		fs.StringVar(&s.ServiceAccounts.Issuer, "service-account-issuer", s.ServiceAccounts.Issuer, ""+
+			"Identifier of the service account token issuer. The issuer will assert this identifier "+
+			"in \"iss\" claim of issued tokens. This value is a string or URI.")
+
+		fs.StringSliceVar(&s.ServiceAccounts.APIAudiences, "service-account-api-audiences", s.ServiceAccounts.APIAudiences, ""+
+			"Identifiers of the API. The service account token authenticator will validate that "+
+			"tokens used against the API are bound to at least one of these audiences.")
 	}
 
 	if s.TokenFile != nil {
@@ -272,6 +304,8 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.OIDCIssuerURL = s.OIDC.IssuerURL
 		ret.OIDCUsernameClaim = s.OIDC.UsernameClaim
 		ret.OIDCUsernamePrefix = s.OIDC.UsernamePrefix
+		ret.OIDCSigningAlgs = s.OIDC.SigningAlgs
+		ret.OIDCRequiredClaims = s.OIDC.RequiredClaims
 	}
 
 	if s.PasswordFile != nil {
@@ -285,6 +319,8 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 	if s.ServiceAccounts != nil {
 		ret.ServiceAccountKeyFiles = s.ServiceAccounts.KeyFiles
 		ret.ServiceAccountLookup = s.ServiceAccounts.Lookup
+		ret.ServiceAccountIssuer = s.ServiceAccounts.Issuer
+		ret.ServiceAccountAPIAudiences = s.ServiceAccounts.APIAudiences
 	}
 
 	if s.TokenFile != nil {
@@ -338,17 +374,8 @@ func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltIn
 
 	// authorization ModeAlwaysAllow cannot be combined with AnonymousAuth.
 	// in such a case the AnonymousAuth is stomped to false and you get a message
-	if o.Anonymous.Allow {
-		found := false
-		for _, mode := range strings.Split(authorization.Mode, ",") {
-			if mode == authzmodes.ModeAlwaysAllow {
-				found = true
-				break
-			}
-		}
-		if found {
-			glog.Warningf("AnonymousAuth is not allowed with the AllowAll authorizer.  Resetting AnonymousAuth to false. You should use a different authorizer")
-			o.Anonymous.Allow = false
-		}
+	if o.Anonymous.Allow && sets.NewString(authorization.Modes...).Has(authzmodes.ModeAlwaysAllow) {
+		glog.Warningf("AnonymousAuth is not allowed with the AlwaysAllow authorizer. Resetting AnonymousAuth to false. You should use a different authorizer")
+		o.Anonymous.Allow = false
 	}
 }

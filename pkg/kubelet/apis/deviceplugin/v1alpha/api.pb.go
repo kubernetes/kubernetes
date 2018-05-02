@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -106,7 +106,7 @@ func (*Empty) ProtoMessage()               {}
 func (*Empty) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{1} }
 
 // ListAndWatch returns a stream of List of Devices
-// Whenever a Device state change or a Device disapears, ListAndWatch
+// Whenever a Device state changes or a Device disappears, ListAndWatch
 // returns the new list
 type ListAndWatchResponse struct {
 	Devices []*Device `protobuf:"bytes,1,rep,name=devices" json:"devices,omitempty"`
@@ -388,7 +388,7 @@ var _Registration_serviceDesc = grpc.ServiceDesc{
 
 type DevicePluginClient interface {
 	// ListAndWatch returns a stream of List of Devices
-	// Whenever a Device state change or a Device disapears, ListAndWatch
+	// Whenever a Device state changes or a Device disappears, ListAndWatch
 	// returns the new list
 	ListAndWatch(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DevicePlugin_ListAndWatchClient, error)
 	// Allocate is called during container creation so that the Device
@@ -450,7 +450,7 @@ func (c *devicePluginClient) Allocate(ctx context.Context, in *AllocateRequest, 
 
 type DevicePluginServer interface {
 	// ListAndWatch returns a stream of List of Devices
-	// Whenever a Device state change or a Device disapears, ListAndWatch
+	// Whenever a Device state changes or a Device disappears, ListAndWatch
 	// returns the new list
 	ListAndWatch(*Empty, DevicePlugin_ListAndWatchServer) error
 	// Allocate is called during container creation so that the Device

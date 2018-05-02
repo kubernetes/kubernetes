@@ -394,4 +394,16 @@ items:
 `))
 		Expect(err.Error()).To(Equal("[kind not set, apiVersion not set]"))
 	})
+
+	It("is fine with crd resource with List as a suffix kind name, which may not be a list of resources", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: fake.com/v1
+kind: FakeList
+metadata:
+  name: fake
+spec:
+  foo: bar
+`))
+		Expect(err).To(BeNil())
+	})
 })

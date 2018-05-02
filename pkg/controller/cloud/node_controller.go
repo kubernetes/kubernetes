@@ -38,22 +38,17 @@ import (
 	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	nodectrlutil "k8s.io/kubernetes/pkg/controller/util/node"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
-var (
-	UpdateNodeSpecBackoff = wait.Backoff{
-		Steps:    20,
-		Duration: 50 * time.Millisecond,
-		Jitter:   1.0}
-
-	ShutDownTaint = &v1.Taint{
-		Key:    algorithm.TaintNodeShutdown,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-)
+var UpdateNodeSpecBackoff = wait.Backoff{
+	Steps:    20,
+	Duration: 50 * time.Millisecond,
+	Jitter:   1.0,
+}
 
 type CloudNodeController struct {
 	nodeInformer coreinformers.NodeInformer
@@ -91,7 +86,7 @@ func NewCloudNodeController(
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
 		glog.V(0).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	} else {
 		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
 	}
@@ -105,8 +100,11 @@ func NewCloudNodeController(
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: cnc.AddCloudNode,
+	// Use shared informer to listen to add/update of nodes. Note that any nodes
+	// that exist before node controller starts will show up in the update method
+	cnc.nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    cnc.AddCloudNode,
+		UpdateFunc: cnc.UpdateCloudNode,
 	})
 
 	return cnc
@@ -156,7 +154,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 		return
 	}
 	// Node that isn't present according to the cloud provider shouldn't have its address updated
-	exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
+	exists, err := ensureNodeExistsByProviderIDOrInstanceID(instances, node)
 	if err != nil {
 		// Continue to update node address when not sure the node is not exists
 		glog.Errorf("%v", err)
@@ -250,25 +248,24 @@ func (cnc *CloudNodeController) MonitorNode() {
 				// we need to check this first to get taint working in similar in all cloudproviders
 				// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
 				// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
-				exists, err := instances.InstanceShutdownByProviderID(context.TODO(), node.Spec.ProviderID)
-				if err != nil && err != cloudprovider.NotImplemented {
+				shutdown, err := nodectrlutil.ShutdownInCloudProvider(context.TODO(), cnc.cloud, node)
+				if err != nil {
 					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
-					continue
 				}
 
-				if exists {
+				if shutdown && err == nil {
 					// if node is shutdown add shutdown taint
-					err = controller.AddOrUpdateTaintOnNode(cnc.kubeClient, node.Name, ShutDownTaint)
+					err = controller.AddOrUpdateTaintOnNode(cnc.kubeClient, node.Name, controller.ShutdownTaint)
 					if err != nil {
 						glog.Errorf("Error patching node taints: %v", err)
 					}
-					// Continue checking the remaining nodes since the current one is fine.
+					// Continue checking the remaining nodes since the current one is shutdown.
 					continue
 				}
 
 				// Check with the cloud provider to see if the node still exists. If it
 				// doesn't, delete the node immediately.
-				exists, err = ensureNodeExistsByProviderIDOrExternalID(instances, node)
+				exists, err := ensureNodeExistsByProviderIDOrInstanceID(instances, node)
 				if err != nil {
 					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
 					continue
@@ -300,7 +297,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 
 			} else {
 				// if taint exist remove taint
-				err = controller.RemoveTaintOffNode(cnc.kubeClient, node.Name, node, ShutDownTaint)
+				err = controller.RemoveTaintOffNode(cnc.kubeClient, node.Name, node, controller.ShutdownTaint)
 				if err != nil {
 					glog.Errorf("Error patching node taints: %v", err)
 				}
@@ -309,19 +306,27 @@ func (cnc *CloudNodeController) MonitorNode() {
 	}
 }
 
+func (cnc *CloudNodeController) UpdateCloudNode(_, newObj interface{}) {
+	if _, ok := newObj.(*v1.Node); !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
+		return
+	}
+	cnc.AddCloudNode(newObj)
+}
+
 // This processes nodes that were added into the cluster, and cloud initialize them if appropriate
 func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 	node := obj.(*v1.Node)
 
-	instances, ok := cnc.cloud.Instances()
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
-		return
-	}
-
 	cloudTaint := getCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
 		glog.V(2).Infof("This node %s is registered without the cloud taint. Will not process.", node.Name)
+		return
+	}
+
+	instances, ok := cnc.cloud.Instances()
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
 		return
 	}
 
@@ -433,16 +438,14 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 	return newTaints
 }
 
-// ensureNodeExistsByProviderIDOrExternalID first checks if the instance exists by the provider id and then by calling external id with node name
-func ensureNodeExistsByProviderIDOrExternalID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
+// ensureNodeExistsByProviderIDOrInstanceID first checks if the instance exists by the provider id and then by calling instance id with node name
+func ensureNodeExistsByProviderIDOrInstanceID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
 	exists, err := instances.InstanceExistsByProviderID(context.TODO(), node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		_, err = instances.ExternalID(context.TODO(), types.NodeName(node.Name))
+		_, err = instances.InstanceID(context.TODO(), types.NodeName(node.Name))
+		//TODO(anupn): Changing the check as InstanceID does not return error
 		if err == nil {
-			return true, nil
-		}
-		if err == cloudprovider.InstanceNotFound {
 			return false, nil
 		}
 

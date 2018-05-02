@@ -14,7 +14,6 @@ go_test(
         "transport_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/transport",
 )
 
 go_library(

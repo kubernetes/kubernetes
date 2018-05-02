@@ -31,8 +31,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // ActualStateOfWorld defines a set of thread-safe operations supported on
@@ -131,8 +131,8 @@ type ActualStateOfWorld interface {
 type AttachedVolume struct {
 	operationexecutor.AttachedVolume
 
-	// MountedByNode indicates that this volume has been been mounted by the
-	// node and is unsafe to detach.
+	// MountedByNode indicates that this volume has been mounted by the node and
+	// is unsafe to detach.
 	// The value is set and unset by SetVolumeMountedByNode(...).
 	MountedByNode bool
 
@@ -275,7 +275,7 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 				err)
 		}
 
-		volumeName, err = volumehelper.GetUniqueVolumeNameFromSpec(
+		volumeName, err = util.GetUniqueVolumeNameFromSpec(
 			attachableVolumePlugin, volumeSpec)
 		if err != nil {
 			return "", fmt.Errorf(
@@ -473,7 +473,7 @@ func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeN
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
 	if !nodeToUpdateExists {
 		// should not happen
-		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t because nodeName=%q  does not exist",
+		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t, because nodeName=%q does not exist",
 			needed, nodeName)
 		return fmt.Errorf(errMsg)
 	}

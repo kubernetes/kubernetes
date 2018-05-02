@@ -19,7 +19,7 @@ package v1beta1
 const (
 	// Healthy means that the device is healty
 	Healthy = "Healthy"
-	// UnHealthy means that the device is unhealty
+	// UnHealthy means that the device is unhealthy
 	Unhealthy = "Unhealthy"
 
 	// Current version of the API supported by kubelet
@@ -30,4 +30,8 @@ const (
 	DevicePluginPath = "/var/lib/kubelet/device-plugins/"
 	// KubeletSocket is the path of the Kubelet registry socket
 	KubeletSocket = DevicePluginPath + "kubelet.sock"
+	// Timeout duration in secs for PreStartContainer RPC
+	KubeletPreStartContainerRPCTimeoutInSecs = 30
 )
+
+var SupportedVersions = [...]string{"v1beta1"}

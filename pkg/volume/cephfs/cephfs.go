@@ -148,7 +148,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			readonly:     readOnly,
 			mounter:      mounter,
 			plugin:       plugin,
-			mountOptions: volume.MountOptionFromSpec(spec),
+			mountOptions: util.MountOptionFromSpec(spec),
 		},
 	}, nil
 }
@@ -323,7 +323,7 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	}
 	src += hosts[i] + ":" + cephfsVolume.path
 
-	mountOptions := volume.JoinMountOptions(cephfsVolume.mountOptions, opt)
+	mountOptions := util.JoinMountOptions(cephfsVolume.mountOptions, opt)
 	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
 	}
@@ -405,6 +405,8 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	mountArgs = append(mountArgs, mountpoint)
 	mountArgs = append(mountArgs, "-r")
 	mountArgs = append(mountArgs, cephfsVolume.path)
+	mountArgs = append(mountArgs, "--id")
+	mountArgs = append(mountArgs, cephfsVolume.id)
 
 	glog.V(4).Infof("Mounting cmd ceph-fuse with arguments (%s)", mountArgs)
 	command := exec.Command("ceph-fuse", mountArgs...)

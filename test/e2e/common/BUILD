@@ -41,6 +41,7 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/version:go_default_library",
@@ -65,6 +66,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/scale:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )

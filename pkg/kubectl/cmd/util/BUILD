@@ -1,14 +1,10 @@
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "cached_discovery.go",
-        "clientcache.go",
+        "conversion.go",
         "factory.go",
         "factory_builder.go",
         "factory_client_access.go",
@@ -18,9 +14,7 @@ go_library(
         "shortcut_restmapper.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS",
-    ],
+    visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps:go_default_library",
@@ -30,7 +24,6 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/categories:go_default_library",
@@ -65,11 +58,8 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
@@ -81,7 +71,6 @@ go_library(
         "//vendor/k8s.io/client-go/scale:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/util/homedir:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
@@ -95,14 +84,7 @@ go_test(
         "helpers_test.go",
         "shortcut_restmapper_test.go",
     ],
-    data = [
-        "//api/swagger-spec",
-    ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
-    visibility = [
-        "//build/visible_to:COMMON_testing",
-    ],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -123,6 +105,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta/testrestmapper:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -132,13 +115,10 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/rest/fake:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
@@ -147,6 +127,7 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
 )
 
 filegroup(

@@ -25,7 +25,6 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["initializer_test.go"],
-    importpath = "k8s.io/apiserver/pkg/admission/initializer_test",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",

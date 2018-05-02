@@ -170,7 +170,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 		var pvclaims []*v1.PersistentVolumeClaim
 		for j := 0; j < volumesPerPod; j++ {
 			currsc := sc[((i*numPods)+j)%len(sc)]
-			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", currsc))
+			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", currsc))
 			Expect(err).NotTo(HaveOccurred())
 			pvclaims = append(pvclaims, pvclaim)
 		}

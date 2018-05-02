@@ -30,19 +30,32 @@ import (
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
+// Payload represents a local copy of a config source (payload) object
+type Payload interface {
+	// UID returns a globally unique (space and time) identifier for the payload.
+	UID() string
+
+	// Files returns a map of filenames to file contents.
+	Files() map[string]string
+
+	// object returns the underlying checkpointed object.
+	object() interface{}
+}
+
 // RemoteConfigSource represents a remote config source object that can be downloaded as a Checkpoint
 type RemoteConfigSource interface {
-	// UID returns the UID of the remote config source object
+	// UID returns a globally unique identifier of the source described by the remote config source object
 	UID() string
 	// APIPath returns the API path to the remote resource, e.g. its SelfLink
 	APIPath() string
-	// Download downloads the remote config source object returns a Checkpoint backed by the object,
+	// Download downloads the remote config source object returns a Payload backed by the object,
 	// or a sanitized failure reason and error if the download fails
-	Download(client clientset.Interface) (Checkpoint, string, error)
+	Download(client clientset.Interface) (Payload, string, error)
 	// Encode returns a []byte representation of the object behind the RemoteConfigSource
 	Encode() ([]byte, error)
 
-	// object returns the underlying source object. If you want to compare sources for equality, use EqualRemoteConfigSources,
+	// object returns the underlying source object.
+	// If you want to compare sources for equality, use EqualRemoteConfigSources,
 	// which compares the underlying source objects for semantic API equality.
 	object() interface{}
 }
@@ -70,7 +83,7 @@ func NewRemoteConfigSource(source *apiv1.NodeConfigSource) (RemoteConfigSource, 
 }
 
 // DecodeRemoteConfigSource is a helper for using the apimachinery to decode serialized RemoteConfigSources;
-// e.g. the objects stored in the .cur and .lkg files by checkpoint/store/fsstore.go
+// e.g. the metadata stored by checkpoint/store/fsstore.go
 func DecodeRemoteConfigSource(data []byte) (RemoteConfigSource, error) {
 	// decode the remote config source
 	obj, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
@@ -97,16 +110,15 @@ func EqualRemoteConfigSources(a, b RemoteConfigSource) bool {
 	if a != nil && b != nil {
 		return apiequality.Semantic.DeepEqual(a.object(), b.object())
 	}
-	if a == nil && b == nil {
-		return true
-	}
-	return false
+	return a == b
 }
 
 // remoteConfigMap implements RemoteConfigSource for v1/ConfigMap config sources
 type remoteConfigMap struct {
 	source *apiv1.NodeConfigSource
 }
+
+var _ RemoteConfigSource = (*remoteConfigMap)(nil)
 
 func (r *remoteConfigMap) UID() string {
 	return string(r.source.ConfigMapRef.UID)
@@ -119,7 +131,7 @@ func (r *remoteConfigMap) APIPath() string {
 	return fmt.Sprintf(configMapAPIPathFmt, ref.Namespace, ref.Name)
 }
 
-func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, string, error) {
+func (r *remoteConfigMap) Download(client clientset.Interface) (Payload, string, error) {
 	var reason string
 	uid := string(r.source.ConfigMapRef.UID)
 
@@ -138,18 +150,18 @@ func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, stri
 		return nil, reason, fmt.Errorf(reason)
 	}
 
-	checkpoint, err := NewConfigMapCheckpoint(cm)
+	payload, err := NewConfigMapPayload(cm)
 	if err != nil {
 		reason = fmt.Sprintf("invalid downloaded object")
 		return nil, reason, fmt.Errorf("%s, error: %v", reason, err)
 	}
 
 	utillog.Infof("successfully downloaded ConfigMap with UID %q", uid)
-	return checkpoint, "", nil
+	return payload, "", nil
 }
 
 func (r *remoteConfigMap) Encode() ([]byte, error) {
-	encoder, err := utilcodec.NewJSONEncoder(apiv1.GroupName)
+	encoder, err := utilcodec.NewYAMLEncoder(apiv1.GroupName)
 	if err != nil {
 		return nil, err
 	}

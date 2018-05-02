@@ -53,7 +53,8 @@ type ContainerManager interface {
 	// Attach prepares a streaming endpoint to attach to a running container, and returns the address.
 	Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error)
 	// ReopenContainerLog asks runtime to reopen the stdout/stderr log file
-	// for the container.
+	// for the container. If it returns error, new container log file MUST NOT
+	// be created.
 	ReopenContainerLog(ContainerID string) error
 }
 

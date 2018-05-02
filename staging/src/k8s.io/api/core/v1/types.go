@@ -446,7 +446,7 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource `json:"storageos,omitempty" protobuf:"bytes,21,opt,name=storageos"`
-	// CSI represents storage that handled by an external CSI driver
+	// CSI represents storage that handled by an external CSI driver (Beta feature).
 	// +optional
 	CSI *CSIPersistentVolumeSource `json:"csi,omitempty" protobuf:"bytes,22,opt,name=csi"`
 }
@@ -458,10 +458,6 @@ const (
 
 	// MountOptionAnnotation defines mount option annotation used in PVs
 	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
-
-	// AlphaStorageNodeAffinityAnnotation defines node affinity policies for a PersistentVolume.
-	// Value is a string of the json representation of type NodeAffinity
-	AlphaStorageNodeAffinityAnnotation = "volume.alpha.kubernetes.io/node-affinity"
 )
 
 // +genclient
@@ -511,8 +507,9 @@ type PersistentVolumeSpec struct {
 	// +optional
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" protobuf:"bytes,4,opt,name=claimRef"`
 	// What happens to a persistent volume when released from its claim.
-	// Valid options are Retain (default) and Recycle.
-	// Recycling must be supported by the volume plugin underlying this persistent volume.
+	// Valid options are Retain (default for manually created PersistentVolumes), Delete (default
+	// for dynamically provisioned PersistentVolumes), and Recycle (deprecated).
+	// Recycle must be supported by the volume plugin underlying this PersistentVolume.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
@@ -530,6 +527,16 @@ type PersistentVolumeSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
+	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+	// This field influences the scheduling of pods that use this volume.
+	// +optional
+	NodeAffinity *VolumeNodeAffinity `json:"nodeAffinity,omitempty" protobuf:"bytes,9,opt,name=nodeAffinity"`
+}
+
+// VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+type VolumeNodeAffinity struct {
+	// Required specifies hard node constraints that must be met.
+	Required *NodeSelector `json:"required,omitempty" protobuf:"bytes,1,opt,name=required"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
@@ -1010,8 +1017,8 @@ type FlockerVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
-	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
+	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node, assume anything we don't explicitly handle is this
+	StorageMediumMemory    StorageMedium = "Memory"    // use memory (e.g. tmpfs on linux)
 	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
 )
 
@@ -1717,7 +1724,7 @@ type LocalVolumeSource struct {
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 }
 
-// Represents storage that is managed by an external CSI volume driver
+// Represents storage that is managed by an external CSI volume driver (Beta feature)
 type CSIPersistentVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
 	// Required.
@@ -1738,6 +1745,34 @@ type CSIPersistentVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
+
+	// Attributes of the volume to publish.
+	// +optional
+	VolumeAttributes map[string]string `json:"volumeAttributes,omitempty" protobuf:"bytes,5,rep,name=volumeAttributes"`
+
+	// ControllerPublishSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// ControllerPublishVolume and ControllerUnpublishVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secrets are passed.
+	// +optional
+	ControllerPublishSecretRef *SecretReference `json:"controllerPublishSecretRef,omitempty" protobuf:"bytes,6,opt,name=controllerPublishSecretRef"`
+
+	// NodeStageSecretRef is a reference to the secret object containing sensitive
+	// information to pass to the CSI driver to complete the CSI NodeStageVolume
+	// and NodeStageVolume and NodeUnstageVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secrets are passed.
+	// +optional
+	NodeStageSecretRef *SecretReference `json:"nodeStageSecretRef,omitempty" protobuf:"bytes,7,opt,name=nodeStageSecretRef"`
+
+	// NodePublishSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// NodePublishVolume and NodeUnpublishVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secrets are passed.
+	// +optional
+	NodePublishSecretRef *SecretReference `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,8,opt,name=nodePublishSecretRef"`
 }
 
 // ContainerPort represents a network port in a single container.
@@ -1783,8 +1818,7 @@ type VolumeMount struct {
 	// mountPropagation determines how mounts are propagated from the host
 	// to container and the other way around.
 	// When not set, MountPropagationHostToContainer is used.
-	// This field is alpha in 1.8 and can be reworked or removed in a future
-	// release.
+	// This field is beta in 1.10.
 	// +optional
 	MountPropagation *MountPropagationMode `json:"mountPropagation,omitempty" protobuf:"bytes,5,opt,name=mountPropagation,casttype=MountPropagationMode"`
 }
@@ -2808,7 +2842,6 @@ type PodSpec struct {
 	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy
 	// explicitly to 'ClusterFirstWithHostNet'.
-	// Note that 'None' policy is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
 	// +optional
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
@@ -2851,6 +2884,15 @@ type PodSpec struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	HostIPC bool `json:"hostIPC,omitempty" protobuf:"varint,13,opt,name=hostIPC"`
+	// Share a single process namespace between all of the containers in a pod.
+	// When this is set containers will be able to view and signal processes from other containers
+	// in the same pod, and the first process in each container will not be assigned PID 1.
+	// HostPID and ShareProcessNamespace cannot both be set.
+	// Optional: Default to false.
+	// This field is alpha-level and is honored only by servers that enable the PodShareProcessNamespace feature.
+	// +k8s:conversion-gen=false
+	// +optional
+	ShareProcessNamespace *bool `json:"shareProcessNamespace,omitempty" protobuf:"varint,27,opt,name=shareProcessNamespace"`
 	// SecurityContext holds pod-level security attributes and common container settings.
 	// Optional: Defaults to empty.  See type description for default values of each field.
 	// +optional
@@ -2905,7 +2947,6 @@ type PodSpec struct {
 	// Specifies the DNS parameters of a pod.
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.
-	// This is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
 	// +optional
 	DNSConfig *PodDNSConfig `json:"dnsConfig,omitempty" protobuf:"bytes,26,opt,name=dnsConfig"`
 }
@@ -2937,6 +2978,13 @@ type PodSecurityContext struct {
 	// for that container.
 	// +optional
 	RunAsUser *int64 `json:"runAsUser,omitempty" protobuf:"varint,2,opt,name=runAsUser"`
+	// The GID to run the entrypoint of the container process.
+	// Uses runtime default if unset.
+	// May also be set in SecurityContext.  If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence
+	// for that container.
+	// +optional
+	RunAsGroup *int64 `json:"runAsGroup,omitempty" protobuf:"varint,6,opt,name=runAsGroup"`
 	// Indicates that the container must run as a non-root user.
 	// If true, the Kubelet will validate the image at runtime to ensure that it
 	// does not run as UID 0 (root) and fail to start the container if it does.
@@ -3675,7 +3723,8 @@ type Endpoints struct {
 	// subsets for the different ports. No address will appear in both Addresses and
 	// NotReadyAddresses in the same subset.
 	// Sets of addresses and ports that comprise a service.
-	Subsets []EndpointSubset `json:"subsets" protobuf:"bytes,2,rep,name=subsets"`
+	// +optional
+	Subsets []EndpointSubset `json:"subsets,omitempty" protobuf:"bytes,2,rep,name=subsets"`
 }
 
 // EndpointSubset is a group of addresses with a common set of ports. The
@@ -3962,10 +4011,12 @@ const (
 	NodeMemoryPressure NodeConditionType = "MemoryPressure"
 	// NodeDiskPressure means the kubelet is under pressure due to insufficient available disk.
 	NodeDiskPressure NodeConditionType = "DiskPressure"
+	// NodePIDPressure means the kubelet is under pressure due to insufficient available PID.
+	NodePIDPressure NodeConditionType = "PIDPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
-	// NodeConfigOK indicates whether the kubelet is correctly configured
-	NodeConfigOK NodeConditionType = "ConfigOK"
+	// NodeKubeletConfigOk indicates whether the kubelet is correctly configured
+	NodeKubeletConfigOk NodeConditionType = "KubeletConfigOk"
 )
 
 // NodeCondition contains condition information for a node.
@@ -4025,8 +4076,6 @@ const (
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	// The resource name for ResourceEphemeralStorage is alpha and it can change across releases.
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
-	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
-	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
 )
 
 const (
@@ -4733,6 +4782,8 @@ const (
 	// HugePages request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	// As burst is not supported for HugePages, we would only quota its request, and ignore the limit.
 	ResourceRequestsHugePagesPrefix = "requests.hugepages-"
+	// Default resource requests prefix
+	DefaultResourceRequestsPrefix = "requests."
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota
@@ -5114,6 +5165,12 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	RunAsUser *int64 `json:"runAsUser,omitempty" protobuf:"varint,4,opt,name=runAsUser"`
+	// The GID to run the entrypoint of the container process.
+	// Uses runtime default if unset.
+	// May also be set in PodSecurityContext.  If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// +optional
+	RunAsGroup *int64 `json:"runAsGroup,omitempty" protobuf:"varint,8,opt,name=runAsGroup"`
 	// Indicates that the container must run as a non-root user.
 	// If true, the Kubelet will validate the image at runtime to ensure that it
 	// does not run as UID 0 (root) and fail to start the container if it does.

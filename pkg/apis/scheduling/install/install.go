@@ -22,29 +22,27 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
 )
 
 func init() {
-	Install(legacyscheme.GroupFactoryRegistry, legacyscheme.Registry, legacyscheme.Scheme)
+	Install(legacyscheme.Registry, legacyscheme.Scheme)
 }
 
 // Install registers the API group and adds types to a scheme
-func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
+func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  scheduling.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			RootScopedKinds:            sets.NewString("PriorityClass"),
 			AddInternalObjectsToScheme: scheduling.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
 			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
 		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
+	).Register(registry, scheme); err != nil {
 		panic(err)
 	}
 }

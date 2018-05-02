@@ -34,7 +34,6 @@ import (
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 const (
@@ -79,6 +78,10 @@ var _ volume.ProvisionableVolumePlugin = &cinderPlugin{}
 const (
 	cinderVolumePluginName = "kubernetes.io/cinder"
 )
+
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(cinderVolumePluginName), volName)
+}
 
 func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
@@ -136,16 +139,17 @@ func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 
 	return &cinderVolumeMounter{
 		cinderVolume: &cinderVolume{
-			podUID:  podUID,
-			volName: spec.Name(),
-			pdName:  pdName,
-			mounter: mounter,
-			manager: manager,
-			plugin:  plugin,
+			podUID:          podUID,
+			volName:         spec.Name(),
+			pdName:          pdName,
+			mounter:         mounter,
+			manager:         manager,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
-		blockDeviceMounter: volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		blockDeviceMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
 }
 
 func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -155,11 +159,12 @@ func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &cinderVolumeUnmounter{
 		&cinderVolume{
-			podUID:  podUID,
-			volName: volName,
-			manager: manager,
-			mounter: mounter,
-			plugin:  plugin,
+			podUID:          podUID,
+			volName:         volName,
+			manager:         manager,
+			mounter:         mounter,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 		}}, nil
 }
 
@@ -304,7 +309,7 @@ type cinderVolume struct {
 	// diskMounter provides the interface that is used to mount the actual block device.
 	blockDeviceMounter mount.Interface
 	plugin             *cinderPlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 func (b *cinderVolumeMounter) GetAttributes() volume.Attributes {
@@ -398,8 +403,7 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 }
 
 func (cd *cinderVolume) GetPath() string {
-	name := cinderVolumePluginName
-	return cd.plugin.host.GetPodVolumeDir(cd.podUID, kstrings.EscapeQualifiedNameForDisk(name), cd.volName)
+	return getPath(cd.podUID, cd.volName, cd.plugin.host)
 }
 
 type cinderVolumeUnmounter struct {
@@ -485,8 +489,7 @@ type cinderVolumeDeleter struct {
 var _ volume.Deleter = &cinderVolumeDeleter{}
 
 func (r *cinderVolumeDeleter) GetPath() string {
-	name := cinderVolumePluginName
-	return r.plugin.host.GetPodVolumeDir(r.podUID, kstrings.EscapeQualifiedNameForDisk(name), r.volName)
+	return getPath(r.podUID, r.volName, r.plugin.host)
 }
 
 func (r *cinderVolumeDeleter) Delete() error {
@@ -501,7 +504,7 @@ type cinderVolumeProvisioner struct {
 var _ volume.Provisioner = &cinderVolumeProvisioner{}
 
 func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
@@ -515,7 +518,7 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			Name:   c.options.PVName,
 			Labels: labels,
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "cinder-dynamic-provisioner",
+				util.VolumeDynamicallyCreatedByKey: "cinder-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

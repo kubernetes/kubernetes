@@ -81,7 +81,7 @@
         "spec": {
           "description": "Specification of the desired behavior of the Deployment.",
           "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentSpec"
-        },
+        }
       },
       "x-kubernetes-group-version-kind": [
         {

@@ -196,16 +196,6 @@ func mapNodeNameToInstanceName(nodeName types.NodeName) string {
 	return string(nodeName)
 }
 
-// ExternalID returns the cloud provider ID of the specified node with the specified NodeName (deprecated).
-func (v *OVirtCloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	name := mapNodeNameToInstanceName(nodeName)
-	instance, err := v.fetchInstance(name)
-	if err != nil {
-		return "", err
-	}
-	return instance.UUID, nil
-}
-
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (v *OVirtCloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {

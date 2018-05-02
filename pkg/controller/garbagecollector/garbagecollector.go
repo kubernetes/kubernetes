@@ -166,11 +166,19 @@ type resettableRESTMapper interface {
 // Note that discoveryClient should NOT be shared with gc.restMapper, otherwise
 // the mapper's underlying discovery client will be unnecessarily reset during
 // the course of detecting new resources.
-func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, period time.Duration, stopCh <-chan struct{}) {
+func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterface, period time.Duration, stopCh <-chan struct{}) {
 	oldResources := make(map[schema.GroupVersionResource]struct{})
 	wait.Until(func() {
 		// Get the current resource list from discovery.
 		newResources := GetDeletableResources(discoveryClient)
+
+		// This can occur if there is an internal error in GetDeletableResources.
+		// If the gc attempts to sync with 0 resources it will block forever.
+		// TODO: Implement a more complete solution for the garbage collector hanging.
+		if len(newResources) == 0 {
+			glog.V(5).Infof("no resources reported by discovery, skipping garbage collector sync")
+			return
+		}
 
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
@@ -295,7 +303,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = client.Resource(resource, item.identity.Namespace).Get(reference.Name, metav1.GetOptions{})
+	owner, err = client.Resource(resource, resourceDefaultNamespace(resource, item.identity.Namespace)).Get(reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)

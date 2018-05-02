@@ -46,7 +46,6 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 		return newSystemErrorWithCause(err, "preparing rootfs")
 	}
 
-	setupDev := needsSetupDev(config)
 	for _, m := range config.Mounts {
 		for _, precmd := range m.PremountCmds {
 			if err := mountCmd(precmd); err != nil {
@@ -64,6 +63,8 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 			}
 		}
 	}
+
+	setupDev := needsSetupDev(config)
 
 	if setupDev {
 		if err := createDevices(config); err != nil {
@@ -100,8 +101,10 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 
 	if config.NoPivotRoot {
 		err = msMoveRoot(config.Rootfs)
-	} else {
+	} else if config.Namespaces.Contains(configs.NEWNS) {
 		err = pivotRoot(config.Rootfs)
+	} else {
+		err = chroot(config.Rootfs)
 	}
 	if err != nil {
 		return newSystemErrorWithCause(err, "jailing process inside rootfs")
@@ -702,6 +705,10 @@ func msMoveRoot(rootfs string) error {
 	if err := unix.Mount(rootfs, "/", "", unix.MS_MOVE, ""); err != nil {
 		return err
 	}
+	return chroot(rootfs)
+}
+
+func chroot(rootfs string) error {
 	if err := unix.Chroot("."); err != nil {
 		return err
 	}
@@ -772,10 +779,10 @@ func remountReadonly(m *configs.Mount) error {
 // mounts ( proc/kcore ).
 // For files, maskPath bind mounts /dev/null over the top of the specified path.
 // For directories, maskPath mounts read-only tmpfs over the top of the specified path.
-func maskPath(path string) error {
+func maskPath(path string, mountLabel string) error {
 	if err := unix.Mount("/dev/null", path, "", unix.MS_BIND, ""); err != nil && !os.IsNotExist(err) {
 		if err == unix.ENOTDIR {
-			return unix.Mount("tmpfs", path, "tmpfs", unix.MS_RDONLY, "")
+			return unix.Mount("tmpfs", path, "tmpfs", unix.MS_RDONLY, label.FormatMountLabel("", mountLabel))
 		}
 		return err
 	}

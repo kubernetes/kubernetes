@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
@@ -92,8 +91,6 @@ type APIAggregator struct {
 
 	delegateHandler http.Handler
 
-	contextMapper genericapirequest.RequestContextMapper
-
 	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
 	proxyClientCert []byte
@@ -158,7 +155,6 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	s := &APIAggregator{
 		GenericAPIServer: genericServer,
 		delegateHandler:  delegationTarget.UnprotectedHandler(),
-		contextMapper:    c.GenericConfig.RequestContextMapper,
 		proxyClientCert:  c.ExtraConfig.ProxyClientCert,
 		proxyClientKey:   c.ExtraConfig.ProxyClientKey,
 		proxyTransport:   c.ExtraConfig.ProxyTransport,
@@ -177,7 +173,6 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	apisHandler := &apisHandler{
 		codecs: aggregatorscheme.Codecs,
 		lister: s.lister,
-		mapper: s.contextMapper,
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
@@ -208,7 +203,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	})
 
 	if openApiConfig != nil {
-		specDownloader := openapicontroller.NewDownloader(s.contextMapper)
+		specDownloader := openapicontroller.NewDownloader()
 		openAPIAggregator, err := openapicontroller.BuildAndRegisterAggregator(
 			&specDownloader,
 			delegationTarget,
@@ -250,7 +245,6 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 
 	// register the proxy handler
 	proxyHandler := &proxyHandler{
-		contextMapper:   s.contextMapper,
 		localDelegate:   s.delegateHandler,
 		proxyClientCert: s.proxyClientCert,
 		proxyClientKey:  s.proxyClientKey,
@@ -278,11 +272,10 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 	// it's time to register the group aggregation endpoint
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
-		codecs:        aggregatorscheme.Codecs,
-		groupName:     apiService.Spec.Group,
-		lister:        s.lister,
-		delegate:      s.delegateHandler,
-		contextMapper: s.contextMapper,
+		codecs:    aggregatorscheme.Codecs,
+		groupName: apiService.Spec.Group,
+		lister:    s.lister,
+		delegate:  s.delegateHandler,
 	}
 	// aggregation is protected
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)

@@ -22,6 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
+kube::etcd::install
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
@@ -44,7 +45,7 @@ if [[ $ret -eq 0 ]]
 then
   echo "${SPECROOT} up to date."
 else
-  echo "${SPECROOT} is out of date. Please run hack/update-swagger-spec.sh"
+  echo "${SPECROOT} is out of date. Please run hack/update-swagger-spec.sh" >&2
   exit 1
 fi
 

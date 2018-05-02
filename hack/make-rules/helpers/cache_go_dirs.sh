@@ -47,8 +47,7 @@ function kfind() {
                 -path ./staging -o \
                 -path ./_\* -o     \
                 -path ./.\* -o     \
-                -path ./docs -o    \
-                -path ./examples   \
+                -path ./docs       \
             \) -prune              \
         \)                         \
         \)                         \

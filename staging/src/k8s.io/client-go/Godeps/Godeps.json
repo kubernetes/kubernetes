@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/client-go",
 	"GoVersion": "go1.9",
-	"GodepVersion": "v79",
+	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
 	],
@@ -29,38 +29,6 @@
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
 			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
-		},
-		{
-			"ImportPath": "github.com/coreos/go-oidc/http",
-			"Rev": "a4973d9a4225417aecf5d450a9522f00c1f7130f"
-		},
-		{
-			"ImportPath": "github.com/coreos/go-oidc/jose",
-			"Rev": "a4973d9a4225417aecf5d450a9522f00c1f7130f"
-		},
-		{
-			"ImportPath": "github.com/coreos/go-oidc/key",
-			"Rev": "a4973d9a4225417aecf5d450a9522f00c1f7130f"
-		},
-		{
-			"ImportPath": "github.com/coreos/go-oidc/oauth2",
-			"Rev": "a4973d9a4225417aecf5d450a9522f00c1f7130f"
-		},
-		{
-			"ImportPath": "github.com/coreos/go-oidc/oidc",
-			"Rev": "a4973d9a4225417aecf5d450a9522f00c1f7130f"
-		},
-		{
-			"ImportPath": "github.com/coreos/pkg/health",
-			"Rev": "fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8"
-		},
-		{
-			"ImportPath": "github.com/coreos/pkg/httputil",
-			"Rev": "fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8"
-		},
-		{
-			"ImportPath": "github.com/coreos/pkg/timeutil",
-			"Rev": "fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
@@ -136,31 +104,31 @@
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
+			"Rev": "6da026c32e2d622cc242d32984259c77237aefe1"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
+			"Rev": "6da026c32e2d622cc242d32984259c77237aefe1"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
+			"Rev": "6da026c32e2d622cc242d32984259c77237aefe1"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
+			"Rev": "6da026c32e2d622cc242d32984259c77237aefe1"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
+			"Rev": "6da026c32e2d622cc242d32984259c77237aefe1"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/utils",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
+			"Rev": "6da026c32e2d622cc242d32984259c77237aefe1"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/pagination",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
+			"Rev": "6da026c32e2d622cc242d32984259c77237aefe1"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
@@ -171,16 +139,8 @@
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
 		},
 		{
-			"ImportPath": "github.com/howeyc/gopass",
-			"Rev": "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
-		},
-		{
 			"ImportPath": "github.com/imdario/mergo",
 			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
-		},
-		{
-			"ImportPath": "github.com/jonboulle/clockwork",
-			"Rev": "72f9bd7c4e0c2a40055ab3d0f09654f730cce982"
 		},
 		{
 			"ImportPath": "github.com/json-iterator/go",
@@ -200,7 +160,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
@@ -612,7 +572,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "a07b7bbb58e7fdc5144f8d7046331d29fc9ad3b3"
+			"Rev": "50ae88d24ede7b8bad68e23c805b5d3da5c8abaf"
 		}
 	]
 }

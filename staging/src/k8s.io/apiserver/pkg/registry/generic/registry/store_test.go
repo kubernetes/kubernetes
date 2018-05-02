@@ -17,6 +17,7 @@ limitations under the License.
 package registry
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -72,7 +73,7 @@ type testGracefulStrategy struct {
 	testRESTStrategy
 }
 
-func (t testGracefulStrategy) CheckGracefulDelete(ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
+func (t testGracefulStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
 	return true
 }
 
@@ -82,7 +83,7 @@ type testOrphanDeleteStrategy struct {
 	*testRESTStrategy
 }
 
-func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
 	return rest.OrphanDependents
 }
 
@@ -98,7 +99,7 @@ func (t *testRESTStrategy) NamespaceScoped() bool          { return t.namespaceS
 func (t *testRESTStrategy) AllowCreateOnUpdate() bool      { return t.allowCreateOnUpdate }
 func (t *testRESTStrategy) AllowUnconditionalUpdate() bool { return t.allowUnconditionalUpdate }
 
-func (t *testRESTStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (t *testRESTStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	metaObj, err := meta.Accessor(obj)
 	if err != nil {
 		panic(err.Error())
@@ -111,11 +112,11 @@ func (t *testRESTStrategy) PrepareForCreate(ctx genericapirequest.Context, obj r
 	metaObj.SetLabels(labels)
 }
 
-func (t *testRESTStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {}
-func (t *testRESTStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (t *testRESTStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
+func (t *testRESTStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return nil
 }
-func (t *testRESTStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (t *testRESTStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return nil
 }
 func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}
@@ -172,7 +173,7 @@ func TestStoreList(t *testing.T) {
 		in      *example.PodList
 		m       storage.SelectionPredicate
 		out     runtime.Object
-		context genericapirequest.Context
+		context context.Context
 	}{
 		"notFound": {
 			in:  nil,
@@ -310,6 +311,11 @@ func TestStoreCreate(t *testing.T) {
 	// re-define delete strategy to have graceful delete capability
 	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+	registry.Decorator = func(obj runtime.Object) error {
+		pod := obj.(*example.Pod)
+		pod.Status.Phase = example.PodPhase("Testing")
+		return nil
+	}
 
 	// create the object with denying admission
 	objA, err := registry.Create(testContext, podA, denyCreateValidation, false)
@@ -321,6 +327,11 @@ func TestStoreCreate(t *testing.T) {
 	objA, err = registry.Create(testContext, podA, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// verify the decorator was called
+	if objA.(*example.Pod).Status.Phase != example.PodPhase("Testing") {
+		t.Errorf("Decorator was not called: %#v", objA)
 	}
 
 	// get the object
@@ -579,7 +590,7 @@ func TestStoreCreateInitializedFailed(t *testing.T) {
 	}
 }
 
-func updateAndVerify(t *testing.T, ctx genericapirequest.Context, registry *Store, pod *example.Pod) bool {
+func updateAndVerify(t *testing.T, ctx context.Context, registry *Store, pod *example.Pod) bool {
 	obj, _, err := registry.Update(ctx, pod.Name, rest.DefaultUpdatedObjectInfo(pod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -733,7 +744,7 @@ func TestNoOpUpdates(t *testing.T) {
 
 type testPodExport struct{}
 
-func (t testPodExport) Export(ctx genericapirequest.Context, obj runtime.Object, exact bool) error {
+func (t testPodExport) Export(ctx context.Context, obj runtime.Object, exact bool) error {
 	pod := obj.(*example.Pod)
 	if pod.Labels == nil {
 		pod.Labels = map[string]string{}
@@ -1774,7 +1785,7 @@ func TestStoreWatch(t *testing.T) {
 
 	table := map[string]struct {
 		selectPred storage.SelectionPredicate
-		context    genericapirequest.Context
+		context    context.Context
 	}{
 		"single": {
 			selectPred: matchPodName("foo"),
@@ -1865,10 +1876,10 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		CreateStrategy:           strategy,
 		UpdateStrategy:           strategy,
 		DeleteStrategy:           strategy,
-		KeyRootFunc: func(ctx genericapirequest.Context) string {
+		KeyRootFunc: func(ctx context.Context) string {
 			return podPrefix
 		},
-		KeyFunc: func(ctx genericapirequest.Context, id string) (string, error) {
+		KeyFunc: func(ctx context.Context, id string) (string, error) {
 			if _, ok := genericapirequest.NamespaceFrom(ctx); !ok {
 				return "", fmt.Errorf("namespace is required")
 			}
@@ -2011,7 +2022,7 @@ type fakeStrategy struct {
 	names.NameGenerator
 }
 
-func (fakeStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+func (fakeStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
 	appsv1beta1 := schema.GroupVersion{Group: "apps", Version: "v1beta1"}
 	appsv1beta2 := schema.GroupVersion{Group: "apps", Version: "v1beta2"}
 	extensionsv1beta1 := schema.GroupVersion{Group: "extensions", Version: "v1beta1"}

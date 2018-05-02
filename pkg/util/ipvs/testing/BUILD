@@ -30,6 +30,5 @@ go_test(
     name = "go_default_test",
     srcs = ["fake_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/ipvs/testing",
     deps = ["//pkg/util/ipvs:go_default_library"],
 )

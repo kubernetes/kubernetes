@@ -5,6 +5,9 @@ metadata:
 spec:
   serviceName: "galera"
   replicas: 3
+  selector:
+    matchLabels:
+      app: mysql
   template:
     metadata:
       labels:

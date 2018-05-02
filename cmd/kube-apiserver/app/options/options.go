@@ -71,6 +71,8 @@ type ServerRunOptions struct {
 
 	MasterCount            int
 	EndpointReconcilerType string
+
+	ServiceAccountSigningKeyFile string
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -92,7 +94,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableLogsHandler:      true,
 		EventTTL:               1 * time.Hour,
 		MasterCount:            1,
-		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
+		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:         ports.KubeletPort,
 			ReadOnlyPort: ports.KubeletReadOnlyPort,
@@ -113,6 +115,8 @@ func NewServerRunOptions() *ServerRunOptions {
 		},
 		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
 	}
+	s.ServiceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
+
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 
@@ -163,7 +167,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"Currently only applies to long-running requests.")
 
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
-		"The number of apiservers running in the cluster, must be a positive number.")
+		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
 
 	fs.StringVar(&s.EndpointReconcilerType, "endpoint-reconciler-type", string(s.EndpointReconcilerType),
 		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+")")
@@ -231,4 +235,6 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
 
+	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
+		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Requires the 'TokenRequest' feature gate.)")
 }

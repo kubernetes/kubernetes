@@ -21,7 +21,6 @@ go_test(
     name = "go_default_test",
     srcs = ["dbus_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/dbus",
     deps = ["//vendor/github.com/godbus/dbus:go_default_library"],
 )
 

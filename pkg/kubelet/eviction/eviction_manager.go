@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
@@ -83,8 +82,8 @@ type managerImpl struct {
 	resourceToNodeReclaimFuncs map[v1.ResourceName]nodeReclaimFuncs
 	// last observations from synchronize
 	lastObservations signalObservations
-	// notifiersInitialized indicates if the threshold notifiers have been initialized (i.e. synchronize() has been called once)
-	notifiersInitialized bool
+	// notifierStopCh is a channel used to stop all thresholdNotifiers
+	notifierStopCh ThresholdStopCh
 	// dedicatedImageFs indicates if imagefs is on a separate device from the rootfs
 	dedicatedImageFs *bool
 }
@@ -101,7 +100,8 @@ func NewManager(
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
 	nodeRef *v1.ObjectReference,
-	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler) {
+	clock clock.Clock,
+) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:           clock,
 		killPodFunc:     killPodFunc,
@@ -113,6 +113,7 @@ func NewManager(
 		nodeRef:         nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		notifierStopCh:               NewInitialStopCh(clock),
 		dedicatedImageFs:             nil,
 	}
 	return manager, manager
@@ -148,11 +149,11 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 }
 
 // Start starts the control loop to observe and response to low compute resources.
-func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, capacityProvider CapacityProvider, monitoringInterval time.Duration) {
+func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
 	// start the eviction manager monitoring
 	go func() {
 		for {
-			if evictedPods := m.synchronize(diskInfoProvider, podFunc, capacityProvider); evictedPods != nil {
+			if evictedPods := m.synchronize(diskInfoProvider, podFunc); evictedPods != nil {
 				glog.Infof("eviction manager: pods %s evicted, waiting for pod to be cleaned up", format.Pods(evictedPods))
 				m.waitForPodsCleanup(podCleanedUpFunc, evictedPods)
 			} else {
@@ -176,13 +177,16 @@ func (m *managerImpl) IsUnderDiskPressure() bool {
 	return hasNodeCondition(m.nodeConditions, v1.NodeDiskPressure)
 }
 
-func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observations signalObservations, hard bool, handler thresholdNotifierHandlerFunc) error {
-	for _, threshold := range thresholds {
+// IsUnderPIDPressure returns true if the node is under PID pressure.
+func (m *managerImpl) IsUnderPIDPressure() bool {
+	m.RLock()
+	defer m.RUnlock()
+	return hasNodeCondition(m.nodeConditions, v1.NodePIDPressure)
+}
+
+func (m *managerImpl) startMemoryThresholdNotifier(summary *statsapi.Summary, hard bool, handler thresholdNotifierHandlerFunc) error {
+	for _, threshold := range m.config.Thresholds {
 		if threshold.Signal != evictionapi.SignalMemoryAvailable || hard != isHardEvictionThreshold(threshold) {
-			continue
-		}
-		observed, found := observations[evictionapi.SignalMemoryAvailable]
-		if !found {
 			continue
 		}
 		cgroups, err := cm.GetCgroupSubsystems()
@@ -195,15 +199,23 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observatio
 			return fmt.Errorf("memory cgroup mount point not found")
 		}
 		attribute := "memory.usage_in_bytes"
-		quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
-		usageThreshold := resource.NewQuantity(observed.capacity.Value(), resource.DecimalSI)
-		usageThreshold.Sub(*quantity)
+		if summary.Node.Memory == nil || summary.Node.Memory.UsageBytes == nil || summary.Node.Memory.WorkingSetBytes == nil {
+			return fmt.Errorf("summary was incomplete")
+		}
+		// Set threshold on usage to capacity - eviction_hard + inactive_file,
+		// since we want to be notified when working_set = capacity - eviction_hard
+		inactiveFile := resource.NewQuantity(int64(*summary.Node.Memory.UsageBytes-*summary.Node.Memory.WorkingSetBytes), resource.BinarySI)
+		capacity := resource.NewQuantity(int64(*summary.Node.Memory.AvailableBytes+*summary.Node.Memory.WorkingSetBytes), resource.BinarySI)
+		evictionThresholdQuantity := evictionapi.GetThresholdQuantity(threshold.Value, capacity)
+		memcgThreshold := capacity.DeepCopy()
+		memcgThreshold.Sub(*evictionThresholdQuantity)
+		memcgThreshold.Add(*inactiveFile)
 		description := fmt.Sprintf("<%s available", formatThresholdValue(threshold.Value))
-		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, usageThreshold.String(), description, handler)
+		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, memcgThreshold.String(), description, handler)
 		if err != nil {
 			return err
 		}
-		go memcgThresholdNotifier.Start(wait.NeverStop)
+		go memcgThresholdNotifier.Start(m.notifierStopCh)
 		return nil
 	}
 	return nil
@@ -211,10 +223,10 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observatio
 
 // synchronize is the main control loop that enforces eviction thresholds.
 // Returns the pod that was killed, or nil if no pod was killed.
-func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, capacityProvider CapacityProvider) []*v1.Pod {
+func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) []*v1.Pod {
 	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
-	if len(thresholds) == 0 {
+	if len(thresholds) == 0 && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		return nil
 	}
 
@@ -239,32 +251,31 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return nil
 	}
 
-	// make observations and get a function to derive pod usage stats relative to those observations.
-	observations, statsFunc := makeSignalObservations(summary, capacityProvider, activePods)
-	debugLogObservations("observations", observations)
-
 	// attempt to create a threshold notifier to improve eviction response time
-	if m.config.KernelMemcgNotification && !m.notifiersInitialized {
-		glog.Infof("eviction manager attempting to integrate with kernel memcg notification api")
-		m.notifiersInitialized = true
+	if m.config.KernelMemcgNotification && m.notifierStopCh.Reset() {
+		glog.V(4).Infof("eviction manager attempting to integrate with kernel memcg notification api")
 		// start soft memory notification
-		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, false, func(desc string) {
+		err = m.startMemoryThresholdNotifier(summary, false, func(desc string) {
 			glog.Infof("soft memory eviction threshold crossed at %s", desc)
 			// TODO wait grace period for soft memory limit
-			m.synchronize(diskInfoProvider, podFunc, capacityProvider)
+			m.synchronize(diskInfoProvider, podFunc)
 		})
 		if err != nil {
 			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
 		}
 		// start hard memory notification
-		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, true, func(desc string) {
+		err = m.startMemoryThresholdNotifier(summary, true, func(desc string) {
 			glog.Infof("hard memory eviction threshold crossed at %s", desc)
-			m.synchronize(diskInfoProvider, podFunc, capacityProvider)
+			m.synchronize(diskInfoProvider, podFunc)
 		})
 		if err != nil {
 			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
 		}
 	}
+
+	// make observations and get a function to derive pod usage stats relative to those observations.
+	observations, statsFunc := makeSignalObservations(summary)
+	debugLogObservations("observations", observations)
 
 	// determine the set of thresholds met independent of grace period
 	thresholds = thresholdsMet(thresholds, observations, false)
@@ -341,7 +352,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
 
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
-	if m.reclaimNodeLevelResources(resourceToReclaim, observations) {
+	if m.reclaimNodeLevelResources(resourceToReclaim) {
 		glog.Infof("eviction manager: able to reduce %v pressure without evicting pods.", resourceToReclaim)
 		return nil
 	}
@@ -429,26 +440,31 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
-func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceName, observations signalObservations) bool {
+func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceName) bool {
 	nodeReclaimFuncs := m.resourceToNodeReclaimFuncs[resourceToReclaim]
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
 		// attempt to reclaim the pressured resource.
-		reclaimed, err := nodeReclaimFunc()
-		if err != nil {
+		if err := nodeReclaimFunc(); err != nil {
 			glog.Warningf("eviction manager: unexpected error when attempting to reduce %v pressure: %v", resourceToReclaim, err)
 		}
-		// update our local observations based on the amount reported to have been reclaimed.
-		// note: this is optimistic, other things could have been still consuming the pressured resource in the interim.
-		for _, signal := range resourceClaimToSignal[resourceToReclaim] {
-			value, ok := observations[signal]
-			if !ok {
-				glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
-				continue
-			}
-			value.available.Add(*reclaimed)
+
+	}
+	if len(nodeReclaimFuncs) > 0 {
+		summary, err := m.summaryProvider.Get(true)
+		if err != nil {
+			glog.Errorf("eviction manager: failed to get get summary stats after resource reclaim: %v", err)
+			return false
 		}
-		// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
-		if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
+
+		// make observations and get a function to derive pod usage stats relative to those observations.
+		observations, _ := makeSignalObservations(summary)
+		debugLogObservations("observations after resource reclaim", observations)
+
+		// determine the set of thresholds met independent of grace period
+		thresholds := thresholdsMet(m.config.Thresholds, observations, false)
+		debugLogThresholdsWithObservation("thresholds after resource reclaim - ignoring grace period", thresholds, observations)
+
+		if len(thresholds) == 0 {
 			return true
 		}
 	}

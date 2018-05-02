@@ -113,7 +113,7 @@ func NewCmdTopNode(f cmdutil.Factory, options *TopNodeOptions, out io.Writer) *c
 		},
 		Aliases: []string{"nodes", "no"},
 	}
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	options.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
@@ -131,7 +131,12 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	}
 
 	o.DiscoveryClient = clientset.DiscoveryClient
-	o.MetricsClient, err = f.MetricsClientSet()
+
+	config, err := f.ClientConfig()
+	if err != nil {
+		return err
+	}
+	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {
 		return err
 	}

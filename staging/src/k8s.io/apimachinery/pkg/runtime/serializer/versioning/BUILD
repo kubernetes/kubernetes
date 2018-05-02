@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["versioning_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/runtime/serializer/versioning",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

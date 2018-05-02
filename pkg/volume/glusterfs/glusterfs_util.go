@@ -34,17 +34,17 @@ func readGlusterLog(path string, podName string) error {
 	var line2 string
 	linecount := 0
 
-	glog.Infof("glusterfs: failure, now attempting to read the gluster log for pod %s", podName)
+	glog.Infof("failure, now attempting to read the gluster log for pod %s", podName)
 
 	// Check and make sure path exists
 	if len(path) == 0 {
-		return fmt.Errorf("glusterfs: log file does not exist for pod: %s", podName)
+		return fmt.Errorf("log file does not exist for pod %s", podName)
 	}
 
 	// open the log file
 	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("glusterfs: could not open log file for pod: %s", podName)
+		return fmt.Errorf("could not open log file for pod %s", podName)
 	}
 	defer file.Close()
 

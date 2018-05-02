@@ -14,7 +14,6 @@ go_library(
 go_binary(
     name = "jsonify",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/integration/benchmark/jsonify",
     visibility = ["//visibility:public"],
 )
 

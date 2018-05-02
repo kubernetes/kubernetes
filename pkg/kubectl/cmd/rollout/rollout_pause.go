@@ -18,35 +18,33 @@ package rollout
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 // PauseConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type PauseConfig struct {
 	resource.FilenameOptions
+	PrintFlags *printers.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
 
-	Pauser  func(info *resource.Info) ([]byte, error)
-	Mapper  meta.RESTMapper
-	Typer   runtime.ObjectTyper
-	Encoder runtime.Encoder
-	Infos   []*resource.Info
+	Pauser func(info *resource.Info) ([]byte, error)
+	Infos  []*resource.Info
 
-	PrintSuccess func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	Out          io.Writer
+	genericclioptions.IOStreams
 }
 
 var (
@@ -64,8 +62,11 @@ var (
 		kubectl rollout pause deployment/nginx`)
 )
 
-func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &PauseConfig{}
+func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &PauseConfig{
+		PrintFlags: printers.NewPrintFlags("paused"),
+		IOStreams:  streams,
+	}
 
 	validArgs := []string{"deployment"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -78,11 +79,11 @@ func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: pause_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := options.CompletePause(f, cmd, out, args)
+			err := o.CompletePause(f, cmd, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = options.RunPause()
+			err = o.RunPause()
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -93,21 +94,16 @@ func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	return cmd
 }
 
-func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
-	o.PrintSuccess = f.PrintSuccess
-	o.Mapper, o.Typer = f.Object()
-	o.Encoder = f.JSONEncoder()
-
 	o.Pauser = f.Pauser
-	o.Out = out
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -115,7 +111,7 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 	}
 
 	r := f.NewBuilder().
-		Internal().
+		Internal(legacyscheme.Scheme).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
@@ -128,6 +124,16 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 		return err
 	}
 
+	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+
+		return printer.PrintObj, nil
+	}
+
 	o.Infos, err = r.Infos()
 	if err != nil {
 		return err
@@ -137,15 +143,24 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 
 func (o PauseConfig) RunPause() error {
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.Infos, o.Encoder, o.Pauser) {
+	for _, patch := range set.CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), o.Pauser) {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s %q %v", info.Mapping.Resource, info.Name, patch.Err))
+			resourceString := info.Mapping.Resource.Resource
+			if len(info.Mapping.Resource.Group) > 0 {
+				resourceString = resourceString + "." + info.Mapping.Resource.Group
+			}
+			allErrs = append(allErrs, fmt.Errorf("error: %s %q %v", resourceString, info.Name, patch.Err))
 			continue
 		}
 
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			o.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "already paused")
+			printer, err := o.ToPrinter("already paused")
+			if err != nil {
+				allErrs = append(allErrs, err)
+				continue
+			}
+			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 			continue
 		}
 
@@ -156,7 +171,12 @@ func (o PauseConfig) RunPause() error {
 		}
 
 		info.Refresh(obj, true)
-		o.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "paused")
+		printer, err := o.ToPrinter("paused")
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
+		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
 	}
 
 	return utilerrors.NewAggregate(allErrs)

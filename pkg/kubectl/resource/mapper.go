@@ -28,96 +28,93 @@ import (
 // Mapper is a convenience struct for holding references to the interfaces
 // needed to create Info for arbitrary objects.
 type Mapper struct {
-	runtime.ObjectTyper
-	meta.RESTMapper
-	ClientMapper
-	runtime.Decoder
-}
+	// localFn indicates the call can't make server requests
+	localFn func() bool
 
-// AcceptUnrecognizedObjects will return a mapper that will tolerate objects
-// that are not recognized by the RESTMapper, returning mappings that can
-// perform minimal transformation. Allows working in disconnected mode, or with
-// objects that the server does not recognize. Returned resource.Info objects
-// may have empty resource fields and nil clients.
-func (m *Mapper) AcceptUnrecognizedObjects() *Mapper {
-	copied := *m
-	copied.RESTMapper = NewRelaxedRESTMapper(m.RESTMapper)
-	copied.ClientMapper = NewRelaxedClientMapper(m.ClientMapper)
-	return &copied
+	RESTMapper   meta.RESTMapper
+	ClientMapper ClientMapper
+	Decoder      runtime.Decoder
 }
 
 // InfoForData creates an Info object for the given data. An error is returned
 // if any of the decoding or client lookup steps fail. Name and namespace will be
 // set into Info if the mapping's MetadataAccessor can retrieve them.
 func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
-	obj, gvk, err := m.Decode(data, nil, nil)
+	obj, gvk, err := m.Decoder.Decode(data, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
 	}
 
-	mapping, err := m.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
-	}
+	name, _ := metadataAccessor.Name(obj)
+	namespace, _ := metadataAccessor.Namespace(obj)
+	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 
-	client, err := m.ClientForMapping(mapping)
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
-	}
-
-	name, _ := mapping.MetadataAccessor.Name(obj)
-	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
-	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
-
-	return &Info{
-		Client:  client,
-		Mapping: mapping,
-
+	ret := &Info{
 		Source:          source,
 		Namespace:       namespace,
 		Name:            name,
 		ResourceVersion: resourceVersion,
 
 		Object: obj,
-	}, nil
+	}
+
+	if m.localFn == nil || !m.localFn() {
+		mapping, err := m.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
+		}
+		ret.Mapping = mapping
+
+		client, err := m.ClientMapper.ClientForMapping(mapping)
+		if err != nil {
+			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
+		}
+		ret.Client = client
+	}
+
+	return ret, nil
 }
 
 // InfoForObject creates an Info object for the given Object. An error is returned
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
-func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []schema.GroupVersionKind) (*Info, error) {
-	groupVersionKinds, _, err := m.ObjectKinds(obj)
+func (m *Mapper) InfoForObject(obj runtime.Object, typer runtime.ObjectTyper, preferredGVKs []schema.GroupVersionKind) (*Info, error) {
+	groupVersionKinds, _, err := typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
 	}
 
-	groupVersionKind := groupVersionKinds[0]
+	gvk := groupVersionKinds[0]
 	if len(groupVersionKinds) > 1 && len(preferredGVKs) > 0 {
-		groupVersionKind = preferredObjectKind(groupVersionKinds, preferredGVKs)
+		gvk = preferredObjectKind(groupVersionKinds, preferredGVKs)
 	}
 
-	mapping, err := m.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
-	if err != nil {
-		return nil, fmt.Errorf("unable to recognize %v: %v", groupVersionKind, err)
-	}
-
-	client, err := m.ClientForMapping(mapping)
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
-	}
-	name, _ := mapping.MetadataAccessor.Name(obj)
-	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
-	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
-	return &Info{
-		Client:  client,
-		Mapping: mapping,
-
+	name, _ := metadataAccessor.Name(obj)
+	namespace, _ := metadataAccessor.Namespace(obj)
+	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
+	ret := &Info{
 		Namespace:       namespace,
 		Name:            name,
 		ResourceVersion: resourceVersion,
 
 		Object: obj,
-	}, nil
+	}
+
+	if m.localFn == nil || !m.localFn() {
+		mapping, err := m.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, fmt.Errorf("unable to recognize %v", err)
+		}
+		ret.Mapping = mapping
+
+		client, err := m.ClientMapper.ClientForMapping(mapping)
+		if err != nil {
+			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
+		}
+		ret.Client = client
+	}
+
+	return ret, nil
 }
 
 // preferredObjectKind picks the possibility that most closely matches the priority list in this order:
@@ -164,74 +161,4 @@ type DisabledClientForMapping struct {
 
 func (f DisabledClientForMapping) ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error) {
 	return nil, nil
-}
-
-// NewRelaxedClientMapper will return a nil mapping if the object is not a recognized resource.
-func NewRelaxedClientMapper(mapper ClientMapper) ClientMapper {
-	return relaxedClientMapper{mapper}
-}
-
-type relaxedClientMapper struct {
-	ClientMapper
-}
-
-func (f relaxedClientMapper) ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error) {
-	if len(mapping.Resource) == 0 {
-		return nil, nil
-	}
-	return f.ClientMapper.ClientForMapping(mapping)
-}
-
-// NewRelaxedRESTMapper returns a RESTMapper that will tolerate mappings that don't exist in provided
-// RESTMapper, returning a mapping that is a best effort against the current server. This allows objects
-// that the server does not recognize to still be loaded.
-func NewRelaxedRESTMapper(mapper meta.RESTMapper) meta.RESTMapper {
-	return relaxedMapper{mapper}
-}
-
-type relaxedMapper struct {
-	meta.RESTMapper
-}
-
-func (m relaxedMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
-	mapping, err := m.RESTMapper.RESTMapping(gk, versions...)
-	if err != nil && meta.IsNoMatchError(err) && len(versions) > 0 {
-		return &meta.RESTMapping{
-			GroupVersionKind: gk.WithVersion(versions[0]),
-			MetadataAccessor: meta.NewAccessor(),
-			Scope:            meta.RESTScopeRoot,
-			ObjectConvertor:  identityConvertor{},
-		}, nil
-	}
-	return mapping, err
-}
-func (m relaxedMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
-	mappings, err := m.RESTMapper.RESTMappings(gk, versions...)
-	if err != nil && meta.IsNoMatchError(err) && len(versions) > 0 {
-		return []*meta.RESTMapping{
-			{
-				GroupVersionKind: gk.WithVersion(versions[0]),
-				MetadataAccessor: meta.NewAccessor(),
-				Scope:            meta.RESTScopeRoot,
-				ObjectConvertor:  identityConvertor{},
-			},
-		}, nil
-	}
-	return mappings, err
-}
-
-type identityConvertor struct{}
-
-var _ runtime.ObjectConvertor = identityConvertor{}
-
-func (c identityConvertor) Convert(in interface{}, out interface{}, context interface{}) error {
-	return fmt.Errorf("unable to convert objects across pointers")
-}
-
-func (c identityConvertor) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (out runtime.Object, err error) {
-	return in, nil
-}
-
-func (c identityConvertor) ConvertFieldLabel(version string, kind string, label string, value string) (string, string, error) {
-	return "", "", fmt.Errorf("unable to convert field labels")
 }

@@ -19,7 +19,7 @@ package volume
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
 var _ MetricsProvider = &metricsStatFS{}
@@ -55,7 +55,7 @@ func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
 
 // getFsInfo writes metrics.Capacity, metrics.Used and metrics.Available from the filesystem info
 func (md *metricsStatFS) getFsInfo(metrics *Metrics) error {
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := util.FsInfo(md.path)
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.FsInfo(md.path)
 	if err != nil {
 		return NewFsInfoFailedError(err)
 	}

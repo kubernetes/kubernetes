@@ -28,7 +28,7 @@ build:
 	docker build --pull -t $(REGISTRY)/kubemark:$(IMAGE_TAG) .
 
 gcloudpush: build
-	gcloud docker -- push $(REGISTRY)/kubemark:$(IMAGE_TAG)
+	docker push $(REGISTRY)/kubemark:$(IMAGE_TAG)
 
 push: build
 	docker -- push $(REGISTRY)/kubemark:$(IMAGE_TAG)

@@ -31,12 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -55,24 +57,6 @@ func testVolume(name string, namespace string, spec core.PersistentVolumeSpec) *
 	objMeta := metav1.ObjectMeta{Name: name}
 	if namespace != "" {
 		objMeta.Namespace = namespace
-	}
-
-	return &core.PersistentVolume{
-		ObjectMeta: objMeta,
-		Spec:       spec,
-	}
-}
-
-func testVolumeWithNodeAffinity(t *testing.T, name string, namespace string, affinity *core.NodeAffinity, spec core.PersistentVolumeSpec) *core.PersistentVolume {
-	objMeta := metav1.ObjectMeta{Name: name}
-	if namespace != "" {
-		objMeta.Namespace = namespace
-	}
-
-	objMeta.Annotations = map[string]string{}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(objMeta.Annotations, affinity)
-	if err != nil {
-		t.Fatalf("Failed to get node affinity annotation: %v", err)
 	}
 
 	return &core.PersistentVolume{
@@ -372,42 +356,6 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				VolumeMode:       &validMode,
 			}),
 		},
-		// LocalVolume alpha feature disabled
-		// TODO: remove when no longer alpha
-		"alpha disabled valid local volume": {
-			isExpectedFailure: true,
-			volume: testVolumeWithNodeAffinity(
-				t,
-				"valid-local-volume",
-				"",
-				&core.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-						NodeSelectorTerms: []core.NodeSelectorTerm{
-							{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-				},
-				core.PersistentVolumeSpec{
-					Capacity: core.ResourceList{
-						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
-					PersistentVolumeSource: core.PersistentVolumeSource{
-						Local: &core.LocalVolumeSource{
-							Path: "/foo",
-						},
-					},
-					StorageClassName: "test-storage-class",
-				}),
-		},
 		"bad-hostpath-volume-backsteps": {
 			isExpectedFailure: true,
 			volume: testVolume("foo", "", core.PersistentVolumeSpec{
@@ -424,20 +372,31 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				StorageClassName: "backstep-hostpath",
 			}),
 		},
-		"bad-local-volume-backsteps": {
+		"volume-node-affinity": {
+			isExpectedFailure: false,
+			volume:            testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"volume-empty-node-affinity": {
 			isExpectedFailure: true,
-			volume: testVolume("foo", "", core.PersistentVolumeSpec{
-				Capacity: core.ResourceList{
-					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-				},
-				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
-				PersistentVolumeSource: core.PersistentVolumeSource{
-					Local: &core.LocalVolumeSource{
-						Path: "/foo/..",
+			volume:            testVolumeWithNodeAffinity(&core.VolumeNodeAffinity{}),
+		},
+		"volume-bad-node-affinity": {
+			isExpectedFailure: true,
+			volume: testVolumeWithNodeAffinity(
+				&core.VolumeNodeAffinity{
+					Required: &core.NodeSelector{
+						NodeSelectorTerms: []core.NodeSelectorTerm{
+							{
+								MatchExpressions: []core.NodeSelectorRequirement{
+									{
+										Operator: core.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
 					},
-				},
-				StorageClassName: "backstep-local",
-			}),
+				}),
 		},
 	}
 
@@ -514,172 +473,179 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 	}
 }
 
+func testLocalVolume(path string, affinity *core.VolumeNodeAffinity) core.PersistentVolumeSpec {
+	return core.PersistentVolumeSpec{
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+		},
+		AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+		PersistentVolumeSource: core.PersistentVolumeSource{
+			Local: &core.LocalVolumeSource{
+				Path: path,
+			},
+		},
+		NodeAffinity:     affinity,
+		StorageClassName: "test-storage-class",
+	}
+}
+
 func TestValidateLocalVolumes(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		volume            *core.PersistentVolume
 	}{
-		"valid local volume": {
-			isExpectedFailure: false,
-			volume: testVolumeWithNodeAffinity(
-				t,
-				"valid-local-volume",
-				"",
-				&core.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-						NodeSelectorTerms: []core.NodeSelectorTerm{
-							{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-				},
-				core.PersistentVolumeSpec{
-					Capacity: core.ResourceList{
-						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
-					PersistentVolumeSource: core.PersistentVolumeSource{
-						Local: &core.LocalVolumeSource{
-							Path: "/foo",
-						},
-					},
-					StorageClassName: "test-storage-class",
-				}),
-		},
-		"invalid local volume nil annotations": {
+		"alpha invalid local volume nil annotations": {
 			isExpectedFailure: true,
 			volume: testVolume(
 				"invalid-local-volume-nil-annotations",
 				"",
-				core.PersistentVolumeSpec{
-					Capacity: core.ResourceList{
-						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
-					PersistentVolumeSource: core.PersistentVolumeSource{
-						Local: &core.LocalVolumeSource{
-							Path: "/foo",
-						},
-					},
-					StorageClassName: "test-storage-class",
-				}),
+				testLocalVolume("/foo", nil)),
 		},
-		"invalid local volume empty affinity": {
-			isExpectedFailure: true,
-			volume: testVolumeWithNodeAffinity(
-				t,
-				"invalid-local-volume-empty-affinity",
-				"",
-				&core.NodeAffinity{},
-				core.PersistentVolumeSpec{
-					Capacity: core.ResourceList{
-						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
-					PersistentVolumeSource: core.PersistentVolumeSource{
-						Local: &core.LocalVolumeSource{
-							Path: "/foo",
-						},
-					},
-					StorageClassName: "test-storage-class",
-				}),
+		"valid local volume": {
+			isExpectedFailure: false,
+			volume: testVolume("valid-local-volume", "",
+				testLocalVolume("/foo", simpleVolumeNodeAffinity("foo", "bar"))),
 		},
-		"invalid local volume preferred affinity": {
+		"invalid local volume no node affinity": {
 			isExpectedFailure: true,
-			volume: testVolumeWithNodeAffinity(
-				t,
-				"invalid-local-volume-preferred-affinity",
-				"",
-				&core.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-						NodeSelectorTerms: []core.NodeSelectorTerm{
-							{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{
-						{
-							Weight: 10,
-							Preference: core.NodeSelectorTerm{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-				},
-				core.PersistentVolumeSpec{
-					Capacity: core.ResourceList{
-						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
-					PersistentVolumeSource: core.PersistentVolumeSource{
-						Local: &core.LocalVolumeSource{
-							Path: "/foo",
-						},
-					},
-					StorageClassName: "test-storage-class",
-				}),
+			volume: testVolume("invalid-local-volume-no-node-affinity", "",
+				testLocalVolume("/foo", nil)),
 		},
 		"invalid local volume empty path": {
 			isExpectedFailure: true,
-			volume: testVolumeWithNodeAffinity(
-				t,
-				"invalid-local-volume-empty-path",
-				"",
-				&core.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-						NodeSelectorTerms: []core.NodeSelectorTerm{
-							{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-				},
-				core.PersistentVolumeSpec{
-					Capacity: core.ResourceList{
-						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-					},
-					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
-					PersistentVolumeSource: core.PersistentVolumeSource{
-						Local: &core.LocalVolumeSource{},
-					},
-					StorageClassName: "test-storage-class",
-				}),
+			volume: testVolume("invalid-local-volume-empty-path", "",
+				testLocalVolume("", simpleVolumeNodeAffinity("foo", "bar"))),
+		},
+		"invalid-local-volume-backsteps": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "",
+				testLocalVolume("/foo/..", simpleVolumeNodeAffinity("foo", "bar"))),
+		},
+		"valid-local-volume-relative-path": {
+			isExpectedFailure: false,
+			volume: testVolume("foo", "",
+				testLocalVolume("foo", simpleVolumeNodeAffinity("foo", "bar"))),
 		},
 	}
 
-	err := utilfeature.DefaultFeatureGate.Set("PersistentLocalVolumes=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
-		return
-	}
 	for name, scenario := range scenarios {
 		errs := ValidatePersistentVolume(scenario.volume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
+func TestValidateLocalVolumesDisabled(t *testing.T) {
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		volume            *core.PersistentVolume
+	}{
+		"feature disabled valid local volume": {
+			isExpectedFailure: true,
+			volume: testVolume("valid-local-volume", "",
+				testLocalVolume("/foo", simpleVolumeNodeAffinity("foo", "bar"))),
+		},
+	}
+
+	utilfeature.DefaultFeatureGate.Set("PersistentLocalVolumes=false")
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolume(scenario.volume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+	utilfeature.DefaultFeatureGate.Set("PersistentLocalVolumes=true")
+
+	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolume(scenario.volume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+}
+
+func testVolumeWithNodeAffinity(affinity *core.VolumeNodeAffinity) *core.PersistentVolume {
+	return testVolume("test-affinity-volume", "",
+		core.PersistentVolumeSpec{
+			Capacity: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+			AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			PersistentVolumeSource: core.PersistentVolumeSource{
+				GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{
+					PDName: "foo",
+				},
+			},
+			StorageClassName: "test-storage-class",
+			NodeAffinity:     affinity,
+		})
+}
+
+func simpleVolumeNodeAffinity(key, value string) *core.VolumeNodeAffinity {
+	return &core.VolumeNodeAffinity{
+		Required: &core.NodeSelector{
+			NodeSelectorTerms: []core.NodeSelectorTerm{
+				{
+					MatchExpressions: []core.NodeSelectorRequirement{
+						{
+							Key:      key,
+							Operator: core.NodeSelectorOpIn,
+							Values:   []string{value},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldPV             *core.PersistentVolume
+		newPV             *core.PersistentVolume
+	}{
+		"nil-nothing-changed": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(nil),
+			newPV:             testVolumeWithNodeAffinity(nil),
+		},
+		"affinity-nothing-changed": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar2")),
+		},
+		"nil-to-obj": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(nil),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"obj-to-nil": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+			newPV:             testVolumeWithNodeAffinity(nil),
+		},
+	}
+
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
@@ -1595,7 +1561,7 @@ func TestValidateKeyToPath(t *testing.T) {
 			ok: true,
 		},
 		{
-			kp: core.KeyToPath{Key: "k", Path: "p", Mode: newInt32(0644)},
+			kp: core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(0644)},
 			ok: true,
 		},
 		{
@@ -1629,12 +1595,12 @@ func TestValidateKeyToPath(t *testing.T) {
 			errtype: field.ErrorTypeInvalid,
 		},
 		{
-			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: newInt32(01000)},
+			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(01000)},
 			ok:      false,
 			errtype: field.ErrorTypeInvalid,
 		},
 		{
-			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: newInt32(-1)},
+			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(-1)},
 			ok:      false,
 			errtype: field.ErrorTypeInvalid,
 		},
@@ -1871,14 +1837,6 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 		t.Errorf("Failed to disable feature gate for CSIPersistentVolumes: %v", err)
 		return
 	}
-
-}
-
-// helper
-func newInt32(val int) *int32 {
-	p := new(int32)
-	*p = int32(val)
-	return p
 }
 
 // This test is a little too top-to-bottom.  Ideally we would test each volume
@@ -2365,7 +2323,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "my-secret",
-						DefaultMode: newInt32(0644),
+						DefaultMode: utilpointer.Int32Ptr(0644),
 					},
 				},
 			},
@@ -2380,7 +2338,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: newInt32(0644),
+							Mode: utilpointer.Int32Ptr(0644),
 						}},
 					},
 				},
@@ -2450,7 +2408,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "s",
-						DefaultMode: newInt32(01000),
+						DefaultMode: utilpointer.Int32Ptr(01000),
 					},
 				},
 			},
@@ -2464,7 +2422,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "s",
-						DefaultMode: newInt32(-1),
+						DefaultMode: utilpointer.Int32Ptr(-1),
 					},
 				},
 			},
@@ -2494,7 +2452,7 @@ func TestValidateVolumes(t *testing.T) {
 						LocalObjectReference: core.LocalObjectReference{
 							Name: "my-cfgmap",
 						},
-						DefaultMode: newInt32(0644),
+						DefaultMode: utilpointer.Int32Ptr(0644),
 					},
 				},
 			},
@@ -2510,7 +2468,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: newInt32(0644),
+							Mode: utilpointer.Int32Ptr(0644),
 						}},
 					},
 				},
@@ -2581,7 +2539,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "c"},
-						DefaultMode:          newInt32(01000),
+						DefaultMode:          utilpointer.Int32Ptr(01000),
 					},
 				},
 			},
@@ -2595,7 +2553,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "c"},
-						DefaultMode:          newInt32(-1),
+						DefaultMode:          utilpointer.Int32Ptr(-1),
 					},
 				},
 			},
@@ -2924,7 +2882,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: newInt32(0644),
+						DefaultMode: utilpointer.Int32Ptr(0644),
 					},
 				},
 			},
@@ -2936,7 +2894,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: newInt32(0644),
+							Mode: utilpointer.Int32Ptr(0644),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -2954,7 +2912,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: newInt32(01000),
+							Mode: utilpointer.Int32Ptr(01000),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -2974,7 +2932,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: newInt32(-1),
+							Mode: utilpointer.Int32Ptr(-1),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -3115,7 +3073,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: newInt32(01000),
+						DefaultMode: utilpointer.Int32Ptr(01000),
 					},
 				},
 			},
@@ -3128,7 +3086,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: newInt32(-1),
+						DefaultMode: utilpointer.Int32Ptr(-1),
 					},
 				},
 			},
@@ -3143,7 +3101,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"some_wwn"},
-						Lun:        newInt32(1),
+						Lun:        utilpointer.Int32Ptr(1),
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
@@ -3170,7 +3128,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{},
-						Lun:        newInt32(1),
+						Lun:        utilpointer.Int32Ptr(1),
 						WWIDs:      []string{},
 						FSType:     "ext4",
 						ReadOnly:   false,
@@ -3188,7 +3146,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"some_wwn"},
-						Lun:        newInt32(1),
+						Lun:        utilpointer.Int32Ptr(1),
 						WWIDs:      []string{"some_wwid"},
 						FSType:     "ext4",
 						ReadOnly:   false,
@@ -3223,7 +3181,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"wwn"},
-						Lun:        newInt32(256),
+						Lun:        utilpointer.Int32Ptr(256),
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
@@ -4067,7 +4025,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					FieldPath:  "metadata.annotations['key']",
 				},
 			},
@@ -4076,7 +4034,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					FieldPath:  "metadata.labels['key']",
 				},
 			},
@@ -4085,7 +4043,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					FieldPath:  "metadata.name",
 				},
 			},
@@ -4094,7 +4052,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					FieldPath:  "metadata.namespace",
 				},
 			},
@@ -4103,7 +4061,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					FieldPath:  "metadata.uid",
 				},
 			},
@@ -4112,7 +4070,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					FieldPath:  "spec.nodeName",
 				},
 			},
@@ -4121,7 +4079,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					FieldPath:  "spec.serviceAccountName",
 				},
 			},
@@ -4130,7 +4088,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					FieldPath:  "status.hostIP",
 				},
 			},
@@ -4139,7 +4097,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					FieldPath:  "status.podIP",
 				},
 			},
@@ -4208,7 +4166,7 @@ func TestValidateEnv(t *testing.T) {
 				Value: "foo",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 						FieldPath:  "metadata.name",
 					},
 				},
@@ -4229,7 +4187,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 						FieldPath:  "metadata.name",
 					},
 					SecretKeyRef: &core.SecretKeySelector{
@@ -4248,7 +4206,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "some_var_name",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 						FieldPath:  "metadata.name",
 					},
 					ConfigMapKeyRef: &core.ConfigMapKeySelector{
@@ -4267,7 +4225,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 						FieldPath:  "metadata.name",
 					},
 					SecretKeyRef: &core.SecretKeySelector{
@@ -4320,7 +4278,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					},
 				},
 			}},
@@ -4345,7 +4303,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
 						FieldPath:  "metadata.whoops",
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					},
 				},
 			}},
@@ -4423,7 +4381,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
 						FieldPath:  "status.phase",
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersions[0].String(),
 					},
 				},
 			}},
@@ -4667,6 +4625,68 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 }
 
+func TestValidateDisabledSubpath(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set("VolumeSubpath=false")
+	defer utilfeature.DefaultFeatureGate.Set("VolumeSubpath=true")
+
+	volumes := []core.Volume{
+		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
+		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+	}
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v1err) > 0 {
+		t.Errorf("Invalid test volume - expected success %v", v1err)
+		return
+	}
+
+	container := core.Container{
+		SecurityContext: nil,
+	}
+
+	goodVolumeDevices := []core.VolumeDevice{
+		{Name: "xyz", DevicePath: "/foofoo"},
+		{Name: "uvw", DevicePath: "/foofoo/share/test"},
+	}
+
+	cases := map[string]struct {
+		mounts      []core.VolumeMount
+		expectError bool
+	}{
+		"subpath not specified": {
+			[]core.VolumeMount{
+				{
+					Name:      "abc-123",
+					MountPath: "/bab",
+				},
+			},
+			false,
+		},
+		"subpath specified": {
+			[]core.VolumeMount{
+				{
+					Name:      "abc-123",
+					MountPath: "/bab",
+					SubPath:   "baz",
+				},
+			},
+			true,
+		},
+	}
+
+	for name, test := range cases {
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+
+		if len(errs) != 0 && !test.expectError {
+			t.Errorf("test %v failed: %+v", name, errs)
+		}
+
+		if len(errs) == 0 && test.expectError {
+			t.Errorf("test %v failed, expected error", name)
+		}
+	}
+}
+
 func TestValidateMountPropagation(t *testing.T) {
 	bTrue := true
 	bFalse := false
@@ -4684,6 +4704,7 @@ func TestValidateMountPropagation(t *testing.T) {
 
 	propagationBidirectional := core.MountPropagationBidirectional
 	propagationHostToContainer := core.MountPropagationHostToContainer
+	propagationNone := core.MountPropagationNone
 	propagationInvalid := core.MountPropagationMode("invalid")
 
 	tests := []struct {
@@ -4700,6 +4721,12 @@ func TestValidateMountPropagation(t *testing.T) {
 		{
 			// implicitly non-privileged container + HostToContainer
 			core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			defaultContainer,
+			false,
+		},
+		{
+			// non-privileged container + None
+			core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationNone},
 			defaultContainer,
 			false,
 		},
@@ -5022,25 +5049,7 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 		{
-			Name:  "resources-test-with-gpu-with-request",
-			Image: "image",
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-					core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
-				},
-				Limits: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-					core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
-				},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "resources-test-with-gpu-without-request",
+			Name:  "resources-test-with-request-and-limit",
 			Image: "image",
 			Resources: core.ResourceRequirements{
 				Requests: core.ResourceList{
@@ -5048,9 +5057,8 @@ func TestValidateContainers(t *testing.T) {
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 				},
 				Limits: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-					core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -5155,7 +5163,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 	}
-	if errs := validateContainers(successCase, volumeDevices, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -5339,41 +5347,6 @@ func TestValidateContainers(t *testing.T) {
 				TerminationMessagePolicy: "File",
 			},
 		},
-		"Resource GPU limit must match request": {
-			{
-				Name:  "gpu-resource-request-limit",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Requests: core.ResourceList{
-						core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-						core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-						core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("0"),
-					},
-					Limits: core.ResourceList{
-						core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-						core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-						core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
-					},
-				},
-				TerminationMessagePolicy: "File",
-				ImagePullPolicy:          "IfNotPresent",
-			},
-		},
-		"Resource GPU invalid setting only request": {
-			{
-				Name:  "gpu-resource-request-limit",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Requests: core.ResourceList{
-						core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-						core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-						core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
-					},
-				},
-				TerminationMessagePolicy: "File",
-				ImagePullPolicy:          "IfNotPresent",
-			},
-		},
 		"Request limit simple invalid": {
 			{
 				Name:  "abc-123",
@@ -5417,7 +5390,67 @@ func TestValidateContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, volumeDevices, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, false, volumeDevices, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
+func TestValidateInitContainers(t *testing.T) {
+	volumeDevices := make(map[string]core.VolumeSource)
+	capabilities.SetForTests(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
+
+	successCase := []core.Container{
+		{
+			Name:  "container-1-same-host-port-different-protocol",
+			Image: "image",
+			Ports: []core.ContainerPort{
+				{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
+				{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{
+			Name:  "container-2-same-host-port-different-protocol",
+			Image: "image",
+			Ports: []core.ContainerPort{
+				{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
+				{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+	}
+	if errs := validateContainers(successCase, true, volumeDevices, field.NewPath("field")); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		AllowPrivileged: false,
+	})
+	errorCases := map[string][]core.Container{
+		"duplicate ports": {
+			{
+				Name:  "abc",
+				Image: "image",
+				Ports: []core.ContainerPort{
+					{
+						ContainerPort: 8080, HostPort: 8080, Protocol: "TCP",
+					},
+					{
+						ContainerPort: 8080, HostPort: 8080, Protocol: "TCP",
+					},
+				},
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+			},
+		},
+	}
+	for k, v := range errorCases {
+		if errs := validateContainers(v, true, volumeDevices, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -5651,24 +5684,9 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
 
-	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("PodPriority")
-	defer func() {
-		var err error
-		// restoring the old value
-		if priorityEnabled {
-			err = utilfeature.DefaultFeatureGate.Set("PodPriority=true")
-		} else {
-			err = utilfeature.DefaultFeatureGate.Set("PodPriority=false")
-		}
-		if err != nil {
-			t.Errorf("Failed to restore feature gate for PodPriority: %v", err)
-		}
-	}()
-	err := utilfeature.DefaultFeatureGate.Set("PodPriority=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for PodPriority: %v", err)
-		return
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, true)()
+
 	successCases := []core.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
@@ -5792,6 +5810,15 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy:     core.RestartPolicyAlways,
 			DNSPolicy:         core.DNSClusterFirst,
 			PriorityClassName: "valid-name",
+		},
+		{ // Populate ShareProcessNamespace
+			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			SecurityContext: &core.PodSecurityContext{
+				ShareProcessNamespace: &[]bool{true}[0],
+			},
 		},
 	}
 	for i := range successCases {
@@ -5964,10 +5991,40 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:         core.DNSClusterFirst,
 			PriorityClassName: "InvalidName",
 		},
+		"ShareProcessNamespace and HostPID both set": {
+			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			SecurityContext: &core.PodSecurityContext{
+				HostPID:               true,
+				ShareProcessNamespace: &[]bool{true}[0],
+			},
+		},
 	}
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
+		}
+	}
+
+	// original value will be restored by previous defer
+	utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, false)
+
+	featuregatedCases := map[string]core.PodSpec{
+		"set ShareProcessNamespace": {
+			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			SecurityContext: &core.PodSecurityContext{
+				ShareProcessNamespace: &[]bool{true}[0],
+			},
+		},
+	}
+	for k, v := range featuregatedCases {
+		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure due to gated feature: %q", k)
 		}
 	}
 }
@@ -6051,6 +6108,13 @@ func TestValidatePod(t *testing.T) {
 											Values:   []string{"value1", "value2"},
 										},
 									},
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"host1"},
+										},
+									},
 								},
 							},
 						},
@@ -6065,6 +6129,47 @@ func TestValidatePod(t *testing.T) {
 											Values:   []string{"bar"},
 										},
 									},
+								},
+							},
+						},
+					},
+				},
+			),
+		},
+		{ // Serialized node affinity requirements.
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: validPodSpec(
+				// TODO: Uncomment and move this block and move inside NodeAffinity once
+				// RequiredDuringSchedulingRequiredDuringExecution is implemented
+				//		RequiredDuringSchedulingRequiredDuringExecution: &core.NodeSelector{
+				//			NodeSelectorTerms: []core.NodeSelectorTerm{
+				//				{
+				//					MatchExpressions: []core.NodeSelectorRequirement{
+				//						{
+				//							Key: "key1",
+				//							Operator: core.NodeSelectorOpExists
+				//						},
+				//					},
+				//				},
+				//			},
+				//		},
+				&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchExpressions: []core.NodeSelectorRequirement{},
+								},
+							},
+						},
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{
+							{
+								Weight: 10,
+								Preference: core.NodeSelectorTerm{
+									MatchExpressions: []core.NodeSelectorRequirement{},
 								},
 							},
 						},
@@ -6238,12 +6343,22 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
+		{ // runtime default seccomp profile
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					core.SeccompPodAnnotationKey: core.SeccompProfileRuntimeDefault,
+				},
+			},
+			Spec: validPodSpec(nil),
+		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: "docker/default",
+					core.SeccompPodAnnotationKey: core.DeprecatedSeccompProfileDockerDefault,
 				},
 			},
 			Spec: validPodSpec(nil),
@@ -6477,6 +6592,108 @@ func TestValidatePod(t *testing.T) {
 				}),
 			},
 		},
+		"invalid node selector requirement in node affinity, key is invalid": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchExpressions: []core.NodeSelectorRequirement{
+										{
+											Key:      "invalid key ___@#",
+											Operator: core.NodeSelectorOpExists,
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid node field selector requirement in node affinity, more values for field selector": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].values",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"host1", "host2"},
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid node field selector requirement in node affinity, invalid operator": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].operator",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: core.NodeSelectorOpExists,
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid node field selector requirement in node affinity, invalid key": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].key",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.namespace",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"ns1"},
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
 		"invalid preferredSchedulingTerm in node affinity, weight should be in range 1-100": {
 			expectedError: "must be in the range 1-100",
 			spec: core.Pod{
@@ -6515,26 +6732,6 @@ func TestValidatePod(t *testing.T) {
 					NodeAffinity: &core.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
 							NodeSelectorTerms: []core.NodeSelectorTerm{},
-						},
-					},
-				}),
-			},
-		},
-		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
-			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: validPodSpec(&core.Affinity{
-					NodeAffinity: &core.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-							NodeSelectorTerms: []core.NodeSelectorTerm{
-								{
-									MatchExpressions: []core.NodeSelectorRequirement{},
-								},
-							},
 						},
 					},
 				}),
@@ -8641,7 +8838,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.SessionAffinity = core.ServiceAffinityClientIP
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: newInt32(-1),
+						TimeoutSeconds: utilpointer.Int32Ptr(-1),
 					},
 				}
 			},
@@ -8654,7 +8851,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.SessionAffinity = core.ServiceAffinityNone
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: newInt32(90),
+						TimeoutSeconds: utilpointer.Int32Ptr(90),
 					},
 				}
 			},
@@ -9346,9 +9543,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName("hugepages-1Gi"):     resource.MustParse("0"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -9362,9 +9556,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
 				},
-			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
 			},
 		},
 		{
@@ -9381,7 +9572,6 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a valid taint to a node
 				Taints: []core.Taint{{Key: "GPU", Value: "true", Effect: "NoSchedule"}},
 			},
@@ -9419,9 +9609,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -9437,8 +9624,7 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
-				PodCIDR:    "192.168.0.0/16",
+				PodCIDR: "192.168.0.0/16",
 			},
 		},
 	}
@@ -9461,29 +9647,11 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		"invalid-labels": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "abc-123",
 				Labels: invalidSelector,
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-				},
-			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
-		},
-		"missing-external-id": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "abc-123",
-				Labels: validSelector,
 			},
 			Status: core.NodeStatus{
 				Capacity: core.ResourceList{
@@ -9497,7 +9665,6 @@ func TestValidateNode(t *testing.T) {
 				Name: "dedicated-node1",
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with an empty key to a node
 				Taints: []core.Taint{{Key: "", Value: "special-user-1", Effect: "NoSchedule"}},
 			},
@@ -9507,7 +9674,6 @@ func TestValidateNode(t *testing.T) {
 				Name: "dedicated-node1",
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with an invalid  key to a node
 				Taints: []core.Taint{{Key: "NoUppercaseOrSpecialCharsLike=Equals", Value: "special-user-1", Effect: "NoSchedule"}},
 			},
@@ -9526,7 +9692,6 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with a bad value to a node
 				Taints: []core.Taint{{Key: "dedicated", Value: "some\\bad\\value", Effect: "NoSchedule"}},
 			},
@@ -9545,7 +9710,6 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with an empty effect to a node
 				Taints: []core.Taint{{Key: "dedicated", Value: "special-user-3", Effect: ""}},
 			},
@@ -9564,7 +9728,6 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with NoExecute effect to a node
 				Taints: []core.Taint{{Key: "dedicated", Value: "special-user-3", Effect: "NoScheduleNoAdmit"}},
 			},
@@ -9574,7 +9737,6 @@ func TestValidateNode(t *testing.T) {
 				Name: "dedicated-node1",
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add two taints to the node with the same key and effect; should be rejected.
 				Taints: []core.Taint{
 					{Key: "dedicated", Value: "special-user-1", Effect: "NoSchedule"},
@@ -9603,9 +9765,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
 				},
-			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
 			},
 		},
 		"invalid-podController": {
@@ -9639,9 +9798,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		"multiple-pre-allocated-hugepages": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -9660,9 +9816,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName("hugepages-1Gi"):     resource.MustParse("10Gi"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		"invalid-pod-cidr": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -9678,8 +9831,7 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
-				PodCIDR:    "192.168.0.0",
+				PodCIDR: "192.168.0.0",
 			},
 		},
 	}
@@ -10149,7 +10301,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.SessionAffinity = "ClientIP"
 				newSvc.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: newInt32(90),
+						TimeoutSeconds: utilpointer.Int32Ptr(90),
 					},
 				}
 			},
@@ -12443,17 +12595,17 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 	successCases := map[string]*core.SessionAffinityConfig{
 		"non-empty config, valid timeout: 1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(1),
+				TimeoutSeconds: utilpointer.Int32Ptr(1),
 			},
 		},
 		"non-empty config, valid timeout: core.MaxClientIPServiceAffinitySeconds-1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(int(core.MaxClientIPServiceAffinitySeconds - 1)),
+				TimeoutSeconds: utilpointer.Int32Ptr(core.MaxClientIPServiceAffinitySeconds - 1),
 			},
 		},
 		"non-empty config, valid timeout: core.MaxClientIPServiceAffinitySeconds": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(int(core.MaxClientIPServiceAffinitySeconds)),
+				TimeoutSeconds: utilpointer.Int32Ptr(core.MaxClientIPServiceAffinitySeconds),
 			},
 		},
 	}
@@ -12476,17 +12628,17 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 		},
 		"non-empty config, invalid timeout: core.MaxClientIPServiceAffinitySeconds+1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(int(core.MaxClientIPServiceAffinitySeconds + 1)),
+				TimeoutSeconds: utilpointer.Int32Ptr(core.MaxClientIPServiceAffinitySeconds + 1),
 			},
 		},
 		"non-empty config, invalid timeout: -1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(-1),
+				TimeoutSeconds: utilpointer.Int32Ptr(-1),
 			},
 		},
 		"non-empty config, invalid timeout: 0": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(0),
+				TimeoutSeconds: utilpointer.Int32Ptr(0),
 			},
 		},
 	}

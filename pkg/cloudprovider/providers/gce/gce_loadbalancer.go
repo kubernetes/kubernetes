@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
 
@@ -43,13 +44,6 @@ var (
 func newLoadBalancerMetricContext(request, region string) *metricContext {
 	return newGenericMetricContext("loadbalancer", request, region, unusedMetricLabel, computeV1Version)
 }
-
-type lbScheme string
-
-const (
-	schemeExternal lbScheme = "EXTERNAL"
-	schemeInternal lbScheme = "INTERNAL"
-)
 
 func init() {
 	var err error
@@ -126,13 +120,13 @@ func (gce *GCECloud) EnsureLoadBalancer(ctx context.Context, clusterName string,
 	}
 
 	if existingFwdRule != nil {
-		existingScheme := lbScheme(strings.ToUpper(existingFwdRule.LoadBalancingScheme))
+		existingScheme := cloud.LbScheme(strings.ToUpper(existingFwdRule.LoadBalancingScheme))
 
 		// If the loadbalancer type changes between INTERNAL and EXTERNAL, the old load balancer should be deleted.
 		if existingScheme != desiredScheme {
 			glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): deleting existing %v loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, existingScheme)
 			switch existingScheme {
-			case schemeInternal:
+			case cloud.SchemeInternal:
 				err = gce.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
 			default:
 				err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
@@ -149,7 +143,7 @@ func (gce *GCECloud) EnsureLoadBalancer(ctx context.Context, clusterName string,
 
 	var status *v1.LoadBalancerStatus
 	switch desiredScheme {
-	case schemeInternal:
+	case cloud.SchemeInternal:
 		status, err = gce.ensureInternalLoadBalancer(clusterName, clusterID, svc, existingFwdRule, nodes)
 	default:
 		status, err = gce.ensureExternalLoadBalancer(clusterName, clusterID, svc, existingFwdRule, nodes)
@@ -170,7 +164,7 @@ func (gce *GCECloud) UpdateLoadBalancer(ctx context.Context, clusterName string,
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v, %v, %v): updating with %d nodes", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, len(nodes))
 
 	switch scheme {
-	case schemeInternal:
+	case cloud.SchemeInternal:
 		err = gce.updateInternalLoadBalancer(clusterName, clusterID, svc, nodes)
 	default:
 		err = gce.updateExternalLoadBalancer(clusterName, svc, nodes)
@@ -191,7 +185,7 @@ func (gce *GCECloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName 
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): deleting loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region)
 
 	switch scheme {
-	case schemeInternal:
+	case cloud.SchemeInternal:
 		err = gce.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
 	default:
 		err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
@@ -200,9 +194,9 @@ func (gce *GCECloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName 
 	return err
 }
 
-func getSvcScheme(svc *v1.Service) lbScheme {
+func getSvcScheme(svc *v1.Service) cloud.LbScheme {
 	if typ, ok := GetLoadBalancerAnnotationType(svc); ok && typ == LBTypeInternal {
-		return schemeInternal
+		return cloud.SchemeInternal
 	}
-	return schemeExternal
+	return cloud.SchemeExternal
 }

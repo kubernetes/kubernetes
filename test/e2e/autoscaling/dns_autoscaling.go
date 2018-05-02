@@ -99,9 +99,11 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	// This test is separated because it is slow and need to run serially.
 	// Will take around 5 minutes to run on a 4 nodes cluster.
 	It("[Serial] [Slow] kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func() {
+		numNodes, err := framework.NumberOfRegisteredNodes(c)
+		Expect(err).NotTo(HaveOccurred())
 
 		By("Replace the dns autoscaling parameters with testing parameters")
-		err := updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams_1)))
+		err = updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams_1)))
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("Restoring initial dns autoscaling parameters")
@@ -117,25 +119,21 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		Expect(waitForDNSReplicasSatisfied(c, getExpectReplicasLinear, DNSdefaultTimeout)).NotTo(HaveOccurred())
 
 		originalSizes := make(map[string]int)
-		sum := 0
 		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 			size, err := framework.GroupSize(mig)
 			Expect(err).NotTo(HaveOccurred())
 			By(fmt.Sprintf("Initial size of %s: %d", mig, size))
 			originalSizes[mig] = size
-			sum += size
 		}
 
 		By("Manually increase cluster size")
-		increasedSize := 0
 		increasedSizes := make(map[string]int)
 		for key, val := range originalSizes {
 			increasedSizes[key] = val + 1
-			increasedSize += increasedSizes[key]
 		}
 		setMigSizes(increasedSizes)
 		Expect(WaitForClusterSizeFunc(c,
-			func(size int) bool { return size == increasedSize }, scaleUpTimeout)).NotTo(HaveOccurred())
+			func(size int) bool { return size == numNodes+len(originalSizes) }, scaleUpTimeout)).NotTo(HaveOccurred())
 
 		By("Wait for kube-dns scaled to expected number")
 		getExpectReplicasLinear = getExpectReplicasFuncLinear(c, &DNSParams_1)
@@ -151,7 +149,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 		By("Restoring cluster size")
 		setMigSizes(originalSizes)
-		Expect(framework.WaitForReadyNodes(c, sum, scaleDownTimeout)).NotTo(HaveOccurred())
+		Expect(framework.WaitForReadyNodes(c, numNodes, scaleDownTimeout)).NotTo(HaveOccurred())
 
 		By("Wait for kube-dns scaled to expected number")
 		Expect(waitForDNSReplicasSatisfied(c, getExpectReplicasLinear, DNSdefaultTimeout)).NotTo(HaveOccurred())

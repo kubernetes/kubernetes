@@ -20,9 +20,9 @@
 REGISTRY?=staging-k8s.gcr.io
 ARCH?=amd64
 OUT_DIR?=_output
-HYPERKUBE_BIN?=$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/hyperkube
+HYPERKUBE_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/hyperkube
 
-BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.8
+BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.10
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build
@@ -33,7 +33,7 @@ ifndef VERSION
     $(error VERSION is undefined)
 endif
 	cp -r ./* ${TEMP_DIR}
-	cp ../../../${HYPERKUBE_BIN} ${TEMP_DIR}
+	cp ${HYPERKUBE_BIN} ${TEMP_DIR}
 
 	chmod a+rx ${TEMP_DIR}/hyperkube
 
@@ -45,11 +45,11 @@ endif
 	rm -rf "${TEMP_DIR}"
 
 push: build
-	gcloud docker -- push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
+	docker push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
 	docker rmi ${REGISTRY}/hyperkube:${VERSION} 2>/dev/null || true
 	docker tag ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
-	gcloud docker -- push ${REGISTRY}/hyperkube:${VERSION}
+	docker push ${REGISTRY}/hyperkube:${VERSION}
 endif
 
 .PHONY: build push all

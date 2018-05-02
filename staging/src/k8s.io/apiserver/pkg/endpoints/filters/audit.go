@@ -38,17 +38,18 @@ import (
 // requests coming to the server. Audit level is decided according to requests'
 // attributes and audit policy. Logs are emitted to the audit sink to
 // process events. If sink or audit policy is nil, no decoration takes place.
-func WithAudit(handler http.Handler, requestContextMapper request.RequestContextMapper, sink audit.Sink, policy policy.Checker, longRunningCheck request.LongRunningRequestCheck) http.Handler {
+func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, longRunningCheck request.LongRunningRequestCheck) http.Handler {
 	if sink == nil || policy == nil {
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, ev, omitStages, err := createAuditEventAndAttachToContext(requestContextMapper, req, policy)
+		req, ev, omitStages, err := createAuditEventAndAttachToContext(req, policy)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to create audit event: %v", err))
 			responsewriters.InternalError(w, req, errors.New("failed to create audit event"))
 			return
 		}
+		ctx := req.Context()
 		if ev == nil || ctx == nil {
 			handler.ServeHTTP(w, req)
 			return
@@ -111,35 +112,29 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 // - context with audit event attached to it
 // - created audit event
 // - error if anything bad happened
-func createAuditEventAndAttachToContext(requestContextMapper request.RequestContextMapper, req *http.Request, policy policy.Checker) (request.Context, *auditinternal.Event, []auditinternal.Stage, error) {
-	ctx, ok := requestContextMapper.Get(req)
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("no context found for request")
-	}
+func createAuditEventAndAttachToContext(req *http.Request, policy policy.Checker) (*http.Request, *auditinternal.Event, []auditinternal.Stage, error) {
+	ctx := req.Context()
 
 	attribs, err := GetAuthorizerAttributes(ctx)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
+		return req, nil, nil, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
 	}
 
 	level, omitStages := policy.LevelAndStages(attribs)
 	audit.ObservePolicyLevel(level)
 	if level == auditinternal.LevelNone {
 		// Don't audit.
-		return nil, nil, nil, nil
+		return req, nil, nil, nil
 	}
 
 	ev, err := audit.NewEventFromRequest(req, level, attribs)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to complete audit event from request: %v", err)
+		return req, nil, nil, fmt.Errorf("failed to complete audit event from request: %v", err)
 	}
 
-	ctx = request.WithAuditEvent(ctx, ev)
-	if err := requestContextMapper.Update(req, ctx); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to attach audit event to context: %v", err)
-	}
+	req = req.WithContext(request.WithAuditEvent(ctx, ev))
 
-	return ctx, ev, omitStages, nil
+	return req, ev, omitStages, nil
 }
 
 func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) {

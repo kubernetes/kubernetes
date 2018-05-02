@@ -185,9 +185,9 @@ func (client VirtualMachineScaleSetExtensionsClient) DeleteResponder(resp *http.
 
 // Get the operation to get the extension.
 //
-// resourceGroupName is the name of the resource group. VMScaleSetName is the name of the VM scale set containing the
-// extension. vmssExtensionName is the name of the VM scale set extension. expand is the expand expression to apply on
-// the operation.
+// resourceGroupName is the name of the resource group. VMScaleSetName is the name of the VM scale set containing
+// the extension. vmssExtensionName is the name of the VM scale set extension. expand is the expand expression to
+// apply on the operation.
 func (client VirtualMachineScaleSetExtensionsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, vmssExtensionName string, expand string) (result VirtualMachineScaleSetExtension, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, VMScaleSetName, vmssExtensionName, expand)
 	if err != nil {
@@ -257,8 +257,8 @@ func (client VirtualMachineScaleSetExtensionsClient) GetResponder(resp *http.Res
 
 // List gets a list of all extensions in a VM scale set.
 //
-// resourceGroupName is the name of the resource group. VMScaleSetName is the name of the VM scale set containing the
-// extension.
+// resourceGroupName is the name of the resource group. VMScaleSetName is the name of the VM scale set containing
+// the extension.
 func (client VirtualMachineScaleSetExtensionsClient) List(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result VirtualMachineScaleSetExtensionListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, VMScaleSetName)

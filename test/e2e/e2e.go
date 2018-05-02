@@ -56,7 +56,7 @@ func setupProviderConfig() error {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 
 	case "gce", "gke":
-		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
+		framework.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
 		zone := framework.TestContext.CloudConfig.Zone
 		region := framework.TestContext.CloudConfig.Region
 
@@ -72,10 +72,9 @@ func setupProviderConfig() error {
 			managedZones = []string{zone}
 		}
 
-		gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{gcecloud.AlphaFeatureNetworkEndpointGroup})
-		if err != nil {
-			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
-		}
+		gceAlphaFeatureGate := gcecloud.NewAlphaFeatureGate([]string{
+			gcecloud.AlphaFeatureNetworkEndpointGroup,
+		})
 
 		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
 			ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
@@ -295,7 +294,7 @@ func gatherTestSuiteMetrics() error {
 			return fmt.Errorf("error writing to %q: %v", filePath, err)
 		}
 	} else {
-		framework.Logf("\n\nTest Suite Metrics:\n%s\n\n", metricsJSON)
+		framework.Logf("\n\nTest Suite Metrics:\n%s\n", metricsJSON)
 	}
 
 	return nil

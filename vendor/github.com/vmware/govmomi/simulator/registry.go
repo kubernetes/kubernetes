@@ -213,8 +213,8 @@ func (r *Registry) getEntityParent(item mo.Entity, kind string) mo.Entity {
 }
 
 // getEntityDatacenter returns the Datacenter containing the given item
-func (r *Registry) getEntityDatacenter(item mo.Entity) *mo.Datacenter {
-	return r.getEntityParent(item, "Datacenter").(*mo.Datacenter)
+func (r *Registry) getEntityDatacenter(item mo.Entity) *Datacenter {
+	return r.getEntityParent(item, "Datacenter").(*Datacenter)
 }
 
 func (r *Registry) getEntityFolder(item mo.Entity, kind string) *Folder {

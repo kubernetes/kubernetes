@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "net",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/images/net",
 )
 
 go_library(

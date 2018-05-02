@@ -139,6 +139,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 		},
 	}
 	for index, test := range testCases {
+		t.Log(registry.RegisteredGroupVersions())
 		actualDisablers, err := MergeAPIResourceConfigs(test.defaultResourceConfig(), test.runtimeConfig, registry)
 		if err == nil && test.err {
 			t.Fatalf("expected error for test case: %v", index)
@@ -165,13 +166,13 @@ func newFakeAPIResourceConfigSource() *serverstore.ResourceConfig {
 }
 
 func newFakeRegistry() *registered.APIRegistrationManager {
-	registry := registered.NewOrDie("")
+	registry := registered.NewAPIRegistrationManager()
 
 	registry.RegisterGroup(apimachinery.GroupMeta{
-		GroupVersion: apiv1.SchemeGroupVersion,
+		GroupVersions: []schema.GroupVersion{apiv1.SchemeGroupVersion},
 	})
 	registry.RegisterGroup(apimachinery.GroupMeta{
-		GroupVersion: extensionsapiv1beta1.SchemeGroupVersion,
+		GroupVersions: []schema.GroupVersion{extensionsapiv1beta1.SchemeGroupVersion},
 	})
 	registry.RegisterVersions([]schema.GroupVersion{apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion})
 	return registry

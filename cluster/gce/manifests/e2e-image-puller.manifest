@@ -34,7 +34,7 @@ spec:
       k8s.gcr.io/busybox:1.24
       k8s.gcr.io/dnsutils:e2e
       k8s.gcr.io/e2e-net-amd64:1.0
-      k8s.gcr.io/echoserver:1.6
+      k8s.gcr.io/echoserver:1.10
       k8s.gcr.io/eptest:0.1
       k8s.gcr.io/fakegitserver:0.1
       k8s.gcr.io/galera-install:0.1
@@ -69,11 +69,11 @@ spec:
       k8s.gcr.io/test-webserver:e2e
       k8s.gcr.io/update-demo:kitten
       k8s.gcr.io/update-demo:nautilus
-      k8s.gcr.io/volume-ceph:0.1
-      k8s.gcr.io/volume-gluster:0.2
-      k8s.gcr.io/volume-iscsi:0.1
-      k8s.gcr.io/volume-nfs:0.8
-      k8s.gcr.io/volume-rbd:0.1
+      gcr.io/kubernetes-e2e-test-images/volume-ceph:0.1
+      gcr.io/kubernetes-e2e-test-images/volume-gluster:0.2
+      gcr.io/kubernetes-e2e-test-images/volume-iscsi:0.1
+      gcr.io/kubernetes-e2e-test-images/volume-nfs:0.8
+      gcr.io/kubernetes-e2e-test-images/volume-rbd:0.1
       k8s.gcr.io/zookeeper-install-3.5.0-alpha:e2e
       gcr.io/google_samples/gb-redisslave:nonexistent
       ; do echo $(date '+%X') pulling $i; docker pull $i 1>/dev/null; done; exit 0;

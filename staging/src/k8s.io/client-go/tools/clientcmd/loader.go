@@ -139,7 +139,9 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 
 	envVarFiles := os.Getenv(RecommendedConfigPathEnvVar)
 	if len(envVarFiles) != 0 {
-		chain = append(chain, filepath.SplitList(envVarFiles)...)
+		fileList := filepath.SplitList(envVarFiles)
+		// prevent the same path load multiple times
+		chain = append(chain, deduplicate(fileList)...)
 
 	} else {
 		chain = append(chain, RecommendedHomeFile)
@@ -557,7 +559,12 @@ func GetClusterFileReferences(cluster *clientcmdapi.Cluster) []*string {
 }
 
 func GetAuthInfoFileReferences(authInfo *clientcmdapi.AuthInfo) []*string {
-	return []*string{&authInfo.ClientCertificate, &authInfo.ClientKey, &authInfo.TokenFile}
+	s := []*string{&authInfo.ClientCertificate, &authInfo.ClientKey, &authInfo.TokenFile}
+	// Only resolve exec command if it isn't PATH based.
+	if authInfo.Exec != nil && strings.ContainsRune(authInfo.Exec.Command, filepath.Separator) {
+		s = append(s, &authInfo.Exec.Command)
+	}
+	return s
 }
 
 // ResolvePaths updates the given refs to be absolute paths, relative to the given base directory
@@ -609,4 +616,18 @@ func MakeRelative(path, base string) (string, error) {
 		return rel, nil
 	}
 	return path, nil
+}
+
+// deduplicate removes any duplicated values and returns a new slice, keeping the order unchanged
+func deduplicate(s []string) []string {
+	encountered := map[string]bool{}
+	ret := make([]string, 0)
+	for i := range s {
+		if encountered[s[i]] {
+			continue
+		}
+		encountered[s[i]] = true
+		ret = append(ret, s[i])
+	}
+	return ret
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,6 +43,9 @@ message PriorityClass {
 
   // globalDefault specifies whether this PriorityClass should be considered as
   // the default priority for pods that do not have any priority class.
+  // Only one PriorityClass can be marked as `globalDefault`. However, if more than
+  // one PriorityClasses exists with their `globalDefault` field set to true,
+  // the smallest value of such global default PriorityClasses will be used as the default priority.
   // +optional
   optional bool globalDefault = 3;
 

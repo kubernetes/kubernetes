@@ -94,7 +94,7 @@ func (s *SearchIndex) FindChild(req *types.FindChild) soap.HasFault {
 	var children []types.ManagedObjectReference
 
 	switch e := obj.(type) {
-	case *mo.Datacenter:
+	case *Datacenter:
 		children = []types.ManagedObjectReference{e.VmFolder, e.HostFolder, e.DatastoreFolder, e.NetworkFolder}
 	case *Folder:
 		children = e.ChildEntity

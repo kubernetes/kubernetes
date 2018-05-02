@@ -38,6 +38,7 @@ import (
 // 1. If a request is not from a node (NodeIdentity() returns isNode=false), reject
 // 2. If a specific node cannot be identified (NodeIdentity() returns nodeName=""), reject
 // 3. If a request is for a secret, configmap, persistent volume or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
+//    node <- configmap
 //    node <- pod
 //    node <- pod <- secret
 //    node <- pod <- configmap
@@ -70,6 +71,7 @@ var (
 	pvcResource       = api.Resource("persistentvolumeclaims")
 	pvResource        = api.Resource("persistentvolumes")
 	vaResource        = storageapi.Resource("volumeattachments")
+	svcAcctResource   = api.Resource("serviceaccounts")
 )
 
 func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -106,6 +108,11 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 				return r.authorizeGet(nodeName, vaVertexType, attrs)
 			}
 			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.CSIPersistentVolume), nil
+		case svcAcctResource:
+			if r.features.Enabled(features.TokenRequest) {
+				return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
+			}
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.TokenRequest), nil
 		}
 	}
 
@@ -151,6 +158,31 @@ func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, att
 	if len(attrs.GetName()) == 0 {
 		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "No Object name found", nil
+	}
+
+	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
+	if err != nil {
+		glog.V(2).Infof("NODE DENY: %v", err)
+		return authorizer.DecisionNoOpinion, "no path found to object", nil
+	}
+	if !ok {
+		glog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "no path found to object", nil
+	}
+	return authorizer.DecisionAllow, "", nil
+}
+
+// authorizeCreateToken authorizes "create" requests to serviceaccounts 'token'
+// subresource of pods running on a node
+func (r *NodeAuthorizer) authorizeCreateToken(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	if attrs.GetVerb() != "create" || len(attrs.GetName()) == 0 {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only create tokens for individual service accounts", nil
+	}
+
+	if attrs.GetSubresource() != "token" {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only create token subresource of serviceaccount", nil
 	}
 
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())

@@ -29,14 +29,12 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -68,33 +66,33 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 		ctx.ClientBuilder.ClientOrDie("service-controller"),
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.ComponentConfig.ClusterName,
+		ctx.ComponentConfig.KubeCloudShared.ClusterName,
 	)
 	if err != nil {
 		// This error shouldn't fail. It lives like this as a legacy.
 		glog.Errorf("Failed to start service controller: %v", err)
 		return false, nil
 	}
-	go serviceController.Run(ctx.Stop, int(ctx.ComponentConfig.ConcurrentServiceSyncs))
+	go serviceController.Run(ctx.Stop, int(ctx.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
 	return true, nil
 }
 
 func startNodeIpamController(ctx ControllerContext) (bool, error) {
 	var clusterCIDR *net.IPNet = nil
 	var serviceCIDR *net.IPNet = nil
-	if ctx.ComponentConfig.AllocateNodeCIDRs {
+	if ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
 		var err error
-		if len(strings.TrimSpace(ctx.ComponentConfig.ClusterCIDR)) != 0 {
-			_, clusterCIDR, err = net.ParseCIDR(ctx.ComponentConfig.ClusterCIDR)
+		if len(strings.TrimSpace(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
+			_, clusterCIDR, err = net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
 			if err != nil {
-				glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.ClusterCIDR, err)
+				glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
 			}
 		}
 
-		if len(strings.TrimSpace(ctx.ComponentConfig.ServiceCIDR)) != 0 {
-			_, serviceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.ServiceCIDR)
+		if len(strings.TrimSpace(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)) != 0 {
+			_, serviceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)
 			if err != nil {
-				glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.ServiceCIDR, err)
+				glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIpamController.ServiceCIDR, err)
 			}
 		}
 	}
@@ -105,9 +103,9 @@ func startNodeIpamController(ctx ControllerContext) (bool, error) {
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		clusterCIDR,
 		serviceCIDR,
-		int(ctx.ComponentConfig.NodeCIDRMaskSize),
-		ctx.ComponentConfig.AllocateNodeCIDRs,
-		ipam.CIDRAllocatorType(ctx.ComponentConfig.CIDRAllocatorType),
+		int(ctx.ComponentConfig.NodeIpamController.NodeCIDRMaskSize),
+		ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs,
+		ipam.CIDRAllocatorType(ctx.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
 	)
 	if err != nil {
 		return true, err
@@ -123,15 +121,15 @@ func startNodeLifecycleController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
-		ctx.ComponentConfig.NodeMonitorPeriod.Duration,
-		ctx.ComponentConfig.NodeStartupGracePeriod.Duration,
-		ctx.ComponentConfig.NodeMonitorGracePeriod.Duration,
-		ctx.ComponentConfig.PodEvictionTimeout.Duration,
-		ctx.ComponentConfig.NodeEvictionRate,
-		ctx.ComponentConfig.SecondaryNodeEvictionRate,
-		ctx.ComponentConfig.LargeClusterSizeThreshold,
-		ctx.ComponentConfig.UnhealthyZoneThreshold,
-		ctx.ComponentConfig.EnableTaintManager,
+		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
+		ctx.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
+		ctx.ComponentConfig.NodeLifecycleController.NodeMonitorGracePeriod.Duration,
+		ctx.ComponentConfig.NodeLifecycleController.PodEvictionTimeout.Duration,
+		ctx.ComponentConfig.NodeLifecycleController.NodeEvictionRate,
+		ctx.ComponentConfig.NodeLifecycleController.SecondaryNodeEvictionRate,
+		ctx.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,
+		ctx.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,
+		ctx.ComponentConfig.NodeLifecycleController.EnableTaintManager,
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
 	)
@@ -143,8 +141,8 @@ func startNodeLifecycleController(ctx ControllerContext) (bool, error) {
 }
 
 func startRouteController(ctx ControllerContext) (bool, error) {
-	if !ctx.ComponentConfig.AllocateNodeCIDRs || !ctx.ComponentConfig.ConfigureCloudRoutes {
-		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.AllocateNodeCIDRs, ctx.ComponentConfig.ConfigureCloudRoutes)
+	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs || !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
+		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return false, nil
 	}
 	if ctx.Cloud == nil {
@@ -156,27 +154,27 @@ func startRouteController(ctx ControllerContext) (bool, error) {
 		glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return false, nil
 	}
-	_, clusterCIDR, err := net.ParseCIDR(ctx.ComponentConfig.ClusterCIDR)
+	_, clusterCIDR, err := net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
 	if err != nil {
-		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.ClusterCIDR, err)
+		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
 	}
-	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.ComponentConfig.ClusterName, clusterCIDR)
-	go routeController.Run(ctx.Stop, ctx.ComponentConfig.RouteReconciliationPeriod.Duration)
+	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.ComponentConfig.KubeCloudShared.ClusterName, clusterCIDR)
+	go routeController.Run(ctx.Stop, ctx.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
 	return true, nil
 }
 
 func startPersistentVolumeBinderController(ctx ControllerContext) (bool, error) {
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                ctx.ClientBuilder.ClientOrDie("persistent-volume-binder"),
-		SyncPeriod:                ctx.ComponentConfig.PVClaimBinderSyncPeriod.Duration,
-		VolumePlugins:             ProbeControllerVolumePlugins(ctx.Cloud, ctx.ComponentConfig.VolumeConfiguration),
+		SyncPeriod:                ctx.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
+		VolumePlugins:             ProbeControllerVolumePlugins(ctx.Cloud, ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 		Cloud:                     ctx.Cloud,
-		ClusterName:               ctx.ComponentConfig.ClusterName,
+		ClusterName:               ctx.ComponentConfig.KubeCloudShared.ClusterName,
 		VolumeInformer:            ctx.InformerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             ctx.InformerFactory.Storage().V1().StorageClasses(),
 		PodInformer:               ctx.InformerFactory.Core().V1().Pods(),
-		EnableDynamicProvisioning: ctx.ComponentConfig.VolumeConfiguration.EnableDynamicProvisioning,
+		EnableDynamicProvisioning: ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration.EnableDynamicProvisioning,
 	}
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
 	if volumeControllerErr != nil {
@@ -187,7 +185,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (bool, error) 
 }
 
 func startAttachDetachController(ctx ControllerContext) (bool, error) {
-	if ctx.ComponentConfig.ReconcilerSyncLoopPeriod.Duration < time.Second {
+	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
 		return true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
 	}
 	attachDetachController, attachDetachControllerErr :=
@@ -199,9 +197,9 @@ func startAttachDetachController(ctx ControllerContext) (bool, error) {
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
 			ctx.Cloud,
 			ProbeAttachableVolumePlugins(),
-			GetDynamicPluginProber(ctx.ComponentConfig.VolumeConfiguration),
-			ctx.ComponentConfig.DisableAttachDetachReconcilerSync,
-			ctx.ComponentConfig.ReconcilerSyncLoopPeriod.Duration,
+			GetDynamicPluginProber(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+			ctx.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
+			ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
 			attachdetach.DefaultTimerConfig,
 		)
 	if attachDetachControllerErr != nil {
@@ -218,7 +216,7 @@ func startVolumeExpandController(ctx ControllerContext) (bool, error) {
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
 			ctx.Cloud,
-			ProbeExpandableVolumePlugins(ctx.ComponentConfig.VolumeConfiguration))
+			ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration))
 
 		if expandControllerErr != nil {
 			return true, fmt.Errorf("Failed to start volume expand controller : %v", expandControllerErr)
@@ -235,7 +233,7 @@ func startEndpointController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Endpoints(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
-	).Run(int(ctx.ComponentConfig.ConcurrentEndpointSyncs), ctx.Stop)
+	).Run(int(ctx.ComponentConfig.EndPointController.ConcurrentEndpointSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -245,7 +243,7 @@ func startReplicationController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
 		replicationcontroller.BurstReplicas,
-	).Run(int(ctx.ComponentConfig.ConcurrentRCSyncs), ctx.Stop)
+	).Run(int(ctx.ComponentConfig.ReplicationController.ConcurrentRCSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -253,7 +251,7 @@ func startPodGCController(ctx ControllerContext) (bool, error) {
 	go podgc.NewPodGC(
 		ctx.ClientBuilder.ClientOrDie("pod-garbage-collector"),
 		ctx.InformerFactory.Core().V1().Pods(),
-		int(ctx.ComponentConfig.TerminatedPodGCThreshold),
+		int(ctx.ComponentConfig.PodGCController.TerminatedPodGCThreshold),
 	).Run(ctx.Stop)
 	return true, nil
 }
@@ -267,7 +265,7 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
-		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.ComponentConfig.ResourceQuotaSyncPeriod.Duration),
+		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration),
 		InformerFactory:           ctx.InformerFactory,
 		ReplenishmentResyncPeriod: ctx.ResyncPeriod,
 		DiscoveryFunc:             discoveryFunc,
@@ -285,7 +283,7 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	go resourceQuotaController.Run(int(ctx.ComponentConfig.ConcurrentResourceQuotaSyncs), ctx.Stop)
+	go resourceQuotaController.Run(int(ctx.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs), ctx.Stop)
 
 	// Periodically the quota controller to detect new resource types
 	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Stop)
@@ -294,29 +292,30 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 }
 
 func startNamespaceController(ctx ControllerContext) (bool, error) {
-	// TODO: should use a dynamic RESTMapper built from the discovery results.
-	restMapper := legacyscheme.Registry.RESTMapper()
-
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
 	nsKubeconfig := ctx.ClientBuilder.ConfigOrDie("namespace-controller")
-	nsKubeconfig.QPS *= 10
-	nsKubeconfig.Burst *= 10
+	nsKubeconfig.QPS *= 20
+	nsKubeconfig.Burst *= 100
 	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
-	namespaceClientPool := dynamic.NewClientPool(nsKubeconfig, restMapper, dynamic.LegacyAPIPathResolverFunc)
 
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 
+	dynamicClient, err := dynamic.NewForConfig(nsKubeconfig)
+	if err != nil {
+		return true, err
+	}
+
 	namespaceController := namespacecontroller.NewNamespaceController(
 		namespaceKubeClient,
-		namespaceClientPool,
+		dynamicClient,
 		discoverResourcesFn,
 		ctx.InformerFactory.Core().V1().Namespaces(),
-		ctx.ComponentConfig.NamespaceSyncPeriod.Duration,
+		ctx.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
 	)
-	go namespaceController.Run(int(ctx.ComponentConfig.ConcurrentNamespaceSyncs), ctx.Stop)
+	go namespaceController.Run(int(ctx.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs), ctx.Stop)
 
 	return true, nil
 }
@@ -344,7 +343,7 @@ func startTTLController(ctx ControllerContext) (bool, error) {
 }
 
 func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
-	if !ctx.ComponentConfig.EnableGarbageCollector {
+	if !ctx.ComponentConfig.GarbageCollectorController.EnableGarbageCollector {
 		return false, nil
 	}
 
@@ -352,7 +351,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 
 	// Use a discovery client capable of being refreshed.
 	discoveryClient := cacheddiscovery.NewMemCacheClient(gcClientset.Discovery())
-	restMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
+	restMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	restMapper.Reset()
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
@@ -367,7 +366,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	// Get an initial set of deletable resources to prime the garbage collector.
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	ignoredResources := make(map[schema.GroupResource]struct{})
-	for _, r := range ctx.ComponentConfig.GCIgnoredResources {
+	for _, r := range ctx.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
@@ -384,7 +383,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	}
 
 	// Start the garbage collector.
-	workers := int(ctx.ComponentConfig.ConcurrentGCSyncs)
+	workers := int(ctx.ComponentConfig.GarbageCollectorController.ConcurrentGCSyncs)
 	go garbageCollector.Run(workers, ctx.Stop)
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
@@ -395,24 +394,20 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 }
 
 func startPVCProtectionController(ctx ControllerContext) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
-		go pvcprotection.NewPVCProtectionController(
-			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
-			ctx.InformerFactory.Core().V1().Pods(),
-			ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
-		).Run(1, ctx.Stop)
-		return true, nil
-	}
-	return false, nil
+	go pvcprotection.NewPVCProtectionController(
+		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
+		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
+	).Run(1, ctx.Stop)
+	return true, nil
 }
 
 func startPVProtectionController(ctx ControllerContext) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
-		go pvprotection.NewPVProtectionController(
-			ctx.InformerFactory.Core().V1().PersistentVolumes(),
-			ctx.ClientBuilder.ClientOrDie("pv-protection-controller"),
-		).Run(1, ctx.Stop)
-		return true, nil
-	}
-	return false, nil
+	go pvprotection.NewPVProtectionController(
+		ctx.InformerFactory.Core().V1().PersistentVolumes(),
+		ctx.ClientBuilder.ClientOrDie("pv-protection-controller"),
+		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
+	).Run(1, ctx.Stop)
+	return true, nil
 }

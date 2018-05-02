@@ -19,17 +19,27 @@ package util
 import (
 	"io/ioutil"
 	"os"
+	"runtime"
 	"testing"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiltesting "k8s.io/client-go/util/testing"
 	// util.go uses api.Codecs.LegacyCodec so import this package to do some
 	// resource initialization.
+	"hash/fnv"
+
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
+
+	"reflect"
+	"strings"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/kubernetes/pkg/util/slice"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 var nodeLabels map[string]string = map[string]string{
@@ -37,7 +47,7 @@ var nodeLabels map[string]string = map[string]string{
 	"test-key2": "test-value2",
 }
 
-func TestCheckNodeAffinity(t *testing.T) {
+func TestCheckVolumeNodeAffinity(t *testing.T) {
 	type affinityTest struct {
 		name          string
 		expectSuccess bool
@@ -46,15 +56,66 @@ func TestCheckNodeAffinity(t *testing.T) {
 
 	cases := []affinityTest{
 		{
-			name:          "valid-no-constraints",
+			name:          "valid-nil",
 			expectSuccess: true,
-			pv:            testVolumeWithNodeAffinity(t, &v1.NodeAffinity{}),
+			pv:            testVolumeWithNodeAffinity(t, nil),
 		},
 		{
-			name:          "valid-constraints",
+			name:          "valid-no-constraints",
 			expectSuccess: true,
-			pv: testVolumeWithNodeAffinity(t, &v1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			pv:            testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{}),
+		},
+		{
+			name:          "select-nothing",
+			expectSuccess: false,
+			pv:            testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{Required: &v1.NodeSelector{}}),
+		},
+		{
+			name:          "select-nothing-empty-terms",
+			expectSuccess: false,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:          "valid-multiple-terms",
+			expectSuccess: true,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key3",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value1", "test-value3"},
+								},
+							},
+						},
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key2",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value0", "test-value2"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:          "valid-multiple-match-expressions",
+			expectSuccess: true,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
 							MatchExpressions: []v1.NodeSelectorRequirement{
@@ -75,10 +136,10 @@ func TestCheckNodeAffinity(t *testing.T) {
 			}),
 		},
 		{
-			name:          "invalid-key",
+			name:          "invalid-multiple-match-expressions-key",
 			expectSuccess: false,
-			pv: testVolumeWithNodeAffinity(t, &v1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
 							MatchExpressions: []v1.NodeSelectorRequirement{
@@ -99,10 +160,10 @@ func TestCheckNodeAffinity(t *testing.T) {
 			}),
 		},
 		{
-			name:          "invalid-values",
+			name:          "invalid-multiple-match-expressions-values",
 			expectSuccess: false,
-			pv: testVolumeWithNodeAffinity(t, &v1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
 							MatchExpressions: []v1.NodeSelectorRequirement{
@@ -115,6 +176,34 @@ func TestCheckNodeAffinity(t *testing.T) {
 									Key:      "test-key2",
 									Operator: v1.NodeSelectorOpIn,
 									Values:   []string{"test-value0", "test-value2"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:          "invalid-multiple-terms",
+			expectSuccess: false,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key3",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value1", "test-value3"},
+								},
+							},
+						},
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key2",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value0", "test-value1"},
 								},
 							},
 						},
@@ -136,16 +225,13 @@ func TestCheckNodeAffinity(t *testing.T) {
 	}
 }
 
-func testVolumeWithNodeAffinity(t *testing.T, affinity *v1.NodeAffinity) *v1.PersistentVolume {
+func testVolumeWithNodeAffinity(t *testing.T, affinity *v1.VolumeNodeAffinity) *v1.PersistentVolume {
 	objMeta := metav1.ObjectMeta{Name: "test-constraints"}
-	objMeta.Annotations = map[string]string{}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(objMeta.Annotations, affinity)
-	if err != nil {
-		t.Fatalf("Failed to get node affinity annotation: %v", err)
-	}
-
 	return &v1.PersistentVolume{
 		ObjectMeta: objMeta,
+		Spec: v1.PersistentVolumeSpec{
+			NodeAffinity: affinity,
+		},
 	}
 }
 
@@ -301,6 +387,721 @@ func TestDoUnmountMountPoint(t *testing.T) {
 		err := doUnmountMountPoint(tt.mountPath, fake, false, tt.corruptedMnt)
 		if err != nil {
 			t.Errorf("err Expected nil, but got: %v", err)
+		}
+	}
+}
+
+func TestCalculateTimeoutForVolume(t *testing.T) {
+	pv := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("500M"),
+			},
+		},
+	}
+
+	timeout := CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 50 {
+		t.Errorf("Expected 50 for timeout but got %v", timeout)
+	}
+
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("2Gi")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 60 {
+		t.Errorf("Expected 60 for timeout but got %v", timeout)
+	}
+
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("150Gi")
+	timeout = CalculateTimeoutForVolume(50, 30, pv)
+	if timeout != 4500 {
+		t.Errorf("Expected 4500 for timeout but got %v", timeout)
+	}
+}
+
+func TestGenerateVolumeName(t *testing.T) {
+
+	// Normal operation, no truncate
+	v1 := GenerateVolumeName("kubernetes", "pv-cinder-abcde", 255)
+	if v1 != "kubernetes-dynamic-pv-cinder-abcde" {
+		t.Errorf("Expected kubernetes-dynamic-pv-cinder-abcde, got %s", v1)
+	}
+
+	// Truncate trailing "6789-dynamic"
+	prefix := strings.Repeat("0123456789", 9) // 90 characters prefix + 8 chars. of "-dynamic"
+	v2 := GenerateVolumeName(prefix, "pv-cinder-abcde", 100)
+	expect := prefix[:84] + "-pv-cinder-abcde"
+	if v2 != expect {
+		t.Errorf("Expected %s, got %s", expect, v2)
+	}
+
+	// Truncate really long cluster name
+	prefix = strings.Repeat("0123456789", 1000) // 10000 characters prefix
+	v3 := GenerateVolumeName(prefix, "pv-cinder-abcde", 100)
+	if v3 != expect {
+		t.Errorf("Expected %s, got %s", expect, v3)
+	}
+}
+
+func TestMountOptionFromSpec(t *testing.T) {
+	scenarios := map[string]struct {
+		volume            *volume.Spec
+		expectedMountList []string
+		systemOptions     []string
+	}{
+		"volume-with-mount-options": {
+			volume: createVolumeSpecWithMountOption("good-mount-opts", "ro,nfsvers=3", v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+			expectedMountList: []string{"ro", "nfsvers=3"},
+			systemOptions:     nil,
+		},
+		"volume-with-bad-mount-options": {
+			volume: createVolumeSpecWithMountOption("good-mount-opts", "", v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+			expectedMountList: []string{},
+			systemOptions:     nil,
+		},
+		"vol-with-sys-opts": {
+			volume: createVolumeSpecWithMountOption("good-mount-opts", "ro,nfsvers=3", v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+			expectedMountList: []string{"ro", "nfsvers=3", "fsid=100", "hard"},
+			systemOptions:     []string{"fsid=100", "hard"},
+		},
+		"vol-with-sys-opts-with-dup": {
+			volume: createVolumeSpecWithMountOption("good-mount-opts", "ro,nfsvers=3", v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/srv", ReadOnly: false},
+				},
+			}),
+			expectedMountList: []string{"ro", "nfsvers=3", "fsid=100"},
+			systemOptions:     []string{"fsid=100", "ro"},
+		},
+	}
+
+	for name, scenario := range scenarios {
+		mountOptions := MountOptionFromSpec(scenario.volume, scenario.systemOptions...)
+		if !reflect.DeepEqual(slice.SortStrings(mountOptions), slice.SortStrings(scenario.expectedMountList)) {
+			t.Errorf("for %s expected mount options : %v got %v", name, scenario.expectedMountList, mountOptions)
+		}
+	}
+}
+
+func createVolumeSpecWithMountOption(name string, mountOptions string, spec v1.PersistentVolumeSpec) *volume.Spec {
+	annotations := map[string]string{
+		v1.MountOptionAnnotation: mountOptions,
+	}
+	objMeta := metav1.ObjectMeta{
+		Name:        name,
+		Annotations: annotations,
+	}
+
+	pv := &v1.PersistentVolume{
+		ObjectMeta: objMeta,
+		Spec:       spec,
+	}
+	return &volume.Spec{PersistentVolume: pv}
+}
+
+func checkFnv32(t *testing.T, s string, expected uint32) {
+	h := fnv.New32()
+	h.Write([]byte(s))
+	h.Sum32()
+
+	if h.Sum32() != expected {
+		t.Fatalf("hash of %q was %v, expected %v", s, h.Sum32(), expected)
+	}
+}
+
+func TestChooseZoneForVolume(t *testing.T) {
+	checkFnv32(t, "henley", 1180403676)
+	// 1180403676 mod 3 == 0, so the offset from "henley" is 0, which makes it easier to verify this by inspection
+
+	// A few others
+	checkFnv32(t, "henley-", 2652299129)
+	checkFnv32(t, "henley-a", 1459735322)
+	checkFnv32(t, "", 2166136261)
+
+	tests := []struct {
+		Zones      sets.String
+		VolumeName string
+		Expected   string
+	}{
+		// Test for PVC names that don't have a dash
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley",
+			Expected:   "a", // hash("henley") == 0
+		},
+		// Tests for PVC names that end in - number, but don't look like statefulset PVCs
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-0",
+			Expected:   "a", // hash("henley") == 0
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-1",
+			Expected:   "b", // hash("henley") + 1 == 1
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-2",
+			Expected:   "c", // hash("henley") + 2 == 2
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-3",
+			Expected:   "a", // hash("henley") + 3 == 3 === 0 mod 3
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-4",
+			Expected:   "b", // hash("henley") + 4 == 4 === 1 mod 3
+		},
+		// Tests for PVC names that are edge cases
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-",
+			Expected:   "c", // hash("henley-") = 2652299129 === 2 mod 3
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-a",
+			Expected:   "c", // hash("henley-a") = 1459735322 === 2 mod 3
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium--1",
+			Expected:   "c", // hash("") + 1 == 2166136261 + 1 === 2 mod 3
+		},
+		// Tests for PVC names for simple StatefulSet cases
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-1",
+			Expected:   "b", // hash("henley") + 1 == 1
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "loud-henley-1",
+			Expected:   "b", // hash("henley") + 1 == 1
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "quiet-henley-2",
+			Expected:   "c", // hash("henley") + 2 == 2
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-2",
+			Expected:   "c", // hash("henley") + 2 == 2
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-3",
+			Expected:   "a", // hash("henley") + 3 == 3 === 0 mod 3
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-4",
+			Expected:   "b", // hash("henley") + 4 == 4 === 1 mod 3
+		},
+		// Tests for statefulsets (or claims) with dashes in the names
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-alpha-henley-2",
+			Expected:   "c", // hash("henley") + 2 == 2
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-beta-henley-3",
+			Expected:   "a", // hash("henley") + 3 == 3 === 0 mod 3
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-gamma-henley-4",
+			Expected:   "b", // hash("henley") + 4 == 4 === 1 mod 3
+		},
+		// Tests for statefulsets name ending in -
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--2",
+			Expected:   "a", // hash("") + 2 == 0 mod 3
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--3",
+			Expected:   "b", // hash("") + 3 == 1 mod 3
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--4",
+			Expected:   "c", // hash("") + 4 == 2 mod 3
+		},
+	}
+
+	for _, test := range tests {
+		actual := ChooseZoneForVolume(test.Zones, test.VolumeName)
+
+		if actual != test.Expected {
+			t.Errorf("Test %v failed, expected zone %q, actual %q", test, test.Expected, actual)
+		}
+	}
+}
+
+func TestChooseZonesForVolume(t *testing.T) {
+	checkFnv32(t, "henley", 1180403676)
+	// 1180403676 mod 3 == 0, so the offset from "henley" is 0, which makes it easier to verify this by inspection
+
+	// A few others
+	checkFnv32(t, "henley-", 2652299129)
+	checkFnv32(t, "henley-a", 1459735322)
+	checkFnv32(t, "", 2166136261)
+
+	tests := []struct {
+		Zones      sets.String
+		VolumeName string
+		NumZones   uint32
+		Expected   sets.String
+	}{
+		// Test for PVC names that don't have a dash
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley",
+			NumZones:   1,
+			Expected:   sets.NewString("a" /* hash("henley") == 0 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley",
+			NumZones:   2,
+			Expected:   sets.NewString("a" /* hash("henley") == 0 */, "b"),
+		},
+		// Tests for PVC names that end in - number, but don't look like statefulset PVCs
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-0",
+			NumZones:   1,
+			Expected:   sets.NewString("a" /* hash("henley") == 0 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-0",
+			NumZones:   2,
+			Expected:   sets.NewString("a" /* hash("henley") == 0 */, "b"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-1",
+			NumZones:   1,
+			Expected:   sets.NewString("b" /* hash("henley") + 1 == 1 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-1",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("henley") + 1 + 1(startingIndex) == 2 */, "a"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-2",
+			NumZones:   1,
+			Expected:   sets.NewString("c" /* hash("henley") + 2 == 2 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-2",
+			NumZones:   2,
+			Expected:   sets.NewString("b" /* hash("henley") + 2 + 2(startingIndex) == 4 */, "c"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-3",
+			NumZones:   1,
+			Expected:   sets.NewString("a" /* hash("henley") + 3 == 3 === 0 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-3",
+			NumZones:   2,
+			Expected:   sets.NewString("a" /* hash("henley") + 3 + 3(startingIndex) == 6 */, "b"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-4",
+			NumZones:   1,
+			Expected:   sets.NewString("b" /* hash("henley") + 4 == 4 === 1 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-4",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("henley") + 4 + 4(startingIndex) == 8 */, "a"),
+		},
+		// Tests for PVC names that are edge cases
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-",
+			NumZones:   1,
+			Expected:   sets.NewString("c" /* hash("henley-") = 2652299129 === 2 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("henley-") = 2652299129 === 2 mod 3 = 2 */, "a"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-a",
+			NumZones:   1,
+			Expected:   sets.NewString("c" /* hash("henley-a") = 1459735322 === 2 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "henley-a",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("henley-a") = 1459735322 === 2 mod 3 = 2 */, "a"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium--1",
+			NumZones:   1,
+			Expected:   sets.NewString("c" /* hash("") + 1 == 2166136261 + 1 === 2 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium--1",
+			NumZones:   2,
+			Expected:   sets.NewString("a" /* hash("") + 1 + 1(startingIndex) == 2166136261 + 1 + 1 === 3 mod 3 = 0 */, "b"),
+		},
+		// Tests for PVC names for simple StatefulSet cases
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-1",
+			NumZones:   1,
+			Expected:   sets.NewString("b" /* hash("henley") + 1 == 1 */),
+		},
+		// Tests for PVC names for simple StatefulSet cases
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-1",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("henley") + 1 + 1(startingIndex) == 2 */, "a"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "loud-henley-1",
+			NumZones:   1,
+			Expected:   sets.NewString("b" /* hash("henley") + 1 == 1 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "loud-henley-1",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("henley") + 1 + 1(startingIndex) == 2 */, "a"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "quiet-henley-2",
+			NumZones:   1,
+			Expected:   sets.NewString("c" /* hash("henley") + 2 == 2 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "quiet-henley-2",
+			NumZones:   2,
+			Expected:   sets.NewString("b" /* hash("henley") + 2 + 2(startingIndex) == 4 */, "c"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-2",
+			NumZones:   1,
+			Expected:   sets.NewString("c" /* hash("henley") + 2 == 2 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-2",
+			NumZones:   2,
+			Expected:   sets.NewString("b" /* hash("henley") + 2 + 2(startingIndex) == 4 */, "c"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-3",
+			NumZones:   1,
+			Expected:   sets.NewString("a" /* hash("henley") + 3 == 3 === 0 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-3",
+			NumZones:   2,
+			Expected:   sets.NewString("a" /* hash("henley") + 3 + 3(startingIndex) == 6 === 6 mod 3 = 0 */, "b"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-4",
+			NumZones:   1,
+			Expected:   sets.NewString("b" /* hash("henley") + 4 == 4 === 1 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley-4",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("henley") + 4 + 4(startingIndex) == 8 === 2 mod 3 */, "a"),
+		},
+		// Tests for statefulsets (or claims) with dashes in the names
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-alpha-henley-2",
+			NumZones:   1,
+			Expected:   sets.NewString("c" /* hash("henley") + 2 == 2 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-alpha-henley-2",
+			NumZones:   2,
+			Expected:   sets.NewString("b" /* hash("henley") + 2 + 2(startingIndex) == 4 */, "c"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-beta-henley-3",
+			NumZones:   1,
+			Expected:   sets.NewString("a" /* hash("henley") + 3 == 3 === 0 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-beta-henley-3",
+			NumZones:   2,
+			Expected:   sets.NewString("a" /* hash("henley") + 3 + 3(startingIndex) == 6 === 0 mod 3 */, "b"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-gamma-henley-4",
+			NumZones:   1,
+			Expected:   sets.NewString("b" /* hash("henley") + 4 == 4 === 1 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-gamma-henley-4",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("henley") + 4 + 4(startingIndex) == 8 === 2 mod 3 */, "a"),
+		},
+		// Tests for statefulsets name ending in -
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--2",
+			NumZones:   1,
+			Expected:   sets.NewString("a" /* hash("") + 2 == 0 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--2",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("") + 2 + 2(startingIndex) == 2 mod 3 */, "a"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--3",
+			NumZones:   1,
+			Expected:   sets.NewString("b" /* hash("") + 3 == 1 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--3",
+			NumZones:   2,
+			Expected:   sets.NewString("b" /* hash("") + 3 + 3(startingIndex) == 1 mod 3 */, "c"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--4",
+			NumZones:   1,
+			Expected:   sets.NewString("c" /* hash("") + 4 == 2 mod 3 */),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--4",
+			NumZones:   2,
+			Expected:   sets.NewString("a" /* hash("") + 4 + 4(startingIndex) == 0 mod 3 */, "b"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--4",
+			NumZones:   3,
+			Expected:   sets.NewString("c" /* hash("") + 4 == 2 mod 3 */, "a", "b"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c"),
+			VolumeName: "medium-henley--4",
+			NumZones:   4,
+			Expected:   sets.NewString("c" /* hash("") + 4 + 9(startingIndex) == 2 mod 3 */, "a", "b", "c"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c", "d", "e", "f", "g", "h", "i"),
+			VolumeName: "henley-0",
+			NumZones:   2,
+			Expected:   sets.NewString("a" /* hash("henley") == 0 */, "b"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c", "d", "e", "f", "g", "h", "i"),
+			VolumeName: "henley-1",
+			NumZones:   2,
+			Expected:   sets.NewString("c" /* hash("henley") == 0 + 2 */, "d"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c", "d", "e", "f", "g", "h", "i"),
+			VolumeName: "henley-2",
+			NumZones:   2,
+			Expected:   sets.NewString("e" /* hash("henley") == 0 + 2 + 2(startingIndex) */, "f"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c", "d", "e", "f", "g", "h", "i"),
+			VolumeName: "henley-3",
+			NumZones:   2,
+			Expected:   sets.NewString("g" /* hash("henley") == 0 + 2 + 4(startingIndex) */, "h"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c", "d", "e", "f", "g", "h", "i"),
+			VolumeName: "henley-0",
+			NumZones:   3,
+			Expected:   sets.NewString("a" /* hash("henley") == 0 */, "b", "c"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c", "d", "e", "f", "g", "h", "i"),
+			VolumeName: "henley-1",
+			NumZones:   3,
+			Expected:   sets.NewString("d" /* hash("henley") == 0 + 1 + 2(startingIndex) */, "e", "f"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c", "d", "e", "f", "g", "h", "i"),
+			VolumeName: "henley-2",
+			NumZones:   3,
+			Expected:   sets.NewString("g" /* hash("henley") == 0 + 2 + 4(startingIndex) */, "h", "i"),
+		},
+		{
+			Zones:      sets.NewString("a", "b", "c", "d", "e", "f", "g", "h", "i"),
+			VolumeName: "henley-3",
+			NumZones:   3,
+			Expected:   sets.NewString("a" /* hash("henley") == 0 + 3 + 6(startingIndex) */, "b", "c"),
+		},
+	}
+
+	for _, test := range tests {
+		actual := ChooseZonesForVolume(test.Zones, test.VolumeName, test.NumZones)
+
+		if !actual.Equal(test.Expected) {
+			t.Errorf("Test %v failed, expected zone %#v, actual %#v", test, test.Expected, actual)
+		}
+	}
+}
+
+func TestValidateZone(t *testing.T) {
+	functionUnderTest := "ValidateZone"
+
+	// First part: want an error
+	errCases := []string{"", " 	 	 "}
+	for _, errCase := range errCases {
+		if got := ValidateZone(errCase); got == nil {
+			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, errCase, got, "an error")
+		}
+	}
+
+	// Second part: want no error
+	succCases := []string{" us-east-1a	"}
+	for _, succCase := range succCases {
+		if got := ValidateZone(succCase); got != nil {
+			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, succCase, got, nil)
+		}
+	}
+}
+
+func TestGetWindowsPath(t *testing.T) {
+	tests := []struct {
+		path         string
+		expectedPath string
+	}{
+		{
+			path:         `/var/lib/kubelet/pods/146f8428-83e7-11e7-8dd4-000d3a31dac4/volumes/kubernetes.io~disk`,
+			expectedPath: `c:\var\lib\kubelet\pods\146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~disk`,
+		},
+		{
+			path:         `\var/lib/kubelet/pods/146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~disk`,
+			expectedPath: `c:\var\lib\kubelet\pods\146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~disk`,
+		},
+		{
+			path:         `/`,
+			expectedPath: `c:\`,
+		},
+		{
+			path:         ``,
+			expectedPath: ``,
+		},
+	}
+
+	for _, test := range tests {
+		result := GetWindowsPath(test.path)
+		if result != test.expectedPath {
+			t.Errorf("GetWindowsPath(%v) returned (%v), want (%v)", test.path, result, test.expectedPath)
+		}
+	}
+}
+
+func TestMakeAbsolutePath(t *testing.T) {
+	tests := []struct {
+		goos         string
+		path         string
+		expectedPath string
+		name         string
+	}{
+		{
+			goos:         "linux",
+			path:         "non-absolute/path",
+			expectedPath: "/non-absolute/path",
+			name:         "linux non-absolute path",
+		},
+		{
+			goos:         "linux",
+			path:         "/absolute/path",
+			expectedPath: "/absolute/path",
+			name:         "linux absolute path",
+		},
+		{
+			goos:         "windows",
+			path:         "some\\path",
+			expectedPath: "c:\\some\\path",
+			name:         "basic windows",
+		},
+		{
+			goos:         "windows",
+			path:         "/some/path",
+			expectedPath: "c:/some/path",
+			name:         "linux path on windows",
+		},
+		{
+			goos:         "windows",
+			path:         "\\some\\path",
+			expectedPath: "c:\\some\\path",
+			name:         "windows path no drive",
+		},
+		{
+			goos:         "windows",
+			path:         "\\:\\some\\path",
+			expectedPath: "\\:\\some\\path",
+			name:         "windows path with colon",
+		},
+	}
+	for _, test := range tests {
+		if runtime.GOOS == test.goos {
+			path := MakeAbsolutePath(test.goos, test.path)
+			if path != test.expectedPath {
+				t.Errorf("[%s] Expected %s saw %s", test.name, test.expectedPath, path)
+			}
 		}
 	}
 }

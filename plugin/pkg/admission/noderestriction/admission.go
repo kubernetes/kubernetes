@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
+	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -53,6 +54,7 @@ func NewPlugin(nodeIdentifier nodeidentifier.NodeIdentifier) *nodePlugin {
 	return &nodePlugin{
 		Handler:        admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		nodeIdentifier: nodeIdentifier,
+		features:       utilfeature.DefaultFeatureGate,
 	}
 }
 
@@ -61,6 +63,8 @@ type nodePlugin struct {
 	*admission.Handler
 	nodeIdentifier nodeidentifier.NodeIdentifier
 	podsGetter     coreinternalversion.PodsGetter
+	// allows overriding for testing
+	features utilfeature.FeatureGate
 }
 
 var (
@@ -83,9 +87,10 @@ func (p *nodePlugin) ValidateInitialization() error {
 }
 
 var (
-	podResource  = api.Resource("pods")
-	nodeResource = api.Resource("nodes")
-	pvcResource  = api.Resource("persistentvolumeclaims")
+	podResource     = api.Resource("pods")
+	nodeResource    = api.Resource("nodes")
+	pvcResource     = api.Resource("persistentvolumeclaims")
+	svcacctResource = api.Resource("serviceaccounts")
 )
 
 func (c *nodePlugin) Admit(a admission.Attributes) error {
@@ -124,6 +129,12 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 		default:
 			return admission.NewForbidden(a, fmt.Errorf("may only update PVC status"))
 		}
+
+	case svcacctResource:
+		if c.features.Enabled(features.TokenRequest) {
+			return c.admitServiceAccount(nodeName, a)
+		}
+		return nil
 
 	default:
 		return nil
@@ -256,7 +267,7 @@ func (c *nodePlugin) admitPodEviction(nodeName string, a admission.Attributes) e
 func (c *nodePlugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 	switch a.GetOperation() {
 	case admission.Update:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		if !c.features.Enabled(features.ExpandPersistentVolumes) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q may not update persistentvolumeclaim metadata", nodeName))
 		}
 
@@ -336,6 +347,47 @@ func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
 		if node.Spec.ConfigSource != nil && !apiequality.Semantic.DeepEqual(node.Spec.ConfigSource, oldNode.Spec.ConfigSource) {
 			return admission.NewForbidden(a, fmt.Errorf("cannot update configSource to a new non-nil configSource"))
 		}
+	}
+
+	return nil
+}
+
+func (c *nodePlugin) admitServiceAccount(nodeName string, a admission.Attributes) error {
+	if a.GetOperation() != admission.Create {
+		return nil
+	}
+	if a.GetSubresource() != "token" {
+		return nil
+	}
+	tr, ok := a.GetObject().(*authenticationapi.TokenRequest)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+
+	// TokenRequests from a node must have a pod binding. That pod must be
+	// scheduled on the node.
+	ref := tr.Spec.BoundObjectRef
+	if ref == nil ||
+		ref.APIVersion != "v1" ||
+		ref.Kind != "Pod" ||
+		ref.Name == "" {
+		return admission.NewForbidden(a, fmt.Errorf("node requested token not bound to a pod"))
+	}
+	if ref.UID == "" {
+		return admission.NewForbidden(a, fmt.Errorf("node requested token with a pod binding without a uid"))
+	}
+	pod, err := c.podsGetter.Pods(a.GetNamespace()).Get(ref.Name, v1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return err
+	}
+	if err != nil {
+		return admission.NewForbidden(a, err)
+	}
+	if ref.UID != pod.UID {
+		return admission.NewForbidden(a, fmt.Errorf("the UID in the bound object reference (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", ref.UID, pod.UID))
+	}
+	if pod.Spec.NodeName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node requested token bound to a pod scheduled on a different node"))
 	}
 
 	return nil

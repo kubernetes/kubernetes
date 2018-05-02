@@ -72,10 +72,10 @@ fi
 
 HEAPSTER_VERSION="v0.18.2"
 MASTER_PPROF_PATH=""
-HEAPSTER_PPROF_PATH="/api/v1/proxy/namespaces/kube-system/services/monitoring-heapster"
+HEAPSTER_PPROF_PATH="/api/v1/namespaces/kube-system/services/monitoring-heapster/proxy"
 KUBELET_PPROF_PATH_PREFIX="/api/v1/proxy/nodes"
-SCHEDULER_PPROF_PATH_PREFIX="/api/v1/proxy/namespaces/kube-system/pods/kube-scheduler"
-CONTROLLER_MANAGER_PPROF_PATH_PREFIX="/api/v1/proxy/namespaces/kube-system/pods/kube-controller-manager"
+SCHEDULER_PPROF_PATH_PREFIX="/api/v1/namespaces/kube-system/pods/kube-scheduler/proxy"
+CONTROLLER_MANAGER_PPROF_PATH_PREFIX="/api/v1/namespaces/kube-system/pods/kube-controller-manager/proxy"
 
 eval set -- "${args}"
 
@@ -292,9 +292,9 @@ for component in ${profile_components}; do
 
   if [[ "${component}" == "kubelet" ]]; then
     for node in ${kubelet_addresses//[,;]/' '}; do
-      grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}/${node}" "${output_dir}/${component}" "${timestamp}"
-    done    
-  else 
+      grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}/${node}/proxy" "${output_dir}/${component}" "${timestamp}"
+    done
+  else
     grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}" "${output_dir}/${component}" "${timestamp}"
   fi
 done

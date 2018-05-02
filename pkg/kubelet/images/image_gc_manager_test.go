@@ -187,10 +187,10 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 		},
 	}
 
-	spaceFreed, err := manager.DeleteUnusedImages()
+	err := manager.DeleteUnusedImages()
 	assert := assert.New(t)
+	assert.Len(fakeRuntime.ImageList, 1)
 	require.NoError(t, err)
-	assert.EqualValues(0, spaceFreed)
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
@@ -291,10 +291,9 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 		}},
 	}
 
-	spaceFreed, err := manager.DeleteUnusedImages()
+	err := manager.DeleteUnusedImages()
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.EqualValues(3072, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, 1)
 }
 
@@ -547,6 +546,16 @@ func TestValidateImageGCPolicy(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestImageCacheReturnCopiedList(t *testing.T) {
+	cache := &imageCache{}
+	testList := []container.Image{{ID: "1"}, {ID: "2"}}
+	cache.set(testList)
+	list := cache.get()
+	assert.Len(t, list, 2)
+	list[0].ID = "3"
+	assert.Equal(t, cache.get(), testList)
 }
 
 func uint64Ptr(i uint64) *uint64 {

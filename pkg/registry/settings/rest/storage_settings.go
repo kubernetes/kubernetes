@@ -36,7 +36,6 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 
 	if apiResourceConfigSource.VersionEnabled(settingsapiv1alpha1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[settingsapiv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = settingsapiv1alpha1.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true

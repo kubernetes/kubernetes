@@ -209,6 +209,11 @@ func (t *TimeRFC1123) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 	return nil
 }
 
+// MarshalXML marshals using time.RFC1123.
+func (t *TimeRFC1123) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	return e.EncodeElement(time.Time(*t).Format(time.RFC1123), start)
+}
+
 // returns a map of custom metadata values from the specified HTTP header
 func getMetadataFromHeaders(header http.Header) map[string]string {
 	metadata := make(map[string]string)

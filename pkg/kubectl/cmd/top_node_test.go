@@ -30,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
@@ -47,8 +49,12 @@ func TestTopNodeAllMetrics(t *testing.T) {
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -72,10 +78,10 @@ func TestTopNodeAllMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, nil, buf)
+	cmd := NewCmdTopNode(tf, nil, buf)
 	cmd.Run(cmd, []string{})
 
 	// Check the presence of node names in the output.
@@ -96,8 +102,12 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", customBaseMetricsAddress, metricsApiVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -121,7 +131,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	opts := &TopNodeOptions{
@@ -131,7 +141,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 			Service:   "custom-heapster-service",
 		},
 	}
-	cmd := NewCmdTopNode(f, opts, buf)
+	cmd := NewCmdTopNode(tf, opts, buf)
 	cmd.Run(cmd, []string{})
 
 	// Check the presence of node names in the output.
@@ -155,8 +165,12 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 	expectedPath := fmt.Sprintf("%s/%s/nodes/%s", baseMetricsAddress, metricsApiVersion, expectedMetrics.Name)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
 
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -180,10 +194,10 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, nil, buf)
+	cmd := NewCmdTopNode(tf, nil, buf)
 	cmd.Run(cmd, []string{expectedMetrics.Name})
 
 	// Check the presence of node names in the output.
@@ -218,8 +232,12 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 	expectedQuery := fmt.Sprintf("labelSelector=%s", url.QueryEscape(label))
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -243,10 +261,10 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, nil, buf)
+	cmd := NewCmdTopNode(tf, nil, buf)
 	cmd.Flags().Set("selector", label)
 	cmd.Run(cmd, []string{})
 
@@ -269,8 +287,12 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 	expectedMetrics, nodes := testNodeV1beta1MetricsData()
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -291,13 +313,25 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, expectedMetrics, nil
 	})
-	tf.MetricsClientSet = fakemetricsClientset
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, nil, buf)
-	cmd.Run(cmd, []string{})
+	cmd := NewCmdTopNode(tf, nil, buf)
+
+	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
+	// TODO then check the particular Run functionality and harvest results from fake clients
+	cmdOptions := &TopNodeOptions{}
+	if err := cmdOptions.Complete(tf, cmd, []string{}, buf); err != nil {
+		t.Fatal(err)
+	}
+	cmdOptions.MetricsClient = fakemetricsClientset
+	if err := cmdOptions.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdOptions.RunTopNode(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Check the presence of node names in the output.
 	result := buf.String()
@@ -319,8 +353,12 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 	}
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
 
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -341,13 +379,25 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 	fakemetricsClientset.AddReactor("get", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, &expectedMetrics, nil
 	})
-	tf.MetricsClientSet = fakemetricsClientset
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, nil, buf)
-	cmd.Run(cmd, []string{expectedMetrics.Name})
+	cmd := NewCmdTopNode(tf, nil, buf)
+
+	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
+	// TODO then check the particular Run functionality and harvest results from fake clients
+	cmdOptions := &TopNodeOptions{}
+	if err := cmdOptions.Complete(tf, cmd, []string{expectedMetrics.Name}, buf); err != nil {
+		t.Fatal(err)
+	}
+	cmdOptions.MetricsClient = fakemetricsClientset
+	if err := cmdOptions.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdOptions.RunTopNode(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Check the presence of node names in the output.
 	result := buf.String()
@@ -379,8 +429,12 @@ func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
 	label := "key=value"
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -402,14 +456,26 @@ func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
 	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, expectedMetrics, nil
 	})
-	tf.MetricsClientSet = fakemetricsClientset
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, nil, buf)
+	cmd := NewCmdTopNode(tf, nil, buf)
 	cmd.Flags().Set("selector", label)
-	cmd.Run(cmd, []string{})
+
+	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
+	// TODO then check the particular Run functionality and harvest results from fake clients
+	cmdOptions := &TopNodeOptions{}
+	if err := cmdOptions.Complete(tf, cmd, []string{}, buf); err != nil {
+		t.Fatal(err)
+	}
+	cmdOptions.MetricsClient = fakemetricsClientset
+	if err := cmdOptions.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdOptions.RunTopNode(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Check the presence of node names in the output.
 	result := buf.String()

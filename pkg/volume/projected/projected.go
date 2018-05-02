@@ -191,6 +191,9 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
+	if err := volumeutil.MakeNestedMountpoints(s.volName, dir, *s.pod); err != nil {
+		return err
+	}
 
 	data, err := s.collectData()
 	if err != nil {

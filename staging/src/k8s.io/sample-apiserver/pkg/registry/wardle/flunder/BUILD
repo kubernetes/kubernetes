@@ -17,12 +17,12 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/validation:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/registry:go_default_library",
     ],
 )

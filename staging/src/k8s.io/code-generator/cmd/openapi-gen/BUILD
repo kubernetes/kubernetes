@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "openapi-gen",
     embed = [":go_default_library"],
-    importpath = "k8s.io/code-generator/cmd/openapi-gen",
 )
 
 go_library(

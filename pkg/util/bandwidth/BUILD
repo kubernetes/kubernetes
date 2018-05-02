@@ -73,7 +73,6 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/bandwidth",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

@@ -175,7 +175,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 		nodePort:   int(port.NodePort),
 		targetPort: port.TargetPort.IntValue(),
 		// Deep-copy in case the service instance changes
-		loadBalancerStatus:       *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
+		loadBalancerStatus:       *service.Status.LoadBalancer.DeepCopy(),
 		sessionAffinityType:      service.Spec.SessionAffinity,
 		stickyMaxAgeSeconds:      stickyMaxAgeSeconds,
 		loadBalancerSourceRanges: make([]string, len(service.Spec.LoadBalancerSourceRanges)),

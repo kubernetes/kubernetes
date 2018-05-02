@@ -16,7 +16,6 @@ go_test(
         "watch_cache_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/storage",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -29,7 +28,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
@@ -51,7 +49,6 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/storage",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/validation/path:go_default_library",

@@ -20,7 +20,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -28,7 +29,7 @@ type deviceAllocateInfo struct {
 	// deviceIds contains device Ids allocated to this container for the given resourceName.
 	deviceIds sets.String
 	// allocResp contains cached rpc AllocateResponse.
-	allocResp *pluginapi.AllocateResponse
+	allocResp *pluginapi.ContainerAllocateResponse
 }
 
 type resourceAllocateInfo map[string]deviceAllocateInfo // Keyed by resourceName.
@@ -43,7 +44,7 @@ func (pdev podDevices) pods() sets.String {
 	return ret
 }
 
-func (pdev podDevices) insert(podUID, contName, resource string, devices sets.String, resp *pluginapi.AllocateResponse) {
+func (pdev podDevices) insert(podUID, contName, resource string, devices sets.String, resp *pluginapi.ContainerAllocateResponse) {
 	if _, podExists := pdev[podUID]; !podExists {
 		pdev[podUID] = make(containerDevices)
 	}
@@ -117,25 +118,18 @@ func (pdev podDevices) devices() map[string]sets.String {
 				if _, exists := ret[resource]; !exists {
 					ret[resource] = sets.NewString()
 				}
-				ret[resource] = ret[resource].Union(devices.deviceIds)
+				if devices.allocResp != nil {
+					ret[resource] = ret[resource].Union(devices.deviceIds)
+				}
 			}
 		}
 	}
 	return ret
 }
 
-// podDevicesCheckpointEntry is used to record <pod, container> to device allocation information.
-type podDevicesCheckpointEntry struct {
-	PodUID        string
-	ContainerName string
-	ResourceName  string
-	DeviceIDs     []string
-	AllocResp     []byte
-}
-
 // Turns podDevices to checkpointData.
-func (pdev podDevices) toCheckpointData() []podDevicesCheckpointEntry {
-	var data []podDevicesCheckpointEntry
+func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
+	var data []checkpoint.PodDevicesEntry
 	for podUID, containerDevices := range pdev {
 		for conName, resources := range containerDevices {
 			for resource, devices := range resources {
@@ -150,7 +144,12 @@ func (pdev podDevices) toCheckpointData() []podDevicesCheckpointEntry {
 					glog.Errorf("Can't marshal allocResp for %v %v %v: %v", podUID, conName, resource, err)
 					continue
 				}
-				data = append(data, podDevicesCheckpointEntry{podUID, conName, resource, devIds, allocResp})
+				data = append(data, checkpoint.PodDevicesEntry{
+					PodUID:        podUID,
+					ContainerName: conName,
+					ResourceName:  resource,
+					DeviceIDs:     devIds,
+					AllocResp:     allocResp})
 			}
 		}
 	}
@@ -158,7 +157,7 @@ func (pdev podDevices) toCheckpointData() []podDevicesCheckpointEntry {
 }
 
 // Populates podDevices from the passed in checkpointData.
-func (pdev podDevices) fromCheckpointData(data []podDevicesCheckpointEntry) {
+func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 	for _, entry := range data {
 		glog.V(2).Infof("Get checkpoint entry: %v %v %v %v %v\n",
 			entry.PodUID, entry.ContainerName, entry.ResourceName, entry.DeviceIDs, entry.AllocResp)
@@ -166,7 +165,7 @@ func (pdev podDevices) fromCheckpointData(data []podDevicesCheckpointEntry) {
 		for _, devID := range entry.DeviceIDs {
 			devIDs.Insert(devID)
 		}
-		allocResp := &pluginapi.AllocateResponse{}
+		allocResp := &pluginapi.ContainerAllocateResponse{}
 		err := allocResp.Unmarshal(entry.AllocResp)
 		if err != nil {
 			glog.Errorf("Can't unmarshal allocResp for %v %v %v: %v", entry.PodUID, entry.ContainerName, entry.ResourceName, err)

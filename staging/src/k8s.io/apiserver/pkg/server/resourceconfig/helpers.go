@@ -78,9 +78,9 @@ func MergeAPIResourceConfigs(
 	if ok {
 		if allAPIFlagValue == "false" {
 			// Disable all group versions.
-			resourceConfig.DisableVersions(registry.RegisteredGroupVersions()...)
+			resourceConfig.DisableAll()
 		} else if allAPIFlagValue == "true" {
-			resourceConfig.EnableVersions(registry.RegisteredGroupVersions()...)
+			resourceConfig.EnableAll()
 		}
 	}
 

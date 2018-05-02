@@ -474,7 +474,7 @@ func TestTokenCreation(t *testing.T) {
 
 			AddedSecret:     serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
 			ExpectedActions: []core.Action{
-			// no update is performed... the custom namespace is preserved
+				// no update is performed... the custom namespace is preserved
 			},
 		},
 
@@ -539,7 +539,7 @@ func TestTokenCreation(t *testing.T) {
 
 			UpdatedSecret:   serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
 			ExpectedActions: []core.Action{
-			// no update is performed... the custom namespace is preserved
+				// no update is performed... the custom namespace is preserved
 			},
 		},
 

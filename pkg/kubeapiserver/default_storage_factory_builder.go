@@ -26,13 +26,13 @@ import (
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
 var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
-	{Group: "", Resource: "replicationControllers"}:        "controllers",
 	{Group: "", Resource: "replicationcontrollers"}:        "controllers",
 	{Group: "", Resource: "endpoints"}:                     "services/endpoints",
 	{Group: "", Resource: "nodes"}:                         "minions",
 	{Group: "", Resource: "services"}:                      "services/specs",
 	{Group: "extensions", Resource: "ingresses"}:           "ingress",
 	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
+	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
 }
 
 // NewStorageFactory builds the DefaultStorageFactory.

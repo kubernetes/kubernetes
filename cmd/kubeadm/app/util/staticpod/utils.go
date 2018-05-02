@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -88,6 +89,24 @@ func ComponentProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, p
 				Path:   path,
 				Port:   intstr.FromInt(port),
 				Scheme: scheme,
+			},
+		},
+		InitialDelaySeconds: 15,
+		TimeoutSeconds:      15,
+		FailureThreshold:    8,
+	}
+}
+
+// EtcdProbe is a helper function for building a shell-based, etcdctl v1.Probe object to healthcheck etcd
+func EtcdProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, port int, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
+	tlsFlags := fmt.Sprintf("--cacert=%[1]s/%[2]s --cert=%[1]s/%[3]s --key=%[1]s/%[4]s", certsDir, CACertName, CertName, KeyName)
+	// etcd pod is alive if a linearizable get succeeds.
+	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl --endpoints=%s:%d %s get foo", GetProbeAddress(cfg, componentName), port, tlsFlags)
+
+	return &v1.Probe{
+		Handler: v1.Handler{
+			Exec: &v1.ExecAction{
+				Command: []string{"/bin/sh", "-ec", cmd},
 			},
 		},
 		InitialDelaySeconds: 15,
@@ -179,12 +198,38 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 	return nil
 }
 
+// ReadStaticPodFromDisk reads a static pod file from disk
+func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
+	buf, err := ioutil.ReadFile(manifestPath)
+	if err != nil {
+		return &v1.Pod{}, fmt.Errorf("failed to read manifest for %q: %v", manifestPath, err)
+	}
+
+	obj, err := util.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
+	if err != nil {
+		return &v1.Pod{}, fmt.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
+	}
+
+	pod := obj.(*v1.Pod)
+
+	return pod, nil
+}
+
 // GetProbeAddress returns an IP address or 127.0.0.1 to use for liveness probes
 // in static pod manifests.
 func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) string {
 	switch {
 	case componentName == kubeadmconstants.KubeAPIServer:
-		if cfg.API.AdvertiseAddress != "" {
+		// In the case of a self-hosted deployment, the initial host on which kubeadm --init is run,
+		// will generate a DaemonSet with a nodeSelector such that all nodes with the label
+		// node-role.kubernetes.io/master='' will have the API server deployed to it. Since the init
+		// is run only once on an initial host, the API advertise address will be invalid for any
+		// future hosts that do not have the same address. Furthermore, since liveness and readiness
+		// probes do not support the Downward API we cannot dynamically set the advertise address to
+		// the node's IP. The only option then is to use localhost.
+		if features.Enabled(cfg.FeatureGates, features.SelfHosting) {
+			return "127.0.0.1"
+		} else if cfg.API.AdvertiseAddress != "" {
 			return cfg.API.AdvertiseAddress
 		}
 	case componentName == kubeadmconstants.KubeControllerManager:

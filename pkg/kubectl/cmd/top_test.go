@@ -43,7 +43,9 @@ const (
 func TestTopSubcommandsExist(t *testing.T) {
 	initTestErrorHandler(t)
 
-	f, _, _, _ := cmdtesting.NewAPIFactory()
+	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTop(f, buf, buf)

@@ -29,7 +29,8 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
-	auditwebhook "k8s.io/apiserver/plugin/pkg/audit/webhook"
+	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
+	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
@@ -54,18 +55,34 @@ func TestAddFlags(t *testing.T) {
 		"--audit-log-maxbackup=12",
 		"--audit-log-maxsize=13",
 		"--audit-log-path=/var/log",
+		"--audit-log-mode=blocking",
+		"--audit-log-batch-buffer-size=46",
+		"--audit-log-batch-max-size=47",
+		"--audit-log-batch-max-wait=48s",
+		"--audit-log-batch-throttle-enable=true",
+		"--audit-log-batch-throttle-qps=49.5",
+		"--audit-log-batch-throttle-burst=50",
+		"--audit-log-truncate-enabled=true",
+		"--audit-log-truncate-max-batch-size=45",
+		"--audit-log-truncate-max-event-size=44",
+		"--audit-log-version=audit.k8s.io/v1alpha1",
 		"--audit-policy-file=/policy",
 		"--audit-webhook-config-file=/webhook-config",
 		"--audit-webhook-mode=blocking",
 		"--audit-webhook-batch-buffer-size=42",
 		"--audit-webhook-batch-max-size=43",
 		"--audit-webhook-batch-max-wait=1s",
+		"--audit-webhook-batch-throttle-enable=false",
 		"--audit-webhook-batch-throttle-qps=43.5",
 		"--audit-webhook-batch-throttle-burst=44",
-		"--audit-webhook-batch-initial-backoff=2s",
+		"--audit-webhook-truncate-enabled=true",
+		"--audit-webhook-truncate-max-batch-size=43",
+		"--audit-webhook-truncate-max-event-size=42",
+		"--audit-webhook-initial-backoff=2s",
+		"--audit-webhook-version=audit.k8s.io/v1alpha1",
 		"--authentication-token-webhook-cache-ttl=3m",
 		"--authentication-token-webhook-config-file=/token-webhook-config",
-		"--authorization-mode=AlwaysDeny",
+		"--authorization-mode=AlwaysDeny,RBAC",
 		"--authorization-policy-file=/policy",
 		"--authorization-webhook-cache-authorized-ttl=3m",
 		"--authorization-webhook-cache-unauthorized-ttl=1m",
@@ -79,11 +96,12 @@ func TestAddFlags(t *testing.T) {
 		"--enable-aggregator-routing=true",
 		"--enable-logs-handler=false",
 		"--enable-swagger-ui=true",
-		"--endpoint-reconciler-type=" + string(reconcilers.MasterCountReconcilerType),
+		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
 		"--etcd-quorum-read=false",
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
 		"--etcd-cafile=/var/run/kubernetes/etcdca.crt",
+		"--http2-max-streams-per-connection=42",
 		"--kubelet-https=true",
 		"--kubelet-read-only-port=10255",
 		"--kubelet-timeout=5s",
@@ -100,8 +118,9 @@ func TestAddFlags(t *testing.T) {
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
 		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
+		ServiceClusterIPRange:  kubeoptions.DefaultServiceIPCIDR,
 		MasterCount:            5,
-		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
+		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		AllowPrivileged:        false,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:            net.ParseIP("192.168.10.10"),
@@ -126,11 +145,12 @@ func TestAddFlags(t *testing.T) {
 				ServerList: nil,
 				Prefix:     "/registry",
 				DeserializationCacheSize: 0,
-				Quorum:             false,
-				KeyFile:            "/var/run/kubernetes/etcd.key",
-				CAFile:             "/var/run/kubernetes/etcdca.crt",
-				CertFile:           "/var/run/kubernetes/etcdce.crt",
-				CompactionInterval: storagebackend.DefaultCompactInterval,
+				Quorum:                false,
+				KeyFile:               "/var/run/kubernetes/etcd.key",
+				CAFile:                "/var/run/kubernetes/etcdca.crt",
+				CertFile:              "/var/run/kubernetes/etcdce.crt",
+				CompactionInterval:    storagebackend.DefaultCompactInterval,
+				CountMetricPollPeriod: time.Minute,
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
 			DeleteCollectionWorkers: 1,
@@ -145,6 +165,7 @@ func TestAddFlags(t *testing.T) {
 				CertDirectory: "/var/run/kubernetes",
 				PairName:      "apiserver",
 			},
+			HTTP2MaxStreamsPerConnection: 42,
 		}),
 		InsecureServing: &kubeoptions.InsecureServingOptions{
 			BindAddress: net.ParseIP("127.0.0.1"),
@@ -176,18 +197,48 @@ func TestAddFlags(t *testing.T) {
 				MaxBackups: 12,
 				MaxSize:    13,
 				Format:     "json",
+				BatchOptions: apiserveroptions.AuditBatchOptions{
+					Mode: "blocking",
+					BatchConfig: auditbuffered.BatchConfig{
+						BufferSize:     46,
+						MaxBatchSize:   47,
+						MaxBatchWait:   48 * time.Second,
+						ThrottleEnable: true,
+						ThrottleQPS:    49.5,
+						ThrottleBurst:  50,
+					},
+				},
+				TruncateOptions: apiserveroptions.AuditTruncateOptions{
+					Enabled: true,
+					TruncateConfig: audittruncate.Config{
+						MaxBatchSize: 45,
+						MaxEventSize: 44,
+					},
+				},
+				GroupVersionString: "audit.k8s.io/v1alpha1",
 			},
 			WebhookOptions: apiserveroptions.AuditWebhookOptions{
-				Mode:       "blocking",
 				ConfigFile: "/webhook-config",
-				BatchConfig: auditwebhook.BatchBackendConfig{
-					BufferSize:     42,
-					MaxBatchSize:   43,
-					MaxBatchWait:   1 * time.Second,
-					ThrottleQPS:    43.5,
-					ThrottleBurst:  44,
-					InitialBackoff: 2 * time.Second,
+				BatchOptions: apiserveroptions.AuditBatchOptions{
+					Mode: "blocking",
+					BatchConfig: auditbuffered.BatchConfig{
+						BufferSize:     42,
+						MaxBatchSize:   43,
+						MaxBatchWait:   1 * time.Second,
+						ThrottleEnable: false,
+						ThrottleQPS:    43.5,
+						ThrottleBurst:  44,
+					},
 				},
+				TruncateOptions: apiserveroptions.AuditTruncateOptions{
+					Enabled: true,
+					TruncateConfig: audittruncate.Config{
+						MaxBatchSize: 43,
+						MaxEventSize: 42,
+					},
+				},
+				InitialBackoff:     2 * time.Second,
+				GroupVersionString: "audit.k8s.io/v1alpha1",
 			},
 			PolicyFile: "/policy",
 		},
@@ -210,6 +261,7 @@ func TestAddFlags(t *testing.T) {
 			BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
 			OIDC: &kubeoptions.OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
 			},
 			PasswordFile:  &kubeoptions.PasswordFileAuthenticationOptions{},
 			RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{},
@@ -221,7 +273,7 @@ func TestAddFlags(t *testing.T) {
 			TokenFailureCacheTTL: 0,
 		},
 		Authorization: &kubeoptions.BuiltInAuthorizationOptions{
-			Mode:                        "AlwaysDeny",
+			Modes:                       []string{"AlwaysDeny", "RBAC"},
 			PolicyFile:                  "/policy",
 			WebhookConfigFile:           "/webhook-config",
 			WebhookCacheAuthorizedTTL:   180000000000,

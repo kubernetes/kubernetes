@@ -37,7 +37,8 @@ func TestMocks(t *testing.T) {
 	const region = "us-central1"
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	keyAlpha := meta.RegionalKey("key-alpha", region)
 	keyBeta := meta.RegionalKey("key-beta", region)

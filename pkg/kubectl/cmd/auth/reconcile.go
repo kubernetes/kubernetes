@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	internalcoreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	internalrbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
@@ -95,7 +96,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	}
 
 	r := f.NewBuilder().
-		Internal().
+		Internal(legacyscheme.Scheme).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -119,9 +120,9 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	shortOutput := output == "name"
 	o.Print = func(info *resource.Info) error {
 		if len(output) > 0 && !shortOutput {
-			return f.PrintResourceInfoForCommand(cmd, info, o.Out)
+			return cmdutil.PrintObject(cmd, info.Object, o.Out)
 		}
-		f.PrintSuccess(shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "reconciled")
+		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "reconciled")
 		return nil
 	}
 

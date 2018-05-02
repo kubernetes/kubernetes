@@ -112,10 +112,12 @@ define VERIFY_HELP_INFO
 #
 # Args:
 #   BRANCH: Branch to be passed to verify-godeps.sh script.
+#   WHAT: List of checks to run
 #
 # Example:
 #   make verify
 #   make verify BRANCH=branch_x
+#   make verify WHAT="bazel typecheck"
 endef
 .PHONY: verify
 ifeq ($(PRINT_HELP),y)
@@ -213,7 +215,7 @@ test-e2e:
 	@echo "$$TEST_E2E_HELP_INFO"
 else
 test-e2e: ginkgo generated_files
-	go run hack/e2e.go -- -v --build --up --test --down
+	go run hack/e2e.go -- --build --up --test --down
 endif
 
 define TEST_E2E_NODE_HELP_INFO
@@ -249,7 +251,7 @@ define TEST_E2E_NODE_HELP_INFO
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #	 Defaults to false.
 #  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
-#  RUNTIME: Container runtime to use (eg. docker, rkt, remote).
+#  RUNTIME: Container runtime to use (eg. docker, remote).
 #    Defaults to "docker".
 #  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
 #   Used when RUNTIME is set to "remote".
@@ -562,7 +564,6 @@ bazel-test-integration:
 	@echo "$$BAZEL_TEST_INTEGRATION_HELP_INFO"
 else
 bazel-test-integration:
-	bazel build --config integration //test/integration/...
 	bazel test --config integration //test/integration/...
 endif
 

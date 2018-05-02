@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "genyaml",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/genyaml",
 )
 
 go_library(

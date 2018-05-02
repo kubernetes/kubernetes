@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -49,11 +48,9 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
-	"k8s.io/kubernetes/pkg/kubelet/gpu"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
@@ -72,7 +69,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func init() {
@@ -168,7 +165,6 @@ func newTestKubeletWithImageList(
 	kubelet.nodeName = types.NodeName(testKubeletHostname)
 	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	kubelet.runtimeState.setNetworkState(nil)
-	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), kubeletconfig.HairpinNone, "", 1440)
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	} else {
@@ -219,7 +215,7 @@ func newTestKubeletWithImageList(
 	kubelet.secretManager = secretManager
 	configMapManager := configmap.NewSimpleConfigMapManager(kubelet.kubeClient)
 	kubelet.configMapManager = configMapManager
-	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager, kubelet.configMapManager)
+	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager, kubelet.configMapManager, podtest.NewMockCheckpointManager())
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
 
 	kubelet.containerRuntime = fakeRuntime
@@ -262,6 +258,16 @@ func newTestKubeletWithImageList(
 		fakeImageService: fakeRuntime,
 		ImageGCManager:   imageGCManager,
 	}
+	kubelet.containerLogManager = logs.NewStubContainerLogManager()
+	containerGCPolicy := kubecontainer.ContainerGCPolicy{
+		MinAge:             time.Duration(0),
+		MaxPerPodContainer: 1,
+		MaxContainers:      -1,
+	}
+	containerGC, err := kubecontainer.NewContainerGC(fakeRuntime, containerGCPolicy, kubelet.sourcesReady)
+	assert.NoError(t, err)
+	kubelet.containerGC = containerGC
+
 	fakeClock := clock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
@@ -314,7 +320,6 @@ func newTestKubeletWithImageList(
 
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
-	kubelet.gpuManager = gpu.NewGPUManagerStub()
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
 }
 
@@ -581,8 +586,10 @@ func TestHandlePluginResources(t *testing.T) {
 	kl := testKubelet.kubelet
 
 	adjustedResource := v1.ResourceName("domain1.com/adjustedResource")
-	unadjustedResouce := v1.ResourceName("domain2.com/unadjustedResouce")
+	emptyResource := v1.ResourceName("domain2.com/emptyResource")
+	missingResource := v1.ResourceName("domain2.com/missingResource")
 	failedResource := v1.ResourceName("domain2.com/failedResource")
+	resourceQuantity0 := *resource.NewQuantity(int64(0), resource.DecimalSI)
 	resourceQuantity1 := *resource.NewQuantity(int64(1), resource.DecimalSI)
 	resourceQuantity2 := *resource.NewQuantity(int64(2), resource.DecimalSI)
 	resourceQuantityInvalid := *resource.NewQuantity(int64(-1), resource.DecimalSI)
@@ -590,9 +597,9 @@ func TestHandlePluginResources(t *testing.T) {
 	nodes := []*v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
-				adjustedResource:  resourceQuantity1,
-				unadjustedResouce: resourceQuantity1,
-				v1.ResourcePods:   allowedPodQuantity,
+				adjustedResource: resourceQuantity1,
+				emptyResource:    resourceQuantity0,
+				v1.ResourcePods:  allowedPodQuantity,
 			}}},
 	}
 	kl.nodeInfo = testNodeInfo{nodes: nodes}
@@ -605,6 +612,7 @@ func TestHandlePluginResources(t *testing.T) {
 		// quantity unchanged.
 		updateResourceMap := map[v1.ResourceName]resource.Quantity{
 			adjustedResource: resourceQuantity2,
+			emptyResource:    resourceQuantity0,
 			failedResource:   resourceQuantityInvalid,
 		}
 		pod := attrs.Pod
@@ -632,7 +640,7 @@ func TestHandlePluginResources(t *testing.T) {
 
 	// pod requiring adjustedResource can be successfully allocated because updatePluginResourcesFunc
 	// adjusts node.allocatableResource for this resource to a sufficient value.
-	fittingPodspec := v1.PodSpec{NodeName: string(kl.nodeName),
+	fittingPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Limits: v1.ResourceList{
 				adjustedResource: resourceQuantity2,
@@ -642,14 +650,30 @@ func TestHandlePluginResources(t *testing.T) {
 			},
 		}}},
 	}
-	// pod requiring unadjustedResouce with insufficient quantity will still fail PredicateAdmit.
-	exceededPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+	// pod requiring emptyResource (extended resources with 0 allocatable) will
+	// not pass PredicateAdmit.
+	emptyPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Limits: v1.ResourceList{
-				unadjustedResouce: resourceQuantity2,
+				emptyResource: resourceQuantity2,
 			},
 			Requests: v1.ResourceList{
-				unadjustedResouce: resourceQuantity2,
+				emptyResource: resourceQuantity2,
+			},
+		}}},
+	}
+	// pod requiring missingResource will pass PredicateAdmit.
+	//
+	// Extended resources missing in node status are ignored in PredicateAdmit.
+	// This is required to support extended resources that are not managed by
+	// device plugin, such as cluster-level resources.
+	missingPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				missingResource: resourceQuantity2,
+			},
+			Requests: v1.ResourceList{
+				missingResource: resourceQuantity2,
 			},
 		}}},
 	}
@@ -664,21 +688,18 @@ func TestHandlePluginResources(t *testing.T) {
 			},
 		}}},
 	}
-	pods := []*v1.Pod{
-		podWithUIDNameNsSpec("123", "fittingpod", "foo", fittingPodspec),
-		podWithUIDNameNsSpec("456", "exceededpod", "foo", exceededPodSpec),
-		podWithUIDNameNsSpec("789", "failedpod", "foo", failedPodSpec),
-	}
-	// The latter two pod should be rejected.
-	fittingPod := pods[0]
-	exceededPod := pods[1]
-	failedPod := pods[2]
 
-	kl.HandlePodAdditions(pods)
+	fittingPod := podWithUIDNameNsSpec("1", "fittingpod", "foo", fittingPodSpec)
+	emptyPod := podWithUIDNameNsSpec("2", "emptypod", "foo", emptyPodSpec)
+	missingPod := podWithUIDNameNsSpec("3", "missingpod", "foo", missingPodSpec)
+	failedPod := podWithUIDNameNsSpec("4", "failedpod", "foo", failedPodSpec)
+
+	kl.HandlePodAdditions([]*v1.Pod{fittingPod, emptyPod, missingPod, failedPod})
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
-	checkPodStatus(t, kl, exceededPod, v1.PodFailed)
+	checkPodStatus(t, kl, emptyPod, v1.PodFailed)
+	checkPodStatus(t, kl, missingPod, v1.PodPending)
 	checkPodStatus(t, kl, failedPod, v1.PodFailed)
 }
 
@@ -2132,7 +2153,7 @@ func waitForVolumeUnmount(
 		func() (bool, error) {
 			// Verify volumes detached
 			podVolumes = volumeManager.GetMountedVolumesForPod(
-				volumehelper.GetUniquePodName(pod))
+				util.GetUniquePodName(pod))
 
 			if len(podVolumes) != 0 {
 				return false, nil

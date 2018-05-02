@@ -17,13 +17,13 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 
-	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -174,22 +174,7 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("CurrentNodeName() failed: %s", err)
 	}
 
-	externalID, err := i.ExternalID(context.TODO(), nodeName)
-	if err != nil {
-		t.Fatalf("Instances.ExternalID(%s) failed: %s", nodeName, err)
-	}
-	t.Logf("Found ExternalID(%s) = %s\n", nodeName, externalID)
-
 	nonExistingVM := types.NodeName(rand.String(15))
-	externalID, err = i.ExternalID(context.TODO(), nonExistingVM)
-	if err == cloudprovider.InstanceNotFound {
-		t.Logf("VM %s was not found as expected\n", nonExistingVM)
-	} else if err == nil {
-		t.Fatalf("Instances.ExternalID did not fail as expected, VM %s was found", nonExistingVM)
-	} else {
-		t.Fatalf("Instances.ExternalID did not fail as expected, err: %v", err)
-	}
-
 	instanceID, err := i.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.InstanceID(%s) failed: %s", nodeName, err)

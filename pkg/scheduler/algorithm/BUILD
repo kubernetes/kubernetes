@@ -32,7 +32,6 @@ go_test(
         "types_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm",
     deps = [
         "//pkg/scheduler/schedulercache:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

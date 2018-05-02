@@ -161,9 +161,9 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 							},
 						})
 						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("Running containers:\n")
+						framework.Logf("Running containers:")
 						for _, c := range containers {
-							framework.Logf("%+v\n", c)
+							framework.Logf("%+v", c)
 						}
 					}
 				})

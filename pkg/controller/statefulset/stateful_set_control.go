@@ -469,7 +469,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				firstUnhealthyPod.Name)
 			return &status, nil
 		}
-		glog.V(4).Infof("StatefulSet %s/%s terminating Pod %s for scale dowm",
+		glog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for scale dowm",
 			set.Namespace,
 			set.Name,
 			condemned[target].Name)
@@ -502,7 +502,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-			glog.V(4).Infof("StatefulSet %s/%s terminating Pod %s for update",
+			glog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for update",
 				set.Namespace,
 				set.Name,
 				replicas[target].Name)

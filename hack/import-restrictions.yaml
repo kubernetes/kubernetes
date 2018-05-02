@@ -17,6 +17,10 @@
   ignoredSubTrees:
   - "./pkg/apis/core/validation"
 
+- baseImportPath: "./pkg/kubectl/genericclioptions/"
+  allowedImports:
+  - k8s.io/apimachinery
+
 - baseImportPath: "./vendor/k8s.io/apimachinery/"
   allowedImports:
   - k8s.io/apimachinery
@@ -40,6 +44,28 @@
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/client-go
+
+# prevent core machinery from taking explicit v1 references unless
+# necessary
+- baseImportPath: "./vendor/k8s.io/client-go/rest/"
+  excludeTests: true
+  allowedImports:
+  - k8s.io/apimachinery
+  - k8s.io/client-go
+- baseImportPath: "./vendor/k8s.io/client-go/tools/"
+  excludeTests: true
+  ignoredSubTrees:
+  - "./vendor/k8s.io/client-go/tools/bootstrap/token/api"
+  - "./vendor/k8s.io/client-go/tools/cache/testing"
+  - "./vendor/k8s.io/client-go/tools/leaderelection/resourcelock"
+  - "./vendor/k8s.io/client-go/tools/portforward"
+  - "./vendor/k8s.io/client-go/tools/record"
+  - "./vendor/k8s.io/client-go/tools/reference"
+  - "./vendor/k8s.io/client-go/tools/remotecommand"
+  allowedImports:
+  - k8s.io/apimachinery
+  - k8s.io/client-go
+
 
 - baseImportPath: "./vendor/k8s.io/apiserver/"
   allowedImports:
