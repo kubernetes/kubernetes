@@ -373,7 +373,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		}
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(obj); err != nil {
+		if err := e.Decorator(out); err != nil {
 			return nil, err
 		}
 	}
