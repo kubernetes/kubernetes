@@ -17,6 +17,7 @@ limitations under the License.
 package testingexec
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -30,6 +31,8 @@ type FakeExec struct {
 	LookPathFunc  func(string) (string, error)
 }
 
+var _ exec.Interface = &FakeExec{}
+
 type FakeCommandAction func(cmd string, args ...string) exec.Cmd
 
 func (fake *FakeExec) Command(cmd string, args ...string) exec.Cmd {
@@ -39,6 +42,10 @@ func (fake *FakeExec) Command(cmd string, args ...string) exec.Cmd {
 	i := fake.CommandCalls
 	fake.CommandCalls++
 	return fake.CommandScript[i](cmd, args...)
+}
+
+func (fake *FakeExec) CommandContext(ctx context.Context, cmd string, args ...string) exec.Cmd {
+	return fake.Command(cmd, args...)
 }
 
 func (fake *FakeExec) LookPath(file string) (string, error) {
