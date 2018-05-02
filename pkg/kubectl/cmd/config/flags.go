@@ -22,10 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 )
 
-// PrintFlags composes common printer flag structs
+// kubectlConfigPrintFlags composes common printer flag structs
 // used across all config commands, and provides a method
 // of retrieving a known printer based on flag values provided.
-type PrintFlags struct {
+type kubectlConfigPrintFlags struct {
 	JSONYamlPrintFlags *printers.JSONYamlPrintFlags
 	NamePrintFlags     *printers.NamePrintFlags
 	TemplateFlags      *printers.KubeTemplatePrintFlags
@@ -33,11 +33,11 @@ type PrintFlags struct {
 	OutputFormat *string
 }
 
-func (f *PrintFlags) Complete(successTemplate string) error {
+func (f *kubectlConfigPrintFlags) Complete(successTemplate string) error {
 	return f.NamePrintFlags.Complete(successTemplate)
 }
 
-func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
+func (f *kubectlConfigPrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	outputFormat := ""
 	if f.OutputFormat != nil {
 		outputFormat = *f.OutputFormat
@@ -58,34 +58,26 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	return nil, printers.NoCompatiblePrinterError{Options: f}
 }
 
-func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
+func (f *kubectlConfigPrintFlags) AddFlags(cmd *cobra.Command) {
 	f.JSONYamlPrintFlags.AddFlags(cmd)
 	f.NamePrintFlags.AddFlags(cmd)
 	f.TemplateFlags.AddFlags(cmd)
 
 	if f.OutputFormat != nil {
-		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
+		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, "Output format. One of: json|yaml|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
 	}
 }
 
 // WithDefaultOutput sets a default output format if one is not provided through a flag value
-func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
-	existingFormat := ""
-	if f.OutputFormat != nil {
-		existingFormat = *f.OutputFormat
-	}
-	if len(existingFormat) == 0 {
-		existingFormat = output
-	}
-	f.OutputFormat = &existingFormat
-
+func (f *kubectlConfigPrintFlags) WithDefaultOutput(output string) *kubectlConfigPrintFlags {
+	f.OutputFormat = &output
 	return f
 }
 
-func NewPrintFlags(operation string) *PrintFlags {
+func newKubeConfigPrintFlags(operation string) *kubectlConfigPrintFlags {
 	outputFormat := ""
 
-	return &PrintFlags{
+	return &kubectlConfigPrintFlags{
 		OutputFormat: &outputFormat,
 
 		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
