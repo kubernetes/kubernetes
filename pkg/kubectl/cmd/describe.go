@@ -73,8 +73,8 @@ type DescribeOptions struct {
 	Selector  string
 	Namespace string
 
-	Describer func(*meta.RESTMapping) (printers.Describer, error)
-	Builder   *resource.Builder
+	Describer  func(*meta.RESTMapping) (printers.Describer, error)
+	NewBuilder func() *resource.Builder
 
 	BuilderArgs []string
 
@@ -141,7 +141,7 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.BuilderArgs = args
 
 	o.Describer = f.Describer
-	o.Builder = f.NewBuilder()
+	o.NewBuilder = f.NewBuilder
 
 	// include the uninitialized objects by default
 	// unless user explicitly set --include-uninitialized=false
@@ -154,7 +154,7 @@ func (o *DescribeOptions) Validate(args []string) error {
 }
 
 func (o *DescribeOptions) Run() error {
-	r := o.Builder.
+	r := o.NewBuilder().
 		Unstructured().
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
@@ -212,7 +212,7 @@ func (o *DescribeOptions) Run() error {
 }
 
 func (o *DescribeOptions) DescribeMatchingResources(originalError error, resource, prefix string) error {
-	r := o.Builder.
+	r := o.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(true, resource).
