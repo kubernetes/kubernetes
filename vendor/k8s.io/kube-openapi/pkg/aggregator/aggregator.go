@@ -159,7 +159,7 @@ func (s *referenceWalker) Start() {
 	}
 }
 
-// usedDefinitionForSpec returns a map with all used definition in the provided spec as keys and true as values.
+// usedDefinitionForSpec returns a map with all used definitions in the provided spec as keys and true as values.
 func usedDefinitionForSpec(sp *spec.Swagger) map[string]bool {
 	usedDefinitions := map[string]bool{}
 	walkOnAllReferences(func(ref spec.Ref) spec.Ref {
@@ -172,7 +172,7 @@ func usedDefinitionForSpec(sp *spec.Swagger) map[string]bool {
 }
 
 // FilterSpecByPaths removes unnecessary paths and definitions used by those paths.
-// i.e. if a Path removed by this function, all definition used by it and not used
+// i.e. if a Path removed by this function, all definitions used by it and not used
 // anywhere else will also be removed.
 func FilterSpecByPaths(sp *spec.Swagger, keepPathPrefixes []string) {
 	// Walk all references to find all used definitions. This function
