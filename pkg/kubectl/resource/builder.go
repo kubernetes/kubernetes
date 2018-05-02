@@ -198,7 +198,7 @@ func (b *Builder) Unstructured() *Builder {
 		b.errs = append(b.errs, fmt.Errorf("no unstructured mapper provided"))
 		return b
 	}
-	if b.mapper != nil {
+	if b.mapper != nil && b.mapper != b.unstructured {
 		b.errs = append(b.errs, fmt.Errorf("another mapper was already selected, cannot use unstructured types"))
 		return b
 	}
@@ -219,7 +219,7 @@ func (b *Builder) Internal(typer runtime.ObjectTyper) *Builder {
 		b.errs = append(b.errs, fmt.Errorf("no internal mapper provided"))
 		return b
 	}
-	if b.mapper != nil {
+	if b.mapper != nil && b.mapper != b.internal {
 		b.errs = append(b.errs, fmt.Errorf("another mapper was already selected, cannot use internal types"))
 		return b
 	}
