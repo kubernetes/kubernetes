@@ -319,6 +319,7 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 	if err != nil {
 		return nil, err
 	}
+	am, err := getVolumeAccessMode(spec)
 
 	return &rbdMounter{
 		rbd:          newRBD(podUID, spec.Name(), img, pool, ro, plugin, manager),
@@ -328,6 +329,7 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 		Secret:       secret,
 		fsType:       fstype,
 		mountOptions: volume.MountOptionFromSpec(spec),
+		accessModes:  am,
 	}, nil
 }
 
@@ -541,7 +543,7 @@ type rbd struct {
 	mounter  *mount.SafeFormatAndMount
 	exec     mount.Exec
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager                diskManager
+	manager diskManager
 	volume.MetricsProvider `json:"-"`
 }
 
@@ -587,6 +589,7 @@ type rbdMounter struct {
 	mountOptions  []string
 	imageFormat   string
 	imageFeatures []string
+	accessModes   []v1.PersistentVolumeAccessMode
 }
 
 var _ volume.Mounter = &rbdMounter{}
@@ -727,6 +730,10 @@ func getVolumeSourceReadOnly(spec *volume.Spec) (bool, error) {
 	}
 
 	return false, fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+func getVolumeAccessMode(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, error) {
+	return spec.PersistentVolume.Spec.AccessModes, nil
 }
 
 func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (string, error) {
