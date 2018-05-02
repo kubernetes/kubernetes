@@ -20,8 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
-	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 // SuggestApiResources returns a suggestion to use the "api-resources" command
