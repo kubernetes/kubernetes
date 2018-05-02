@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -52,7 +53,11 @@ func GetHostname(hostnameOverride string) string {
 		}
 		hostname = nodename
 	}
-	return strings.ToLower(strings.TrimSpace(hostname))
+	hostname = strings.ToLower(strings.TrimSpace(hostname))
+	if msgs := utilvalidation.IsDNS1123Subdomain(hostname); len(msgs) != 0 {
+		glog.Fatalf("Invalid hostname: %s", strings.Join(msgs, ", "))
+	}
+	return hostname
 }
 
 // GetPreferredNodeAddress returns the address of the provided node, using the provided preference order.
