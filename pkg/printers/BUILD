@@ -21,7 +21,6 @@ go_library(
         "kube_template_flags.go",
         "name.go",
         "name_flags.go",
-        "printers.go",
         "tabwriter.go",
         "template.go",
         "template_flags.go",
