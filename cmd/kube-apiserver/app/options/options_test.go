@@ -96,7 +96,7 @@ func TestAddFlags(t *testing.T) {
 		"--enable-aggregator-routing=true",
 		"--enable-logs-handler=false",
 		"--enable-swagger-ui=true",
-		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
+		"--endpoint-reconciler-type=" + string(reconcilers.MasterCountReconcilerType),
 		"--etcd-quorum-read=false",
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
@@ -120,7 +120,7 @@ func TestAddFlags(t *testing.T) {
 		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
 		ServiceClusterIPRange:  kubeoptions.DefaultServiceIPCIDR,
 		MasterCount:            5,
-		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
+		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
 		AllowPrivileged:        false,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:            net.ParseIP("192.168.10.10"),
