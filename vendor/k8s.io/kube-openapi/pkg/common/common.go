@@ -32,7 +32,7 @@ type OpenAPIDefinition struct {
 
 type ReferenceCallback func(path string) spec.Ref
 
-// OpenAPIDefinitions is collection of all definitions.
+// GetOpenAPIDefinitions is collection of all definitions.
 type GetOpenAPIDefinitions func(ReferenceCallback) map[string]OpenAPIDefinition
 
 // OpenAPIDefinitionGetter gets openAPI definitions for a given type. If a type implements this interface,
