@@ -89,20 +89,52 @@ func ObjectReflectDiff(a, b interface{}) string {
 	}
 	out := []string{""}
 	for _, d := range diffs {
+		elidedA, elidedB := limit(d.a, d.b, 80)
 		out = append(out,
 			fmt.Sprintf("%s:", d.path),
-			limit(fmt.Sprintf("  a: %#v", d.a), 80),
-			limit(fmt.Sprintf("  b: %#v", d.b), 80),
+			fmt.Sprintf("  a: %s", elidedA),
+			fmt.Sprintf("  b: %s", elidedB),
 		)
 	}
 	return strings.Join(out, "\n")
 }
 
-func limit(s string, max int) string {
-	if len(s) > max {
-		return s[:max]
+// limit:
+// 1. stringifies aObj and bObj
+// 2. elides identical prefixes if either is too long
+// 3. elides remaining content from the end if either is too long
+func limit(aObj, bObj interface{}, max int) (string, string) {
+	elidedPrefix := ""
+	elidedASuffix := ""
+	elidedBSuffix := ""
+	a, b := fmt.Sprintf("%#v", aObj), fmt.Sprintf("%#v", bObj)
+	for {
+		switch {
+		case len(a) > max && len(a) > 4 && len(b) > 4 && a[:4] == b[:4]:
+			// a is too long, b has data, and the first several characters are the same
+			elidedPrefix = "..."
+			a = a[2:]
+			b = b[2:]
+
+		case len(b) > max && len(b) > 4 && len(a) > 4 && a[:4] == b[:4]:
+			// b is too long, a has data, and the first several characters are the same
+			elidedPrefix = "..."
+			a = a[2:]
+			b = b[2:]
+
+		case len(a) > max:
+			a = a[:max]
+			elidedASuffix = "..."
+
+		case len(b) > max:
+			b = b[:max]
+			elidedBSuffix = "..."
+
+		default:
+			// both are short enough
+			return elidedPrefix + a + elidedASuffix, elidedPrefix + b + elidedBSuffix
+		}
 	}
-	return s
 }
 
 func public(s string) bool {
