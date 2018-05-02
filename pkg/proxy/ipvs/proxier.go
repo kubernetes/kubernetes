@@ -1053,7 +1053,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.NodePort != 0 {
 			addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 			if err != nil {
-				glog.Errorf("Failed to get node ip address matching nodeport cidr")
+				glog.Errorf("Failed to get node ip address matching nodeport cidr: %v", err)
 				continue
 			}
 
@@ -1067,6 +1067,7 @@ func (proxier *Proxier) syncProxyRules() {
 						Protocol:    protocol,
 					}
 					lps = append(lps, lp)
+					// If we encounter a zero CIDR, then there is no point in processing the rest of the addresses.
 					break
 				}
 				lp := utilproxy.LocalPort{
@@ -1078,6 +1079,7 @@ func (proxier *Proxier) syncProxyRules() {
 				lps = append(lps, lp)
 			}
 
+			// For ports on node IPs, open the actual port and hold it.
 			for _, lp := range lps {
 				if proxier.portsMap[lp] != nil {
 					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
