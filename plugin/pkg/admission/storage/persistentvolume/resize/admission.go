@@ -165,7 +165,7 @@ func (pvcr *persistentVolumeClaimResize) checkVolumePlugin(pv *api.PersistentVol
 		return true
 	}
 
-	if pv.Spec.AzureDisk != nil {
+	if pv.Spec.FlexVolume != nil {
 		return true
 	}
 	return false
