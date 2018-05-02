@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -28,11 +29,17 @@ import (
 )
 
 // JSONPrinter is an implementation of ResourcePrinter which outputs an object as JSON.
-type JSONPrinter struct {
-}
+type JSONPrinter struct{}
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
 func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	// we use reflect.Indirect here in order to obtain the actual value from a pointer.
+	// we need an actual value in order to retrieve the package path for an object.
+	// using reflect.Indirect indiscriminately is valid here, as all runtime.Objects are supposed to be pointers.
+	if internalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
+		return fmt.Errorf(internalObjectPrinterErr)
+	}
+
 	switch obj := obj.(type) {
 	case *runtime.Unknown:
 		var buf bytes.Buffer
@@ -64,6 +71,13 @@ type YAMLPrinter struct {
 
 // PrintObj prints the data as YAML.
 func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	// we use reflect.Indirect here in order to obtain the actual value from a pointer.
+	// we need an actual value in order to retrieve the package path for an object.
+	// using reflect.Indirect indiscriminately is valid here, as all runtime.Objects are supposed to be pointers.
+	if internalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
+		return fmt.Errorf(internalObjectPrinterErr)
+	}
+
 	switch obj := obj.(type) {
 	case *runtime.Unknown:
 		data, err := yaml.JSONToYAML(obj.Raw)

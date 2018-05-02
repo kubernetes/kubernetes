@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -31,8 +32,6 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-
-	"fmt"
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/transport"
 )

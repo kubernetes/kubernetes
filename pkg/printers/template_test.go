@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestTemplate(t *testing.T) {
@@ -33,8 +33,8 @@ func TestTemplate(t *testing.T) {
 		expectErr func(error) (string, bool)
 	}{
 		"support base64 decoding of secret data": {
-			template: "{{ .Data.username | base64decode }}",
-			obj: &api.Secret{
+			template: "{{ .data.username | base64decode }}",
+			obj: &v1.Secret{
 				Data: map[string][]byte{
 					"username": []byte("hunter"),
 				},
@@ -42,7 +42,7 @@ func TestTemplate(t *testing.T) {
 			expectOut: "hunter",
 		},
 		"test error path for base64 decoding": {
-			template: "{{ .Data.username | base64decode }}",
+			template: "{{ .data.username | base64decode }}",
 			obj:      &badlyMarshaledSecret{},
 			expectErr: func(err error) (string, bool) {
 				matched := strings.Contains(err.Error(), "base64 decode")
@@ -89,9 +89,9 @@ func TestTemplate(t *testing.T) {
 }
 
 type badlyMarshaledSecret struct {
-	api.Secret
+	v1.Secret
 }
 
 func (a badlyMarshaledSecret) MarshalJSON() ([]byte, error) {
-	return []byte(`{"apiVersion":"v1","Data":{"username":"--THIS IS NOT BASE64--"},"kind":"Secret"}`), nil
+	return []byte(`{"apiVersion":"v1","data":{"username":"--THIS IS NOT BASE64--"},"kind":"Secret"}`), nil
 }

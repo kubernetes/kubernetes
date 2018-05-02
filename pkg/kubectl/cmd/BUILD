@@ -155,6 +155,7 @@ go_test(
         "apply_test.go",
         "attach_test.go",
         "clusterinfo_dump_test.go",
+        "cmd_printing_test.go",
         "cmd_test.go",
         "convert_test.go",
         "cp_test.go",

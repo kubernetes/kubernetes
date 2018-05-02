@@ -194,7 +194,9 @@ func validateArguments(cmd *cobra.Command, filenames, args []string) error {
 }
 
 func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.OldName = args[0]
+	if len(args) > 0 {
+		o.OldName = args[0]
+	}
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.KeepOldName = len(args) == 1
@@ -399,6 +401,7 @@ func (o *RollingUpdateOptions) Run() error {
 	if replicasDefaulted {
 		newRc.Spec.Replicas = oldRc.Spec.Replicas
 	}
+
 	if o.DryRun {
 		oldRcData := &bytes.Buffer{}
 		newRcData := &bytes.Buffer{}
@@ -410,10 +413,10 @@ func (o *RollingUpdateOptions) Run() error {
 			if err != nil {
 				return err
 			}
-			if err := printer.PrintObj(oldRc, oldRcData); err != nil {
+			if err := printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(oldRc, nil), oldRcData); err != nil {
 				return err
 			}
-			if err := printer.PrintObj(newRc, newRcData); err != nil {
+			if err := printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(newRc, nil), newRcData); err != nil {
 				return err
 			}
 		}
@@ -462,7 +465,7 @@ func (o *RollingUpdateOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	return printer.PrintObj(newRc, o.Out)
+	return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(newRc, nil), o.Out)
 }
 
 func findNewName(args []string, oldRc *api.ReplicationController) string {

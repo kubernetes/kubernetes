@@ -252,19 +252,19 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 		t.Errorf("Test data and unmarshaled data are not equal: %v", diff.ObjectDiff(poutput, testData))
 	}
 
-	obj := &api.Pod{
+	obj := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 	}
 	buf.Reset()
 	printer.PrintObj(obj, buf)
-	var objOut api.Pod
+	var objOut v1.Pod
 	// Verify that given function runs without error.
 	err = unmarshalFunc(buf.Bytes(), &objOut)
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
 	// Use real decode function to undo the versioning process.
-	objOut = api.Pod{}
+	objOut = v1.Pod{}
 	if err := runtime.DecodeInto(s, buf.Bytes(), &objOut); err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +359,7 @@ func TestTemplatePanic(t *testing.T) {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 	buffer := &bytes.Buffer{}
-	err = printer.PrintObj(&api.Pod{}, buffer)
+	err = printer.PrintObj(&v1.Pod{}, buffer)
 	if err == nil {
 		t.Fatalf("expected that template to crash")
 	}
@@ -374,7 +374,7 @@ func TestNamePrinter(t *testing.T) {
 		expect string
 	}{
 		"singleObject": {
-			&api.Pod{
+			&v1.Pod{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "Pod",
 				},
@@ -567,31 +567,25 @@ func TestPrinters(t *testing.T) {
 	}
 	jsonpathPrinter = printers.NewVersionedPrinter(jsonpathPrinter, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
-	allPrinters := map[string]printers.ResourcePrinter{
-		"humanReadable": printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
-			NoHeaders: true,
-		}),
-		"humanReadableHeaders": printers.NewHumanReadablePrinter(nil, printers.PrintOptions{}),
-		"json":                 &printers.JSONPrinter{},
-		"yaml":                 &printers.YAMLPrinter{},
-		"template":             templatePrinter,
-		"template2":            templatePrinter2,
-		"jsonpath":             jsonpathPrinter,
+	genericPrinters := map[string]printers.ResourcePrinter{
+		"json":      &printers.JSONPrinter{},
+		"yaml":      &printers.YAMLPrinter{},
+		"template":  templatePrinter,
+		"template2": templatePrinter2,
+		"jsonpath":  jsonpathPrinter,
 		"name": &printers.NamePrinter{
 			Typer:    legacyscheme.Scheme,
 			Decoders: []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme},
 		},
 	}
-	AddHandlers((allPrinters["humanReadable"]).(*printers.HumanReadablePrinter))
-	AddHandlers((allPrinters["humanReadableHeaders"]).(*printers.HumanReadablePrinter))
 	objects := map[string]runtime.Object{
-		"pod":             &api.Pod{ObjectMeta: om("pod")},
-		"emptyPodList":    &api.PodList{},
-		"nonEmptyPodList": &api.PodList{Items: []api.Pod{{}}},
-		"endpoints": &api.Endpoints{
-			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
-				Ports:     []api.EndpointPort{{Port: 8080}},
+		"pod":             &v1.Pod{ObjectMeta: om("pod")},
+		"emptyPodList":    &v1.PodList{},
+		"nonEmptyPodList": &v1.PodList{Items: []v1.Pod{{}}},
+		"endpoints": &v1.Endpoints{
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
+				Ports:     []v1.EndpointPort{{Port: 8080}},
 			}}},
 	}
 	// map of printer name to set of objects it should fail on.
@@ -600,7 +594,29 @@ func TestPrinters(t *testing.T) {
 		"jsonpath":  sets.NewString("emptyPodList", "nonEmptyPodList", "endpoints"),
 	}
 
-	for pName, p := range allPrinters {
+	for pName, p := range genericPrinters {
+		for oName, obj := range objects {
+			b := &bytes.Buffer{}
+			if err := p.PrintObj(obj, b); err != nil {
+				if set, found := expectedErrors[pName]; found && set.Has(oName) {
+					// expected error
+					continue
+				}
+				t.Errorf("printer '%v', object '%v'; error: '%v'", pName, oName, err)
+			}
+		}
+	}
+
+	// a humanreadable printer deals with internal-versioned objects
+	humanReadablePrinter := map[string]printers.ResourcePrinter{
+		"humanReadable": printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
+			NoHeaders: true,
+		}),
+		"humanReadableHeaders": printers.NewHumanReadablePrinter(nil, printers.PrintOptions{}),
+	}
+	AddHandlers((humanReadablePrinter["humanReadable"]).(*printers.HumanReadablePrinter))
+	AddHandlers((humanReadablePrinter["humanReadableHeaders"]).(*printers.HumanReadablePrinter))
+	for pName, p := range humanReadablePrinter {
 		for oName, obj := range objects {
 			b := &bytes.Buffer{}
 			if err := p.PrintObj(obj, b); err != nil {
