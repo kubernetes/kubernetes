@@ -20,12 +20,15 @@ import (
 	"fmt"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 
 	api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -276,4 +279,39 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 
 	mountsDir := path.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
 	return path.Join(mountsDir, volumeName), nil
+}
+
+func (plugin *flexVolumePlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
+	const timeout = 10 * time.Minute
+
+	call := plugin.NewDriverCallWithTimeout(expandVolumeCmd, timeout)
+	call.Append(strconv.FormatInt(newSize.Value(), 10))
+	call.Append(strconv.FormatInt(oldSize.Value(), 10))
+	call.AppendSpec(spec, plugin.host, nil)
+
+	// If the volume driver does not support resizing, Flex Volume Plugin can throw out error here
+	// to stop expand controller's resizing process.
+	ds, err := call.Run()
+	if err != nil {
+		return *resource.NewQuantity(0, resource.BinarySI), err
+	}
+
+	return *resource.NewQuantity(ds.ActualVolumeSize, resource.BinarySI), nil
+}
+
+func (plugin *flexVolumePlugin) RequiresFSResize() bool {
+	return plugin.capabilities.RequiresFSResize
+}
+
+func (plugin *flexVolumePlugin) ExpandFS(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) error {
+	const timeout = 10 * time.Minute
+
+	call := plugin.NewDriverCallWithTimeout(expandFSCmd, timeout)
+	call.Append(strconv.FormatInt(newSize.Value(), 10))
+	call.Append(strconv.FormatInt(oldSize.Value(), 10))
+	call.AppendSpec(spec, plugin.host, nil)
+
+	_, err := call.Run()
+
+	return err
 }
