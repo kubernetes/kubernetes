@@ -18,9 +18,46 @@ package tail
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestReadAtMost(t *testing.T) {
+	fakeFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(fakeFile.Name())
+	fakeData := []byte("this is fake data")
+
+	if err := ioutil.WriteFile(fakeFile.Name(), fakeData, 0600); err != nil {
+		t.Fatalf("WriteFile %s: %v", fakeFile.Name(), err)
+	}
+
+	var readTests = []struct {
+		readLen    int
+		out        []byte
+		moreUnread bool
+	}{
+		{5, []byte(" data"), true},
+		{len(fakeData), fakeData, false},
+		{len(fakeData) + 1, fakeData, false},
+	}
+
+	for c, tt := range readTests {
+		t.Logf("TestCase #%d: %+v", c, tt)
+		s, moreUnread, err := ReadAtMost(fakeFile.Name(), int64(tt.readLen))
+
+		if err != nil {
+			t.Errorf("#%d: ReadAtMost error: %v", c, err)
+		}
+		if bytes.Compare(s, tt.out) != 0 {
+			t.Errorf("#%d: expected data %s got %s", tt.out, s)
+		}
+		if moreUnread != tt.moreUnread {
+			t.Errorf("#%d: expected more unread %t got %t", moreUnread, tt.moreUnread)
+		}
+	}
+}
 
 func TestTail(t *testing.T) {
 	line := strings.Repeat("a", blockSize)
