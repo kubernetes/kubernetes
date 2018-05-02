@@ -326,13 +326,16 @@ var configMapKeyRegexp = regexp.MustCompile("^" + configMapKeyFmt + "$")
 // IsConfigMapKey tests for a string that is a valid key for a ConfigMap or Secret
 func IsConfigMapKey(value string) []string {
 	var errs []string
-	if len(value) > DNS1123SubdomainMaxLength {
-		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
+	parts := strings.Split(value, "/")
+	for _, part := range parts {
+		if len(part) > DNS1123SubdomainMaxLength {
+			errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
+		}
+		if !configMapKeyRegexp.MatchString(part) {
+			errs = append(errs, RegexError(configMapKeyErrMsg, configMapKeyFmt, "key.name", "KEY_NAME", "key-name"))
+		}
+		errs = append(errs, hasChDirPrefix(part)...)
 	}
-	if !configMapKeyRegexp.MatchString(value) {
-		errs = append(errs, RegexError(configMapKeyErrMsg, configMapKeyFmt, "key.name", "KEY_NAME", "key-name"))
-	}
-	errs = append(errs, hasChDirPrefix(value)...)
 	return errs
 }
 

@@ -428,6 +428,8 @@ func TestIsConfigMapKey(t *testing.T) {
 		".so.is.this",
 		"THIS_IS_GOOD",
 		"so_is_this_17",
+		"go/od",
+		"go/.od",
 	}
 
 	for i := range successCases {
@@ -439,6 +441,11 @@ func TestIsConfigMapKey(t *testing.T) {
 	failureCases := []string{
 		".",
 		"..",
+		"/bad",
+		"ba//d",
+		"bad/",
+		"/",
+		"b/./ad",
 		"..bad",
 		"b*d",
 		"bad!&bad",
