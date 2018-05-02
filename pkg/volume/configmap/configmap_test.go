@@ -267,6 +267,28 @@ func TestMakePayload(t *testing.T) {
 			payload:  map[string]util.FileProjection{},
 			success:  true,
 		},
+		{
+			name: "part of existent key",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "path/to/foo",
+				},
+			},
+			configMap: &v1.ConfigMap{
+				Data: map[string]string{
+					"foo/bar": "foobar",
+					"foo/cat": "foocat",
+				},
+			},
+			mode:     0644,
+			optional: true,
+			payload: map[string]util.FileProjection{
+				"path/to/foo/bar": {Data: []byte("foobar"), Mode: 0644},
+				"path/to/foo/cat": {Data: []byte("foocat"), Mode: 0644},
+			},
+			success: true,
+		},
 	}
 
 	for _, tc := range cases {

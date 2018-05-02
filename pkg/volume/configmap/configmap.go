@@ -18,6 +18,7 @@ package configmap
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -26,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	k8sstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -138,7 +139,7 @@ type configMapVolume struct {
 var _ volume.Volume = &configMapVolume{}
 
 func (sv *configMapVolume) GetPath() string {
-	return sv.plugin.host.GetPodVolumeDir(sv.podUID, strings.EscapeQualifiedNameForDisk(configMapPluginName), sv.volName)
+	return sv.plugin.host.GetPodVolumeDir(sv.podUID, k8sstrings.EscapeQualifiedNameForDisk(configMapPluginName), sv.volName)
 }
 
 // configMapVolumeMounter handles retrieving secrets from the API server
@@ -269,23 +270,48 @@ func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *
 		}
 	} else {
 		for _, ktp := range mappings {
-			if stringData, ok := configMap.Data[ktp.Key]; ok {
-				fileProjection.Data = []byte(stringData)
-			} else if binaryData, ok := configMap.BinaryData[ktp.Key]; ok {
-				fileProjection.Data = binaryData
-			} else {
+			var setMode = func(projection *volumeutil.FileProjection) {
+				if ktp.Mode != nil {
+					projection.Mode = *ktp.Mode
+				} else {
+					projection.Mode = *defaultMode
+				}
+			}
+
+			var found bool
+			for key, stringData := range configMap.Data {
+				if key == ktp.Key {
+					found = true
+					fileProjection.Data = []byte(stringData)
+					setMode(&fileProjection)
+					payload[ktp.Path] = fileProjection
+				} else if strings.HasPrefix(key, ktp.Key+"/") {
+					found = true
+					fileProjection.Data = []byte(stringData)
+					setMode(&fileProjection)
+					payload[ktp.Path+key[len(ktp.Key):]] = fileProjection
+				}
+			}
+			for key, binaryData := range configMap.BinaryData {
+				if key == ktp.Key {
+					found = true
+					fileProjection.Data = binaryData
+					setMode(&fileProjection)
+					payload[ktp.Path] = fileProjection
+				} else if strings.HasPrefix(key, ktp.Key+"/") {
+					found = true
+					fileProjection.Data = binaryData
+					setMode(&fileProjection)
+					payload[ktp.Path+key[len(ktp.Key):]] = fileProjection
+				}
+			}
+
+			if !found {
 				if optional {
 					continue
 				}
 				return nil, fmt.Errorf("configmap references non-existent config key: %s", ktp.Key)
 			}
-
-			if ktp.Mode != nil {
-				fileProjection.Mode = *ktp.Mode
-			} else {
-				fileProjection.Mode = *defaultMode
-			}
-			payload[ktp.Path] = fileProjection
 		}
 	}
 

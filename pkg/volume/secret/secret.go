@@ -18,6 +18,7 @@ package secret
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -26,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	k8sstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -55,7 +56,7 @@ func wrappedVolumeSpec() volume.Spec {
 }
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(secretPluginName), volName)
+	return host.GetPodVolumeDir(uid, k8sstrings.EscapeQualifiedNameForDisk(secretPluginName), volName)
 }
 
 func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
@@ -263,8 +264,29 @@ func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32,
 		}
 	} else {
 		for _, ktp := range mappings {
-			content, ok := secret.Data[ktp.Key]
-			if !ok {
+			var setMode = func(projection *volumeutil.FileProjection) {
+				if ktp.Mode != nil {
+					projection.Mode = *ktp.Mode
+				} else {
+					projection.Mode = *defaultMode
+				}
+			}
+
+			var found bool
+			for key, content := range secret.Data {
+				if key == ktp.Key {
+					found = true
+					fileProjection.Data = content
+					setMode(&fileProjection)
+					payload[ktp.Path] = fileProjection
+				} else if strings.HasPrefix(key, ktp.Key+"/") {
+					found = true
+					fileProjection.Data = content
+					setMode(&fileProjection)
+					payload[ktp.Path+key[len(ktp.Key):]] = fileProjection
+				}
+			}
+			if !found {
 				if optional {
 					continue
 				}
@@ -272,14 +294,6 @@ func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32,
 				glog.Errorf(err_msg)
 				return nil, fmt.Errorf(err_msg)
 			}
-
-			fileProjection.Data = []byte(content)
-			if ktp.Mode != nil {
-				fileProjection.Mode = *ktp.Mode
-			} else {
-				fileProjection.Mode = *defaultMode
-			}
-			payload[ktp.Path] = fileProjection
 		}
 	}
 	return payload, nil
