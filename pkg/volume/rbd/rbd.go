@@ -254,6 +254,8 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 		}
 	}
 
+	am, err := getVolumeAccessMode(spec)
+
 	return &rbdMounter{
 		rbd:     newRBD("", spec.Name(), img, pool, ro, plugin, &RBDUtil{}),
 		Mon:     mon,
@@ -261,6 +263,7 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 		Keyring: keyring,
 		Secret:  secret,
 		fsType:  fstype,
+		accessModes:  am,
 	}, nil
 }
 
@@ -319,6 +322,7 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 	if err != nil {
 		return nil, err
 	}
+
 	am, err := getVolumeAccessMode(spec)
 
 	return &rbdMounter{
@@ -733,7 +737,10 @@ func getVolumeSourceReadOnly(spec *volume.Spec) (bool, error) {
 }
 
 func getVolumeAccessMode(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, error) {
-	return spec.PersistentVolume.Spec.AccessModes, nil
+	if spec.PersistentVolume != nil {
+		return spec.PersistentVolume.Spec.AccessModes, nil
+	}
+	return nil, nil
 }
 
 func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (string, error) {

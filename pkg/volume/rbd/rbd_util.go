@@ -270,11 +270,15 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("error: %v, rbd output: %v", err, rbdOutput)
 		}
+
+		// If accessModes contain ReadOnlyMany, we don't need check rbd status of being used.
 		needValidFound := true
-		for _, v := range b.accessModes {
-			if v == v1.ReadOnlyMany {
-				needValidFound = false
-				break
+		if b.accessModes != nil {
+			for _, v := range b.accessModes {
+				if v == v1.ReadOnlyMany {
+					needValidFound = false
+					break
+				}
 			}
 		}
 		if needValidFound && found {
