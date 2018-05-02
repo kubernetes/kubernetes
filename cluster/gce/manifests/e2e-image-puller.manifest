@@ -76,14 +76,16 @@ spec:
       gcr.io/kubernetes-e2e-test-images/volume-rbd:0.1
       k8s.gcr.io/zookeeper-install-3.5.0-alpha:e2e
       gcr.io/google_samples/gb-redisslave:nonexistent
-      ; do echo $(date '+%X') pulling $i; docker pull $i 1>/dev/null; done; exit 0;
+      ; do echo $(date '+%X') pulling $i; crictl pull $i 1>/dev/null; done; exit 0;
     securityContext:
       privileged: true
     volumeMounts:
-    - mountPath: /var/run/docker.sock
+    - mountPath: {{ container_runtime_endpoint }}
       name: socket
-    - mountPath: /usr/bin/docker
-      name: docker
+    - mountPath: /usr/bin/crictl
+      name: crictl
+    - mountPath: /etc/crictl.yaml
+      name: config
   # Add a container that runs a health-check
   - name: nethealth-check
     resources:
@@ -98,13 +100,17 @@ spec:
     - "/usr/bin/nethealth || true"
   volumes:
   - hostPath:
-      path: /var/run/docker.sock
+      path: {{ container_runtime_endpoint }}
       type: Socket
     name: socket
   - hostPath:
-      path: /usr/bin/docker
+      path: /home/kubernetes/bin/crictl
       type: File
-    name: docker
+    name: crictl
+  - hostPath:
+      path: /etc/crictl.yaml
+      type: File
+    name: config
   # This pod is really fire-and-forget.
   restartPolicy: OnFailure
   # This pod needs hostNetworking for true VM perf measurement as well as avoiding cbr0 issues

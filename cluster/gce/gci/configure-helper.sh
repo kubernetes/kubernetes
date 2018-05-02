@@ -2114,10 +2114,16 @@ function start-fluentd-resource-update {
   wait-for-apiserver-and-update-fluentd &
 }
 
-# Update {{ container-runtime }} with actual container runtime name.
+# Update {{ container-runtime }} with actual container runtime name,
+# and {{ container-runtime-endpoint }} with actual container runtime
+# endpoint.
 function update-container-runtime {
-  local -r configmap_yaml="$1"
-  sed -i -e "s@{{ *container_runtime *}}@${CONTAINER_RUNTIME_NAME:-docker}@g" "${configmap_yaml}"
+  local -r file="$1"
+  local -r container_runtime_endpoint="${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}"
+  sed -i \
+    -e "s@{{ *container_runtime *}}@${CONTAINER_RUNTIME_NAME:-docker}@g" \
+    -e "s@{{ *container_runtime_endpoint *}}@${container_runtime_endpoint#unix://}@g" \
+    "${file}"
 }
 
 # Remove configuration in yaml file if node journal is not enabled.
@@ -2394,8 +2400,9 @@ EOF
 # Starts an image-puller - used in test clusters.
 function start-image-puller {
   echo "Start image-puller"
-  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/e2e-image-puller.manifest" \
-    /etc/kubernetes/manifests/
+  local -r e2e_image_puller_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/e2e-image-puller.manifest"
+  update-container-runtime "${e2e_image_puller_manifest}"
+  cp "${e2e_image_puller_manifest}" /etc/kubernetes/manifests/
 }
 
 # Setups manifests for ingress controller and gce-specific policies for service controller.

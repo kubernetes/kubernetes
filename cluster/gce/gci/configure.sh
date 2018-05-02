@@ -28,6 +28,8 @@ DEFAULT_CNI_VERSION="v0.6.0"
 DEFAULT_CNI_SHA1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f"
 DEFAULT_NPD_VERSION="v0.4.1"
 DEFAULT_NPD_SHA1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
+DEFAULT_CRICTL_VERSION="v1.0.0-beta.1"
+DEFAULT_CRICTL_SHA1="6816982ea1b83506945ce02949199171fee17b0b"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
@@ -234,6 +236,34 @@ function install-cni-binaries {
   rm -f "${KUBE_HOME}/${cni_tar}"
 }
 
+# Install crictl binary.
+function install-crictl {
+  if [[ -n "${CRICTL_VERSION:-}" ]]; then
+    local -r crictl_version="${CRICTL_VERSION}"
+    local -r crictl_sha1="${CRICTL_TAR_HASH}"
+  else
+    local -r crictl_version="${DEFAULT_CRICTL_VERSION}"
+    local -r crictl_sha1="${DEFAULT_CRICTL_SHA1}"
+  fi
+  local -r crictl="crictl-${crictl_version}-linux-amd64"
+
+  if is-preloaded "${crictl}" "${crictl_sha1}"; then
+    echo "crictl is preloaded"
+    return
+  fi
+
+  echo "Downloading crictl"
+  local -r crictl_path="https://storage.googleapis.com/kubernetes-release/crictl"
+  download-or-bust "${crictl_sha1}" "${crictl_path}/${crictl}"
+  mv "${KUBE_HOME}/${crictl}" "${KUBE_BIN}/crictl"
+  chmod a+x "${KUBE_BIN}/crictl"
+
+  # Create crictl config file.
+  cat > /etc/crictl.yaml <<EOF
+runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
+EOF
+}
+
 function install-kube-manifests {
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   local dst_dir="${KUBE_HOME}/kube-manifests"
@@ -369,6 +399,9 @@ function install-kube-binary-config {
   if [[ "${REMOUNT_VOLUME_PLUGIN_DIR:-}" == "true" && -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
     remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
   fi
+
+  # Install crictl on each node.
+  install-crictl
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
