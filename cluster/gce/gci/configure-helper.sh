@@ -2183,12 +2183,6 @@ function setup-fluentd {
   sed -i -e "s@{{ fluentd_gcp_configmap_name }}@${fluentd_gcp_configmap_name}@g" "${fluentd_gcp_yaml}"
   fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.2-1.5.30-1-k8s}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
-  if [[ "${STACKDRIVER_METADATA_AGENT_URL:-}" != "" ]]; then
-    metadata_agent_url="${STACKDRIVER_METADATA_AGENT_URL}"
-  else
-    metadata_agent_url="http://${HOSTNAME}:8799"
-  fi
-  sed -i -e "s@{{ stackdriver_metadata_agent_url }}@${metadata_agent_url}@g" "${fluentd_gcp_yaml}"
   update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}
   update-container-runtime ${fluentd_gcp_configmap_yaml}

@@ -38,13 +38,13 @@ spec:
         - name: config-volume
           mountPath: /etc/google-fluentd/config.d
         env:
-        - name: STACKDRIVER_METADATA_AGENT_URL
-          value: {{ stackdriver_metadata_agent_url }}
         - name: NODE_NAME
           valueFrom:
             fieldRef:
               apiVersion: v1
               fieldPath: spec.nodeName
+        - name: STACKDRIVER_METADATA_AGENT_URL
+          value: http://$(NODE_NAME):8799
         # Liveness probe is aimed to help in situarions where fluentd
         # silently hangs for no apparent reasons until manual restart.
         # The idea of this probe is that if fluentd is not queueing or
