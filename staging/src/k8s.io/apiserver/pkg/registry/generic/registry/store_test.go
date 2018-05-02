@@ -311,6 +311,11 @@ func TestStoreCreate(t *testing.T) {
 	// re-define delete strategy to have graceful delete capability
 	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+	registry.Decorator = func(obj runtime.Object) error {
+		pod := obj.(*example.Pod)
+		pod.Status.Phase = example.PodPhase("Testing")
+		return nil
+	}
 
 	// create the object with denying admission
 	objA, err := registry.Create(testContext, podA, denyCreateValidation, false)
@@ -322,6 +327,11 @@ func TestStoreCreate(t *testing.T) {
 	objA, err = registry.Create(testContext, podA, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// verify the decorator was called
+	if objA.(*example.Pod).Status.Phase != example.PodPhase("Testing") {
+		t.Errorf("Decorator was not called: %#v", objA)
 	}
 
 	// get the object
