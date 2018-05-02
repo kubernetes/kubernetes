@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers_test
+package printers
 
 import (
 	"bytes"
@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestMassageJSONPath(t *testing.T) {
@@ -48,7 +47,7 @@ func TestMassageJSONPath(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
-			output, err := printers.RelaxedJSONPathExpression(test.input)
+			output, err := RelaxedJSONPathExpression(test.input)
 			if err != nil && !test.expectErr {
 				t.Errorf("unexpected error: %v", err)
 				return
@@ -69,7 +68,7 @@ func TestMassageJSONPath(t *testing.T) {
 func TestNewColumnPrinterFromSpec(t *testing.T) {
 	tests := []struct {
 		spec            string
-		expectedColumns []printers.Column
+		expectedColumns []Column
 		expectErr       bool
 		name            string
 		noHeaders       bool
@@ -97,7 +96,7 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 		{
 			spec: "NAME:metadata.name,API_VERSION:apiVersion",
 			name: "ok",
-			expectedColumns: []printers.Column{
+			expectedColumns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -116,7 +115,7 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			printer, err := printers.NewCustomColumnsPrinterFromSpec(test.spec, legacyscheme.Codecs.UniversalDecoder(), test.noHeaders)
+			printer, err := NewCustomColumnsPrinterFromSpec(test.spec, legacyscheme.Codecs.UniversalDecoder(), test.noHeaders)
 			if test.expectErr {
 				if err == nil {
 					t.Errorf("[%s] unexpected non-error", test.name)
@@ -164,7 +163,7 @@ const exampleTemplateTwo = `NAME               		API_VERSION
 func TestNewColumnPrinterFromTemplate(t *testing.T) {
 	tests := []struct {
 		spec            string
-		expectedColumns []printers.Column
+		expectedColumns []Column
 		expectErr       bool
 		name            string
 	}{
@@ -191,7 +190,7 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 		{
 			spec: exampleTemplateOne,
 			name: "ok",
-			expectedColumns: []printers.Column{
+			expectedColumns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -205,7 +204,7 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 		{
 			spec: exampleTemplateTwo,
 			name: "ok-2",
-			expectedColumns: []printers.Column{
+			expectedColumns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -220,7 +219,7 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			reader := bytes.NewBufferString(test.spec)
-			printer, err := printers.NewCustomColumnsPrinterFromTemplate(reader, legacyscheme.Codecs.UniversalDecoder())
+			printer, err := NewCustomColumnsPrinterFromTemplate(reader, legacyscheme.Codecs.UniversalDecoder())
 			if test.expectErr {
 				if err == nil {
 					t.Errorf("[%s] unexpected non-error", test.name)
@@ -241,12 +240,12 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 
 func TestColumnPrint(t *testing.T) {
 	tests := []struct {
-		columns        []printers.Column
+		columns        []Column
 		obj            runtime.Object
 		expectedOutput string
 	}{
 		{
-			columns: []printers.Column{
+			columns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -258,7 +257,7 @@ foo
 `,
 		},
 		{
-			columns: []printers.Column{
+			columns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -276,7 +275,7 @@ bar
 `,
 		},
 		{
-			columns: []printers.Column{
+			columns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -292,7 +291,7 @@ foo       baz
 `,
 		},
 		{
-			columns: []printers.Column{
+			columns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -315,7 +314,7 @@ foo       baz           <none>
 
 	for _, test := range tests {
 		t.Run(test.expectedOutput, func(t *testing.T) {
-			printer := &printers.CustomColumnsPrinter{
+			printer := &CustomColumnsPrinter{
 				Columns: test.columns,
 				Decoder: legacyscheme.Codecs.UniversalDecoder(),
 			}
@@ -332,7 +331,7 @@ foo       baz           <none>
 
 // this mimics how resource/get.go calls the customcolumn printer
 func TestIndividualPrintObjOnExistingTabWriter(t *testing.T) {
-	columns := []printers.Column{
+	columns := []Column{
 		{
 			Header:    "NAME",
 			FieldSpec: "{.metadata.name}",
@@ -356,8 +355,8 @@ bar       bar                bar
 `
 
 	buffer := &bytes.Buffer{}
-	tabWriter := printers.GetNewTabWriter(buffer)
-	printer := &printers.CustomColumnsPrinter{
+	tabWriter := GetNewTabWriter(buffer)
+	printer := &CustomColumnsPrinter{
 		Columns: columns,
 		Decoder: legacyscheme.Codecs.UniversalDecoder(),
 	}

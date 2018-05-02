@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // This init should be removed after switching this command and its tests to user external types.
@@ -198,7 +197,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			cmd.Flags().Set("image", "nginx")
 			cmd.Flags().Set("generator", "run/v1")
 
-			printFlags := printers.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
+			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -366,7 +365,7 @@ func TestGenerateService(t *testing.T) {
 				}),
 			}
 
-			printFlags := printers.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
+			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
