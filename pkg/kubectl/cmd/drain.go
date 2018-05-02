@@ -40,21 +40,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 type DrainOptions struct {
-	PrintFlags *printers.PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
 
 	Namespace          string
@@ -108,7 +108,7 @@ var (
 
 func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &DrainOptions{
-		PrintFlags: printers.NewPrintFlags("cordoned").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("cordoned").WithTypeSetter(scheme.Scheme),
 
 		IOStreams: ioStreams,
 	}
@@ -140,7 +140,7 @@ var (
 
 func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &DrainOptions{
-		PrintFlags: printers.NewPrintFlags("uncordoned").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("uncordoned").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 
@@ -196,7 +196,7 @@ var (
 
 func NewDrainOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainOptions {
 	return &DrainOptions{
-		PrintFlags: printers.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 
 		IOStreams:          ioStreams,
 		backOff:            clockwork.NewRealClock(),
@@ -279,6 +279,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		if err != nil {
 			return nil, err
 		}
+
 		return printer.PrintObj, nil
 	}
 
@@ -319,7 +320,7 @@ func (o *DrainOptions) RunDrain() error {
 		return err
 	}
 
-	printer, err := o.ToPrinter("drained")
+	printObj, err := o.ToPrinter("drained")
 	if err != nil {
 		return err
 	}
@@ -334,7 +335,7 @@ func (o *DrainOptions) RunDrain() error {
 		}
 		if err == nil || o.DryRun {
 			drainedNodes.Insert(info.Name)
-			printer.PrintObj(info.Object, o.Out)
+			printObj(info.Object, o.Out)
 		} else {
 			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q, aborting command...\n\n", info.Name)
 			remainingNodes := []string{}
@@ -650,7 +651,7 @@ func (o *DrainOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.D
 	} else {
 		verbStr = "deleted"
 	}
-	printer, err := o.ToPrinter(verbStr)
+	printObj, err := o.ToPrinter(verbStr)
 	if err != nil {
 		return pods, err
 	}
@@ -660,7 +661,7 @@ func (o *DrainOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.D
 		for i, pod := range pods {
 			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				printer.PrintObj(&pod, o.Out)
+				printObj(&pod, o.Out)
 				continue
 			} else if err != nil {
 				return false, err
@@ -736,12 +737,12 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			}
 			unsched := node.Spec.Unschedulable
 			if unsched == desired {
-				printer, err := o.ToPrinter(already(desired))
+				printObj, err := o.ToPrinter(already(desired))
 				if err != nil {
 					fmt.Printf("error: %v", err)
 					continue
 				}
-				printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
+				printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
 			} else {
 				if !o.DryRun {
 					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
@@ -762,20 +763,20 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 						continue
 					}
 				}
-				printer, err := o.ToPrinter(changed(desired))
+				printObj, err := o.ToPrinter(changed(desired))
 				if err != nil {
 					fmt.Fprintf(o.ErrOut, "%v", err)
 					continue
 				}
-				printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
+				printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
 			}
 		} else {
-			printer, err := o.ToPrinter("skipped")
+			printObj, err := o.ToPrinter("skipped")
 			if err != nil {
 				fmt.Fprintf(o.ErrOut, "%v", err)
 				continue
 			}
-			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
+			printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
 		}
 	}
 

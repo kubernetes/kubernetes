@@ -33,9 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -68,7 +68,7 @@ var (
 type ScaleOptions struct {
 	FilenameOptions resource.FilenameOptions
 	RecordFlags     *genericclioptions.RecordFlags
-	PrintFlags      *printers.PrintFlags
+	PrintFlags      *genericclioptions.PrintFlags
 	PrintObj        printers.ResourcePrinterFunc
 
 	Selector        string
@@ -98,9 +98,9 @@ func NewScaleOptions(ioStreams genericclioptions.IOStreams) *ScaleOptions {
 	return &ScaleOptions{
 		// TODO(juanvallejo): figure out why we only support the "name" outputFormat in this command
 		// we only support "-o name" for this command, so only register the name printer
-		PrintFlags: &printers.PrintFlags{
+		PrintFlags: &genericclioptions.PrintFlags{
 			OutputFormat:   &outputFormat,
-			NamePrintFlags: printers.NewNamePrintFlags("scaled"),
+			NamePrintFlags: genericclioptions.NewNamePrintFlags("scaled"),
 		},
 		RecordFlags:     genericclioptions.NewRecordFlags(),
 		CurrentReplicas: -1,

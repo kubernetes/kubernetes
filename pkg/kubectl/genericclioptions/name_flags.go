@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package genericclioptions
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
 
 // NamePrintFlags provides default flags necessary for printing
@@ -42,8 +44,8 @@ func (f *NamePrintFlags) Complete(successTemplate string) error {
 // handling --output=name printing.
 // Returns false if the specified outputFormat does not match a supported format.
 // Supported format types can be found in pkg/printers/printers.go
-func (f *NamePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, error) {
-	namePrinter := &NamePrinter{
+func (f *NamePrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
+	namePrinter := &printers.NamePrinter{
 		Operation: f.Operation,
 	}
 

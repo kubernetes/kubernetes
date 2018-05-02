@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers_test
+package genericclioptions
 
 import (
 	"bytes"
@@ -23,10 +23,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
-func TestPrinterSupportsExpectedJSONYamlFormats(t *testing.T) {
+func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 	testObject := &v1.Pod{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -35,44 +34,69 @@ func TestPrinterSupportsExpectedJSONYamlFormats(t *testing.T) {
 	testCases := []struct {
 		name           string
 		outputFormat   string
+		operation      string
+		dryRun         bool
+		expectedError  string
 		expectedOutput string
 		expectNoMatch  bool
 	}{
 		{
-			name:           "json output format matches a json printer",
-			outputFormat:   "json",
-			expectedOutput: "\"name\": \"foo\"",
+			name:           "valid \"name\" output format with no operation prints resource name",
+			outputFormat:   "name",
+			expectedOutput: "pod/foo",
 		},
 		{
-			name:           "yaml output format matches a yaml printer",
-			outputFormat:   "yaml",
-			expectedOutput: "name: foo",
+			name:           "valid \"name\" output format and an operation results in a short-output (non success printer) message",
+			outputFormat:   "name",
+			operation:      "patched",
+			expectedOutput: "pod/foo",
 		},
 		{
-			name:          "output format for another printer does not match a json/yaml printer",
-			outputFormat:  "jsonpath",
+			name:          "operation and no valid \"name\" output does not match a printer",
+			operation:     "patched",
+			outputFormat:  "invalid",
+			dryRun:        true,
 			expectNoMatch: true,
 		},
 		{
-			name:          "invalid output format results in no match",
+			name:           "operation and empty output still matches name printer",
+			expectedOutput: "pod/foo patched",
+			operation:      "patched",
+		},
+		{
+			name:          "no printer is matched on an invalid outputFormat",
 			outputFormat:  "invalid",
+			expectNoMatch: true,
+		},
+		{
+			name:          "printer should not match on any other format supported by another printer",
+			outputFormat:  "go-template",
 			expectNoMatch: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := printers.JSONYamlPrintFlags{}
+			printFlags := NamePrintFlags{
+				Operation: tc.operation,
+			}
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
-				if !printers.IsNoCompatiblePrinterError(err) {
+				if !IsNoCompatiblePrinterError(err) {
 					t.Fatalf("expected no printer matches for output format %q", tc.outputFormat)
 				}
 				return
 			}
-			if printers.IsNoCompatiblePrinterError(err) {
-				t.Fatalf("expected to match template printer for output format %q", tc.outputFormat)
+			if IsNoCompatiblePrinterError(err) {
+				t.Fatalf("expected to match name printer for output format %q", tc.outputFormat)
+			}
+
+			if len(tc.expectedError) > 0 {
+				if err == nil || !strings.Contains(err.Error(), tc.expectedError) {
+					t.Errorf("expecting error %q, got %v", tc.expectedError, err)
+				}
+				return
 			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

@@ -20,6 +20,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	genericprinters "k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -27,11 +29,11 @@ import (
 // used across all config commands, and provides a method
 // of retrieving a known printer based on flag values provided.
 type kubectlConfigPrintFlags struct {
-	JSONYamlPrintFlags *printers.JSONYamlPrintFlags
-	NamePrintFlags     *printers.NamePrintFlags
+	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
+	NamePrintFlags     *genericclioptions.NamePrintFlags
 	TemplateFlags      *printers.KubeTemplatePrintFlags
 
-	TypeSetter *printers.TypeSetterPrinter
+	TypeSetter *genericprinters.TypeSetterPrinter
 
 	OutputFormat *string
 }
@@ -46,19 +48,19 @@ func (f *kubectlConfigPrintFlags) ToPrinter() (printers.ResourcePrinter, error) 
 		outputFormat = *f.OutputFormat
 	}
 
-	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
+	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
-	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
+	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
-	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
+	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
-	return nil, printers.NoCompatiblePrinterError{Options: f}
+	return nil, genericclioptions.NoCompatiblePrinterError{Options: f}
 }
 
 func (f *kubectlConfigPrintFlags) AddFlags(cmd *cobra.Command) {
@@ -83,10 +85,10 @@ func newKubeConfigPrintFlags(scheme runtime.ObjectTyper) *kubectlConfigPrintFlag
 	return &kubectlConfigPrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-		NamePrintFlags:     printers.NewNamePrintFlags(""),
+		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
+		NamePrintFlags:     genericclioptions.NewNamePrintFlags(""),
 		TemplateFlags:      printers.NewKubeTemplatePrintFlags(),
 
-		TypeSetter: printers.NewTypeSetter(scheme),
+		TypeSetter: genericprinters.NewTypeSetter(scheme),
 	}
 }

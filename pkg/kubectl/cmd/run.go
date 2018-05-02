@@ -20,11 +20,10 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/pkg/printers"
-
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
+
+	"k8s.io/client-go/dynamic"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -98,7 +97,7 @@ type RunObject struct {
 }
 
 type RunOptions struct {
-	PrintFlags    *printers.PrintFlags
+	PrintFlags    *genericclioptions.PrintFlags
 	DeleteFlags   *DeleteFlags
 	DeleteOptions *DeleteOptions
 	RecordFlags   *genericclioptions.RecordFlags
@@ -127,7 +126,7 @@ type RunOptions struct {
 
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
-		PrintFlags:  printers.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 

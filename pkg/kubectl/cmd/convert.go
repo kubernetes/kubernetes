@@ -27,9 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -89,7 +89,7 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 
 // ConvertOptions have the data required to perform the convert operation
 type ConvertOptions struct {
-	PrintFlags *printers.PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 	PrintObj   printers.ResourcePrinterFunc
 
 	resource.FilenameOptions
@@ -103,7 +103,7 @@ type ConvertOptions struct {
 
 func NewConvertOptions(ioStreams genericclioptions.IOStreams) *ConvertOptions {
 	return &ConvertOptions{
-		PrintFlags: printers.NewPrintFlags("converted").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
+		PrintFlags: genericclioptions.NewPrintFlags("converted").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
 		local:      true,
 		IOStreams:  ioStreams,
 	}

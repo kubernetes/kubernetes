@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 // GoTemplatePrintFlags provides default flags necessary for template printing.
@@ -39,7 +41,7 @@ type GoTemplatePrintFlags struct {
 // Returns false if the specified templateFormat does not match a template format.
 func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, error) {
 	if (f.TemplateArgument == nil || len(*f.TemplateArgument) == 0) && len(templateFormat) == 0 {
-		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
+		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
 	}
 
 	templateValue := ""
@@ -68,7 +70,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter
 	}
 
 	if _, supportedFormat := supportedFormats[templateFormat]; !supportedFormat {
-		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
+		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
 	}
 
 	if len(templateValue) == 0 {
