@@ -425,7 +425,7 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			namespace = ""
 		}
-		actualObject, err := dynamicClient.Resource(mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)).Namespace(namespace).Create(asUnstructured)
+		actualObject, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).Create(asUnstructured)
 		if err != nil {
 			return err
 		}

@@ -346,7 +346,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			return err
 		}
 		// Serialize the object with the annotation applied.
-		actualObject, err := o.DynamicClient.Resource(objMapping.GroupVersionKind.GroupVersion().WithResource(objMapping.Resource)).Namespace(o.Namespace).Create(asUnstructured)
+		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
 		if err != nil {
 			return err
 		}

@@ -64,7 +64,7 @@ type Builder struct {
 	objectTyper runtime.ObjectTyper
 
 	// codecFactory describes which codecs you want to use
-	codecFactory *serializer.CodecFactory
+	negotiatedSerializer runtime.NegotiatedSerializer
 
 	// local indicates that we cannot make server calls
 	local bool
@@ -240,13 +240,19 @@ func (b *Builder) WithScheme(scheme *runtime.Scheme, decodingVersions ...schema.
 	}
 	b.objectTyper = scheme
 	codecFactory := serializer.NewCodecFactory(scheme)
-	b.codecFactory = &codecFactory
+	negotiatedSerializer := runtime.NegotiatedSerializer(codecFactory)
+	// if you specified versions, you're specifying a desire for external types, which you don't want to round-trip through
+	// internal types
+	if len(decodingVersions) > 0 {
+		negotiatedSerializer = &serializer.DirectCodecFactory{CodecFactory: codecFactory}
+	}
+	b.negotiatedSerializer = negotiatedSerializer
 
 	b.mapper = &mapper{
 		localFn:    b.isLocal,
 		restMapper: b.restMapper,
 		clientFn:   b.getClient,
-		decoder:    b.codecFactory.UniversalDecoder(decodingVersions...),
+		decoder:    codecFactory.UniversalDecoder(decodingVersions...),
 	}
 
 	return b
@@ -827,8 +833,8 @@ func (b *Builder) getClient(gv schema.GroupVersion) (RESTClient, error) {
 		return b.fakeClientFn(gv)
 	}
 
-	if b.codecFactory != nil {
-		return b.clientConfigFn.clientForGroupVersion(gv, b.codecFactory)
+	if b.negotiatedSerializer != nil {
+		return b.clientConfigFn.clientForGroupVersion(gv, b.negotiatedSerializer)
 	}
 
 	return b.clientConfigFn.unstructuredClientForGroupVersion(gv)

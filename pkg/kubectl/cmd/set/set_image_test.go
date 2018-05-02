@@ -24,9 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/printers"
-
 	"github.com/stretchr/testify/assert"
+
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -36,21 +35,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestImageLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
+	ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
@@ -173,7 +173,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
+	ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
@@ -554,7 +554,7 @@ func TestSetImageRemote(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-			ns := legacyscheme.Codecs
+			ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,

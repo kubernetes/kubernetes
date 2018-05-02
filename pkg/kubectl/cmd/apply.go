@@ -592,7 +592,7 @@ type pruner struct {
 }
 
 func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMapping, includeUninitialized bool) error {
-	objList, err := p.dynamicClient.Resource(mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)).
+	objList, err := p.dynamicClient.Resource(mapping.Resource).
 		Namespace(namespace).
 		List(metav1.ListOptions{
 			LabelSelector:        p.labelSelector,
@@ -648,7 +648,7 @@ func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, scale
 
 func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.DynamicInterface, cascade bool, gracePeriod int, clientsetFunc func() (internalclientset.Interface, error), scaleClient scaleclient.ScalesGetter) error {
 	if !cascade {
-		return c.Resource(mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)).Namespace(namespace).Delete(name, nil)
+		return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, nil)
 	}
 	cs, err := clientsetFunc()
 	if err != nil {
@@ -659,7 +659,7 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Dyna
 		if _, ok := err.(*kubectl.NoSuchReaperError); !ok {
 			return err
 		}
-		return c.Resource(mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)).Namespace(namespace).Delete(name, nil)
+		return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, nil)
 	}
 	var options *metav1.DeleteOptions
 	if gracePeriod >= 0 {

@@ -36,9 +36,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -50,7 +50,7 @@ func TestSetEnvLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
+	ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -93,7 +93,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
+	ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -464,7 +464,7 @@ func TestSetEnvRemote(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-			ns := legacyscheme.Codecs
+			ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
