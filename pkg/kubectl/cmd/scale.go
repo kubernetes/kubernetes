@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
@@ -225,7 +226,7 @@ func (o *ScaleOptions) RunScale() error {
 		}
 
 		mapping := info.ResourceMapping()
-		if mapping.Resource == "jobs" {
+		if mapping.Resource.GroupResource() == (schema.GroupResource{Group: "batch", Resource: "jobs"}) {
 			// go down the legacy jobs path.  This can be removed in 3.14  For now, contain it.
 			fmt.Fprintf(o.ErrOut, "%s scale job is DEPRECATED and will be removed in a future version.\n", o.parent)
 
@@ -234,8 +235,7 @@ func (o *ScaleOptions) RunScale() error {
 			}
 
 		} else {
-			gvk := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)
-			if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, gvk.GroupResource()); err != nil {
+			if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource.GroupResource()); err != nil {
 				return err
 			}
 		}

@@ -697,7 +697,7 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 
 func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) {
 	mappings := make(map[string]*meta.RESTMapping)
-	canonical := make(map[string]struct{})
+	canonical := make(map[schema.GroupVersionResource]struct{})
 	for _, r := range b.resourceTuples {
 		if _, ok := mappings[r.Resource]; ok {
 			continue
@@ -707,7 +707,6 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 			return nil, err
 		}
 
-		mappings[mapping.Resource] = mapping
 		mappings[r.Resource] = mapping
 		canonical[mapping.Resource] = struct{}{}
 	}
@@ -829,7 +828,7 @@ func (b *Builder) visitByResource() *Result {
 	}
 	clients := make(map[string]RESTClient)
 	for _, mapping := range mappings {
-		s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
+		s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource.Resource)
 		if _, ok := clients[s]; ok {
 			continue
 		}
@@ -848,7 +847,7 @@ func (b *Builder) visitByResource() *Result {
 		if !ok {
 			return result.withError(fmt.Errorf("resource %q is not recognized: %v", tuple.Resource, mappings))
 		}
-		s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
+		s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource.Resource)
 		client, ok := clients[s]
 		if !ok {
 			return result.withError(fmt.Errorf("could not find a client for resource %q", tuple.Resource))
