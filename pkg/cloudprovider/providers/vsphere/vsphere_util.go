@@ -472,13 +472,9 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 	glog.V(9).Infof("vmMoMap: +%v", vmMoMap)
 
 	for _, nodeName := range nodes {
-		node, err := vs.nodeManager.GetNode(nodeName)
+		nodeUUID, err := vs.nodeManager.GetVMUUIDFromNodeOrConfigMap(nodeName)
 		if err != nil {
-			return nodesToRetry, err
-		}
-		nodeUUID, err := GetNodeUUID(&node)
-		if err != nil {
-			glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, err)
+			glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", nodeName, err)
 			return nodesToRetry, err
 		}
 		nodeUUID = strings.ToLower(nodeUUID)

@@ -50,6 +50,8 @@ const (
 	VolDir                        = "kubevols"
 	RoundTripperDefaultCount      = 3
 	DummyVMPrefixName             = "vsphere-k8s"
+	UUIDConfigMapName             = "vsphere-vm-uuid"
+	UUIDConfigMapNameSpace        = "kube-system"
 	MacOuiVC                      = "00:50:56"
 	MacOuiEsx                     = "00:0c:29"
 	CleanUpDummyVMRoutineInterval = 5
@@ -83,6 +85,7 @@ type VSphere struct {
 	nodeManager          *NodeManager
 	vmUUID               string
 	isSecretInfoProvided bool
+	informerFactory      informers.SharedInformerFactory
 }
 
 // Represents a vSphere instance where one or more kubernetes nodes are running.
@@ -226,6 +229,19 @@ func init() {
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (vs *VSphere) Initialize(clientBuilder controller.ControllerClientBuilder) {
+	vs.NodeManager().setKubeClient(clientBuilder.ClientOrDie("vsphere-cloud-provider"))
+
+	// Only on controller node it is required to register listeners.
+	// Register callbacks for node updates
+	// EventHandler needs to be added once kubeClient is provided to nodemanager
+	if vs.informerFactory != nil {
+		glog.V(4).Infof("Setting up node informers for vSphere Cloud Provider")
+		vs.informerFactory.Core().V1().Nodes().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    vs.NodeAdded,
+			DeleteFunc: vs.NodeDeleted,
+		})
+		glog.V(4).Infof("Node informers in vSphere cloud provider initialized")
+	}
 }
 
 // Initialize Node Informers
@@ -246,16 +262,7 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 		vs.nodeManager.UpdateCredentialManager(secretCredentialManager)
 	}
 
-	// Only on controller node it is required to register listeners.
-	// Register callbacks for node updates
-	glog.V(4).Infof("Setting up node informers for vSphere Cloud Provider")
-	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
-	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    vs.NodeAdded,
-		DeleteFunc: vs.NodeDeleted,
-	})
-	glog.V(4).Infof("Node informers in vSphere cloud provider initialized")
-
+	vs.informerFactory = informerFactory
 }
 
 // Creates new worker node interface and returns
@@ -478,12 +485,15 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 		return nil, err
 	}
 
+	vmUUIDCache := newNodeUUIDCache(UUIDConfigMapName, UUIDConfigMapNameSpace)
+
 	vs := VSphere{
 		vsphereInstanceMap: vsphereInstanceMap,
 		nodeManager: &NodeManager{
 			vsphereInstanceMap: vsphereInstanceMap,
 			nodeInfoMap:        make(map[string]*NodeInfo),
 			registeredNodes:    make(map[string]*v1.Node),
+			vmUUIDCache:        vmUUIDCache,
 		},
 		isSecretInfoProvided: isSecretInfoProvided,
 		cfg:                  &cfg,
@@ -924,6 +934,11 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 		defer cancel()
 		vsi, err := vs.getVSphereInstance(nodeName)
 		if err != nil {
+			if err == vclib.ErrNoVMFound {
+				glog.Warningf("Node %q does not exist, vsphere CP will assume disk %v is not attached to it.", nodeName, volPath)
+				// make the disk as detached and return false without error.
+				return false, nil
+			}
 			return false, err
 		}
 		// Ensure client is logged in and session is valid
@@ -933,11 +948,6 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 		}
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
-			if err == vclib.ErrNoVMFound {
-				glog.Warningf("Node %q does not exist, vsphere CP will assume disk %v is not attached to it.", nodeName, volPath)
-				// make the disk as detached and return false without error.
-				return false, nil
-			}
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", vSphereInstance, err)
 			return false, err
 		}

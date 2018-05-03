@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 )
 
@@ -47,6 +48,9 @@ type NodeManager struct {
 	registeredNodes map[string]*v1.Node
 	//CredentialsManager
 	credentialManager *SecretCredentialManager
+	// A cache of node's name and UUID. It also is backed up
+	// by a configmap and hence not lost when node is deleted.
+	vmUUIDCache *nodeUUIDCache
 
 	// Mutexes
 	registeredNodesLock   sync.RWMutex
@@ -66,7 +70,7 @@ const (
 	QUEUE_SIZE = POOL_SIZE * 10
 )
 
-func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
+func (nm *NodeManager) DiscoverNode(nodeName string, node *v1.Node) error {
 	type VmSearch struct {
 		vc         string
 		datacenter *vclib.Datacenter
@@ -77,15 +81,23 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 	var queueChannel chan *VmSearch
 	var wg sync.WaitGroup
 	var globalErr *error
-
+	var nodeUUID string
+	var findNodeErr error
 	queueChannel = make(chan *VmSearch, QUEUE_SIZE)
-	nodeUUID, err := GetNodeUUID(node)
-	if err != nil {
-		glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, err)
-		return err
+	if node != nil {
+		nodeUUID, findNodeErr = GetNodeUUID(node)
+		if findNodeErr != nil {
+			glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, findNodeErr)
+			return findNodeErr
+		}
+	} else {
+		nodeUUID, findNodeErr = nm.vmUUIDCache.getVMUUID(nodeName)
+		if findNodeErr != nil {
+			glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", nodeName, findNodeErr)
+			return findNodeErr
+		}
 	}
-
-	glog.V(4).Infof("Discovering node %s with uuid %s", node.ObjectMeta.Name, nodeUUID)
+	glog.V(4).Infof("Discovering node %s with uuid %s", nodeName, nodeUUID)
 
 	vmFound := false
 	globalErr = nil
@@ -159,7 +171,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 					break
 				}
 
-				glog.V(4).Infof("Finding node %s in vc=%s and datacenter=%s", node.Name, vc, datacenterObj.Name())
+				glog.V(4).Infof("Finding node %s in vc=%s and datacenter=%s", nodeName, vc, datacenterObj.Name())
 				queueChannel <- &VmSearch{
 					vc:         vc,
 					datacenter: datacenterObj,
@@ -177,21 +189,20 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 				vm, err := res.datacenter.GetVMByUUID(ctx, nodeUUID)
 				if err != nil {
 					glog.V(4).Infof("Error %q while looking for vm=%+v in vc=%s and datacenter=%s",
-						err, node.Name, vm, res.vc, res.datacenter.Name())
+						err, nodeName, vm, res.vc, res.datacenter.Name())
 					if err != vclib.ErrNoVMFound {
 						setGlobalErr(err)
 					} else {
-						glog.V(4).Infof("Did not find node %s in vc=%s and datacenter=%s",
-							node.Name, res.vc, res.datacenter.Name(), err)
+						glog.V(4).Infof("Did not find node %s in vc=%s and datacenter=%s", nodeName, res.vc, res.datacenter.Name())
 					}
 					continue
 				}
 				if vm != nil {
 					glog.V(4).Infof("Found node %s as vm=%+v in vc=%s and datacenter=%s",
-						node.Name, vm, res.vc, res.datacenter.Name())
+						nodeName, vm, res.vc, res.datacenter.Name())
 
 					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID}
-					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
+					nm.addNodeInfo(nodeName, nodeInfo)
 					for range queueChannel {
 					}
 					setVMFound(true)
@@ -210,28 +221,21 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 		return *globalErr
 	}
 
-	glog.V(4).Infof("Discovery Node: %q vm not found", node.Name)
+	glog.V(4).Infof("Discovery Node: %q vm not found", nodeName)
 	return vclib.ErrNoVMFound
 }
 
-func (nm *NodeManager) RegisterNode(node *v1.Node) error {
-	nm.addNode(node)
-	nm.DiscoverNode(node)
-	return nil
-}
-
-func (nm *NodeManager) UnRegisterNode(node *v1.Node) error {
-	nm.removeNode(node)
-	return nil
+// Set kubeclient in UUID cache manager
+func (nm *NodeManager) setKubeClient(kubeClient clientset.Interface) {
+	nm.vmUUIDCache.kubeClient = kubeClient
 }
 
 func (nm *NodeManager) RediscoverNode(nodeName k8stypes.NodeName) error {
 	node, err := nm.GetNode(nodeName)
-
 	if err != nil {
-		return err
+		return nm.DiscoverNode(convertToString(nodeName), nil)
 	}
-	return nm.DiscoverNode(&node)
+	return nm.DiscoverNode(convertToString(nodeName), &node)
 }
 
 func (nm *NodeManager) GetNode(nodeName k8stypes.NodeName) (v1.Node, error) {
@@ -242,6 +246,49 @@ func (nm *NodeManager) GetNode(nodeName k8stypes.NodeName) (v1.Node, error) {
 		return v1.Node{}, vclib.ErrNoVMFound
 	}
 	return *node, nil
+}
+
+// GetVMUUIDFromNodeOrConfigMap first gets node's UUID from node otherwise from configmap
+func (nm *NodeManager) GetVMUUIDFromNodeOrConfigMap(nodeName k8stypes.NodeName) (string, error) {
+	node, err := nm.GetNode(nodeName)
+	if err == nil {
+		return GetNodeUUID(&node)
+	}
+	return nm.vmUUIDCache.getVMUUID(convertToString(nodeName))
+}
+
+func (nm *NodeManager) RegisterNode(node *v1.Node) error {
+	nm.addNode(node)
+	var err error
+	nodeUUID, err := GetNodeUUID(node)
+	if err != nil {
+		glog.Errorf("Failed to get vm uuid for node %s. err: %+v", node.Name, err)
+		return err
+	}
+	err = nm.vmUUIDCache.addNode(node.Name, nodeUUID)
+	if err != nil {
+		glog.Errorf("error registering node %s with %v", node.Name, err)
+	}
+	err = nm.DiscoverNode(node.Name, node)
+	if err != nil {
+		glog.Errorf("error discovering node %s with %v", node.Name, err)
+	}
+	return nil
+}
+
+func (nm *NodeManager) UnRegisterNode(node *v1.Node) error {
+	nm.removeNode(node)
+	nodeUUID, err := GetNodeUUID(node)
+	if err != nil {
+		glog.Errorf("error getting node %s UUID with %v", node.Name, err)
+		return nil
+	}
+
+	err = nm.vmUUIDCache.markDelete(node.Name, nodeUUID)
+	if err != nil {
+		glog.Errorf("error marking node %s as deleted in cache %v", node.Name, err)
+	}
+	return nil
 }
 
 func (nm *NodeManager) addNode(node *v1.Node) {
@@ -305,7 +352,7 @@ func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
 	var nodeDetails []NodeDetails
 
 	for nodeName, nodeObj := range nm.registeredNodes {
-		nodeInfo, err := nm.GetNodeInfoWithNodeObject(nodeObj)
+		nodeInfo, err := nm.GetNodeInfoWithNodeObject(nodeName, nodeObj)
 		if err != nil {
 			return nil, err
 		}
@@ -401,8 +448,7 @@ func (nm *NodeManager) vcConnect(ctx context.Context, vsphereInstance *VSphereIn
 // NodeInfo returned may not be updated to reflect current VM location.
 //
 // This method is a getter but it can cause side-effect of updating NodeInfo object.
-func (nm *NodeManager) GetNodeInfoWithNodeObject(node *v1.Node) (NodeInfo, error) {
-	nodeName := node.Name
+func (nm *NodeManager) GetNodeInfoWithNodeObject(nodeName string, node *v1.Node) (NodeInfo, error) {
 	getNodeInfo := func(nodeName string) *NodeInfo {
 		nm.nodeInfoLock.RLock()
 		nodeInfo := nm.nodeInfoMap[nodeName]
@@ -414,7 +460,7 @@ func (nm *NodeManager) GetNodeInfoWithNodeObject(node *v1.Node) (NodeInfo, error
 	if nodeInfo == nil {
 		// Rediscover node if no NodeInfo found.
 		glog.V(4).Infof("No VM found for node %q. Initiating rediscovery.", nodeName)
-		err = nm.DiscoverNode(node)
+		err = nm.DiscoverNode(nodeName, node)
 		if err != nil {
 			glog.Errorf("Error %q node info for node %q not found", err, nodeName)
 			return NodeInfo{}, err
