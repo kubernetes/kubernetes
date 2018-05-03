@@ -232,6 +232,10 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 	if err != nil {
 		return nil, err
 	}
+	ams, err := getVolumeAccessModes(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	secretName, secretNs, err := getSecretNameAndNamespace(spec, pod.Namespace)
 	if err != nil {
@@ -255,12 +259,13 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 	}
 
 	return &rbdMounter{
-		rbd:     newRBD("", spec.Name(), img, pool, ro, plugin, &RBDUtil{}),
-		Mon:     mon,
-		Id:      id,
-		Keyring: keyring,
-		Secret:  secret,
-		fsType:  fstype,
+		rbd:         newRBD("", spec.Name(), img, pool, ro, plugin, &RBDUtil{}),
+		Mon:         mon,
+		Id:          id,
+		Keyring:     keyring,
+		Secret:      secret,
+		fsType:      fstype,
+		accessModes: ams,
 	}, nil
 }
 
@@ -319,6 +324,10 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 	if err != nil {
 		return nil, err
 	}
+	ams, err := getVolumeAccessModes(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	return &rbdMounter{
 		rbd:          newRBD(podUID, spec.Name(), img, pool, ro, plugin, manager),
@@ -328,6 +337,7 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 		Secret:       secret,
 		fsType:       fstype,
 		mountOptions: volutil.MountOptionFromSpec(spec),
+		accessModes:  ams,
 	}, nil
 }
 
@@ -767,6 +777,7 @@ type rbdMounter struct {
 	mountOptions  []string
 	imageFormat   string
 	imageFeatures []string
+	accessModes   []v1.PersistentVolumeAccessMode
 }
 
 var _ volume.Mounter = &rbdMounter{}
@@ -1041,6 +1052,19 @@ func getVolumeSourceReadOnly(spec *volume.Spec) (bool, error) {
 	}
 
 	return false, fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+func getVolumeAccessModes(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, error) {
+	// Only PersistentVolumeSpec has AccessModes
+	if spec.PersistentVolume != nil {
+		if spec.PersistentVolume.Spec.RBD != nil {
+			return spec.PersistentVolume.Spec.AccessModes, nil
+		} else {
+			return nil, fmt.Errorf("Spec does not reference a RBD volume type")
+		}
+	}
+
+	return nil, nil
 }
 
 func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (string, error) {
