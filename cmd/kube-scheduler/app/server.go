@@ -23,13 +23,11 @@ import (
 	"net/http"
 	"os"
 	goruntime "runtime"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
@@ -154,21 +152,15 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 	if c.InsecureServing != nil {
 		separateMetrics := c.InsecureMetricsServing != nil
 		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, separateMetrics), nil, nil)
-		// TODO: fail early as all other Kubernetes binaries
-		go wait.Until(func() {
-			if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to start healthz server: %v", err))
-			}
-		}, 5*time.Second, stopCh)
+		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
+			return fmt.Errorf("failed to start healthz server: %v", err)
+		}
 	}
-	if c.InsecureServing != nil {
+	if c.InsecureMetricsServing != nil {
 		handler := buildHandlerChain(newMetricsHandler(&c.ComponentConfig), nil, nil)
-		// TODO: fail early as all other Kubernetes binaries
-		go wait.Until(func() {
-			if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to start metrics server: %v", err))
-			}
-		}, 5*time.Second, stopCh)
+		if err := c.InsecureMetricsServing.Serve(handler, 0, stopCh); err != nil {
+			return fmt.Errorf("failed to start metrics server: %v", err)
+		}
 	}
 	if c.SecureServing != nil {
 		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, false), c.Authentication.Authenticator, c.Authorization.Authorizer)
