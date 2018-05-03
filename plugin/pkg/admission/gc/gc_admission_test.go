@@ -102,6 +102,9 @@ func TestGCAdmission(t *testing.T) {
 		return err == nil
 	}
 	expectCantSetOwnerRefError := func(err error) bool {
+		if err == nil {
+			return false
+		}
 		return strings.Contains(err.Error(), "cannot set an ownerRef on a resource you can't delete")
 	}
 	tests := []struct {
@@ -140,7 +143,7 @@ func TestGCAdmission(t *testing.T) {
 			username:   "non-deleter",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
 			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
-			checkError: expectCantSetOwnerRefError,
+			checkError: expectNoError,
 		},
 		{
 			name:       "non-pod-deleter, create, no objectref change",
@@ -154,7 +157,7 @@ func TestGCAdmission(t *testing.T) {
 			username:   "non-pod-deleter",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
 			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
-			checkError: expectCantSetOwnerRefError,
+			checkError: expectNoError,
 		},
 		{
 			name:       "non-pod-deleter, create, objectref change, but not a pod",
@@ -254,23 +257,26 @@ func TestGCAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 	}
-	gcAdmit, err := newGCPermissionsEnforcement()
-	if err != nil {
-		t.Error(err)
-	}
 
 	for _, tc := range tests {
-		operation := admission.Create
-		if tc.oldObj != nil {
-			operation = admission.Update
-		}
-		user := &user.DefaultInfo{Name: tc.username}
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
+		t.Run(tc.name, func(t *testing.T) {
+			gcAdmit, err := newGCPermissionsEnforcement()
+			if err != nil {
+				t.Error(err)
+			}
 
-		err := gcAdmit.Validate(attributes)
-		if !tc.checkError(err) {
-			t.Errorf("%v: unexpected err: %v", tc.name, err)
-		}
+			operation := admission.Create
+			if tc.oldObj != nil {
+				operation = admission.Update
+			}
+			user := &user.DefaultInfo{Name: tc.username}
+			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
+
+			err = gcAdmit.Validate(attributes)
+			if !tc.checkError(err) {
+				t.Errorf("unexpected err: %v", err)
+			}
+		})
 	}
 }
 
