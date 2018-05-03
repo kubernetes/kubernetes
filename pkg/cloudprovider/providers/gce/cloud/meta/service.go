@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 )
 
 // ServiceInfo defines the entry for a Service that code will be generated for.
@@ -159,6 +160,13 @@ func (i *ServiceInfo) KeyIsZonal() bool {
 	return i.keyType == Zonal
 }
 
+// KeyIsProject is true if the key represents the project resource.
+func (i *ServiceInfo) KeyIsProject() bool {
+	// Projects are a special resource for ResourceId because there is no 'key' value. This func
+	// is used by the generator to not accept a key parameter.
+	return i.Service == "Projects"
+}
+
 // MakeKey returns the call used to create the appropriate key type.
 func (i *ServiceInfo) MakeKey(name, location string) string {
 	switch i.keyType {
@@ -220,15 +228,20 @@ type ServiceGroup struct {
 	GA    *ServiceInfo
 }
 
-// Service returns any ServiceInfo object belonging to the ServiceGroup.
+// Service returns any ServiceInfo string belonging to the ServiceGroup.
 func (sg *ServiceGroup) Service() string {
+	return sg.ServiceInfo().Service
+}
+
+// ServiceInfo returns any ServiceInfo object belonging to the ServiceGroup.
+func (sg *ServiceGroup) ServiceInfo() *ServiceInfo {
 	switch {
 	case sg.GA != nil:
-		return sg.GA.Service
+		return sg.GA
 	case sg.Alpha != nil:
-		return sg.Alpha.Service
+		return sg.Alpha
 	case sg.Beta != nil:
-		return sg.Beta.Service
+		return sg.Beta
 	default:
 		panic(errors.New("service group is empty"))
 	}
@@ -272,6 +285,16 @@ func groupServices(services []*ServiceInfo) map[string]*ServiceGroup {
 // AllServicesByGroup is a map of service name to ServicesGroup.
 var AllServicesByGroup map[string]*ServiceGroup
 
+// SortedServicesGroups is a slice of Servicegroup sorted by Service name.
+var SortedServicesGroups []*ServiceGroup
+
 func init() {
 	AllServicesByGroup = groupServices(AllServices)
+
+	for _, sg := range AllServicesByGroup {
+		SortedServicesGroups = append(SortedServicesGroups, sg)
+	}
+	sort.Slice(SortedServicesGroups, func(i, j int) bool {
+		return SortedServicesGroups[i].Service() < SortedServicesGroups[j].Service()
+	})
 }
