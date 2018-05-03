@@ -222,6 +222,7 @@ func TestAuthorizer(t *testing.T) {
 
 func TestAuthorizerSharedResources(t *testing.T) {
 	g := NewGraph()
+	g.destinationEdgeThreshold = 1
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
 
@@ -250,7 +251,8 @@ func TestAuthorizerSharedResources(t *testing.T) {
 			},
 		},
 	})
-	g.AddPod(&api.Pod{
+
+	pod3 := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod3-node3", Namespace: "ns1"},
 		Spec: api.PodSpec{
 			NodeName: "node3",
@@ -258,7 +260,8 @@ func TestAuthorizerSharedResources(t *testing.T) {
 				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "shared-all"}}},
 			},
 		},
-	})
+	}
+	g.AddPod(pod3)
 
 	g.SetNodeConfigMap("node1", "shared-configmap", "ns1")
 	g.SetNodeConfigMap("node2", "shared-configmap", "ns1")
@@ -316,6 +319,30 @@ func TestAuthorizerSharedResources(t *testing.T) {
 
 		if (decision == authorizer.DecisionAllow) != tc.ExpectAllowed {
 			t.Errorf("%d: expected %v, got %v", i, tc.ExpectAllowed, decision)
+		}
+	}
+
+	{
+		node3SharedSecretGet := authorizer.AttributesRecord{User: node3, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: "shared-all"}
+
+		decision, _, err := authz.Authorize(node3SharedSecretGet)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if decision != authorizer.DecisionAllow {
+			t.Error("expected allowed")
+		}
+
+		// should trigger recalculation of the shared secret index
+		pod3.Spec.Volumes = nil
+		g.AddPod(pod3)
+
+		decision, _, err = authz.Authorize(node3SharedSecretGet)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if decision == authorizer.DecisionAllow {
+			t.Errorf("unexpectedly allowed")
 		}
 	}
 }
@@ -401,6 +428,39 @@ func BenchmarkPopulationRetention(b *testing.B) {
 			_ = fmt.Sprintf("%T\n", g)
 		}
 	}
+}
+
+func BenchmarkWriteIndexMaintenance(b *testing.B) {
+
+	// Run with:
+	// go test ./plugin/pkg/auth/authorizer/node -benchmem -bench BenchmarkWriteIndexMaintenance -run None
+
+	opts := sampleDataOpts{
+		// simulate high replication in a small number of namespaces:
+		nodes:                  5000,
+		namespaces:             1,
+		podsPerNode:            1,
+		attachmentsPerNode:     20,
+		sharedConfigMapsPerPod: 0,
+		uniqueConfigMapsPerPod: 1,
+		sharedSecretsPerPod:    1,
+		uniqueSecretsPerPod:    1,
+		sharedPVCsPerPod:       0,
+		uniquePVCsPerPod:       1,
+	}
+	nodes, pods, pvs, attachments := generate(opts)
+	g := NewGraph()
+	populate(g, nodes, pods, pvs, attachments)
+	// Garbage collect before the first iteration
+	runtime.GC()
+	b.ResetTimer()
+
+	b.SetParallelism(100)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			g.AddPod(pods[0])
+		}
+	})
 }
 
 func BenchmarkAuthorization(b *testing.B) {
