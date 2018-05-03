@@ -914,6 +914,9 @@ contexts:
   name: service-account-context
 current-context: service-account-context
 EOF
+  elif [[ "${FETCH_BOOTSTRAP_KUBECONFIG:-false}" == "true" ]]; then
+    echo "Fetching kubelet bootstrap-kubeconfig file from metadata"
+    get-metadata-value "instance/attributes/bootstrap-kubeconfig" >/var/lib/kubelet/bootstrap-kubeconfig
   else
     echo "Fetching kubelet kubeconfig file from metadata"
     get-metadata-value "instance/attributes/kubeconfig" >/var/lib/kubelet/kubeconfig
