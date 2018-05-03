@@ -233,7 +233,7 @@ func getName(params map[string]string) (string, error) {
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
 		if !found || len(name) == 0 {
-			return "", fmt.Errorf("'name' is a required parameter.")
+			return "", fmt.Errorf("'name' is a required parameter")
 		}
 	}
 	return name, nil
