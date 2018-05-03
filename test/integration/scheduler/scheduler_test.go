@@ -43,7 +43,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	schedulerapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
-	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -182,19 +181,17 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		eventBroadcaster := record.NewBroadcaster()
 		eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 
-		ss := &schedulerappconfig.Config{
-			ComponentConfig: componentconfig.KubeSchedulerConfiguration{
-				HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-				SchedulerName:                  v1.DefaultSchedulerName,
-				AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
-					Policy: &componentconfig.SchedulerPolicySource{
-						ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
-							Namespace: policyConfigMap.Namespace,
-							Name:      policyConfigMap.Name,
-						},
+		ss := &schedulerapp.SchedulerServer{
+			SchedulerName: v1.DefaultSchedulerName,
+			AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
+				Policy: &componentconfig.SchedulerPolicySource{
+					ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+						Namespace: policyConfigMap.Namespace,
+						Name:      policyConfigMap.Name,
 					},
 				},
 			},
+			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			Client:          clientSet,
 			InformerFactory: informerFactory,
 			PodInformer:     factory.NewPodInformer(clientSet, 0),
@@ -203,7 +200,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			Broadcaster:     eventBroadcaster,
 		}
 
-		config, err := schedulerapp.NewSchedulerConfig(ss.Complete())
+		config, err := ss.SchedulerConfig()
 		if err != nil {
 			t.Fatalf("couldn't make scheduler config: %v", err)
 		}
@@ -243,19 +240,17 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 
-	ss := &schedulerappconfig.Config{
-		ComponentConfig: componentconfig.KubeSchedulerConfiguration{
-			SchedulerName: v1.DefaultSchedulerName,
-			AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
-				Policy: &componentconfig.SchedulerPolicySource{
-					ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
-						Namespace: "non-existent-config",
-						Name:      "non-existent-config",
-					},
+	ss := &schedulerapp.SchedulerServer{
+		SchedulerName: v1.DefaultSchedulerName,
+		AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
+			Policy: &componentconfig.SchedulerPolicySource{
+				ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+					Namespace: "non-existent-config",
+					Name:      "non-existent-config",
 				},
 			},
-			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		},
+		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		Client:          clientSet,
 		InformerFactory: informerFactory,
 		PodInformer:     factory.NewPodInformer(clientSet, 0),
@@ -264,7 +259,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		Broadcaster:     eventBroadcaster,
 	}
 
-	_, err := schedulerapp.NewSchedulerConfig(ss.Complete())
+	_, err := ss.SchedulerConfig()
 	if err == nil {
 		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")
 	}

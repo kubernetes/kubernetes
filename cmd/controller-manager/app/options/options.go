@@ -225,6 +225,7 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.ServiceController.AddFlags(fs)
 	o.SecureServing.AddFlags(fs)
 	o.InsecureServing.AddFlags(fs)
+	o.InsecureServing.AddDeprecatedFlags(fs)
 	o.Authentication.AddFlags(fs)
 	o.Authorization.AddFlags(fs)
 }
@@ -303,7 +304,7 @@ func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Co
 	if err := o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
-	if err := o.InsecureServing.ApplyTo(&c.InsecureServing); err != nil {
+	if err := o.InsecureServing.ApplyTo(&c.InsecureServing, &c.ComponentConfig.KubeCloudShared); err != nil {
 		return err
 	}
 	if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
@@ -312,11 +313,6 @@ func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Co
 	if err := o.Authorization.ApplyTo(&c.Authorization); err != nil {
 		return err
 	}
-
-	// sync back to component config
-	// TODO: find more elegant way than synching back the values.
-	c.ComponentConfig.KubeCloudShared.Port = int32(o.InsecureServing.BindPort)
-	c.ComponentConfig.KubeCloudShared.Address = o.InsecureServing.BindAddress.String()
 
 	var err error
 	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)

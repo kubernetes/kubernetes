@@ -51,7 +51,7 @@ go_library(
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
-        "//cmd/kube-scheduler/app/options:go_default_library",
+        "//cmd/kube-scheduler/app:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
