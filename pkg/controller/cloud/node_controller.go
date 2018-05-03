@@ -154,7 +154,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 		return
 	}
 	// Node that isn't present according to the cloud provider shouldn't have its address updated
-	exists, err := ensureNodeExistsByProviderIDOrInstanceID(instances, node)
+	exists, err := ensureNodeExistsByProviderID(instances, node)
 	if err != nil {
 		// Continue to update node address when not sure the node is not exists
 		glog.Errorf("%v", err)
@@ -265,7 +265,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 
 				// Check with the cloud provider to see if the node still exists. If it
 				// doesn't, delete the node immediately.
-				exists, err := ensureNodeExistsByProviderIDOrInstanceID(instances, node)
+				exists, err := ensureNodeExistsByProviderID(instances, node)
 				if err != nil {
 					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
 					continue
@@ -438,21 +438,24 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 	return newTaints
 }
 
-// ensureNodeExistsByProviderIDOrInstanceID first checks if the instance exists by the provider id and then by calling instance id with node name
-func ensureNodeExistsByProviderIDOrInstanceID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
-	exists, err := instances.InstanceExistsByProviderID(context.TODO(), node.Spec.ProviderID)
-	if err != nil {
-		providerIDErr := err
-		_, err = instances.InstanceID(context.TODO(), types.NodeName(node.Name))
-		//TODO(anupn): Changing the check as InstanceID does not return error
-		if err == nil {
-			return false, nil
+// ensureNodeExistsByProviderID checks if the instance exists by the provider id,
+// If provider id in spec is empty it calls instanceId with node name to get provider id
+func ensureNodeExistsByProviderID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		var err error
+		providerID, err = instances.InstanceID(context.TODO(), types.NodeName(node.Name))
+		if err != nil {
+			return false, err
 		}
 
-		return false, fmt.Errorf("InstanceExistsByProviderID: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
+		if providerID == "" {
+			glog.Warningf("Cannot find valid providerID for node name %q, assuming non existence", node.Name)
+			return false, nil
+		}
 	}
 
-	return exists, nil
+	return instances.InstanceExistsByProviderID(context.TODO(), providerID)
 }
 
 func getNodeAddressesByProviderIDOrName(instances cloudprovider.Instances, node *v1.Node) ([]v1.NodeAddress, error) {
