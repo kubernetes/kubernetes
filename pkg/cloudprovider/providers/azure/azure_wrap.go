@@ -104,7 +104,9 @@ func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pi
 	}
 
 	var realErr error
-	pip, err = az.PublicIPAddressesClient.Get(resourceGroup, pipName, "")
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	pip, err = az.PublicIPAddressesClient.Get(ctx, resourceGroup, pipName, "")
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return pip, false, realErr
@@ -194,7 +196,10 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 
 func (az *Cloud) newLBCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		lb, err := az.LoadBalancerClient.Get(az.ResourceGroup, key, "")
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		lb, err := az.LoadBalancerClient.Get(ctx, az.ResourceGroup, key, "")
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr

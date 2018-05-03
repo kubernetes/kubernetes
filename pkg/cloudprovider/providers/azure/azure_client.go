@@ -96,20 +96,18 @@ type InterfacesClient interface {
 
 // LoadBalancersClient defines needed functions for azure network.LoadBalancersClient
 type LoadBalancersClient interface {
-	CreateOrUpdate(resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, cancel <-chan struct{}) (<-chan network.LoadBalancer, <-chan error)
-	Delete(resourceGroupName string, loadBalancerName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error)
-	List(resourceGroupName string) (result LoadBalancerListResultPage, err error)
-	ListNextResults(resourceGroupName string, lastResult LoadBalancerListResultPage) (result LoadBalancerListResultPage, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer) (resp *http.Response, err error)
+	Delete(ctx context.Context, resourceGroupName string, loadBalancerName string) (resp *http.Response, err error)
+	Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error)
+	List(ctx context.Context, resourceGroupName string) (result []network.LoadBalancer, err error)
 }
 
 // PublicIPAddressesClient defines needed functions for azure network.PublicIPAddressesClient
 type PublicIPAddressesClient interface {
-	CreateOrUpdate(resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress, cancel <-chan struct{}) (<-chan network.PublicIPAddress, <-chan error)
-	Delete(resourceGroupName string, publicIPAddressName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
-	List(resourceGroupName string) (result PublicIPAddressListResultPage, err error)
-	ListNextResults(resourceGroupName string, lastResults PublicIPAddressListResultPage) (result PublicIPAddressListResultPage, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) (resp *http.Response, err error)
+	Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) (resp *http.Response, err error)
+	Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
+	List(ctx context.Context, resourceGroupName string) (result []network.PublicIPAddress, err error)
 }
 
 // SubnetsClient defines needed functions for azure network.SubnetsClient
@@ -392,13 +390,11 @@ func newAzLoadBalancersClient(config *azClientConfig) *azLoadBalancersClient {
 	}
 }
 
-func (az *azLoadBalancersClient) CreateOrUpdate(resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, cancel <-chan struct{}) (<-chan network.LoadBalancer, <-chan error) {
+func (az *azLoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "LBCreateOrUpdate")
-		resultChan := make(chan network.LoadBalancer, 1)
-		resultChan <- network.LoadBalancer{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "LBCreateOrUpdate")
+		return nil, err
 	}
 
 	glog.V(10).Infof("azLoadBalancersClient.CreateOrUpdate(%q,%q): start", resourceGroupName, loadBalancerName)
@@ -406,37 +402,23 @@ func (az *azLoadBalancersClient) CreateOrUpdate(resourceGroupName string, loadBa
 		glog.V(10).Infof("azLoadBalancersClient.CreateOrUpdate(%q,%q): end", resourceGroupName, loadBalancerName)
 	}()
 
-	ctx := context.TODO()
-	errChan := make(chan error, 1)
-	resultChan := make(chan network.LoadBalancer, 1)
 	mc := newMetricContext("load_balancers", "create_or_update", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, loadBalancerName, parameters)
+	mc.Observe(err)
 	if err != nil {
-		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azLoadBalancersClient) Delete(resourceGroupName string, loadBalancerName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (az *azLoadBalancersClient) Delete(ctx context.Context, resourceGroupName string, loadBalancerName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "LBDelete")
-		resultChan := make(chan autorest.Response, 1)
-		resultChan <- autorest.Response{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "LBDelete")
+		return nil, err
 	}
 
 	glog.V(10).Infof("azLoadBalancersClient.Delete(%q,%q): start", resourceGroupName, loadBalancerName)
@@ -444,31 +426,19 @@ func (az *azLoadBalancersClient) Delete(resourceGroupName string, loadBalancerNa
 		glog.V(10).Infof("azLoadBalancersClient.Delete(%q,%q): end", resourceGroupName, loadBalancerName)
 	}()
 
-	ctx := context.TODO()
-	errChan := make(chan error, 1)
-	resultChan := make(chan autorest.Response, 1)
 	mc := newMetricContext("load_balancers", "delete", resourceGroupName, az.client.SubscriptionID)
-	future, err := az.client.Delete(context.TODO(), resourceGroupName, loadBalancerName)
+	future, err := az.client.Delete(ctx, resourceGroupName, loadBalancerName)
+	mc.Observe(err)
 	if err != nil {
-		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azLoadBalancersClient) Get(resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error) {
+func (az *azLoadBalancersClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error) {
 	if !az.rateLimiterReader.TryAccept() {
 		err = createARMRateLimitErr(false, "LBGet")
 		return
@@ -480,15 +450,15 @@ func (az *azLoadBalancersClient) Get(resourceGroupName string, loadBalancerName 
 	}()
 
 	mc := newMetricContext("load_balancers", "get", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.Get(context.TODO(), resourceGroupName, loadBalancerName, expand)
+	result, err = az.client.Get(ctx, resourceGroupName, loadBalancerName, expand)
 	mc.Observe(err)
 	return
 }
 
-func (az *azLoadBalancersClient) List(resourceGroupName string) (LoadBalancerListResultPage, error) {
+func (az *azLoadBalancersClient) List(ctx context.Context, resourceGroupName string) ([]network.LoadBalancer, error) {
 	if !az.rateLimiterReader.TryAccept() {
 		err := createARMRateLimitErr(false, "LBList")
-		return &network.LoadBalancerListResultPage{}, err
+		return nil, err
 	}
 
 	glog.V(10).Infof("azLoadBalancersClient.List(%q): start", resourceGroupName)
@@ -497,26 +467,22 @@ func (az *azLoadBalancersClient) List(resourceGroupName string) (LoadBalancerLis
 	}()
 
 	mc := newMetricContext("load_balancers", "list", resourceGroupName, az.client.SubscriptionID)
-	result, err := az.client.List(context.TODO(), resourceGroupName)
+	iterator, err := az.client.ListComplete(ctx, resourceGroupName)
 	mc.Observe(err)
-	return &result, err
-}
-
-func (az *azLoadBalancersClient) ListNextResults(resourceGroupName string, lastResult LoadBalancerListResultPage) (result LoadBalancerListResultPage, err error) {
-	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "LBListNextResults")
-		return
+	if err != nil {
+		return nil, err
 	}
 
-	glog.V(10).Infof("azLoadBalancersClient.ListNextResults(%q): start", lastResult)
-	defer func() {
-		glog.V(10).Infof("azLoadBalancersClient.ListNextResults(%q): end", lastResult)
-	}()
+	result := make([]network.LoadBalancer, 0)
+	for ; iterator.NotDone(); err = iterator.Next() {
+		if err != nil {
+			return nil, err
+		}
 
-	mc := newMetricContext("load_balancers", "list_next_results", resourceGroupName, az.client.SubscriptionID)
-	err = lastResult.Next()
-	mc.Observe(err)
-	return lastResult, err
+		result = append(result, iterator.Value())
+	}
+
+	return result, nil
 }
 
 // azPublicIPAddressesClient implements PublicIPAddressesClient.
@@ -540,13 +506,11 @@ func newAzPublicIPAddressesClient(config *azClientConfig) *azPublicIPAddressesCl
 	}
 }
 
-func (az *azPublicIPAddressesClient) CreateOrUpdate(resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress, cancel <-chan struct{}) (<-chan network.PublicIPAddress, <-chan error) {
+func (az *azPublicIPAddressesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "PublicIPCreateOrUpdate")
-		resultChan := make(chan network.PublicIPAddress, 1)
-		resultChan <- network.PublicIPAddress{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "PublicIPCreateOrUpdate")
+		return nil, err
 	}
 
 	glog.V(10).Infof("azPublicIPAddressesClient.CreateOrUpdate(%q,%q): start", resourceGroupName, publicIPAddressName)
@@ -554,37 +518,23 @@ func (az *azPublicIPAddressesClient) CreateOrUpdate(resourceGroupName string, pu
 		glog.V(10).Infof("azPublicIPAddressesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, publicIPAddressName)
 	}()
 
-	ctx := context.TODO()
-	errChan := make(chan error, 1)
-	resultChan := make(chan network.PublicIPAddress, 1)
 	mc := newMetricContext("public_ip_addresses", "create_or_update", resourceGroupName, az.client.SubscriptionID)
-	future, err := az.client.CreateOrUpdate(context.TODO(), resourceGroupName, publicIPAddressName, parameters)
+	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, publicIPAddressName, parameters)
+	mc.Observe(err)
 	if err != nil {
-		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azPublicIPAddressesClient) Delete(resourceGroupName string, publicIPAddressName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (az *azPublicIPAddressesClient) Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "PublicIPDelete")
-		resultChan := make(chan autorest.Response, 1)
-		resultChan <- autorest.Response{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "PublicIPDelete")
+		return nil, err
 	}
 
 	glog.V(10).Infof("azPublicIPAddressesClient.Delete(%q,%q): start", resourceGroupName, publicIPAddressName)
@@ -592,31 +542,19 @@ func (az *azPublicIPAddressesClient) Delete(resourceGroupName string, publicIPAd
 		glog.V(10).Infof("azPublicIPAddressesClient.Delete(%q,%q): end", resourceGroupName, publicIPAddressName)
 	}()
 
-	ctx := context.TODO()
-	resultChan := make(chan autorest.Response, 1)
-	errChan := make(chan error, 1)
 	mc := newMetricContext("public_ip_addresses", "delete", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.Delete(ctx, resourceGroupName, publicIPAddressName)
+	mc.Observe(err)
 	if err != nil {
-		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azPublicIPAddressesClient) Get(resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
+func (az *azPublicIPAddressesClient) Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
 	if !az.rateLimiterReader.TryAccept() {
 		err = createARMRateLimitErr(false, "PublicIPGet")
 		return
@@ -628,13 +566,12 @@ func (az *azPublicIPAddressesClient) Get(resourceGroupName string, publicIPAddre
 	}()
 
 	mc := newMetricContext("public_ip_addresses", "get", resourceGroupName, az.client.SubscriptionID)
-	ctx := context.TODO()
 	result, err = az.client.Get(ctx, resourceGroupName, publicIPAddressName, expand)
 	mc.Observe(err)
 	return
 }
 
-func (az *azPublicIPAddressesClient) List(resourceGroupName string) (PublicIPAddressListResultPage, error) {
+func (az *azPublicIPAddressesClient) List(ctx context.Context, resourceGroupName string) ([]network.PublicIPAddress, error) {
 	if !az.rateLimiterReader.TryAccept() {
 		return nil, createARMRateLimitErr(false, "PublicIPList")
 	}
@@ -645,27 +582,22 @@ func (az *azPublicIPAddressesClient) List(resourceGroupName string) (PublicIPAdd
 	}()
 
 	mc := newMetricContext("public_ip_addresses", "list", resourceGroupName, az.client.SubscriptionID)
-	ctx := context.TODO()
-	result, err := az.client.List(ctx, resourceGroupName)
+	iterator, err := az.client.ListComplete(ctx, resourceGroupName)
 	mc.Observe(err)
-	return &result, err
-}
-
-func (az *azPublicIPAddressesClient) ListNextResults(resourceGroupName string, lastResults PublicIPAddressListResultPage) (result PublicIPAddressListResultPage, err error) {
-	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "PublicIPListNextResults")
-		return
+	if err != nil {
+		return nil, err
 	}
 
-	glog.V(10).Infof("azPublicIPAddressesClient.ListNextResults(%q): start", lastResults)
-	defer func() {
-		glog.V(10).Infof("azPublicIPAddressesClient.ListNextResults(%q): end", lastResults)
-	}()
+	result := make([]network.PublicIPAddress, 0)
+	for ; iterator.NotDone(); err = iterator.Next() {
+		if err != nil {
+			return nil, err
+		}
 
-	mc := newMetricContext("public_ip_addresses", "list_next_results", resourceGroupName, az.client.SubscriptionID)
-	err = lastResults.Next()
-	mc.Observe(err)
-	return lastResults, err
+		result = append(result, iterator.Value())
+	}
+
+	return result, nil
 }
 
 // azSubnetsClient implements SubnetsClient.
