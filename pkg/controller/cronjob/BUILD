@@ -17,6 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/cronjob",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/robfig/cron:go_default_library",
@@ -32,11 +33,19 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/informers/batch/v1:go_default_library",
+        "//vendor/k8s.io/client-go/informers/batch/v1beta1:go_default_library",
+        "//vendor/k8s.io/client-go/informers/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/listers/batch/v1:go_default_library",
+        "//vendor/k8s.io/client-go/listers/batch/v1beta1:go_default_library",
+        "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/tools/reference:go_default_library",
+        "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
     ],
 )
 
