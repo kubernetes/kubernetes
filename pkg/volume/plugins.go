@@ -483,7 +483,7 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 	if err != nil {
 		return fmt.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
 	}
-
+	pm.probedPlugins[name] = probedPlugin
 	glog.V(1).Infof("Loaded volume plugin %q", name)
 	return nil
 }
@@ -611,7 +611,7 @@ func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVo
 	return nil, fmt.Errorf("no persistent volume plugin matched")
 }
 
-// FindRecyclablePluginByName fetches a persistent volume plugin by name.  If
+// FindRecyclablePluginBySpec fetches a persistent volume plugin by name.  If
 // no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindRecyclablePluginBySpec(spec *Spec) (RecyclableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
@@ -637,7 +637,7 @@ func (pm *VolumePluginMgr) FindProvisionablePluginByName(name string) (Provision
 	return nil, fmt.Errorf("no provisionable volume plugin matched")
 }
 
-// FindDeletablePluginBySppec fetches a persistent volume plugin by spec.  If
+// FindDeletablePluginBySpec fetches a persistent volume plugin by spec.  If
 // no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
@@ -719,7 +719,7 @@ func (pm *VolumePluginMgr) FindExpandablePluginBySpec(spec *Spec) (ExpandableVol
 	return nil, nil
 }
 
-// FindExpandablePluginBySpec fetches a persistent volume plugin by name.
+// FindExpandablePluginByName fetches a persistent volume plugin by name.
 func (pm *VolumePluginMgr) FindExpandablePluginByName(name string) (ExpandableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginByName(name)
 	if err != nil {
