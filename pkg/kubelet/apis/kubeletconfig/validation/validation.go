@@ -31,6 +31,11 @@ import (
 func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
 	allErrors := []error{}
 
+	// Make a local copy of the global feature gates and combine it with the gates set by this configuration.
+	// This allows us to validate the config against the set of gates it will actually run against.
+	localFeatureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+	localFeatureGate.SetFromMap(kc.FeatureGates)
+
 	if !kc.CgroupsPerQOS && len(kc.EnforceNodeAllocatable) > 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) is not supported unless CgroupsPerQOS (--cgroups-per-qos) feature is turned on"))
 	}
@@ -88,7 +93,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.RegistryPullQPS < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: RegistryPullQPS (--registry-qps) %v must not be a negative number", kc.RegistryPullQPS))
 	}
-	if kc.ServerTLSBootstrap && !utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ServerTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
 	for _, val := range kc.EnforceNodeAllocatable {

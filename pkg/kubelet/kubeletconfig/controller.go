@@ -43,9 +43,22 @@ const (
 	configTrialDuration = 10 * time.Minute
 )
 
+// TransformFunc edits the KubeletConfiguration in-place, and returns an
+// error if any of the transformations failed.
+type TransformFunc func(kc *kubeletconfig.KubeletConfiguration) error
+
 // Controller manages syncing dynamic Kubelet configurations
 // For more information, see the proposal: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/dynamic-kubelet-configuration.md
 type Controller struct {
+	// transform applies an arbitrary transformation to config after loading, and before validation.
+	// This can be used, for example, to include config from flags before the controller's validation step.
+	// If transform returns an error, loadConfig will fail, and an InternalError will be reported.
+	// Be wary if using this function as an extension point, in most cases the controller should
+	// probably just be natively extended to do what you need. Injecting flag precedence transformations
+	// is something of an exception because the caller of this controller (cmd/) is aware of flags, but this
+	// controller's tree (pkg/) is not.
+	transform TransformFunc
+
 	// pendingConfigSource; write to this channel to indicate that the config source needs to be synced from the API server
 	pendingConfigSource chan bool
 
@@ -59,9 +72,17 @@ type Controller struct {
 	checkpointStore store.Store
 }
 
-// NewController constructs a new Controller object and returns it. Directory paths must be absolute.
-func NewController(dynamicConfigDir string) *Controller {
+// NewController constructs a new Controller object and returns it. The dynamicConfigDir
+// path must be absolute. transform applies an arbitrary transformation to config after loading, and before validation.
+// This can be used, for example, to include config from flags before the controller's validation step.
+// If transform returns an error, loadConfig will fail, and an InternalError will be reported.
+// Be wary if using this function as an extension point, in most cases the controller should
+// probably just be natively extended to do what you need. Injecting flag precedence transformations
+// is something of an exception because the caller of this controller (cmd/) is aware of flags, but this
+// controller's tree (pkg/) is not.
+func NewController(dynamicConfigDir string, transform TransformFunc) *Controller {
 	return &Controller{
+		transform: transform,
 		// channels must have capacity at least 1, since we signal with non-blocking writes
 		pendingConfigSource: make(chan bool, 1),
 		configStatus:        status.NewNodeConfigStatus(),
@@ -71,6 +92,7 @@ func NewController(dynamicConfigDir string) *Controller {
 
 // Bootstrap attempts to return a valid KubeletConfiguration based on the configuration of the Controller,
 // or returns an error if no valid configuration could be produced. Bootstrap should be called synchronously before StartSync.
+// If the pre-existing local configuration should be used, Bootstrap returns a nil config.
 func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	utillog.Infof("starting controller")
 
@@ -194,6 +216,13 @@ func (cc *Controller) loadConfig(source checkpoint.RemoteConfigSource) (*kubelet
 	if err != nil {
 		return nil, status.LoadError, err
 	}
+	// apply any required transformations to the KubeletConfiguration
+	if cc.transform != nil {
+		if err := cc.transform(kc); err != nil {
+			return nil, status.InternalError, err
+		}
+	}
+	// validate the result
 	if err := validation.ValidateKubeletConfiguration(kc); err != nil {
 		return nil, status.ValidateError, err
 	}
