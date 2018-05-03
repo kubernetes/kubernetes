@@ -150,9 +150,8 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 
 			instances, _ := fc.Instances()
 			exists, err := ensureNodeExistsByProviderID(instances, tc.node)
-			if tc.providerIDErr == nil {
-				assert.NoError(t, err)
-			}
+			assert.Equal(t, err, tc.providerIDErr)
+
 			assert.EqualValues(t, tc.expectedCalls, fc.Calls,
 				"expected cloud provider methods `%v` to be called but `%v` was called ",
 				tc.expectedCalls, fc.Calls)
