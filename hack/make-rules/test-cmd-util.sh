@@ -3677,7 +3677,7 @@ run_kubectl_config_set_tests() {
   kubectl config set clusters.test2-cluster.certificate-authority-data <(echo "#Comment" && cat "${TMPDIR:-/tmp}/apiserver.crt") --set-raw-bytes
   a_written=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test2-cluster")].cluster.certificate-authority-data}')
 
-  test "$a_writen" == "$r_writen"
+ test "$a_written" == "$r_written"
 
   set +o nounset
   set +o errexit
