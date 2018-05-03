@@ -174,6 +174,16 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return kl.podManager.GetPodByName(namespace, name)
 }
 
+// GetPodByCgroupfs provides the pod that maps to the specified cgroup, as well
+// as whether the pod was found.
+func (kl *Kubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) {
+	pcm := kl.containerManager.NewPodContainerManager()
+	if result, podUID := pcm.IsPodCgroup(cgroupfs); result {
+		return kl.podManager.GetPodByUID(podUID)
+	}
+	return nil, false
+}
+
 // GetHostname Returns the hostname as the kubelet sees it.
 func (kl *Kubelet) GetHostname() string {
 	return kl.hostname

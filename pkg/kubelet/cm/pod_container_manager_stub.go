@@ -49,3 +49,7 @@ func (m *podContainerManagerStub) ReduceCPULimits(_ CgroupName) error {
 func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
 	return nil, nil
 }
+
+func (m *podContainerManagerStub) IsPodCgroup(cgroupfs string) (bool, types.UID) {
+	return false, types.UID("")
+}

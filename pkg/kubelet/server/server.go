@@ -278,7 +278,7 @@ func (s *Server) InstallDefaultHandlers() {
 
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := prometheus.NewRegistry()
-	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabels))
+	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host)))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		promhttp.HandlerFor(r, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)
@@ -825,31 +825,40 @@ func (a prometheusHostAdapter) GetMachineInfo() (*cadvisorapi.MachineInfo, error
 	return a.host.GetCachedMachineInfo()
 }
 
-// containerPrometheusLabels maps cAdvisor labels to prometheus labels.
-func containerPrometheusLabels(c *cadvisorapi.ContainerInfo) map[string]string {
-	// Prometheus requires that all metrics in the same family have the same labels,
-	// so we arrange to supply blank strings for missing labels
-	var name, image, podName, namespace, containerName string
-	if len(c.Aliases) > 0 {
-		name = c.Aliases[0]
+func containerPrometheusLabelsFunc(s stats.StatsProvider) metrics.ContainerLabelsFunc {
+	// containerPrometheusLabels maps cAdvisor labels to prometheus labels.
+	return func(c *cadvisorapi.ContainerInfo) map[string]string {
+		// Prometheus requires that all metrics in the same family have the same labels,
+		// so we arrange to supply blank strings for missing labels
+		var name, image, podName, namespace, containerName string
+		if len(c.Aliases) > 0 {
+			name = c.Aliases[0]
+		}
+		image = c.Spec.Image
+		if v, ok := c.Spec.Labels[kubelettypes.KubernetesPodNameLabel]; ok {
+			podName = v
+		}
+		if v, ok := c.Spec.Labels[kubelettypes.KubernetesPodNamespaceLabel]; ok {
+			namespace = v
+		}
+		if v, ok := c.Spec.Labels[kubelettypes.KubernetesContainerNameLabel]; ok {
+			containerName = v
+		}
+		// Associate pod cgroup with pod so we have an accurate accounting of sandbox
+		if podName == "" && namespace == "" {
+			if pod, found := s.GetPodByCgroupfs(c.Name); found {
+				podName = pod.Name
+				namespace = pod.Namespace
+			}
+		}
+		set := map[string]string{
+			metrics.LabelID:    c.Name,
+			metrics.LabelName:  name,
+			metrics.LabelImage: image,
+			"pod_name":         podName,
+			"namespace":        namespace,
+			"container_name":   containerName,
+		}
+		return set
 	}
-	image = c.Spec.Image
-	if v, ok := c.Spec.Labels[kubelettypes.KubernetesPodNameLabel]; ok {
-		podName = v
-	}
-	if v, ok := c.Spec.Labels[kubelettypes.KubernetesPodNamespaceLabel]; ok {
-		namespace = v
-	}
-	if v, ok := c.Spec.Labels[kubelettypes.KubernetesContainerNameLabel]; ok {
-		containerName = v
-	}
-	set := map[string]string{
-		metrics.LabelID:    c.Name,
-		metrics.LabelName:  name,
-		metrics.LabelImage: image,
-		"pod_name":         podName,
-		"namespace":        namespace,
-		"container_name":   containerName,
-	}
-	return set
 }
