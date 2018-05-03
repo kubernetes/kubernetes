@@ -257,7 +257,6 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 	}
 
 	devicePath, found := waitForPath(b.Pool, b.Image, 1)
-
 	if !found {
 		_, err = b.exec.Run("modprobe", "rbd")
 		if err != nil {
@@ -565,7 +564,7 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	if sizeIndex == -1 || divIndex == -1 || divIndex <= sizeIndex+5 {
 		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, output)
 	}
-	rbdSizeStr := output[sizeIndex+5: divIndex]
+	rbdSizeStr := output[sizeIndex+5 : divIndex]
 	rbdSize, err := strconv.Atoi(rbdSizeStr)
 	if err != nil {
 		return 0, fmt.Errorf("can not convert size str: %s to int", rbdSizeStr)

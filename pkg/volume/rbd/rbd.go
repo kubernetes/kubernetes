@@ -547,7 +547,7 @@ type rbd struct {
 	mounter  *mount.SafeFormatAndMount
 	exec     mount.Exec
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager diskManager
+	manager                diskManager
 	volume.MetricsProvider `json:"-"`
 }
 
