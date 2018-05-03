@@ -22,6 +22,7 @@ type ListOpts struct {
 	ID            string `q:"id"`
 	Name          string `q:"name"`
 	TenantID      string `q:"tenant_id"`
+	ProjectID     string `q:"project_id"`
 	PoolID        string `q:"pool_id"`
 	Type          string `q:"type"`
 	Delay         int    `q:"delay"`
@@ -119,9 +120,13 @@ type CreateOpts struct {
 	// types.
 	ExpectedCodes string `json:"expected_codes,omitempty"`
 
-	// The UUID of the tenant who owns the Monitor. Only administrative users
-	// can specify a tenant UUID other than their own.
+	// TenantID is the UUID of the project who owns the Monitor.
+	// Only administrative users can specify a project UUID other than their own.
 	TenantID string `json:"tenant_id,omitempty"`
+
+	// ProjectID is the UUID of the project who owns the Monitor.
+	// Only administrative users can specify a project UUID other than their own.
+	ProjectID string `json:"project_id,omitempty"`
 
 	// The Name of the Monitor.
 	Name string `json:"name,omitempty"`

@@ -17,6 +17,7 @@ type ListOpts struct {
 	FixedIP           string `q:"fixed_ip_address"`
 	FloatingIP        string `q:"floating_ip_address"`
 	TenantID          string `q:"tenant_id"`
+	ProjectID         string `q:"project_id"`
 	Limit             int    `q:"limit"`
 	Marker            string `q:"marker"`
 	SortKey           string `q:"sort_key"`
@@ -55,6 +56,7 @@ type CreateOpts struct {
 	FixedIP           string `json:"fixed_ip_address,omitempty"`
 	SubnetID          string `json:"subnet_id,omitempty"`
 	TenantID          string `json:"tenant_id,omitempty"`
+	ProjectID         string `json:"project_id,omitempty"`
 }
 
 // ToFloatingIPCreateMap allows CreateOpts to satisfy the CreateOptsBuilder

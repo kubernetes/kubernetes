@@ -22,6 +22,7 @@ type ListOpts struct {
 	AdminStateUp *bool  `q:"admin_state_up"`
 	NetworkID    string `q:"network_id"`
 	TenantID     string `q:"tenant_id"`
+	ProjectID    string `q:"project_id"`
 	DeviceOwner  string `q:"device_owner"`
 	MACAddress   string `q:"mac_address"`
 	ID           string `q:"id"`
@@ -81,6 +82,7 @@ type CreateOpts struct {
 	DeviceID            string        `json:"device_id,omitempty"`
 	DeviceOwner         string        `json:"device_owner,omitempty"`
 	TenantID            string        `json:"tenant_id,omitempty"`
+	ProjectID           string        `json:"project_id,omitempty"`
 	SecurityGroups      *[]string     `json:"security_groups,omitempty"`
 	AllowedAddressPairs []AddressPair `json:"allowed_address_pairs,omitempty"`
 }
