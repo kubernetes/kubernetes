@@ -2,16 +2,23 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
+<<<<<<< HEAD
     srcs = [
         "extension.go",
         "openapi.go",
     ],
+=======
+    srcs = ["openapi.go"],
+>>>>>>> run ./hack/update-bazel.sh
     importpath = "k8s.io/kube-openapi/pkg/generators",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
+<<<<<<< HEAD
         "//vendor/k8s.io/gengo/examples/set-gen/sets:go_default_library",
+=======
+>>>>>>> run ./hack/update-bazel.sh
         "//vendor/k8s.io/gengo/generator:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",
         "//vendor/k8s.io/gengo/types:go_default_library",
