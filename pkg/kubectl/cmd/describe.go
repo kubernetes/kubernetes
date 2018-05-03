@@ -88,8 +88,8 @@ type DescribeOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &DescribeOptions{
+func NewDescribeOptions(parent string, streams genericclioptions.IOStreams) *DescribeOptions {
+	return &DescribeOptions{
 		FilenameOptions: &resource.FilenameOptions{},
 		DescriberSettings: &printers.DescriberSettings{
 			ShowEvents: true,
@@ -99,7 +99,10 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 
 		IOStreams: streams,
 	}
+}
 
+func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewDescribeOptions(parent, streams)
 	cmd := &cobra.Command{
 		Use: "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		DisableFlagsInUseLine: true,
@@ -108,7 +111,9 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		Example: describeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Run())
+			option := NewDescribeOptions(parent, streams)
+			option.Complete(f, cmd, args)
+			cmdutil.CheckErr(o.Run(option))
 		},
 	}
 	usage := "containing the resource to describe"
@@ -153,7 +158,7 @@ func (o *DescribeOptions) Validate(args []string) error {
 	return nil
 }
 
-func (o *DescribeOptions) Run() error {
+func (o *DescribeOptions) Run(option *DescribeOptions) error {
 	r := o.Builder.
 		Unstructured().
 		ContinueOnError().
@@ -173,7 +178,7 @@ func (o *DescribeOptions) Run() error {
 	infos, err := r.Infos()
 	if err != nil {
 		if apierrors.IsNotFound(err) && len(o.BuilderArgs) == 2 {
-			return o.DescribeMatchingResources(err, o.BuilderArgs[0], o.BuilderArgs[1])
+			return option.DescribeMatchingResources(err, o.BuilderArgs[0], o.BuilderArgs[1])
 		}
 		allErrs = append(allErrs, err)
 	}
