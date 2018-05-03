@@ -426,12 +426,12 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 			return fmt.Errorf("no original object found for %#v", info.Object)
 		}
 
-		originalJS, err := encodeToJson(cmdutil.InternalVersionJSONEncoder(), originalInfo.Object)
+		originalJS, err := encodeToJson(originalInfo.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
 
-		editedJS, err := encodeToJson(cmdutil.InternalVersionJSONEncoder(), info.Object)
+		editedJS, err := encodeToJson(info.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
@@ -461,7 +461,7 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 }
 
 func (o *EditOptions) annotationPatch(update *resource.Info) error {
-	patch, _, patchType, err := GetApplyPatch(update.Object, cmdutil.InternalVersionJSONEncoder())
+	patch, _, patchType, err := GetApplyPatch(update.Object.(runtime.Unstructured))
 	if err != nil {
 		return err
 	}
@@ -478,8 +478,8 @@ func (o *EditOptions) annotationPatch(update *resource.Info) error {
 	return nil
 }
 
-func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, types.PatchType, error) {
-	beforeJSON, err := encodeToJson(codec, obj)
+func GetApplyPatch(obj runtime.Unstructured) ([]byte, []byte, types.PatchType, error) {
+	beforeJSON, err := encodeToJson(obj)
 	if err != nil {
 		return nil, []byte(""), types.MergePatchType, err
 	}
@@ -494,7 +494,7 @@ func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, t
 	}
 	annotations[api.LastAppliedConfigAnnotation] = string(beforeJSON)
 	accessor.SetAnnotations(objCopy, annotations)
-	afterJSON, err := encodeToJson(codec, objCopy)
+	afterJSON, err := encodeToJson(objCopy.(runtime.Unstructured))
 	if err != nil {
 		return nil, beforeJSON, types.MergePatchType, err
 	}
@@ -502,8 +502,8 @@ func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, t
 	return patch, beforeJSON, types.MergePatchType, err
 }
 
-func encodeToJson(codec runtime.Encoder, obj runtime.Object) ([]byte, error) {
-	serialization, err := runtime.Encode(codec, obj)
+func encodeToJson(obj runtime.Unstructured) ([]byte, error) {
+	serialization, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -560,12 +560,12 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return fmt.Errorf("no original object found for %#v", info.Object)
 		}
 
-		originalJS, err := encodeToJson(cmdutil.InternalVersionJSONEncoder(), originalInfo.Object)
+		originalJS, err := encodeToJson(originalInfo.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
 
-		editedJS, err := encodeToJson(cmdutil.InternalVersionJSONEncoder(), info.Object)
+		editedJS, err := encodeToJson(info.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
