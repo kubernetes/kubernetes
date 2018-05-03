@@ -358,6 +358,7 @@ func TestPlugin(t *testing.T) {
 						FSType:       "ext4",
 					},
 				},
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
 			},
 		}, false),
 		root: tmpDir,
