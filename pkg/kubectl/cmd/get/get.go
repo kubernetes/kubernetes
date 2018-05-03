@@ -614,6 +614,22 @@ func (o *GetOptions) decodeIntoTable(encoder runtime.Encoder, obj runtime.Object
 		return nil, err
 	}
 
+	for i := range table.Rows {
+		row := &table.Rows[i]
+		if row.Object.Raw == nil || row.Object.Object != nil {
+			//if row already has Object.Object
+			//we don't change it
+			continue
+		}
+
+		converted, err := runtime.Decode(unstructured.UnstructuredJSONScheme, row.Object.Raw)
+		if err != nil {
+			//if error happens, we just continue
+			continue
+		}
+		row.Object.Object = converted
+	}
+
 	return table, nil
 }
 
