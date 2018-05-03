@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -151,7 +151,7 @@ func (o *SetLastAppliedOptions) Validate() error {
 		if err != nil {
 			return err
 		}
-		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.Object, scheme.DefaultJSONEncoder())
+		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
@@ -189,6 +189,8 @@ func (o *SetLastAppliedOptions) Validate() error {
 func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 	for i, patch := range o.patchBufferList {
 		info := o.infoList[i]
+		finalObj := info.Object
+
 		if !o.dryRun {
 			mapping := info.ResourceMapping()
 			client, err := o.unstructuredClientForMapping(mapping)
@@ -196,13 +198,12 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			patchedObj, err := helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch)
+			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch)
 			if err != nil {
 				return err
 			}
-			info.Refresh(patchedObj, false)
 		}
-		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+		if err := o.PrintObj(finalObj, o.Out); err != nil {
 			return err
 		}
 	}
