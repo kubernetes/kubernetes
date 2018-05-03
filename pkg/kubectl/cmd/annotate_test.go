@@ -22,11 +22,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/rest/fake"
+	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -452,8 +455,13 @@ func TestAnnotateErrors(t *testing.T) {
 
 func TestAnnotateObject(t *testing.T) {
 	pods, _, _ := testData()
+	objs := []runtime.Object{}
+	for i := range pods.Items {
+		objs = append(objs, &pods.Items[i])
+	}
 
 	tf := cmdtesting.NewTestFactory()
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, objs...)
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
@@ -464,14 +472,6 @@ func TestAnnotateObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
-				switch req.URL.Path {
-				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
@@ -502,12 +502,26 @@ func TestAnnotateObject(t *testing.T) {
 	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	actions := tf.FakeDynamicClient.Actions()
+	if len(actions) != 1 {
+		t.Fatal(spew.Sdump(actions))
+	}
+	patchAction := actions[0].(clientgotesting.PatchAction)
+	if patchAction.GetNamespace() != "test" || patchAction.GetName() != "foo" || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "pods"}) {
+		t.Fatal(spew.Sdump(actions))
+	}
 }
 
 func TestAnnotateObjectFromFile(t *testing.T) {
 	pods, _, _ := testData()
+	objs := []runtime.Object{}
+	for i := range pods.Items {
+		objs = append(objs, &pods.Items[i])
+	}
 
 	tf := cmdtesting.NewTestFactory()
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, objs...)
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
@@ -518,14 +532,6 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
-				switch req.URL.Path {
-				case "/namespaces/test/replicationcontrollers/cassandra":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/replicationcontrollers/cassandra":
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
@@ -556,6 +562,15 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	}
 	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	actions := tf.FakeDynamicClient.Actions()
+	if len(actions) != 1 {
+		t.Fatal(spew.Sdump(actions))
+	}
+	patchAction := actions[0].(clientgotesting.PatchAction)
+	if patchAction.GetNamespace() != "test" || patchAction.GetName() != "cassandra" || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}) {
+		t.Fatal(spew.Sdump(actions))
 	}
 }
 
@@ -589,12 +604,22 @@ func TestAnnotateLocal(t *testing.T) {
 	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	actions := tf.FakeDynamicClient.Actions()
+	if len(actions) != 0 {
+		t.Fatal(spew.Sdump(actions))
+	}
 }
 
 func TestAnnotateMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
+	objs := []runtime.Object{}
+	for i := range pods.Items {
+		objs = append(objs, &pods.Items[i])
+	}
 
 	tf := cmdtesting.NewTestFactory()
+	tf.FakeDynamicClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, objs...)
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
@@ -607,16 +632,6 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 				switch req.URL.Path {
 				case "/namespaces/test/pods":
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			case "PATCH":
-				switch req.URL.Path {
-				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
-				case "/namespaces/test/pods/bar":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[1])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -644,5 +659,18 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	}
 	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	actions := tf.FakeDynamicClient.Actions()
+	if len(actions) != 2 {
+		t.Fatal(spew.Sdump(actions))
+	}
+	patchAction := actions[0].(clientgotesting.PatchAction)
+	if patchAction.GetNamespace() != "test" || patchAction.GetName() != "foo" || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "pods"}) {
+		t.Fatal(spew.Sdump(actions))
+	}
+	patchAction = actions[1].(clientgotesting.PatchAction)
+	if patchAction.GetNamespace() != "test" || patchAction.GetName() != "bar" || patchAction.GetResource() != (schema.GroupVersionResource{Version: "v1", Resource: "pods"}) {
+		t.Fatal(spew.Sdump(actions))
 	}
 }

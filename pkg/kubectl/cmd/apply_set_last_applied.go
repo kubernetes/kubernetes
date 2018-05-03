@@ -23,8 +23,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -44,15 +44,16 @@ type SetLastAppliedOptions struct {
 
 	FilenameOptions resource.FilenameOptions
 
-	infoList                     []*resource.Info
-	namespace                    string
-	enforceNamespace             bool
-	dryRun                       bool
-	shortOutput                  bool
-	output                       string
-	patchBufferList              []PatchBuffer
-	builder                      *resource.Builder
-	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	infoList         []*resource.Info
+	namespace        string
+	enforceNamespace bool
+	dryRun           bool
+	shortOutput      bool
+	output           string
+	patchBufferList  []PatchBuffer
+	builder          *resource.Builder
+
+	DynamicClient dynamic.DynamicInterface
 
 	genericclioptions.IOStreams
 }
@@ -121,7 +122,10 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 		return err
 	}
 	o.builder = f.NewBuilder()
-	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
 
 	if o.dryRun {
 		// TODO(juanvallejo): This can be cleaned up even further by creating
@@ -191,18 +195,13 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 		info := o.infoList[i]
 		if !o.dryRun {
 			mapping := info.ResourceMapping()
-			client, err := o.unstructuredClientForMapping(mapping)
-			if err != nil {
-				return err
-			}
-			helper := resource.NewHelper(client, mapping)
-			patchedObj, err := helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch)
+			patchedObj, err := o.DynamicClient.Resource(mapping.Resource).Patch(info.Name, patch.PatchType, patch.Patch)
 			if err != nil {
 				return err
 			}
 			info.Refresh(patchedObj, false)
 		}
-		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+		if err := o.PrintObj(info.Object, o.Out); err != nil {
 			return err
 		}
 	}

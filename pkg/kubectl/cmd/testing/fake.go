@@ -35,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -241,6 +243,7 @@ type TestFactory struct {
 	Namespace          string
 	ClientConfigVal    *restclient.Config
 	CommandVal         string
+	FakeDynamicClient  *fakedynamic.FakeDynamicClient
 
 	tempConfigFile *os.File
 
@@ -253,8 +256,9 @@ func NewTestFactory() *TestFactory {
 	// to avoid polluting an existing user config.
 	config, configFile := defaultFakeClientConfig()
 	return &TestFactory{
-		Factory:        cmdutil.NewFactory(config),
-		tempConfigFile: configFile,
+		Factory:           cmdutil.NewFactory(config),
+		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(legacyscheme.Scheme),
+		tempConfigFile:    configFile,
 	}
 }
 
@@ -400,6 +404,13 @@ func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
 	clientset.Policy().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	return clientset, nil
+}
+
+func (f *TestFactory) DynamicClient() (dynamic.DynamicInterface, error) {
+	if f.FakeDynamicClient != nil {
+		return f.FakeDynamicClient, nil
+	}
+	return f.Factory.DynamicClient()
 }
 
 func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
