@@ -45,12 +45,14 @@ type NodeManager struct {
 	nodeInfoMap map[string]*NodeInfo
 	// Maps node name to node structure
 	registeredNodes map[string]*v1.Node
+	removedNodes    map[string]*v1.Node
 	//CredentialsManager
 	credentialManager *SecretCredentialManager
 
 	// Mutexes
 	registeredNodesLock   sync.RWMutex
 	nodeInfoLock          sync.RWMutex
+	removedNodesLock      sync.RWMutex
 	credentialManagerLock sync.Mutex
 }
 
@@ -244,6 +246,16 @@ func (nm *NodeManager) GetNode(nodeName k8stypes.NodeName) (v1.Node, error) {
 	return *node, nil
 }
 
+func (nm *NodeManager) GetRemovedNode(nodeName k8stypes.NodeName) (v1.Node, error) {
+	nm.removedNodesLock.RLock()
+	node := nm.removedNodes[convertToString(nodeName)]
+	nm.removedNodesLock.RUnlock()
+	if node == nil {
+		return v1.Node{}, vclib.ErrNoVMFound
+	}
+	return *node, nil
+}
+
 func (nm *NodeManager) addNode(node *v1.Node) {
 	nm.registeredNodesLock.Lock()
 	nm.registeredNodes[node.ObjectMeta.Name] = node
@@ -251,6 +263,10 @@ func (nm *NodeManager) addNode(node *v1.Node) {
 }
 
 func (nm *NodeManager) removeNode(node *v1.Node) {
+	nm.removedNodesLock.Lock()
+	nm.removedNodes[node.ObjectMeta.Name] = node
+	nm.removedNodesLock.Unlock()
+
 	nm.registeredNodesLock.Lock()
 	delete(nm.registeredNodes, node.ObjectMeta.Name)
 	nm.registeredNodesLock.Unlock()
