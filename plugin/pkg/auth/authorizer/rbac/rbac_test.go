@@ -116,8 +116,8 @@ type defaultAttributes struct {
 }
 
 func (d *defaultAttributes) String() string {
-	return fmt.Sprintf("user=(%s), groups=(%s), verb=(%s), resource=(%s), namespace=(%s), apiGroup=(%s)",
-		d.user, strings.Split(d.groups, ","), d.verb, d.resource, d.namespace, d.apiGroup)
+	return fmt.Sprintf("user=(%s), groups=(%s), verb=(%s), resource=(%s), subresource=(%s), namespace=(%s), apiGroup=(%s)",
+		d.user, strings.Split(d.groups, ","), d.verb, d.resource, d.subresource, d.namespace, d.apiGroup)
 }
 
 func (d *defaultAttributes) GetUser() user.Info {

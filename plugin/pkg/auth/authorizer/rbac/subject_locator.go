@@ -45,18 +45,6 @@ type SubjectAccessEvaluator struct {
 	roleToRuleMapper         RoleToRuleMapper
 }
 
-func NewSubjectAccessEvaluator(roles rbacregistryvalidation.RoleGetter, roleBindings rbacregistryvalidation.RoleBindingLister, clusterRoles rbacregistryvalidation.ClusterRoleGetter, clusterRoleBindings rbacregistryvalidation.ClusterRoleBindingLister, superUser string) *SubjectAccessEvaluator {
-	subjectLocator := &SubjectAccessEvaluator{
-		superUser:                superUser,
-		roleBindingLister:        roleBindings,
-		clusterRoleBindingLister: clusterRoleBindings,
-		roleToRuleMapper: rbacregistryvalidation.NewDefaultRuleResolver(
-			roles, roleBindings, clusterRoles, clusterRoleBindings,
-		),
-	}
-	return subjectLocator
-}
-
 // AllowedSubjects returns the subjects that can perform an action and any errors encountered while computing the list.
 // It is possible to have both subjects and errors returned if some rolebindings couldn't be resolved, but others could be.
 func (r *SubjectAccessEvaluator) AllowedSubjects(requestAttributes authorizer.Attributes) ([]rbac.Subject, error) {
