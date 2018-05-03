@@ -160,6 +160,9 @@ message CustomResourceDefinitionSpec {
 
   // AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 8;
+
+  // Prune enables pruning of fields not specified in validation.openAPIV3Schema. Note: this will default to true in version v1.
+  optional bool prune = 9;
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition

@@ -168,6 +168,11 @@ func (in *CustomResourceDefinitionSpec) DeepCopyInto(out *CustomResourceDefiniti
 		*out = make([]CustomResourceColumnDefinition, len(*in))
 		copy(*out, *in)
 	}
+	if in.Prune != nil {
+		in, out := &in.Prune, &out.Prune
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

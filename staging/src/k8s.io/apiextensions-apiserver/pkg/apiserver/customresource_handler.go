@@ -29,6 +29,7 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
 	"github.com/golang/glog"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/pruning"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -493,6 +494,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				decoderVersion:    schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
 				encoderVersion:    schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
 				validator:         validator,
+				pruning:           *crd.Spec.Prune,
 			},
 			crd.Status.AcceptedNames.Categories,
 			table,
@@ -514,7 +516,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
-			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, validator: validator},
+			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, validator: validator, pruning: *crd.Spec.Prune},
 			ParameterCodec: parameterCodec,
 
 			Creater:         creator,
@@ -550,7 +552,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		// shallow copy
 		statusScope := requestScopes[v.Name]
 		statusScope.Subresource = "status"
-		statusScope.Serializer = unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, validator: statusValidator, validatedField: "status"}
+		statusScope.Serializer = unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, validator: statusValidator, validatedField: "status", pruning: *crd.Spec.Prune}
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,
@@ -588,6 +590,7 @@ type unstructuredNegotiatedSerializer struct {
 	// empty or a top-level field name like "status" the validator should be applied to
 	validatedField string
 	validator      *validate.SchemaValidator
+	pruning        bool
 }
 
 func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
@@ -616,7 +619,7 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{validator: s.validator, validatedField: s.validatedField}}
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{validator: s.validator, validatedField: s.validatedField, pruning: s.pruning}}
 	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
 }
 
@@ -709,17 +712,19 @@ type crdConversionRESTOptionsGetter struct {
 	encoderVersion schema.GroupVersion
 	decoderVersion schema.GroupVersion
 	validator      *validate.SchemaValidator
+	pruning        bool
 }
 
 func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret, err := t.RESTOptionsGetter.GetRESTOptions(resource)
 	if err == nil {
 		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
-			// drop invalid fields while decoding old CRs (before we had any ObjectMeta validation)
+			// drop invalid fields while decoding old CRs (before we haven't had any ObjectMeta validation)
 			dropInvalidMetadata: true,
 			validator:           t.validator,
+			pruning:             t.pruning,
 		}}
-		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{validator: t.validator}}
+		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{validator: t.validator, pruning: t.pruning}}
 		ret.StorageConfig.Codec = versioning.NewCodec(
 			ret.StorageConfig.Codec,
 			d,
@@ -803,13 +808,14 @@ func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, 
 // unstructuredSchemaCoercer does the validation for Unstructured that json.Unmarshal
 // does for native types. This includes:
 // - validating and pruning ObjectMeta (here with optional error instead of pruning)
-// - TODO: application of an OpenAPI validator (against the whole object or a top-level field of it).
-// - TODO: optionally application of post-validation algorithms like defaulting and/or OpenAPI based pruning.
+// - application of an skeleton OpenAPI validator (against the whole object or a top-level field of it).
+// - application of post-validation algorithms like defaulting and/or OpenAPI based pruning.
 type unstructuredSchemaCoercer struct {
 	dropInvalidMetadata bool
 	validator           *validate.SchemaValidator
 	// empty or a top-level field name like "status" the validator should be applied to
 	validatedField string
+	pruning        bool
 }
 
 func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
@@ -840,10 +846,14 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 				}
 			}
 		}
-		if validatee != nil {
+		prune := v.pruning && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourcePruning)
+		if validatee != nil && prune {
 			result := v.validator.Validate(validatee)
 			if result.AsError() != nil {
 				return result.AsError()
+			}
+			if prune {
+				pruning.Prune(result)
 			}
 		}
 	}

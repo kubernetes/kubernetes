@@ -23,6 +23,7 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/pruning:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset:go_default_library",
@@ -114,6 +115,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/pruning:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:all-srcs",
     ],
     tags = ["automanaged"],

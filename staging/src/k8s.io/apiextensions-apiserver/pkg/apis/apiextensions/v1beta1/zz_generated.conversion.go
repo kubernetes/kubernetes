@@ -414,6 +414,7 @@ func autoConvert_v1beta1_CustomResourceDefinitionSpec_To_apiextensions_CustomRes
 	out.Subresources = (*apiextensions.CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
 	out.Versions = *(*[]apiextensions.CustomResourceDefinitionVersion)(unsafe.Pointer(&in.Versions))
 	out.AdditionalPrinterColumns = *(*[]apiextensions.CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
+	out.Prune = (*bool)(unsafe.Pointer(in.Prune))
 	return nil
 }
 
@@ -441,6 +442,7 @@ func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1beta1_CustomRes
 	out.Subresources = (*CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
 	out.Versions = *(*[]CustomResourceDefinitionVersion)(unsafe.Pointer(&in.Versions))
 	out.AdditionalPrinterColumns = *(*[]CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
+	out.Prune = (*bool)(unsafe.Pointer(in.Prune))
 	return nil
 }
 

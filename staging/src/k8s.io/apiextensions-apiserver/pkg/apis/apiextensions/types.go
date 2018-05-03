@@ -51,6 +51,9 @@ type CustomResourceDefinitionSpec struct {
 	Versions []CustomResourceDefinitionVersion
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
+	// Prune enables pruning of fields not specified in validation.openAPIV3Schema.
+	// Note: this will default to false in version v1beta1 and to true in version v1. It is never nil here.
+	Prune *bool
 }
 
 type CustomResourceDefinitionVersion struct {

@@ -54,6 +54,8 @@ type CustomResourceDefinitionSpec struct {
 	Versions []CustomResourceDefinitionVersion `json:"versions,omitempty" protobuf:"bytes,7,rep,name=versions"`
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,8,rep,name=additionalPrinterColumns"`
+	// Prune enables pruning of fields not specified in validation.openAPIV3Schema. Note: this will default to true in version v1.
+	Prune *bool `json:"prune,omitempty" protobuf:"varint,9,opt,name=prune"`
 }
 
 type CustomResourceDefinitionVersion struct {

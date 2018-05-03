@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/utils/pointer"
 )
 
 // CleanCrdFn declares the clean up function needed to remove the CRD
@@ -43,7 +44,7 @@ type TestCrd struct {
 }
 
 // CreateTestCRD creates a new CRD specifically for the calling test.
-func CreateTestCRD(f *Framework) (*TestCrd, error) {
+func CreateTestCRD(f *Framework, prune bool) (*TestCrd, error) {
 	suffix := randomSuffix()
 	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
 	kind := fmt.Sprintf("E2e-test-%s-%s-crd", f.BaseName, suffix)
@@ -74,6 +75,7 @@ func CreateTestCRD(f *Framework) (*TestCrd, error) {
 	}
 
 	crd := newCRDForTest(testcrd)
+	crd.Spec.Prune = pointer.BoolPtr(prune)
 
 	//create CRD and waits for the resource to be recognized and available.
 	crd, err = fixtures.CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
@@ -112,6 +114,27 @@ func newCRDForTest(testcrd *TestCrd) *apiextensionsv1beta1.CustomResourceDefinit
 				ListKind: testcrd.GetListName(),
 			},
 			Scope: apiextensionsv1beta1.NamespaceScoped,
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"data": {
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"mutation-start": {
+									Type: "string",
+								},
+								"mutation-stage-1": {
+									Type: "string",
+								},
+								// explicitly disabled to test pruning:
+								// TODO: uncomment and add additional test field for pruning
+								//"mutation-stage-2": {
+								//	Type: "string",
+								//},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }

@@ -28,12 +28,14 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -126,7 +128,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	})
 
 	It("Should be able to deny custom resource creation", func() {
-		testcrd, err := framework.CreateTestCRD(f)
+		testcrd, err := framework.CreateTestCRD(f, false)
 		if err != nil {
 			return
 		}
@@ -161,14 +163,31 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	})
 
 	It("Should mutate custom resource", func() {
-		testcrd, err := framework.CreateTestCRD(f)
+		prune := false
+		testcrd, err := framework.CreateTestCRD(f, prune)
 		if err != nil {
 			return
 		}
 		defer testcrd.CleanUp()
 		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
-		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClient)
+		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClient, prune)
+	})
+
+	It("Should mutate custom resource with pruning", func() {
+		if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourcePruning) {
+			framework.Skipf("run test with --feature-gates=CustomResourcePruning=true to enable opt-in CRD pruning")
+		}
+
+		prune := true
+		testcrd, err := framework.CreateTestCRD(f, prune)
+		if err != nil {
+			return
+		}
+		defer testcrd.CleanUp()
+		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
+		defer webhookCleanup()
+		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClient, prune)
 	})
 
 	It("Should deny crd creation", func() {
@@ -1194,7 +1213,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1
 	}
 }
 
-func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
+func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface, prune bool) {
 	By("Creating a custom resource that should be mutated by the webhook")
 	cr := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -1214,7 +1233,9 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
 		"mutation-stage-1": "yes",
-		"mutation-stage-2": "yes",
+	}
+	if !prune {
+		expectedCRData["mutation-stage-2"] = "yes"
 	}
 	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
 		framework.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
