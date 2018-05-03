@@ -73,9 +73,9 @@ type ResourceMapping interface {
 // Info contains temporary info to execute a REST call, or show the results
 // of an already completed REST call.
 type Info struct {
+	// Client will only be present if this builder was not local
 	Client RESTClient
-	// Mapping may be nil if the object has no available metadata, but is still parseable
-	// from disk.
+	// Mapping will only be present if this builder was not local
 	Mapping *meta.RESTMapping
 
 	// Namespace will be set if the object is namespaced and has a specified value.
