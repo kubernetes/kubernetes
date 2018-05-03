@@ -344,9 +344,8 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	}
 
 	// Copy over non-user fields
-	// TODO: make this a merge function
-	if errs := validation.ValidateServiceUpdate(service, oldService); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
+	if err := rest.BeforeUpdate(registry.Strategy, ctx, service, oldService); err != nil {
+		return nil, false, err
 	}
 
 	// TODO: this should probably move to strategy.PrepareForCreate()
