@@ -46,7 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservoptions "k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	scheduleroptions "k8s.io/kubernetes/cmd/kube-scheduler/app/options"
+	schedulerapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -548,7 +548,7 @@ func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
 		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
 	}
 	if len(eac.SchedulerExtraArgs) > 0 {
-		opts, err := scheduleroptions.NewOptions()
+		opts, err := schedulerapp.NewOptions()
 		if err != nil {
 			warnings = append(warnings, err)
 		}
