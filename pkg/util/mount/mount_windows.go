@@ -438,6 +438,20 @@ func getAllParentLinks(path string) ([]string, error) {
 	return links, nil
 }
 
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	realpath, err := filepath.EvalSymlinks(pathname)
+	if err != nil {
+		return nil, err
+	}
+	return getMountRefsByDev(mounter, realpath)
+}
+
+// Note that on windows, it always returns 0. We actually don't set FSGroup on
+// windows platform, see SetVolumeOwnership implementation.
+func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
+	return 0, nil
+}
+
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return doSafeMakeDir(pathname, base, perm)

@@ -921,6 +921,31 @@ func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMo
 	return doSafeMakeDir(pathname, base, perm)
 }
 
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	realpath, err := filepath.EvalSymlinks(pathname)
+	if err != nil {
+		return nil, err
+	}
+	return getMountRefsByDev(mounter, realpath)
+}
+
+func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
+	realpath, err := filepath.EvalSymlinks(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return getFSGroup(realpath)
+}
+
+// This implementation is shared between Linux and NsEnterMounter
+func getFSGroup(pathname string) (int64, error) {
+	info, err := os.Stat(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return int64(info.Sys().(*syscall.Stat_t).Gid), nil
+}
+
 // This implementation is shared between Linux and NsEnterMounter
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	glog.V(4).Infof("Creating directory %q within base %q", pathname, base)
