@@ -39,9 +39,3 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["generated.proto"],
-    visibility = ["//visibility:public"],
-)
