@@ -139,7 +139,14 @@ func TestGetMountRefs(t *testing.T) {
 }
 
 func TestDoSafeMakeDir(t *testing.T) {
-	const testingVolumePath = `c:\tmp\DoSafeMakeDirTest`
+	base, err := ioutil.TempDir("", "TestDoSafeMakeDir")
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	defer os.RemoveAll(base)
+
+	testingVolumePath := filepath.Join(base, "testingVolumePath")
 	os.MkdirAll(testingVolumePath, 0755)
 	defer os.RemoveAll(testingVolumePath)
 
@@ -171,7 +178,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 			volumePath:    testingVolumePath,
 			subPath:       filepath.Join(testingVolumePath, `symlink`),
 			expectError:   false,
-			symlinkTarget: `c:\tmp`,
+			symlinkTarget: base,
 		},
 		{
 			volumePath:    testingVolumePath,
@@ -189,7 +196,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 			volumePath:    testingVolumePath,
 			subPath:       filepath.Join(testingVolumePath, `a\b\symlink`),
 			expectError:   false,
-			symlinkTarget: `c:\tmp`,
+			symlinkTarget: base,
 		},
 		{
 			volumePath:    testingVolumePath,
@@ -228,7 +235,14 @@ func TestDoSafeMakeDir(t *testing.T) {
 }
 
 func TestLockAndCheckSubPath(t *testing.T) {
-	const testingVolumePath = `c:\tmp\LockAndCheckSubPathTest`
+	base, err := ioutil.TempDir("", "TestLockAndCheckSubPath")
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	defer os.RemoveAll(base)
+
+	testingVolumePath := filepath.Join(base, "testingVolumePath")
 
 	tests := []struct {
 		volumePath          string
@@ -270,14 +284,14 @@ func TestLockAndCheckSubPath(t *testing.T) {
 			subPath:             filepath.Join(testingVolumePath, `symlink`),
 			expectedHandleCount: 0,
 			expectError:         true,
-			symlinkTarget:       `c:\tmp`,
+			symlinkTarget:       base,
 		},
 		{
 			volumePath:          testingVolumePath,
 			subPath:             filepath.Join(testingVolumePath, `a\b\c\symlink`),
 			expectedHandleCount: 0,
 			expectError:         true,
-			symlinkTarget:       `c:\tmp`,
+			symlinkTarget:       base,
 		},
 		{
 			volumePath:          testingVolumePath,
@@ -325,7 +339,14 @@ func TestLockAndCheckSubPath(t *testing.T) {
 }
 
 func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
-	const testingVolumePath = `c:\tmp\LockAndCheckSubPathWithoutSymlinkTest`
+	base, err := ioutil.TempDir("", "TestLockAndCheckSubPathWithoutSymlink")
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	defer os.RemoveAll(base)
+
+	testingVolumePath := filepath.Join(base, "testingVolumePath")
 
 	tests := []struct {
 		volumePath          string
@@ -367,14 +388,14 @@ func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
 			subPath:             filepath.Join(testingVolumePath, `symlink`),
 			expectedHandleCount: 1,
 			expectError:         true,
-			symlinkTarget:       `c:\tmp`,
+			symlinkTarget:       base,
 		},
 		{
 			volumePath:          testingVolumePath,
 			subPath:             filepath.Join(testingVolumePath, `a\b\c\symlink`),
 			expectedHandleCount: 4,
 			expectError:         true,
-			symlinkTarget:       `c:\tmp`,
+			symlinkTarget:       base,
 		},
 		{
 			volumePath:          testingVolumePath,
@@ -422,7 +443,14 @@ func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
 }
 
 func TestFindExistingPrefix(t *testing.T) {
-	const testingVolumePath = `c:\tmp\FindExistingPrefixTest`
+	base, err := ioutil.TempDir("", "TestFindExistingPrefix")
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	defer os.RemoveAll(base)
+
+	testingVolumePath := filepath.Join(base, "testingVolumePath")
 
 	tests := []struct {
 		base                    string
