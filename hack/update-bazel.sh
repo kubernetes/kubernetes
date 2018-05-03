@@ -40,7 +40,6 @@ touch "${KUBE_ROOT}/vendor/BUILD"
 gazelle fix \
     -build_file_name=BUILD,BUILD.bazel \
     -external=vendored \
-    -proto=legacy \
     -mode=fix
 # gazelle gets confused by our staging/ directory, prepending an extra
 # "k8s.io/kubernetes/staging/src" to the import path.
