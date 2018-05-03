@@ -166,7 +166,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			deleted := false
 			timeout := false
 			var lastPod *v1.Pod
-			timer := time.After(1 * time.Minute)
+			timer := time.After(2 * time.Minute)
 			for !deleted && !timeout {
 				select {
 				case event, _ := <-w.ResultChan():
