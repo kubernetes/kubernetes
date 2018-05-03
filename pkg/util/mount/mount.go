@@ -110,6 +110,15 @@ type Interface interface {
 	PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error)
 }
 
+type MounterWithMountPointsCache interface {
+	// EnableAndPolling enables mountpoints cache and starts polling loop. On
+	// some platforms (e.g. linux), mounter runs a goroutine to watch change
+	// events of mountpoints.
+	EnableAndPolling(stopCh <-chan struct{})
+	// MarkCacheStale marks cache stale, then Mounter will try to get new mountpoints.
+	MarkCacheStale()
+}
+
 type Subpath struct {
 	// index of the VolumeMount for this container
 	VolumeMountIndex int

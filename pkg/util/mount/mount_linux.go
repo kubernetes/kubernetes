@@ -32,6 +32,7 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilio "k8s.io/kubernetes/pkg/util/io"
 	utilexec "k8s.io/utils/exec"
@@ -65,7 +66,11 @@ const (
 type Mounter struct {
 	mounterPath string
 	withSystemd bool
+	// Optional mountpoints cache.
+	mpCache *mountPointsCache
 }
+
+var _ MounterWithMountPointsCache = &Mounter{}
 
 // New returns a mount.Interface for the current system.
 // It provides options to override the default mounter behavior.
@@ -148,6 +153,10 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 		glog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n", err, mountCmd, args, string(output))
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n",
 			err, mountCmd, args, string(output))
+	}
+	if err == nil && m.mpCache != nil {
+		// Invalidate cache immediately.
+		m.mpCache.markStale()
 	}
 	return err
 }
@@ -246,12 +255,21 @@ func (mounter *Mounter) Unmount(target string) error {
 	if err != nil {
 		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
 	}
+	if err == nil && mounter.mpCache != nil {
+		// Invalidate cache immediately.
+		mounter.mpCache.markStale()
+	}
 	return nil
 }
 
 // List returns a list of all mounted filesystems.
-func (*Mounter) List() ([]MountPoint, error) {
-	return listProcMounts(procMountsPath)
+func (mounter *Mounter) List() ([]MountPoint, error) {
+	if mounter.mpCache == nil {
+		return listProcMounts(procMountsPath)
+	}
+	return mounter.mpCache.Get(func() ([]MountPoint, error) {
+		return listProcMounts(procMountsPath)
+	})
 }
 
 func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
@@ -919,6 +937,23 @@ func removeEmptyDirs(baseDir, endDir string) error {
 
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return doSafeMakeDir(pathname, base, perm)
+}
+
+func (mounter *Mounter) EnableAndPolling(stopCh <-chan struct{}) {
+	defer runtime.HandleCrash()
+
+	mounter.mpCache = newMountPointsCache()
+	go mounter.mpCache.Run(stopCh)
+
+	<-stopCh
+	glog.Infof("Shutting down Mounter")
+}
+
+func (mounter *Mounter) MarkCacheStale() {
+	if mounter.mpCache == nil {
+		return
+	}
+	mounter.mpCache.markStale()
 }
 
 // This implementation is shared between Linux and NsEnterMounter

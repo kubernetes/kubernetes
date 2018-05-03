@@ -31,6 +31,7 @@ go_library(
         "@io_bazel_rules_go//go/platform:linux": [
             "exec_mount.go",
             "mount_linux.go",
+            "mountpoints_cache_linux.go",
             "nsenter_mount.go",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
@@ -75,7 +76,9 @@ go_library(
             "//pkg/util/io:go_default_library",
             "//pkg/util/nsenter:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -89,6 +92,7 @@ go_test(
         "@io_bazel_rules_go//go/platform:linux": [
             "exec_mount_test.go",
             "mount_linux_test.go",
+            "mountpoints_cache_linux_test.go",
             "nsenter_mount_test.go",
         ],
         "@io_bazel_rules_go//go/platform:windows": [

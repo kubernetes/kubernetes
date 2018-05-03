@@ -208,6 +208,8 @@ type KubeletFlags struct {
 	// hostIPCSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
 	HostIPCSources []string
+	// This flag, if set, disables mountpoints cache.
+	DisableMountpointsCache bool
 }
 
 // NewKubeletFlags will create a new KubeletFlags with default values
@@ -243,7 +245,8 @@ func NewKubeletFlags() *KubeletFlags {
 		HostPIDSources:      []string{kubetypes.AllSource},
 		HostIPCSources:      []string{kubetypes.AllSource},
 		// TODO(#56523): default CAdvisorPort to 0 (disabled) and deprecate it
-		CAdvisorPort: 4194,
+		CAdvisorPort:            4194,
+		DisableMountpointsCache: false,
 	}
 }
 
@@ -393,6 +396,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.BoolVar(&f.ExitOnLockContention, "exit-on-lock-contention", f.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 	fs.StringVar(&f.SeccompProfileRoot, "seccomp-profile-root", f.SeccompProfileRoot, "<Warning: Alpha feature> Directory path for seccomp profiles.")
 	fs.StringVar(&f.BootstrapCheckpointPath, "bootstrap-checkpoint-path", f.BootstrapCheckpointPath, "<Warning: Alpha feature> Path to to the directory where the checkpoints are stored")
+	fs.BoolVar(&f.DisableMountpointsCache, "disable-mountpoints-cache", f.DisableMountpointsCache, "Disable mountpoints cache. [default=false]")
 
 	// DEPRECATED FLAGS
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "")
