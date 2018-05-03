@@ -13,6 +13,7 @@ import (
 type Endpoint struct {
 	ID        string `json:"id"`
 	Region    string `json:"region"`
+	RegionID  string `json:"region_id"`
 	Interface string `json:"interface"`
 	URL       string `json:"url"`
 }

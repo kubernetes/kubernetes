@@ -1,6 +1,8 @@
 package loadbalancers
 
 import (
+	"fmt"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/pagination"
 )
@@ -20,6 +22,7 @@ type ListOpts struct {
 	Description        string `q:"description"`
 	AdminStateUp       *bool  `q:"admin_state_up"`
 	TenantID           string `q:"tenant_id"`
+	ProjectID          string `q:"project_id"`
 	ProvisioningStatus string `q:"provisioning_status"`
 	VipAddress         string `q:"vip_address"`
 	VipPortID          string `q:"vip_port_id"`
@@ -35,7 +38,7 @@ type ListOpts struct {
 	SortDir            string `q:"sort_dir"`
 }
 
-// ToLoadbalancerListQuery formats a ListOpts into a query string.
+// ToLoadBalancerListQuery formats a ListOpts into a query string.
 func (opts ListOpts) ToLoadBalancerListQuery() (string, error) {
 	q, err := gophercloud.BuildQueryString(opts)
 	return q.String(), err
@@ -81,9 +84,13 @@ type CreateOpts struct {
 	// that belong to them or networks that are shared).
 	VipSubnetID string `json:"vip_subnet_id" required:"true"`
 
-	// The UUID of the tenant who owns the Loadbalancer. Only administrative users
-	// can specify a tenant UUID other than their own.
+	// TenantID is the UUID of the project who owns the Loadbalancer.
+	// Only administrative users can specify a project UUID other than their own.
 	TenantID string `json:"tenant_id,omitempty"`
+
+	// ProjectID is the UUID of the project who owns the Loadbalancer.
+	// Only administrative users can specify a project UUID other than their own.
+	ProjectID string `json:"project_id,omitempty"`
 
 	// The IP address of the Loadbalancer.
 	VipAddress string `json:"vip_address,omitempty"`
@@ -167,6 +174,20 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) (r UpdateR
 // unique ID.
 func Delete(c *gophercloud.ServiceClient, id string) (r DeleteResult) {
 	_, r.Err = c.Delete(resourceURL(c, id), nil)
+	return
+}
+
+// CascadingDelete is like `Delete`, but will also delete any of the load balancer's
+// children (listener, monitor, etc).
+// NOTE: This function will only work with Octavia load balancers; Neutron does not
+// support this.
+func CascadingDelete(c *gophercloud.ServiceClient, id string) (r DeleteResult) {
+	if c.Type != "load-balancer" {
+		r.Err = fmt.Errorf("error prior to running cascade delete: only Octavia LBs supported")
+		return
+	}
+	u := fmt.Sprintf("%s?cascade=true", resourceURL(c, id))
+	_, r.Err = c.Delete(u, nil)
 	return
 }
 
