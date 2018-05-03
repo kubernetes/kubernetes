@@ -199,6 +199,31 @@ func (m *podContainerManagerImpl) ReduceCPULimits(podCgroup CgroupName) error {
 	return m.cgroupManager.ReduceCPULimits(podCgroup)
 }
 
+// IsPodCgroup returns true if the literal cgroupfs name corresponds to a pod
+func (m *podContainerManagerImpl) IsPodCgroup(cgroupfs string) (bool, types.UID) {
+	// convert the literal cgroupfs form to the driver specific value
+	cgroupName := m.cgroupManager.CgroupName(cgroupfs)
+	qosContainersList := [3]CgroupName{m.qosContainersInfo.BestEffort, m.qosContainersInfo.Burstable, m.qosContainersInfo.Guaranteed}
+	basePath := ""
+	for _, qosContainerName := range qosContainersList {
+		// a pod cgroup is a direct child of a qos node, so check if its a match
+		if len(cgroupName) == len(qosContainerName)+1 {
+			basePath = cgroupName[len(qosContainerName)]
+		}
+	}
+	if basePath == "" {
+		return false, types.UID("")
+	}
+	if !strings.HasPrefix(basePath, podCgroupNamePrefix) {
+		return false, types.UID("")
+	}
+	parts := strings.Split(basePath, podCgroupNamePrefix)
+	if len(parts) != 2 {
+		return false, types.UID("")
+	}
+	return true, types.UID(parts[1])
+}
+
 // GetAllPodsFromCgroups scans through all the subsystems of pod cgroups
 // Get list of pods whose cgroup still exist on the cgroup mounts
 func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
@@ -292,4 +317,8 @@ func (m *podContainerManagerNoop) ReduceCPULimits(_ CgroupName) error {
 
 func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
 	return nil, nil
+}
+
+func (m *podContainerManagerNoop) IsPodCgroup(cgroupfs string) (bool, types.UID) {
+	return false, types.UID("")
 }
