@@ -110,10 +110,6 @@ func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
 	return &JSONPathPrinter{tmpl, j}, nil
 }
 
-func (j *JSONPathPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
 // PrintObj formats the obj with the JSONPath Template.
 func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	var queryObj interface{} = obj
@@ -149,13 +145,4 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return fmt.Errorf("error executing jsonpath %q: %v\n", j.rawTemplate, err)
 	}
 	return nil
-}
-
-// TODO: implement HandledResources()
-func (p *JSONPathPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (p *JSONPathPrinter) IsGeneric() bool {
-	return true
 }

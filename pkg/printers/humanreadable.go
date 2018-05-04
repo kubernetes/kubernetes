@@ -257,14 +257,6 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 	return keys
 }
 
-func (h *HumanReadablePrinter) AfterPrint(output io.Writer, res string) error {
-	return nil
-}
-
-func (h *HumanReadablePrinter) IsGeneric() bool {
-	return false
-}
-
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "Unknown object: %s", string(data))
 	return err
