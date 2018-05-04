@@ -128,3 +128,14 @@ filegroup(
     ],
     tags = ["automanaged"],
 )
+
+go_test(
+    name = "go_default_xtest",
+    srcs = ["config_test.go"],
+    deps = [
+        ":go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
+        "//cmd/kubeadm/app/features:go_default_library",
+        "//vendor/github.com/renstrom/dedent:go_default_library",
+    ],
+)

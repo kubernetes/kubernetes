@@ -58,6 +58,7 @@ docs/admin/kubeadm_alpha_phase_selfhosting_convert-from-staticpods.md
 docs/admin/kubeadm_alpha_phase_upload-config.md
 docs/admin/kubeadm_completion.md
 docs/admin/kubeadm_config.md
+docs/admin/kubeadm_config_list-images.md
 docs/admin/kubeadm_config_upload.md
 docs/admin/kubeadm_config_upload_from-file.md
 docs/admin/kubeadm_config_upload_from-flags.md
@@ -132,6 +133,7 @@ docs/man/man1/kubeadm-alpha-phase-upload-config.1
 docs/man/man1/kubeadm-alpha-phase.1
 docs/man/man1/kubeadm-alpha.1
 docs/man/man1/kubeadm-completion.1
+docs/man/man1/kubeadm-config-list-images.1
 docs/man/man1/kubeadm-config-upload-from-file.1
 docs/man/man1/kubeadm-config-upload-from-flags.1
 docs/man/man1/kubeadm-config-upload.1
