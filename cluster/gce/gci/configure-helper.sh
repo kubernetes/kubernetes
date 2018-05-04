@@ -1226,7 +1226,9 @@ function start-kubelet {
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
     flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
   fi
-
+  if [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
+    flags+=" --max-pods=${MAX_PODS_PER_NODE}"
+  fi
 
   local -r kubelet_env_file="/etc/default/kubelet"
   echo "KUBELET_OPTS=\"${flags}\"" > "${kubelet_env_file}"
