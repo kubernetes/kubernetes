@@ -716,7 +716,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
-				Returns(http.StatusOK, "OK", versionedStatus)
+				Returns(http.StatusOK, "OK", versionedStatus).
+				Returns(http.StatusAccepted, "Accepted", versionedStatus)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 				if err := addObjectParams(ws, route, versionedDeleteOptions); err != nil {
