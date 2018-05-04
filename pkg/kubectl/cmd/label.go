@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -124,8 +123,6 @@ func NewLabelOptions(ioStreams genericclioptions.IOStreams) *LabelOptions {
 func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewLabelOptions(ioStreams)
 
-	validArgs := cmdutil.ValidArgList(f)
-
 	cmd := &cobra.Command{
 		Use: "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		DisableFlagsInUseLine: true,
@@ -137,8 +134,6 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunLabel())
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	o.RecordFlags.AddFlags(cmd)

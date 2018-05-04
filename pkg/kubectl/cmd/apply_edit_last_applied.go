@@ -19,7 +19,6 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
@@ -59,8 +58,6 @@ var (
 func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 
-	validArgs := cmdutil.ValidArgList(f)
-
 	cmd := &cobra.Command{
 		Use: "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
@@ -75,8 +72,6 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 				cmdutil.CheckErr(err)
 			}
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	// bind flag structs

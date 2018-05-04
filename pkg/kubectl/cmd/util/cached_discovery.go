@@ -220,11 +220,11 @@ func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
 }
 
 func (d *CachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return d.delegate.ServerPreferredResources()
+	return discovery.ServerPreferredResources(d)
 }
 
 func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return d.delegate.ServerPreferredNamespacedResources()
+	return discovery.ServerPreferredNamespacedResources(d)
 }
 
 func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {

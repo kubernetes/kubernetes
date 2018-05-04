@@ -60,9 +60,6 @@ __kubectl_override_flags()
                     ;;
             esac
         done
-        if [ "${w}" == "--all-namespaces" ]; then
-            namespace="--all-namespaces"
-        fi
     done
     for var in "${__kubectl_override_flag_list[@]##*-}"; do
         if eval "test -n \"\$${var}\""; then
@@ -109,7 +106,12 @@ __kubectl_parse_get()
 __kubectl_get_resource()
 {
     if [[ ${#nouns[@]} -eq 0 ]]; then
-        return 1
+      local kubectl_out
+      if kubectl_out=$(kubectl api-resources $(__kubectl_override_flags) -o name --cached --request-timeout=5s --verbs=get 2>/dev/null); then
+          COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+          return 0
+      fi
+      return 1
     fi
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
 }
