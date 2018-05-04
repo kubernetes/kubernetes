@@ -111,11 +111,12 @@ func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, string, 
 // CreateOrUpdateSGWithRetry invokes az.SecurityGroupsClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		respChan, errChan := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
-		resp := <-respChan
-		err := <-errChan
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		resp, err := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.ResourceGroup, *sg.Name, sg)
 		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
-		done, err := processRetryResponse(resp.Response, err)
+		done, err := processHTTPRetryResponse(resp, err)
 		if done && err == nil {
 			// Invalidate the cache right after updating
 			az.nsgCache.Delete(*sg.Name)
@@ -208,11 +209,12 @@ func (az *Cloud) CreateOrUpdatePIPWithRetry(pipResourceGroup string, pip network
 // CreateOrUpdateInterfaceWithRetry invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateInterfaceWithRetry(nic network.Interface) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		respChan, errChan := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
-		resp := <-respChan
-		err := <-errChan
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		resp, err := az.InterfacesClient.CreateOrUpdate(ctx, az.ResourceGroup, *nic.Name, nic)
 		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): end", *nic.Name)
-		return processRetryResponse(resp.Response, err)
+		return processHTTPRetryResponse(resp, err)
 	})
 }
 
@@ -246,32 +248,35 @@ func (az *Cloud) DeleteLBWithRetry(lbName string) error {
 // CreateOrUpdateRouteTableWithRetry invokes az.RouteTablesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateRouteTableWithRetry(routeTable network.RouteTable) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		respChan, errChan := az.RouteTablesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, routeTable, nil)
-		resp := <-respChan
-		err := <-errChan
-		return processRetryResponse(resp.Response, err)
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		resp, err := az.RouteTablesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, routeTable)
+		return processHTTPRetryResponse(resp, err)
 	})
 }
 
 // CreateOrUpdateRouteWithRetry invokes az.RoutesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateRouteWithRetry(route network.Route) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		respChan, errChan := az.RoutesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, *route.Name, route, nil)
-		resp := <-respChan
-		err := <-errChan
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		resp, err := az.RoutesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, *route.Name, route)
 		glog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
-		return processRetryResponse(resp.Response, err)
+		return processHTTPRetryResponse(resp, err)
 	})
 }
 
 // DeleteRouteWithRetry invokes az.RoutesClient.Delete with exponential backoff retry
 func (az *Cloud) DeleteRouteWithRetry(routeName string) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		respChan, errChan := az.RoutesClient.Delete(az.ResourceGroup, az.RouteTableName, routeName, nil)
-		resp := <-respChan
-		err := <-errChan
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		resp, err := az.RoutesClient.Delete(ctx, az.ResourceGroup, az.RouteTableName, routeName)
 		glog.V(10).Infof("RoutesClient.Delete(%s): end", az.RouteTableName)
-		return processRetryResponse(resp, err)
+		return processHTTPRetryResponse(resp, err)
 	})
 }
 

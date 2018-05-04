@@ -129,7 +129,9 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 		rg = az.ResourceGroup
 	}
 
-	subnet, err = az.SubnetsClient.Get(rg, virtualNetworkName, subnetName, "")
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	subnet, err = az.SubnetsClient.Get(ctx, rg, virtualNetworkName, subnetName, "")
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return subnet, false, realErr
@@ -217,7 +219,9 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 
 func (az *Cloud) newNSGCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		nsg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, key, "")
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		nsg, err := az.SecurityGroupsClient.Get(ctx, az.ResourceGroup, key, "")
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
@@ -235,7 +239,9 @@ func (az *Cloud) newNSGCache() (*timedCache, error) {
 
 func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		rt, err := az.RouteTablesClient.Get(az.ResourceGroup, key, "")
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		rt, err := az.RouteTablesClient.Get(ctx, az.ResourceGroup, key, "")
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
