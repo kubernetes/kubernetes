@@ -25,24 +25,32 @@ set -o pipefail
 # We simply kill the process when there is a failure. Another systemd service will
 # automatically restart the process.
 function container_runtime_monitoring {
-  # Container runtime startup takes time. Make initial attempts before starting
-  # killing the container runtime.
   local -r max_attempts=5
   local attempt=1
   local -r crictl="${KUBE_HOME}/bin/crictl"
-  local -r container_runtime="${CONTAINER_RUNTIME_NAME:-docker}"
-  until timeout 60 "${crictl}" pods > /dev/null; do
+  local -r container_runtime_name="${CONTAINER_RUNTIME_NAME:-docker}"
+  # We still need to use `docker ps` when container runtime is "docker". This is because
+  # dockershim is still part of kubelet today. When kubelet is down, crictl pods
+  # will also fail, and docker will be killed. This is undesirable especially when
+  # docker live restore is disabled.
+  local healthcheck_command="docker ps"
+  if [[ "${CONTAINER_RUNTIME:-docker}" != "docker" ]]; then
+    healthcheck_command="${crictl} pods"
+  fi
+  # Container runtime startup takes time. Make initial attempts before starting
+  # killing the container runtime.
+  until timeout 60 ${healthcheck_command} > /dev/null; do
     if (( attempt == max_attempts )); then
       echo "Max attempt ${max_attempts} reached! Proceeding to monitor container runtime healthiness."
       break
     fi
-    echo "$attempt initial attempt \"${crictl} pods\"! Trying again in $attempt seconds..."
-    sleep "$(( attempt++ ))"
+    echo "$attempt initial attempt \"${healthcheck_command}\"! Trying again in $attempt seconds..."
+    sleep "$(( 2 ** attempt++ ))"
   done
   while true; do
-    if ! timeout 60 "${crictl}" pods > /dev/null; then
-      echo "Container runtime ${container_runtime} failed!"
-      systemctl kill --kill-who=main "${container_runtime}"
+    if ! timeout 60 ${healthcheck_command} > /dev/null; then
+      echo "Container runtime ${container_runtime_name} failed!"
+      systemctl kill --kill-who=main "${container_runtime_name}"
       # Wait for a while, as we don't want to kill it again before it is really up.
       sleep 120
     else
