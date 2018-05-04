@@ -70,6 +70,9 @@ type VolumeSource struct {
 	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore,omitempty" protobuf:"bytes,4,opt,name=awsElasticBlockStore"`
 	// GitRepo represents a git repository at a particular revision.
+	// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+	// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+	// into the Pod's container.
 	// +optional
 	GitRepo *GitRepoVolumeSource `json:"gitRepo,omitempty" protobuf:"bytes,5,opt,name=gitRepo"`
 	// Secret represents a secret that should populate this volume.
@@ -972,6 +975,10 @@ type AWSElasticBlockStoreVolumeSource struct {
 // Represents a volume that is populated with the contents of a git repository.
 // Git repo volumes do not support ownership management.
 // Git repo volumes support SELinux relabeling.
+//
+// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+// into the Pod's container.
 type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string `json:"repository" protobuf:"bytes,1,opt,name=repository"`
