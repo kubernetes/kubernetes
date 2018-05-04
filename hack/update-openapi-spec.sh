@@ -31,7 +31,11 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
 function cleanup()
 {
-    [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
+    if [[ -n ${APISERVER_PID-} ]]; then
+      kill ${APISERVER_PID} 1>&2 2>/dev/null
+      wait ${APISERVER_PID} || true
+    fi
+    unset APISERVER_PID
 
     kube::etcd::cleanup
 
