@@ -52,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -199,6 +200,13 @@ func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 	return internalclientset.NewForConfig(clientConfig)
 }
 
+func (f *ring0Factory) DynamicClient() (dynamic.DynamicInterface, error) {
+	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	return dynamic.NewForConfig(clientConfig)
+}
 func (f *ring0Factory) checkMatchingServerVersion() error {
 	f.checkServerVersion.Do(func() {
 		if !f.requireMatchedServerVersion {
@@ -249,6 +257,7 @@ func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.Po
 			t.Spec.Template = &v1.PodTemplateSpec{}
 		}
 		return true, fn(&t.Spec.Template.Spec)
+
 	// Deployment
 	case *extensionsv1beta1.Deployment:
 		return true, fn(&t.Spec.Template.Spec)
@@ -258,6 +267,7 @@ func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.Po
 		return true, fn(&t.Spec.Template.Spec)
 	case *appsv1.Deployment:
 		return true, fn(&t.Spec.Template.Spec)
+
 	// DaemonSet
 	case *extensionsv1beta1.DaemonSet:
 		return true, fn(&t.Spec.Template.Spec)
@@ -265,6 +275,7 @@ func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.Po
 		return true, fn(&t.Spec.Template.Spec)
 	case *appsv1.DaemonSet:
 		return true, fn(&t.Spec.Template.Spec)
+
 	// ReplicaSet
 	case *extensionsv1beta1.ReplicaSet:
 		return true, fn(&t.Spec.Template.Spec)
@@ -272,6 +283,7 @@ func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.Po
 		return true, fn(&t.Spec.Template.Spec)
 	case *appsv1.ReplicaSet:
 		return true, fn(&t.Spec.Template.Spec)
+
 	// StatefulSet
 	case *appsv1beta1.StatefulSet:
 		return true, fn(&t.Spec.Template.Spec)
@@ -279,14 +291,17 @@ func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.Po
 		return true, fn(&t.Spec.Template.Spec)
 	case *appsv1.StatefulSet:
 		return true, fn(&t.Spec.Template.Spec)
+
 	// Job
 	case *batchv1.Job:
 		return true, fn(&t.Spec.Template.Spec)
+
 	// CronJob
 	case *batchv1beta1.CronJob:
 		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
 	case *batchv2alpha1.CronJob:
 		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
+
 	default:
 		return false, fmt.Errorf("the object is not a pod or does not have a pod template")
 	}

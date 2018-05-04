@@ -124,7 +124,7 @@ func (o *RolloutStatusOptions) Validate(cmd *cobra.Command, args []string) error
 
 func (o *RolloutStatusOptions) Run() error {
 	r := o.Builder.
-		Internal(legacyscheme.Scheme).
+		WithScheme(legacyscheme.Scheme).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).

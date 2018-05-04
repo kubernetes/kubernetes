@@ -24,9 +24,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -97,7 +100,8 @@ type ExposeServiceOptions struct {
 	Namespace string
 	Mapper    meta.RESTMapper
 
-	Builder *resource.Builder
+	DynamicClient dynamic.DynamicInterface
+	Builder       *resource.Builder
 
 	Recorder genericclioptions.Recorder
 	genericclioptions.IOStreams
@@ -180,6 +184,11 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 		return err
 	}
 
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
 	o.Generators = f.Generators
 	o.Builder = f.NewBuilder()
 	o.CanBeExposed = f.CanBeExposed
@@ -203,7 +212,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 
 func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) error {
 	r := o.Builder.
-		Internal(legacyscheme.Scheme).
+		WithScheme(legacyscheme.Scheme).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
@@ -313,33 +322,36 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			}
 		}
 
-		resourceMapper := &resource.Mapper{
-			RESTMapper:   o.Mapper,
-			ClientMapper: resource.ClientMapperFunc(o.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
-		}
-		info, err = resourceMapper.InfoForObject(object, legacyscheme.Scheme, nil)
-		if err != nil {
-			return err
-		}
 		if err := o.Recorder.Record(object); err != nil {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
-		info.Refresh(object, true)
+
 		if o.DryRun {
 			return o.PrintObj(object, o.Out)
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
+		asUnstructured := &unstructured.Unstructured{}
+		if err := legacyscheme.Scheme.Convert(object, asUnstructured, nil); err != nil {
+			return err
+		}
+		gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(asUnstructured)
+		if err != nil {
+			return err
+		}
+		objMapping, err := o.Mapper.RESTMapping(gvks[0].GroupKind(), gvks[0].Version)
+		if err != nil {
+			return err
+		}
 		// Serialize the object with the annotation applied.
-		object, err = resource.NewHelper(info.Client, info.Mapping).Create(o.Namespace, false, object)
+		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
 		if err != nil {
 			return err
 		}
 
-		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+		return o.PrintObj(actualObject, o.Out)
 	})
 	if err != nil {
 		return err

@@ -171,7 +171,11 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 		return err
 	}
 	o.Result = r
-	o.Mapper = r.Mapper().RESTMapper
+
+	o.Mapper, err = f.RESTMapper()
+	if err != nil {
+		return err
+	}
 
 	// Set up writer
 	o.Out = out

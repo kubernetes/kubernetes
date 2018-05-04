@@ -30,12 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/util/env"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -241,7 +241,7 @@ func (o *EnvOptions) RunEnv() error {
 
 	if len(o.From) != 0 {
 		b := o.builder().
-			Internal(legacyscheme.Scheme).
+			WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...).
 			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(o.namespace).DefaultNamespace().
@@ -261,11 +261,7 @@ func (o *EnvOptions) RunEnv() error {
 		}
 
 		for _, info := range infos {
-			versionedObject, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return err
-			}
-			switch from := versionedObject.(type) {
+			switch from := info.Object.(type) {
 			case *v1.Secret:
 				for key := range from.Data {
 					envVar := v1.EnvVar{
@@ -309,7 +305,7 @@ func (o *EnvOptions) RunEnv() error {
 	}
 
 	b := o.builder().
-		Internal(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
@@ -326,8 +322,7 @@ func (o *EnvOptions) RunEnv() error {
 	if err != nil {
 		return err
 	}
-	patches := CalculatePatches(infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-		info.Object = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
+	patches := CalculatePatches(infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		_, err := o.updatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
@@ -394,7 +389,7 @@ func (o *EnvOptions) RunEnv() error {
 		})
 
 		if err == nil {
-			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 		}
 		return nil, err
 	})
@@ -418,7 +413,7 @@ func (o *EnvOptions) RunEnv() error {
 		}
 
 		if o.Local || o.dryRun {
-			if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, patch.Info.Mapping), o.Out); err != nil {
+			if err := o.PrintObj(patch.Info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
@@ -437,7 +432,7 @@ func (o *EnvOptions) RunEnv() error {
 			return fmt.Errorf("at least one environment variable must be provided")
 		}
 
-		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+		if err := o.PrintObj(info.Object, o.Out); err != nil {
 			return err
 		}
 	}

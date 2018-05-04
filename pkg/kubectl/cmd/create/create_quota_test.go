@@ -17,41 +17,16 @@ limitations under the License.
 package create
 
 import (
-	"net/http"
 	"testing"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreateQuota(t *testing.T) {
 	resourceQuotaObject := &v1.ResourceQuota{}
 	resourceQuotaObject.Name = "my-quota"
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-	ns := legacyscheme.Codecs
-
-	tf.Client = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/resourcequotas" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, resourceQuotaObject)}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
-	tf.Namespace = "test"
 
 	tests := map[string]struct {
 		flags          []string
@@ -75,14 +50,21 @@ func TestCreateQuota(t *testing.T) {
 		},
 	}
 	for name, test := range tests {
-		ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
-		cmd := NewCmdCreateQuota(tf, ioStreams)
-		cmd.Flags().Parse(test.flags)
-		cmd.Flags().Set("output", "name")
-		cmd.Run(cmd, []string{resourceQuotaObject.Name})
+		t.Run(name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		if buf.String() != test.expectedOutput {
-			t.Errorf("%s: expected output: %s, but got: %s", name, test.expectedOutput, buf.String())
-		}
+			tf.Namespace = "test"
+
+			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdCreateQuota(tf, ioStreams)
+			cmd.Flags().Parse(test.flags)
+			cmd.Flags().Set("output", "name")
+			cmd.Run(cmd, []string{resourceQuotaObject.Name})
+
+			if buf.String() != test.expectedOutput {
+				t.Errorf("%s: expected output: %s, but got: %s", name, test.expectedOutput, buf.String())
+			}
+		})
 	}
 }
