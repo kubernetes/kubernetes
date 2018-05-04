@@ -91,6 +91,7 @@ kubeletConfiguration:
     containerLogMaxSize: 10Mi
     contentType: application/vnd.kubernetes.protobuf
     cpuCFSQuota: true
+    cpuCFSQuotaPeriod: 0s
     cpuManagerPolicy: none
     cpuManagerReconcilePeriod: 10s
     enableControllerAttachDetach: true

@@ -83,6 +83,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "helpers_linux_test.go",
         "helpers_test.go",
         "instrumented_services_test.go",
         "kuberuntime_container_linux_test.go",

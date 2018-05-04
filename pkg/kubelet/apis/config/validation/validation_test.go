@@ -18,7 +18,9 @@ package validation
 
 import (
 	"testing"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -48,6 +50,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		RegistryPullQPS:             5,
 		HairpinMode:                 kubeletconfig.PromiscuousBridge,
 		NodeLeaseDurationSeconds:    1,
+		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 100 * time.Millisecond},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase); allErrors != nil {
 		t.Errorf("expect no errors, got %v", allErrors)
@@ -77,6 +80,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		RegistryPullQPS:             -10,
 		HairpinMode:                 "foo",
 		NodeLeaseDurationSeconds:    -1,
+		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 0},
 	}
 	const numErrs = 23
 	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrs {
