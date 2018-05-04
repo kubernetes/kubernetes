@@ -59,10 +59,8 @@ const ResourceResyncTime time.Duration = 0
 // ensures that the garbage collector operates with a graph that is at least as
 // up to date as the notification is sent.
 type GarbageCollector struct {
-	restMapper resettableRESTMapper
-	// clientPool uses the regular dynamicCodec. We need it to update
-	// finalizers. It can be removed if we support patching finalizers.
-	clientPool dynamic.ClientPool
+	restMapper    resettableRESTMapper
+	dynamicClient dynamic.DynamicInterface
 	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
 	attemptToDelete workqueue.RateLimitingInterface
 	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
@@ -76,8 +74,7 @@ type GarbageCollector struct {
 }
 
 func NewGarbageCollector(
-	metaOnlyClientPool dynamic.ClientPool,
-	clientPool dynamic.ClientPool,
+	dynamicClient dynamic.DynamicInterface,
 	mapper resettableRESTMapper,
 	deletableResources map[schema.GroupVersionResource]struct{},
 	ignoredResources map[schema.GroupResource]struct{},
@@ -88,17 +85,17 @@ func NewGarbageCollector(
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
 	gc := &GarbageCollector{
-		clientPool:       clientPool,
+		dynamicClient:    dynamicClient,
 		restMapper:       mapper,
 		attemptToDelete:  attemptToDelete,
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
 	gb := &GraphBuilder{
-		metaOnlyClientPool: metaOnlyClientPool,
-		informersStarted:   informersStarted,
-		restMapper:         mapper,
-		graphChanges:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+		dynamicClient:    dynamicClient,
+		informersStarted: informersStarted,
+		restMapper:       mapper,
+		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
 		uidToNode: &concurrentUIDToNode{
 			uidToNode: make(map[types.UID]*node),
 		},
@@ -291,19 +288,15 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	// ii) should update the object to remove such references. This is to
 	// prevent objects having references to an old resource from being
 	// deleted during a cluster upgrade.
-	fqKind := schema.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
-	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	resource, namespaced, err := gc.apiResource(reference.APIVersion, reference.Kind)
 	if err != nil {
 		return false, nil, err
 	}
-	resource, err := gc.apiResource(reference.APIVersion, reference.Kind)
-	if err != nil {
-		return false, nil, err
-	}
+
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = client.Resource(resource, resourceDefaultNamespace(resource, item.identity.Namespace)).Get(reference.Name, metav1.GetOptions{})
+	owner, err = gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)

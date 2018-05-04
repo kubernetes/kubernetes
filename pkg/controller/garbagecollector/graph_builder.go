@@ -91,6 +91,7 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
+	dynamicClient dynamic.DynamicInterface
 	// metaOnlyClientPool uses a special codec, which removes fields except for
 	// apiVersion, kind, and metadata during decoding.
 	metaOnlyClientPool dynamic.ClientPool
@@ -127,27 +128,15 @@ func (m *monitor) Run() {
 
 type monitors map[schema.GroupVersionResource]*monitor
 
-func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource) *cache.ListWatch {
+func listWatcher(client dynamic.DynamicInterface, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.
-				Resource(&apiResource, metav1.NamespaceAll).
-				List(options)
+			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
+			return client.Resource(resource).List(options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.
-				Resource(&apiResource, metav1.NamespaceAll).
-				Watch(options)
+			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
+			return client.Resource(resource).Watch(options)
 		},
 	}
 }
@@ -199,12 +188,8 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 
 	// TODO: consider store in one storage.
 	glog.V(5).Infof("create storage for resource %s", resource)
-	client, err := gb.metaOnlyClientPool.ClientForGroupVersionKind(kind)
-	if err != nil {
-		return nil, err
-	}
 	_, monitor := cache.NewInformer(
-		listWatcher(client, resource),
+		listWatcher(gb.dynamicClient, resource),
 		nil,
 		ResourceResyncTime,
 		// don't need to clone because it's not from shared cache

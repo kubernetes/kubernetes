@@ -352,13 +352,13 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	discoveryClient := cacheddiscovery.NewMemCacheClient(gcClientset.Discovery())
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
-	config.ContentConfig = dynamic.ContentConfig()
-	// TODO: Make NewMetadataCodecFactory support arbitrary (non-compiled)
-	// resource types. Otherwise we'll be storing full Unstructured data in our
-	// caches for custom resources. Consider porting it to work with
-	// metav1beta1.PartialObjectMetadata.
-	metaOnlyClientPool := dynamic.NewClientPool(config, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc)
-	clientPool := dynamic.NewClientPool(config, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc)
+	// bump QPS limits on our dynamic client that we use to GC every deleted object
+	config.QPS *= 20
+	config.Burst *= 20
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return true, err
+	}
 
 	// Get an initial set of deletable resources to prime the garbage collector.
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
@@ -367,8 +367,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
-		metaOnlyClientPool,
-		clientPool,
+		dynamicClient,
 		ctx.RESTMapper,
 		deletableResources,
 		ignoredResources,
