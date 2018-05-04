@@ -54,6 +54,10 @@ var upgradeTests = []upgrades.Test{
 	&upgrades.AppArmorUpgradeTest{},
 }
 
+var gpuUpgradeTests = []upgrades.Test{
+	&upgrades.NvidiaGPUUpgradeTest{},
+}
+
 var statefulsetUpgradeTests = []upgrades.Test{
 	&upgrades.MySqlUpgradeTest{},
 	&upgrades.EtcdUpgradeTest{},
@@ -252,6 +256,52 @@ var _ = SIGDescribe("ingress Downgrade [Feature:IngressDowngrade]", func() {
 				framework.ExpectNoError(framework.IngressUpgrade(false))
 			}
 			runUpgradeSuite(f, ingressUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.IngressUpgrade, upgradeFunc)
+		})
+	})
+})
+
+var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
+	f := framework.NewDefaultFramework("gpu-upgrade")
+
+	// Create the frameworks here because we can only create them
+	// in a "Describe".
+	testFrameworks := createUpgradeFrameworks(gpuUpgradeTests)
+	Describe("master upgrade", func() {
+		It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "GPU master upgrade"}
+			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-master-upgrade", Classname: "upgrade_tests"}
+			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, gpuUpgradeTest)
+				target := upgCtx.Versions[1].Version.String()
+				framework.ExpectNoError(framework.MasterUpgrade(target))
+				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+			}
+			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.MasterUpgrade, upgradeFunc)
+		})
+	})
+	Describe("cluster upgrade", func() {
+		It("should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "GPU cluster upgrade"}
+			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-upgrade", Classname: "upgrade_tests"}
+			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, gpuUpgradeTest)
+				target := upgCtx.Versions[1].Version.String()
+				framework.ExpectNoError(framework.MasterUpgrade(target))
+				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+			}
+			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
