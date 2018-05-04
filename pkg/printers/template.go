@@ -57,10 +57,6 @@ func (p *GoTemplatePrinter) AllowMissingKeys(allow bool) {
 	}
 }
 
-func (p *GoTemplatePrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
 // PrintObj formats the obj with the Go Template.
 func (p *GoTemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	var data []byte
@@ -85,15 +81,6 @@ func (p *GoTemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return fmt.Errorf("error executing template %q: %v", p.rawTemplate, err)
 	}
 	return nil
-}
-
-// TODO: implement HandledResources()
-func (p *GoTemplatePrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (p *GoTemplatePrinter) IsGeneric() bool {
-	return true
 }
 
 // safeExecute tries to execute the template, but catches panics and returns an error
