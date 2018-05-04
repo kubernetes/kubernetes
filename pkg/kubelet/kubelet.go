@@ -27,7 +27,6 @@ import (
 	"os"
 	"path"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -2069,20 +2068,6 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
-}
-
-// updateCloudProviderFromMachineInfo updates the node's provider ID field
-// from the given cadvisor machine info.
-func (kl *Kubelet) updateCloudProviderFromMachineInfo(node *v1.Node, info *cadvisorapi.MachineInfo) {
-	if info.CloudProvider != cadvisorapi.UnknownProvider &&
-		info.CloudProvider != cadvisorapi.Baremetal {
-		// The cloud providers from pkg/cloudprovider/providers/* that update ProviderID
-		// will use the format of cloudprovider://project/availability_zone/instance_name
-		// here we only have the cloudprovider and the instance name so we leave project
-		// and availability zone empty for compatibility.
-		node.Spec.ProviderID = strings.ToLower(string(info.CloudProvider)) +
-			":////" + string(info.InstanceID)
-	}
 }
 
 // GetConfiguration returns the KubeletConfiguration used to configure the kubelet.
