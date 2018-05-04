@@ -67,7 +67,6 @@ func NewViewLastAppliedOptions(ioStreams genericclioptions.IOStreams) *ViewLastA
 
 func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := NewViewLastAppliedOptions(ioStreams)
-	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
 		Use: "view-last-applied (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
@@ -80,8 +79,6 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 			cmdutil.CheckErr(options.Validate(cmd))
 			cmdutil.CheckErr(options.RunApplyViewLastApplied(cmd))
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	cmd.Flags().StringVarP(&options.OutputFormat, "output", "o", options.OutputFormat, "Output format. Must be one of yaml|json")

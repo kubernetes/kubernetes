@@ -120,7 +120,6 @@ func NewAnnotateOptions(ioStreams genericclioptions.IOStreams) *AnnotateOptions 
 
 func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAnnotateOptions(ioStreams)
-	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
 		Use: "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
@@ -133,8 +132,6 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunAnnotate())
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	// bind flag structs

@@ -148,7 +148,6 @@ func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptio
 // retrieves one or more resources from a server.
 func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewGetOptions(parent, streams)
-	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
 		Use: "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE[.VERSION][.GROUP] [NAME | -l label] | TYPE[.VERSION][.GROUP]/NAME ...) [flags]",
@@ -162,8 +161,6 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 			cmdutil.CheckErr(o.Run(f, cmd, args))
 		},
 		SuggestFor: []string{"list", "ps"},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	o.PrintFlags.AddFlags(cmd)

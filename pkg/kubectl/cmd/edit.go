@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
@@ -72,8 +71,6 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	o := editor.NewEditOptions(editor.NormalEditMode, ioStreams)
 	o.ValidateOptions = cmdutil.ValidateOptions{EnableValidation: true}
 
-	validArgs := cmdutil.ValidArgList(f)
-
 	cmd := &cobra.Command{
 		Use: "edit (RESOURCE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
@@ -88,8 +85,6 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 				cmdutil.CheckErr(err)
 			}
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	// bind flag structs
