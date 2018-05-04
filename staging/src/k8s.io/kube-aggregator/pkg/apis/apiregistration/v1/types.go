@@ -53,8 +53,7 @@ type APIServiceSpec struct {
 	// This is strongly discouraged.  You should use the CABundle instead.
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty" protobuf:"varint,4,opt,name=insecureSkipTLSVerify"`
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
-	// +optional
-	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,5,opt,name=caBundle"`
+	CABundle []byte `json:"caBundle" protobuf:"bytes,5,opt,name=caBundle"`
 
 	// GroupPriorityMininum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
 	// Note that other versions of this group might specify even higher GroupPriorityMininum values such that the whole group gets a higher priority.

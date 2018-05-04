@@ -112,13 +112,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
-	if in.QOSReserved != nil {
-		in, out := &in.QOSReserved, &out.QOSReserved
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	if in.EvictionHard != nil {
 		in, out := &in.EvictionHard, &out.EvictionHard

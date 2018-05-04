@@ -193,13 +193,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
-	if in.QOSReserved != nil {
-		in, out := &in.QOSReserved, &out.QOSReserved
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	if in.PodPidsLimit != nil {
 		in, out := &in.PodPidsLimit, &out.PodPidsLimit

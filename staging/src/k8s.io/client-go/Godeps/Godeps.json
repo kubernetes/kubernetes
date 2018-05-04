@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/client-go",
-	"GoVersion": "go1.10",
+	"GoVersion": "go1.9",
 	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
@@ -16,19 +16,19 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Rev": "1ff28809256a84bb6966640ff3d0371af82ccba4"
+			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/adal",
-			"Rev": "1ff28809256a84bb6966640ff3d0371af82ccba4"
+			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Rev": "1ff28809256a84bb6966640ff3d0371af82ccba4"
+			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Rev": "1ff28809256a84bb6966640ff3d0371af82ccba4"
+			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
@@ -144,15 +144,7 @@
 		},
 		{
 			"ImportPath": "github.com/json-iterator/go",
-			"Rev": "2ddf6d758266fcb080a4f9e054b9f292c85e6798"
-		},
-		{
-			"ImportPath": "github.com/modern-go/concurrent",
-			"Rev": "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94"
-		},
-		{
-			"ImportPath": "github.com/modern-go/reflect2",
-			"Rev": "05fbef0ca5da472bbf96c9322b84a53edc03c9fd"
+			"Rev": "13f86432b882000a51c6e610c620974462691a97"
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
@@ -160,11 +152,11 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "583c0c0531f06d5278b7d917446061adc344b5cd"
+			"Rev": "4c012f6dcd9546820e378d0bdda4d8fc772cdfea"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Rev": "c679ae2cc0cb27ec3293fea7e254e47386f05d69"
+			"Rev": "f6abca593680b2315d2075e0f5e2a9751e3f431a"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",

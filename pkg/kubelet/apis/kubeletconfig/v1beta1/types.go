@@ -107,13 +107,6 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
-	// serverTLSBootstrap enables server certificate bootstrap. Instead of self
-	// signing a serving certificate, the Kubelet will request a certificate from
-	// the certificates.k8s.io API. This requires an approver to approve the
-	// certificate signing requests. The RotateKubeletServerCertificate feature
-	// must be enabled.
-	// Default: false
-	ServerTLSBootstrap bool `json:"serverTLSBootstrap,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	// Defaults:
 	//   anonymous:
@@ -256,11 +249,6 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
-	// Map of QoS resource reservation percentages (memory only for now).
-	// Requires the QOSReserved feature gate to be enabled.
-	// Default: nil
-	// +optional
-	QOSReserved map[string]string `json:"qosReserved,omitempty"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	// Default: "2m"
