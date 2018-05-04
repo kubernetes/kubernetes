@@ -27,14 +27,14 @@ import (
 
 // mustRunAs implements the GroupStrategy interface
 type mustRunAs struct {
-	ranges []policy.GroupIDRange
+	ranges []policy.IDRange
 	field  string
 }
 
 var _ GroupStrategy = &mustRunAs{}
 
 // NewMustRunAs provides a new MustRunAs strategy based on ranges.
-func NewMustRunAs(ranges []policy.GroupIDRange, field string) (GroupStrategy, error) {
+func NewMustRunAs(ranges []policy.IDRange, field string) (GroupStrategy, error) {
 	if len(ranges) == 0 {
 		return nil, fmt.Errorf("ranges must be supplied for MustRunAs")
 	}
