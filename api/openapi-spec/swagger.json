@@ -1306,6 +1306,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -1808,6 +1814,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -2318,6 +2330,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -2824,6 +2842,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -3326,6 +3350,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -3992,6 +4022,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -5808,6 +5844,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -6310,6 +6352,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -7140,6 +7188,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -7806,6 +7860,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -8312,6 +8372,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -8721,6 +8787,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -9651,6 +9723,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -10359,6 +10437,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -11613,6 +11697,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -17766,6 +17856,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -18505,6 +18601,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -18991,6 +19093,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -19983,6 +20091,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -20907,6 +21021,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -21794,6 +21914,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -23042,6 +23168,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -23544,6 +23676,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -24210,6 +24348,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -25040,6 +25184,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -25862,6 +26012,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -28821,6 +28977,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -29323,6 +29485,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -30233,6 +30401,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -32520,6 +32694,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -33022,6 +33202,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -33688,6 +33874,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -34518,6 +34710,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -35340,6 +35538,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -39122,6 +39326,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -40257,6 +40467,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -41433,6 +41649,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -42568,6 +42790,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -43711,6 +43939,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -44767,6 +45001,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -45877,6 +46117,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -46885,6 +47131,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -48109,6 +48361,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -48771,6 +49029,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -49685,6 +49949,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -50351,6 +50621,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -50853,6 +51129,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -51935,6 +52217,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -54503,6 +54791,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -55515,6 +55809,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -56273,6 +56573,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -57369,6 +57675,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -57839,6 +58151,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -58321,6 +58639,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -58811,6 +59135,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -60642,6 +60972,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -61112,6 +61448,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -61594,6 +61936,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -62084,6 +62432,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -63915,6 +64269,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -64385,6 +64745,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -64867,6 +65233,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -65357,6 +65729,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -67237,6 +67615,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -67972,6 +68356,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -68752,6 +69142,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -69760,6 +70156,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -70495,6 +70897,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -71238,6 +71646,12 @@
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -71724,6 +72138,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
