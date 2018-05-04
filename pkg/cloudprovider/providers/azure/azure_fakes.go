@@ -220,33 +220,19 @@ func newFakeAzureInterfacesClient() *fakeAzureInterfacesClient {
 	return fIC
 }
 
-func (fIC *fakeAzureInterfacesClient) CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error) {
+func (fIC *fakeAzureInterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkInterfaceName string, parameters network.Interface) (resp *http.Response, err error) {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
-	resultChan := make(chan network.Interface, 1)
-	errChan := make(chan error, 1)
-	var result network.Interface
-	var err error
-	defer func() {
-		resultChan <- result
-		errChan <- err
-		close(resultChan)
-		close(errChan)
-	}()
+
 	if _, ok := fIC.FakeStore[resourceGroupName]; !ok {
 		fIC.FakeStore[resourceGroupName] = make(map[string]network.Interface)
 	}
 	fIC.FakeStore[resourceGroupName][networkInterfaceName] = parameters
-	result = fIC.FakeStore[resourceGroupName][networkInterfaceName]
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	err = nil
 
-	return resultChan, errChan
+	return nil, nil
 }
 
-func (fIC *fakeAzureInterfacesClient) Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error) {
+func (fIC *fakeAzureInterfacesClient) Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error) {
 	fIC.mutex.Lock()
 	defer fIC.mutex.Unlock()
 	if _, ok := fIC.FakeStore[resourceGroupName]; ok {
@@ -260,7 +246,7 @@ func (fIC *fakeAzureInterfacesClient) Get(resourceGroupName string, networkInter
 	}
 }
 
-func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
+func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
 	return result, nil
 }
 
@@ -328,67 +314,37 @@ func newFakeAzureSubnetsClient() *fakeAzureSubnetsClient {
 	return fASC
 }
 
-func (fASC *fakeAzureSubnetsClient) CreateOrUpdate(resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet, cancel <-chan struct{}) (<-chan network.Subnet, <-chan error) {
+func (fASC *fakeAzureSubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet) (resp *http.Response, err error) {
 	fASC.mutex.Lock()
 	defer fASC.mutex.Unlock()
-	resultChan := make(chan network.Subnet, 1)
-	errChan := make(chan error, 1)
-	var result network.Subnet
-	var err error
-	defer func() {
-		resultChan <- result
-		errChan <- err
-		close(resultChan)
-		close(errChan)
-	}()
+
 	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
 	if _, ok := fASC.FakeStore[rgVnet]; !ok {
 		fASC.FakeStore[rgVnet] = make(map[string]network.Subnet)
 	}
 	fASC.FakeStore[rgVnet][subnetName] = subnetParameters
-	result = fASC.FakeStore[rgVnet][subnetName]
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	err = nil
-	return resultChan, errChan
+
+	return nil, nil
 }
 
-func (fASC *fakeAzureSubnetsClient) Delete(resourceGroupName string, virtualNetworkName string, subnetName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (fASC *fakeAzureSubnetsClient) Delete(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string) (resp *http.Response, err error) {
 	fASC.mutex.Lock()
 	defer fASC.mutex.Unlock()
-	respChan := make(chan autorest.Response, 1)
-	errChan := make(chan error, 1)
-	var resp autorest.Response
-	var err error
-	defer func() {
-		respChan <- resp
-		errChan <- err
-		close(respChan)
-		close(errChan)
-	}()
 
 	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
 	if rgSubnets, ok := fASC.FakeStore[rgVnet]; ok {
 		if _, ok := rgSubnets[subnetName]; ok {
 			delete(rgSubnets, subnetName)
-			resp.Response = &http.Response{
-				StatusCode: http.StatusAccepted,
-			}
-			err = nil
-			return respChan, errChan
+			return nil, nil
 		}
 	}
-	resp.Response = &http.Response{
+
+	return &http.Response{
 		StatusCode: http.StatusNotFound,
-	}
-	err = autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such Subnet",
-	}
-	return respChan, errChan
+	}, nil
 }
-func (fASC *fakeAzureSubnetsClient) Get(resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error) {
+
+func (fASC *fakeAzureSubnetsClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error) {
 	fASC.mutex.Lock()
 	defer fASC.mutex.Unlock()
 	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
@@ -403,30 +359,10 @@ func (fASC *fakeAzureSubnetsClient) Get(resourceGroupName string, virtualNetwork
 	}
 }
 
-type fakeSubnetListResultPage struct {
-	next   SubnetListResultPage
-	value  network.SubnetListResult
-	values []network.Subnet
-	err    error
-}
-
-func (pg *fakeSubnetListResultPage) Next() error {
-	return nil
-}
-func (pg *fakeSubnetListResultPage) NotDone() bool {
-	return pg.next != nil
-}
-
-func (pg *fakeSubnetListResultPage) Response() network.SubnetListResult {
-	return pg.value
-}
-func (pg *fakeSubnetListResultPage) Values() []network.Subnet {
-	return pg.values
-}
-
-func (fASC *fakeAzureSubnetsClient) List(resourceGroupName string, virtualNetworkName string) (result SubnetListResultPage, err error) {
+func (fASC *fakeAzureSubnetsClient) List(ctx context.Context, resourceGroupName string, virtualNetworkName string) (result []network.Subnet, err error) {
 	fASC.mutex.Lock()
 	defer fASC.mutex.Unlock()
+
 	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
 	var value []network.Subnet
 	if _, ok := fASC.FakeStore[rgVnet]; ok {
@@ -434,12 +370,8 @@ func (fASC *fakeAzureSubnetsClient) List(resourceGroupName string, virtualNetwor
 			value = append(value, v)
 		}
 	}
-	return &fakeSubnetListResultPage{
-		value: network.SubnetListResult{
-			Value: &value,
-		},
-		values: value,
-	}, nil
+
+	return value, nil
 }
 
 type fakeAzureNSGClient struct {
@@ -454,65 +386,35 @@ func newFakeAzureNSGClient() *fakeAzureNSGClient {
 	return fNSG
 }
 
-func (fNSG *fakeAzureNSGClient) CreateOrUpdate(resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, cancel <-chan struct{}) (<-chan network.SecurityGroup, <-chan error) {
+func (fNSG *fakeAzureNSGClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup) (resp *http.Response, err error) {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
-	resultChan := make(chan network.SecurityGroup, 1)
-	errChan := make(chan error, 1)
-	var result network.SecurityGroup
-	var err error
-	defer func() {
-		resultChan <- result
-		errChan <- err
-		close(resultChan)
-		close(errChan)
-	}()
+
 	if _, ok := fNSG.FakeStore[resourceGroupName]; !ok {
 		fNSG.FakeStore[resourceGroupName] = make(map[string]network.SecurityGroup)
 	}
 	fNSG.FakeStore[resourceGroupName][networkSecurityGroupName] = parameters
-	result = fNSG.FakeStore[resourceGroupName][networkSecurityGroupName]
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	err = nil
-	return resultChan, errChan
+
+	return nil, nil
 }
 
-func (fNSG *fakeAzureNSGClient) Delete(resourceGroupName string, networkSecurityGroupName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (fNSG *fakeAzureNSGClient) Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (resp *http.Response, err error) {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
-	respChan := make(chan autorest.Response, 1)
-	errChan := make(chan error, 1)
-	var resp autorest.Response
-	var err error
-	defer func() {
-		respChan <- resp
-		errChan <- err
-		close(respChan)
-		close(errChan)
-	}()
+
 	if rgSGs, ok := fNSG.FakeStore[resourceGroupName]; ok {
 		if _, ok := rgSGs[networkSecurityGroupName]; ok {
 			delete(rgSGs, networkSecurityGroupName)
-			resp.Response = &http.Response{
-				StatusCode: http.StatusAccepted,
-			}
-			err = nil
-			return respChan, errChan
+			return nil, nil
 		}
 	}
-	resp.Response = &http.Response{
+
+	return &http.Response{
 		StatusCode: http.StatusNotFound,
-	}
-	err = autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such NSG",
-	}
-	return respChan, errChan
+	}, nil
 }
 
-func (fNSG *fakeAzureNSGClient) Get(resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error) {
+func (fNSG *fakeAzureNSGClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error) {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
 	if _, ok := fNSG.FakeStore[resourceGroupName]; ok {
@@ -526,43 +428,18 @@ func (fNSG *fakeAzureNSGClient) Get(resourceGroupName string, networkSecurityGro
 	}
 }
 
-type fakeSecurityGroupListResultPage struct {
-	next   SecurityGroupListResultPage
-	value  network.SecurityGroupListResult
-	values []network.SecurityGroup
-	err    error
-}
-
-func (pg *fakeSecurityGroupListResultPage) Next() error {
-	return nil
-}
-func (pg *fakeSecurityGroupListResultPage) NotDone() bool {
-	return pg.next != nil
-}
-
-func (pg *fakeSecurityGroupListResultPage) Response() network.SecurityGroupListResult {
-	return pg.value
-}
-func (pg *fakeSecurityGroupListResultPage) Values() []network.SecurityGroup {
-	return pg.values
-}
-
-func (fNSG *fakeAzureNSGClient) List(resourceGroupName string) (result SecurityGroupListResultPage, err error) {
+func (fNSG *fakeAzureNSGClient) List(ctx context.Context, resourceGroupName string) (result []network.SecurityGroup, err error) {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
+
 	var value []network.SecurityGroup
 	if _, ok := fNSG.FakeStore[resourceGroupName]; ok {
 		for _, v := range fNSG.FakeStore[resourceGroupName] {
 			value = append(value, v)
 		}
 	}
-	result = &fakeSecurityGroupListResultPage{
-		value: network.SecurityGroupListResult{
-			Value: &value,
-		},
-		values: value,
-	}
-	return result, nil
+
+	return value, nil
 }
 
 func getRandomIPPtr() *string {
@@ -722,66 +599,32 @@ func newFakeRoutesClient() *fakeRoutesClient {
 	return fRC
 }
 
-func (fRC *fakeRoutesClient) CreateOrUpdate(resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, cancel <-chan struct{}) (<-chan network.Route, <-chan error) {
+func (fRC *fakeRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route) (resp *http.Response, err error) {
 	fRC.mutex.Lock()
 	defer fRC.mutex.Unlock()
-
-	resultChan := make(chan network.Route, 1)
-	errChan := make(chan error, 1)
-	var result network.Route
-	var err error
-	defer func() {
-		resultChan <- result
-		errChan <- err
-		close(resultChan)
-		close(errChan)
-	}()
 
 	if _, ok := fRC.FakeStore[routeTableName]; !ok {
 		fRC.FakeStore[routeTableName] = make(map[string]network.Route)
 	}
 	fRC.FakeStore[routeTableName][routeName] = routeParameters
-	result = fRC.FakeStore[routeTableName][routeName]
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	err = nil
-	return resultChan, errChan
+
+	return nil, nil
 }
 
-func (fRC *fakeRoutesClient) Delete(resourceGroupName string, routeTableName string, routeName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (fRC *fakeRoutesClient) Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (resp *http.Response, err error) {
 	fRC.mutex.Lock()
 	defer fRC.mutex.Unlock()
 
-	respChan := make(chan autorest.Response, 1)
-	errChan := make(chan error, 1)
-	var resp autorest.Response
-	var err error
-	defer func() {
-		respChan <- resp
-		errChan <- err
-		close(respChan)
-		close(errChan)
-	}()
 	if routes, ok := fRC.FakeStore[routeTableName]; ok {
 		if _, ok := routes[routeName]; ok {
 			delete(routes, routeName)
-			resp.Response = &http.Response{
-				StatusCode: http.StatusAccepted,
-			}
-
-			err = nil
-			return respChan, errChan
+			return nil, nil
 		}
 	}
-	resp.Response = &http.Response{
+
+	return &http.Response{
 		StatusCode: http.StatusNotFound,
-	}
-	err = autorest.DetailedError{
-		StatusCode: http.StatusNotFound,
-		Message:    "Not such Route",
-	}
-	return respChan, errChan
+	}, nil
 }
 
 type fakeRouteTablesClient struct {
@@ -797,36 +640,21 @@ func newFakeRouteTablesClient() *fakeRouteTablesClient {
 	return fRTC
 }
 
-func (fRTC *fakeRouteTablesClient) CreateOrUpdate(resourceGroupName string, routeTableName string, parameters network.RouteTable, cancel <-chan struct{}) (<-chan network.RouteTable, <-chan error) {
+func (fRTC *fakeRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable) (resp *http.Response, err error) {
 	fRTC.mutex.Lock()
 	defer fRTC.mutex.Unlock()
 
 	fRTC.Calls = append(fRTC.Calls, "CreateOrUpdate")
 
-	resultChan := make(chan network.RouteTable, 1)
-	errChan := make(chan error, 1)
-	var result network.RouteTable
-	var err error
-	defer func() {
-		resultChan <- result
-		errChan <- err
-		close(resultChan)
-		close(errChan)
-	}()
-
 	if _, ok := fRTC.FakeStore[resourceGroupName]; !ok {
 		fRTC.FakeStore[resourceGroupName] = make(map[string]network.RouteTable)
 	}
 	fRTC.FakeStore[resourceGroupName][routeTableName] = parameters
-	result = fRTC.FakeStore[resourceGroupName][routeTableName]
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	err = nil
-	return resultChan, errChan
+
+	return nil, nil
 }
 
-func (fRTC *fakeRouteTablesClient) Get(resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
+func (fRTC *fakeRouteTablesClient) Get(ctx context.Context, resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
 	fRTC.mutex.Lock()
 	defer fRTC.mutex.Unlock()
 
