@@ -59,6 +59,7 @@ type ApiResourcesOptions struct {
 	Namespaced bool
 	Verbs      []string
 	NoHeaders  bool
+	Cached     bool
 
 	genericclioptions.IOStreams
 }
@@ -94,6 +95,7 @@ func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 	cmd.Flags().StringVar(&o.APIGroup, "api-group", "", "Limit to resources in the specified API group.")
 	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", true, "Namespaced indicates if a resource is namespaced or not.")
 	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
+	cmd.Flags().BoolVar(&o.Cached, "cached", o.Cached, "Use the cached list of resources if available.")
 	return cmd
 }
 
@@ -125,8 +127,10 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 		return err
 	}
 
-	// Always request fresh data from the server
-	discoveryclient.Invalidate()
+	if !o.Cached {
+		// Always request fresh data from the server
+		discoveryclient.Invalidate()
+	}
 
 	lists, err := discoveryclient.ServerPreferredResources()
 	if err != nil {
