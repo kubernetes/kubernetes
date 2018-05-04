@@ -250,6 +250,11 @@ func IsGroupDiscoveryFailedError(err error) bool {
 
 // serverPreferredResources returns the supported resources with the version preferred by the server.
 func (d *DiscoveryClient) serverPreferredResources() ([]*metav1.APIResourceList, error) {
+	return ServerPreferredResources(d)
+}
+
+// ServerPreferredResources uses the provided discovery interface to look up preferred resources
+func ServerPreferredResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) {
 	serverGroupList, err := d.ServerGroups()
 	if err != nil {
 		return nil, err
@@ -319,7 +324,12 @@ func (d *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList,
 // ServerPreferredNamespacedResources returns the supported namespaced resources with the
 // version preferred by the server.
 func (d *DiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	all, err := d.ServerPreferredResources()
+	return ServerPreferredNamespacedResources(d)
+}
+
+// ServerPreferredNamespacedResources uses the provided discovery interface to look up preferred namespaced resources
+func ServerPreferredNamespacedResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) {
+	all, err := ServerPreferredResources(d)
 	return FilteredBy(ResourcePredicateFunc(func(groupVersion string, r *metav1.APIResource) bool {
 		return r.Namespaced
 	}), all), err
