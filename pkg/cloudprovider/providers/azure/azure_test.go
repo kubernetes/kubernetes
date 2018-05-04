@@ -1056,7 +1056,9 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 				},
 			},
 		}
-		az.InterfacesClient.CreateOrUpdate(az.Config.ResourceGroup, nicName, newNIC, nil)
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		az.InterfacesClient.CreateOrUpdate(ctx, az.Config.ResourceGroup, nicName, newNIC)
 
 		// create vm
 		asID := az.getAvailabilitySetID(asName)
@@ -1077,9 +1079,9 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 			},
 		}
 
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-		_, err := az.VirtualMachinesClient.CreateOrUpdate(ctx, az.Config.ResourceGroup, vmName, newVM)
+		vmCtx, vmCancel := getContextWithCancel()
+		defer vmCancel()
+		_, err := az.VirtualMachinesClient.CreateOrUpdate(vmCtx, az.Config.ResourceGroup, vmName, newVM)
 		if err != nil {
 		}
 		// add to kubernetes
@@ -1176,11 +1178,13 @@ func getTestSecurityGroup(az *Cloud, services ...v1.Service) *network.SecurityGr
 		},
 	}
 
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 	az.SecurityGroupsClient.CreateOrUpdate(
+		ctx,
 		az.ResourceGroup,
 		az.SecurityGroupName,
-		sg,
-		nil)
+		sg)
 
 	return &sg
 }
@@ -1854,13 +1858,15 @@ func addTestSubnet(t *testing.T, az *Cloud, svc *v1.Service) {
 		az.VnetName,
 		subName)
 
-	_, errChan := az.SubnetsClient.CreateOrUpdate(az.VnetResourceGroup, az.VnetName, subName,
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	_, err := az.SubnetsClient.CreateOrUpdate(ctx, az.VnetResourceGroup, az.VnetName, subName,
 		network.Subnet{
 			ID:   &subnetID,
 			Name: &subName,
-		}, nil)
+		})
 
-	if err := <-errChan; err != nil {
+	if err != nil {
 		t.Errorf("Subnet cannot be created or update, %v", err)
 	}
 	svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = subName
