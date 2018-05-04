@@ -21,6 +21,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -74,6 +75,7 @@ func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
 		cpuCFSQuota:         false,
+		cpuCFSQuotaPeriod:   metav1.Duration{Duration: time.Microsecond * 100},
 		livenessManager:     proberesults.NewManager(),
 		containerRefManager: kubecontainer.NewRefManager(),
 		machineInfo:         machineInfo,

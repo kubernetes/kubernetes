@@ -43,6 +43,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/apis/config:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )
