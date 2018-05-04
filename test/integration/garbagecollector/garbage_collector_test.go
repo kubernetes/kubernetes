@@ -224,9 +224,6 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	restMapper.Reset()
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	config := *result.ClientConfig
-	config.ContentConfig = dynamic.ContentConfig()
-	metaOnlyClientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-	clientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	dynamicClient, err := dynamic.NewForConfig(&config)
 	if err != nil {
 		t.Fatalf("failed to create dynamicClient: %v", err)
@@ -235,8 +232,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
-		metaOnlyClientPool,
-		clientPool,
+		dynamicClient,
 		restMapper,
 		deletableResources,
 		garbagecollector.DefaultIgnoredResources(),
