@@ -164,12 +164,12 @@ func PSPAllowsFSType(psp *policy.PodSecurityPolicy, fsType policy.FSType) bool {
 }
 
 // UserFallsInRange is a utility to determine it the id falls in the valid range.
-func UserFallsInRange(id int64, rng policy.UserIDRange) bool {
+func UserFallsInRange(id int64, rng policy.IDRange) bool {
 	return id >= rng.Min && id <= rng.Max
 }
 
 // GroupFallsInRange is a utility to determine it the id falls in the valid range.
-func GroupFallsInRange(id int64, rng policy.GroupIDRange) bool {
+func GroupFallsInRange(id int64, rng policy.IDRange) bool {
 	return id >= rng.Min && id <= rng.Max
 }
 

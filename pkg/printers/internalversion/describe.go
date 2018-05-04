@@ -3535,13 +3535,13 @@ func describePodSecurityPolicy(psp *policy.PodSecurityPolicy) (string, error) {
 		w.Write(LEVEL_2, "Level:\t%s\n", stringOrNone(level))
 
 		w.Write(LEVEL_1, "Run As User Strategy: %s\t\n", string(psp.Spec.RunAsUser.Rule))
-		w.Write(LEVEL_2, "Ranges:\t%s\n", userIDRangeToString(psp.Spec.RunAsUser.Ranges))
+		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.RunAsUser.Ranges))
 
 		w.Write(LEVEL_1, "FSGroup Strategy: %s\t\n", string(psp.Spec.FSGroup.Rule))
-		w.Write(LEVEL_2, "Ranges:\t%s\n", groupIDRangeToString(psp.Spec.FSGroup.Ranges))
+		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.FSGroup.Ranges))
 
 		w.Write(LEVEL_1, "Supplemental Groups Strategy: %s\t\n", string(psp.Spec.SupplementalGroups.Rule))
-		w.Write(LEVEL_2, "Ranges:\t%s\n", groupIDRangeToString(psp.Spec.SupplementalGroups.Ranges))
+		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.SupplementalGroups.Ranges))
 
 		return nil
 	})
@@ -3586,19 +3586,7 @@ func hostPortRangeToString(ranges []policy.HostPortRange) string {
 	return stringOrNone(formattedString)
 }
 
-func userIDRangeToString(ranges []policy.UserIDRange) string {
-	formattedString := ""
-	if ranges != nil {
-		strRanges := []string{}
-		for _, r := range ranges {
-			strRanges = append(strRanges, fmt.Sprintf("%d-%d", r.Min, r.Max))
-		}
-		formattedString = strings.Join(strRanges, ",")
-	}
-	return stringOrNone(formattedString)
-}
-
-func groupIDRangeToString(ranges []policy.GroupIDRange) string {
+func idRangeToString(ranges []policy.IDRange) string {
 	formattedString := ""
 	if ranges != nil {
 		strRanges := []string{}

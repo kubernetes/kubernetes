@@ -270,7 +270,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	invalidUIDPSP := validPSP()
 	invalidUIDPSP.Spec.RunAsUser.Rule = policy.RunAsUserStrategyMustRunAs
-	invalidUIDPSP.Spec.RunAsUser.Ranges = []policy.UserIDRange{{Min: -1, Max: 1}}
+	invalidUIDPSP.Spec.RunAsUser.Ranges = []policy.IDRange{{Min: -1, Max: 1}}
 
 	missingObjectMetaName := validPSP()
 	missingObjectMetaName.ObjectMeta.Name = ""
@@ -288,17 +288,17 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSupGroupStratType.Spec.SupplementalGroups.Rule = "invalid"
 
 	invalidRangeMinGreaterThanMax := validPSP()
-	invalidRangeMinGreaterThanMax.Spec.FSGroup.Ranges = []policy.GroupIDRange{
+	invalidRangeMinGreaterThanMax.Spec.FSGroup.Ranges = []policy.IDRange{
 		{Min: 2, Max: 1},
 	}
 
 	invalidRangeNegativeMin := validPSP()
-	invalidRangeNegativeMin.Spec.FSGroup.Ranges = []policy.GroupIDRange{
+	invalidRangeNegativeMin.Spec.FSGroup.Ranges = []policy.IDRange{
 		{Min: -1, Max: 10},
 	}
 
 	invalidRangeNegativeMax := validPSP()
-	invalidRangeNegativeMax.Spec.FSGroup.Ranges = []policy.GroupIDRange{
+	invalidRangeNegativeMax.Spec.FSGroup.Ranges = []policy.IDRange{
 		{Min: 1, Max: -10},
 	}
 
@@ -539,7 +539,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	mustRunAs.Spec.FSGroup.Rule = policy.FSGroupStrategyMustRunAs
 	mustRunAs.Spec.SupplementalGroups.Rule = policy.SupplementalGroupsStrategyMustRunAs
 	mustRunAs.Spec.RunAsUser.Rule = policy.RunAsUserStrategyMustRunAs
-	mustRunAs.Spec.RunAsUser.Ranges = []policy.UserIDRange{
+	mustRunAs.Spec.RunAsUser.Ranges = []policy.IDRange{
 		{Min: 1, Max: 1},
 	}
 	mustRunAs.Spec.SELinux.Rule = policy.SELinuxStrategyMustRunAs
@@ -733,8 +733,8 @@ func Test_validatePSPRunAsUser(t *testing.T) {
 		{"Invalid RunAsUserStrategy", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategy("someInvalidStrategy")}, true},
 		{"RunAsUserStrategyMustRunAs", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs}, false},
 		{"RunAsUserStrategyMustRunAsNonRoot", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAsNonRoot}, false},
-		{"RunAsUserStrategyMustRunAsNonRoot With Valid Range", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs, Ranges: []policy.UserIDRange{{Min: 2, Max: 3}, {Min: 4, Max: 5}}}, false},
-		{"RunAsUserStrategyMustRunAsNonRoot With Invalid Range", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs, Ranges: []policy.UserIDRange{{Min: 2, Max: 3}, {Min: 5, Max: 4}}}, true},
+		{"RunAsUserStrategyMustRunAsNonRoot With Valid Range", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs, Ranges: []policy.IDRange{{Min: 2, Max: 3}, {Min: 4, Max: 5}}}, false},
+		{"RunAsUserStrategyMustRunAsNonRoot With Invalid Range", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs, Ranges: []policy.IDRange{{Min: 2, Max: 3}, {Min: 5, Max: 4}}}, true},
 	}
 
 	for _, testCase := range testCases {

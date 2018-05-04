@@ -38,7 +38,7 @@ func TestNewMustRunAs(t *testing.T) {
 		},
 		"valid opts": {
 			opts: &policy.RunAsUserStrategyOptions{
-				Ranges: []policy.UserIDRange{
+				Ranges: []policy.IDRange{
 					{Min: 1, Max: 1},
 				},
 			},
@@ -58,7 +58,7 @@ func TestNewMustRunAs(t *testing.T) {
 
 func TestGenerate(t *testing.T) {
 	opts := &policy.RunAsUserStrategyOptions{
-		Ranges: []policy.UserIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
 		},
 	}
@@ -77,7 +77,7 @@ func TestGenerate(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	opts := &policy.RunAsUserStrategyOptions{
-		Ranges: []policy.UserIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
 			{Min: 10, Max: 20},
 		},

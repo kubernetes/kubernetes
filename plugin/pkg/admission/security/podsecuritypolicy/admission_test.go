@@ -324,11 +324,11 @@ func defaultPod(t *testing.T, pod *kapi.Pod) *kapi.Pod {
 func TestAdmitPreferNonmutating(t *testing.T) {
 	mutating1 := restrictivePSP()
 	mutating1.Name = "mutating1"
-	mutating1.Spec.RunAsUser.Ranges = []policy.UserIDRange{{Min: int64(1), Max: int64(1)}}
+	mutating1.Spec.RunAsUser.Ranges = []policy.IDRange{{Min: int64(1), Max: int64(1)}}
 
 	mutating2 := restrictivePSP()
 	mutating2.Name = "mutating2"
-	mutating2.Spec.RunAsUser.Ranges = []policy.UserIDRange{{Min: int64(2), Max: int64(2)}}
+	mutating2.Spec.RunAsUser.Ranges = []policy.IDRange{{Min: int64(2), Max: int64(2)}}
 
 	privilegedPSP := permissivePSP()
 	privilegedPSP.Name = "privileged"
@@ -1194,7 +1194,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 	mustRunAs := permissivePSP()
 	mustRunAs.Name = "mustRunAs"
 	mustRunAs.Spec.RunAsUser.Rule = policy.RunAsUserStrategyMustRunAs
-	mustRunAs.Spec.RunAsUser.Ranges = []policy.UserIDRange{
+	mustRunAs.Spec.RunAsUser.Ranges = []policy.IDRange{
 		{Min: int64(999), Max: int64(1000)},
 	}
 
@@ -1357,7 +1357,7 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 	mustRunAs := permissivePSP()
 	mustRunAs.Name = "mustRunAs"
 	mustRunAs.Spec.SupplementalGroups.Rule = policy.SupplementalGroupsStrategyMustRunAs
-	mustRunAs.Spec.SupplementalGroups.Ranges = []policy.GroupIDRange{{Min: int64(999), Max: int64(1000)}}
+	mustRunAs.Spec.SupplementalGroups.Ranges = []policy.IDRange{{Min: int64(999), Max: int64(1000)}}
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
@@ -2354,7 +2354,7 @@ func restrictivePSP() *policy.PodSecurityPolicy {
 		Spec: policy.PodSecurityPolicySpec{
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyMustRunAs,
-				Ranges: []policy.UserIDRange{
+				Ranges: []policy.IDRange{
 					{Min: int64(999), Max: int64(999)},
 				},
 			},
@@ -2366,13 +2366,13 @@ func restrictivePSP() *policy.PodSecurityPolicy {
 			},
 			FSGroup: policy.FSGroupStrategyOptions{
 				Rule: policy.FSGroupStrategyMustRunAs,
-				Ranges: []policy.GroupIDRange{
+				Ranges: []policy.IDRange{
 					{Min: int64(999), Max: int64(999)},
 				},
 			},
 			SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
 				Rule: policy.SupplementalGroupsStrategyMustRunAs,
-				Ranges: []policy.GroupIDRange{
+				Ranges: []policy.IDRange{
 					{Min: int64(999), Max: int64(999)},
 				},
 			},

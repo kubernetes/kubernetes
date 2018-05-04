@@ -186,7 +186,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	failSupplementalGroupPSP := defaultPSP()
 	failSupplementalGroupPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
 		Rule: policy.SupplementalGroupsStrategyMustRunAs,
-		Ranges: []policy.GroupIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
 		},
 	}
@@ -197,7 +197,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	failFSGroupPSP := defaultPSP()
 	failFSGroupPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
 		Rule: policy.FSGroupStrategyMustRunAs,
-		Ranges: []policy.GroupIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
 		},
 	}
@@ -409,7 +409,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	badUID := int64(1)
 	failUserPSP.Spec.RunAsUser = policy.RunAsUserStrategyOptions{
 		Rule:   policy.RunAsUserStrategyMustRunAs,
-		Ranges: []policy.UserIDRange{{Min: uid, Max: uid}},
+		Ranges: []policy.IDRange{{Min: uid, Max: uid}},
 	}
 	failUserPod := defaultPod()
 	failUserPod.Spec.Containers[0].SecurityContext.RunAsUser = &badUID
@@ -564,7 +564,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	supGroupPSP := defaultPSP()
 	supGroupPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
 		Rule: policy.SupplementalGroupsStrategyMustRunAs,
-		Ranges: []policy.GroupIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 5},
 		},
 	}
@@ -574,7 +574,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	fsGroupPSP := defaultPSP()
 	fsGroupPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
 		Rule: policy.FSGroupStrategyMustRunAs,
-		Ranges: []policy.GroupIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 5},
 		},
 	}
@@ -746,7 +746,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	uid := int64(999)
 	userPSP.Spec.RunAsUser = policy.RunAsUserStrategyOptions{
 		Rule:   policy.RunAsUserStrategyMustRunAs,
-		Ranges: []policy.UserIDRange{{Min: uid, Max: uid}},
+		Ranges: []policy.IDRange{{Min: uid, Max: uid}},
 	}
 	userPod := defaultPod()
 	userPod.Spec.Containers[0].SecurityContext.RunAsUser = &uid
