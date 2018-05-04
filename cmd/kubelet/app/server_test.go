@@ -40,6 +40,18 @@ func TestValueOfAllocatableResources(t *testing.T) {
 			name:           "invalid quantity unit",
 		},
 		{
+			kubeReserved:   map[string]string{"cpu": "200m", "memory": "15G"},
+			systemReserved: map[string]string{"cpu": "200m", "memory": "15m"},
+			errorExpected:  true,
+			name:           "invalid quantity unit (m) for memory",
+		},
+		{
+			kubeReserved:   map[string]string{"cpu": "200m", "memory": "15G"},
+			systemReserved: map[string]string{"cpu": "200m", "memory": "15k"},
+			errorExpected:  true,
+			name:           "invalid quantity unit (k) for memory",
+		},
+		{
 			kubeReserved:   map[string]string{"cpu": "200m", "memory": "15G", "ephemeral-storage": "10Gi"},
 			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ki"},
 			errorExpected:  false,
