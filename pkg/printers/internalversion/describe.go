@@ -192,23 +192,18 @@ func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (printers.De
 
 // GenericDescriberFor returns a generic describer for the specified mapping
 // that uses only information available from runtime.Unstructured
-func GenericDescriberFor(mapping *meta.RESTMapping, dynamic dynamic.Interface, events coreclient.EventsGetter) printers.Describer {
+func GenericDescriberFor(mapping *meta.RESTMapping, dynamic dynamic.DynamicInterface, events coreclient.EventsGetter) printers.Describer {
 	return &genericDescriber{mapping, dynamic, events}
 }
 
 type genericDescriber struct {
 	mapping *meta.RESTMapping
-	dynamic dynamic.Interface
+	dynamic dynamic.DynamicInterface
 	events  coreclient.EventsGetter
 }
 
 func (g *genericDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (output string, err error) {
-	apiResource := &metav1.APIResource{
-		Name:       g.mapping.Resource.Resource,
-		Namespaced: g.mapping.Scope.Name() == meta.RESTScopeNameNamespace,
-		Kind:       g.mapping.GroupVersionKind.Kind,
-	}
-	obj, err := g.dynamic.Resource(apiResource, namespace).Get(name, metav1.GetOptions{})
+	obj, err := g.dynamic.Resource(g.mapping.Resource).Namespace(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
