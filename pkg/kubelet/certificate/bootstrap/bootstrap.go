@@ -123,10 +123,7 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	}
 
 	// Marshal to disk
-	if err := clientcmd.WriteToFile(kubeconfigData, kubeconfigPath); err != nil {
-		return err
-	}
-	return nil
+	return clientcmd.WriteToFile(kubeconfigData, kubeconfigPath)
 }
 
 func loadRESTClientConfig(kubeconfig string) (*restclient.Config, error) {
