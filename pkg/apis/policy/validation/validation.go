@@ -325,12 +325,12 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 	return allErrs
 }
 
-func validateUserIDRange(fldPath *field.Path, rng policy.UserIDRange) field.ErrorList {
-	return validateIDRanges(fldPath, int64(rng.Min), int64(rng.Max))
+func validateUserIDRange(fldPath *field.Path, rng policy.IDRange) field.ErrorList {
+	return validateIDRanges(fldPath, rng.Min, rng.Max)
 }
 
-func validateGroupIDRange(fldPath *field.Path, rng policy.GroupIDRange) field.ErrorList {
-	return validateIDRanges(fldPath, int64(rng.Min), int64(rng.Max))
+func validateGroupIDRange(fldPath *field.Path, rng policy.IDRange) field.ErrorList {
+	return validateIDRanges(fldPath, rng.Min, rng.Max)
 }
 
 // validateIDRanges ensures the range is valid.
