@@ -11,7 +11,7 @@ Binaries required to provision container networking.
 
 %prep
 mkdir -p ./bin
-tar -C ./bin -xz -f cni-plugins-amd64-v0.6.0.tgz
+tar -C ./bin -xz -f {cni-plugins-amd64-v0.6.0.tgz}
 
 %install
 
