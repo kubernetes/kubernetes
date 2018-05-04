@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -220,15 +221,24 @@ func (options *CertificateOptions) modifyCertificateCondition(builder *resource.
 		if err != nil {
 			return err
 		}
-		csr := info.Object.(*certificates.CertificateSigningRequest)
-		csr, hasCondition := modify(csr)
-		if !hasCondition || force {
-			csr, err = clientSet.Certificates().
-				CertificateSigningRequests().
-				UpdateApproval(csr)
-			if err != nil {
-				return err
+		for i := 0; ; i++ {
+			csr := info.Object.(*certificates.CertificateSigningRequest)
+			csr, hasCondition := modify(csr)
+			if !hasCondition || force {
+				csr, err = clientSet.Certificates().
+					CertificateSigningRequests().
+					UpdateApproval(csr)
+				if errors.IsConflict(err) && i < 10 {
+					if err := info.Get(); err != nil {
+						return err
+					}
+					continue
+				}
+				if err != nil {
+					return err
+				}
 			}
+			break
 		}
 		found++
 
