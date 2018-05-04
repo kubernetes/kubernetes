@@ -268,7 +268,7 @@ func TestPrinter(t *testing.T) {
 		if err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
-		if printer.IsGeneric() && len(test.OutputVersions) > 0 {
+		if len(test.OutputVersions) > 0 {
 			printer = printers.NewVersionedPrinter(printer, legacyscheme.Scheme, legacyscheme.Scheme, test.OutputVersions...)
 		}
 		if err := printer.PrintObj(test.Input, buf); err != nil {
