@@ -251,3 +251,27 @@ func ValidArgList(f ClientAccessFactory) []string {
 
 	return validArgs
 }
+
+// AllResourceList returns list of all resource names discovered.
+func AllResourceList(f ClientAccessFactory) []string {
+	discoveryclient, err := f.DiscoveryClient()
+	if err != nil {
+		return []string{}
+	}
+
+	// Always request fresh data from the server
+	discoveryclient.Invalidate()
+
+	lists, err := discoveryclient.ServerPreferredResources()
+	if err != nil {
+		return []string{}
+	}
+
+	resources := []string{}
+	for _, list := range lists {
+		for _, resource := range list.APIResources {
+			resources = append(resources, resource.Name)
+		}
+	}
+	return resources
+}
