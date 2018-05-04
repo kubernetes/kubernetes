@@ -60,9 +60,6 @@ __kubectl_override_flags()
                     ;;
             esac
         done
-        if [ "${w}" == "--all-namespaces" ]; then
-            namespace="--all-namespaces"
-        fi
     done
     for var in "${__kubectl_override_flag_list[@]##*-}"; do
         if eval "test -n \"\$${var}\""; then
