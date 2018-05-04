@@ -34,7 +34,9 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -43,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -419,17 +422,55 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevision)
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevisionList)
 
+	// Addding known resources beforehand - cf: pkg/printers/humanreadable.go.
+	h.TableHandler(objectMetaColumnDefinitions, printAPIService)
+	h.TableHandler(objectMetaColumnDefinitions, printPodPreset)
+	h.TableHandler(objectMetaColumnDefinitions, printCustomResourceDefinition)
+	h.TableHandler(objectMetaColumnDefinitions, printResourceQuota)
+	h.TableHandler(objectMetaColumnDefinitions, printLimitRange)
+	h.TableHandler(objectMetaColumnDefinitions, printClusterRole)
+	h.TableHandler(objectMetaColumnDefinitions, printRole)
+
 	AddDefaultHandlers(h)
+}
+
+// types without defined columns
+var objectMetaColumnDefinitions = []metav1beta1.TableColumnDefinition{
+	{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+	{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 }
 
 // AddDefaultHandlers adds handlers that can work with most Kubernetes objects.
 func AddDefaultHandlers(h printers.PrintHandler) {
-	// types without defined columns
-	objectMetaColumnDefinitions := []metav1beta1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-	}
 	h.DefaultTableHandler(objectMetaColumnDefinitions, printObjectMeta)
+}
+
+func printAPIService(obj *apiregistration.APIService, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	return printObjectMeta(obj, options)
+}
+
+func printPodPreset(obj *settingsv1alpha1.PodPreset, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	return printObjectMeta(obj, options)
+}
+
+func printCustomResourceDefinition(obj *apiext.CustomResourceDefinition, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	return printObjectMeta(obj, options)
+}
+
+func printResourceQuota(obj *api.ResourceQuota, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	return printObjectMeta(obj, options)
+}
+
+func printLimitRange(obj *api.LimitRange, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	return printObjectMeta(obj, options)
+}
+
+func printClusterRole(obj *rbac.ClusterRole, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	return printObjectMeta(obj, options)
+}
+
+func printRole(obj *rbac.Role, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	return printObjectMeta(obj, options)
 }
 
 func printObjectMeta(obj runtime.Object, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
