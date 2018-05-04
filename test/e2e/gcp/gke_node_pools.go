@@ -14,18 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package gcp
 
 import (
 	"fmt"
-	"os/exec"
-
-	"k8s.io/kubernetes/test/e2e/framework"
-
 	. "github.com/onsi/ginkgo"
+	"k8s.io/kubernetes/test/e2e/framework"
+	"os/exec"
 )
 
-var _ = framework.KubeDescribe("GKE node pools [Feature:GKENodePool]", func() {
+var _ = SIGDescribe("GKE node pools [Feature:GKENodePool]", func() {
 
 	f := framework.NewDefaultFramework("node-pools")
 
