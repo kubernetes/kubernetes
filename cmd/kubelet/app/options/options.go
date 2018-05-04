@@ -196,7 +196,7 @@ type KubeletFlags struct {
 	// enable gathering custom metrics.
 	EnableCustomMetrics bool
 	// allowPrivileged enables containers to request privileged mode.
-	// Defaults to false.
+	// Defaults to true.
 	AllowPrivileged bool
 	// hostNetworkSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use of host network. Defaults to "*". Valid
@@ -244,6 +244,8 @@ func NewKubeletFlags() *KubeletFlags {
 		HostIPCSources:      []string{kubetypes.AllSource},
 		// TODO(#56523): default CAdvisorPort to 0 (disabled) and deprecate it
 		CAdvisorPort: 4194,
+		// TODO(#58010:v1.13.0): Remove --allow-privileged, it is deprecated
+		AllowPrivileged: true,
 	}
 }
 
@@ -416,8 +418,8 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
 	fs.BoolVar(&f.EnableCustomMetrics, "enable-custom-metrics", f.EnableCustomMetrics, "Support for gathering custom metrics.")
 	fs.MarkDeprecated("enable-custom-metrics", "will be removed in a future version")
-	// TODO(#58010:v1.12.0): Remove --allow-privileged, it is deprecated
-	fs.BoolVar(&f.AllowPrivileged, "allow-privileged", f.AllowPrivileged, "If true, allow containers to request privileged mode.")
+	// TODO(#58010:v1.13.0): Remove --allow-privileged, it is deprecated
+	fs.BoolVar(&f.AllowPrivileged, "allow-privileged", f.AllowPrivileged, "If true, allow containers to request privileged mode. Default: true")
 	fs.MarkDeprecated("allow-privileged", "will be removed in a future version")
 	// TODO(#58010:v1.12.0): Remove --host-network-sources, it is deprecated
 	fs.StringSliceVar(&f.HostNetworkSources, "host-network-sources", f.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network.")
