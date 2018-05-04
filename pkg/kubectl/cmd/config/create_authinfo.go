@@ -35,16 +35,18 @@ import (
 )
 
 type createAuthInfoOptions struct {
-	configAccess      clientcmd.ConfigAccess
-	name              string
-	authPath          flag.StringFlag
-	clientCertificate flag.StringFlag
-	clientKey         flag.StringFlag
-	token             flag.StringFlag
-	username          flag.StringFlag
-	password          flag.StringFlag
-	embedCertData     flag.Tristate
-	authProvider      flag.StringFlag
+	configAccess          clientcmd.ConfigAccess
+	name                  string
+	authPath              flag.StringFlag
+	clientCertificate     flag.StringFlag
+	clientCertificateData flag.StringFlag
+	clientKey             flag.StringFlag
+	clientKeyData         flag.StringFlag
+	token                 flag.StringFlag
+	username              flag.StringFlag
+	password              flag.StringFlag
+	embedCertData         flag.Tristate
+	authProvider          flag.StringFlag
 
 	authProviderArgs         map[string]string
 	authProviderArgsToRemove []string
@@ -64,13 +66,17 @@ var (
 		    Client-certificate flags:
 		    --%v=certfile --%v=keyfile
 
+		    Client-certificate-data flags:
+		    --%v=certdata --%v=keydata
+
 		    Bearer token flags:
 			  --%v=bearer_token
 
 		    Basic auth flags:
 			  --%v=basic_user --%v=basic_password
 
-		Bearer token and basic auth are mutually exclusive.`), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
+		Client-certificate and client-certificate-data are mutually exclusive.
+		Bearer token and basic auth are mutually exclusive.`), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagCertData, clientcmd.FlagKeyData, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
 
 	create_authinfo_example = templates.Examples(`
 		# Set only the "client-key" field on the "cluster-admin"
@@ -100,7 +106,7 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess)
 
 func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: fmt.Sprintf("set-credentials NAME [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password] [--%v=provider_name] [--%v=key=value]", clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword, flagAuthProvider, flagAuthProviderArg),
+		Use: fmt.Sprintf("set-credentials NAME [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=certdata] [--%v=keydata] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password] [--%v=provider_name] [--%v=key=value]", clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagCertData, clientcmd.FlagKeyData, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword, flagAuthProvider, flagAuthProviderArg),
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Sets a user entry in kubeconfig"),
 		Long:    create_authinfo_long,
@@ -120,6 +126,8 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 	cmd.MarkFlagFilename(clientcmd.FlagCertFile)
 	cmd.Flags().Var(&options.clientKey, clientcmd.FlagKeyFile, "Path to "+clientcmd.FlagKeyFile+" file for the user entry in kubeconfig")
 	cmd.MarkFlagFilename(clientcmd.FlagKeyFile)
+	cmd.Flags().Var(&options.clientCertificateData, clientcmd.FlagCertData, clientcmd.FlagCertData+" data for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.clientKeyData, clientcmd.FlagKeyData, clientcmd.FlagKeyData+" data for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.token, clientcmd.FlagBearerToken, clientcmd.FlagBearerToken+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
@@ -188,7 +196,12 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 			}
 		}
 	}
-
+	if o.clientCertificateData.Provided() {
+		modifiedAuthInfo.ClientCertificateData = []byte(o.clientCertificateData.Value())
+	}
+	if o.clientKeyData.Provided() {
+		modifiedAuthInfo.ClientKeyData = []byte(o.clientKeyData.Value())
+	}
 	if o.token.Provided() {
 		modifiedAuthInfo.Token = o.token.Value()
 		setToken = len(modifiedAuthInfo.Token) > 0

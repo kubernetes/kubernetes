@@ -148,6 +148,8 @@ const (
 	FlagInsecure         = "insecure-skip-tls-verify"
 	FlagCertFile         = "client-certificate"
 	FlagKeyFile          = "client-key"
+	FlagCertData         = "client-certificate-data"
+	FlagKeyData          = "client-key-data"
 	FlagCAFile           = "certificate-authority"
 	FlagEmbedCerts       = "embed-certs"
 	FlagBearerToken      = "token"
