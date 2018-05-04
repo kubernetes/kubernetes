@@ -239,15 +239,3 @@ func maybeWrapSortingPrinter(printer printers.ResourcePrinter, printOpts printer
 func SuggestApiResources(parent string) string {
 	return templates.LongDesc(fmt.Sprintf("Use \"%s api-resources\" for a complete list of supported resources.", parent))
 }
-
-// Retrieve a list of handled resources from printer as valid args
-// TODO: This function implementation should be replaced with a real implementation from the discovery service.
-func ValidArgList(f ClientAccessFactory) []string {
-	validArgs := []string{}
-
-	humanReadablePrinter := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
-	printersinternal.AddHandlers(humanReadablePrinter)
-	validArgs = humanReadablePrinter.HandledResources()
-
-	return validArgs
-}
