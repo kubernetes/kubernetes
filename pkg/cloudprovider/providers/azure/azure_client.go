@@ -41,45 +41,6 @@ func createARMRateLimitErr(isWrite bool, opName string) error {
 	return fmt.Errorf("azure - ARM rate limited(%s) for operation:%s", opType, opName)
 }
 
-func createARMRateLimitErrChannel(isWrite bool, opName string) chan error {
-	err := createARMRateLimitErr(isWrite, opName)
-	errChan := make(chan error, 1)
-	errChan <- err
-	return errChan
-}
-
-// LoadBalancerListResultPage is for faking.
-type LoadBalancerListResultPage interface {
-	Next() error
-	NotDone() bool
-	Response() network.LoadBalancerListResult
-	Values() []network.LoadBalancer
-}
-
-// PublicIPAddressListResultPage is for faking.
-type PublicIPAddressListResultPage interface {
-	Next() error
-	NotDone() bool
-	Response() network.PublicIPAddressListResult
-	Values() []network.PublicIPAddress
-}
-
-// SecurityGroupListResultPage is for faking.
-type SecurityGroupListResultPage interface {
-	Next() error
-	NotDone() bool
-	Response() network.SecurityGroupListResult
-	Values() []network.SecurityGroup
-}
-
-// SubnetListResultPage is for faking.
-type SubnetListResultPage interface {
-	Next() error
-	NotDone() bool
-	Response() network.SubnetListResult
-	Values() []network.Subnet
-}
-
 // VirtualMachinesClient defines needed functions for azure compute.VirtualMachinesClient
 type VirtualMachinesClient interface {
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachine) (resp *http.Response, err error)
@@ -89,9 +50,9 @@ type VirtualMachinesClient interface {
 
 // InterfacesClient defines needed functions for azure network.InterfacesClient
 type InterfacesClient interface {
-	CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error)
-	Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error)
-	GetVirtualMachineScaleSetNetworkInterface(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, networkInterfaceName string, parameters network.Interface) (resp *http.Response, err error)
+	Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error)
+	GetVirtualMachineScaleSetNetworkInterface(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error)
 }
 
 // LoadBalancersClient defines needed functions for azure network.LoadBalancersClient
@@ -112,18 +73,18 @@ type PublicIPAddressesClient interface {
 
 // SubnetsClient defines needed functions for azure network.SubnetsClient
 type SubnetsClient interface {
-	CreateOrUpdate(resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet, cancel <-chan struct{}) (<-chan network.Subnet, <-chan error)
-	Delete(resourceGroupName string, virtualNetworkName string, subnetName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error)
-	List(resourceGroupName string, virtualNetworkName string) (result SubnetListResultPage, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet) (resp *http.Response, err error)
+	Delete(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string) (resp *http.Response, err error)
+	Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error)
+	List(ctx context.Context, resourceGroupName string, virtualNetworkName string) (result []network.Subnet, err error)
 }
 
 // SecurityGroupsClient defines needed functions for azure network.SecurityGroupsClient
 type SecurityGroupsClient interface {
-	CreateOrUpdate(resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, cancel <-chan struct{}) (<-chan network.SecurityGroup, <-chan error)
-	Delete(resourceGroupName string, networkSecurityGroupName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error)
-	List(resourceGroupName string) (result SecurityGroupListResultPage, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup) (resp *http.Response, err error)
+	Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (resp *http.Response, err error)
+	Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error)
+	List(ctx context.Context, resourceGroupName string) (result []network.SecurityGroup, err error)
 }
 
 // VirtualMachineScaleSetsClient defines needed functions for azure compute.VirtualMachineScaleSetsClient
@@ -144,14 +105,14 @@ type VirtualMachineScaleSetVMsClient interface {
 
 // RoutesClient defines needed functions for azure network.RoutesClient
 type RoutesClient interface {
-	CreateOrUpdate(resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, cancel <-chan struct{}) (<-chan network.Route, <-chan error)
-	Delete(resourceGroupName string, routeTableName string, routeName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route) (resp *http.Response, err error)
+	Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (resp *http.Response, err error)
 }
 
 // RouteTablesClient defines needed functions for azure network.RouteTablesClient
 type RouteTablesClient interface {
-	CreateOrUpdate(resourceGroupName string, routeTableName string, parameters network.RouteTable, cancel <-chan struct{}) (<-chan network.RouteTable, <-chan error)
-	Get(resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable) (resp *http.Response, err error)
+	Get(ctx context.Context, resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error)
 }
 
 // StorageAccountClient defines needed functions for azure storage.AccountsClient
@@ -297,13 +258,11 @@ func newAzInterfacesClient(config *azClientConfig) *azInterfacesClient {
 	}
 }
 
-func (az *azInterfacesClient) CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error) {
+func (az *azInterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkInterfaceName string, parameters network.Interface) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "NiCreateOrUpdate")
-		resultChan := make(chan network.Interface, 1)
-		resultChan <- network.Interface{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "NiCreateOrUpdate")
+		return
 	}
 
 	glog.V(10).Infof("azInterfacesClient.CreateOrUpdate(%q,%q): start", resourceGroupName, networkInterfaceName)
@@ -311,31 +270,19 @@ func (az *azInterfacesClient) CreateOrUpdate(resourceGroupName string, networkIn
 		glog.V(10).Infof("azInterfacesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, networkInterfaceName)
 	}()
 
-	ctx := context.TODO()
-	errChan := make(chan error, 1)
-	resultChan := make(chan network.Interface, 1)
 	mc := newMetricContext("interfaces", "create_or_update", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, networkInterfaceName, parameters)
 	if err != nil {
 		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		errChan <- err
-		resultChan <- result
-	}()
 
-	return resultChan, errChan
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azInterfacesClient) Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error) {
+func (az *azInterfacesClient) Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error) {
 	if !az.rateLimiterReader.TryAccept() {
 		err = createARMRateLimitErr(false, "NicGet")
 		return
@@ -347,12 +294,12 @@ func (az *azInterfacesClient) Get(resourceGroupName string, networkInterfaceName
 	}()
 
 	mc := newMetricContext("interfaces", "get", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.Get(context.TODO(), resourceGroupName, networkInterfaceName, expand)
+	result, err = az.client.Get(ctx, resourceGroupName, networkInterfaceName, expand)
 	mc.Observe(err)
 	return
 }
 
-func (az *azInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
+func (az *azInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
 	if !az.rateLimiterReader.TryAccept() {
 		err = createARMRateLimitErr(false, "NicGetVirtualMachineScaleSetNetworkInterface")
 		return
@@ -364,7 +311,7 @@ func (az *azInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(resource
 	}()
 
 	mc := newMetricContext("interfaces", "get_vmss_ni", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.GetVirtualMachineScaleSetNetworkInterface(context.TODO(), resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
+	result, err = az.client.GetVirtualMachineScaleSetNetworkInterface(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
 	mc.Observe(err)
 	return
 }
@@ -621,13 +568,11 @@ func newAzSubnetsClient(config *azClientConfig) *azSubnetsClient {
 	}
 }
 
-func (az *azSubnetsClient) CreateOrUpdate(resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet, cancel <-chan struct{}) (<-chan network.Subnet, <-chan error) {
+func (az *azSubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "SubnetCreateOrUpdate")
-		resultChan := make(chan network.Subnet, 1)
-		resultChan <- network.Subnet{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "SubnetCreateOrUpdate")
+		return
 	}
 
 	glog.V(10).Infof("azSubnetsClient.CreateOrUpdate(%q,%q,%q): start", resourceGroupName, virtualNetworkName, subnetName)
@@ -635,37 +580,23 @@ func (az *azSubnetsClient) CreateOrUpdate(resourceGroupName string, virtualNetwo
 		glog.V(10).Infof("azSubnetsClient.CreateOrUpdate(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
 	}()
 
-	ctx := context.TODO()
-	resultChan := make(chan network.Subnet, 1)
-	errChan := make(chan error, 1)
 	mc := newMetricContext("subnets", "create_or_update", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, virtualNetworkName, subnetName, subnetParameters)
 	if err != nil {
 		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azSubnetsClient) Delete(resourceGroupName string, virtualNetworkName string, subnetName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (az *azSubnetsClient) Delete(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "SubnetDelete")
-		resultChan := make(chan autorest.Response, 1)
-		resultChan <- autorest.Response{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "SubnetDelete")
+		return
 	}
 
 	glog.V(10).Infof("azSubnetsClient.Delete(%q,%q,%q): start", resourceGroupName, virtualNetworkName, subnetName)
@@ -673,31 +604,19 @@ func (az *azSubnetsClient) Delete(resourceGroupName string, virtualNetworkName s
 		glog.V(10).Infof("azSubnetsClient.Delete(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
 	}()
 
-	ctx := context.TODO()
-	resultChan := make(chan autorest.Response, 1)
-	errChan := make(chan error, 1)
 	mc := newMetricContext("subnets", "delete", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.Delete(ctx, resourceGroupName, virtualNetworkName, subnetName)
 	if err != nil {
 		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azSubnetsClient) Get(resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error) {
+func (az *azSubnetsClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error) {
 	if !az.rateLimiterReader.TryAccept() {
 		err = createARMRateLimitErr(false, "SubnetGet")
 		return
@@ -709,13 +628,12 @@ func (az *azSubnetsClient) Get(resourceGroupName string, virtualNetworkName stri
 	}()
 
 	mc := newMetricContext("subnets", "get", resourceGroupName, az.client.SubscriptionID)
-	ctx := context.TODO()
 	result, err = az.client.Get(ctx, resourceGroupName, virtualNetworkName, subnetName, expand)
 	mc.Observe(err)
 	return
 }
 
-func (az *azSubnetsClient) List(resourceGroupName string, virtualNetworkName string) (SubnetListResultPage, error) {
+func (az *azSubnetsClient) List(ctx context.Context, resourceGroupName string, virtualNetworkName string) ([]network.Subnet, error) {
 	if !az.rateLimiterReader.TryAccept() {
 		return nil, createARMRateLimitErr(false, "SubnetList")
 	}
@@ -726,10 +644,22 @@ func (az *azSubnetsClient) List(resourceGroupName string, virtualNetworkName str
 	}()
 
 	mc := newMetricContext("subnets", "list", resourceGroupName, az.client.SubscriptionID)
-	ctx := context.TODO()
-	result, err := az.client.List(ctx, resourceGroupName, virtualNetworkName)
-	mc.Observe(err)
-	return &result, err
+	iterator, err := az.client.ListComplete(ctx, resourceGroupName, virtualNetworkName)
+	if err != nil {
+		mc.Observe(err)
+		return nil, err
+	}
+
+	result := make([]network.Subnet, 0)
+	for ; iterator.NotDone(); err = iterator.Next() {
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, iterator.Value())
+	}
+
+	return result, nil
 }
 
 // azSecurityGroupsClient implements SecurityGroupsClient.
@@ -753,13 +683,11 @@ func newAzSecurityGroupsClient(config *azClientConfig) *azSecurityGroupsClient {
 	}
 }
 
-func (az *azSecurityGroupsClient) CreateOrUpdate(resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, cancel <-chan struct{}) (<-chan network.SecurityGroup, <-chan error) {
+func (az *azSecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "NSGCreateOrUpdate")
-		resultChan := make(chan network.SecurityGroup, 1)
-		resultChan <- network.SecurityGroup{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "NSGCreateOrUpdate")
+		return
 	}
 
 	glog.V(10).Infof("azSecurityGroupsClient.CreateOrUpdate(%q,%q): start", resourceGroupName, networkSecurityGroupName)
@@ -767,37 +695,23 @@ func (az *azSecurityGroupsClient) CreateOrUpdate(resourceGroupName string, netwo
 		glog.V(10).Infof("azSecurityGroupsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, networkSecurityGroupName)
 	}()
 
-	ctx := context.TODO()
-	resultChan := make(chan network.SecurityGroup, 1)
-	errChan := make(chan error, 1)
 	mc := newMetricContext("security_groups", "create_or_update", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, networkSecurityGroupName, parameters)
 	if err != nil {
 		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azSecurityGroupsClient) Delete(resourceGroupName string, networkSecurityGroupName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (az *azSecurityGroupsClient) Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "NSGDelete")
-		resultChan := make(chan autorest.Response, 1)
-		resultChan <- autorest.Response{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "NSGDelete")
+		return
 	}
 
 	glog.V(10).Infof("azSecurityGroupsClient.Delete(%q,%q): start", resourceGroupName, networkSecurityGroupName)
@@ -805,31 +719,19 @@ func (az *azSecurityGroupsClient) Delete(resourceGroupName string, networkSecuri
 		glog.V(10).Infof("azSecurityGroupsClient.Delete(%q,%q): end", resourceGroupName, networkSecurityGroupName)
 	}()
 
-	ctx := context.TODO()
-	resultChan := make(chan autorest.Response, 1)
-	errChan := make(chan error, 1)
 	mc := newMetricContext("security_groups", "delete", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.Delete(ctx, resourceGroupName, networkSecurityGroupName)
 	if err != nil {
 		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azSecurityGroupsClient) Get(resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error) {
+func (az *azSecurityGroupsClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error) {
 	if !az.rateLimiterReader.TryAccept() {
 		err = createARMRateLimitErr(false, "NSGGet")
 		return
@@ -841,13 +743,12 @@ func (az *azSecurityGroupsClient) Get(resourceGroupName string, networkSecurityG
 	}()
 
 	mc := newMetricContext("security_groups", "get", resourceGroupName, az.client.SubscriptionID)
-	ctx := context.TODO()
 	result, err = az.client.Get(ctx, resourceGroupName, networkSecurityGroupName, expand)
 	mc.Observe(err)
 	return
 }
 
-func (az *azSecurityGroupsClient) List(resourceGroupName string) (SecurityGroupListResultPage, error) {
+func (az *azSecurityGroupsClient) List(ctx context.Context, resourceGroupName string) ([]network.SecurityGroup, error) {
 	if !az.rateLimiterReader.TryAccept() {
 		return nil, createARMRateLimitErr(false, "NSGList")
 	}
@@ -858,10 +759,22 @@ func (az *azSecurityGroupsClient) List(resourceGroupName string) (SecurityGroupL
 	}()
 
 	mc := newMetricContext("security_groups", "list", resourceGroupName, az.client.SubscriptionID)
-	ctx := context.TODO()
-	result, err := az.client.List(ctx, resourceGroupName)
+	iterator, err := az.client.ListComplete(ctx, resourceGroupName)
 	mc.Observe(err)
-	return &result, err
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]network.SecurityGroup, 0)
+	for ; iterator.NotDone(); err = iterator.Next() {
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, iterator.Value())
+	}
+
+	return result, nil
 }
 
 // azVirtualMachineScaleSetsClient implements VirtualMachineScaleSetsClient.
@@ -1109,13 +1022,11 @@ func newAzRoutesClient(config *azClientConfig) *azRoutesClient {
 	}
 }
 
-func (az *azRoutesClient) CreateOrUpdate(resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, cancel <-chan struct{}) (<-chan network.Route, <-chan error) {
+func (az *azRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "RouteCreateOrUpdate")
-		resultChan := make(chan network.Route, 1)
-		resultChan <- network.Route{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "RouteCreateOrUpdate")
+		return
 	}
 
 	glog.V(10).Infof("azRoutesClient.CreateOrUpdate(%q,%q,%q): start", resourceGroupName, routeTableName, routeName)
@@ -1123,37 +1034,23 @@ func (az *azRoutesClient) CreateOrUpdate(resourceGroupName string, routeTableNam
 		glog.V(10).Infof("azRoutesClient.CreateOrUpdate(%q,%q,%q): end", resourceGroupName, routeTableName, routeName)
 	}()
 
-	ctx := context.TODO()
-	resultChan := make(chan network.Route, 1)
-	errChan := make(chan error, 1)
 	mc := newMetricContext("routes", "create_or_update", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, routeTableName, routeName, routeParameters)
 	if err != nil {
 		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azRoutesClient) Delete(resourceGroupName string, routeTableName string, routeName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error) {
+func (az *azRoutesClient) Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "RouteDelete")
-		resultChan := make(chan autorest.Response, 1)
-		resultChan <- autorest.Response{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "RouteDelete")
+		return
 	}
 
 	glog.V(10).Infof("azRoutesClient.Delete(%q,%q,%q): start", resourceGroupName, routeTableName, routeName)
@@ -1161,28 +1058,16 @@ func (az *azRoutesClient) Delete(resourceGroupName string, routeTableName string
 		glog.V(10).Infof("azRoutesClient.Delete(%q,%q,%q): end", resourceGroupName, routeTableName, routeName)
 	}()
 
-	ctx := context.TODO()
-	resultChan := make(chan autorest.Response, 1)
-	errChan := make(chan error, 1)
 	mc := newMetricContext("routes", "delete", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.Delete(ctx, resourceGroupName, routeTableName, routeName)
 	if err != nil {
 		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
 // azRouteTablesClient implements RouteTablesClient.
@@ -1206,13 +1091,11 @@ func newAzRouteTablesClient(config *azClientConfig) *azRouteTablesClient {
 	}
 }
 
-func (az *azRouteTablesClient) CreateOrUpdate(resourceGroupName string, routeTableName string, parameters network.RouteTable, cancel <-chan struct{}) (<-chan network.RouteTable, <-chan error) {
+func (az *azRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		errChan := createARMRateLimitErrChannel(true, "RouteTableCreateOrUpdate")
-		resultChan := make(chan network.RouteTable, 1)
-		resultChan <- network.RouteTable{}
-		return resultChan, errChan
+		err = createARMRateLimitErr(true, "RouteTableCreateOrUpdate")
+		return
 	}
 
 	glog.V(10).Infof("azRouteTablesClient.CreateOrUpdate(%q,%q): start", resourceGroupName, routeTableName)
@@ -1220,31 +1103,19 @@ func (az *azRouteTablesClient) CreateOrUpdate(resourceGroupName string, routeTab
 		glog.V(10).Infof("azRouteTablesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, routeTableName)
 	}()
 
-	ctx := context.TODO()
-	resultChan := make(chan network.RouteTable, 1)
-	errChan := make(chan error, 1)
 	mc := newMetricContext("route_tables", "create_or_update", resourceGroupName, az.client.SubscriptionID)
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, routeTableName, parameters)
+	mc.Observe(err)
 	if err != nil {
-		mc.Observe(err)
-		errChan <- err
-		return resultChan, errChan
+		return future.Response(), err
 	}
-	go func() {
-		if err := future.WaitForCompletion(ctx, az.client.Client); err != nil {
-			mc.Observe(err)
-			errChan <- err
-			return
-		}
-		result, err := future.Result(az.client)
-		mc.Observe(err)
-		errChan <- err
-		resultChan <- result
-	}()
-	return resultChan, errChan
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azRouteTablesClient) Get(resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
+func (az *azRouteTablesClient) Get(ctx context.Context, resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
 	if !az.rateLimiterReader.TryAccept() {
 		err = createARMRateLimitErr(false, "GetRouteTable")
 		return
@@ -1256,7 +1127,6 @@ func (az *azRouteTablesClient) Get(resourceGroupName string, routeTableName stri
 	}()
 
 	mc := newMetricContext("route_tables", "get", resourceGroupName, az.client.SubscriptionID)
-	ctx := context.TODO()
 	result, err = az.client.Get(ctx, resourceGroupName, routeTableName, expand)
 	mc.Observe(err)
 	return
