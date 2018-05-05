@@ -23,8 +23,8 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	core_v1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -156,6 +156,7 @@ func autoConvert_v1alpha1_HostPathMount_To_kubeadm_HostPathMount(in *HostPathMou
 	out.HostPath = in.HostPath
 	out.MountPath = in.MountPath
 	out.Writable = in.Writable
+	out.PathType = v1.HostPathType(in.PathType)
 	return nil
 }
 
@@ -169,6 +170,7 @@ func autoConvert_kubeadm_HostPathMount_To_v1alpha1_HostPathMount(in *kubeadm.Hos
 	out.HostPath = in.HostPath
 	out.MountPath = in.MountPath
 	out.Writable = in.Writable
+	out.PathType = v1.HostPathType(in.PathType)
 	return nil
 }
 
@@ -240,7 +242,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.NoTaintMaster = in.NoTaintMaster
 	out.PrivilegedPods = in.PrivilegedPods
 	out.Token = in.Token
-	out.TokenTTL = (*v1.Duration)(unsafe.Pointer(in.TokenTTL))
+	out.TokenTTL = (*meta_v1.Duration)(unsafe.Pointer(in.TokenTTL))
 	out.TokenUsages = *(*[]string)(unsafe.Pointer(&in.TokenUsages))
 	out.TokenGroups = *(*[]string)(unsafe.Pointer(&in.TokenGroups))
 	out.CRISocket = in.CRISocket
@@ -253,7 +255,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.APIServerCertSANs))
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
-	out.ImagePullPolicy = core_v1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
 	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
 	if err := Convert_v1alpha1_AuditPolicyConfiguration_To_kubeadm_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
 		return err
@@ -291,7 +293,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.NoTaintMaster = in.NoTaintMaster
 	out.PrivilegedPods = in.PrivilegedPods
 	out.Token = in.Token
-	out.TokenTTL = (*v1.Duration)(unsafe.Pointer(in.TokenTTL))
+	out.TokenTTL = (*meta_v1.Duration)(unsafe.Pointer(in.TokenTTL))
 	out.TokenUsages = *(*[]string)(unsafe.Pointer(&in.TokenUsages))
 	out.TokenGroups = *(*[]string)(unsafe.Pointer(&in.TokenGroups))
 	out.CRISocket = in.CRISocket
@@ -303,7 +305,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.SchedulerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.SchedulerExtraVolumes))
 	out.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.APIServerCertSANs))
 	out.CertificatesDir = in.CertificatesDir
-	out.ImagePullPolicy = core_v1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
 	out.ImageRepository = in.ImageRepository
 	// INFO: in.CIImageRepository opted out of conversion generation
 	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
@@ -349,7 +351,7 @@ func autoConvert_v1alpha1_NodeConfiguration_To_kubeadm_NodeConfiguration(in *Nod
 	out.DiscoveryFile = in.DiscoveryFile
 	out.DiscoveryToken = in.DiscoveryToken
 	out.DiscoveryTokenAPIServers = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenAPIServers))
-	out.DiscoveryTimeout = (*v1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
+	out.DiscoveryTimeout = (*meta_v1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
 	out.NodeName = in.NodeName
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
@@ -371,7 +373,7 @@ func autoConvert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in *kub
 	out.DiscoveryFile = in.DiscoveryFile
 	out.DiscoveryToken = in.DiscoveryToken
 	out.DiscoveryTokenAPIServers = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenAPIServers))
-	out.DiscoveryTimeout = (*v1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
+	out.DiscoveryTimeout = (*meta_v1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
 	out.NodeName = in.NodeName
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token

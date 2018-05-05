@@ -301,7 +301,7 @@ type HostPathMount struct {
 	// Writable controls write access to the volume
 	Writable bool
 	// PathType is the type of the HostPath.
-	PathType string
+	PathType v1.HostPathType
 }
 
 // KubeProxy contains elements describing the proxy configuration.
