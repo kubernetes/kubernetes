@@ -24,6 +24,7 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/validate"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -168,10 +169,10 @@ func ValidateDaemonSetUpdateStrategy(strategy *extensions.DaemonSetUpdateStrateg
 // ValidateDaemonSetName can be used to check whether the given daemon set name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateDaemonSetName = apivalidation.NameIsDNSSubdomain
+var ValidateDaemonSetName = apimachineryvalidation.NameIsDNSSubdomain
 
 // Validates that the given name can be used as a deployment name.
-var ValidateDeploymentName = apivalidation.NameIsDNSSubdomain
+var ValidateDeploymentName = apimachineryvalidation.NameIsDNSSubdomain
 
 func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -368,7 +369,7 @@ func ValidateIngress(ingress *extensions.Ingress) field.ErrorList {
 }
 
 // ValidateIngressName validates that the given name can be used as an Ingress name.
-var ValidateIngressName = apivalidation.NameIsDNSSubdomain
+var ValidateIngressName = apimachineryvalidation.NameIsDNSSubdomain
 
 func validateIngressTLS(spec *extensions.IngressSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -507,7 +508,7 @@ func validateIngressBackend(backend *extensions.IngressBackend, fldPath *field.P
 // name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateReplicaSetName = apivalidation.NameIsDNSSubdomain
+var ValidateReplicaSetName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateReplicaSet tests if required fields in the ReplicaSet are set.
 func ValidateReplicaSet(rs *extensions.ReplicaSet) field.ErrorList {
