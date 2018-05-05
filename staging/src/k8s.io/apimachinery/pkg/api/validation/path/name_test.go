@@ -21,104 +21,57 @@ import (
 	"testing"
 )
 
-func TestValidatePathSegmentName(t *testing.T) {
+func TestIsValidPathSegmentName(t *testing.T) {
 	testcases := map[string]struct {
 		Name        string
-		Prefix      bool
 		ExpectedMsg string
 	}{
 		"empty": {
 			Name:        "",
-			Prefix:      false,
 			ExpectedMsg: "",
 		},
-		"empty,prefix": {
-			Name:        "",
-			Prefix:      true,
-			ExpectedMsg: "",
-		},
-
 		"valid": {
 			Name:        "foo.bar.baz",
-			Prefix:      false,
 			ExpectedMsg: "",
 		},
-		"valid,prefix": {
-			Name:        "foo.bar.baz",
-			Prefix:      true,
-			ExpectedMsg: "",
-		},
-
 		// Make sure mixed case, non DNS subdomain characters are tolerated
 		"valid complex": {
 			Name:        "sha256:ABCDEF012345@ABCDEF012345",
-			Prefix:      false,
 			ExpectedMsg: "",
 		},
 		// Make sure non-ascii characters are tolerated
 		"valid extended charset": {
 			Name:        "Iñtërnâtiônàlizætiøn",
-			Prefix:      false,
 			ExpectedMsg: "",
 		},
-
 		"dot": {
 			Name:        ".",
-			Prefix:      false,
 			ExpectedMsg: ".",
 		},
 		"dot leading": {
 			Name:        ".test",
-			Prefix:      false,
 			ExpectedMsg: "",
 		},
-		"dot,prefix": {
-			Name:        ".",
-			Prefix:      true,
-			ExpectedMsg: "",
-		},
-
 		"dot dot": {
 			Name:        "..",
-			Prefix:      false,
 			ExpectedMsg: "..",
 		},
 		"dot dot leading": {
 			Name:        "..test",
-			Prefix:      false,
 			ExpectedMsg: "",
 		},
-		"dot dot,prefix": {
-			Name:        "..",
-			Prefix:      true,
-			ExpectedMsg: "",
-		},
-
 		"slash": {
 			Name:        "foo/bar",
-			Prefix:      false,
 			ExpectedMsg: "/",
 		},
-		"slash,prefix": {
-			Name:        "foo/bar",
-			Prefix:      true,
-			ExpectedMsg: "/",
-		},
-
 		"percent": {
 			Name:        "foo%bar",
-			Prefix:      false,
-			ExpectedMsg: "%",
-		},
-		"percent,prefix": {
-			Name:        "foo%bar",
-			Prefix:      true,
 			ExpectedMsg: "%",
 		},
 	}
 
 	for k, tc := range testcases {
-		msgs := ValidatePathSegmentName(tc.Name, tc.Prefix)
+		msgs := IsValidPathSegmentName(tc.Name)
 		if len(tc.ExpectedMsg) == 0 && len(msgs) > 0 {
 			t.Errorf("%s: expected no message, got %v", k, msgs)
 		}
@@ -131,26 +84,19 @@ func TestValidatePathSegmentName(t *testing.T) {
 	}
 }
 
-func TestValidateWithMultiErrors(t *testing.T) {
+func TestIsValidPathSegmentNameWithMultiErrors(t *testing.T) {
 	testcases := map[string]struct {
 		Name        string
-		Prefix      bool
 		ExpectedMsg []string
 	}{
 		"slash,percent": {
-			Name:        "foo//bar%",
-			Prefix:      false,
-			ExpectedMsg: []string{"may not contain '/'", "may not contain '%'"},
-		},
-		"slash,percent,prefix": {
-			Name:        "foo//bar%",
-			Prefix:      true,
+			Name:        "foo/bar%",
 			ExpectedMsg: []string{"may not contain '/'", "may not contain '%'"},
 		},
 	}
 
 	for k, tc := range testcases {
-		msgs := ValidatePathSegmentName(tc.Name, tc.Prefix)
+		msgs := IsValidPathSegmentName(tc.Name)
 		if len(tc.ExpectedMsg) == 0 && len(msgs) > 0 {
 			t.Errorf("%s: expected no message, got %v", k, msgs)
 		}
