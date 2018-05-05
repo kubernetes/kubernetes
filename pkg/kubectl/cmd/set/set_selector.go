@@ -222,6 +222,11 @@ func (o *SetSelectorOptions) RunSelector() error {
 		if patch.Err != nil {
 			return patch.Err
 		}
+
+		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
+			return nil
+		}
+
 		if o.local || o.dryrun {
 			return o.PrintObj(info.Object, o.Out)
 		}
