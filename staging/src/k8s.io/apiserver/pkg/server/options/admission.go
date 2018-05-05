@@ -87,6 +87,10 @@ func NewAdmissionOptions() *AdmissionOptions {
 
 // AddFlags adds flags related to admission for a specific APIServer to the specified FlagSet
 func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
+	if a == nil {
+		return
+	}
+
 	fs.StringSliceVar(&a.EnablePlugins, "enable-admission-plugins", a.EnablePlugins, ""+
 		"admission plugins that should be enabled in addition to default enabled ones. "+
 		"Comma-delimited list of admission plugins: "+strings.Join(a.Plugins.Registered(), ", ")+". "+
