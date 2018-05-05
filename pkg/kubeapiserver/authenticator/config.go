@@ -196,9 +196,6 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		if config.Anonymous {
 			return anonymous.NewAuthenticator(), &securityDefinitions, nil
 		}
-	}
-
-	if len(authenticators) == 0 {
 		return nil, &securityDefinitions, nil
 	}
 
