@@ -279,7 +279,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targetUtilization int64, metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference, selector labels.Selector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
 	utilization, timestamp, err = c.metricsClient.GetObjectMetric(metricName, namespace, objectRef)
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v on %s %s/%s", metricName, objectRef.Kind, namespace, objectRef.Name, err)
+		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v on %s %s/%s", metricName, objectRef.Kind, namespace, objectRef.Name, err.Error())
 	}
 
 	usageRatio := float64(utilization) / float64(targetUtilization)
@@ -291,7 +291,7 @@ func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targe
 	readyPodCount, err := c.getReadyPodsCount(namespace, selector)
 
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
+		return 0, 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err.Error())
 	}
 
 	replicaCount = int32(math.Ceil(usageRatio * float64(readyPodCount)))
@@ -333,7 +333,7 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 	}
 	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, namespace, metricLabelSelector)
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err)
+		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err.Error())
 	}
 	utilization = 0
 	for _, val := range metrics {
@@ -343,7 +343,7 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 	readyPodCount, err := c.getReadyPodsCount(namespace, podSelector)
 
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
+		return 0, 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err.Error())
 	}
 
 	usageRatio := float64(utilization) / float64(targetUtilization)
@@ -365,7 +365,7 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int3
 	}
 	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, namespace, metricLabelSelector)
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err)
+		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err.Error())
 	}
 	utilization = 0
 	for _, val := range metrics {
