@@ -360,7 +360,7 @@ func (nm *NodeManager) renewNodeInfo(nodeInfo *NodeInfo, reconnect bool) (*NodeI
 			return nil, err
 		}
 	}
-	vm := nodeInfo.vm.RenewVM(vsphereInstance.conn.GoVmomiClient)
+	vm := nodeInfo.vm.RenewVM(vsphereInstance.conn.Client)
 	return &NodeInfo{vm: &vm, dataCenter: vm.Datacenter, vcServer: nodeInfo.vcServer}, nil
 }
 
