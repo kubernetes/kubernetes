@@ -47,7 +47,7 @@ func TestFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vc := &VSphereConnection{GoVmomiClient: c}
+	vc := &VSphereConnection{GoVmomiClient: c.Client}
 
 	dc, err := GetDatacenter(ctx, vc, testDefaultDatacenter)
 	if err != nil {
