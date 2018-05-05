@@ -135,7 +135,7 @@ func TestVSphereLogin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to connect to vSphere: %s", err)
 	}
-	defer vcInstance.conn.GoVmomiClient.Logout(ctx)
+	defer vcInstance.conn.Logout(ctx)
 }
 
 func TestZones(t *testing.T) {

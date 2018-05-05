@@ -411,7 +411,7 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 func logout(vs *VSphere) {
 	for _, vsphereIns := range vs.vsphereInstanceMap {
 		if vsphereIns.conn.GoVmomiClient != nil {
-			vsphereIns.conn.GoVmomiClient.Logout(context.TODO())
+			vsphereIns.conn.Logout(context.TODO())
 		}
 	}
 
