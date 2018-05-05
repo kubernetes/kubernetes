@@ -43,7 +43,7 @@ func TestVirtualMachine(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vc := &VSphereConnection{GoVmomiClient: c.Client}
+	vc := &VSphereConnection{Client: c.Client}
 
 	dc, err := GetDatacenter(ctx, vc, testDefaultDatacenter)
 	if err != nil {
