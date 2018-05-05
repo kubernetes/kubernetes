@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"fmt"
 	"hash/fnv"
 	"sync"
 
@@ -86,6 +87,12 @@ func (ec *EquivalenceCache) RunPredicate(
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
+
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		// This may happen during tests.
+		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("nodeInfo is nil or node is invalid")
+	}
+
 	fit, reasons, invalid := ec.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash)
 	if !invalid {
 		return fit, reasons, nil
