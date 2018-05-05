@@ -30,7 +30,7 @@ import (
 
 // VSphereConnection contains information for connecting to vCenter
 type VSphereConnection struct {
-	GoVmomiClient     *vim25.Client
+	Client            *vim25.Client
 	Username          string
 	Password          string
 	Hostname          string
@@ -43,23 +43,23 @@ var (
 	clientLock sync.Mutex
 )
 
-// Connect makes connection to vCenter and sets VSphereConnection.GoVmomiClient.
-// If connection.GoVmomiClient is already set, it obtains the existing user session.
-// if user session is not valid, connection.GoVmomiClient will be set to the new client.
+// Connect makes connection to vCenter and sets VSphereConnection.Client.
+// If connection.Client is already set, it obtains the existing user session.
+// if user session is not valid, connection.Client will be set to the new client.
 func (connection *VSphereConnection) Connect(ctx context.Context) error {
 	var err error
 	clientLock.Lock()
 	defer clientLock.Unlock()
 
-	if connection.GoVmomiClient == nil {
-		connection.GoVmomiClient, err = connection.NewClient(ctx)
+	if connection.Client == nil {
+		connection.Client, err = connection.NewClient(ctx)
 		if err != nil {
 			glog.Errorf("Failed to create govmomi client. err: %+v", err)
 			return err
 		}
 		return nil
 	}
-	m := session.NewManager(connection.GoVmomiClient)
+	m := session.NewManager(connection.Client)
 	userSession, err := m.UserSession(ctx)
 	if err != nil {
 		glog.Errorf("Error while obtaining user session. err: %+v", err)
@@ -70,7 +70,7 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 	}
 	glog.Warningf("Creating new client session since the existing session is not valid or not authenticated")
 
-	connection.GoVmomiClient, err = connection.NewClient(ctx)
+	connection.Client, err = connection.NewClient(ctx)
 	if err != nil {
 		glog.Errorf("Failed to create govmomi client. err: %+v", err)
 		return err
@@ -80,7 +80,7 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 
 // Logout calls SessionManager.Logout for the given connection.
 func (connection *VSphereConnection) Logout(ctx context.Context) {
-	m := session.NewManager(connection.GoVmomiClient)
+	m := session.NewManager(connection.Client)
 	if err := m.Logout(ctx); err != nil {
 		glog.Errorf("Logout failed: %s", err)
 	}
