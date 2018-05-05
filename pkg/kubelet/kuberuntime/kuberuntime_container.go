@@ -333,6 +333,11 @@ func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]
 	return containers, nil
 }
 
+// getContainers lists containers by filter.
+func (m *kubeGenericRuntimeManager) getContainersHelper(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+	return m.runtimeService.ListContainers(filter)
+}
+
 // makeUID returns a randomly generated string.
 func makeUID() string {
 	return fmt.Sprintf("%08x", rand.Uint32())
