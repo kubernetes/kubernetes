@@ -98,7 +98,7 @@ func TestLogEventsLegacy(t *testing.T) {
 		},
 	} {
 		var buf bytes.Buffer
-		backend := NewBackend(&buf, FormatLegacy, auditv1beta1.SchemeGroupVersion)
+		backend := NewBackend(&eventLogger{staticLogger: &buf}, FormatLegacy, auditv1beta1.SchemeGroupVersion)
 		backend.ProcessEvents(test.event)
 		match, err := regexp.MatchString(test.expected, buf.String())
 		if err != nil {
@@ -151,7 +151,7 @@ func TestLogEventsJson(t *testing.T) {
 		},
 	} {
 		var buf bytes.Buffer
-		backend := NewBackend(&buf, FormatJson, auditv1beta1.SchemeGroupVersion)
+		backend := NewBackend(&eventLogger{staticLogger: &buf}, FormatJson, auditv1beta1.SchemeGroupVersion)
 		backend.ProcessEvents(event)
 		// decode events back and compare with the original one.
 		result := &auditinternal.Event{}
