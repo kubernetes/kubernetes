@@ -48,7 +48,7 @@ func TestUtils(t *testing.T) {
 
 	vc := &VSphereConnection{Client: c.Client}
 
-	dc, err := GetDatacenter(ctx, vc, testDefaultDatacenter)
+	dc, err := GetDatacenter(ctx, vc, TestDefaultDatacenter)
 	if err != nil {
 		t.Error(err)
 	}

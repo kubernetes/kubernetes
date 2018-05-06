@@ -360,7 +360,10 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 	return vsphereInstanceMap, nil
 }
 
-// Creates new Contreoller node interface and returns
+// getVMUUID allows tests to override GetVMUUID
+var getVMUUID = GetVMUUID
+
+// Creates new Controller node interface and returns
 func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 	var err error
 
@@ -399,7 +402,7 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 		glog.Errorf("Failed to get hostname. err: %+v", err)
 		return nil, err
 	}
-	vs.vmUUID, err = GetVMUUID()
+	vs.vmUUID, err = getVMUUID()
 	if err != nil {
 		glog.Errorf("Failed to get uuid. err: %+v", err)
 		return nil, err
