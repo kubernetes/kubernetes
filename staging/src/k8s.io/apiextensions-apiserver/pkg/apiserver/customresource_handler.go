@@ -60,12 +60,20 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
+)
+
+const (
+	// This version is being used instead of any provided version by the CRD author to make sure
+	// the list object will go through conversion. Listed object may have different versions than
+	// request or storage version. This name should be unique.
+	CrdListVersion = "crd_list_version_A173D508-268B-4654-BEF2-2A943F379F9C"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -86,6 +94,7 @@ type crdHandler struct {
 	delegate          http.Handler
 	restOptionsGetter generic.RESTOptionsGetter
 	admission         admission.Interface
+	crdGetter         client.CustomResourceDefinitionsGetter
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -108,6 +117,7 @@ type crdInfo struct {
 	// TODO(mehdy): Look like when you delete a CRD, there is a fatal error reagrding these scopes or storages on status.
 	statusRequestScopes map[string]handlers.RequestScope
 
+	// storageVersion is the CRD version used when storing the object in etcd.
 	storageVersion string
 }
 
@@ -120,7 +130,8 @@ func NewCustomResourceDefinitionHandler(
 	crdInformer informers.CustomResourceDefinitionInformer,
 	delegate http.Handler,
 	restOptionsGetter generic.RESTOptionsGetter,
-	admission admission.Interface) *crdHandler {
+	admission admission.Interface,
+	crdGetter client.CustomResourceDefinitionsGetter) *crdHandler {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -129,8 +140,8 @@ func NewCustomResourceDefinitionHandler(
 		delegate:                delegate,
 		restOptionsGetter:       restOptionsGetter,
 		admission:               admission,
+		crdGetter:               crdGetter,
 	}
-
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: ret.updateCustomResourceDefinition,
 		DeleteFunc: func(obj interface{}) {
@@ -193,6 +204,25 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	switch requestInfo.Verb {
+	case "create", "update", "patch":
+		found := false
+		for _, v := range crd.Status.StoredVersions {
+			if crdInfo.storageVersion == v {
+				found = true
+				break
+			}
+		}
+		if !found {
+			crd.Status.StoredVersions = append(crd.Status.StoredVersions, crdInfo.storageVersion)
+			crd, err = r.crdGetter.CustomResourceDefinitions().UpdateStatus(crd)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 	}
 
 	verb := strings.ToUpper(requestInfo.Verb)
@@ -374,9 +404,7 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 	if err != nil {
 		return nil, err
 	}
-	kind := schema.FromAPIVersionAndKind(crd.TypeMeta.APIVersion, crd.TypeMeta.Kind)
-	// TODO(mbohlool): Is this the right custom resource.
-	return info.storages[kind.Version].CustomResource, nil
+	return info.storages[info.storageVersion].CustomResource, nil
 }
 
 func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResourceDefinition) (*crdInfo, error) {
@@ -394,7 +422,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	}
 
 	storageVersion := apiextensions.GetCRDStorageVersion(crd)
-	// storageKind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: storageVersion, Kind: crd.Status.AcceptedNames.Kind}
 	requestScopes := map[string]handlers.RequestScope{}
 	storages := map[string]customresource.CustomResourceStorage{}
 	statusScopes := map[string]handlers.RequestScope{}
@@ -488,11 +515,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
-			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter:converter},
+			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: converter},
 			ParameterCodec: parameterCodec,
 
-			Creater: creator,
-			Convertor: converter,
+			Creater:         creator,
+			Convertor:       converter,
 			Defaulter:       unstructuredDefaulter{parameterScheme},
 			Typer:           typer,
 			UnsafeConvertor: converter,
@@ -532,12 +559,13 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	}
 
 	ret := &crdInfo{
-		spec:          &crd.Spec,
-		acceptedNames: &crd.Status.AcceptedNames,
+		spec:                &crd.Spec,
+		acceptedNames:       &crd.Status.AcceptedNames,
 		storages:            storages,
 		requestScopes:       requestScopes,
 		scaleRequestScopes:  scaleScopes,
 		statusRequestScopes: statusScopes,
+		storageVersion:      storageVersion,
 	}
 
 	// Copy because we cannot write to storageMap without a race
@@ -551,8 +579,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 }
 
 type unstructuredNegotiatedSerializer struct {
-	typer   runtime.ObjectTyper
-	creator runtime.ObjectCreater
+	typer     runtime.ObjectTyper
+	creator   runtime.ObjectCreater
 	converter runtime.ObjectConvertor
 }
 
@@ -592,7 +620,7 @@ type UnstructuredObjectTyper struct {
 
 func newUnstructuredObjectTyper(Delegate runtime.ObjectTyper) UnstructuredObjectTyper {
 	return UnstructuredObjectTyper{
-		Delegate: Delegate,
+		Delegate:          Delegate,
 		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(nil),
 	}
 }

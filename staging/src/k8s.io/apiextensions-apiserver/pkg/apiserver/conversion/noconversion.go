@@ -34,6 +34,7 @@ func NewNoConversionConverter(clusterScoped bool) NoConversionConverter {
 	}
 }
 
+// ConvertToVersion converts given object to the version requested.
 func (c NoConversionConverter) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (out runtime.Object, err error) {
 	// not actually converting anything. The embedded UnstructuredObjectConverter will set the apiVersion and kind
 	// of the object. In the future other converters can use this method to do actual conversions.

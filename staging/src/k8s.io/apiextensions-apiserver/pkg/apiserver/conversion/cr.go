@@ -19,6 +19,8 @@ package conversion
 import (
 	"fmt"
 
+	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -60,14 +62,29 @@ func (crConverter) Convert(in, out, context interface{}) error {
 	return nil
 }
 
-func (crConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
+func (crConverter) convertToVersion(in runtime.Object, target runtime.GroupVersioner) error {
 	if kind := in.GetObjectKind().GroupVersionKind(); !kind.Empty() {
 		gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{kind})
 		if !ok {
 			// TODO: should this be a typed error?
-			return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
+			return fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
 		}
 		in.GetObjectKind().SetGroupVersionKind(gvk)
 	}
-	return in, nil
+	return nil
+}
+
+func (c crConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
+	glog.Warningf("ZZZ: Object %s.", in.GetObjectKind().GroupVersionKind().String())
+	var err error
+	// Run the converter on the list items instead of list itself
+	if meta.IsListType(in) {
+		glog.Warning("ZZZ: List type detected.")
+		err = meta.EachListItem(in, func(item runtime.Object) error {
+			return c.convertToVersion(item, target)
+		})
+	} else {
+		err = c.convertToVersion(in, target)
+	}
+	return in, err
 }

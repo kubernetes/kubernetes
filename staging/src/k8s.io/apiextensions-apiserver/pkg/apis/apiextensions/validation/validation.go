@@ -91,14 +91,17 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 
 	storageFlagCount := 0
 	versionsMap := map[string]bool{}
-	for _, version := range spec.Versions {
+	for i, version := range spec.Versions {
 		if version.Storage {
 			storageFlagCount++
 		}
 		if versionsMap[version.Name] {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), spec.Versions, "duplicate version name "+version.Name))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i), spec.Versions[i], "duplicate version name "+version.Name))
 		} else {
 			versionsMap[version.Name] = true
+		}
+		if errs := validationutil.IsDNS1035Label(version.Name); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i), spec.Versions[i], strings.Join(errs, ",")))
 		}
 	}
 	if storageFlagCount != 1 {
@@ -145,7 +148,6 @@ func ValidateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.Cus
 
 	if established {
 		// these effect the storage and cannot be changed therefore
-		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Version, oldSpec.Version, fldPath.Child("version"))...)
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Scope, oldSpec.Scope, fldPath.Child("scope"))...)
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Names.Kind, oldSpec.Names.Kind, fldPath.Child("names", "kind"))...)
 	}

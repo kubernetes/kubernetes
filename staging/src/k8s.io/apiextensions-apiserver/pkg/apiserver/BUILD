@@ -28,6 +28,7 @@ go_library(
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion:go_default_library",
@@ -96,5 +97,5 @@ go_test(
     name = "go_default_test",
     srcs = ["customresource_handler_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library"],
+    deps = ["//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion:go_default_library"],
 )
