@@ -45,21 +45,29 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 	}
 
 	rootUser := int64(0)
+	rootGroup := int64(0)
 	anyUser := int64(1000)
+	anyGroup := int64(2000)
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
+	runAsNonRootGroupTrue := true
+	runAsNonRootGroupFalse := false
+
 	for _, test := range []struct {
-		desc     string
-		sc       *v1.SecurityContext
-		uid      *int64
-		username string
-		fail     bool
+		desc      string
+		sc        *v1.SecurityContext
+		uid       *int64
+		username  string
+		gid       *int64
+		groupname string
+		fail      bool
 	}{
 		{
 			desc: "Pass if SecurityContext is not set",
 			sc:   nil,
 			uid:  &rootUser,
 			fail: false,
+			gid:  nil,
 		},
 		{
 			desc: "Pass if RunAsNonRoot is not set",
@@ -126,9 +134,86 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			},
 			fail: false,
 		},
+		{
+			desc: "Pass if SecurityContext is not set",
+			sc:   nil,
+			uid:  &rootUser,
+			fail: false,
+			gid:  &rootGroup,
+		},
+		{
+			desc: "Pass if RunAsNonRootGroup is not set",
+			sc: &v1.SecurityContext{
+				RunAsUser:  &rootUser,
+				RunAsGroup: &rootGroup,
+			},
+			uid:  &rootUser,
+			gid:  &rootGroup,
+			fail: false,
+		},
+		{
+			desc: "Pass if RunAsNonRootGroup is false (image group is root)",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootGroupFalse,
+			},
+			uid:  &rootUser,
+			gid:  &rootGroup,
+			fail: false,
+		},
+		{
+			desc: "Pass if RunAsNonRootGroup is false (RunAsGroup is root)",
+			sc: &v1.SecurityContext{
+				RunAsNonRootGroup: &runAsNonRootFalse,
+				RunAsGroup:        &rootGroup,
+			},
+			uid:  &rootUser,
+			gid:  &rootGroup,
+			fail: false,
+		},
+		{
+			desc: "Fail if container's RunAsGroup is root and RunAsNonRootGroup is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRootGroup: &runAsNonRootGroupTrue,
+				RunAsGroup:        &rootGroup,
+			},
+			uid:  &rootUser,
+			gid:  &rootGroup,
+			fail: true,
+		},
+		{
+			desc: "Fail if image's group is root and RunAsNonRootGroup is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRootGroup: &runAsNonRootGroupTrue,
+			},
+			gid:  &rootGroup,
+			fail: true,
+		},
+		{
+			desc: "Fail if image's groupname is set and RunAsNonRootGroup is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRootGroup: &runAsNonRootGroupTrue,
+			},
+			groupname: "test",
+			fail:      true,
+		},
+		{
+			desc: "Pass if image's group is non-root and RunAsNonRootGroup is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRootGroup: &runAsNonRootGroupTrue,
+			},
+			gid:  &anyGroup,
+			fail: false,
+		},
+		{
+			desc: "Pass if container's group and image's group aren't set and RunAsNonRootGroup is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRootGroup: &runAsNonRootGroupTrue,
+			},
+			fail: false,
+		},
 	} {
 		pod.Spec.Containers[0].SecurityContext = test.sc
-		err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], test.uid, test.username)
+		err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], test.uid, test.username, test.gid, test.groupname)
 		if test.fail {
 			assert.Error(t, err, test.desc)
 		} else {
