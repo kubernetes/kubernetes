@@ -50,7 +50,7 @@ import (
 // Info about an API group.
 type APIGroupInfo struct {
 	GroupMeta apimachinery.GroupMeta
-	// Info about the resources in this group. Its a map from version to resource to the storage.
+	// Info about the resources in this group. It's a map from version to resource to the storage.
 	VersionedResourcesStorageMap map[string]map[string]rest.Storage
 	// OptionsExternalVersion controls the APIVersion used for common objects in the
 	// schema like api.Status, api.DeleteOptions, and metav1.ListOptions. Other implementors may
