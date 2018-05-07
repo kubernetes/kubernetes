@@ -17,8 +17,9 @@ limitations under the License.
 package priorities
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -229,13 +230,8 @@ func TestTaintAndToleration(t *testing.T) {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
 		ttp := priorityFunction(ComputeTaintTolerationPriorityMap, ComputeTaintTolerationPriorityReduce, nil)
 		list, err := ttp(test.pod, nodeNameToInfo, test.nodes)
-		if err != nil {
-			t.Errorf("%s, unexpected error: %v", test.test, err)
-		}
-
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s,\nexpected:\n\t%+v,\ngot:\n\t%+v", test.test, test.expectedList, list)
-		}
+		assert.NoErrorf(t, err, "%s, unexpected error: %v", test.test, err)
+		assert.EqualValuesf(t, test.expectedList, list, "%s,\nexpected:\n\t%+v,\ngot:\n\t%+v", test.test, test.expectedList, list)
 	}
 
 }
