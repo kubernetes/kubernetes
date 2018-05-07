@@ -371,26 +371,23 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		return ret, nil
 	}
 
-	// In addition to Unstructured objects (Custom Resources), we also may sometimes need to
-	// decode unversioned Options objects, so we delegate to parameterScheme for such types.
-	parameterScheme := runtime.NewScheme()
-	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version},
-		&metav1.ListOptions{},
-		&metav1.ExportOptions{},
-		&metav1.GetOptions{},
-		&metav1.DeleteOptions{},
-	)
-	parameterCodec := runtime.NewParameterCodec(parameterScheme)
+	// some Options types can be in the request body. This scheme knows how to convert them.
+	fallbackScheme := runtime.NewScheme()
+	metav1.AddToGroupVersion(fallbackScheme, schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name})
+	metav1.AddToGroupVersion(fallbackScheme, schema.GroupVersion{Group: "", Version: "v1"}) // DeleteOptions are sent as core v1 in DeleteCollection
+
+	parameterCodec := runtime.NewParameterCodec(fallbackScheme)
 
 	clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
 	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Status.AcceptedNames.Kind}
 	typer := unstructuredObjectTyper{
-		delegate:          parameterScheme,
+		delegate:          fallbackScheme,
 		unstructuredTyper: discovery.NewUnstructuredObjectTyper(),
 	}
 	creator := unstructuredCreator{}
 	converter := crdObjectConverter{
 		unstructuredDelegate: unstructured.UnstructuredObjectConverter{},
+		fallbackDelegate:     fallbackScheme,
 		clusterScoped:        clusterScoped,
 	}
 
@@ -469,7 +466,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		Creater:         creator,
 		Convertor:       converter,
-		Defaulter:       unstructuredNoopDefaulter{parameterScheme},
+		Defaulter:       unstructuredNoopDefaulter{fallbackScheme},
 		Typer:           typer,
 		UnsafeConvertor: converter,
 
@@ -524,16 +521,22 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 // crdObjectConverter wraps an unstructured object converter adding:
 // - support for field selectors
-// - support for UnstructuredList, applying the delegate to each item.
+// - support for UnstructuredList, applying the delegate to each item
+// - support for some native types (like DeleteOptions) via a normal scheme.
 type crdObjectConverter struct {
-	unstructuredDelegate unstructured.UnstructuredObjectConverter
+	unstructuredDelegate runtime.ObjectConvertor
+	fallbackDelegate     runtime.ObjectConvertor
 	clusterScoped        bool
 }
 
 var _ runtime.ObjectConvertor = crdObjectConverter{}
 
 func (c crdObjectConverter) Convert(in, out, context interface{}) error {
-	return c.unstructuredDelegate.Convert(in, out, context)
+	if _, ok := out.(*unstructured.Unstructured); ok {
+		return c.unstructuredDelegate.Convert(in, out, context)
+	}
+
+	return c.fallbackDelegate.Convert(in, out, context)
 }
 
 func (c crdObjectConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
