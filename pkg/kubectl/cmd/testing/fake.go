@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -429,7 +430,7 @@ func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) 
 
 func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
 	groupResources := testDynamicResources()
-	mapper := discovery.NewRESTMapper(groupResources)
+	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
 	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
 	// TODO: make this opt-in?
 	mapper = meta.FirstHitRESTMapper{
@@ -441,7 +442,7 @@ func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
 
 	// TODO: should probably be the external scheme
 	fakeDs := &fakeCachedDiscoveryClient{}
-	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
+	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
 	return expander, nil
 }
 
@@ -467,8 +468,8 @@ func (f *TestFactory) ScaleClient() (scaleclient.ScalesGetter, error) {
 	return f.ScaleGetter, nil
 }
 
-func testDynamicResources() []*discovery.APIGroupResources {
-	return []*discovery.APIGroupResources{
+func testDynamicResources() []*restmapper.APIGroupResources {
+	return []*restmapper.APIGroupResources{
 		{
 			Group: metav1.APIGroup{
 				Versions: []metav1.GroupVersionForDiscovery{

@@ -31,6 +31,7 @@ go_library(
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/restmapper:go_default_library",
         "//vendor/k8s.io/client-go/scale:go_default_library",
     ],
 )

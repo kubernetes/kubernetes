@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
 )
 
@@ -310,7 +311,7 @@ func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, co
 		return nil, err
 	}
 
-	resources := []*discovery.APIGroupResources{
+	resources := []*restmapper.APIGroupResources{
 		{
 			Group: metav1.APIGroup{
 				Name: crd.Spec.Group,
@@ -325,7 +326,7 @@ func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, co
 		},
 	}
 
-	restMapper := discovery.NewRESTMapper(resources)
+	restMapper := restmapper.NewDiscoveryRESTMapper(resources)
 	resolver := scale.NewDiscoveryScaleKindResolver(discoveryClient)
 
 	return scale.NewForConfig(config, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)

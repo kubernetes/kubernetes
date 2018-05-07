@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
@@ -182,7 +183,7 @@ func (f *Framework) BeforeEach() {
 		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
-		restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 		restMapper.Reset()
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)

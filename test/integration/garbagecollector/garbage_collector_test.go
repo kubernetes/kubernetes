@@ -36,11 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -220,7 +220,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	createNamespaceOrDie("aval", clientSet, t)
 
 	discoveryClient := cacheddiscovery.NewMemCacheClient(clientSet.Discovery())
-	restMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	restMapper.Reset()
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	config := *result.ClientConfig

@@ -54,11 +54,11 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	certutil "k8s.io/client-go/util/cert"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapi "k8s.io/kube-openapi/pkg/common"
@@ -575,7 +575,7 @@ func BuildAdmissionPluginInitializers(
 	// We have a functional client so we can use that to build our discovery backed REST mapper
 	// Use a discovery client capable of being refreshed.
 	discoveryClient := cacheddiscovery.NewMemCacheClient(client.Discovery())
-	discoveryRESTMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
+	discoveryRESTMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 
 	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {
 		discoveryRESTMapper.Reset()

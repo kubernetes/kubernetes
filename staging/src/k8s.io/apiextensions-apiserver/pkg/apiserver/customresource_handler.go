@@ -385,7 +385,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Status.AcceptedNames.Kind}
 	typer := UnstructuredObjectTyper{
 		Delegate:          parameterScheme,
-		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(nil),
+		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(),
 	}
 	creator := unstructuredCreator{}
 

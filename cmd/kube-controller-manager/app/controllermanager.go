@@ -35,10 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
@@ -228,7 +228,7 @@ type ControllerContext struct {
 	// DeferredDiscoveryRESTMapper is a RESTMapper that will defer
 	// initialization of the RESTMapper until the first mapping is
 	// requested.
-	RESTMapper *discovery.DeferredDiscoveryRESTMapper
+	RESTMapper *restmapper.DeferredDiscoveryRESTMapper
 
 	// AvailableResources is a map listing currently available resources
 	AvailableResources map[schema.GroupVersionResource]bool
@@ -399,7 +399,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 	// Use a discovery client capable of being refreshed.
 	discoveryClient := rootClientBuilder.ClientOrDie("controller-discovery")
 	cachedClient := cacheddiscovery.NewMemCacheClient(discoveryClient.Discovery())
-	restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedClient)
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedClient)
 	go wait.Until(func() {
 		restMapper.Reset()
 	}, 30*time.Second, stop)

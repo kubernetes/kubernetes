@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	manualfake "k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/restmapper"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -470,7 +471,7 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
+	mapper := restmapper.NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
 	b := resource.NewFakeBuilder(fakeClient(), mapper, categories.LegacyCategoryExpander)
 
 	for _, test := range tests {

@@ -141,6 +141,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/pkg/version:all-srcs",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:all-srcs",
         "//staging/src/k8s.io/client-go/rest:all-srcs",
+        "//staging/src/k8s.io/client-go/restmapper:all-srcs",
         "//staging/src/k8s.io/client-go/scale:all-srcs",
         "//staging/src/k8s.io/client-go/testing:all-srcs",
         "//staging/src/k8s.io/client-go/third_party/forked/golang/template:all-srcs",

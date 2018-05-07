@@ -146,6 +146,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes/typed/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/rbac/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/restmapper:go_default_library",
         "//vendor/k8s.io/client-go/scale:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
