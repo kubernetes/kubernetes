@@ -128,6 +128,7 @@ go_test(
         "//pkg/kubelet/cm/cpumanager:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/eviction:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/kubeletconfig:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",
