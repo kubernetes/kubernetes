@@ -65,12 +65,16 @@ func (f *PrintFlags) ToPrinter() (ResourcePrinter, error) {
 		outputFormat = *f.OutputFormat
 	}
 
-	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
-		return p, err
+	if f.JSONYamlPrintFlags != nil {
+		if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+			return p, err
+		}
 	}
 
-	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
-		return p, err
+	if f.NamePrintFlags != nil {
+		if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+			return p, err
+		}
 	}
 
 	return nil, NoCompatiblePrinterError{Options: f, OutputFormat: f.OutputFormat}
@@ -87,15 +91,7 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 
 // WithDefaultOutput sets a default output format if one is not provided through a flag value
 func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
-	existingFormat := ""
-	if f.OutputFormat != nil {
-		existingFormat = *f.OutputFormat
-	}
-	if len(existingFormat) == 0 {
-		existingFormat = output
-	}
-	f.OutputFormat = &existingFormat
-
+	f.OutputFormat = &output
 	return f
 }
 

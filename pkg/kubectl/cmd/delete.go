@@ -124,8 +124,6 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			options := deleteFlags.ToOptions(out, errOut)
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-
 			if err := options.Complete(f, out, errOut, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
@@ -185,6 +183,10 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 }
 
 func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
+	if o.Output != "" && o.Output != "name" {
+		return cmdutil.UsageErrorf(cmd, "Unexpected -o output mode: %v. We only support '-o name'.", o.Output)
+	}
+
 	if o.DeleteAll && len(o.LabelSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}

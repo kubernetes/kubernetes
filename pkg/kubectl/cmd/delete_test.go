@@ -48,9 +48,7 @@ func fakecmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-		},
+		Run: func(cmd *cobra.Command, args []string) {},
 	}
 	return cmd
 }

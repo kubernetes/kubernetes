@@ -1121,7 +1121,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			name:        "set with exist object",
 			filePath:    filenameRC,
 			expectedErr: "",
-			expectedOut: "replicationcontroller/test-rc configured\n",
+			expectedOut: "replicationcontroller/test-rc\n",
 			output:      "name",
 		},
 		{
@@ -1142,14 +1142,14 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			name:        "set with exist object output json",
 			filePath:    filenameRCJSON,
 			expectedErr: "",
-			expectedOut: "replicationcontroller/test-rc configured\n",
+			expectedOut: "replicationcontroller/test-rc\n",
 			output:      "name",
 		},
 		{
 			name:        "set test for a directory of files",
 			filePath:    dirName,
 			expectedErr: "",
-			expectedOut: "replicationcontroller/test-rc configured\nreplicationcontroller/test-rc configured\n",
+			expectedOut: "replicationcontroller/test-rc\nreplicationcontroller/test-rc\n",
 			output:      "name",
 		},
 	}

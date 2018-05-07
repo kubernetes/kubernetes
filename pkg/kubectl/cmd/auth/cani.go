@@ -19,12 +19,12 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,8 +48,7 @@ type CanIOptions struct {
 	Subresource    string
 	ResourceName   string
 
-	Out io.Writer
-	Err io.Writer
+	genericclioptions.IOStreams
 }
 
 var (
@@ -81,10 +80,9 @@ var (
 		kubectl auth can-i get /logs/`)
 )
 
-func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
+func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CanIOptions{
-		Out: out,
-		Err: err,
+		IOStreams: streams,
 	}
 
 	cmd := &cobra.Command{
@@ -232,9 +230,9 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
 		if err != nil {
 			if len(groupResource.Group) == 0 {
-				fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
+				fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s'\n", groupResource.Resource)
 			} else {
-				fmt.Fprintf(o.Err, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
+				fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
 			}
 			return schema.GroupVersionResource{Resource: resourceArg}
 		}

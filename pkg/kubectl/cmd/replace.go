@@ -91,8 +91,15 @@ type ReplaceOptions struct {
 }
 
 func NewReplaceOptions(out, errOut io.Writer) *ReplaceOptions {
+	outputFormat := ""
+
 	return &ReplaceOptions{
-		PrintFlags:  printers.NewPrintFlags("replaced"),
+		// TODO(juanvallejo): figure out why we only support the "name" outputFormat in this command
+		// we only support "-o name" for this command, so only register the name printer
+		PrintFlags: &printers.PrintFlags{
+			OutputFormat:   &outputFormat,
+			NamePrintFlags: printers.NewNamePrintFlags("replaced"),
+		},
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 
 		Out:    out,
@@ -110,7 +117,6 @@ func NewCmdReplace(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    replaceLong,
 		Example: replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
 			cmdutil.CheckErr(o.Run())

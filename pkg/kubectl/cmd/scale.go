@@ -93,9 +93,16 @@ type ScaleOptions struct {
 }
 
 func NewScaleOptions(ioStreams genericclioptions.IOStreams) *ScaleOptions {
+	outputFormat := ""
+
 	return &ScaleOptions{
+		// TODO(juanvallejo): figure out why we only support the "name" outputFormat in this command
+		// we only support "-o name" for this command, so only register the name printer
+		PrintFlags: &printers.PrintFlags{
+			OutputFormat:   &outputFormat,
+			NamePrintFlags: printers.NewNamePrintFlags("scaled"),
+		},
 		RecordFlags:     genericclioptions.NewRecordFlags(),
-		PrintFlags:      printers.NewPrintFlags("scaled"),
 		CurrentReplicas: -1,
 		Recorder:        genericclioptions.NoopRecorder{},
 		IOStreams:       ioStreams,
@@ -173,9 +180,6 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 }
 
 func (o *ScaleOptions) Validate(cmd *cobra.Command) error {
-	if err := cmdutil.ValidateOutputArgs(cmd); err != nil {
-		return err
-	}
 	if o.Replicas < 0 {
 		return fmt.Errorf("The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
 	}
