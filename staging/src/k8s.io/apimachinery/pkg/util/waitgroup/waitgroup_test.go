@@ -49,6 +49,21 @@ func TestWaitGroup(t *testing.T) {
 	}
 }
 
+func TestWaitGroup_WaitGroupWrapper(t *testing.T) {
+	wg := &Wrapper{}
+	n := 16
+	exited := make(chan bool, n)
+	for i := 0; i != n; i++ {
+		wg.Wrap(func() {
+			exited <- true
+		})
+	}
+	wg.Wait()
+	for i := 0; i != n; i++ {
+		<-exited // Will block if barrier fails to unlock someone.
+	}
+}
+
 func TestWaitGroupAddFail(t *testing.T) {
 	wg := &SafeWaitGroup{}
 	wg.Add(1)
