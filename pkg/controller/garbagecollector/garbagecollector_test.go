@@ -58,7 +58,7 @@ func (_ *testRESTMapper) Reset() {}
 func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
-	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme)}}
+	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
@@ -199,7 +199,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(dynamicClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme)}, podResource, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(dynamicClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, podResource, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -823,7 +823,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rm := &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme)}
+	rm := &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}
 	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)

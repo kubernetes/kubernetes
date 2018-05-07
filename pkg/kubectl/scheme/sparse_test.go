@@ -36,9 +36,9 @@ func TestCronJob(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(string(cronjobBytes))
-	t.Log(Registry.RegisteredGroupVersions())
+	t.Log(Scheme.PrioritizedVersionsAllGroups())
 
-	decoder := Codecs.UniversalDecoder(Registry.RegisteredGroupVersions()...)
+	decoder := Codecs.UniversalDecoder(Scheme.PrioritizedVersionsAllGroups()...)
 
 	uncastDst, err := runtime.Decode(decoder, cronjobBytes)
 	if err != nil {

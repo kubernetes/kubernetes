@@ -67,7 +67,7 @@ func NewYAMLEncoder(groupName string) (runtime.Encoder, error) {
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
 
-	versions := legacyscheme.Registry.RegisteredVersionsForGroup(groupName)
+	versions := legacyscheme.Scheme.PrioritizedVersionsForGroup(groupName)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("no enabled versions for group %q", groupName)
 	}

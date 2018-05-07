@@ -57,7 +57,7 @@ func TestSplitAndParseResourceRequest(t *testing.T) {
 		},
 	}
 
-	mapper := testrestmapper.TestOnlyStaticRESTMapper(scheme.Registry, scheme.Scheme, scheme.Versions...)
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	for _, test := range tests {
 		gotInResource, gotFieldsPath, err := SplitAndParseResourceRequest(test.inresource, mapper)
 		if err != nil {

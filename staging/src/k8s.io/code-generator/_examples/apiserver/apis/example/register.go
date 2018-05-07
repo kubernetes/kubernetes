@@ -24,9 +24,8 @@ import (
 var SchemeGroupVersion = schema.GroupVersion{Group: "example.api.code-generator.k8s.io", Version: runtime.APIVersionInternal}
 
 var (
-	SchemeBuilder    = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme      = SchemeBuilder.AddToScheme
-	AddToSchemeOrDie = SchemeBuilder.AddToSchemeOrDie
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource

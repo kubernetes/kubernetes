@@ -18,8 +18,6 @@ package testrestmapper
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,16 +29,13 @@ import (
 //     all other groups alphabetical.
 // TODO callers of this method should be updated to build their own specific restmapper based on their scheme for their tests
 // TODO the things being tested are related to whether various cases are handled, not tied to the particular types being checked.
-func TestOnlyStaticRESTMapper(m *registered.APIRegistrationManager, scheme *runtime.Scheme, versionPatterns ...schema.GroupVersion) meta.RESTMapper {
+func TestOnlyStaticRESTMapper(scheme *runtime.Scheme, versionPatterns ...schema.GroupVersion) meta.RESTMapper {
 	unionMapper := meta.MultiRESTMapper{}
 	unionedGroups := sets.NewString()
-	for _, enabledVersion := range m.RegisteredGroupVersions() {
+	for _, enabledVersion := range scheme.PrioritizedVersionsAllGroups() {
 		if !unionedGroups.Has(enabledVersion.Group) {
 			unionedGroups.Insert(enabledVersion.Group)
-			groupMeta := m.GroupOrDie(enabledVersion.Group)
-			if groupMeta != nil {
-				unionMapper = append(unionMapper, newRESTMapper(scheme, groupMeta))
-			}
+			unionMapper = append(unionMapper, newRESTMapper(enabledVersion.Group, scheme))
 		}
 	}
 
@@ -56,17 +51,17 @@ func TestOnlyStaticRESTMapper(m *registered.APIRegistrationManager, scheme *runt
 	}
 
 	prioritizedGroups := []string{"", "extensions", "metrics"}
-	resourcePriority, kindPriority := prioritiesForGroups(m, prioritizedGroups...)
+	resourcePriority, kindPriority := prioritiesForGroups(scheme, prioritizedGroups...)
 
 	prioritizedGroupsSet := sets.NewString(prioritizedGroups...)
 	remainingGroups := sets.String{}
-	for _, enabledVersion := range m.RegisteredGroupVersions() {
+	for _, enabledVersion := range scheme.PrioritizedVersionsAllGroups() {
 		if !prioritizedGroupsSet.Has(enabledVersion.Group) {
 			remainingGroups.Insert(enabledVersion.Group)
 		}
 	}
 
-	remainingResourcePriority, remainingKindPriority := prioritiesForGroups(m, remainingGroups.List()...)
+	remainingResourcePriority, remainingKindPriority := prioritiesForGroups(scheme, remainingGroups.List()...)
 	resourcePriority = append(resourcePriority, remainingResourcePriority...)
 	kindPriority = append(kindPriority, remainingKindPriority...)
 
@@ -75,12 +70,12 @@ func TestOnlyStaticRESTMapper(m *registered.APIRegistrationManager, scheme *runt
 
 // prioritiesForGroups returns the resource and kind priorities for a PriorityRESTMapper, preferring the preferred version of each group first,
 // then any non-preferred version of the group second.
-func prioritiesForGroups(m *registered.APIRegistrationManager, groups ...string) ([]schema.GroupVersionResource, []schema.GroupVersionKind) {
+func prioritiesForGroups(scheme *runtime.Scheme, groups ...string) ([]schema.GroupVersionResource, []schema.GroupVersionKind) {
 	resourcePriority := []schema.GroupVersionResource{}
 	kindPriority := []schema.GroupVersionKind{}
 
 	for _, group := range groups {
-		availableVersions := m.RegisteredVersionsForGroup(group)
+		availableVersions := scheme.PrioritizedVersionsForGroup(group)
 		if len(availableVersions) > 0 {
 			resourcePriority = append(resourcePriority, availableVersions[0].WithResource(meta.AnyResource))
 			kindPriority = append(kindPriority, availableVersions[0].WithKind(meta.AnyKind))
@@ -94,9 +89,9 @@ func prioritiesForGroups(m *registered.APIRegistrationManager, groups ...string)
 	return resourcePriority, kindPriority
 }
 
-func newRESTMapper(scheme *runtime.Scheme, groupMeta *apimachinery.GroupMeta) meta.RESTMapper {
-	mapper := meta.NewDefaultRESTMapper(groupMeta.GroupVersions)
-	for _, gv := range groupMeta.GroupVersions {
+func newRESTMapper(group string, scheme *runtime.Scheme) meta.RESTMapper {
+	mapper := meta.NewDefaultRESTMapper(scheme.PrioritizedVersionsForGroup(group))
+	for _, gv := range scheme.PrioritizedVersionsForGroup(group) {
 		for kind := range scheme.KnownTypes(gv) {
 			if ignoredKinds.Has(kind) {
 				continue

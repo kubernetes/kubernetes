@@ -84,7 +84,7 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrin
 	}
 
 	p, err := NewCustomColumnsPrinterFromSpec(templateValue, decoder, f.NoHeaders)
-	return NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, scheme.Versions...), err
+	return NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...), err
 }
 
 // AddFlags receives a *cobra.Command reference and binds

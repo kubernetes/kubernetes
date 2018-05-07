@@ -34,7 +34,6 @@ import (
 	// "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apimachinery/pkg/apimachinery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -151,12 +150,8 @@ func TestInstallAPIGroups(t *testing.T) {
 		scheme.AddKnownTypes(v1GroupVersion, &metav1.Status{})
 		metav1.AddToGroupVersion(scheme, v1GroupVersion)
 
-		groupMeta := apimachinery.GroupMeta{
-			GroupVersions: []schema.GroupVersion{gv},
-		}
-
 		return APIGroupInfo{
-			GroupMeta: groupMeta,
+			PrioritizedVersions: []schema.GroupVersion{gv},
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				gv.Version: {
 					"getter":  &testGetterStorage{Version: gv.Version},
@@ -184,7 +179,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	for _, api := range apis[1:] {
 		err = s.InstallAPIGroup(&api)
 		assert.NoError(err)
-		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.GroupMeta.GroupVersions[0].Group) // /apis/<group>
+		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.PrioritizedVersions[0].Group) // /apis/<group>
 	}
 
 	server := httptest.NewServer(s.Handler)
@@ -225,19 +220,19 @@ func TestInstallAPIGroups(t *testing.T) {
 				continue
 			}
 
-			if got, expected := group.Name, info.GroupMeta.GroupVersions[0].Group; got != expected {
+			if got, expected := group.Name, info.PrioritizedVersions[0].Group; got != expected {
 				t.Errorf("[%d] unexpected group name at path %q: got=%q expected=%q", i, path, got, expected)
 				continue
 			}
 
-			if got, expected := group.PreferredVersion.Version, info.GroupMeta.GroupVersions[0].Version; got != expected {
+			if got, expected := group.PreferredVersion.Version, info.PrioritizedVersions[0].Version; got != expected {
 				t.Errorf("[%d] unexpected group version at path %q: got=%q expected=%q", i, path, got, expected)
 				continue
 			}
 		}
 
 		// should serve APIResourceList at group path + /<group-version>
-		path = path + "/" + info.GroupMeta.GroupVersions[0].Version
+		path = path + "/" + info.PrioritizedVersions[0].Version
 		resp, err = http.Get(server.URL + path)
 		if err != nil {
 			t.Errorf("[%d] unexpected error getting path %q path: %v", i, path, err)
@@ -259,7 +254,7 @@ func TestInstallAPIGroups(t *testing.T) {
 			continue
 		}
 
-		if got, expected := resources.GroupVersion, info.GroupMeta.GroupVersions[0].String(); got != expected {
+		if got, expected := resources.GroupVersion, info.PrioritizedVersions[0].String(); got != expected {
 			t.Errorf("[%d] unexpected groupVersion at path %q: got=%q expected=%q", i, path, got, expected)
 			continue
 		}

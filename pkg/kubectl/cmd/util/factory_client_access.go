@@ -626,7 +626,7 @@ func InternalVersionDecoder() runtime.Decoder {
 }
 
 func InternalVersionJSONEncoder() runtime.Encoder {
-	encoder := legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...)
+	encoder := legacyscheme.Codecs.LegacyCodec(legacyscheme.Scheme.PrioritizedVersionsAllGroups()...)
 	return unstructured.JSONFallbackEncoder{Encoder: encoder}
 }
 

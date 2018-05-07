@@ -471,7 +471,7 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper := restmapper.NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
+	mapper := restmapper.NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme), ds)
 	b := resource.NewFakeBuilder(fakeClient(), mapper, categories.LegacyCategoryExpander)
 
 	for _, test := range tests {

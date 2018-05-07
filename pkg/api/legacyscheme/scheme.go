@@ -17,14 +17,9 @@ limitations under the License.
 package legacyscheme
 
 import (
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
-
-// Registry is an instance of an API registry.  This is an interim step to start removing the idea of a global
-// API registry.
-var Registry = registered.NewAPIRegistrationManager()
 
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
 // NOTE: If you are copying this file to start a new api group, STOP! Copy the

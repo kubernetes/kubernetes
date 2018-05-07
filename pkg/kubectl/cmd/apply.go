@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -301,9 +302,6 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 	output := cmdutil.GetFlagString(cmd, "output")
 	shortOutput := output == "name"
 
-	encoder := scheme.DefaultJSONEncoder()
-	deserializer := scheme.Codecs.UniversalDeserializer()
-
 	visitedUids := sets.NewString()
 	visitedNamespaces := sets.NewString()
 
@@ -326,7 +324,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		// Get the modified configuration of the object. Embed the result
 		// as an annotation in the modified configuration, so that it will appear
 		// in the patch sent to the server.
-		modified, err := kubectl.GetModifiedConfiguration(info.Object, true, encoder)
+		modified, err := kubectl.GetModifiedConfiguration(info.Object, true, unstructured.UnstructuredJSONScheme)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
 		}
@@ -340,7 +338,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			}
 			// Create the resource if it doesn't exist
 			// First, update the annotation used by kubectl apply
-			if err := kubectl.CreateApplyAnnotation(info.Object, encoder); err != nil {
+			if err := kubectl.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
@@ -392,8 +390,6 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 				return err
 			}
 			patcher := &patcher{
-				encoder:       encoder,
-				decoder:       deserializer,
 				mapping:       info.Mapping,
 				helper:        helper,
 				dynamicClient: dynamicClient,
@@ -676,9 +672,6 @@ func (p *patcher) delete(namespace, name string) error {
 }
 
 type patcher struct {
-	encoder runtime.Encoder
-	decoder runtime.Decoder
-
 	mapping       *meta.RESTMapping
 	helper        *resource.Helper
 	dynamicClient dynamic.DynamicInterface
@@ -698,7 +691,7 @@ type patcher struct {
 
 func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	// Serialize the current configuration of the object from the server.
-	current, err := runtime.Encode(p.encoder, obj)
+	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("serializing current configuration from:\n%v\nfor:", obj), source, err)
 	}
@@ -804,7 +797,7 @@ func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	if err != nil {
 		return modified, nil, err
 	}
-	versionedObject, _, err := p.decoder.Decode(modified, nil, nil)
+	versionedObject, _, err := unstructured.UnstructuredJSONScheme.Decode(modified, nil, nil)
 	if err != nil {
 		return modified, nil, err
 	}

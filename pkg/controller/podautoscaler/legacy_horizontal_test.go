@@ -498,7 +498,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		eventClient.Core(),
 		testScaleClient,
 		testClient.Autoscaling(),
-		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme),
+		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		replicaCalc,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		controller.NoResyncPeriodFunc(),

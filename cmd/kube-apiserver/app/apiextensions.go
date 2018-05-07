@@ -58,7 +58,7 @@ func createAPIExtensionsConfig(
 	if err := commandOptions.APIEnablement.ApplyTo(
 		&genericConfig,
 		apiextensionsapiserver.DefaultAPIResourceConfigSource(),
-		apiextensionsapiserver.Registry); err != nil {
+		apiextensionsapiserver.Scheme); err != nil {
 		return nil, err
 	}
 

@@ -64,7 +64,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	if err := options.RecommendedOptions.ApplyTo(genericConfig, nil); err != nil {
 		return nil, err
 	}
-	if err := options.APIEnablement.ApplyTo(&genericConfig.Config, extensionsapiserver.DefaultAPIResourceConfigSource(), extensionsapiserver.Registry); err != nil {
+	if err := options.APIEnablement.ApplyTo(&genericConfig.Config, extensionsapiserver.DefaultAPIResourceConfigSource(), extensionsapiserver.Scheme); err != nil {
 		return nil, err
 	}
 

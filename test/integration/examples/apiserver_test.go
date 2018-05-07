@@ -429,9 +429,9 @@ func testAPIGroupList(t *testing.T, client rest.Interface) {
 		Version:      wardlev1beta1.SchemeGroupVersion.Version,
 	}
 
-	assert.Equal(t, v1alpha1, apiGroupList.Groups[0].Versions[0])
-	assert.Equal(t, v1beta1, apiGroupList.Groups[0].Versions[1])
-	assert.Equal(t, v1alpha1, apiGroupList.Groups[0].PreferredVersion)
+	assert.Equal(t, v1beta1, apiGroupList.Groups[0].Versions[0])
+	assert.Equal(t, v1alpha1, apiGroupList.Groups[0].Versions[1])
+	assert.Equal(t, v1beta1, apiGroupList.Groups[0].PreferredVersion)
 }
 
 func testAPIGroup(t *testing.T, client rest.Interface) {
@@ -447,8 +447,8 @@ func testAPIGroup(t *testing.T, client rest.Interface) {
 	}
 	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.Group, apiGroup.Name)
 	assert.Equal(t, 2, len(apiGroup.Versions))
-	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.String(), apiGroup.Versions[0].GroupVersion)
-	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.Version, apiGroup.Versions[0].Version)
+	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.String(), apiGroup.Versions[1].GroupVersion)
+	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.Version, apiGroup.Versions[1].Version)
 	assert.Equal(t, apiGroup.PreferredVersion, apiGroup.Versions[0])
 }
 

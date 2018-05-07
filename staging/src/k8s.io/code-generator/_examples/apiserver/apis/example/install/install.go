@@ -20,13 +20,14 @@ package install
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/code-generator/_examples/apiserver/apis/example"
 	"k8s.io/code-generator/_examples/apiserver/apis/example/v1"
 )
 
 // Install registers the API group and adds types to a scheme
 func Install(scheme *runtime.Scheme) {
-	example.AddToSchemeOrDie(scheme)
-	v1.AddToSchemeOrDie(scheme)
-	scheme.SetVersionPriorityOrDie(v1.SchemeGroupVersion)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion))
 }

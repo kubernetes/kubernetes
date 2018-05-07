@@ -235,7 +235,7 @@ func NewMasterConfig() *master.Config {
 	info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(legacyscheme.Scheme, info)
 
-	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Registry)
+	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
 	// FIXME (soltysh): this GroupVersionResource override should be configurable
 	// we need to set both for the whole group and for cronjobs, separately
 	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})

@@ -35,7 +35,7 @@ func TestCreateService(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	negSer := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -69,7 +69,7 @@ func TestCreateServiceNodePort(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	negSer := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -103,7 +103,7 @@ func TestCreateServiceExternalName(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	negSer := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{

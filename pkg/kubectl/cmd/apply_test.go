@@ -398,7 +398,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -1127,7 +1127,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},

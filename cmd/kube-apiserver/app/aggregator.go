@@ -84,7 +84,7 @@ func createAggregatorConfig(
 	if err := commandOptions.APIEnablement.ApplyTo(
 		&genericConfig,
 		aggregatorapiserver.DefaultAPIResourceConfigSource(),
-		aggregatorscheme.Registry); err != nil {
+		aggregatorscheme.Scheme); err != nil {
 		return nil, err
 	}
 

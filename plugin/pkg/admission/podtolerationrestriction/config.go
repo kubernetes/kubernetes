@@ -21,7 +21,6 @@ import (
 	"io"
 	"io/ioutil"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	internalapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
@@ -31,13 +30,12 @@ import (
 )
 
 var (
-	registry = registered.NewAPIRegistrationManager()
-	scheme   = runtime.NewScheme()
-	codecs   = serializer.NewCodecFactory(scheme)
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
 )
 
 func init() {
-	install.Install(registry, scheme)
+	install.Install(scheme)
 }
 
 // LoadConfiguration loads the provided configuration.

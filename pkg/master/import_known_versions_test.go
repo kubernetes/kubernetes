@@ -49,7 +49,7 @@ func TestGroupVersions(t *testing.T) {
 		t.Errorf("No additional unnamespaced groups should be created")
 	}
 
-	for _, gv := range legacyscheme.Registry.RegisteredGroupVersions() {
+	for _, gv := range legacyscheme.Scheme.PrioritizedVersionsAllGroups() {
 		if !strings.HasSuffix(gv.Group, ".k8s.io") && !legacyUnsuffixedGroups.Has(gv.Group) {
 			t.Errorf("Group %s does not have the standard kubernetes API group suffix of .k8s.io", gv.Group)
 		}
