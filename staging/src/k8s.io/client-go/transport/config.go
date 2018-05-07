@@ -17,6 +17,7 @@ limitations under the License.
 package transport
 
 import (
+	"context"
 	"net"
 	"net/http"
 )
@@ -52,7 +53,12 @@ type Config struct {
 	// RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
 
+	// DialContext specifies the dial function for creating unencrypted TCP connections.
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
+
 	// Dial specifies the dial function for creating unencrypted TCP connections.
+	// Deprecated: Use DialContext instead, which allows cancel the dialing.
+	// If both are set, DialContext takes priority.
 	Dial func(network, addr string) (net.Conn, error)
 }
 

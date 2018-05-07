@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -24,8 +26,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,8 +35,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 
-	"errors"
-
+	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -208,6 +207,10 @@ func (n *fakeNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, 
 	return &fakeCodec{}
 }
 
+var fakeDialContextFunc = func(context context.Context, network, addr string) (net.Conn, error) {
+	return nil, fakeDialerError
+}
+
 var fakeDialFunc = func(network, addr string) (net.Conn, error) {
 	return nil, fakeDialerError
 }
@@ -254,6 +257,8 @@ func TestAnonymousConfig(t *testing.T) {
 		},
 		// Dial does not require fuzzer
 		func(r *func(network, addr string) (net.Conn, error), f fuzz.Continue) {},
+		// DialContext does not require fuzzer
+		func(r *func(context context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {},
 	)
 	for i := 0; i < 20; i++ {
 		original := &Config{}
@@ -332,6 +337,9 @@ func TestCopyConfig(t *testing.T) {
 		func(r *func(network, addr string) (net.Conn, error), f fuzz.Continue) {
 			*r = fakeDialFunc
 		},
+		func(r *func(context context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {
+			*r = fakeDialContextFunc
+		},
 	)
 	for i := 0; i < 20; i++ {
 		original := &Config{}
@@ -359,11 +367,22 @@ func TestCopyConfig(t *testing.T) {
 		}
 		actual.Dial = nil
 		expected.Dial = nil
+
+		if actual.DialContext != nil {
+			_, actualError := actual.DialContext(nil, "", "")
+			_, expectedError := actual.DialContext(nil, "", "")
+			if !reflect.DeepEqual(expectedError, actualError) {
+				t.Fatalf("CopyConfig dropped the DialContext field")
+			}
+		}
+		actual.DialContext = nil
+		expected.DialContext = nil
+
 		if actual.AuthConfigPersister != nil {
 			actualError := actual.AuthConfigPersister.Persist(nil)
 			expectedError := actual.AuthConfigPersister.Persist(nil)
 			if !reflect.DeepEqual(expectedError, actualError) {
-				t.Fatalf("CopyConfig  dropped the Dial field")
+				t.Fatalf("CopyConfig  dropped the Dial and DialContext field")
 			}
 		}
 		actual.AuthConfigPersister = nil
