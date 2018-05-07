@@ -54,6 +54,13 @@ func (v validationMatch) matches(err *field.Error) bool {
 }
 
 func TestValidateCustomResourceDefinition(t *testing.T) {
+	singleVersionList := []apiextensions.CustomResourceDefinitionVersion{
+		{
+			Name:    "version",
+			Served:  true,
+			Storage: true,
+		},
+	}
 	tests := []struct {
 		name     string
 		resource *apiextensions.CustomResourceDefinition
@@ -174,16 +181,10 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
 				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group:   "group.com",
-					Version: "version",
-					Versions: []apiextensions.CustomResourceDefinitionVersion{
-						{
-							Name:    "version",
-							Served:  true,
-							Storage: true,
-						},
-					},
-					Scope: apiextensions.NamespaceScoped,
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -209,16 +210,10 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
 				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group:   "group.com",
-					Version: "version",
-					Versions: []apiextensions.CustomResourceDefinitionVersion{
-						{
-							Name:    "version",
-							Served:  true,
-							Storage: true,
-						},
-					},
-					Scope: apiextensions.NamespaceScoped,
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",

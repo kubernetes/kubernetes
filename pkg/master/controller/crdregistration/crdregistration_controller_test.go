@@ -24,6 +24,7 @@ import (
 	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 )
@@ -32,7 +33,7 @@ func TestHandleVersionUpdate(t *testing.T) {
 	tests := []struct {
 		name         string
 		startingCRDs []*apiextensions.CustomResourceDefinition
-		version      schema.GroupVersion
+		versions     []schema.GroupVersion
 
 		expectedAdded   []*apiregistration.APIService
 		expectedRemoved []string
@@ -42,8 +43,16 @@ func TestHandleVersionUpdate(t *testing.T) {
 			startingCRDs: []*apiextensions.CustomResourceDefinition{
 				{
 					Spec: apiextensions.CustomResourceDefinitionSpec{
-						Group:   "group.com",
-						Version: "v1",
+						Group: "group.com",
+						// Version field is deprecated and crd registration won't rely on it at all.
+						// defaulting route will fill up Versions field if user only provided version field.
+						Versions: []apiextensions.CustomResourceDefinitionVersion{
+							{
+								Name:    "v1",
+								Served:  true,
+								Storage: true,
+							},
+						},
 					},
 				},
 			},
@@ -66,8 +75,14 @@ func TestHandleVersionUpdate(t *testing.T) {
 			startingCRDs: []*apiextensions.CustomResourceDefinition{
 				{
 					Spec: apiextensions.CustomResourceDefinitionSpec{
-						Group:   "group.com",
-						Version: "v1",
+						Group: "group.com",
+						Versions: []apiextensions.CustomResourceDefinitionVersion{
+							{
+								Name:    "v1",
+								Served:  true,
+								Storage: true,
+							},
+						},
 					},
 				},
 			},
@@ -98,7 +113,6 @@ func TestHandleVersionUpdate(t *testing.T) {
 			t.Errorf("%s expected %v, got %v", test.name, test.expectedRemoved, registration.removed)
 		}
 	}
-
 }
 
 type fakeAPIServiceRegistration struct {
@@ -111,4 +125,9 @@ func (a *fakeAPIServiceRegistration) AddAPIServiceToSync(in *apiregistration.API
 }
 func (a *fakeAPIServiceRegistration) RemoveAPIServiceToSync(name string) {
 	a.removed = append(a.removed, name)
+}
+
+func testVersionedCRDRegistration() {
+	client := fake.NewSimpleClientset()
+
 }

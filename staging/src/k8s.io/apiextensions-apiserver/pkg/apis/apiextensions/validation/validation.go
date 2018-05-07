@@ -65,13 +65,13 @@ func ValidateCustomResourceDefinitionStoredVersions(storedVersions []string, ver
 		storedVersionsMap[v] = i
 	}
 	for _, v := range versions {
-		if _, ok := storedVersionsMap[v.Name]; v.Served && ok {
+		if _, ok := storedVersionsMap[v.Name]; ok {
 			delete(storedVersionsMap, v.Name)
 		}
 	}
 
 	for v, i := range storedVersionsMap {
-		allErrs = append(allErrs, field.Invalid(fldPath.Index(i), v, "Cannot delete this version from Spec.Versions"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Index(i), v, "must appear in spec.versions"))
 	}
 
 	return allErrs
@@ -96,12 +96,6 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), spec.Group, "should be a domain with at least one dot"))
 	}
 
-	if len(spec.Version) != 0 {
-		if errs := validationutil.IsDNS1035Label(spec.Version); len(errs) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, strings.Join(errs, ",")))
-		}
-	}
-
 	switch spec.Scope {
 	case "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
@@ -112,12 +106,13 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 
 	storageFlagCount := 0
 	versionsMap := map[string]bool{}
+	uniqueNames := true
 	for i, version := range spec.Versions {
 		if version.Storage {
 			storageFlagCount++
 		}
 		if versionsMap[version.Name] {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i), spec.Versions[i], "duplicate version name "+version.Name))
+			uniqueNames = false
 		} else {
 			versionsMap[version.Name] = true
 		}
@@ -125,12 +120,18 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i), spec.Versions[i], strings.Join(errs, ",")))
 		}
 	}
-	if storageFlagCount != 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), spec.Versions, "one and only one version should be marked as storage version"))
+	if !uniqueNames {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), spec.Versions, "must contain unique version names"))
 	}
-	if len(spec.Version) != 0 && len(spec.Versions) > 1 {
-		if spec.Versions[0].Name != spec.Version {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, "spec.version should be the first item in spec.versions"))
+	if storageFlagCount != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), spec.Versions, "must have exactly one version marked as storage version"))
+	}
+	if len(spec.Version) != 0 {
+		if errs := validationutil.IsDNS1035Label(spec.Version); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, strings.Join(errs, ",")))
+		}
+		if len(spec.Versions) > 1 && spec.Versions[0].Name != spec.Version {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, "must match the first version in spec.versions"))
 		}
 	}
 

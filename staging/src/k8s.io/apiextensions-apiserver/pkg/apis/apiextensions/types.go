@@ -26,7 +26,8 @@ type CustomResourceDefinitionSpec struct {
 	Group string
 	// Version is the version this resource belongs in
 	// Should be always first item in Versions field if provided.
-	// If Versions field is provided, this field is optional.
+	// Optional, but at least one of Version or Versions must be set.
+	// Deprecated: Please use `Versions`.
 	Version string
 	// Names are the names used to describe this custom resource
 	Names CustomResourceDefinitionNames
@@ -50,7 +51,7 @@ type CustomResourceDefinitionVersion struct {
 	Name string
 	// Served is a flag enabling/disabling this version from being served via REST APIs
 	Served bool
-	// Storage flags the version as a storage version. There must be exactly one flagged
+	// Storage flags the version as storage version. There must be exactly one flagged
 	// as storage version.
 	Storage bool
 }
@@ -136,9 +137,10 @@ type CustomResourceDefinitionStatus struct {
 	AcceptedNames CustomResourceDefinitionNames
 
 	// StoredVersions are all versions ever marked as storage in spec. Tracking these
-	// versions allows a migration path for stored version in etcd. The field is mutable
-	// so the migration controller can first make sure a version is certified (i.e. all
-	// stored objects is that version) then remove the rest of the versions from this list.
+	// versions allows a migration path for stored versions in etcd. The field is mutable
+	// so the migration controller can first finish a migration to another version (i.e.
+	// that no old objects are left in the storage), and then remove the rest of the
+	// versions from this list.
 	// None of the versions in this list can be removed from the spec.Versions field.
 	StoredVersions []string
 }

@@ -42,6 +42,17 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(obj.Names.ListKind) == 0 && len(obj.Names.Kind) > 0 {
 				obj.Names.ListKind = obj.Names.Kind + "List"
 			}
+			if len(obj.Versions) == 0 && len(obj.Version) != 0 {
+				obj.Versions = []apiextensions.CustomResourceDefinitionVersion{
+					{
+						Name:    obj.Version,
+						Served:  true,
+						Storage: true,
+					},
+				}
+			} else if len(obj.Versions) != 0 {
+				obj.Version = obj.Versions[0].Name
+			}
 		},
 		func(obj *apiextensions.JSONSchemaProps, c fuzz.Continue) {
 			// we cannot use c.FuzzNoCustom because of the interface{} fields. So let's loop with reflection.

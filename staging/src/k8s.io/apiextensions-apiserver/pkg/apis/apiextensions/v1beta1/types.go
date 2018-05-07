@@ -26,7 +26,8 @@ type CustomResourceDefinitionSpec struct {
 	Group string `json:"group" protobuf:"bytes,1,opt,name=group"`
 	// Version is the version this resource belongs in
 	// Should be always first item in Versions field if provided.
-	// If Versions field is provided, this field is optional.
+	// Optional, but at least one of Version or Versions must be set.
+	// Deprecated: Please use `Versions`.
 	// +optional
 	Version string `json:"version,omitempty" protobuf:"bytes,2,opt,name=version"`
 	// Names are the names used to describe this custom resource
@@ -57,7 +58,7 @@ type CustomResourceDefinitionVersion struct {
 	// Default is True.
 	// +optional
 	Served bool `json:"served" protobuf:"varint,2,opt,name=served"`
-	// Storage flags the version as a storage version. There must be exactly one
+	// Storage flags the version as storage version. There must be exactly one
 	// flagged as storage version.
 	// Default is False.
 	// +optional
@@ -145,9 +146,10 @@ type CustomResourceDefinitionStatus struct {
 	AcceptedNames CustomResourceDefinitionNames `json:"acceptedNames" protobuf:"bytes,2,opt,name=acceptedNames"`
 
 	// StoredVersions are all versions ever marked as storage in spec. Tracking these
-	// versions allow a migration path for stored version in etcd. The field is mutable
-	// so the migration controller can first make sure a version is certified (i.e. all
-	// stored objects is that version) then remove the rest of the versions from this list.
+	// versions allows a migration path for stored versions in etcd. The field is mutable
+	// so the migration controller can first finish a migration to another version (i.e.
+	// that no old objects are left in the storage), and then remove the rest of the
+	// versions from this list.
 	// None of the versions in this list can be removed from the spec.Versions field.
 	StoredVersions []string `protobuf:"bytes,3,rep,name=storedVersions"`
 }

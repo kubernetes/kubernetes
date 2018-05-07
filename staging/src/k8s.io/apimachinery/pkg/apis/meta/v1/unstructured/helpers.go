@@ -460,12 +460,12 @@ type UnstructuredObjectConverter struct{}
 func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 	unstructIn, ok := in.(*Unstructured)
 	if !ok {
-		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
+		return fmt.Errorf("input type %T is not valid for unstructured conversion", in)
 	}
 
 	unstructOut, ok := out.(*Unstructured)
 	if !ok {
-		return fmt.Errorf("output type %T in not valid for unstructured conversion", out)
+		return fmt.Errorf("output type %T is not valid for unstructured conversion", out)
 	}
 
 	// maybe deep copy the map? It is documented in the
