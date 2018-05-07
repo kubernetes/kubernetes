@@ -359,7 +359,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			expectedErr:  "error: Unexpected -o output mode: wide, the flag 'output' must be one of yaml|json\nSee 'view-last-applied -h' for help and examples.",
 			expectedOut:  "",
 			selector:     "",
-			args:         []string{"rc", "test-rc"},
+			args:         []string{"replicationcontroller", "test-rc"},
 			respBytes:    rcBytesWithConfig,
 		},
 		{
@@ -369,7 +369,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			expectedErr:  "",
 			expectedOut:  "test: 1234\n",
 			selector:     "name=test-rc",
-			args:         []string{"rc"},
+			args:         []string{"replicationcontroller"},
 			respBytes:    rcBytesWithConfig,
 		},
 		{
@@ -379,7 +379,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			expectedErr:  "error: no last-applied-configuration annotation found on resource: test-rc",
 			expectedOut:  "",
 			selector:     "",
-			args:         []string{"rc", "test-rc"},
+			args:         []string{"replicationcontroller", "test-rc"},
 			respBytes:    rcBytes,
 		},
 		{
@@ -389,7 +389,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			expectedErr:  "Error from server (NotFound): the server could not find the requested resource (get replicationcontrollers no-match)",
 			expectedOut:  "",
 			selector:     "",
-			args:         []string{"rc", "no-match"},
+			args:         []string{"replicationcontroller", "no-match"},
 			respBytes:    nil,
 		},
 	}
