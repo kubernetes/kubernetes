@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -109,7 +110,12 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
+	// DialContext specifies the dial function for creating unencrypted TCP connections.
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
+
 	// Dial specifies the dial function for creating unencrypted TCP connections.
+	// Deprecated: Use DialContext instead, which allows cancel the dialing.
+	// If both are set, DialContext takes priority.
 	Dial func(network, addr string) (net.Conn, error)
 
 	// Version forces a specific version to be used (if registered)
@@ -415,6 +421,7 @@ func AnonymousClientConfig(config *Config) *Config {
 		Burst:         config.Burst,
 		Timeout:       config.Timeout,
 		Dial:          config.Dial,
+		DialContext:   config.DialContext,
 	}
 }
 
@@ -453,5 +460,6 @@ func CopyConfig(config *Config) *Config {
 		RateLimiter:   config.RateLimiter,
 		Timeout:       config.Timeout,
 		Dial:          config.Dial,
+		DialContext:   config.DialContext,
 	}
 }
