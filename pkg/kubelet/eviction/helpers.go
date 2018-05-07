@@ -38,8 +38,8 @@ import (
 
 const (
 	unsupportedEvictionSignal = "unsupported eviction signal %v"
-	// the reason reported back in status.
-	reason = "Evicted"
+	// Reason is the reason reported back in status.
+	Reason = "Evicted"
 	// the message associated with the reason.
 	message = "The node was low on resource: %v. "
 	// additional information for containers exceeding requests
@@ -1028,7 +1028,7 @@ func buildSignalToRankFunc(withImageFs bool) map[evictionapi.Signal]rankFunc {
 
 // PodIsEvicted returns true if the reported pod status is due to an eviction.
 func PodIsEvicted(podStatus v1.PodStatus) bool {
-	return podStatus.Phase == v1.PodFailed && podStatus.Reason == reason
+	return podStatus.Phase == v1.PodFailed && podStatus.Reason == Reason
 }
 
 // buildSignalToNodeReclaimFuncs returns reclaim functions associated with resources.
