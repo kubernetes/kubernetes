@@ -12,6 +12,7 @@ go_library(
         "attacher.go",
         "azure_common.go",
         "azure_dd.go",
+        "azure_dd_block.go",
         "azure_mounter.go",
         "azure_provision.go",
     ] + select({
@@ -60,6 +61,7 @@ go_library(
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//pkg/volume/util/volumepathhandler:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -89,6 +91,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "azure_common_test.go",
+        "azure_dd_block_test.go",
         "azure_dd_test.go",
     ],
     embed = [":go_default_library"],
@@ -97,6 +100,8 @@ go_test(
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
     ],
 )
