@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discovery
+package restmapper
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 
 	"github.com/golang/glog"
 )
@@ -37,9 +38,9 @@ type APIGroupResources struct {
 	VersionedResources map[string][]metav1.APIResource
 }
 
-// NewRESTMapper returns a PriorityRESTMapper based on the discovered
+// NewDiscoveryRESTMapper returns a PriorityRESTMapper based on the discovered
 // groups and resources passed in.
-func NewRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper {
+func NewDiscoveryRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper {
 	unionMapper := meta.MultiRESTMapper{}
 
 	var groupPriority []string
@@ -141,7 +142,7 @@ func NewRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper {
 
 // GetAPIGroupResources uses the provided discovery client to gather
 // discovery information and populate a slice of APIGroupResources.
-func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
+func GetAPIGroupResources(cl discovery.DiscoveryInterface) ([]*APIGroupResources, error) {
 	apiGroups, err := cl.ServerGroups()
 	if err != nil {
 		if apiGroups == nil || len(apiGroups.Groups) == 0 {
@@ -177,13 +178,13 @@ func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 type DeferredDiscoveryRESTMapper struct {
 	initMu   sync.Mutex
 	delegate meta.RESTMapper
-	cl       CachedDiscoveryInterface
+	cl       discovery.CachedDiscoveryInterface
 }
 
 // NewDeferredDiscoveryRESTMapper returns a
 // DeferredDiscoveryRESTMapper that will lazily query the provided
 // client for discovery information to do REST mappings.
-func NewDeferredDiscoveryRESTMapper(cl CachedDiscoveryInterface) *DeferredDiscoveryRESTMapper {
+func NewDeferredDiscoveryRESTMapper(cl discovery.CachedDiscoveryInterface) *DeferredDiscoveryRESTMapper {
 	return &DeferredDiscoveryRESTMapper{
 		cl: cl,
 	}
@@ -202,7 +203,7 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 		return nil, err
 	}
 
-	d.delegate = NewRESTMapper(groupResources)
+	d.delegate = NewDiscoveryRESTMapper(groupResources)
 	return d.delegate, err
 }
 
