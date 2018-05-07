@@ -48,7 +48,7 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, er
 	}
 
 	// wrap the printer in a versioning printer that understands when to convert and when not to convert
-	return NewVersionedPrinter(printer, legacyscheme.Scheme, legacyscheme.Scheme, kubectlscheme.Versions...), nil
+	return NewVersionedPrinter(printer, legacyscheme.Scheme, legacyscheme.Scheme, kubectlscheme.Scheme.PrioritizedVersionsAllGroups()...), nil
 
 }
 

@@ -663,7 +663,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	if len(overrides) > 0 {
-		codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Registry.RegisteredGroupVersions()...))
+		codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
 		obj, err = cmdutil.Merge(codec, obj, overrides)
 		if err != nil {
 			return nil, err
