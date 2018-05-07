@@ -327,6 +327,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
 		var heartbeatClient v1core.CoreV1Interface
+		var closeAllConns func()
 		var externalKubeClient clientgoclientset.Interface
 
 		clientConfig, err := CreateAPIServerClientConfig(s)
@@ -339,7 +340,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 					return err
 				}
 			}
-			_, err := certificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager)
+			closeAllConns, err = certificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager)
 			if err != nil {
 				return err
 			}
@@ -387,6 +388,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		kubeDeps.ExternalKubeClient = externalKubeClient
 		if heartbeatClient != nil {
 			kubeDeps.HeartbeatClient = heartbeatClient
+			kubeDeps.OnHeartbeatFailure = closeAllConns
 		}
 		if eventClient != nil {
 			kubeDeps.EventClient = eventClient
