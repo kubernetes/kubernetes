@@ -86,17 +86,15 @@ func (g *GenScheme) GenerateType(c *generator.Context, t *types.Type, w io.Write
 	allInstallGroups := clientgentypes.ToGroupInstallPackages(g.Groups, g.GroupGoNames)
 
 	m := map[string]interface{}{
-		"allGroupVersions":                 allGroupVersions,
-		"allInstallGroups":                 allInstallGroups,
-		"customRegister":                   false,
-		"runtimeNewParameterCodec":         c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "NewParameterCodec"}),
-		"runtimeNewScheme":                 c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "NewScheme"}),
-		"serializerNewCodecFactory":        c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/serializer", Name: "NewCodecFactory"}),
-		"runtimeScheme":                    c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Scheme"}),
-		"schemaGroupVersion":               c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
-		"metav1AddToGroupVersion":          c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "AddToGroupVersion"}),
-		"registeredNew":                    c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apimachinery/registered", Name: "NewAPIRegistrationManager"}),
-		"registeredAPIRegistrationManager": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apimachinery/registered", Name: "APIRegistrationManager"}),
+		"allGroupVersions":          allGroupVersions,
+		"allInstallGroups":          allInstallGroups,
+		"customRegister":            false,
+		"runtimeNewParameterCodec":  c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "NewParameterCodec"}),
+		"runtimeNewScheme":          c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "NewScheme"}),
+		"serializerNewCodecFactory": c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/serializer", Name: "NewCodecFactory"}),
+		"runtimeScheme":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Scheme"}),
+		"schemaGroupVersion":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
+		"metav1AddToGroupVersion":   c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "AddToGroupVersion"}),
 	}
 	globals := map[string]string{
 		"Scheme":         "Scheme",
@@ -136,20 +134,18 @@ var $.ParameterCodec$ = $.runtimeNewParameterCodec|raw$($.Scheme$)
 `
 
 var registryRegistration = `
-var $.Registry$ = $.registeredNew|raw$()
-
 func init() {
 	$.metav1AddToGroupVersion|raw$($.Scheme$, $.schemaGroupVersion|raw${Version: "v1"})
-	Install($.Registry$, $.Scheme$)
+	Install($.Scheme$)
 }
 
 // Install registers the API group and adds types to a scheme
-func Install(registry *$.registeredAPIRegistrationManager|raw$, scheme *$.runtimeScheme|raw$) {
+func Install(scheme *$.runtimeScheme|raw$) {
 	$- range .allInstallGroups$
-	$.InstallPackageAlias$.Install(registry, scheme)
+	$.InstallPackageAlias$.Install(scheme)
 	$- end$
 	$if .customRegister$
-	ExtraInstall(registry, scheme)
+	ExtraInstall(scheme)
 	$end -$
 }
 `

@@ -53,7 +53,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -106,7 +106,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -170,7 +170,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -237,7 +237,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -292,7 +292,7 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -360,7 +360,7 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -438,7 +438,7 @@ func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{

@@ -30,7 +30,6 @@ var (
 	SchemeBuilder      runtime.SchemeBuilder
 	localSchemeBuilder = &SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
-	AddToSchemeOrDie   = localSchemeBuilder.AddToSchemeOrDie
 )
 
 func init() {

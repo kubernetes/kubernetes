@@ -34,7 +34,7 @@ func TestReplaceObject(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	deleted := false
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -91,7 +91,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	redisMasterDeleted := false
 	frontendDeleted := false
@@ -162,7 +162,7 @@ func TestReplaceDirectory(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	created := map[string]bool{}
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -220,7 +220,7 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,

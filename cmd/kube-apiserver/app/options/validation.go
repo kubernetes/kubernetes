@@ -82,7 +82,7 @@ func (s *ServerRunOptions) Validate() []error {
 	if s.MasterCount <= 0 {
 		errors = append(errors, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
 	}
-	if errs := s.APIEnablement.Validate(legacyscheme.Registry, apiextensionsapiserver.Registry, aggregatorscheme.Registry); len(errs) > 0 {
+	if errs := s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
 

@@ -256,7 +256,7 @@ func (c *configOkCondition) Sync(client clientset.Interface, nodeName string) {
 		err = fmt.Errorf("unsupported media type %q", mediaType)
 		return
 	}
-	versions := legacyscheme.Registry.RegisteredVersionsForGroup(api.GroupName)
+	versions := legacyscheme.Scheme.PrioritizedVersionsForGroup(api.GroupName)
 	if len(versions) == 0 {
 		err = fmt.Errorf("no enabled versions for group %q", api.GroupName)
 		return

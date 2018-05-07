@@ -436,7 +436,7 @@ func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
 	mapper = meta.FirstHitRESTMapper{
 		MultiRESTMapper: meta.MultiRESTMapper{
 			mapper,
-			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme),
+			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		},
 	}
 

@@ -59,7 +59,7 @@ var (
 	corev1GV     = schema.GroupVersion{Version: "v1"}
 	corev1Codec  = scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
 	metaAccessor = meta.NewAccessor()
-	restmapper   = testrestmapper.TestOnlyStaticRESTMapper(scheme.Registry, scheme.Scheme)
+	restmapper   = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme)
 )
 
 func stringBody(body string) io.ReadCloser {
@@ -274,7 +274,7 @@ func newDefaultBuilder() *Builder {
 
 func newDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
 	return NewFakeBuilder(fakeClientFn, restmapper, categories.LegacyCategoryExpander).
-		WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...)
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
 }
 
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
