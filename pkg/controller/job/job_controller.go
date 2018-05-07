@@ -625,7 +625,7 @@ func pastBackoffLimitOnFailure(job *batch.Job, pods []*v1.Pod) bool {
 	result := int32(0)
 	for i := range pods {
 		po := pods[i]
-		if po.Status.Phase != v1.PodRunning {
+		if po.Status.Phase == v1.PodRunning {
 			continue
 		}
 		for j := range po.Status.InitContainerStatuses {
