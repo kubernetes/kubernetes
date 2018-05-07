@@ -2746,13 +2746,6 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">photonPersistentDisk</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_photonpersistentdiskvolumesource">v1.PhotonPersistentDiskVolumeSource</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">projected</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Items for all in one resources secrets, configmaps, and downward API</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -3851,47 +3844,6 @@ Examples:<br>
 
 </div>
 <div class="sect2">
-<h3 id="_v1_photonpersistentdiskvolumesource">v1.PhotonPersistentDiskVolumeSource</h3>
-<div class="paragraph">
-<p>Represents a Photon Controller persistent disk resource.</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">pdID</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ID that identifies Photon Controller persistent disk</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
 <h3 id="_v1_scaleiovolumesource">v1.ScaleIOVolumeSource</h3>
 <div class="paragraph">
 <p>ScaleIOVolumeSource represents a persistent ScaleIO volume</p>
@@ -4254,47 +4206,6 @@ Examples:<br>
 
 </div>
 <div class="sect2">
-<h3 id="_v1beta1_cronjobstatus">v1beta1.CronJobStatus</h3>
-<div class="paragraph">
-<p>CronJobStatus represents the current state of a cron job.</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">active</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A list of pointers to currently running jobs.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectreference">v1.ObjectReference</a> array</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">lastScheduleTime</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Information when was the last time the job was successfully scheduled.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
 <h3 id="_v1_fcvolumesource">v1.FCVolumeSource</h3>
 <div class="paragraph">
 <p>Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.</p>
@@ -4350,6 +4261,47 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1beta1_cronjobstatus">v1beta1.CronJobStatus</h3>
+<div class="paragraph">
+<p>CronJobStatus represents the current state of a cron job.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">active</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A list of pointers to currently running jobs.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectreference">v1.ObjectReference</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lastScheduleTime</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Information when was the last time the job was successfully scheduled.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>

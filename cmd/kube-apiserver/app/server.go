@@ -812,7 +812,6 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"io.k8s.kubernetes.pkg.apis.rbac.v1beta1.RoleRef":                                              "io.k8s.api.rbac.v1beta1.RoleRef",
 		"io.k8s.kubernetes.pkg.apis.apps.v1beta1.Scale":                                                "io.k8s.api.apps.v1beta1.Scale",
 		"io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.InitializerConfiguration":           "io.k8s.api.admissionregistration.v1alpha1.InitializerConfiguration",
-		"io.k8s.kubernetes.pkg.api.v1.PhotonPersistentDiskVolumeSource":                                "io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource",
 		"io.k8s.kubernetes.pkg.api.v1.PreferredSchedulingTerm":                                         "io.k8s.api.core.v1.PreferredSchedulingTerm",
 		"io.k8s.kubernetes.pkg.apis.batch.v1.JobSpec":                                                  "io.k8s.api.batch.v1.JobSpec",
 		"io.k8s.kubernetes.pkg.api.v1.EventSource":                                                     "io.k8s.api.core.v1.EventSource",

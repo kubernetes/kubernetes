@@ -347,8 +347,6 @@ filegroup(
         "//vendor/github.com/vishvananda/netlink:all-srcs",
         "//vendor/github.com/vishvananda/netns:all-srcs",
         "//vendor/github.com/vmware/govmomi:all-srcs",
-        "//vendor/github.com/vmware/photon-controller-go-sdk/SSPI:all-srcs",
-        "//vendor/github.com/vmware/photon-controller-go-sdk/photon:all-srcs",
         "//vendor/github.com/xanzy/go-cloudstack/cloudstack:all-srcs",
         "//vendor/github.com/xiang90/probing:all-srcs",
         "//vendor/golang.org/x/crypto/bcrypt:all-srcs",

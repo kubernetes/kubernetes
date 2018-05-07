@@ -607,14 +607,6 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 			allErrs = append(allErrs, validateVsphereVolumeSource(source.VsphereVolume, fldPath.Child("vsphereVolume"))...)
 		}
 	}
-	if source.PhotonPersistentDisk != nil {
-		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("photonPersistentDisk"), "may not specify more than 1 volume type"))
-		} else {
-			numVolumes++
-			allErrs = append(allErrs, validatePhotonPersistentDiskVolumeSource(source.PhotonPersistentDisk, fldPath.Child("photonPersistentDisk"))...)
-		}
-	}
 	if source.PortworxVolume != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("portworxVolume"), "may not specify more than 1 volume type"))
@@ -1323,14 +1315,6 @@ func validateVsphereVolumeSource(cd *core.VsphereVirtualDiskVolumeSource, fldPat
 	return allErrs
 }
 
-func validatePhotonPersistentDiskVolumeSource(cd *core.PhotonPersistentDiskVolumeSource, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(cd.PdID) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("pdID"), ""))
-	}
-	return allErrs
-}
-
 func validatePortworxVolumeSource(pwx *core.PortworxVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(pwx.VolumeID) == 0 {
@@ -1648,14 +1632,6 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateVsphereVolumeSource(pv.Spec.VsphereVolume, specPath.Child("vsphereVolume"))...)
-		}
-	}
-	if pv.Spec.PhotonPersistentDisk != nil {
-		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("photonPersistentDisk"), "may not specify more than 1 volume type"))
-		} else {
-			numVolumes++
-			allErrs = append(allErrs, validatePhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, specPath.Child("photonPersistentDisk"))...)
 		}
 	}
 	if pv.Spec.PortworxVolume != nil {

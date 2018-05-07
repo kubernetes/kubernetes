@@ -62,7 +62,6 @@ func GetAllFSTypesAsSet() sets.String {
 		string(policy.VsphereVolume),
 		string(policy.Quobyte),
 		string(policy.AzureDisk),
-		string(policy.PhotonPersistentDisk),
 		string(policy.StorageOS),
 		string(policy.Projected),
 		string(policy.PortworxVolume),
@@ -119,8 +118,6 @@ func GetVolumeFSType(v api.Volume) (policy.FSType, error) {
 		return policy.Quobyte, nil
 	case v.AzureDisk != nil:
 		return policy.AzureDisk, nil
-	case v.PhotonPersistentDisk != nil:
-		return policy.PhotonPersistentDisk, nil
 	case v.StorageOS != nil:
 		return policy.StorageOS, nil
 	case v.Projected != nil:
