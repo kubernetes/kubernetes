@@ -39,7 +39,11 @@ def export_urls_impl(repo_ctx):
     repo_ctx.file(repo_ctx.path("BUILD.bazel"), """
 exports_files(glob(["**"]), visibility=["//visibility:public"])
 """)
-    repo_ctx.file(repo_ctx.path("urls.txt"), content = "\n".join(repo_ctx.attr.urls))
+    repo_ctx.file(
+        repo_ctx.path("urls.txt"),
+        # Add a trailing newline, since the "while read" loop needs it
+        content = ("\n".join(repo_ctx.attr.urls) + "\n"),
+    )
 
 _export_urls = repository_rule(
     attrs = {
