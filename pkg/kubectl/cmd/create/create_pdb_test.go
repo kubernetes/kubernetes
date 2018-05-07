@@ -69,12 +69,12 @@ func TestCreatePdb(t *testing.T) {
 			IOStreams:  ioStreams,
 		},
 	}
-	err := options.Complete(cmd, []string{pdbName})
+	err := options.Complete(tf, cmd, []string{pdbName})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	err = options.Run(tf)
+	err = options.Run()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
