@@ -33,6 +33,19 @@ var (
 		prometheus.BuildFQName("", "storage_count", "attachable_volumes_in_use"),
 		"Measure number of volumes in use",
 		[]string{"node", "volume_plugin"}, nil)
+
+	adControllerVolumesMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "attachdetach_controller_total_volumes",
+			Help: "Number of volumes in A/D Controller",
+		},
+		[]string{"plugin_name", "state"})
+
+	adControllerForcedDetachMetric = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "attachdetach_controller_total_forced_detaches",
+			Help: "Number of times the A/D Controller performed a forced detach",
+		})
 )
 var registerMetrics sync.Once
 
@@ -49,13 +62,15 @@ type volumeInUseCollector struct {
 //     {"172.168.1.100.ec2.internal": {"aws-ebs": 10, "glusterfs": 3}}
 type nodeVolumeCount map[types.NodeName]map[string]int
 
-// Register registers pvc's in-use metrics
+// Register registers A/D Controller metrics
 func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 	pvLister corelisters.PersistentVolumeLister,
 	podLister corelisters.PodLister,
 	pluginMgr *volume.VolumePluginMgr) {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(newVolumeInUseCollector(pvcLister, podLister, pvLister, pluginMgr))
+		prometheus.MustRegister(adControllerVolumesMetric)
+		prometheus.MustRegister(adControllerForcedDetachMetric)
 	})
 
 }
@@ -131,4 +146,22 @@ func (collector *volumeInUseCollector) getVolumeInUseCount() nodeVolumeCount {
 		}
 	}
 	return nodeVolumeMap
+}
+
+// RecordADControllerVolumesMetric registers the amount of volumes, and their respective states, in the A/D Controller.
+func RecordADControllerVolumesMetric(pluginName, state string) {
+	if pluginName == "" {
+		pluginName = "N/A"
+	}
+	adControllerVolumesMetric.WithLabelValues(pluginName, state).Inc()
+}
+
+// ResetADControllerVolumesMetric resets the amount of volumes, and their respective plugin names and states, in the Volume Manager.
+func ResetADControllerVolumesMetric() {
+	adControllerVolumesMetric.Reset()
+}
+
+// RecordADControllerForcedDetachMetric register the number of times the A/D Controller performed a fored detach.
+func RecordADControllerForcedDetachMetric() {
+	adControllerForcedDetachMetric.Inc()
 }
