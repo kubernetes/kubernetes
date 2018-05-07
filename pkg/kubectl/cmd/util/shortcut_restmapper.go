@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 // shortcutExpander is a RESTMapper that can be used for Kubernetes resources.   It expands the resource first, then invokes the wrapped
@@ -73,8 +72,8 @@ func (e shortcutExpander) RESTMappings(gk schema.GroupKind, versions ...string) 
 // First the list of potential resources will be taken from the API server.
 // Next we will append the hardcoded list of resources - to be backward compatible with old servers.
 // NOTE that the list is ordered by group priority.
-func (e shortcutExpander) getShortcutMappings() ([]*metav1.APIResourceList, []kubectl.ResourceShortcuts, error) {
-	res := []kubectl.ResourceShortcuts{}
+func (e shortcutExpander) getShortcutMappings() ([]*metav1.APIResourceList, []resourceShortcuts, error) {
+	res := []resourceShortcuts{}
 	// get server resources
 	// This can return an error *and* the results it was able to find.  We don't need to fail on the error.
 	apiResList, err := e.discoveryClient.ServerResources()
@@ -89,7 +88,7 @@ func (e shortcutExpander) getShortcutMappings() ([]*metav1.APIResourceList, []ku
 		}
 		for _, apiRes := range apiResources.APIResources {
 			for _, shortName := range apiRes.ShortNames {
-				rs := kubectl.ResourceShortcuts{
+				rs := resourceShortcuts{
 					ShortForm: schema.GroupResource{Group: gv.Group, Resource: shortName},
 					LongForm:  schema.GroupResource{Group: gv.Group, Resource: apiRes.Name},
 				}
@@ -98,8 +97,6 @@ func (e shortcutExpander) getShortcutMappings() ([]*metav1.APIResourceList, []ku
 		}
 	}
 
-	// append hardcoded short forms at the end of the list
-	res = append(res, kubectl.ResourcesShortcutStatic...)
 	return apiResList, res, nil
 }
 
@@ -157,4 +154,11 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 	}
 
 	return resource
+}
+
+// ResourceShortcuts represents a structure that holds the information how to
+// transition from resource's shortcut to its full name.
+type resourceShortcuts struct {
+	ShortForm schema.GroupResource
+	LongForm  schema.GroupResource
 }
