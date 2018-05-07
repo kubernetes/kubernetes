@@ -177,6 +177,14 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	postUpgradeResourceStore := &GCPResourceStore{}
 	t.populateGCPResourceStore(postUpgradeResourceStore)
 
+	// Stub out the number of instances as that is out of Ingress controller's control.
+	for _, ig := range t.resourceStore.IgList {
+		ig.Size = 0
+	}
+	for _, ig := range postUpgradeResourceStore.IgList {
+		ig.Size = 0
+	}
+
 	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
 		i1 := v1.Interface()
 		i2 := v2.Interface()
