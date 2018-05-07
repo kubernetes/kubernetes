@@ -380,6 +380,9 @@ func (kl *Kubelet) syncNodeStatus() {
 func (kl *Kubelet) updateNodeStatus() error {
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := kl.tryUpdateNodeStatus(i); err != nil {
+			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
+				kl.onRepeatedHeartbeatFailure()
+			}
 			glog.Errorf("Error updating node status, will retry: %v", err)
 		} else {
 			return nil
