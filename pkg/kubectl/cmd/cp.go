@@ -261,6 +261,8 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	}
 
 	reader, outStream := io.Pipe()
+	prefix := getPrefix(src.File)
+	prefix = path.Clean(prefix)
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
 			In:  nil,
@@ -272,7 +274,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 		},
 
 		// TODO: Improve error messages by first testing if 'tar' is present in the container?
-		Command:  []string{"tar", "cf", "-", src.File},
+		Command:  []string{"tar", "cf", "-", prefix},
 		Executor: &DefaultRemoteExecutor{},
 	}
 
@@ -280,8 +282,6 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 		defer outStream.Close()
 		o.execute(options)
 	}()
-	prefix := getPrefix(src.File)
-	prefix = path.Clean(prefix)
 	return untarAll(reader, dest.File, prefix)
 }
 
