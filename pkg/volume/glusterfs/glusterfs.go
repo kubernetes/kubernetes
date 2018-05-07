@@ -19,6 +19,7 @@ package glusterfs
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"path"
 	"runtime"
@@ -331,7 +332,8 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	// Refer to backup-volfile-servers @ http://docs.gluster.org/en/latest/Administrator%20Guide/Setting%20Up%20Clients/
 
 	if (len(addrlist) > 0) && (addrlist[0] != "") {
-		ip := addrlist[0]
+		// we'll pick a random address from the list to prevent a mount-storm
+		ip := addrlist[rand.Intn(len(addrlist))]
 		errs = b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", mountOptions)
 		if errs == nil {
 			glog.Infof("successfully mounted directory %s", dir)
