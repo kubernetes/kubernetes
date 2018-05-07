@@ -53,6 +53,27 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpecUpdate(&obj.Spec, &oldObj.Spec, apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established), field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
+	return allErrs
+}
+
+// ValidateCustomResourceDefinitionStoredVersions statically validates
+func ValidateCustomResourceDefinitionStoredVersions(storedVersions []string, versions []apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	storedVersionsMap := map[string]int{}
+	for i, v := range storedVersions {
+		storedVersionsMap[v] = i
+	}
+	for _, v := range versions {
+		if _, ok := storedVersionsMap[v.Name]; v.Served && ok {
+			delete(storedVersionsMap, v.Name)
+		}
+	}
+
+	for v, i := range storedVersionsMap {
+		allErrs = append(allErrs, field.Invalid(fldPath.Index(i), v, "Cannot delete this version from Spec.Versions"))
+	}
+
 	return allErrs
 }
 
@@ -75,10 +96,10 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), spec.Group, "should be a domain with at least one dot"))
 	}
 
-	if len(spec.Version) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("version"), ""))
-	} else if errs := validationutil.IsDNS1035Label(spec.Version); len(errs) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, strings.Join(errs, ",")))
+	if len(spec.Version) != 0 {
+		if errs := validationutil.IsDNS1035Label(spec.Version); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, strings.Join(errs, ",")))
+		}
 	}
 
 	switch spec.Scope {
@@ -87,6 +108,30 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 	case apiextensions.ClusterScoped, apiextensions.NamespaceScoped:
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), spec.Scope, []string{string(apiextensions.ClusterScoped), string(apiextensions.NamespaceScoped)}))
+	}
+
+	storageFlagCount := 0
+	versionsMap := map[string]bool{}
+	for i, version := range spec.Versions {
+		if version.Storage {
+			storageFlagCount++
+		}
+		if versionsMap[version.Name] {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i), spec.Versions[i], "duplicate version name "+version.Name))
+		} else {
+			versionsMap[version.Name] = true
+		}
+		if errs := validationutil.IsDNS1035Label(version.Name); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i), spec.Versions[i], strings.Join(errs, ",")))
+		}
+	}
+	if storageFlagCount != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), spec.Versions, "one and only one version should be marked as storage version"))
+	}
+	if len(spec.Version) != 0 && len(spec.Versions) > 1 {
+		if spec.Versions[0].Name != spec.Version {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, "spec.version should be the first item in spec.versions"))
+		}
 	}
 
 	// in addition to the basic name restrictions, some names are required for spec, but not for status
@@ -130,7 +175,6 @@ func ValidateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.Cus
 
 	if established {
 		// these effect the storage and cannot be changed therefore
-		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Version, oldSpec.Version, fldPath.Child("version"))...)
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Scope, oldSpec.Scope, fldPath.Child("scope"))...)
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Names.Kind, oldSpec.Names.Kind, fldPath.Child("names", "kind"))...)
 	}
