@@ -40,10 +40,10 @@ type ReconcileOptions struct {
 	RBACClient      internalrbacclient.RbacInterface
 	NamespaceClient internalcoreclient.NamespaceInterface
 
-	Print func(*resource.Info) error
-
-	Out io.Writer
-	Err io.Writer
+	Print  func(*resource.Info) error
+	DryRun bool
+	Out    io.Writer
+	Err    io.Writer
 }
 
 var (
@@ -78,6 +78,7 @@ func NewCmdReconcile(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	}
 
 	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
 	usage := "identifying the resource to reconcile."
 	cmdutil.AddFilenameOptionFlags(cmd, fileOptions, usage)
 	cmd.MarkFlagRequired("filename")
@@ -115,14 +116,14 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	o.RBACClient = client.Rbac()
 	o.NamespaceClient = client.Core().Namespaces()
 
-	dryRun := false
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	output := cmdutil.GetFlagString(cmd, "output")
 	shortOutput := output == "name"
 	o.Print = func(info *resource.Info) error {
 		if len(output) > 0 && !shortOutput {
 			return cmdutil.PrintObject(cmd, info.Object, o.Out)
 		}
-		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "reconciled")
+		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, o.DryRun, "reconciled")
 		return nil
 	}
 
@@ -160,11 +161,12 @@ func (o *ReconcileOptions) RunReconcile() error {
 		// shallowInfoCopy this is used to later twiddle the Object for printing
 		// we really need more straightforward printing options
 		shallowInfoCopy := *info
+		confirm := !o.DryRun
 
 		switch t := info.Object.(type) {
 		case *rbac.Role:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
-				Confirm:                true,
+				Confirm:                confirm,
 				RemoveExtraPermissions: false,
 				Role: reconciliation.RoleRuleOwner{Role: t},
 				Client: reconciliation.RoleModifier{
@@ -181,7 +183,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 
 		case *rbac.ClusterRole:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
-				Confirm:                true,
+				Confirm:                confirm,
 				RemoveExtraPermissions: false,
 				Role: reconciliation.ClusterRoleRuleOwner{ClusterRole: t},
 				Client: reconciliation.ClusterRoleModifier{
@@ -197,7 +199,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 
 		case *rbac.RoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
-				Confirm:             true,
+				Confirm:             confirm,
 				RemoveExtraSubjects: false,
 				RoleBinding:         reconciliation.RoleBindingAdapter{RoleBinding: t},
 				Client: reconciliation.RoleBindingClientAdapter{
@@ -214,7 +216,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 
 		case *rbac.ClusterRoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
-				Confirm:             true,
+				Confirm:             confirm,
 				RemoveExtraSubjects: false,
 				RoleBinding:         reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: t},
 				Client: reconciliation.ClusterRoleBindingClientAdapter{
