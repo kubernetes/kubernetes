@@ -81,7 +81,7 @@ func (plugin *azureDataDiskPlugin) GetPluginName() string {
 }
 
 func (plugin *azureDataDiskPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, err := getVolumeSource(spec)
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
@@ -140,12 +140,12 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 func (plugin *azureDataDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	volumeSource, err := getVolumeSource(spec)
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
 
-	disk := makeDataDisk(spec.Name(), "", volumeSource.DiskName, plugin.host)
+	disk := makeDataDisk(spec.Name(), "", volumeSource.DiskName, plugin.host, plugin)
 
 	return &azureDiskDeleter{
 		spec:     spec,
@@ -166,11 +166,11 @@ func (plugin *azureDataDiskPlugin) NewProvisioner(options volume.VolumeOptions) 
 }
 
 func (plugin *azureDataDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, options volume.VolumeOptions) (volume.Mounter, error) {
-	volumeSource, err := getVolumeSource(spec)
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
-	disk := makeDataDisk(spec.Name(), pod.UID, volumeSource.DiskName, plugin.host)
+	disk := makeDataDisk(spec.Name(), pod.UID, volumeSource.DiskName, plugin.host, plugin)
 
 	return &azureDiskMounter{
 		plugin:   plugin,
@@ -181,7 +181,7 @@ func (plugin *azureDataDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, op
 }
 
 func (plugin *azureDataDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	disk := makeDataDisk(volName, podUID, "", plugin.host)
+	disk := makeDataDisk(volName, podUID, "", plugin.host, plugin)
 
 	return &azureDiskUnmounter{
 		plugin:   plugin,

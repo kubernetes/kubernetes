@@ -44,7 +44,7 @@ var _ volume.Mounter = &azureDiskMounter{}
 
 func (m *azureDiskMounter) GetAttributes() volume.Attributes {
 	readOnly := false
-	volumeSource, err := getVolumeSource(m.spec)
+	volumeSource, _, err := getVolumeSource(m.spec)
 	if err != nil {
 		glog.Infof("azureDisk - mounter failed to get volume source for spec %s %v", m.spec.Name(), err)
 	} else if volumeSource.ReadOnly != nil {
@@ -71,7 +71,7 @@ func (m *azureDiskMounter) GetPath() string {
 
 func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	mounter := m.plugin.host.GetMounter(m.plugin.GetPluginName())
-	volumeSource, err := getVolumeSource(m.spec)
+	volumeSource, _, err := getVolumeSource(m.spec)
 
 	if err != nil {
 		glog.Infof("azureDisk - mounter failed to get volume source for spec %s", m.spec.Name())
