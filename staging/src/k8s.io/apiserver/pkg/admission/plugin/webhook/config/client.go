@@ -17,11 +17,13 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -145,11 +147,11 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 			cfg.TLSClientConfig.ServerName = serverName
 		}
 
-		delegateDialer := cfg.Dial
+		delegateDialer := cfg.DialContext
 		if delegateDialer == nil {
-			delegateDialer = net.Dial
+			delegateDialer = (&net.Dialer{Timeout: 3 * time.Second}).DialContext
 		}
-		cfg.Dial = func(network, addr string) (net.Conn, error) {
+		cfg.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if addr == host {
 				u, err := cm.serviceResolver.ResolveEndpoint(svc.Namespace, svc.Name)
 				if err != nil {
@@ -157,7 +159,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 				}
 				addr = u.Host
 			}
-			return delegateDialer(network, addr)
+			return delegateDialer(ctx, network, addr)
 		}
 
 		return complete(cfg)
