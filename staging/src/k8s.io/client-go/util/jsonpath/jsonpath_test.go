@@ -157,26 +157,26 @@ func TestStructInput(t *testing.T) {
 	}
 
 	storeTests := []jsonpathTest{
-		{"plain", "hello jsonpath", nil, "hello jsonpath", false},
-		{"recursive", "{..}", []int{1, 2, 3}, "[1 2 3]", false},
-		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "2 3", false},
-		{"quote", `{"{"}`, nil, "{", false},
-		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4", false},
-		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday", false},
-		{"variable", "hello {.Name}", storeData, "hello jsonpath", false},
-		{"dict/", "{$.Labels.web/html}", storeData, "15", false},
-		{"dict/", "{$.Employees.jason}", storeData, "manager", false},
-		{"dict/", "{$.Employees.dan}", storeData, "clerk", false},
-		{"dict-", "{.Labels.k8s-app}", storeData, "20", false},
-		{"nest", "{.Bicycle[*].Color}", storeData, "red green", false},
-		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville", false},
-		{"allfileds", "{.Bicycle.*}", storeData, "{red 19.95 true} {green 20.01 false}", false},
-		{"recurfileds", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
+		{"plain", "hello jsonpath", nil, "hello jsonpath\n", false},
+		{"recursive", "{..}", []int{1, 2, 3}, "[1 2 3]\n", false},
+		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "2 3\n", false},
+		{"quote", `{"{"}`, nil, "{\n", false},
+		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4\n", false},
+		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday\n", false},
+		{"variable", "hello {.Name}", storeData, "hello jsonpath\n", false},
+		{"dict/", "{$.Labels.web/html}", storeData, "15\n", false},
+		{"dict/", "{$.Employees.jason}", storeData, "manager\n", false},
+		{"dict/", "{$.Employees.dan}", storeData, "clerk\n", false},
+		{"dict-", "{.Labels.k8s-app}", storeData, "20\n", false},
+		{"nest", "{.Bicycle[*].Color}", storeData, "red green\n", false},
+		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville\n", false},
+		{"allfileds", "{.Bicycle.*}", storeData, "{red 19.95 true} {green 20.01 false}\n", false},
+		{"recurfileds", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01\n", false},
 		{"lastarray", "{.Book[-1:]}", storeData,
-			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}", false},
+			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}\n", false},
 		{"recurarray", "{..Book[2]}", storeData,
-			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}", false},
-		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, "{red 19.95 true}", false},
+			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}\n", false},
+		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, "{red 19.95 true}\n", false},
 	}
 	testJSONPath(storeTests, false, t)
 
@@ -210,8 +210,8 @@ func TestJSONInput(t *testing.T) {
 		t.Error(err)
 	}
 	pointsTests := []jsonpathTest{
-		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5", false},
-		{"bracket key", "{[0]['id']}", pointsData, "i1", false},
+		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5\n", false},
+		{"bracket key", "{[0]['id']}", pointsData, "i1\n", false},
 	}
 	testJSONPath(pointsTests, false, t)
 }
@@ -271,21 +271,21 @@ func TestKubernetes(t *testing.T) {
 	}
 
 	nodesTests := []jsonpathTest{
-		{"range item", `{range .items[*]}{.metadata.name}, {end}{.kind}`, nodesData, "127.0.0.1, 127.0.0.2, List", false},
-		{"range item with quote", `{range .items[*]}{.metadata.name}{"\t"}{end}`, nodesData, "127.0.0.1\t127.0.0.2\t", false},
+		{"range item", `{range .items[*]}{.metadata.name}, {end}{.kind}`, nodesData, "127.0.0.1, 127.0.0.2, List\n", false},
+		{"range item with quote", `{range .items[*]}{.metadata.name}{"\t"}{end}`, nodesData, "127.0.0.1\t127.0.0.2\t\n", false},
 		{"range addresss", `{.items[*].status.addresses[*].address}`, nodesData,
-			"127.0.0.1 127.0.0.2 127.0.0.3", false},
+			"127.0.0.1 127.0.0.2 127.0.0.3\n", false},
 		{"double range", `{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}`, nodesData,
-			"127.0.0.1, 127.0.0.2, 127.0.0.3, ", false},
-		{"item name", `{.items[*].metadata.name}`, nodesData, "127.0.0.1 127.0.0.2", false},
+			"127.0.0.1, 127.0.0.2, 127.0.0.3, \n", false},
+		{"item name", `{.items[*].metadata.name}`, nodesData, "127.0.0.1 127.0.0.2\n", false},
 		{"union nodes capacity", `{.items[*]['metadata.name', 'status.capacity']}`, nodesData,
-			"127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]", false},
+			"127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]\n", false},
 		{"range nodes capacity", `{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}`, nodesData,
-			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] ", false},
-		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret", false},
-		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1", false},
-		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None", false},
-		{"bool item", `{.items[?(@..ready==true)].metadata.name}`, &nodesData, "127.0.0.1", false},
+			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] \n", false},
+		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret\n", false},
+		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1\n", false},
+		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None\n", false},
+		{"bool item", `{.items[?(@..ready==true)].metadata.name}`, &nodesData, "127.0.0.1\n", false},
 	}
 	testJSONPath(nodesTests, false, t)
 
@@ -347,7 +347,7 @@ func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
 				"filter, should only match a subset, some items don't have annotations, tolerate missing items",
 				`{.items[?(@.metadata.annotations.color=="blue")].metadata.name}`,
 				data,
-				"pod1 pod4",
+				"pod1 pod4\n",
 				false, // expect no error
 			},
 		},
