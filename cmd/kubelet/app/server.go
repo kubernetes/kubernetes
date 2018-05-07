@@ -338,9 +338,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 				if err != nil {
 					return err
 				}
-				if err := certificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager); err != nil {
-					return err
-				}
+			}
+			_, err := certificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager)
+			if err != nil {
+				return err
 			}
 
 			kubeClient, err = clientset.NewForConfig(clientConfig)
