@@ -143,7 +143,7 @@ func (test viewClusterTest) run(t *testing.T) {
 	pathOptions.EnvVar = ""
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigView(cmdutil.NewFactory(nil), buf, errBuf, pathOptions)
+	cmd := NewCmdConfigView(cmdutil.NewFactory(cmdutil.NewTestConfigFlags()), buf, errBuf, pathOptions)
 	cmd.Flags().Parse(test.flags)
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error executing command: %v,kubectl config view flags: %v", err, test.flags)
