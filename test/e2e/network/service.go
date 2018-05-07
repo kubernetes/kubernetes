@@ -2024,6 +2024,9 @@ func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface
 	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	defer func() {
 		framework.StopServeHostnameService(cs, f.InternalClientset, f.ScalesGetter, ns, serviceName)
+		lb := cloudprovider.GetLoadBalancerName(svc)
+		framework.Logf("cleaning gce resource for %s", lb)
+		framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 	}()
 	ingressIP := framework.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 	port := int(svc.Spec.Ports[0].Port)
