@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package restmapper
 
 import (
 	"strings"
@@ -36,34 +36,42 @@ type shortcutExpander struct {
 
 var _ meta.RESTMapper = &shortcutExpander{}
 
-func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) shortcutExpander {
+// NewShortcutExpander wraps a restmapper in a layer that expands shortcuts found via discovery
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) meta.RESTMapper {
 	return shortcutExpander{RESTMapper: delegate, discoveryClient: client}
 }
 
+// KindFor fulfills meta.RESTMapper
 func (e shortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
 	return e.RESTMapper.KindFor(e.expandResourceShortcut(resource))
 }
 
+// KindsFor fulfills meta.RESTMapper
 func (e shortcutExpander) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
 	return e.RESTMapper.KindsFor(e.expandResourceShortcut(resource))
 }
 
+// ResourcesFor fulfills meta.RESTMapper
 func (e shortcutExpander) ResourcesFor(resource schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
 	return e.RESTMapper.ResourcesFor(e.expandResourceShortcut(resource))
 }
 
+// ResourceFor fulfills meta.RESTMapper
 func (e shortcutExpander) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
 	return e.RESTMapper.ResourceFor(e.expandResourceShortcut(resource))
 }
 
+// ResourceSingularizer fulfills meta.RESTMapper
 func (e shortcutExpander) ResourceSingularizer(resource string) (string, error) {
 	return e.RESTMapper.ResourceSingularizer(e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource)
 }
 
+// RESTMapping fulfills meta.RESTMapper
 func (e shortcutExpander) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
 	return e.RESTMapper.RESTMapping(gk, versions...)
 }
 
+// RESTMappings fulfills meta.RESTMapper
 func (e shortcutExpander) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
 	return e.RESTMapper.RESTMappings(gk, versions...)
 }

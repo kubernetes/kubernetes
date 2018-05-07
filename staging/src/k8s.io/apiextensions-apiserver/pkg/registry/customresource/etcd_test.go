@@ -61,7 +61,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 
 	typer := apiserver.UnstructuredObjectTyper{
 		Delegate:          parameterScheme,
-		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(nil),
+		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(),
 	}
 
 	kind := schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "Noxu"}
