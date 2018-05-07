@@ -506,7 +506,11 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 	// Initialize scheduler.
 	context := initTest(t, "preemption")
 	defer cleanupTest(t, context)
+
 	cs := context.clientSet
+
+	defer cleanupPodsInNamespace(cs, t, context.ns.Name)
+
 	// Create a node with some resources and a label.
 	nodeRes := &v1.ResourceList{
 		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),

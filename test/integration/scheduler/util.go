@@ -534,3 +534,29 @@ func cleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 		}
 	}
 }
+
+// noPodsInNamespace returns true if no pods in the given namespace.
+func noPodsInNamespace(c clientset.Interface, podNamespace string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pods, err := c.CoreV1().Pods(podNamespace).List(metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return len(pods.Items) == 0, nil
+	}
+}
+
+// cleanupPodsInNamespace deletes the pods in the given namespace and waits for them to
+// be actually deleted.
+func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
+	if err := cs.CoreV1().Pods(ns).DeleteCollection(nil, metav1.ListOptions{}); err != nil {
+		t.Errorf("error while listing pod in namespace %v: %v", ns, err)
+		return
+	}
+
+	if err := wait.Poll(time.Second, wait.ForeverTestTimeout,
+		noPodsInNamespace(cs, ns)); err != nil {
+		t.Errorf("error while waiting for pods in namespace %v: %v", ns, err)
+	}
+}
