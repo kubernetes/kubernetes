@@ -19,19 +19,19 @@ package create
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"net/url"
-
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -344,6 +344,12 @@ type CreateSubcommandOptions struct {
 	DryRun           bool
 	CreateAnnotation bool
 
+	Namespace        string
+	EnforceNamespace bool
+
+	Mapper        meta.RESTMapper
+	DynamicClient dynamic.DynamicInterface
+
 	PrintObj func(obj kruntime.Object) error
 
 	genericclioptions.IOStreams
@@ -356,7 +362,7 @@ func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSu
 	}
 }
 
-func (o *CreateSubcommandOptions) Complete(cmd *cobra.Command, args []string, generator kubectl.StructuredGenerator) error {
+func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, generator kubectl.StructuredGenerator) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -379,38 +385,43 @@ func (o *CreateSubcommandOptions) Complete(cmd *cobra.Command, args []string, ge
 		return printer.PrintObj(obj, o.Out)
 	}
 
+	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	o.Mapper, err = f.RESTMapper()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// TODO(juanvallejo): remove dependency on factory here. Complete necessary bits
-// from it in the Complete() method.
 // RunCreateSubcommand executes a create subcommand using the specified options
-func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) error {
-	namespace, nsOverriden, err := f.DefaultNamespace()
+func (o *CreateSubcommandOptions) Run() error {
+	obj, err := o.StructuredGenerator.StructuredGenerate()
 	if err != nil {
 		return err
 	}
-	obj, err := options.StructuredGenerator.StructuredGenerate()
-	if err != nil {
-		return err
-	}
-	mapper, err := f.RESTMapper()
-	if err != nil {
-		return err
-	}
-	if !options.DryRun {
+	if !o.DryRun {
 		// create subcommands have compiled knowledge of things they create, so type them directly
 		gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
 		if err != nil {
 			return err
 		}
 		gvk := gvks[0]
-		mapping, err := mapper.RESTMapping(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
+		mapping, err := o.Mapper.RESTMapping(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
 		if err != nil {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(options.CreateAnnotation, obj, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
@@ -418,14 +429,10 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 		if err := legacyscheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
 			return err
 		}
-		dynamicClient, err := f.DynamicClient()
-		if err != nil {
-			return err
-		}
 		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-			namespace = ""
+			o.Namespace = ""
 		}
-		actualObject, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).Create(asUnstructured)
+		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
 		if err != nil {
 			return err
 		}
@@ -433,10 +440,10 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 		// ensure we pass a versioned object to the printer
 		obj = actualObject
 	} else {
-		if meta, err := meta.Accessor(obj); err == nil && nsOverriden {
-			meta.SetNamespace(namespace)
+		if meta, err := meta.Accessor(obj); err == nil && o.EnforceNamespace {
+			meta.SetNamespace(o.Namespace)
 		}
 	}
 
-	return options.PrintObj(obj)
+	return o.PrintObj(obj)
 }

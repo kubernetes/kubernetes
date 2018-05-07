@@ -77,8 +77,8 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericclioptions
 		Long:    serviceClusterIPLong,
 		Example: serviceClusterIPExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -96,7 +96,7 @@ func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
 	return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
 }
 
-func (o *ServiceClusterIPOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *ServiceClusterIPOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -115,12 +115,12 @@ func (o *ServiceClusterIPOpts) Complete(cmd *cobra.Command, args []string) error
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateServiceClusterIP is the implementation of the create service clusterip command
-func (o *ServiceClusterIPOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *ServiceClusterIPOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -149,8 +149,8 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 		Long:    serviceNodePortLong,
 		Example: serviceNodePortExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -164,7 +164,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 	return cmd
 }
 
-func (o *ServiceNodePortOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *ServiceNodePortOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -184,12 +184,12 @@ func (o *ServiceNodePortOpts) Complete(cmd *cobra.Command, args []string) error 
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateServiceNodePort is the implementation of the create service nodeport command
-func (o *ServiceNodePortOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *ServiceNodePortOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -218,8 +218,8 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericcliopti
 		Long:    serviceLoadBalancerLong,
 		Example: serviceLoadBalancerExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -232,7 +232,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericcliopti
 	return cmd
 }
 
-func (o *ServiceLoadBalancerOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *ServiceLoadBalancerOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -251,12 +251,12 @@ func (o *ServiceLoadBalancerOpts) Complete(cmd *cobra.Command, args []string) er
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateServiceLoadBalancer is the implementation of the create service loadbalancer command
-func (o *ServiceLoadBalancerOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *ServiceLoadBalancerOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -289,8 +289,8 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericcliopti
 		Long:    serviceExternalNameLong,
 		Example: serviceExternalNameExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -305,7 +305,7 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericcliopti
 	return cmd
 }
 
-func (o *ServiceExternalNameOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *ServiceExternalNameOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -324,10 +324,10 @@ func (o *ServiceExternalNameOpts) Complete(cmd *cobra.Command, args []string) er
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateExternalNameService is the implementation of the create service externalname command
-func (o *ServiceExternalNameOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *ServiceExternalNameOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }
