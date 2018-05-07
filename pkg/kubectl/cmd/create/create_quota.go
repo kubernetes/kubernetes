@@ -56,8 +56,8 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 		Long:                  quotaLong,
 		Example:               quotaExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -71,7 +71,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	return cmd
 }
 
-func (o *QuotaOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -89,10 +89,10 @@ func (o *QuotaOpts) Complete(cmd *cobra.Command, args []string) error {
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateQuota implements the behavior to run the create quota command
-func (o *QuotaOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *QuotaOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }

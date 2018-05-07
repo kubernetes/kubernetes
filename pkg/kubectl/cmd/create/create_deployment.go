@@ -56,7 +56,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 		Example:               deploymentExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -143,13 +143,13 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // createDeployment
 // 1. Reads user config values from Cobra.
 // 2. Sets up the correct Generator object.
 // 3. Calls RunCreateSubcommand.
-func (o *DeploymentOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *DeploymentOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }

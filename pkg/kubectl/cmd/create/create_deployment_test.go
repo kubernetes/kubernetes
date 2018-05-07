@@ -153,6 +153,6 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	err = options.Run(tf)
+	err = options.Run()
 	assert.Error(t, err, "at least one image must be specified")
 }

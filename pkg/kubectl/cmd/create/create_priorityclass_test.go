@@ -69,12 +69,12 @@ func TestCreatePriorityClass(t *testing.T) {
 			IOStreams:  ioStreams,
 		},
 	}
-	err := options.Complete(cmd, []string{pcName})
+	err := options.Complete(tf, cmd, []string{pcName})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	err = options.Run(tf)
+	err = options.Run()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
