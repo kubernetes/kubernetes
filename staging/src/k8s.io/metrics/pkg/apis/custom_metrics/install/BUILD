@@ -10,9 +10,8 @@ go_library(
     srcs = ["install.go"],
     importpath = "k8s.io/metrics/pkg/apis/custom_metrics/install",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/custom_metrics:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:go_default_library",
     ],

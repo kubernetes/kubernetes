@@ -19,25 +19,14 @@ limitations under the License.
 package install
 
 import (
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/code-generator/_examples/apiserver/apis/example2"
 	"k8s.io/code-generator/_examples/apiserver/apis/example2/v1"
 )
 
 // Install registers the API group and adds types to a scheme
-func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	if err := announced.NewGroupMetaFactory(
-		&announced.GroupMetaFactoryArgs{
-			GroupName:                  example2.SchemeGroupVersion.Group,
-			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version},
-			AddInternalObjectsToScheme: example2.AddToScheme,
-		},
-		announced.VersionToSchemeFunc{
-			v1.SchemeGroupVersion.Version: v1.AddToScheme,
-		},
-	).Register(registry, scheme); err != nil {
-		panic(err)
-	}
+func Install(scheme *runtime.Scheme) {
+	example2.AddToSchemeOrDie(scheme)
+	v1.AddToSchemeOrDie(scheme)
+	scheme.SetVersionPriorityOrDie(v1.SchemeGroupVersion)
 }
