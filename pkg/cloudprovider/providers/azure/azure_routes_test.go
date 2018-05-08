@@ -94,10 +94,8 @@ func TestCreateRoute(t *testing.T) {
 	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
 
 	nodeIP := "2.4.6.8"
-	fakeVM.NodeToIP = map[string]map[string]string{
-		"": {
-			"node": nodeIP,
-		},
+	fakeVM.NodeToIP = map[string]string{
+		"node": nodeIP,
 	}
 
 	err := cloud.CreateRoute(context.TODO(), "cluster", "unused", &route)
