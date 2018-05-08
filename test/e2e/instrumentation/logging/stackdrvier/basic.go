@@ -138,7 +138,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 		})
 	})
 
-	ginkgo.It("should ingest events", func() {
+	ginkgo.It("should ingest events [Feature:StackdriverLogging]", func() {
 		eventCreationInterval := 10 * time.Second
 
 		withLogProviderForScope(f, eventsScope, func(p *sdLogProvider) {
