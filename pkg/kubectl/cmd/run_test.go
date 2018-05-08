@@ -208,7 +208,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
+				DeleteOptions: deleteFlags.ToOptions(genericclioptions.NewTestIOStreamsDiscard()),
 
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
@@ -377,7 +377,7 @@ func TestGenerateService(t *testing.T) {
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
+				DeleteOptions: deleteFlags.ToOptions(genericclioptions.NewTestIOStreamsDiscard()),
 
 				IOStreams: ioStreams,
 

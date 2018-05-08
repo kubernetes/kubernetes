@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"archive/tar"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -34,6 +33,8 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+
+	"bytes"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -194,8 +195,10 @@ func (o *CopyOptions) Run(args []string) error {
 func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
-			Out: bytes.NewBuffer([]byte{}),
-			Err: bytes.NewBuffer([]byte{}),
+			IOStreams: genericclioptions.IOStreams{
+				Out:    bytes.NewBuffer([]byte{}),
+				ErrOut: bytes.NewBuffer([]byte{}),
+			},
 
 			Namespace: dest.PodNamespace,
 			PodName:   dest.PodName,
@@ -240,9 +243,11 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec) error {
 
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
-			In:    reader,
-			Out:   o.Out,
-			Err:   o.ErrOut,
+			IOStreams: genericclioptions.IOStreams{
+				In:     reader,
+				Out:    o.Out,
+				ErrOut: o.ErrOut,
+			},
 			Stdin: true,
 
 			Namespace: dest.PodNamespace,
@@ -263,9 +268,11 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	reader, outStream := io.Pipe()
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
-			In:  nil,
-			Out: outStream,
-			Err: o.Out,
+			IOStreams: genericclioptions.IOStreams{
+				In:     nil,
+				Out:    outStream,
+				ErrOut: o.Out,
+			},
 
 			Namespace: src.PodNamespace,
 			PodName:   src.PodName,
