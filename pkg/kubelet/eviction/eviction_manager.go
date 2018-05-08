@@ -197,7 +197,7 @@ func (m *managerImpl) IsUnderPIDPressure() bool {
 	return hasNodeCondition(m.nodeConditions, v1.NodePIDPressure)
 }
 
-func (m *managerImpl) startMemoryThresholdNotifier(summary *statsapi.Summary, hard bool, handler thresholdNotifierHandlerFunc) error {
+func (m *managerImpl) startMemoryThresholdNotifier(summary *statsapi.Summary, hard, allocatable bool, handler thresholdNotifierHandlerFunc) error {
 	for _, threshold := range m.config.Thresholds {
 		if threshold.Signal != evictionapi.SignalMemoryAvailable || hard != isHardEvictionThreshold(threshold) {
 			continue
@@ -206,19 +206,27 @@ func (m *managerImpl) startMemoryThresholdNotifier(summary *statsapi.Summary, ha
 		if err != nil {
 			return err
 		}
-		// TODO add support for eviction from --cgroup-root
 		cgpath, found := cgroups.MountPoints["memory"]
 		if !found || len(cgpath) == 0 {
 			return fmt.Errorf("memory cgroup mount point not found")
 		}
 		attribute := "memory.usage_in_bytes"
-		if summary.Node.Memory == nil || summary.Node.Memory.UsageBytes == nil || summary.Node.Memory.WorkingSetBytes == nil {
+		memoryStats := summary.Node.Memory
+		if allocatable {
+			cgpath += m.config.PodCgroupRoot
+			allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods)
+			if err != nil {
+				return err
+			}
+			memoryStats = allocatableContainer.Memory
+		}
+		if memoryStats == nil || memoryStats.UsageBytes == nil || memoryStats.WorkingSetBytes == nil || memoryStats.AvailableBytes == nil {
 			return fmt.Errorf("summary was incomplete")
 		}
 		// Set threshold on usage to capacity - eviction_hard + inactive_file,
 		// since we want to be notified when working_set = capacity - eviction_hard
-		inactiveFile := resource.NewQuantity(int64(*summary.Node.Memory.UsageBytes-*summary.Node.Memory.WorkingSetBytes), resource.BinarySI)
-		capacity := resource.NewQuantity(int64(*summary.Node.Memory.AvailableBytes+*summary.Node.Memory.WorkingSetBytes), resource.BinarySI)
+		inactiveFile := resource.NewQuantity(int64(*memoryStats.UsageBytes-*memoryStats.WorkingSetBytes), resource.BinarySI)
+		capacity := resource.NewQuantity(int64(*memoryStats.AvailableBytes+*memoryStats.WorkingSetBytes), resource.BinarySI)
 		evictionThresholdQuantity := evictionapi.GetThresholdQuantity(threshold.Value, capacity)
 		memcgThreshold := capacity.DeepCopy()
 		memcgThreshold.Sub(*evictionThresholdQuantity)
@@ -268,21 +276,37 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	if m.config.KernelMemcgNotification && m.notifierStopCh.Reset() {
 		glog.V(4).Infof("eviction manager attempting to integrate with kernel memcg notification api")
 		// start soft memory notification
-		err = m.startMemoryThresholdNotifier(summary, false, func(desc string) {
+		err = m.startMemoryThresholdNotifier(summary, false, false, func(desc string) {
 			glog.Infof("soft memory eviction threshold crossed at %s", desc)
 			// TODO wait grace period for soft memory limit
 			m.synchronize(diskInfoProvider, podFunc)
 		})
 		if err != nil {
 			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
+		} // start soft memory notification
+		err = m.startMemoryThresholdNotifier(summary, false, true, func(desc string) {
+			glog.Infof("soft allocatable memory eviction threshold crossed at %s", desc)
+			// TODO wait grace period for soft memory limit
+			m.synchronize(diskInfoProvider, podFunc)
+		})
+		if err != nil {
+			glog.Warningf("eviction manager: failed to create allocatable soft memory threshold notifier: %v", err)
 		}
 		// start hard memory notification
-		err = m.startMemoryThresholdNotifier(summary, true, func(desc string) {
+		err = m.startMemoryThresholdNotifier(summary, true, false, func(desc string) {
 			glog.Infof("hard memory eviction threshold crossed at %s", desc)
 			m.synchronize(diskInfoProvider, podFunc)
 		})
 		if err != nil {
 			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
+		}
+		// start hard memory notification
+		err = m.startMemoryThresholdNotifier(summary, true, true, func(desc string) {
+			glog.Infof("hard allocatable memory eviction threshold crossed at %s", desc)
+			m.synchronize(diskInfoProvider, podFunc)
+		})
+		if err != nil {
+			glog.Warningf("eviction manager: failed to create hard allocatable memory threshold notifier: %v", err)
 		}
 	}
 
