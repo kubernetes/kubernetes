@@ -20,17 +20,24 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -76,17 +83,37 @@ var (
 type ExposeServiceOptions struct {
 	FilenameOptions resource.FilenameOptions
 	RecordFlags     *genericclioptions.RecordFlags
+	PrintFlags      *printers.PrintFlags
+	PrintObj        printers.ResourcePrinterFunc
+
+	DryRun           bool
+	EnforceNamespace bool
+
+	Generators                func(string) map[string]kubectl.Generator
+	CanBeExposed              func(kind schema.GroupKind) error
+	ClientForMapping          func(*meta.RESTMapping) (resource.RESTClient, error)
+	MapBasedSelectorForObject func(runtime.Object) (string, error)
+	PortsForObject            func(runtime.Object) ([]string, error)
+	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
+	LabelsForObject           func(runtime.Object) (map[string]string, error)
+
+	Namespace string
+	Mapper    meta.RESTMapper
+
+	DynamicClient dynamic.DynamicInterface
+	Builder       *resource.Builder
 
 	Recorder genericclioptions.Recorder
 	genericclioptions.IOStreams
 }
 
-func NewExposeServiceOptions(streams genericclioptions.IOStreams) *ExposeServiceOptions {
+func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServiceOptions {
 	return &ExposeServiceOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
+		PrintFlags:  printers.NewPrintFlags("exposed"),
 
 		Recorder:  genericclioptions.NoopRecorder{},
-		IOStreams: streams,
+		IOStreams: ioStreams,
 	}
 }
 
@@ -107,15 +134,14 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Example: exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.RunExpose(f, cmd, args))
+			cmdutil.CheckErr(o.RunExpose(cmd, args))
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
+		ValidArgs: validArgs,
 	}
 
 	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
-	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "service/v2", i18n.T("The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."))
 	cmd.Flags().String("protocol", "", i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
 	cmd.Flags().String("port", "", i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
@@ -140,7 +166,16 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 }
 
 func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	var err error
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = printer.PrintObj
 
 	o.RecordFlags.Complete(f.Command(cmd, false))
 	o.Recorder, err = o.RecordFlags.ToRecorder()
@@ -148,32 +183,49 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 		return err
 	}
 
-	return err
-}
-
-func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	namespace, enforceNamespace, err := f.DefaultNamespace()
+	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
 
-	mapper, typer := f.Object()
-	r := f.NewBuilder().
-		Internal().
+	o.Generators = f.Generators
+	o.Builder = f.NewBuilder()
+	o.CanBeExposed = f.CanBeExposed
+	o.ClientForMapping = f.ClientForMapping
+	o.MapBasedSelectorForObject = f.MapBasedSelectorForObject
+	o.PortsForObject = f.PortsForObject
+	o.ProtocolsForObject = f.ProtocolsForObject
+	o.Mapper, err = f.RESTMapper()
+	if err != nil {
+		return err
+	}
+	o.LabelsForObject = f.LabelsForObject
+
+	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) error {
+	r := o.Builder.
+		WithScheme(legacyscheme.Scheme).
 		ContinueOnError().
-		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
-	err = r.Err()
+	err := r.Err()
 	if err != nil {
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
 	// Get the generator, setup and validate all required parameters
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generators := f.Generators("expose")
+	generators := o.Generators("expose")
 	generator, found := generators[generatorName]
 	if !found {
 		return cmdutil.UsageErrorf(cmd, "generator %q not found.", generatorName)
@@ -186,7 +238,7 @@ func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, cmd *cobra.Command, 
 		}
 
 		mapping := info.ResourceMapping()
-		if err := f.CanBeExposed(mapping.GroupVersionKind.GroupKind()); err != nil {
+		if err := o.CanBeExposed(mapping.GroupVersionKind.GroupKind()); err != nil {
 			return err
 		}
 
@@ -200,7 +252,7 @@ func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, cmd *cobra.Command, 
 		// For objects that need a pod selector, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --selector
 		if s, found := params["selector"]; found && kubectl.IsZero(s) {
-			s, err := f.MapBasedSelectorForObject(info.Object)
+			s, err := o.MapBasedSelectorForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't retrieve selectors via --selector flag or introspection: %v", err)
 			}
@@ -212,7 +264,7 @@ func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, cmd *cobra.Command, 
 		// For objects that need a port, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --port
 		if port, found := params["port"]; found && kubectl.IsZero(port) {
-			ports, err := f.PortsForObject(info.Object)
+			ports, err := o.PortsForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection: %v", err)
 			}
@@ -231,7 +283,7 @@ func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, cmd *cobra.Command, 
 		// Always try to derive protocols from the exposed object, may use
 		// different protocols for different ports.
 		if _, found := params["protocol"]; found {
-			protocolsMap, err := f.ProtocolsForObject(info.Object)
+			protocolsMap, err := o.ProtocolsForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't find protocol via introspection: %v", err)
 			}
@@ -241,7 +293,7 @@ func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, cmd *cobra.Command, 
 		}
 
 		if kubectl.IsZero(params["labels"]) {
-			labels, err := f.LabelsForObject(info.Object)
+			labels, err := o.LabelsForObject(info.Object)
 			if err != nil {
 				return err
 			}
@@ -269,43 +321,36 @@ func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, cmd *cobra.Command, 
 			}
 		}
 
-		resourceMapper := &resource.Mapper{
-			ObjectTyper:  typer,
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
-		}
-		info, err = resourceMapper.InfoForObject(object, nil)
-		if err != nil {
-			return err
-		}
 		if err := o.Recorder.Record(object); err != nil {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
-		info.Refresh(object, true)
-		if cmdutil.GetDryRunFlag(cmd) {
-			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-				return cmdutil.PrintObject(cmd, object, o.Out)
-			}
-			cmdutil.PrintSuccess(false, o.Out, info.Object, true, "exposed")
-			return nil
+
+		if o.DryRun {
+			return o.PrintObj(object, o.Out)
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
+		asUnstructured := &unstructured.Unstructured{}
+		if err := legacyscheme.Scheme.Convert(object, asUnstructured, nil); err != nil {
+			return err
+		}
+		gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(asUnstructured)
+		if err != nil {
+			return err
+		}
+		objMapping, err := o.Mapper.RESTMapping(gvks[0].GroupKind(), gvks[0].Version)
+		if err != nil {
+			return err
+		}
 		// Serialize the object with the annotation applied.
-		object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, object)
+		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
 		if err != nil {
 			return err
 		}
 
-		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return cmdutil.PrintObject(cmd, object, o.Out)
-		}
-
-		cmdutil.PrintSuccess(false, o.Out, info.Object, false, "exposed")
-		return nil
+		return o.PrintObj(actualObject, o.Out)
 	})
 	if err != nil {
 		return err

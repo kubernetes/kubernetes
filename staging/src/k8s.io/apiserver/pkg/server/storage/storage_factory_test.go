@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"os"
 	"reflect"
 	"testing"
 
@@ -35,7 +34,7 @@ import (
 var (
 	v1GroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
-	registry       = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
+	registry       = registered.NewAPIRegistrationManager()
 	scheme         = runtime.NewScheme()
 	codecs         = serializer.NewCodecFactory(scheme)
 	parameterCodec = runtime.NewParameterCodec(scheme)
@@ -116,7 +115,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 }
 
 func TestUpdateEtcdOverrides(t *testing.T) {
-	registry := registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
+	registry := registered.NewAPIRegistrationManager()
 	exampleinstall.Install(registry, scheme)
 
 	testCases := []struct {

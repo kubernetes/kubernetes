@@ -2,8 +2,8 @@ load("//build:workspace_mirror.bzl", "mirror")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "4b2c61795ac2eefcb28f3eb8e1cb2d8fb3c2eafa0f6712473bc5f93728f38758",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.10.2/rules_go-0.10.2.tar.gz"),
+    sha256 = "6c770aece75ac47fe218ad881775c37cf29db013ab751d0bfef01c0b5a6ee01f",
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.10.4/rules_go-0.10.4.tar.gz"),
 )
 
 http_archive(
@@ -39,7 +39,7 @@ http_archive(
 
 load("@bazel_skylib//:lib.bzl", "versions")
 
-versions.check(minimum_bazel_version = "0.10.0")
+versions.check(minimum_bazel_version = "0.13.0")
 
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains", "go_download_sdk")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker_pull")
@@ -47,7 +47,7 @@ load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.10.1",
+    go_version = "1.10.2",
 )
 
 docker_repositories()
@@ -83,4 +83,5 @@ docker_pull(
 )
 
 load("//build:workspace_mirror.bzl", "export_urls")
+
 export_urls("workspace_urls")

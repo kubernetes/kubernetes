@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ### Copyright 2010 Manuel Carrasco Moñino. (manolo at apache.org)
 ###
 ### Licensed under the Apache License, Version 2.0.

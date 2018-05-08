@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/api/core/v1"
 )
 
 func TestGetSeccompSecurityOpts(t *testing.T) {
@@ -44,7 +45,11 @@ func TestGetSeccompSecurityOpts(t *testing.T) {
 		expectedOpts:   []string{"seccomp=unconfined"},
 	}, {
 		msg:            "Seccomp default",
-		seccompProfile: "docker/default",
+		seccompProfile: v1.SeccompProfileRuntimeDefault,
+		expectedOpts:   nil,
+	}, {
+		msg:            "Seccomp deprecated default",
+		seccompProfile: v1.DeprecatedSeccompProfileDockerDefault,
 		expectedOpts:   nil,
 	}}
 

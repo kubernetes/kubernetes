@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,9 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	manualfake "k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/restmapper"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
@@ -45,7 +45,7 @@ import (
 )
 
 func TestPortsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -76,7 +76,7 @@ func TestPortsForObject(t *testing.T) {
 }
 
 func TestProtocolsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -114,7 +114,7 @@ func TestProtocolsForObject(t *testing.T) {
 }
 
 func TestLabelsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	tests := []struct {
 		name     string
@@ -165,7 +165,7 @@ func TestLabelsForObject(t *testing.T) {
 }
 
 func TestCanBeExposed(t *testing.T) {
-	factory := NewFactory(nil)
+	factory := NewFactory(NewTestConfigFlags())
 	tests := []struct {
 		kind      schema.GroupKind
 		expectErr bool
@@ -441,10 +441,10 @@ func TestMakePortsString(t *testing.T) {
 	}
 }
 
-func fakeClient() resource.ClientMapper {
-	return resource.ClientMapperFunc(func(*meta.RESTMapping) (resource.RESTClient, error) {
+func fakeClient() resource.FakeClientFunc {
+	return func(version schema.GroupVersion) (resource.RESTClient, error) {
 		return &manualfake.RESTClient{}, nil
-	})
+	}
 }
 
 func TestDiscoveryReplaceAliases(t *testing.T) {
@@ -471,17 +471,8 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
-	b := resource.NewBuilder(
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  legacyscheme.Scheme,
-			ClientMapper: fakeClient(),
-			Decoder:      testapi.Default.Codec(),
-		},
-		nil,
-		categories.LegacyCategoryExpander,
-	)
+	mapper := restmapper.NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
+	b := resource.NewFakeBuilder(fakeClient(), mapper, categories.LegacyCategoryExpander)
 
 	for _, test := range tests {
 		replaced := b.ReplaceAliases(test.arg)

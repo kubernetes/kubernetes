@@ -44,7 +44,7 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, er
 	case "yaml":
 		printer = &YAMLPrinter{}
 	default:
-		return nil, NoCompatiblePrinterError{f}
+		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &outputFormat}
 	}
 
 	// wrap the printer in a versioning printer that understands when to convert and when not to convert

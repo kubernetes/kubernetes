@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -37,9 +38,9 @@ type CustomColumnsPrintFlags struct {
 // handling custom-column printing.
 // Returns false if the specified templateFormat does not match a supported format.
 // Supported format types can be found in pkg/printers/printers.go
-func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, bool, error) {
+func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, error) {
 	if len(templateFormat) == 0 {
-		return nil, false, fmt.Errorf("missing output format")
+		return nil, NoCompatiblePrinterError{}
 	}
 
 	templateValue := ""
@@ -63,11 +64,11 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrin
 	}
 
 	if _, supportedFormat := supportedFormats[templateFormat]; !supportedFormat {
-		return nil, false, nil
+		return nil, NoCompatiblePrinterError{}
 	}
 
 	if len(templateValue) == 0 {
-		return nil, true, fmt.Errorf("custom-columns format specified but no custom columns given")
+		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
 	}
 
 	decoder := scheme.Codecs.UniversalDecoder()
@@ -75,15 +76,15 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrin
 	if templateFormat == "custom-columns-file" {
 		file, err := os.Open(templateValue)
 		if err != nil {
-			return nil, true, fmt.Errorf("error reading template %s, %v\n", templateValue, err)
+			return nil, fmt.Errorf("error reading template %s, %v\n", templateValue, err)
 		}
 		defer file.Close()
 		p, err := NewCustomColumnsPrinterFromTemplate(file, decoder)
-		return p, true, err
+		return p, err
 	}
 
 	p, err := NewCustomColumnsPrinterFromSpec(templateValue, decoder, f.NoHeaders)
-	return p, true, err
+	return NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, scheme.Versions...), err
 }
 
 // AddFlags receives a *cobra.Command reference and binds
@@ -93,9 +94,9 @@ func (f *CustomColumnsPrintFlags) AddFlags(c *cobra.Command) {}
 // NewCustomColumnsPrintFlags returns flags associated with
 // custom-column printing, with default values set.
 // NoHeaders and TemplateArgument should be set by callers.
-func NewCustomColumnsPrintFlags(noHeaders bool, templateValue string) *CustomColumnsPrintFlags {
+func NewCustomColumnsPrintFlags() *CustomColumnsPrintFlags {
 	return &CustomColumnsPrintFlags{
-		NoHeaders:        noHeaders,
-		TemplateArgument: templateValue,
+		NoHeaders:        false,
+		TemplateArgument: "",
 	}
 }

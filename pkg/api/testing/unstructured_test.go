@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metaunstruct "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -37,11 +38,11 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
+func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVersion schema.GroupVersion, kind string) {
 	// We do fuzzing on the internal version of the object, and only then
 	// convert to the external version. This is because custom fuzzing
 	// function are only supported for internal objects.
-	internalObj, err := legacyscheme.Scheme.New(group.InternalGroupVersion().WithKind(kind))
+	internalObj, err := legacyscheme.Scheme.New(internalVersion.WithKind(kind))
 	if err != nil {
 		t.Fatalf("Couldn't create internal object %v: %v", kind, err)
 	}
@@ -62,7 +63,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 			},
 		).Fuzz(internalObj)
 
-	item, err := legacyscheme.Scheme.New(group.GroupVersion().WithKind(kind))
+	item, err := legacyscheme.Scheme.New(externalVersion.WithKind(kind))
 	if err != nil {
 		t.Fatalf("Couldn't create external object %v: %v", kind, err)
 	}
@@ -118,13 +119,13 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 
 func TestRoundTrip(t *testing.T) {
 	for groupKey, group := range testapi.Groups {
-		for kind := range group.ExternalTypes() {
+		for kind := range legacyscheme.Scheme.KnownTypes(*group.GroupVersion()) {
 			if nonRoundTrippableTypes.Has(kind) {
 				continue
 			}
 			t.Logf("Testing: %v in %v", kind, groupKey)
 			for i := 0; i < 50; i++ {
-				doRoundTrip(t, group, kind)
+				doRoundTrip(t, schema.GroupVersion{Group: groupKey, Version: runtime.APIVersionInternal}, *group.GroupVersion(), kind)
 				if t.Failed() {
 					break
 				}
@@ -135,7 +136,7 @@ func TestRoundTrip(t *testing.T) {
 
 func TestRoundTripWithEmptyCreationTimestamp(t *testing.T) {
 	for groupKey, group := range testapi.Groups {
-		for kind := range group.ExternalTypes() {
+		for kind := range legacyscheme.Scheme.KnownTypes(*group.GroupVersion()) {
 			if nonRoundTrippableTypes.Has(kind) {
 				continue
 			}

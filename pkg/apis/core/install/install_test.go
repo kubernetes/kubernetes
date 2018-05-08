@@ -53,7 +53,7 @@ func TestCodec(t *testing.T) {
 	pod := internal.Pod{}
 	// We do want to use package registered rather than testapi here, because we
 	// want to test if the package install and package registered work as expected.
-	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersion), &pod)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: "", Version: "v1"}), &pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -61,61 +61,8 @@ func TestCodec(t *testing.T) {
 	if err := json.Unmarshal(data, &other); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if other.APIVersion != legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersion.Version || other.Kind != "Pod" {
+	if other.APIVersion != "v1" || other.Kind != "Pod" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
-	}
-}
-
-func TestInterfacesFor(t *testing.T) {
-	if _, err := legacyscheme.Registry.GroupOrDie(internal.GroupName).InterfacesFor(internal.SchemeGroupVersion); err == nil {
-		t.Fatalf("unexpected non-error: %v", err)
-	}
-	for i, version := range legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersions {
-		if vi, err := legacyscheme.Registry.GroupOrDie(internal.GroupName).InterfacesFor(version); err != nil || vi == nil {
-			t.Fatalf("%d: unexpected result: %v", i, err)
-		}
-	}
-}
-
-func TestRESTMapper(t *testing.T) {
-	gv := schema.GroupVersion{Group: "", Version: "v1"}
-	rcGVK := gv.WithKind("ReplicationController")
-	podTemplateGVK := gv.WithKind("PodTemplate")
-
-	if gvk, err := legacyscheme.Registry.RESTMapper().KindFor(internal.SchemeGroupVersion.WithResource("replicationcontrollers")); err != nil || gvk != rcGVK {
-		t.Errorf("unexpected version mapping: %v %v", gvk, err)
-	}
-
-	if m, err := legacyscheme.Registry.GroupOrDie(internal.GroupName).RESTMapper.RESTMapping(podTemplateGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != podTemplateGVK || m.Resource != "podtemplates" {
-		t.Errorf("unexpected version mapping: %#v %v", m, err)
-	}
-
-	for _, version := range legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersions {
-		mapping, err := legacyscheme.Registry.GroupOrDie(internal.GroupName).RESTMapper.RESTMapping(rcGVK.GroupKind(), version.Version)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		if mapping.Resource != "replicationControllers" && mapping.Resource != "replicationcontrollers" {
-			t.Errorf("incorrect resource name: %#v", mapping)
-		}
-		if mapping.GroupVersionKind.GroupVersion() != version {
-			t.Errorf("incorrect version: %v", mapping)
-		}
-
-		interfaces, _ := legacyscheme.Registry.GroupOrDie(internal.GroupName).InterfacesFor(version)
-		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
-			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
-		}
-
-		rc := &internal.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-		name, err := meta.NewAccessor().Name(rc)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if name != "foo" {
-			t.Errorf("bad name: %q", name)
-		}
 	}
 }
 

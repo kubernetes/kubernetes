@@ -104,7 +104,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, string) {
 	podQOS := v1qos.GetPodQOS(pod)
 	// Get the parent QOS container name
-	var parentContainer string
+	var parentContainer CgroupName
 	switch podQOS {
 	case v1.PodQOSGuaranteed:
 		parentContainer = m.qosContainersInfo.Guaranteed
@@ -116,7 +116,7 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	podContainer := GetPodCgroupNameSuffix(pod.UID)
 
 	// Get the absolute path of the cgroup
-	cgroupName := (CgroupName)(path.Join(parentContainer, podContainer))
+	cgroupName := NewCgroupName(parentContainer, podContainer)
 	// Get the literal cgroupfs name
 	cgroupfsName := m.cgroupManager.Name(cgroupName)
 
@@ -189,7 +189,7 @@ func (m *podContainerManagerImpl) ReduceCPULimits(podCgroup CgroupName) error {
 func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
 	// Map for storing all the found pods on the disk
 	foundPods := make(map[types.UID]CgroupName)
-	qosContainersList := [3]string{m.qosContainersInfo.BestEffort, m.qosContainersInfo.Burstable, m.qosContainersInfo.Guaranteed}
+	qosContainersList := [3]CgroupName{m.qosContainersInfo.BestEffort, m.qosContainersInfo.Burstable, m.qosContainersInfo.Guaranteed}
 	// Scan through all the subsystem mounts
 	// and through each QoS cgroup directory for each subsystem mount
 	// If a pod cgroup exists in even a single subsystem mount
@@ -197,7 +197,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 	for _, val := range m.subsystems.MountPoints {
 		for _, qosContainerName := range qosContainersList {
 			// get the subsystems QoS cgroup absolute name
-			qcConversion := m.cgroupManager.Name(CgroupName(qosContainerName))
+			qcConversion := m.cgroupManager.Name(qosContainerName)
 			qc := path.Join(val, qcConversion)
 			dirInfo, err := ioutil.ReadDir(qc)
 			if err != nil {
@@ -219,7 +219,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 				internalPath := m.cgroupManager.CgroupName(cgroupfsPath)
 				// we only care about base segment of the converted path since that
 				// is what we are reading currently to know if it is a pod or not.
-				basePath := path.Base(string(internalPath))
+				basePath := internalPath[len(internalPath)-1]
 				if !strings.Contains(basePath, podCgroupNamePrefix) {
 					continue
 				}
@@ -259,7 +259,7 @@ func (m *podContainerManagerNoop) EnsureExists(_ *v1.Pod) error {
 }
 
 func (m *podContainerManagerNoop) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
-	return m.cgroupRoot, string(m.cgroupRoot)
+	return m.cgroupRoot, m.cgroupRoot.ToCgroupfs()
 }
 
 func (m *podContainerManagerNoop) GetPodContainerNameForDriver(_ *v1.Pod) string {

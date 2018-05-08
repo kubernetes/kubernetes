@@ -13,6 +13,7 @@ go_library(
         "delete_resources.go",
         "density_utils.go",
         "deployment.go",
+        "paths.go",
         "pod_store.go",
         "replicaset.go",
         "runners.go",

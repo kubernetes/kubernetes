@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,6 +37,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -147,7 +147,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					if test.obj != nil {
@@ -184,7 +184,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 }
 
 func TestAttach(t *testing.T) {
-	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := "v1"
 	tests := []struct {
 		name, version, podPath, fetchPodPath, attachPath, container string
 		pod                                                         *api.Pod
@@ -231,7 +231,7 @@ func TestAttach(t *testing.T) {
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
@@ -249,9 +249,6 @@ func TestAttach(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
-			bufOut := bytes.NewBuffer([]byte{})
-			bufErr := bytes.NewBuffer([]byte{})
-			bufIn := bytes.NewBuffer([]byte{})
 			remoteAttach := &fakeRemoteAttach{}
 			if test.remoteAttachErr {
 				remoteAttach.err = fmt.Errorf("attach error")
@@ -259,9 +256,7 @@ func TestAttach(t *testing.T) {
 			params := &AttachOptions{
 				StreamOptions: StreamOptions{
 					ContainerName: test.container,
-					In:            bufIn,
-					Out:           bufOut,
-					Err:           bufErr,
+					IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
 				},
 				Attach:        remoteAttach,
 				GetPodTimeout: 1000,
@@ -298,7 +293,7 @@ func TestAttach(t *testing.T) {
 }
 
 func TestAttachWarnings(t *testing.T) {
-	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := "v1"
 	tests := []struct {
 		name, container, version, podPath, fetchPodPath, expectedErr string
 		pod                                                          *api.Pod
@@ -324,7 +319,7 @@ func TestAttachWarnings(t *testing.T) {
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
@@ -342,16 +337,12 @@ func TestAttachWarnings(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
-			bufOut := bytes.NewBuffer([]byte{})
-			bufErr := bytes.NewBuffer([]byte{})
-			bufIn := bytes.NewBuffer([]byte{})
+			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
 			ex := &fakeRemoteAttach{}
 			params := &AttachOptions{
 				StreamOptions: StreamOptions{
 					ContainerName: test.container,
-					In:            bufIn,
-					Out:           bufOut,
-					Err:           bufErr,
+					IOStreams:     streams,
 					Stdin:         test.stdin,
 					TTY:           test.tty,
 				},

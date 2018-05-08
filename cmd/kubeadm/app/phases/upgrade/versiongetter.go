@@ -122,3 +122,30 @@ func computeKubeletVersions(nodes []v1.Node) map[string]uint16 {
 	}
 	return kubeletVersions
 }
+
+// OfflineVersionGetter will use the version provided or
+type OfflineVersionGetter struct {
+	VersionGetter
+	version string
+}
+
+// NewOfflineVersionGetter wraps a VersionGetter and skips online communication if default information is supplied.
+// Version can be "" and the behavior will be identical to the versionGetter passed in.
+func NewOfflineVersionGetter(versionGetter VersionGetter, version string) VersionGetter {
+	return &OfflineVersionGetter{
+		VersionGetter: versionGetter,
+		version:       version,
+	}
+}
+
+// VersionFromCILabel will return the version that was passed into the struct
+func (o *OfflineVersionGetter) VersionFromCILabel(ciVersionLabel, description string) (string, *versionutil.Version, error) {
+	if o.version == "" {
+		return o.VersionGetter.VersionFromCILabel(ciVersionLabel, description)
+	}
+	ver, err := versionutil.ParseSemantic(o.version)
+	if err != nil {
+		return "", nil, fmt.Errorf("Couldn't parse version %s: %v", description, err)
+	}
+	return o.version, ver, nil
+}

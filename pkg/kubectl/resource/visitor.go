@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -74,10 +73,11 @@ type ResourceMapping interface {
 // Info contains temporary info to execute a REST call, or show the results
 // of an already completed REST call.
 type Info struct {
+	// Client will only be present if this builder was not local
 	Client RESTClient
-	// Mapping may be nil if the object has no available metadata, but is still parseable
-	// from disk.
+	// Mapping will only be present if this builder was not local
 	Mapping *meta.RESTMapping
+
 	// Namespace will be set if the object is namespaced and has a specified value.
 	Namespace string
 	Name      string
@@ -158,7 +158,7 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 func (i *Info) String() string {
 	basicInfo := fmt.Sprintf("Name: %q, Namespace: %q\nObject: %+q", i.Name, i.Namespace, i.Object)
 	if i.Mapping != nil {
-		mappingInfo := fmt.Sprintf("Resource: %q, GroupVersionKind: %q", i.Mapping.Resource,
+		mappingInfo := fmt.Sprintf("Resource: %q, GroupVersionKind: %q", i.Mapping.Resource.String(),
 			i.Mapping.GroupVersionKind.String())
 		return fmt.Sprint(mappingInfo, "\n", basicInfo)
 	}
@@ -178,61 +178,6 @@ func (i *Info) Watch(resourceVersion string) (watch.Interface, error) {
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping
 func (i *Info) ResourceMapping() *meta.RESTMapping {
 	return i.Mapping
-}
-
-// Internal attempts to convert the provided object to an internal type or returns an error.
-func (i *Info) Internal() (runtime.Object, error) {
-	return i.Mapping.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
-}
-
-// AsInternal returns the object in internal form if possible, or i.Object if it cannot be
-// converted.
-func (i *Info) AsInternal() runtime.Object {
-	if obj, err := i.Internal(); err == nil {
-		return obj
-	}
-	return i.Object
-}
-
-// Versioned returns the object as a Go type in the mapping's version or returns an error.
-func (i *Info) Versioned() (runtime.Object, error) {
-	return i.Mapping.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupVersion())
-}
-
-// AsVersioned returns the object as a Go object in the external form if possible (matching the
-// group version kind of the mapping, or i.Object if it cannot be converted.
-func (i *Info) AsVersioned() runtime.Object {
-	if obj, err := i.Versioned(); err == nil {
-		return obj
-	}
-	return i.Object
-}
-
-// Unstructured returns the current object in unstructured form (as a runtime.Unstructured)
-func (i *Info) Unstructured() (runtime.Unstructured, error) {
-	switch t := i.Object.(type) {
-	case runtime.Unstructured:
-		return t, nil
-	case *runtime.Unknown:
-		gvk := i.Mapping.GroupVersionKind
-		out, _, err := unstructured.UnstructuredJSONScheme.Decode(t.Raw, &gvk, nil)
-		return out.(runtime.Unstructured), err
-	default:
-		out := &unstructured.Unstructured{}
-		if err := i.Mapping.Convert(i.Object, out, nil); err != nil {
-			return nil, err
-		}
-		return out, nil
-	}
-}
-
-// AsUnstructured returns the object as a Go object in external form as a runtime.Unstructured
-// (map of JSON equivalent values) or as i.Object if it cannot be converted.
-func (i *Info) AsUnstructured() runtime.Object {
-	if out, err := i.Unstructured(); err == nil {
-		return out
-	}
-	return i.Object
 }
 
 // VisitorList implements Visit for the sub visitors it contains. The first error
@@ -425,18 +370,19 @@ func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
 // the visit.
 // TODO: allow errors to be aggregated?
 type FlattenListVisitor struct {
-	Visitor
-	*Mapper
+	visitor Visitor
+	typer   runtime.ObjectTyper
+	mapper  *mapper
 }
 
 // NewFlattenListVisitor creates a visitor that will expand list style runtime.Objects
 // into individual items and then visit them individually.
-func NewFlattenListVisitor(v Visitor, mapper *Mapper) Visitor {
-	return FlattenListVisitor{v, mapper}
+func NewFlattenListVisitor(v Visitor, typer runtime.ObjectTyper, mapper *mapper) Visitor {
+	return FlattenListVisitor{v, typer, mapper}
 }
 
 func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
-	return v.Visitor.Visit(func(info *Info, err error) error {
+	return v.visitor.Visit(func(info *Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -447,7 +393,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if err != nil {
 			return fn(info, nil)
 		}
-		if errs := runtime.DecodeList(items, v.Mapper.Decoder); len(errs) > 0 {
+		if errs := runtime.DecodeList(items, v.mapper.decoder); len(errs) > 0 {
 			return utilerrors.NewAggregate(errs)
 		}
 
@@ -458,7 +404,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		}
 
 		for i := range items {
-			item, err := v.InfoForObject(items[i], preferredGVKs)
+			item, err := v.mapper.infoForObject(items[i], v.typer, preferredGVKs)
 			if err != nil {
 				return err
 			}
@@ -487,7 +433,7 @@ func ignoreFile(path string, extensions []string) bool {
 }
 
 // FileVisitorForSTDIN return a special FileVisitor just for STDIN
-func FileVisitorForSTDIN(mapper *Mapper, schema validation.Schema) Visitor {
+func FileVisitorForSTDIN(mapper *mapper, schema validation.Schema) Visitor {
 	return &FileVisitor{
 		Path:          constSTDINstr,
 		StreamVisitor: NewStreamVisitor(nil, mapper, constSTDINstr, schema),
@@ -497,7 +443,7 @@ func FileVisitorForSTDIN(mapper *Mapper, schema validation.Schema) Visitor {
 // ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
 // After FileVisitors open the files, they will pass an io.Reader to a StreamVisitor to do the reading. (stdin
 // is also taken care of). Paths argument also accepts a single file, and will return a single visitor
-func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
+func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
 	var visitors []Visitor
 	err := filepath.Walk(paths, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -564,17 +510,17 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 // a stream decoder method on runtime.Codec to properly handle this.
 type StreamVisitor struct {
 	io.Reader
-	*Mapper
+	*mapper
 
 	Source string
 	Schema validation.Schema
 }
 
 // NewStreamVisitor is a helper function that is useful when we want to change the fields of the struct but keep calls the same.
-func NewStreamVisitor(r io.Reader, mapper *Mapper, source string, schema validation.Schema) *StreamVisitor {
+func NewStreamVisitor(r io.Reader, mapper *mapper, source string, schema validation.Schema) *StreamVisitor {
 	return &StreamVisitor{
 		Reader: r,
-		Mapper: mapper,
+		mapper: mapper,
 		Source: source,
 		Schema: schema,
 	}
@@ -599,7 +545,7 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 		if err := ValidateSchema(ext.Raw, v.Schema); err != nil {
 			return fmt.Errorf("error validating %q: %v", v.Source, err)
 		}
-		info, err := v.InfoForData(ext.Raw, v.Source)
+		info, err := v.infoForData(ext.Raw, v.Source)
 		if err != nil {
 			if fnErr := fn(info, err); fnErr != nil {
 				return fnErr

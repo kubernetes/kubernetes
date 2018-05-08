@@ -38,7 +38,7 @@ import (
 
 // NOTE: Copied from webhook backend to register auditv1beta1 to scheme
 var (
-	registry = registered.NewOrDie("")
+	registry = registered.NewAPIRegistrationManager()
 )
 
 func init() {

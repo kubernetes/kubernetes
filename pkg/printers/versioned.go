@@ -45,20 +45,10 @@ func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConver
 	}
 }
 
-func (p *VersionedPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
 // PrintObj implements ResourcePrinter
 func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	// if we're unstructured, no conversion necessary
 	if _, ok := obj.(*unstructured.Unstructured); ok {
-		return p.printer.PrintObj(obj, w)
-	}
-	// if we aren't a generic printer, we don't convert.  This means the printer must be aware of what it is getting.
-	// The default printers fall into this category.
-	// TODO eventually, all printers must be generic
-	if !p.IsGeneric() {
 		return p.printer.PrintObj(obj, w)
 	}
 
@@ -92,13 +82,4 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 	return p.printer.PrintObj(converted, w)
-}
-
-// TODO: implement HandledResources()
-func (p *VersionedPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (p *VersionedPrinter) IsGeneric() bool {
-	return p.printer.IsGeneric()
 }

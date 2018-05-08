@@ -3,8 +3,8 @@ mode: create
 filename: "svc.yaml"
 namespace: "edit-test"
 expectedStdout:
-- service "svc1" created
-- service "svc2" created
+- service/svc1 created
+- service/svc2 created
 expectedExitCode: 0
 steps:
 - type: edit

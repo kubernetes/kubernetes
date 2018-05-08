@@ -41,9 +41,9 @@ func NewSecurityRulesClientWithBaseURI(baseURI string, subscriptionID string) Se
 
 // CreateOrUpdate creates or updates a security rule in the specified network security group.
 //
-// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network security
-// group. securityRuleName is the name of the security rule. securityRuleParameters is parameters supplied to the
-// create or update network security rule operation.
+// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network
+// security group. securityRuleName is the name of the security rule. securityRuleParameters is parameters supplied
+// to the create or update network security rule operation.
 func (client SecurityRulesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, securityRuleName string, securityRuleParameters SecurityRule) (result SecurityRulesCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, networkSecurityGroupName, securityRuleName, securityRuleParameters)
 	if err != nil {
@@ -114,8 +114,8 @@ func (client SecurityRulesClient) CreateOrUpdateResponder(resp *http.Response) (
 
 // Delete deletes the specified network security rule.
 //
-// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network security
-// group. securityRuleName is the name of the security rule.
+// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network
+// security group. securityRuleName is the name of the security rule.
 func (client SecurityRulesClient) Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, securityRuleName string) (result SecurityRulesDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, networkSecurityGroupName, securityRuleName)
 	if err != nil {
@@ -183,8 +183,8 @@ func (client SecurityRulesClient) DeleteResponder(resp *http.Response) (result a
 
 // Get get the specified network security rule.
 //
-// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network security
-// group. securityRuleName is the name of the security rule.
+// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network
+// security group. securityRuleName is the name of the security rule.
 func (client SecurityRulesClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, securityRuleName string) (result SecurityRule, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, networkSecurityGroupName, securityRuleName)
 	if err != nil {
@@ -251,8 +251,8 @@ func (client SecurityRulesClient) GetResponder(resp *http.Response) (result Secu
 
 // List gets all security rules in a network security group.
 //
-// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network security
-// group.
+// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network
+// security group.
 func (client SecurityRulesClient) List(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (result SecurityRuleListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, networkSecurityGroupName)

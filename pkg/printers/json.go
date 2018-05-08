@@ -31,10 +31,6 @@ import (
 type JSONPrinter struct {
 }
 
-func (p *JSONPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
 // PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
 func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	switch obj := obj.(type) {
@@ -58,25 +54,12 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	return err
 }
 
-// TODO: implement HandledResources()
-func (p *JSONPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (p *JSONPrinter) IsGeneric() bool {
-	return true
-}
-
 // YAMLPrinter is an implementation of ResourcePrinter which outputs an object as YAML.
 // The input object is assumed to be in the internal version of an API and is converted
 // to the given version first.
 type YAMLPrinter struct {
 	version   string
 	converter runtime.ObjectConvertor
-}
-
-func (p *YAMLPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
 }
 
 // PrintObj prints the data as YAML.
@@ -97,13 +80,4 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 	_, err = fmt.Fprint(w, string(output))
 	return err
-}
-
-// TODO: implement HandledResources()
-func (p *YAMLPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (p *YAMLPrinter) IsGeneric() bool {
-	return true
 }

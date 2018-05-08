@@ -777,8 +777,13 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 	mountSource := fmt.Sprintf("/proc/%d/fd/%v", kubeletPid, fd)
 
 	// Do the bind mount
+	options := []string{"bind"}
+	if subpath.ReadOnly {
+		options = append(options, "ro")
+	}
+
 	glog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
-	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, []string{"bind"}); err != nil {
+	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
 
@@ -919,6 +924,31 @@ func removeEmptyDirs(baseDir, endDir string) error {
 
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return doSafeMakeDir(pathname, base, perm)
+}
+
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	realpath, err := filepath.EvalSymlinks(pathname)
+	if err != nil {
+		return nil, err
+	}
+	return getMountRefsByDev(mounter, realpath)
+}
+
+func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
+	realpath, err := filepath.EvalSymlinks(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return getFSGroup(realpath)
+}
+
+// This implementation is shared between Linux and NsEnterMounter
+func getFSGroup(pathname string) (int64, error) {
+	info, err := os.Stat(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return int64(info.Sys().(*syscall.Stat_t).Gid), nil
 }
 
 // This implementation is shared between Linux and NsEnterMounter

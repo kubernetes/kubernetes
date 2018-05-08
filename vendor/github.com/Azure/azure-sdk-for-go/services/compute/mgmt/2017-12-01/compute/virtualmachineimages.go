@@ -41,8 +41,8 @@ func NewVirtualMachineImagesClientWithBaseURI(baseURI string, subscriptionID str
 
 // Get gets a virtual machine image.
 //
-// location is the name of a supported Azure region. publisherName is a valid image publisher. offer is a valid image
-// publisher offer. skus is a valid image SKU. version is a valid image SKU version.
+// location is the name of a supported Azure region. publisherName is a valid image publisher. offer is a valid
+// image publisher offer. skus is a valid image SKU. version is a valid image SKU version.
 func (client VirtualMachineImagesClient) Get(ctx context.Context, location string, publisherName string, offer string, skus string, version string) (result VirtualMachineImage, err error) {
 	req, err := client.GetPreparer(ctx, location, publisherName, offer, skus, version)
 	if err != nil {
@@ -111,8 +111,8 @@ func (client VirtualMachineImagesClient) GetResponder(resp *http.Response) (resu
 
 // List gets a list of all virtual machine image versions for the specified location, publisher, offer, and SKU.
 //
-// location is the name of a supported Azure region. publisherName is a valid image publisher. offer is a valid image
-// publisher offer. skus is a valid image SKU. filter is the filter to apply on the operation.
+// location is the name of a supported Azure region. publisherName is a valid image publisher. offer is a valid
+// image publisher offer. skus is a valid image SKU. filter is the filter to apply on the operation.
 func (client VirtualMachineImagesClient) List(ctx context.Context, location string, publisherName string, offer string, skus string, filter string, top *int32, orderby string) (result ListVirtualMachineImageResource, err error) {
 	req, err := client.ListPreparer(ctx, location, publisherName, offer, skus, filter, top, orderby)
 	if err != nil {
@@ -320,8 +320,8 @@ func (client VirtualMachineImagesClient) ListPublishersResponder(resp *http.Resp
 
 // ListSkus gets a list of virtual machine image SKUs for the specified location, publisher, and offer.
 //
-// location is the name of a supported Azure region. publisherName is a valid image publisher. offer is a valid image
-// publisher offer.
+// location is the name of a supported Azure region. publisherName is a valid image publisher. offer is a valid
+// image publisher offer.
 func (client VirtualMachineImagesClient) ListSkus(ctx context.Context, location string, publisherName string, offer string) (result ListVirtualMachineImageResource, err error) {
 	req, err := client.ListSkusPreparer(ctx, location, publisherName, offer)
 	if err != nil {

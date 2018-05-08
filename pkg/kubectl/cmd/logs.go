@@ -25,14 +25,17 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -87,12 +90,19 @@ type LogsOptions struct {
 	GetPodTimeout time.Duration
 	LogsForObject func(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
 
-	Out io.Writer
+	genericclioptions.IOStreams
+}
+
+func NewLogsOptions(streams genericclioptions.IOStreams) *LogsOptions {
+	return &LogsOptions{
+		IOStreams: streams,
+	}
 }
 
 // NewCmdLogs creates a new pod logs command
-func NewCmdLogs(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := &LogsOptions{}
+func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewLogsOptions(streams)
+
 	cmd := &cobra.Command{
 		Use: "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
 		DisableFlagsInUseLine: true,
@@ -101,11 +111,11 @@ func NewCmdLogs(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: logsExample,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if len(os.Args) > 1 && os.Args[1] == "log" {
-				printDeprecationWarning(errOut, "logs", "log")
+				printDeprecationWarning(o.ErrOut, "logs", "log")
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, out, cmd, args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunLogs())
 		},
@@ -127,7 +137,7 @@ func NewCmdLogs(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	o.AllContainers = cmdutil.GetFlagBool(cmd, "all-containers")
@@ -187,7 +197,6 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	}
 	o.Options = logOptions
 	o.LogsForObject = f.LogsForObject
-	o.Out = out
 
 	if len(selector) != 0 {
 		if logOptions.Follow {
@@ -200,7 +209,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 
 	if o.Object == nil {
 		builder := f.NewBuilder().
-			Internal().
+			WithScheme(legacyscheme.Scheme).
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
 		if o.ResourceArg != "" {

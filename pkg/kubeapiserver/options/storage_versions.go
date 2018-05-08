@@ -101,7 +101,6 @@ func (s *StorageSerializationOptions) AddFlags(fs *pflag.FlagSet) {
 		"In the case where objects are moved from one group to the other, "+
 		"you may specify the format \"group1=group2/v1beta1,group3/v1beta1,...\". "+
 		"You only need to pass the groups you wish to change from the defaults. "+
-		"It defaults to a list of preferred versions of all registered groups, "+
-		"which is derived from the KUBE_API_VERSIONS environment variable.")
+		"It defaults to a list of preferred versions of all known groups.")
 
 }

@@ -18,7 +18,6 @@ package aws_ebs
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -164,7 +163,7 @@ func (ebs *awsElasticBlockStore) GetGlobalMapPath(spec *volume.Spec) (string, er
 	if err != nil {
 		return "", err
 	}
-	return path.Join(ebs.plugin.host.GetVolumeDevicePluginDir(awsElasticBlockStorePluginName), string(volumeSource.VolumeID)), nil
+	return filepath.Join(ebs.plugin.host.GetVolumeDevicePluginDir(awsElasticBlockStorePluginName), string(volumeSource.VolumeID)), nil
 }
 
 // GetPodDeviceMapPath returns pod device map path and volume name

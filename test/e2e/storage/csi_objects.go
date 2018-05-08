@@ -40,7 +40,7 @@ import (
 const (
 	csiHostPathPluginImage      string = "quay.io/k8scsi/hostpathplugin:v0.2.0"
 	csiExternalAttacherImage    string = "quay.io/k8scsi/csi-attacher:v0.2.0"
-	csiExternalProvisionerImage string = "quay.io/k8scsi/csi-provisioner:v0.2.0"
+	csiExternalProvisionerImage string = "quay.io/k8scsi/csi-provisioner:v0.2.1"
 	csiDriverRegistrarImage     string = "quay.io/k8scsi/driver-registrar:v0.2.0"
 )
 

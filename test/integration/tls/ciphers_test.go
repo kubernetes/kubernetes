@@ -29,7 +29,7 @@ import (
 
 func runBasicSecureAPIServer(t *testing.T, ciphers []string) (kubeapiservertesting.TearDownFunc, int) {
 	flags := []string{"--tls-cipher-suites", strings.Join(ciphers, ",")}
-	testServer := kubeapiservertesting.StartTestServerOrDie(t, flags, framework.SharedEtcd())
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 	return testServer.TearDownFn, testServer.ServerOpts.SecureServing.BindPort
 }
 

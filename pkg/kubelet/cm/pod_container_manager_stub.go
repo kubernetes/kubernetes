@@ -35,7 +35,7 @@ func (m *podContainerManagerStub) EnsureExists(_ *v1.Pod) error {
 }
 
 func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
-	return "", ""
+	return nil, ""
 }
 
 func (m *podContainerManagerStub) Destroy(_ CgroupName) error {

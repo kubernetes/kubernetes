@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +30,7 @@ import (
 )
 
 var (
-	registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
+	registry = registered.NewAPIRegistrationManager()
 	scheme   = runtime.NewScheme()
 	codecs   = serializer.NewCodecFactory(scheme)
 )

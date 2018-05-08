@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest"
 
@@ -104,7 +104,9 @@ func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pi
 	}
 
 	var realErr error
-	pip, err = az.PublicIPAddressesClient.Get(resourceGroup, pipName, "")
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	pip, err = az.PublicIPAddressesClient.Get(ctx, resourceGroup, pipName, "")
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return pip, false, realErr
@@ -127,7 +129,9 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 		rg = az.ResourceGroup
 	}
 
-	subnet, err = az.SubnetsClient.Get(rg, virtualNetworkName, subnetName, "")
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	subnet, err = az.SubnetsClient.Get(ctx, rg, virtualNetworkName, subnetName, "")
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return subnet, false, realErr
@@ -174,7 +178,9 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 		// case we do get instance view every time to fulfill the azure_zones requirement without hitting
 		// throttling.
 		// Consider adding separate parameter for controlling 'InstanceView' once node update issue #56276 is fixed
-		vm, err := az.VirtualMachinesClient.Get(az.ResourceGroup, key, compute.InstanceView)
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		vm, err := az.VirtualMachinesClient.Get(ctx, az.ResourceGroup, key, compute.InstanceView)
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
@@ -192,7 +198,10 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 
 func (az *Cloud) newLBCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		lb, err := az.LoadBalancerClient.Get(az.ResourceGroup, key, "")
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		lb, err := az.LoadBalancerClient.Get(ctx, az.ResourceGroup, key, "")
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
@@ -210,7 +219,9 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 
 func (az *Cloud) newNSGCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		nsg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, key, "")
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		nsg, err := az.SecurityGroupsClient.Get(ctx, az.ResourceGroup, key, "")
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
@@ -228,7 +239,9 @@ func (az *Cloud) newNSGCache() (*timedCache, error) {
 
 func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		rt, err := az.RouteTablesClient.Get(az.ResourceGroup, key, "")
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		rt, err := az.RouteTablesClient.Get(ctx, az.ResourceGroup, key, "")
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr

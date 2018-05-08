@@ -40,8 +40,11 @@ const (
 	// KubeLoadBalancerSet is used to store service load balancer ingress ip + port, it is the service lb portal.
 	KubeLoadBalancerSet = "KUBE-LOAD-BALANCER"
 
-	// KubeLoadBalancerIngressLocalSet is used to store service load balancer ingress ip + port with externalTrafficPolicy=local.
-	KubeLoadBalancerIngressLocalSet = "KUBE-LB-INGRESS-LOCAL"
+	// KubeLoadBalancerLocalSet is used to store service load balancer ingress ip + port with externalTrafficPolicy=local.
+	KubeLoadBalancerLocalSet = "KUBE-LOAD-BALANCER-LOCAL"
+
+	// KubeLoadbalancerFWSet is used to store service load balancer ingress ip + port for load balancer with sourceRange.
+	KubeLoadbalancerFWSet = "KUBE-LOAD-BALANCER-FW"
 
 	// KubeLoadBalancerSourceIPSet is used to store service load balancer ingress ip + port + source IP for packet filter purpose.
 	KubeLoadBalancerSourceIPSet = "KUBE-LOAD-BALANCER-SOURCE-IP"

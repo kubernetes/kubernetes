@@ -54,8 +54,8 @@ import (
 )
 
 func init() {
-	legacyscheme.Scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &TestPrintType{})
-	legacyscheme.Scheme.AddKnownTypes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion, &TestPrintType{})
+	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}, &TestPrintType{})
+	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &TestPrintType{})
 }
 
 var testData = TestStruct{
@@ -92,30 +92,10 @@ func TestVersionedPrinter(t *testing.T) {
 		}),
 		legacyscheme.Scheme,
 		legacyscheme.Scheme,
-		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		schema.GroupVersion{Group: "", Version: "v1"},
 	)
 	if err := p.PrintObj(original, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestPrintDefault(t *testing.T) {
-	printerTests := []struct {
-		Name   string
-		Format string
-	}{
-		{"test wide", "wide"},
-		{"test blank format", ""},
-	}
-
-	for _, test := range printerTests {
-		printer, err := printers.GetStandardPrinter(nil, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, printers.PrintOptions{AllowMissingKeys: false})
-		if err != nil {
-			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
-		}
-		if printer.IsGeneric() {
-			t.Errorf("in %s, printer should not be generic: %#v", test.Name, printer)
-		}
 	}
 }
 
@@ -212,7 +192,7 @@ func TestPrintUnstructuredObject(t *testing.T) {
 
 	for _, test := range tests {
 		out.Reset()
-		printer := printers.NewHumanReadablePrinter(nil, nil, test.options).With(AddDefaultHandlers)
+		printer := printers.NewHumanReadablePrinter(nil, test.options).With(AddDefaultHandlers)
 		printer.PrintObj(test.object, out)
 
 		matches, err := regexp.MatchString(test.expected, out.String())
@@ -247,78 +227,6 @@ func (obj *TestUnknownType) DeepCopyObject() runtime.Object {
 	}
 	clone := *obj
 	return &clone
-}
-
-func TestPrinter(t *testing.T) {
-	//test inputs
-	simpleTest := &TestPrintType{"foo"}
-	podTest := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	podListTest := &api.PodList{
-		Items: []api.Pod{
-			{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
-		},
-	}
-	emptyListTest := &api.PodList{}
-	testapi, err := legacyscheme.Scheme.ConvertToVersion(podTest, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	printerTests := []struct {
-		Name           string
-		PrintOpts      *printers.PrintOptions
-		Input          runtime.Object
-		OutputVersions []schema.GroupVersion
-		Expect         string
-	}{
-		{"test json", &printers.PrintOptions{OutputFormatType: "json", AllowMissingKeys: true}, simpleTest, nil, "{\n    \"Data\": \"foo\"\n}\n"},
-		{"test yaml", &printers.PrintOptions{OutputFormatType: "yaml", AllowMissingKeys: true}, simpleTest, nil, "Data: foo\n"},
-		{"test template", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}", AllowMissingKeys: true},
-			podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo"},
-		{"test jsonpath", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.metadata.name}", AllowMissingKeys: true}, podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo"},
-		{"test jsonpath list", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.items[*].metadata.name}", AllowMissingKeys: true}, podListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "foo bar"},
-		{"test jsonpath empty list", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.items[*].metadata.name}", AllowMissingKeys: true}, emptyListTest, []schema.GroupVersion{v1.SchemeGroupVersion}, ""},
-		{"test name", &printers.PrintOptions{OutputFormatType: "name", AllowMissingKeys: true}, podTest, []schema.GroupVersion{v1.SchemeGroupVersion}, "pod/foo\n"},
-		{"emits versioned objects", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{.kind}}", AllowMissingKeys: true}, testapi, []schema.GroupVersion{v1.SchemeGroupVersion}, "Pod"},
-	}
-	for _, test := range printerTests {
-		buf := bytes.NewBuffer([]byte{})
-		printer, err := printers.GetStandardPrinter(legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
-		if err != nil {
-			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
-		}
-		if printer.IsGeneric() && len(test.OutputVersions) > 0 {
-			printer = printers.NewVersionedPrinter(printer, legacyscheme.Scheme, legacyscheme.Scheme, test.OutputVersions...)
-		}
-		if err := printer.PrintObj(test.Input, buf); err != nil {
-			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
-		}
-		if buf.String() != test.Expect {
-			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String())
-		}
-	}
-
-}
-
-func TestBadPrinter(t *testing.T) {
-	badPrinterTests := []struct {
-		Name      string
-		PrintOpts *printers.PrintOptions
-		Error     error
-	}{
-		{"empty template", &printers.PrintOptions{OutputFormatType: "template", AllowMissingKeys: false}, fmt.Errorf("template format specified but no template given")},
-		{"bad template", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{ .Name", AllowMissingKeys: false}, fmt.Errorf("error parsing template {{ .Name, template: output:1: unclosed action\n")},
-		{"bad templatefile", &printers.PrintOptions{OutputFormatType: "templatefile", AllowMissingKeys: false}, fmt.Errorf("template format specified but no template given")},
-		{"bad jsonpath", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.Name", AllowMissingKeys: false}, fmt.Errorf("error parsing jsonpath {.Name, unclosed action\n")},
-		{"unknown format", &printers.PrintOptions{OutputFormatType: "anUnknownFormat", OutputFormatArgument: "", AllowMissingKeys: false}, fmt.Errorf("output format \"anUnknownFormat\" not recognized")},
-	}
-	for _, test := range badPrinterTests {
-		_, err := printers.GetStandardPrinter(legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
-		if err == nil || err.Error() != test.Error.Error() {
-			t.Errorf("in %s, expect %s, got %s", test.Name, test.Error, err)
-		}
-	}
 }
 
 func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc func(data []byte, v interface{}) error) {
@@ -408,7 +316,7 @@ func ErrorPrintHandler(obj *TestPrintType, w io.Writer, options printers.PrintOp
 
 func TestCustomTypePrinting(t *testing.T) {
 	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	printer.Handler(columns, nil, PrintCustomType)
 
 	obj := TestPrintType{"test object"}
@@ -425,7 +333,7 @@ func TestCustomTypePrinting(t *testing.T) {
 
 func TestPrintHandlerError(t *testing.T) {
 	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	printer.Handler(columns, nil, ErrorPrintHandler)
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
@@ -436,7 +344,7 @@ func TestPrintHandlerError(t *testing.T) {
 }
 
 func TestUnknownTypePrinting(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	buffer := &bytes.Buffer{}
 	err := printer.PrintObj(&TestUnknownType{}, buffer)
 	if err == nil {
@@ -491,8 +399,13 @@ func TestNamePrinter(t *testing.T) {
 			},
 			"pod/foo\npod/bar\n"},
 	}
-	printOpts := &printers.PrintOptions{OutputFormatType: "name", AllowMissingKeys: false}
-	printer, _ := printers.GetStandardPrinter(legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *printOpts)
+
+	printFlags := printers.NewPrintFlags("").WithDefaultOutput("name")
+	printer, err := printFlags.ToPrinter()
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
 	for name, item := range tests {
 		buff := &bytes.Buffer{}
 		err := printer.PrintObj(item.obj, buff)
@@ -607,7 +520,7 @@ func TestTemplateStrings(t *testing.T) {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := printers.NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+	printer := printers.NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, schema.GroupVersion{Group: "", Version: "v1"})
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}
@@ -655,10 +568,10 @@ func TestPrinters(t *testing.T) {
 	jsonpathPrinter = printers.NewVersionedPrinter(jsonpathPrinter, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
 	allPrinters := map[string]printers.ResourcePrinter{
-		"humanReadable": printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+		"humanReadable": printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
 			NoHeaders: true,
 		}),
-		"humanReadableHeaders": printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{}),
+		"humanReadableHeaders": printers.NewHumanReadablePrinter(nil, printers.PrintOptions{}),
 		"json":                 &printers.JSONPrinter{},
 		"yaml":                 &printers.YAMLPrinter{},
 		"template":             templatePrinter,
@@ -703,7 +616,7 @@ func TestPrinters(t *testing.T) {
 
 func TestPrintEventsResultSorted(t *testing.T) {
 	// Arrange
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	AddHandlers(printer)
 
 	obj := api.EventList{
@@ -748,7 +661,7 @@ func TestPrintEventsResultSorted(t *testing.T) {
 }
 
 func TestPrintNodeStatus(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	AddHandlers(printer)
 	table := []struct {
 		node   api.Node
@@ -838,7 +751,7 @@ func TestPrintNodeStatus(t *testing.T) {
 }
 
 func TestPrintNodeRole(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	AddHandlers(printer)
 	table := []struct {
 		node     api.Node
@@ -883,7 +796,7 @@ func TestPrintNodeRole(t *testing.T) {
 }
 
 func TestPrintNodeOSImage(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
@@ -928,7 +841,7 @@ func TestPrintNodeOSImage(t *testing.T) {
 }
 
 func TestPrintNodeKernelVersion(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
@@ -973,7 +886,7 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 }
 
 func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
@@ -1018,7 +931,7 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 }
 
 func TestPrintNodeName(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
 		Wide: true,
 	})
 	AddHandlers(printer)
@@ -1055,7 +968,7 @@ func TestPrintNodeName(t *testing.T) {
 }
 
 func TestPrintNodeExternalIP(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
 		Wide: true,
 	})
 	AddHandlers(printer)
@@ -1103,7 +1016,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 }
 
 func TestPrintNodeInternalIP(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
 		Wide: true,
 	})
 	AddHandlers(printer)
@@ -1505,7 +1418,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 	for i, test := range table {
 		if test.isNamespaced {
 			// Expect output to include namespace when requested.
-			printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+			printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
 				WithNamespace: true,
 			})
 			AddHandlers(printer)
@@ -1520,7 +1433,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			}
 		} else {
 			// Expect error when trying to get all namespaces for un-namespaced object.
-			printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+			printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
 				WithNamespace: true,
 			})
 			buffer := &bytes.Buffer{}
@@ -1598,7 +1511,7 @@ func TestPrintPodTable(t *testing.T) {
 			t.Fatal(err)
 		}
 		buf := &bytes.Buffer{}
-		p := printers.NewHumanReadablePrinter(nil, nil, test.opts).With(AddHandlers).AddTabWriter(false)
+		p := printers.NewHumanReadablePrinter(nil, test.opts).With(AddHandlers).AddTabWriter(false)
 		if err := p.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
@@ -3004,44 +2917,6 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
-	}
-}
-
-func TestAllowMissingKeys(t *testing.T) {
-	tests := []struct {
-		Name      string
-		PrintOpts *printers.PrintOptions
-		Input     runtime.Object
-		Expect    string
-		Error     string
-	}{
-		{"test template, allow missing keys", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{.blarg}}", AllowMissingKeys: true}, &api.Pod{}, "<no value>", ""},
-		{"test template, strict", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{.blarg}}", AllowMissingKeys: false}, &api.Pod{}, "", `error executing template "{{.blarg}}": template: output:1:2: executing "output" at <.blarg>: map has no entry for key "blarg"`},
-		{"test jsonpath, allow missing keys", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.blarg}", AllowMissingKeys: true}, &api.Pod{}, "", ""},
-		{"test jsonpath, strict", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.blarg}", AllowMissingKeys: false}, &api.Pod{}, "", "error executing jsonpath \"{.blarg}\": blarg is not found\n"},
-	}
-	for _, test := range tests {
-		buf := bytes.NewBuffer([]byte{})
-		printer, err := printers.GetStandardPrinter(legacyscheme.Scheme, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, *test.PrintOpts)
-		if err != nil {
-			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
-		}
-		err = printer.PrintObj(test.Input, buf)
-		if len(test.Error) == 0 && err != nil {
-			t.Errorf("in %s, unexpected error: %v", test.Name, err)
-			continue
-		}
-		if len(test.Error) > 0 {
-			if err == nil {
-				t.Errorf("in %s, expected to get error: %v", test.Name, test.Error)
-			} else if e, a := test.Error, err.Error(); e != a {
-				t.Errorf("in %s, expected error %q, got %q", test.Name, e, a)
-			}
-			continue
-		}
-		if buf.String() != test.Expect {
-			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String())
-		}
 	}
 }
 

@@ -36,9 +36,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -50,7 +50,7 @@ func TestSetEnvLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
+	ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -61,33 +61,28 @@ func TestSetEnvLocal(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
-
 	outputFormat := "name"
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdEnv(tf, streams)
-	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", outputFormat)
-	cmd.Flags().Set("local", "true")
-
-	opts := EnvOptions{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags(""),
-
-			OutputFormat: &outputFormat,
-		},
-		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
-		Local:     true,
-		IOStreams: streams,
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	opts := NewEnvOptions(streams)
+	opts.PrintFlags = &printers.PrintFlags{
+		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+		NamePrintFlags:     printers.NewNamePrintFlags(""),
+		OutputFormat:       &outputFormat,
 	}
-	err := opts.Complete(tf, cmd, []string{"env=prod"})
-	if err == nil {
-		err = opts.RunEnv(tf)
+	opts.FilenameOptions = resource.FilenameOptions{
+		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"},
 	}
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	opts.Local = true
+
+	err := opts.Complete(tf, NewCmdEnv(tf, streams), []string{"env=prod"})
+	assert.NoError(t, err)
+	err = opts.Validate()
+	assert.NoError(t, err)
+	err = opts.RunEnv()
+	assert.NoError(t, err)
+	if bufErr.Len() > 0 {
+		t.Errorf("unexpected error: %s", string(bufErr.String()))
 	}
 	if !strings.Contains(buf.String(), "replicationcontroller/cassandra") {
 		t.Errorf("did not set env: %s", buf.String())
@@ -98,8 +93,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
-
+	ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -112,33 +106,27 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
-
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdEnv(tf, streams)
-	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", outputFormat)
-	cmd.Flags().Set("local", "true")
-
-	opts := EnvOptions{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags(""),
-
-			OutputFormat: &outputFormat,
-		},
-		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
-		Local:     true,
-		IOStreams: streams,
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	opts := NewEnvOptions(streams)
+	opts.PrintFlags = &printers.PrintFlags{
+		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+		NamePrintFlags:     printers.NewNamePrintFlags(""),
+		OutputFormat:       &outputFormat,
 	}
-	err := opts.Complete(tf, cmd, []string{"env=prod"})
-	if err == nil {
-		err = opts.RunEnv(tf)
+	opts.FilenameOptions = resource.FilenameOptions{
+		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"},
 	}
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	opts.Local = true
 
+	err := opts.Complete(tf, NewCmdEnv(tf, streams), []string{"env=prod"})
+	assert.NoError(t, err)
+	err = opts.Validate()
+	assert.NoError(t, err)
+	err = opts.RunEnv()
+	assert.NoError(t, err)
+	if bufErr.Len() > 0 {
+		t.Errorf("unexpected error: %s", string(bufErr.String()))
+	}
 	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {
 		t.Errorf("expected out:\n%s\nbut got:\n%s", expectedOut, buf.String())
@@ -472,10 +460,11 @@ func TestSetEnvRemote(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
 			tf := cmdtesting.NewTestFactory()
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-			ns := legacyscheme.Codecs
+			ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
@@ -505,23 +494,18 @@ func TestSetEnvRemote(t *testing.T) {
 			}
 
 			outputFormat := "yaml"
-
 			streams := genericclioptions.NewTestIOStreamsDiscard()
-			cmd := NewCmdEnv(tf, streams)
-			cmd.Flags().Set("output", outputFormat)
-			opts := EnvOptions{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags(""),
-
-					OutputFormat: &outputFormat,
-				},
-				Local:     false,
-				IOStreams: streams,
+			opts := NewEnvOptions(streams)
+			opts.PrintFlags = &printers.PrintFlags{
+				JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+				NamePrintFlags:     printers.NewNamePrintFlags(""),
+				OutputFormat:       &outputFormat,
 			}
-			err := opts.Complete(tf, cmd, input.args)
+			opts.Local = false
+			opts.IOStreams = streams
+			err := opts.Complete(tf, NewCmdEnv(tf, streams), input.args)
 			assert.NoError(t, err)
-			err = opts.RunEnv(tf)
+			err = opts.RunEnv()
 			assert.NoError(t, err)
 		})
 	}

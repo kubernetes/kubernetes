@@ -20,8 +20,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/arm/disk"
-	storage "github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -54,18 +54,19 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 	}
 
 	diskSizeGB := int32(sizeGB)
-	model := disk.Model{
+	model := compute.Disk{
 		Location: &c.common.location,
-		Tags:     &newTags,
-		Properties: &disk.Properties{
-			AccountType:  disk.StorageAccountTypes(storageAccountType),
+		Tags:     newTags,
+		Sku: &compute.DiskSku{
+			Name: compute.StorageAccountTypes(storageAccountType),
+		},
+		DiskProperties: &compute.DiskProperties{
 			DiskSizeGB:   &diskSizeGB,
-			CreationData: &disk.CreationData{CreateOption: disk.Empty},
+			CreationData: &compute.CreationData{CreateOption: compute.Empty},
 		}}
-	cancel := make(chan struct{})
-	respChan, errChan := c.common.cloud.DisksClient.CreateOrUpdate(c.common.resourceGroup, diskName, model, cancel)
-	<-respChan
-	err := <-errChan
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	_, err := c.common.cloud.DisksClient.CreateOrUpdate(ctx, c.common.resourceGroup, diskName, model)
 	if err != nil {
 		return "", err
 	}
@@ -99,10 +100,10 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 //DeleteManagedDisk : delete managed disk
 func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 	diskName := path.Base(diskURI)
-	cancel := make(chan struct{})
-	respChan, errChan := c.common.cloud.DisksClient.Delete(c.common.resourceGroup, diskName, cancel)
-	<-respChan
-	err := <-errChan
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+
+	_, err := c.common.cloud.DisksClient.Delete(ctx, c.common.resourceGroup, diskName)
 	if err != nil {
 		return err
 	}
@@ -116,13 +117,16 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 
 // return: disk provisionState, diskID, error
 func (c *ManagedDiskController) getDisk(diskName string) (string, string, error) {
-	result, err := c.common.cloud.DisksClient.Get(c.common.resourceGroup, diskName)
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+
+	result, err := c.common.cloud.DisksClient.Get(ctx, c.common.resourceGroup, diskName)
 	if err != nil {
 		return "", "", err
 	}
 
-	if result.Properties != nil && (*result.Properties).ProvisioningState != nil {
-		return *(*result.Properties).ProvisioningState, *result.ID, nil
+	if result.DiskProperties != nil && (*result.DiskProperties).ProvisioningState != nil {
+		return *(*result.DiskProperties).ProvisioningState, *result.ID, nil
 	}
 
 	return "", "", err

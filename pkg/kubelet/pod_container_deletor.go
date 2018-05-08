@@ -99,6 +99,7 @@ func (p *podContainerDeletor) deleteContainersInPod(filterContainerID string, po
 	containersToKeep := p.containersToKeep
 	if removeAll {
 		containersToKeep = 0
+		filterContainerID = ""
 	}
 
 	for _, candidate := range getContainersToDeleteInPod(filterContainerID, podStatus, containersToKeep) {

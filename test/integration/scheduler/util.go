@@ -19,6 +19,7 @@ package scheduler
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -39,7 +41,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -48,8 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"net/http/httptest"
 )
 
 type TestContext struct {
@@ -120,7 +119,7 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		&restclient.Config{
 			QPS: -1, Host: s.URL,
 			ContentConfig: restclient.ContentConfig{
-				GroupVersion: testapi.Groups[v1.GroupName].GroupVersion(),
+				GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
 			},
 		},
 	)
@@ -316,6 +315,12 @@ func createNode(cs clientset.Interface, name string, res *v1.ResourceList) (*v1.
 		},
 	}
 	return cs.CoreV1().Nodes().Create(n)
+}
+
+// updateNodeStatus updates the status of node.
+func updateNodeStatus(cs clientset.Interface, node *v1.Node) error {
+	_, err := cs.CoreV1().Nodes().UpdateStatus(node)
+	return err
 }
 
 // createNodes creates `numNodes` nodes. The created node names will be in the
@@ -527,5 +532,31 @@ func cleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 			podDeleted(cs, p.Namespace, p.Name)); err != nil {
 			t.Errorf("error while waiting for pod  %v/%v to get deleted: %v", p.Namespace, p.Name, err)
 		}
+	}
+}
+
+// noPodsInNamespace returns true if no pods in the given namespace.
+func noPodsInNamespace(c clientset.Interface, podNamespace string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pods, err := c.CoreV1().Pods(podNamespace).List(metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return len(pods.Items) == 0, nil
+	}
+}
+
+// cleanupPodsInNamespace deletes the pods in the given namespace and waits for them to
+// be actually deleted.
+func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
+	if err := cs.CoreV1().Pods(ns).DeleteCollection(nil, metav1.ListOptions{}); err != nil {
+		t.Errorf("error while listing pod in namespace %v: %v", ns, err)
+		return
+	}
+
+	if err := wait.Poll(time.Second, wait.ForeverTestTimeout,
+		noPodsInNamespace(cs, ns)); err != nil {
+		t.Errorf("error while waiting for pods in namespace %v: %v", ns, err)
 	}
 }

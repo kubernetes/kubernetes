@@ -28,7 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
@@ -584,7 +584,9 @@ func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (netw
 		}
 	}
 
-	nic, err := as.InterfacesClient.Get(as.ResourceGroup, nicName, "")
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	nic, err := as.InterfacesClient.Get(ctx, as.ResourceGroup, nicName, "")
 	if err != nil {
 		return network.Interface{}, err
 	}
@@ -652,11 +654,11 @@ func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.N
 
 		nicName := *nic.Name
 		glog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
-		respChan, errChan := as.InterfacesClient.CreateOrUpdate(as.ResourceGroup, *nic.Name, nic, nil)
-		resp := <-respChan
-		err := <-errChan
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		resp, err := as.InterfacesClient.CreateOrUpdate(ctx, as.ResourceGroup, *nic.Name, nic)
 		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%q): end", *nic.Name)
-		if as.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
+		if as.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 			glog.V(2).Infof("nicupdate(%s) backing off: nic(%s) - updating, err=%v", serviceName, nicName, err)
 			retryErr := as.CreateOrUpdateInterfaceWithRetry(nic)
 			if retryErr != nil {

@@ -150,10 +150,6 @@ type CustomColumnsPrinter struct {
 	lastType reflect.Type
 }
 
-func (s *CustomColumnsPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
 func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	if w, found := out.(*tabwriter.Writer); !found {
 		w = GetNewTabWriter(out)
@@ -235,12 +231,4 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 	}
 	fmt.Fprintln(out, strings.Join(columns, "\t"))
 	return nil
-}
-
-func (s *CustomColumnsPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (s *CustomColumnsPrinter) IsGeneric() bool {
-	return true
 }

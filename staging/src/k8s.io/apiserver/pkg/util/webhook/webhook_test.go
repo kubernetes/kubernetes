@@ -70,25 +70,6 @@ var (
 	retryBackoff  = time.Duration(500) * time.Millisecond
 )
 
-// TestDisabledGroupVersion ensures that requiring a group version works as expected
-func TestDisabledGroupVersion(t *testing.T) {
-	gv := schema.GroupVersion{Group: "webhook.util.k8s.io", Version: "v1"}
-	gvs := []schema.GroupVersion{gv}
-	registry := registered.NewOrDie(gv.String())
-	_, err := NewGenericWebhook(registry, scheme.Codecs, "/some/path", gvs, retryBackoff)
-
-	if err == nil {
-		t.Errorf("expected an error")
-	} else {
-		aErrMsg := err.Error()
-		eErrMsg := fmt.Sprintf("webhook plugin requires enabling extension resource: %s", gv)
-
-		if aErrMsg != eErrMsg {
-			t.Errorf("unexpected error message mismatch:\n  Expected: %s\n  Actual:   %s", eErrMsg, aErrMsg)
-		}
-	}
-}
-
 // TestKubeConfigFile ensures that a kube config file, regardless of validity, is handled properly
 func TestKubeConfigFile(t *testing.T) {
 	badCAPath := "/tmp/missing/ca.pem"
@@ -277,7 +258,7 @@ func TestKubeConfigFile(t *testing.T) {
 			if err == nil {
 				defer os.Remove(kubeConfigFile)
 
-				_, err = NewGenericWebhook(registered.NewOrDie(""), scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff)
+				_, err = NewGenericWebhook(registered.NewAPIRegistrationManager(), scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff)
 			}
 
 			return err
@@ -300,7 +281,7 @@ func TestKubeConfigFile(t *testing.T) {
 // TestMissingKubeConfigFile ensures that a kube config path to a missing file is handled properly
 func TestMissingKubeConfigFile(t *testing.T) {
 	kubeConfigPath := "/some/missing/path"
-	_, err := NewGenericWebhook(registered.NewOrDie(""), scheme.Codecs, kubeConfigPath, groupVersions, retryBackoff)
+	_, err := NewGenericWebhook(registered.NewAPIRegistrationManager(), scheme.Codecs, kubeConfigPath, groupVersions, retryBackoff)
 
 	if err == nil {
 		t.Errorf("creating the webhook should had failed")
@@ -412,7 +393,7 @@ func TestTLSConfig(t *testing.T) {
 
 			defer os.Remove(configFile)
 
-			wh, err := NewGenericWebhook(registered.NewOrDie(""), scheme.Codecs, configFile, groupVersions, retryBackoff)
+			wh, err := NewGenericWebhook(registered.NewAPIRegistrationManager(), scheme.Codecs, configFile, groupVersions, retryBackoff)
 
 			if err == nil {
 				err = wh.RestClient.Get().Do().Error()
@@ -477,7 +458,7 @@ func TestRequestTimeout(t *testing.T) {
 
 	var requestTimeout = 10 * time.Millisecond
 
-	wh, err := newGenericWebhook(registered.NewOrDie(""), scheme.Codecs, configFile, groupVersions, retryBackoff, requestTimeout)
+	wh, err := newGenericWebhook(registered.NewAPIRegistrationManager(), scheme.Codecs, configFile, groupVersions, retryBackoff, requestTimeout)
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)
 	}
@@ -563,7 +544,7 @@ func TestWithExponentialBackoff(t *testing.T) {
 
 	defer os.Remove(configFile)
 
-	wh, err := NewGenericWebhook(registered.NewOrDie(""), scheme.Codecs, configFile, groupVersions, retryBackoff)
+	wh, err := NewGenericWebhook(registered.NewAPIRegistrationManager(), scheme.Codecs, configFile, groupVersions, retryBackoff)
 
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)

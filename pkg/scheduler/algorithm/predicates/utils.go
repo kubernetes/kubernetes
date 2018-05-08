@@ -17,12 +17,8 @@ limitations under the License.
 package predicates
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -68,69 +64,6 @@ func CreateSelectorFromLabels(aL map[string]string) labels.Selector {
 		return labels.Everything()
 	}
 	return labels.Set(aL).AsSelector()
-}
-
-// EquivalencePodGenerator is a generator of equivalence class for pod with consideration of PVC info.
-type EquivalencePodGenerator struct {
-	pvcInfo PersistentVolumeClaimInfo
-}
-
-// NewEquivalencePodGenerator returns a getEquivalencePod method with consideration of PVC info.
-func NewEquivalencePodGenerator(pvcInfo PersistentVolumeClaimInfo) algorithm.GetEquivalencePodFunc {
-	g := &EquivalencePodGenerator{
-		pvcInfo: pvcInfo,
-	}
-	return g.getEquivalencePod
-}
-
-// GetEquivalencePod returns a EquivalencePod which contains a group of pod attributes which can be reused.
-func (e *EquivalencePodGenerator) getEquivalencePod(pod *v1.Pod) interface{} {
-	// For now we only consider pods:
-	// 1. OwnerReferences is Controller
-	// 2. with same OwnerReferences
-	// 3. with same PVC claim
-	// to be equivalent
-	for _, ref := range pod.OwnerReferences {
-		if ref.Controller != nil && *ref.Controller {
-			pvcSet, err := e.getPVCSet(pod)
-			if err == nil {
-				// A pod can only belongs to one controller, so let's return.
-				return &EquivalencePod{
-					ControllerRef: ref,
-					PVCSet:        pvcSet,
-				}
-			}
-
-			// If error encountered, log warning and return nil (i.e. no equivalent pod found)
-			glog.Warningf("[EquivalencePodGenerator] for pod: %v failed due to: %v", pod.GetName(), err)
-			return nil
-		}
-	}
-	return nil
-}
-
-// getPVCSet returns a set of PVC UIDs of given pod.
-func (e *EquivalencePodGenerator) getPVCSet(pod *v1.Pod) (sets.String, error) {
-	result := sets.NewString()
-	for _, volume := range pod.Spec.Volumes {
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
-		pvcName := volume.PersistentVolumeClaim.ClaimName
-		pvc, err := e.pvcInfo.GetPersistentVolumeClaimInfo(pod.GetNamespace(), pvcName)
-		if err != nil {
-			return nil, err
-		}
-		result.Insert(string(pvc.UID))
-	}
-
-	return result, nil
-}
-
-// EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
-type EquivalencePod struct {
-	ControllerRef metav1.OwnerReference
-	PVCSet        sets.String
 }
 
 // portsConflict check whether existingPorts and wantPorts conflict with each other

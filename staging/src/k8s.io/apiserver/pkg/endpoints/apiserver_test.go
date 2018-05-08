@@ -71,18 +71,6 @@ import (
 	"k8s.io/apiserver/pkg/server/filters"
 )
 
-// alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
-// It is useful in tests and when using kubernetes in an open manner.
-type alwaysAdmit struct{}
-
-func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
-	return nil
-}
-
-func (alwaysAdmit) Handles(operation admission.Operation) bool {
-	return true
-}
-
 type alwaysMutatingDeny struct{}
 
 func (alwaysMutatingDeny) Admit(a admission.Attributes) (err error) {
@@ -129,7 +117,6 @@ var parameterCodec = runtime.NewParameterCodec(scheme)
 
 var accessor = meta.NewAccessor()
 var selfLinker runtime.SelfLinker = accessor
-var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
 
 func init() {
@@ -141,33 +128,6 @@ func init() {
 
 	example.AddToScheme(scheme)
 	examplev1.AddToScheme(scheme)
-}
-
-func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-	switch version {
-	case testGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor: scheme,
-		}, nil
-	case newGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor: scheme,
-		}, nil
-	case grouplessGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor: scheme,
-		}, nil
-	case testGroup2Version:
-		return &meta.VersionInterfaces{
-			ObjectConvertor: scheme,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, groupVersions)
-	}
-}
-
-func newMapper() *meta.DefaultRESTMapper {
-	return meta.NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
 }
 
 func addGrouplessTypes() {
@@ -215,26 +175,6 @@ func init() {
 	addTestTypes()
 	addNewTestTypes()
 
-	nsMapper := newMapper()
-
-	// enumerate all supported versions, get the kinds, and register with
-	// the mapper how to address our resources
-	for _, gv := range groupVersions {
-		for kind := range scheme.KnownTypes(gv) {
-			gvk := gv.WithKind(kind)
-			root := bool(kind == "SimpleRoot")
-			if root {
-				nsMapper.Add(gvk, meta.RESTScopeRoot)
-			} else {
-				nsMapper.Add(gvk, meta.RESTScopeNamespace)
-			}
-		}
-	}
-
-	mapper = nsMapper
-	namespaceMapper = nsMapper
-	admissionControl = alwaysAdmit{}
-
 	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
@@ -263,11 +203,6 @@ func handle(storage map[string]rest.Storage) http.Handler {
 	return handleInternal(storage, admissionControl, selfLinker, nil)
 }
 
-// tests using the new namespace scope mechanism
-func handleNamespaced(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker, nil)
-}
-
 // tests using a custom self linker
 func handleLinker(storage map[string]rest.Storage, selfLinker runtime.SelfLinker) http.Handler {
 	return handleInternal(storage, admissionControl, selfLinker, nil)
@@ -281,12 +216,13 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	template := APIGroupVersion{
 		Storage: storage,
 
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
-		Mapper:    namespaceMapper,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
+		RootScopedKinds: sets.NewString("SimpleRoot"),
 
 		ParameterCodec: parameterCodec,
 
@@ -409,6 +345,10 @@ type SimpleRESTStorage struct {
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
+}
+
+func (storage *SimpleRESTStorage) NamespaceScoped() bool {
+	return true
 }
 
 func (storage *SimpleRESTStorage) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
@@ -679,6 +619,10 @@ type GetWithOptionsRootRESTStorage struct {
 	takesPath       string
 }
 
+func (r *GetWithOptionsRootRESTStorage) NamespaceScoped() bool {
+	return false
+}
+
 func (r *GetWithOptionsRootRESTStorage) Get(ctx context.Context, name string, options runtime.Object) (runtime.Object, error) {
 	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
 		return nil, fmt.Errorf("Unexpected options object: %#v", options)
@@ -859,12 +803,15 @@ func TestNotFound(t *testing.T) {
 
 		if response.StatusCode != v.Status {
 			t.Errorf("Expected %d for %s (%s), Got %#v", v.Status, v.Method, k, response)
-			t.Errorf("MAPPER: %v", mapper)
 		}
 	}
 }
 
 type UnimplementedRESTStorage struct{}
+
+func (UnimplementedRESTStorage) NamespaceScoped() bool {
+	return true
+}
 
 func (UnimplementedRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
@@ -3206,15 +3153,16 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Storage: map[string]rest.Storage{
 			"simple/sub": storage,
 		},
-		Root:      "/" + prefix,
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
+		Root:            "/" + prefix,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
+		RootScopedKinds: sets.NewString("SimpleRoot"),
 
-		Admit:  admissionControl,
-		Mapper: namespaceMapper,
+		Admit: admissionControl,
 
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
@@ -3236,15 +3184,15 @@ func TestParentResourceIsRequired(t *testing.T) {
 			"simple":     &SimpleRESTStorage{},
 			"simple/sub": storage,
 		},
-		Root:      "/" + prefix,
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
+		Root:            "/" + prefix,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
 
-		Admit:  admissionControl,
-		Mapper: namespaceMapper,
+		Admit: admissionControl,
 
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
@@ -3824,6 +3772,8 @@ type SimpleXGSubresourceRESTStorage struct {
 	itemGVK schema.GroupVersionKind
 }
 
+var _ = rest.GroupVersionKindProvider(&SimpleXGSubresourceRESTStorage{})
+
 func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 	return &genericapitesting.SimpleXGSubresource{}
 }
@@ -3831,8 +3781,6 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	return storage.item.DeepCopyObject(), nil
 }
-
-var _ = rest.GroupVersionKindProvider(&SimpleXGSubresourceRESTStorage{})
 
 func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	return storage.itemGVK
@@ -3858,12 +3806,12 @@ func TestXGSubresource(t *testing.T) {
 	group := APIGroupVersion{
 		Storage: storage,
 
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
-		Mapper:    namespaceMapper,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
 
 		ParameterCodec: parameterCodec,
 
