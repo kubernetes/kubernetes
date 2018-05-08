@@ -352,3 +352,221 @@ func TestVolumes(t *testing.T) {
 	// 	t.Fatalf("Cannot delete VMDK volume %s: %v", volPath, err)
 	// }
 }
+
+func TestSecretVSphereConfig(t *testing.T) {
+	var vs *VSphere
+	var (
+		username = "user"
+		password = "password"
+	)
+	var testcases = []struct {
+		testName                 string
+		conf                     string
+		expectedIsSecretProvided bool
+		expectedUsername         string
+		expectedPassword         string
+		expectedError            error
+	}{
+		{
+			testName: "Username and password with old configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			user = user
+			password = password
+			datacenter = us-west
+			working-dir = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+		},
+		{
+			testName: "SecretName and SecretNamespace in old configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			datacenter = us-west
+			secret-name = "vccreds"
+			secret-namespace = "kube-system"
+			working-dir = kubernetes
+			`,
+			expectedIsSecretProvided: true,
+			expectedError:            nil,
+		},
+		{
+			testName: "SecretName and SecretNamespace with Username and Password in old configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			user = user
+			password = password
+			datacenter = us-west
+			secret-name = "vccreds"
+			secret-namespace = "kube-system"
+			working-dir = kubernetes
+			`,
+			expectedIsSecretProvided: true,
+			expectedError:            nil,
+		},
+		{
+			testName: "SecretName and SecretNamespace with Username missing in old configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			password = password
+			datacenter = us-west
+			secret-name = "vccreds"
+			secret-namespace = "kube-system"
+			working-dir = kubernetes
+			`,
+			expectedIsSecretProvided: true,
+			expectedError:            nil,
+		},
+		{
+			testName: "SecretNamespace missing with Username and Password in old configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			user = user
+			password = password
+			datacenter = us-west
+			secret-name = "vccreds"
+			working-dir = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+		},
+		{
+			testName: "SecretNamespace and Username missing in old configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			password = password
+			datacenter = us-west
+			secret-name = "vccreds"
+			working-dir = kubernetes
+			`,
+			expectedError: ErrUsernameMissing,
+		},
+		{
+			testName: "SecretNamespace and Password missing in old configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			user = user
+			datacenter = us-west
+			secret-name = "vccreds"
+			working-dir = kubernetes
+			`,
+			expectedError: ErrPasswordMissing,
+		},
+		{
+			testName: "SecretNamespace, Username and Password missing in old configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			datacenter = us-west
+			secret-name = "vccreds"
+			working-dir = kubernetes
+			`,
+			expectedError: ErrUsernameMissing,
+		},
+		{
+			testName: "Username and password with new configuration but username and password in global section",
+			conf: `[Global]
+			user = user
+			password = password
+			datacenter = us-west
+			[VirtualCenter "0.0.0.0"]
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+		},
+		{
+			testName: "Username and password with new configuration, username and password in virtualcenter section",
+			conf: `[Global]
+			server = 0.0.0.0
+			port = 443
+			insecure-flag = true
+			datacenter = us-west
+			[VirtualCenter "0.0.0.0"]
+			user = user
+			password = password
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+		},
+		{
+			testName: "SecretName and SecretNamespace with new configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			secret-name = "vccreds"
+			secret-namespace = "kube-system"
+			datacenter = us-west
+			[VirtualCenter "0.0.0.0"]
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedIsSecretProvided: true,
+			expectedError:            nil,
+		},
+		{
+			testName: "SecretName and SecretNamespace with Username missing in new configuration",
+			conf: `[Global]
+			server = 0.0.0.0
+			port = 443
+			insecure-flag = true
+			datacenter = us-west
+			secret-name = "vccreds"
+			secret-namespace = "kube-system"
+			[VirtualCenter "0.0.0.0"]
+			password = password
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedIsSecretProvided: true,
+			expectedError:            nil,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Logf("Executing Testcase: %s", testcase.testName)
+		cfg, err := readConfig(strings.NewReader(testcase.conf))
+		if err != nil {
+			t.Fatalf("Should succeed when a valid config is provided: %s", err)
+		}
+		vs, err = buildVSphereFromConfig(cfg)
+		if err != testcase.expectedError {
+			t.Fatalf("Should succeed when a valid config is provided: %s", err)
+		}
+		if err != nil {
+			continue
+		}
+		if vs.isSecretInfoProvided != testcase.expectedIsSecretProvided {
+			t.Fatalf("SecretName and SecretNamespace was expected in config %s. error: %s",
+				testcase.conf, err)
+		}
+		if !testcase.expectedIsSecretProvided {
+			for _, vsInstance := range vs.vsphereInstanceMap {
+				if vsInstance.conn.Username != testcase.expectedUsername {
+					t.Fatalf("Expected username doesn't match actual username in config %s. error: %s",
+						testcase.expectedUsername, vsInstance.conn.Username, testcase.conf, err)
+				}
+				if vsInstance.conn.Password != testcase.expectedPassword {
+					t.Fatalf("Expected password doesn't match actual password in config %s. error: %s",
+						testcase.expectedPassword, vsInstance.conn.Password, testcase.conf, err)
+				}
+
+			}
+		}
+
+	}
+}
