@@ -68,6 +68,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			errors: []validationMatch{
 				invalid("metadata", "name"),
+				invalid("spec", "versions"),
+				invalid("spec", "version"),
 				required("spec", "version"),
 				required("spec", "scope"),
 				required("spec", "names", "singular"),
@@ -82,6 +84,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			errors: []validationMatch{
 				invalid("metadata", "name"),
+				invalid("spec", "versions"),
+				invalid("spec", "version"),
 				required("spec", "group"),
 				required("spec", "version"),
 				required("spec", "scope"),
@@ -130,6 +134,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("status", "acceptedNames", "kind"),
 				invalid("status", "acceptedNames", "listKind"), // invalid format
 				invalid("status", "acceptedNames", "listKind"), // kind == listKind
+				invalid("spec", "versions"),
+				invalid("spec", "version"),
 			},
 		},
 		{
@@ -161,6 +167,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				required("spec", "scope"),
 				invalid("spec", "names", "listKind"),
 				invalid("status", "acceptedNames", "listKind"),
+				invalid("spec", "versions"),
+				invalid("spec", "version"),
 			},
 		},
 		{
@@ -170,7 +178,14 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group.com",
 					Version: "version",
-					Scope:   apiextensions.NamespaceScoped,
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -198,7 +213,14 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group.com",
 					Version: "version",
-					Scope:   apiextensions.NamespaceScoped,
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -265,7 +287,14 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group.com",
 					Version: "version",
-					Scope:   apiextensions.ResourceScope("Cluster"),
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -290,7 +319,14 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group.com",
 					Version: "version",
-					Scope:   apiextensions.ResourceScope("Cluster"),
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -319,7 +355,14 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group.com",
 					Version: "version",
-					Scope:   apiextensions.ResourceScope("Cluster"),
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -347,7 +390,14 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group.com",
 					Version: "version",
-					Scope:   apiextensions.ResourceScope("Cluster"),
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -376,7 +426,14 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group.com",
 					Version: "version",
-					Scope:   apiextensions.ResourceScope("Cluster"),
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -404,7 +461,14 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "abc.com",
 					Version: "version2",
-					Scope:   apiextensions.ResourceScope("Namespaced"),
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.ResourceScope("Namespaced"),
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural2",
 						Singular: "singular2",
@@ -436,7 +500,14 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "group.com",
 					Version: "version",
-					Scope:   apiextensions.ResourceScope("Cluster"),
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -464,7 +535,14 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group:   "abc.com",
 					Version: "version2",
-					Scope:   apiextensions.ResourceScope("Namespaced"),
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.ResourceScope("Namespaced"),
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural2",
 						Singular: "singular2",
@@ -483,7 +561,6 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 			},
 			errors: []validationMatch{
 				immutable("spec", "group"),
-				immutable("spec", "version"),
 				immutable("spec", "scope"),
 				immutable("spec", "names", "kind"),
 				immutable("spec", "names", "plural"),

@@ -170,17 +170,20 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	case *runtime.Unknown:
 		return c.encoder.Encode(obj, w)
 	case runtime.Unstructured:
-		// avoid conversion roundtrip if GVK is the right one already or is empty (yes, this is a hack, but the old behaviour we rely on in kubectl)
-		objGVK := obj.GetObjectKind().GroupVersionKind()
-		if len(objGVK.Version) == 0 {
-			return c.encoder.Encode(obj, w)
-		}
-		targetGVK, ok := c.encodeVersion.KindForGroupVersionKinds([]schema.GroupVersionKind{objGVK})
-		if !ok {
-			return runtime.NewNotRegisteredGVKErrForTarget(objGVK, c.encodeVersion)
-		}
-		if targetGVK == objGVK {
-			return c.encoder.Encode(obj, w)
+		// Only avoid conversion if unstructed is not a list, giving the converter a chance to convert list items.
+		if !obj.IsList() {
+			// avoid conversion roundtrip if GVK is the right one already or is empty (yes, this is a hack, but the old behaviour we rely on in kubectl)
+			objGVK := obj.GetObjectKind().GroupVersionKind()
+			if len(objGVK.Version) == 0 {
+				return c.encoder.Encode(obj, w)
+			}
+			targetGVK, ok := c.encodeVersion.KindForGroupVersionKinds([]schema.GroupVersionKind{objGVK})
+			if !ok {
+				return runtime.NewNotRegisteredGVKErrForTarget(objGVK, c.encodeVersion)
+			}
+			if targetGVK == objGVK {
+				return c.encoder.Encode(obj, w)
+			}
 		}
 	}
 
