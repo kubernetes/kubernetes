@@ -14,18 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package genericclioptions
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
@@ -54,8 +54,6 @@ const (
 
 var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
 
-// TODO(juanvallejo): move to pkg/kubectl/genericclioptions once
-// the dependency on cmdutil is broken here.
 // ConfigFlags composes the set of values necessary
 // for obtaining a REST client config
 type ConfigFlags struct {
@@ -88,6 +86,9 @@ func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
 	return f.ToRawKubeConfigLoader().ClientConfig()
 }
 
+// ToRawKubeConfigLoader binds config flag values to config overrides
+// Returns an interactive clientConfig if the password flag is enabled,
+// or a non-interactive clientConfig otherwise.
 func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	// use the standard defaults for this client command
@@ -189,7 +190,7 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	return discovery.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
 
-// RESTMapper returns a mapper.
+// ToRESTMapper returns a mapper.
 func (f *ConfigFlags) ToRESTMapper() (meta.RESTMapper, error) {
 	discoveryClient, err := f.ToDiscoveryClient()
 	if err != nil {
@@ -201,13 +202,8 @@ func (f *ConfigFlags) ToRESTMapper() (meta.RESTMapper, error) {
 	return expander, nil
 }
 
+// AddFlags binds client configuration flags to a given flagset
 func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
-	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
-
-	// Normalize all flags that are coming from other packages or pre-configurations
-	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
-
 	if f.KubeConfig != nil {
 		flags.StringVar(f.KubeConfig, "kubeconfig", *f.KubeConfig, "Path to the kubeconfig file to use for CLI requests.")
 	}
@@ -265,12 +261,14 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 
 }
 
+// WithDeprecatedPasswordFlag enables the username and password config flags
 func (f *ConfigFlags) WithDeprecatedPasswordFlag() *ConfigFlags {
 	f.Username = stringptr("")
 	f.Password = stringptr("")
 	return f
 }
 
+// NewConfigFlags returns ConfigFlags with default values set
 func NewConfigFlags() *ConfigFlags {
 	impersonateGroup := []string{}
 	insecure := false
@@ -299,56 +297,14 @@ func stringptr(val string) *string {
 	return &val
 }
 
-// TODO(juanvallejo): move to separate file when config_flags are moved
-// to pkg/kubectl/genericclioptions
-type TestConfigFlags struct {
-	clientConfig    clientcmd.ClientConfig
-	discoveryClient discovery.CachedDiscoveryInterface
-	restMapper      meta.RESTMapper
-}
+// overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
+var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
 
-func (f *TestConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
-	if f.clientConfig == nil {
-		panic("attempt to obtain a test RawKubeConfigLoader with no clientConfig specified")
-	}
-	return f.clientConfig
-}
-
-func (f *TestConfigFlags) ToRESTConfig() (*rest.Config, error) {
-	return f.ToRawKubeConfigLoader().ClientConfig()
-}
-
-func (f *TestConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	return f.discoveryClient, nil
-}
-
-func (f *TestConfigFlags) ToRESTMapper() (meta.RESTMapper, error) {
-	if f.restMapper != nil {
-		return f.restMapper, nil
-	}
-	if f.discoveryClient != nil {
-		mapper := restmapper.NewDeferredDiscoveryRESTMapper(f.discoveryClient)
-		expander := restmapper.NewShortcutExpander(mapper, f.discoveryClient)
-		return expander, nil
-	}
-	return nil, fmt.Errorf("no restmapper")
-}
-
-func (f *TestConfigFlags) WithClientConfig(clientConfig clientcmd.ClientConfig) *TestConfigFlags {
-	f.clientConfig = clientConfig
-	return f
-}
-
-func (f *TestConfigFlags) WithRESTMapper(mapper meta.RESTMapper) *TestConfigFlags {
-	f.restMapper = mapper
-	return f
-}
-
-func (f *TestConfigFlags) WithDiscoveryClient(c discovery.CachedDiscoveryInterface) *TestConfigFlags {
-	f.discoveryClient = c
-	return f
-}
-
-func NewTestConfigFlags() *TestConfigFlags {
-	return &TestConfigFlags{}
+// computeDiscoverCacheDir takes the parentDir and the host and comes up with a "usually non-colliding" name.
+func computeDiscoverCacheDir(parentDir, host string) string {
+	// strip the optional scheme from host if its there:
+	schemelessHost := strings.Replace(strings.Replace(host, "https://", "", 1), "http://", "", 1)
+	// now do a simple collapse of non-AZ09 characters.  Collisions are possible but unlikely.  Even if we do collide the problem is short lived
+	safeHost := overlyCautiousIllegalFileCharacters.ReplaceAllString(schemelessHost, "_")
+	return filepath.Join(parentDir, safeHost)
 }
