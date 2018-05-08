@@ -30,7 +30,7 @@ import (
 )
 
 func startDaemonSetController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}] {
+	if _, ok := ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}]; !ok {
 		return false, nil
 	}
 	dsc, err := daemon.NewDaemonSetsController(
@@ -48,7 +48,7 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 }
 
 func startStatefulSetController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}] {
+	if _, ok := ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}]; !ok {
 		return false, nil
 	}
 	go statefulset.NewStatefulSetController(
@@ -62,7 +62,7 @@ func startStatefulSetController(ctx ControllerContext) (bool, error) {
 }
 
 func startReplicaSetController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}] {
+	if _, ok := ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}]; !ok {
 		return false, nil
 	}
 	go replicaset.NewReplicaSetController(

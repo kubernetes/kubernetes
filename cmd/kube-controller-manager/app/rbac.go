@@ -22,7 +22,7 @@ import (
 )
 
 func startClusterRoleAggregrationController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"}] {
+	if _, ok := ctx.AvailableResources[schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"}]; !ok {
 		return false, nil
 	}
 	go clusterroleaggregation.NewClusterRoleAggregation(

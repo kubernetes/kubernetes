@@ -231,7 +231,7 @@ type ControllerContext struct {
 	RESTMapper *discovery.DeferredDiscoveryRESTMapper
 
 	// AvailableResources is a map listing currently available resources
-	AvailableResources map[schema.GroupVersionResource]bool
+	AvailableResources map[schema.GroupVersionResource]struct{}
 
 	// Cloud is the cloud provider interface for the controllers to use.
 	// It must be initialized and ready to use.
@@ -358,7 +358,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 // TODO: In general, any controller checking this needs to be dynamic so
 //  users don't have to restart their controller manager if they change the apiserver.
 // Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
-func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
+func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]struct{}, error) {
 	client := clientBuilder.ClientOrDie("controller-discovery")
 	discoveryClient := client.Discovery()
 	resourceMap, err := discoveryClient.ServerResources()
@@ -369,14 +369,14 @@ func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 		return nil, fmt.Errorf("unable to get any supported resources from server")
 	}
 
-	allResources := map[schema.GroupVersionResource]bool{}
+	allResources := make(map[schema.GroupVersionResource]struct{})
 	for _, apiResourceList := range resourceMap {
 		version, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
 		if err != nil {
 			return nil, err
 		}
 		for _, apiResource := range apiResourceList.APIResources {
-			allResources[version.WithResource(apiResource.Name)] = true
+			allResources[version.WithResource(apiResource.Name)] = struct{}{}
 		}
 	}
 
