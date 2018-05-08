@@ -311,7 +311,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				NewCmdExplain("kubectl", f, ioStreams),
 				get.NewCmdGet("kubectl", f, ioStreams),
 				NewCmdEdit(f, ioStreams),
-				NewCmdDelete(f, out, err),
+				NewCmdDelete(f, ioStreams),
 			},
 		},
 		{
@@ -328,7 +328,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			Commands: []*cobra.Command{
 				NewCmdCertificate(f, ioStreams),
 				NewCmdClusterInfo(f, ioStreams),
-				NewCmdTop(f, out, err),
+				NewCmdTop(f, ioStreams),
 				NewCmdCordon(f, ioStreams),
 				NewCmdUncordon(f, ioStreams),
 				NewCmdDrain(f, ioStreams),
@@ -339,11 +339,11 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			Message: "Troubleshooting and Debugging Commands:",
 			Commands: []*cobra.Command{
 				NewCmdDescribe("kubectl", f, ioStreams),
-				NewCmdLogs(f, out, err),
-				NewCmdAttach(f, in, out, err),
-				NewCmdExec(f, in, out, err),
-				NewCmdPortForward(f, out, err),
-				NewCmdProxy(f, out),
+				NewCmdLogs(f, ioStreams),
+				NewCmdAttach(f, ioStreams),
+				NewCmdExec(f, ioStreams),
+				NewCmdPortForward(f, ioStreams),
+				NewCmdProxy(f, ioStreams),
 				NewCmdCp(f, ioStreams),
 				auth.NewCmdAuth(f, ioStreams),
 			},
@@ -353,7 +353,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			Commands: []*cobra.Command{
 				NewCmdApply("kubectl", f, ioStreams),
 				NewCmdPatch(f, ioStreams),
-				NewCmdReplace(f, out, err),
+				NewCmdReplace(f, ioStreams),
 				NewCmdConvert(f, ioStreams),
 			},
 		},
@@ -362,7 +362,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			Commands: []*cobra.Command{
 				NewCmdLabel(f, ioStreams),
 				NewCmdAnnotate("kubectl", f, ioStreams),
-				NewCmdCompletion(out, ""),
+				NewCmdCompletion(ioStreams.Out, ""),
 			},
 		},
 	}
@@ -371,7 +371,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	filters := []string{"options"}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
-	alpha := NewCmdAlpha(f, in, out, err)
+	alpha := NewCmdAlpha(f, ioStreams)
 	if !alpha.HasSubCommands() {
 		filters = append(filters, alpha.Name())
 	}
@@ -392,11 +392,11 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	cmds.AddCommand(alpha)
 	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
-	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
+	cmds.AddCommand(NewCmdPlugin(f, ioStreams))
 	cmds.AddCommand(NewCmdVersion(f, ioStreams))
 	cmds.AddCommand(NewCmdApiVersions(f, ioStreams))
 	cmds.AddCommand(NewCmdApiResources(f, ioStreams))
-	cmds.AddCommand(NewCmdOptions(out))
+	cmds.AddCommand(NewCmdOptions(ioStreams.Out))
 
 	return cmds
 }

@@ -17,12 +17,12 @@ limitations under the License.
 package cmd
 
 import (
-	"io"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
@@ -72,10 +72,9 @@ type DeleteFlags struct {
 	Output         *string
 }
 
-func (f *DeleteFlags) ToOptions(out, errOut io.Writer) *DeleteOptions {
+func (f *DeleteFlags) ToOptions(streams genericclioptions.IOStreams) *DeleteOptions {
 	options := &DeleteOptions{
-		Out:    out,
-		ErrOut: errOut,
+		IOStreams: streams,
 	}
 
 	// add filename options
