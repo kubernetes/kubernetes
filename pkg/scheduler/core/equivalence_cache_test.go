@@ -251,7 +251,7 @@ func TestRunPredicate(t *testing.T) {
 			meta := algorithm.EmptyPredicateMetadataProducer(nil, nil)
 
 			ecache := NewEquivalenceCache()
-			equivClass := ecache.getEquivalenceClassInfo(pod)
+			equivClass := ecache.GetEquivalenceClassInfo(pod)
 			if test.expectCacheHit {
 				ecache.updateResult(pod.Name, "testPredicate", test.expectFit, test.expectedReasons, equivClass.hash, test.cache, node)
 			}
@@ -311,7 +311,7 @@ func TestUpdateResult(t *testing.T) {
 		reasons            []algorithm.PredicateFailureReason
 		equivalenceHash    uint64
 		expectPredicateMap bool
-		expectCacheItem    HostPredicate
+		expectCacheItem    predicateResult
 		cache              schedulercache.Cache
 	}{
 		{
@@ -322,7 +322,7 @@ func TestUpdateResult(t *testing.T) {
 			fit:                true,
 			equivalenceHash:    123,
 			expectPredicateMap: false,
-			expectCacheItem: HostPredicate{
+			expectCacheItem: predicateResult{
 				Fit: true,
 			},
 			cache: &upToDateCache{},
@@ -335,7 +335,7 @@ func TestUpdateResult(t *testing.T) {
 			fit:                false,
 			equivalenceHash:    123,
 			expectPredicateMap: true,
-			expectCacheItem: HostPredicate{
+			expectCacheItem: predicateResult{
 				Fit: false,
 			},
 			cache: &upToDateCache{},
@@ -344,12 +344,12 @@ func TestUpdateResult(t *testing.T) {
 	for _, test := range tests {
 		ecache := NewEquivalenceCache()
 		if test.expectPredicateMap {
-			ecache.algorithmCache[test.nodeName] = AlgorithmCache{}
-			predicateItem := HostPredicate{
+			ecache.cache[test.nodeName] = make(predicateMap)
+			predicateItem := predicateResult{
 				Fit: true,
 			}
-			ecache.algorithmCache[test.nodeName][test.predicateKey] =
-				PredicateMap{
+			ecache.cache[test.nodeName][test.predicateKey] =
+				resultMap{
 					test.equivalenceHash: predicateItem,
 				}
 		}
@@ -366,7 +366,7 @@ func TestUpdateResult(t *testing.T) {
 			node,
 		)
 
-		cachedMapItem, ok := ecache.algorithmCache[test.nodeName][test.predicateKey]
+		cachedMapItem, ok := ecache.cache[test.nodeName][test.predicateKey]
 		if !ok {
 			t.Errorf("Failed: %s, can't find expected cache item: %v",
 				test.name, test.expectCacheItem)
@@ -618,7 +618,7 @@ func TestGetEquivalenceHash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			for i, podInfo := range test.podInfoList {
 				testPod := podInfo.pod
-				eclassInfo := ecache.getEquivalenceClassInfo(testPod)
+				eclassInfo := ecache.GetEquivalenceClassInfo(testPod)
 				if eclassInfo == nil && podInfo.hashIsValid {
 					t.Errorf("Failed: pod %v is expected to have valid hash", testPod)
 				}
@@ -708,7 +708,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 
 	// there should be no cached predicate any more
 	for _, test := range tests {
-		if algorithmCache, exist := ecache.algorithmCache[test.nodeName]; exist {
+		if algorithmCache, exist := ecache.cache[test.nodeName]; exist {
 			if _, exist := algorithmCache[testPredicate]; exist {
 				t.Errorf("Failed: cached item for predicate key: %v on node: %v should be invalidated",
 					testPredicate, test.nodeName)
@@ -778,7 +778,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 	for _, test := range tests {
 		// invalidate cached predicate for all nodes
 		ecache.InvalidateAllCachedPredicateItemOfNode(test.nodeName)
-		if _, exist := ecache.algorithmCache[test.nodeName]; exist {
+		if _, exist := ecache.cache[test.nodeName]; exist {
 			t.Errorf("Failed: cached item for node: %v should be invalidated", test.nodeName)
 			break
 		}
@@ -788,7 +788,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 func BenchmarkEquivalenceHash(b *testing.B) {
 	pod := makeBasicPod("test")
 	for i := 0; i < b.N; i++ {
-		getEquivalenceHash(pod)
+		getEquivalencePod(pod)
 	}
 }
 

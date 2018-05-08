@@ -342,10 +342,10 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		// We can use the same metadata producer for all nodes.
 		meta := g.predicateMetaProducer(pod, g.cachedNodeInfoMap)
 
-		var equivCacheInfo *equivalenceClassInfo
+		var equivCacheInfo *EquivalenceClassInfo
 		if g.equivalenceCache != nil {
 			// getEquivalenceClassInfo will return immediately if no equivalence pod found
-			equivCacheInfo = g.equivalenceCache.getEquivalenceClassInfo(pod)
+			equivCacheInfo = g.equivalenceCache.GetEquivalenceClassInfo(pod)
 		}
 
 		checkNode := func(i int) {
@@ -462,7 +462,7 @@ func podFitsOnNode(
 	ecache *EquivalenceCache,
 	queue SchedulingQueue,
 	alwaysCheckAllPredicates bool,
-	equivCacheInfo *equivalenceClassInfo,
+	equivCacheInfo *EquivalenceClassInfo,
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	var (
 		eCacheAvailable  bool
