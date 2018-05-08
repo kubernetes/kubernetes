@@ -84890,6 +84890,13 @@
        "type": "string"
       }
      },
+     "lastApplied": {
+      "description": "LastApplied is a map of workflow-id to last applied configuration. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". It keeps track of the ownership of fields. The last applied configuration is always in the same version as the parent object. It's used to keep track of the intent of the workflow-id that submitted that configuration.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
      "name": {
       "description": "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
