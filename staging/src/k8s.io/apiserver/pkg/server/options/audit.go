@@ -368,7 +368,10 @@ func (o *AuditTruncateOptions) wrapBackend(delegate audit.Backend, gv schema.Gro
 
 func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.Path, "audit-log-path", o.Path,
-		"If set, all requests coming to the apiserver will be logged to this file.  '-' means standard out.")
+		"If set, all requests coming to the apiserver will be logged to this file.  '-' means standard out. "+
+			"Advanced audit events can be splitted into different files by setting {namespace} or {username} in the path. "+
+			"For example, when setting path to /var/log/k8s-audits/{namespace}.log, requests to kube-system namespace will "+
+			"be saved at file /var/log/k8s-audits/kube-system.log")
 	fs.IntVar(&o.MaxAge, "audit-log-maxage", o.MaxBackups,
 		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename.")
 	fs.IntVar(&o.MaxBackups, "audit-log-maxbackup", o.MaxBackups,
@@ -451,8 +454,19 @@ func (o *AuditLogOptions) getWriter() io.Writer {
 	return w
 }
 
+func (o *AuditLogOptions) getAdvancedWriter() (pluginlog.EventLogger, error) {
+	if !o.enabled() {
+		return nil, nil
+	}
+	return pluginlog.NewEventLogger(o.Path, o.MaxAge, o.MaxBackups, o.MaxSize)
+}
+
 func (o *AuditLogOptions) advancedApplyTo(c *server.Config) error {
-	if w := o.getWriter(); w != nil {
+	w, err := o.getAdvancedWriter()
+	if err != nil {
+		return err
+	}
+	if w != nil {
 		groupVersion, _ := schema.ParseGroupVersion(o.GroupVersionString)
 		log := pluginlog.NewBackend(w, o.Format, groupVersion)
 		log = o.BatchOptions.wrapBackend(log)

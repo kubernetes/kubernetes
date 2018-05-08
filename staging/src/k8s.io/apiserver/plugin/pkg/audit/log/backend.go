@@ -18,7 +18,6 @@ package log
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,14 +43,14 @@ var AllowedFormats = []string{
 }
 
 type backend struct {
-	out          io.Writer
+	out          EventLogger
 	format       string
 	groupVersion schema.GroupVersion
 }
 
 var _ audit.Backend = &backend{}
 
-func NewBackend(out io.Writer, format string, groupVersion schema.GroupVersion) audit.Backend {
+func NewBackend(out EventLogger, format string, groupVersion schema.GroupVersion) audit.Backend {
 	return &backend{
 		out:          out,
 		format:       format,
@@ -66,6 +65,10 @@ func (b *backend) ProcessEvents(events ...*auditinternal.Event) {
 }
 
 func (b *backend) logEvent(ev *auditinternal.Event) {
+	writer := b.out.GetWriter(ev)
+	if writer == nil {
+		audit.HandlePluginError(PluginName, fmt.Errorf("Failed to get writer of audit event"), ev)
+	}
 	line := ""
 	switch b.format {
 	case FormatLegacy:
@@ -82,7 +85,7 @@ func (b *backend) logEvent(ev *auditinternal.Event) {
 			b.format, strings.Join(AllowedFormats, ",")), ev)
 		return
 	}
-	if _, err := fmt.Fprint(b.out, line); err != nil {
+	if _, err := fmt.Fprint(writer, line); err != nil {
 		audit.HandlePluginError(PluginName, err, ev)
 	}
 }
@@ -92,7 +95,7 @@ func (b *backend) Run(stopCh <-chan struct{}) error {
 }
 
 func (b *backend) Shutdown() {
-	// Nothing to do here.
+	b.out.Close()
 }
 
 func (b *backend) String() string {
