@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"syscall"
@@ -28,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -42,7 +42,7 @@ var (
 )
 
 // NewCmdPlugin creates the command that is the top-level for plugin commands.
-func NewCmdPlugin(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	// Loads plugins and create commands for each plugin identified
 	loadedPlugins, loadErr := f.PluginLoader().Load()
 	if loadErr != nil {
@@ -58,14 +58,14 @@ func NewCmdPlugin(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Co
 			if len(loadedPlugins) == 0 {
 				cmdutil.CheckErr(fmt.Errorf("no plugins installed."))
 			}
-			cmdutil.DefaultSubCommandRun(err)(cmd, args)
+			cmdutil.DefaultSubCommandRun(streams.ErrOut)(cmd, args)
 		},
 	}
 
 	if len(loadedPlugins) > 0 {
 		pluginRunner := f.PluginRunner()
 		for _, p := range loadedPlugins {
-			cmd.AddCommand(NewCmdForPlugin(f, p, pluginRunner, in, out, err))
+			cmd.AddCommand(NewCmdForPlugin(f, p, pluginRunner, streams))
 		}
 	}
 
@@ -73,7 +73,7 @@ func NewCmdPlugin(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Co
 }
 
 // NewCmdForPlugin creates a command capable of running the provided plugin.
-func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.PluginRunner, in io.Reader, out, errout io.Writer) *cobra.Command {
+func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.PluginRunner, streams genericclioptions.IOStreams) *cobra.Command {
 	if !plugin.IsValid() {
 		return nil
 	}
@@ -85,7 +85,7 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 		Example: templates.Examples(plugin.Example),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(plugin.Command) == 0 {
-				cmdutil.DefaultSubCommandRun(errout)(cmd, args)
+				cmdutil.DefaultSubCommandRun(streams.ErrOut)(cmd, args)
 				return
 			}
 
@@ -104,9 +104,7 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 			}
 
 			runningContext := plugins.RunningContext{
-				In:          in,
-				Out:         out,
-				ErrOut:      errout,
+				IOStreams:   streams,
 				Args:        args,
 				EnvProvider: envProvider,
 				WorkingDir:  plugin.Dir,
@@ -117,7 +115,7 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 					// check for (and exit with) the correct exit code
 					// from a failed plugin command execution
 					if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-						fmt.Fprintf(errout, "error: %v\n", err)
+						fmt.Fprintf(streams.ErrOut, "error: %v\n", err)
 						os.Exit(status.ExitStatus())
 					}
 				}
@@ -132,7 +130,7 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 	}
 
 	for _, childPlugin := range plugin.Tree {
-		cmd.AddCommand(NewCmdForPlugin(f, childPlugin, runner, in, out, errout))
+		cmd.AddCommand(NewCmdForPlugin(f, childPlugin, runner, streams))
 	}
 
 	return cmd

@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -86,11 +85,10 @@ type ReplaceOptions struct {
 
 	Recorder genericclioptions.Recorder
 
-	Out    io.Writer
-	ErrOut io.Writer
+	genericclioptions.IOStreams
 }
 
-func NewReplaceOptions(out, errOut io.Writer) *ReplaceOptions {
+func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
 	outputFormat := ""
 
 	return &ReplaceOptions{
@@ -102,13 +100,12 @@ func NewReplaceOptions(out, errOut io.Writer) *ReplaceOptions {
 		},
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 
-		Out:    out,
-		ErrOut: errOut,
+		IOStreams: streams,
 	}
 }
 
-func NewCmdReplace(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := NewReplaceOptions(out, errOut)
+func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewReplaceOptions(streams)
 
 	cmd := &cobra.Command{
 		Use: "replace -f FILENAME",
@@ -154,7 +151,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	deleteOpts := o.DeleteFlags.ToOptions(o.Out, o.ErrOut)
+	deleteOpts := o.DeleteFlags.ToOptions(o.IOStreams)
 
 	//Replace will create a resource if it doesn't exist already, so ignore not found error
 	deleteOpts.IgnoreNotFound = true
