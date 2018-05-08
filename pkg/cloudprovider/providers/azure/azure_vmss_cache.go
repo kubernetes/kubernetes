@@ -47,13 +47,19 @@ func (ss *scaleSet) makeVmssVMName(scaleSetName, instanceID string) string {
 }
 
 func extractVmssVMName(name string) (string, string, error) {
-	ret := strings.Split(name, vmssNameSeparator)
-	if len(ret) != 2 {
+	split := strings.SplitAfter(name, vmssNameSeparator)
+	if len(split) < 2 {
 		glog.Errorf("Failed to extract vmssVMName %q", name)
 		return "", "", ErrorNotVmssInstance
 	}
 
-	return ret[0], ret[1], nil
+	ssName := strings.Join(split[0:len(split)-1], "")
+	// removing the trailing `vmssNameSeparator` since we used SplitAfter
+	ssName = ssName[:len(ssName)-1]
+
+	instanceID := split[len(split)-1]
+
+	return ssName, instanceID, nil
 }
 
 func (ss *scaleSet) newVmssCache() (*timedCache, error) {
