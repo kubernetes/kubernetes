@@ -499,38 +499,17 @@ func TestPatchResourceNumberConversion(t *testing.T) {
 		expectedPod: &example.Pod{},
 	}
 
-	tc.startingPod.Name = name
-	tc.startingPod.Namespace = namespace
-	tc.startingPod.UID = uid
-	tc.startingPod.ResourceVersion = "1"
-	tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
+	setTcPod(tc.startingPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), &fifteen, "")
 
 	// Patch tries to change to 30.
-	tc.changedPod.Name = name
-	tc.changedPod.Namespace = namespace
-	tc.changedPod.UID = uid
-	tc.changedPod.ResourceVersion = "1"
-	tc.changedPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
+	setTcPod(tc.changedPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), &thirty, "")
 
 	// Someone else already changed it to 30.
 	// This should be fine since it's not a "meaningful conflict".
 	// Previously this was detected as a meaningful conflict because int64(30) != float64(30).
-	tc.updatePod.Name = name
-	tc.updatePod.Namespace = namespace
-	tc.updatePod.UID = uid
-	tc.updatePod.ResourceVersion = "2"
-	tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.updatePod.Spec.ActiveDeadlineSeconds = &thirty
-	tc.updatePod.Spec.NodeName = "anywhere"
+	setTcPod(tc.updatePod, name, namespace, uid, "2", examplev1.SchemeGroupVersion.String(), &thirty, "anywhere")
 
-	tc.expectedPod.Name = name
-	tc.expectedPod.Namespace = namespace
-	tc.expectedPod.UID = uid
-	tc.expectedPod.ResourceVersion = "2"
-	tc.expectedPod.Spec.ActiveDeadlineSeconds = &thirty
-	tc.expectedPod.Spec.NodeName = "anywhere"
+	setTcPod(tc.expectedPod, name, namespace, uid, "2", "", &thirty, "anywhere")
 
 	tc.Run(t)
 }
@@ -552,34 +531,13 @@ func TestPatchResourceWithVersionConflict(t *testing.T) {
 		expectedPod: &example.Pod{},
 	}
 
-	tc.startingPod.Name = name
-	tc.startingPod.Namespace = namespace
-	tc.startingPod.UID = uid
-	tc.startingPod.ResourceVersion = "1"
-	tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
+	setTcPod(tc.startingPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), &fifteen, "")
 
-	tc.changedPod.Name = name
-	tc.changedPod.Namespace = namespace
-	tc.changedPod.UID = uid
-	tc.changedPod.ResourceVersion = "1"
-	tc.changedPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
+	setTcPod(tc.changedPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), &thirty, "")
 
-	tc.updatePod.Name = name
-	tc.updatePod.Namespace = namespace
-	tc.updatePod.UID = uid
-	tc.updatePod.ResourceVersion = "2"
-	tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.updatePod.Spec.ActiveDeadlineSeconds = &fifteen
-	tc.updatePod.Spec.NodeName = "anywhere"
+	setTcPod(tc.updatePod, name, namespace, uid, "2", examplev1.SchemeGroupVersion.String(), &fifteen, "anywhere")
 
-	tc.expectedPod.Name = name
-	tc.expectedPod.Namespace = namespace
-	tc.expectedPod.UID = uid
-	tc.expectedPod.ResourceVersion = "2"
-	tc.expectedPod.Spec.ActiveDeadlineSeconds = &thirty
-	tc.expectedPod.Spec.NodeName = "anywhere"
+	setTcPod(tc.expectedPod, name, namespace, uid, "2", "", &thirty, "anywhere")
 
 	tc.Run(t)
 }
@@ -667,26 +625,11 @@ func TestPatchResourceWithConflict(t *testing.T) {
 
 	// See issue #63104 for discussion of how much sense this makes.
 
-	tc.startingPod.Name = name
-	tc.startingPod.Namespace = namespace
-	tc.startingPod.UID = uid
-	tc.startingPod.ResourceVersion = "1"
-	tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.startingPod.Spec.NodeName = "here"
+	setTcPod(tc.startingPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), nil, "here")
 
-	tc.changedPod.Name = name
-	tc.changedPod.Namespace = namespace
-	tc.changedPod.UID = uid
-	tc.changedPod.ResourceVersion = "1"
-	tc.changedPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.changedPod.Spec.NodeName = "there"
+	setTcPod(tc.changedPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), nil, "there")
 
-	tc.updatePod.Name = name
-	tc.updatePod.Namespace = namespace
-	tc.updatePod.UID = uid
-	tc.updatePod.ResourceVersion = "2"
-	tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.updatePod.Spec.NodeName = "anywhere"
+	setTcPod(tc.updatePod, name, namespace, uid, "2", examplev1.SchemeGroupVersion.String(), nil, "anywhere")
 
 	tc.expectedPod.Name = name
 	tc.expectedPod.Namespace = namespace
@@ -752,26 +695,11 @@ func TestPatchWithAdmissionRejection(t *testing.T) {
 			expectedError: test.expectedError,
 		}
 
-		tc.startingPod.Name = name
-		tc.startingPod.Namespace = namespace
-		tc.startingPod.UID = uid
-		tc.startingPod.ResourceVersion = "1"
-		tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
-		tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
+		setTcPod(tc.startingPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), &fifteen, "")
 
-		tc.changedPod.Name = name
-		tc.changedPod.Namespace = namespace
-		tc.changedPod.UID = uid
-		tc.changedPod.ResourceVersion = "1"
-		tc.changedPod.APIVersion = examplev1.SchemeGroupVersion.String()
-		tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
+		setTcPod(tc.changedPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), &thirty, "")
 
-		tc.updatePod.Name = name
-		tc.updatePod.Namespace = namespace
-		tc.updatePod.UID = uid
-		tc.updatePod.ResourceVersion = "1"
-		tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
-		tc.updatePod.Spec.ActiveDeadlineSeconds = &fifteen
+		setTcPod(tc.updatePod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), &fifteen, "")
 
 		tc.Run(t)
 	}
@@ -804,27 +732,11 @@ func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
 		expectedError: "admission failure",
 	}
 
-	tc.startingPod.Name = name
-	tc.startingPod.Namespace = namespace
-	tc.startingPod.UID = uid
-	tc.startingPod.ResourceVersion = "1"
-	tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
+	setTcPod(tc.startingPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), &fifteen, "")
 
-	tc.changedPod.Name = name
-	tc.changedPod.Namespace = namespace
-	tc.changedPod.UID = uid
-	tc.changedPod.ResourceVersion = "1"
-	tc.changedPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
+	setTcPod(tc.changedPod, name, namespace, uid, "1", examplev1.SchemeGroupVersion.String(), &thirty, "")
 
-	tc.updatePod.Name = name
-	tc.updatePod.Namespace = namespace
-	tc.updatePod.UID = uid
-	tc.updatePod.ResourceVersion = "2"
-	tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.updatePod.Spec.ActiveDeadlineSeconds = &fifteen
-	tc.updatePod.Spec.NodeName = "anywhere"
+	setTcPod(tc.updatePod, name, namespace, uid, "2", examplev1.SchemeGroupVersion.String(), &fifteen, "anywhere")
 
 	tc.Run(t)
 }
@@ -920,5 +832,21 @@ func TestFinishRequest(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
 			t.Errorf("%d: unexpected obj. expected %#v, got %#v", i, tc.expectedObj, obj)
 		}
+	}
+}
+
+func setTcPod(tcPod *example.Pod, name string, namespace string, uid types.UID, resourceVersion string, apiVersion string, activeDeadlineSeconds *int64, nodeName string) {
+	tcPod.Name = name
+	tcPod.Namespace = namespace
+	tcPod.UID = uid
+	tcPod.ResourceVersion = resourceVersion
+	if len(apiVersion) != 0 {
+		tcPod.APIVersion = apiVersion
+	}
+	if activeDeadlineSeconds != nil {
+		tcPod.Spec.ActiveDeadlineSeconds = activeDeadlineSeconds
+	}
+	if len(nodeName) != 0 {
+		tcPod.Spec.NodeName = nodeName
 	}
 }
