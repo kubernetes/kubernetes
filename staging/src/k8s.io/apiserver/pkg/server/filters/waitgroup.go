@@ -17,9 +17,11 @@ limitations under the License.
 package filters
 
 import (
+	"errors"
 	"net/http"
 
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -30,7 +32,7 @@ func WithWaitGroup(handler http.Handler, longRunning apirequest.LongRunningReque
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
 			// if this happens, the handler chain isn't setup correctly because there is no request info
-			handler.ServeHTTP(w, req)
+			responsewriters.InternalError(w, req, errors.New("no RequestInfo found in the context"))
 			return
 		}
 
