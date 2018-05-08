@@ -17,10 +17,16 @@ limitations under the License.
 package volume
 
 import (
+	"time"
+
+	cadvisor "github.com/google/cadvisor/fs"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
+
+const timeout = time.Minute
 
 var _ MetricsProvider = &metricsDu{}
 
@@ -46,54 +52,27 @@ func (md *metricsDu) GetMetrics() (*Metrics, error) {
 		return metrics, NewNoPathDefinedError()
 	}
 
-	err := md.runDu(metrics)
+	used, err := cadvisor.GetDirDiskUsage(md.path, timeout)
 	if err != nil {
 		return metrics, err
 	}
 
-	err = md.runFind(metrics)
+	inodesUsed, err := cadvisor.GetDirInodeUsage(md.path, timeout)
 	if err != nil {
 		return metrics, err
 	}
 
-	err = md.getFsInfo(metrics)
-	if err != nil {
-		return metrics, err
-	}
-
-	return metrics, nil
-}
-
-// runDu executes the "du" command and writes the results to metrics.Used
-func (md *metricsDu) runDu(metrics *Metrics) error {
-	used, err := fs.Du(md.path)
-	if err != nil {
-		return err
-	}
-	metrics.Used = used
-	return nil
-}
-
-// runFind executes the "find" command and writes the results to metrics.InodesUsed
-func (md *metricsDu) runFind(metrics *Metrics) error {
-	inodesUsed, err := fs.Find(md.path)
-	if err != nil {
-		return err
-	}
-	metrics.InodesUsed = resource.NewQuantity(inodesUsed, resource.BinarySI)
-	return nil
-}
-
-// getFsInfo writes metrics.Capacity and metrics.Available from the filesystem
-// info
-func (md *metricsDu) getFsInfo(metrics *Metrics) error {
 	available, capacity, _, inodes, inodesFree, _, err := fs.FsInfo(md.path)
 	if err != nil {
-		return NewFsInfoFailedError(err)
+		return metrics, NewFsInfoFailedError(err)
 	}
+
 	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
 	metrics.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
+	metrics.Used = resource.NewQuantity(int64(used), resource.BinarySI)
 	metrics.Inodes = resource.NewQuantity(inodes, resource.BinarySI)
 	metrics.InodesFree = resource.NewQuantity(inodesFree, resource.BinarySI)
-	return nil
+	metrics.InodesUsed = resource.NewQuantity(int64(inodesUsed), resource.BinarySI)
+
+	return metrics, nil
 }
