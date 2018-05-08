@@ -864,7 +864,7 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 	argsToUse = append(argsToUse, args...)
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdConfig(cmdutil.NewFactory(cmdutil.NewTestConfigFlags()), clientcmd.NewDefaultPathOptions(), streams)
+	cmd := NewCmdConfig(cmdutil.NewFactory(genericclioptions.NewTestConfigFlags()), clientcmd.NewDefaultPathOptions(), streams)
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
 

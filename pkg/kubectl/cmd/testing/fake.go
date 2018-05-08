@@ -50,6 +50,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
@@ -267,7 +268,7 @@ func NewTestFactory() *TestFactory {
 	fallbackReader := bytes.NewBuffer([]byte{})
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
 
-	configFlags := cmdutil.NewTestConfigFlags().
+	configFlags := genericclioptions.NewTestConfigFlags().
 		WithClientConfig(clientConfig).
 		WithRESTMapper(testRESTMapper())
 
