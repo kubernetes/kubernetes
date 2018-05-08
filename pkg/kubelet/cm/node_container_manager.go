@@ -159,6 +159,7 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 		valQuota, valPeriod := MilliCPUToQuota(q.MilliValue())
 		rc.CpuQuota = &valQuota
 		rc.CpuPeriod = &valPeriod
+		glog.V(4).Infof("CPU Quota: %v, Period: %v", valQuota, valPeriod)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
 		rc.HugePageLimit = HugePageLimits(rl)
