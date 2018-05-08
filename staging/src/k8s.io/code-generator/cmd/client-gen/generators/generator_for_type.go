@@ -250,7 +250,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 			}
 		}
 
-		// TODO: Figure out schemantic for watching a sub-resource.
+		// TODO: Figure out schematic for watching a sub-resource.
 		if e.HasVerb("watch") {
 			sw.Do(adjustTemplate(e.VerbName, e.VerbType, watchTemplate), m)
 		}
@@ -271,7 +271,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 			}
 		}
 
-		// TODO: Figure out schemantic for deleting a sub-resource (what arguments
+		// TODO: Figure out schematic for deleting a sub-resource (what arguments
 		// are passed, does it need two names? etc.
 		if e.HasVerb("delete") {
 			sw.Do(adjustTemplate(e.VerbName, e.VerbType, deleteTemplate), m)
