@@ -355,9 +355,12 @@ func TestValidationSchema(t *testing.T) {
 
 	// fields other than properties in root schema are not allowed
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition.Spec.Subresources = &apiextensionsv1beta1.CustomResourceSubresources{
+		Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+	}
 	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err == nil {
-		t.Fatalf("unexpected non-error: if subresources for custom resources are enabled, only properties can be used at the root of the schema")
+		t.Fatalf(`unexpected non-error, expected: must only have "properties" or "required" at the root if the status subresource is enabled`)
 	}
 
 	// make sure we are not restricting fields to properties even in subschemas
@@ -372,6 +375,7 @@ func TestValidationSchema(t *testing.T) {
 				},
 			},
 		},
+		Required: []string{"spec"},
 	}
 	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {

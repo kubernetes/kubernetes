@@ -106,7 +106,11 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionNames(&spec.Names, fldPath.Child("names"))...)
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionValidation(spec.Validation, fldPath.Child("validation"))...)
+		statusEnabled := false
+		if spec.Subresources != nil && spec.Subresources.Status != nil {
+			statusEnabled = true
+		}
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionValidation(spec.Validation, statusEnabled, fldPath.Child("validation"))...)
 	} else if spec.Validation != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("validation"), "disabled by feature-gate CustomResourceValidation"))
 	}
@@ -187,7 +191,7 @@ type specStandardValidator interface {
 }
 
 // ValidateCustomResourceDefinitionValidation statically validates
-func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiextensions.CustomResourceValidation, fldPath *field.Path) field.ErrorList {
+func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiextensions.CustomResourceValidation, statusSubresourceEnabled bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if customResourceValidation == nil {
@@ -195,21 +199,19 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 	}
 
 	if schema := customResourceValidation.OpenAPIV3Schema; schema != nil {
-		// if subresources are enabled, only properties is allowed inside the root schema
-		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
+		// if subresources are enabled, only "properties" and "required" is allowed inside the root schema
+		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && statusSubresourceEnabled {
 			v := reflect.ValueOf(schema).Elem()
-			fieldsPresent := 0
-
 			for i := 0; i < v.NumField(); i++ {
-				field := v.Field(i).Interface()
-				if !reflect.DeepEqual(field, reflect.Zero(reflect.TypeOf(field)).Interface()) {
-					fieldsPresent++
+				// skip zero values
+				if value := v.Field(i).Interface(); reflect.DeepEqual(value, reflect.Zero(reflect.TypeOf(value)).Interface()) {
+					continue
 				}
-			}
 
-			if fieldsPresent > 1 || (fieldsPresent == 1 && v.FieldByName("Properties").IsNil()) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), *schema, fmt.Sprintf("if subresources for custom resources are enabled, only properties can be used at the root of the schema")))
-				return allErrs
+				if name := v.Type().Field(i).Name; name != "Properties" && name != "Required" {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), *schema, fmt.Sprintf(`must only have "properties" or "required" at the root if the status subresource is enabled`)))
+					break
+				}
 			}
 		}
 

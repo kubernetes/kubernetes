@@ -19,9 +19,13 @@ package validation
 import (
 	"testing"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/features"
 )
 
 type validationMatch struct {
@@ -515,5 +519,72 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v", tc.name, errs[i])
 			}
 		}
+	}
+}
+
+func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
+
+	tests := []struct {
+		name          string
+		input         apiextensions.CustomResourceValidation
+		statusEnabled bool
+		wantError     bool
+	}{
+		{
+			name:      "empty",
+			input:     apiextensions.CustomResourceValidation{},
+			wantError: false,
+		},
+		{
+			name:          "empty with status",
+			input:         apiextensions.CustomResourceValidation{},
+			statusEnabled: true,
+			wantError:     false,
+		},
+		{
+			name: "root type without status",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+				},
+			},
+			statusEnabled: false,
+			wantError:     false,
+		},
+		{
+			name: "root type with status",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+				},
+			},
+			statusEnabled: true,
+			wantError:     true,
+		},
+		{
+			name: "properties and required with status",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"spec":   {},
+						"status": {},
+					},
+					Required: []string{"spec", "status"},
+				},
+			},
+			statusEnabled: true,
+			wantError:     false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ValidateCustomResourceDefinitionValidation(&tt.input, tt.statusEnabled, field.NewPath("spec", "validation"))
+			if !tt.wantError && len(got) > 0 {
+				t.Errorf("Expected no error, but got: %v", got)
+			} else if tt.wantError && len(got) == 0 {
+				t.Error("Expected error, but got none")
+			}
+		})
 	}
 }
