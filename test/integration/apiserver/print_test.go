@@ -156,10 +156,6 @@ func TestServerSidePrint(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
 
 	cacheDir, err := ioutil.TempDir(os.TempDir(), "test-integration-apiserver-print")
 	if err != nil {
@@ -169,7 +165,12 @@ func TestServerSidePrint(t *testing.T) {
 		os.Remove(cacheDir)
 	}()
 
-	configFlags.WithDiscoveryClient(util.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)))
+	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, time.Duration(10*time.Minute))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	configFlags.WithDiscoveryClient(cachedClient)
 
 	factory := util.NewFactory(configFlags)
 	mapper, err := factory.RESTMapper()
