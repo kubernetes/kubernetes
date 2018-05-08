@@ -63,7 +63,7 @@ var (
 func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOptions {
 	return &ReconcileOptions{
 		FilenameOptions: &resource.FilenameOptions{},
-		PrintFlags:      printers.NewPrintFlags("reconciled"),
+		PrintFlags:      printers.NewPrintFlags("reconciled", legacyscheme.Scheme),
 		IOStreams:       ioStreams,
 	}
 }

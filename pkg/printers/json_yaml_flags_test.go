@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -59,7 +60,7 @@ func TestPrinterSupportsExpectedJSONYamlFormats(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := printers.JSONYamlPrintFlags{}
+			printFlags := printers.JSONYamlPrintFlags{Scheme: legacyscheme.Scheme}
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -56,7 +57,7 @@ type ClusterInfoDumpOptions struct {
 // NewCmdCreateSecret groups subcommands to create various types of secrets
 func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoDumpOptions{
-		PrintFlags: printers.NewPrintFlags(""),
+		PrintFlags: printers.NewPrintFlags("", legacyscheme.Scheme),
 
 		IOStreams: ioStreams,
 	}

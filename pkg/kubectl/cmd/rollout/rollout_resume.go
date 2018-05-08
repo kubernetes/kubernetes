@@ -61,7 +61,7 @@ var (
 
 func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ResumeConfig{
-		PrintFlags: printers.NewPrintFlags("resumed"),
+		PrintFlags: printers.NewPrintFlags("resumed", legacyscheme.Scheme),
 		IOStreams:  streams,
 	}
 

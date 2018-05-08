@@ -19,6 +19,8 @@ package rollout
 import (
 	"io"
 
+	"github.com/spf13/cobra"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -27,8 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-
-	"github.com/spf13/cobra"
 )
 
 // UndoOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -64,7 +64,7 @@ var (
 
 func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &UndoOptions{
-		PrintFlags: printers.NewPrintFlags(""),
+		PrintFlags: printers.NewPrintFlags("", legacyscheme.Scheme),
 	}
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}

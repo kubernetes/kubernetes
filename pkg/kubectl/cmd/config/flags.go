@@ -19,6 +19,7 @@ package config
 import (
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -74,14 +75,14 @@ func (f *kubectlConfigPrintFlags) WithDefaultOutput(output string) *kubectlConfi
 	return f
 }
 
-func newKubeConfigPrintFlags(operation string) *kubectlConfigPrintFlags {
+func newKubeConfigPrintFlags(scheme runtime.ObjectConvertor) *kubectlConfigPrintFlags {
 	outputFormat := ""
 
 	return &kubectlConfigPrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-		NamePrintFlags:     printers.NewNamePrintFlags(operation),
+		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme),
+		NamePrintFlags:     printers.NewNamePrintFlags("", scheme),
 		TemplateFlags:      printers.NewKubeTemplatePrintFlags(),
 	}
 }

@@ -376,14 +376,14 @@ func TestComplete(t *testing.T) {
 		"test-missing-name": {
 			params: []string{},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags: NewPrintFlags("created"),
+				PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
 			},
 			expectErr: true,
 		},
 		"test-duplicate-verbs": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags: NewPrintFlags("created"),
+				PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
 				Name:       roleName,
 				Verbs: []string{
 					"get",
@@ -416,7 +416,7 @@ func TestComplete(t *testing.T) {
 		"test-verball": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags: NewPrintFlags("created"),
+				PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
 				Name:       roleName,
 				Verbs: []string{
 					"get",
@@ -445,7 +445,7 @@ func TestComplete(t *testing.T) {
 		"test-duplicate-resourcenames": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags:    NewPrintFlags("created"),
+				PrintFlags:    NewPrintFlags("created", legacyscheme.Scheme),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo", "foo"},
@@ -470,7 +470,7 @@ func TestComplete(t *testing.T) {
 		"test-valid-complete-case": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags:    NewPrintFlags("created"),
+				PrintFlags:    NewPrintFlags("created", legacyscheme.Scheme),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo"},

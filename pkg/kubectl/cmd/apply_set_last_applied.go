@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -82,7 +83,7 @@ var (
 
 func NewSetLastAppliedOptions(ioStreams genericclioptions.IOStreams) *SetLastAppliedOptions {
 	return &SetLastAppliedOptions{
-		PrintFlags: printers.NewPrintFlags("configured"),
+		PrintFlags: printers.NewPrintFlags("configured", legacyscheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }

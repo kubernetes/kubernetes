@@ -32,6 +32,8 @@ import (
 // a resource's fully-qualified Kind.group/name, or a successful
 // message about that resource if an Operation is provided.
 type NamePrintFlags struct {
+	Scheme runtime.ObjectConvertor
+
 	// Operation describes the name of the action that
 	// took place on an object, to be included in the
 	// finalized "successful" message.
@@ -73,7 +75,7 @@ func (f *NamePrintFlags) AddFlags(c *cobra.Command) {}
 
 // NewNamePrintFlags returns flags associated with
 // --name printing, with default values set.
-func NewNamePrintFlags(operation string) *NamePrintFlags {
+func NewNamePrintFlags(operation string, scheme runtime.ObjectConvertor) *NamePrintFlags {
 	return &NamePrintFlags{
 		Operation: operation,
 	}

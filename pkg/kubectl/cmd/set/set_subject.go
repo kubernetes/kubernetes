@@ -82,7 +82,7 @@ type SubjectOptions struct {
 
 func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
 	return &SubjectOptions{
-		PrintFlags: printers.NewPrintFlags("subjects updated"),
+		PrintFlags: printers.NewPrintFlags("subjects updated", legacyscheme.Scheme),
 
 		IOStreams: streams,
 	}

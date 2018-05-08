@@ -63,7 +63,7 @@ var (
 
 func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &PauseConfig{
-		PrintFlags: printers.NewPrintFlags("paused"),
+		PrintFlags: printers.NewPrintFlags("paused", legacyscheme.Scheme),
 		IOStreams:  streams,
 	}
 

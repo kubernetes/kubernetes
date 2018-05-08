@@ -59,7 +59,7 @@ func TestCreatePdb(t *testing.T) {
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", outputFormat)
 
-	printFlags := NewPrintFlags("created")
+	printFlags := NewPrintFlags("created", legacyscheme.Scheme)
 	printFlags.OutputFormat = &outputFormat
 
 	options := &PodDisruptionBudgetOpts{

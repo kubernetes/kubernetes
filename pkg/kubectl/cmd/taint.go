@@ -17,10 +17,9 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
-
-	"encoding/json"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -87,7 +86,7 @@ var (
 
 func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	options := &TaintOptions{
-		PrintFlags: printers.NewPrintFlags("tainted"),
+		PrintFlags: printers.NewPrintFlags("tainted", legacyscheme.Scheme),
 		IOStreams:  streams,
 	}
 
