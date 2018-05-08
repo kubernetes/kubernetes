@@ -274,7 +274,12 @@ func TestNewNodeInfo(t *testing.T) {
 		},
 	}
 
+	gen := generation
 	ni := NewNodeInfo(pods...)
+	if ni.generation <= gen {
+		t.Errorf("generation is not incremented. previous: %v, current: %v", gen, ni.generation)
+	}
+	expected.generation = ni.generation
 	if !reflect.DeepEqual(expected, ni) {
 		t.Errorf("expected: %#v, got: %#v", expected, ni)
 	}
@@ -584,10 +589,16 @@ func TestNodeInfoAddPod(t *testing.T) {
 	}
 
 	ni := fakeNodeInfo()
+	gen := ni.generation
 	for _, pod := range pods {
 		ni.AddPod(pod)
+		if ni.generation <= gen {
+			t.Errorf("generation is not incremented. Prev: %v, current: %v", gen, ni.generation)
+		}
+		gen = ni.generation
 	}
 
+	expected.generation = ni.generation
 	if !reflect.DeepEqual(expected, ni) {
 		t.Errorf("expected: %#v, got: %#v", expected, ni)
 	}
@@ -788,6 +799,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 	for _, test := range tests {
 		ni := fakeNodeInfo(pods...)
 
+		gen := ni.generation
 		err := ni.RemovePod(test.pod)
 		if err != nil {
 			if test.errExpected {
@@ -798,8 +810,13 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			} else {
 				t.Errorf("expected no error, got: %v", err)
 			}
+		} else {
+			if ni.generation <= gen {
+				t.Errorf("generation is not incremented. Prev: %v, current: %v", gen, ni.generation)
+			}
 		}
 
+		test.expectedNodeInfo.generation = ni.generation
 		if !reflect.DeepEqual(test.expectedNodeInfo, ni) {
 			t.Errorf("expected: %#v, got: %#v", test.expectedNodeInfo, ni)
 		}
