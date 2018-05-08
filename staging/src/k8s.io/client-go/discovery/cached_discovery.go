@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package discovery
 
 import (
 	"errors"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -30,15 +31,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 // CachedDiscoveryClient implements the functions that discovery server-supported API groups,
 // versions and resources.
 type CachedDiscoveryClient struct {
-	delegate discovery.DiscoveryInterface
+	delegate DiscoveryInterface
 
 	// cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
 	cacheDirectory string
@@ -57,7 +57,7 @@ type CachedDiscoveryClient struct {
 	fresh bool
 }
 
-var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
+var _ CachedDiscoveryInterface = &CachedDiscoveryClient{}
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
@@ -91,7 +91,7 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 
 // ServerResources returns the supported resources for all groups and versions.
 func (d *CachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	return discovery.ServerResources(d)
+	return ServerResources(d)
 }
 
 func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
@@ -207,11 +207,11 @@ func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
 }
 
 func (d *CachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return discovery.ServerPreferredResources(d)
+	return ServerPreferredResources(d)
 }
 
 func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return discovery.ServerPreferredNamespacedResources(d)
+	return ServerPreferredNamespacedResources(d)
 }
 
 func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
@@ -238,8 +238,32 @@ func (d *CachedDiscoveryClient) Invalidate() {
 	d.invalidated = true
 }
 
+// NewCachedDiscoveryClientForConfig creates a new DiscoveryClient for the given config, and wraps
+// the created client in a CachedDiscoveryClient. The provided configuration is upddated with a
+// custom transport that understands cache responses.
+func NewCachedDiscoveryClientForConfig(config *restclient.Config, cacheDirectory string, ttl time.Duration) (*CachedDiscoveryClient, error) {
+	if len(cacheDirectory) > 0 {
+		// update the given restconfig with a custom roundtripper that
+		// understands how to handle cache responses.
+		wt := config.WrapTransport
+		config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+			if wt != nil {
+				rt = wt(rt)
+			}
+			return newCacheRoundTripper(cacheDirectory, rt)
+		}
+	}
+
+	discoveryClient, err := NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return newCachedDiscoveryClient(discoveryClient, cacheDirectory, ttl), nil
+}
+
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
-func NewCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
+func newCachedDiscoveryClient(delegate DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
 	return &CachedDiscoveryClient{
 		delegate:       delegate,
 		cacheDirectory: cacheDirectory,

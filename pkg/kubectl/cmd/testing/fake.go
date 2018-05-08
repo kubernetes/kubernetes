@@ -418,11 +418,15 @@ func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
 
 func (f *TestFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	fakeClient := f.Client.(*fake.RESTClient)
-	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(f.ClientConfigVal)
-	discoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
 	cacheDir := filepath.Join("", ".kube", "cache", "discovery")
-	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(f.ClientConfigVal, cacheDir, time.Duration(10*time.Minute))
+	if err != nil {
+		return nil, err
+	}
+	cachedClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+
+	return cachedClient, nil
 }
 
 func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
