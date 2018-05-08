@@ -182,7 +182,7 @@ func TestSyncIPSetEntries(t *testing.T) {
 	}
 
 	for i := range testCases {
-		set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCases[i].set.Name, testCases[i].setType, testCases[i].ipv6)
+		set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCases[i].set.Name, testCases[i].setType, testCases[i].ipv6, "comment-"+testCases[i].set.Name)
 
 		if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
 			t.Errorf("Unexpected error: %v", err)
