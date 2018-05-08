@@ -38,9 +38,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -84,9 +84,9 @@ func (f *ring1Factory) RESTMapper() (meta.RESTMapper, error) {
 	}
 
 	// allow conversion between typed and unstructured objects
-	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	// TODO: should this also indicate it recognizes typed objects?
-	expander := NewShortcutExpander(mapper, discoveryClient)
+	expander := restmapper.NewShortcutExpander(mapper, discoveryClient)
 	return expander, nil
 }
 

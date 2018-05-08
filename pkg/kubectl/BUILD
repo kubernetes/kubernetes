@@ -98,7 +98,6 @@ go_library(
         "generate.go",
         "history.go",
         "interfaces.go",
-        "kubectl.go",
         "namespace.go",
         "pdb.go",
         "priorityclass.go",

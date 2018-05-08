@@ -14,15 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package restmapper
 
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	"github.com/googleapis/gnostic/OpenAPIv2"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 )
 
 func TestReplaceAliases(t *testing.T) {
@@ -32,12 +38,6 @@ func TestReplaceAliases(t *testing.T) {
 		expected schema.GroupVersionResource
 		srvRes   []*metav1.APIResourceList
 	}{
-		{
-			name:     "rc-resolves-to-replicationcontrollers",
-			arg:      "rc",
-			expected: schema.GroupVersionResource{Resource: "replicationcontrollers"},
-			srvRes:   []*metav1.APIResourceList{},
-		},
 		{
 			name:     "storageclasses-no-replacement",
 			arg:      "storageclasses",
@@ -126,13 +126,13 @@ func TestReplaceAliases(t *testing.T) {
 		},
 	}
 
-	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
-
 	for _, test := range tests {
+		ds := &fakeDiscoveryClient{}
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.srvRes, nil
 		}
+		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds).(shortcutExpander)
+
 		actual := mapper.expandResourceShortcut(schema.GroupVersionResource{Resource: test.arg})
 		if actual != test.expected {
 			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, actual)
@@ -143,12 +143,12 @@ func TestReplaceAliases(t *testing.T) {
 func TestKindFor(t *testing.T) {
 	tests := []struct {
 		in       schema.GroupVersionResource
-		expected schema.GroupVersionKind
+		expected schema.GroupVersionResource
 		srvRes   []*metav1.APIResourceList
 	}{
 		{
 			in:       schema.GroupVersionResource{Group: "storage.k8s.io", Version: "", Resource: "sc"},
-			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"},
+			expected: schema.GroupVersionResource{Group: "storage.k8s.io", Version: "", Resource: "storageclasses"},
 			srvRes: []*metav1.APIResourceList{
 				{
 					GroupVersion: "storage.k8s.io/v1",
@@ -163,7 +163,7 @@ func TestKindFor(t *testing.T) {
 		},
 		{
 			in:       schema.GroupVersionResource{Group: "", Version: "", Resource: "sc"},
-			expected: schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"},
+			expected: schema.GroupVersionResource{Group: "storage.k8s.io", Version: "", Resource: "storageclasses"},
 			srvRes: []*metav1.APIResourceList{
 				{
 					GroupVersion: "storage.k8s.io/v1",
@@ -178,19 +178,112 @@ func TestKindFor(t *testing.T) {
 		},
 	}
 
-	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
-
 	for i, test := range tests {
+		ds := &fakeDiscoveryClient{}
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.srvRes, nil
 		}
-		ret, err := mapper.KindFor(test.in)
-		if err != nil {
-			t.Errorf("%d: unexpected error returned %s", i, err.Error())
-		}
-		if ret != test.expected {
-			t.Errorf("%d: unexpected data returned %#v, expected %#v", i, ret, test.expected)
+
+		delegate := &fakeRESTMapper{}
+		mapper := NewShortcutExpander(delegate, ds)
+
+		mapper.KindFor(test.in)
+		if delegate.kindForInput != test.expected {
+			t.Errorf("%d: unexpected data returned %#v, expected %#v", i, delegate.kindForInput, test.expected)
 		}
 	}
+}
+
+type fakeRESTMapper struct {
+	kindForInput schema.GroupVersionResource
+}
+
+func (f *fakeRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	f.kindForInput = resource
+	return schema.GroupVersionKind{}, nil
+}
+
+func (f *fakeRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+	return schema.GroupVersionResource{}, nil
+}
+
+func (f *fakeRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
+	return nil, nil
+}
+
+func (f *fakeRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	return "", nil
+}
+
+type fakeDiscoveryClient struct {
+	serverResourcesHandler func() ([]*metav1.APIResourceList, error)
+}
+
+var _ discovery.DiscoveryInterface = &fakeDiscoveryClient{}
+
+func (c *fakeDiscoveryClient) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
+}
+
+func (c *fakeDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
+	return &metav1.APIGroupList{
+		Groups: []metav1.APIGroup{
+			{
+				Name: "a",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{
+						GroupVersion: "a/v1",
+						Version:      "v1",
+					},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{
+					GroupVersion: "a/v1",
+					Version:      "v1",
+				},
+			},
+		},
+	}, nil
+}
+
+func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	if groupVersion == "a/v1" {
+		return &metav1.APIResourceList{APIResources: []metav1.APIResource{{Name: "widgets", Kind: "Widget"}}}, nil
+	}
+
+	return nil, errors.NewNotFound(schema.GroupResource{}, "")
+}
+
+func (c *fakeDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
+	if c.serverResourcesHandler != nil {
+		return c.serverResourcesHandler()
+	}
+	return []*metav1.APIResourceList{}, nil
+}
+
+func (c *fakeDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {
+	return &version.Info{}, nil
+}
+
+func (c *fakeDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
+	return &openapi_v2.Document{}, nil
 }
