@@ -216,6 +216,7 @@ func TestNewNodeInfo(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
+		imageSizes: map[string]int64{},
 		pods: []*v1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -304,6 +305,9 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
+				imageSizes: map[string]int64{
+					"gcr.io/10": 10 * 1024 * 1024,
+				},
 				pods: []*v1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -372,6 +376,9 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
+				},
+				imageSizes: map[string]int64{
+					"gcr.io/10": 10 * 1024 * 1024,
 				},
 				pods: []*v1.Pod{
 					{
@@ -530,6 +537,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
+		imageSizes: map[string]int64{},
 		pods: []*v1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -648,6 +656,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
+				imageSizes: map[string]int64{},
 				pods: []*v1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -763,6 +772,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
+				imageSizes: map[string]int64{},
 				pods: []*v1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
