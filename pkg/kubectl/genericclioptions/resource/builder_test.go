@@ -557,6 +557,39 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 	}
 }
 
+func TestReplaceAliases(t *testing.T) {
+	tests := []struct {
+		name     string
+		arg      string
+		expected string
+	}{
+		{
+			name:     "no-replacement",
+			arg:      "service",
+			expected: "service",
+		},
+		{
+			name:     "all-replacement",
+			arg:      "all",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions",
+		},
+		{
+			name:     "alias-in-comma-separated-arg",
+			arg:      "all,secrets",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions,secrets",
+		},
+	}
+
+	b := newDefaultBuilder()
+
+	for _, test := range tests {
+		replaced := b.ReplaceAliases(test.arg)
+		if replaced != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
+		}
+	}
+}
+
 func TestResourceByName(t *testing.T) {
 	pods, _ := testData()
 	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{

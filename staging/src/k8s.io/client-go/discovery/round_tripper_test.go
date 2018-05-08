@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package transport
+package discovery
 
 import (
 	"bytes"
@@ -44,7 +44,7 @@ func TestCacheRoundTripper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cache := NewCacheRoundTripper(cacheDir, rt)
+	cache := newCacheRoundTripper(cacheDir, rt)
 
 	// First call, caches the response
 	req := &http.Request{

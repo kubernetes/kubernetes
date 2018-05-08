@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package transport provides a round tripper capable of caching HTTP responses.
-package transport
+package discovery
 
 import (
 	"net/http"
@@ -30,10 +30,10 @@ type cacheRoundTripper struct {
 	rt *httpcache.Transport
 }
 
-// NewCacheRoundTripper creates a roundtripper that reads the ETag on
+// newCacheRoundTripper creates a roundtripper that reads the ETag on
 // response headers and send the If-None-Match header on subsequent
 // corresponding requests.
-func NewCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
+func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
 	d := diskv.New(diskv.Options{
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),

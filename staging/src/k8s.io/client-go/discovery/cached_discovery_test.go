@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package discovery
 
 import (
 	"io/ioutil"
@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 )
@@ -42,7 +41,7 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	defer os.RemoveAll(d)
 
 	c := fakeDiscoveryClient{}
-	cdc := NewCachedDiscoveryClient(&c, d, 60*time.Second)
+	cdc := newCachedDiscoveryClient(&c, d, 60*time.Second)
 	assert.True(cdc.Fresh(), "should be fresh after creation")
 
 	cdc.ServerGroups()
@@ -61,7 +60,7 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	assert.True(cdc.Fresh(), "should be fresh after another resources call")
 	assert.Equal(c.resourceCalls, 1)
 
-	cdc = NewCachedDiscoveryClient(&c, d, 60*time.Second)
+	cdc = newCachedDiscoveryClient(&c, d, 60*time.Second)
 	cdc.ServerGroups()
 	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing groups cache")
 	assert.Equal(c.groupCalls, 1)
@@ -86,7 +85,7 @@ func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
 	defer os.RemoveAll(d)
 
 	c := fakeDiscoveryClient{}
-	cdc := NewCachedDiscoveryClient(&c, d, 1*time.Nanosecond)
+	cdc := newCachedDiscoveryClient(&c, d, 1*time.Nanosecond)
 	cdc.ServerGroups()
 	assert.Equal(c.groupCalls, 1)
 
@@ -105,7 +104,7 @@ type fakeDiscoveryClient struct {
 	serverResourcesHandler func() ([]*metav1.APIResourceList, error)
 }
 
-var _ discovery.DiscoveryInterface = &fakeDiscoveryClient{}
+var _ DiscoveryInterface = &fakeDiscoveryClient{}
 
 func (c *fakeDiscoveryClient) RESTClient() restclient.Interface {
 	return &fake.RESTClient{}
