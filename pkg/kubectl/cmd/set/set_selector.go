@@ -79,7 +79,7 @@ var (
 
 func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions {
 	return &SetSelectorOptions{
-		PrintFlags:  printers.NewPrintFlags("selector updated"),
+		PrintFlags:  printers.NewPrintFlags("selector updated", legacyscheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},

@@ -82,7 +82,7 @@ type AutoscaleOptions struct {
 
 func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOptions {
 	return &AutoscaleOptions{
-		PrintFlags:      printers.NewPrintFlags("autoscaled"),
+		PrintFlags:      printers.NewPrintFlags("autoscaled", legacyscheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
 		RecordFlags:     genericclioptions.NewRecordFlags(),
 		Recorder:        genericclioptions.NoopRecorder{},
