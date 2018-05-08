@@ -19,13 +19,12 @@ package create
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"net/url"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -78,7 +77,7 @@ var (
 
 func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
-		PrintFlags:  NewPrintFlags("created"),
+		PrintFlags:  NewPrintFlags("created", legacyscheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -347,7 +346,7 @@ type CreateSubcommandOptions struct {
 
 func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
 	return &CreateSubcommandOptions{
-		PrintFlags: NewPrintFlags("created"),
+		PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }

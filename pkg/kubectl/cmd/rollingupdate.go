@@ -114,7 +114,7 @@ type RollingUpdateOptions struct {
 
 func NewRollingUpdateOptions(streams genericclioptions.IOStreams) *RollingUpdateOptions {
 	return &RollingUpdateOptions{
-		PrintFlags:      printers.NewPrintFlags("rolling updated"),
+		PrintFlags:      printers.NewPrintFlags("rolling updated", legacyscheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
 		DeploymentKey:   "deployment",
 		Timeout:         timeout,

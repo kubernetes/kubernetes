@@ -79,7 +79,7 @@ type SetServiceAccountOptions struct {
 
 func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
 	return &SetServiceAccountOptions{
-		PrintFlags:  printers.NewPrintFlags("serviceaccount updated"),
+		PrintFlags:  printers.NewPrintFlags("serviceaccount updated", legacyscheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},

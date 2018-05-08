@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -100,7 +101,7 @@ func NewScaleOptions(ioStreams genericclioptions.IOStreams) *ScaleOptions {
 		// we only support "-o name" for this command, so only register the name printer
 		PrintFlags: &printers.PrintFlags{
 			OutputFormat:   &outputFormat,
-			NamePrintFlags: printers.NewNamePrintFlags("scaled"),
+			NamePrintFlags: printers.NewNamePrintFlags("scaled", legacyscheme.Scheme),
 		},
 		RecordFlags:     genericclioptions.NewRecordFlags(),
 		CurrentReplicas: -1,

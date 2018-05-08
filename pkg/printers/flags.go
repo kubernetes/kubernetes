@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type NoCompatiblePrinterError struct {
@@ -53,6 +55,8 @@ type PrintFlags struct {
 	NamePrintFlags     *NamePrintFlags
 
 	OutputFormat *string
+
+	Scheme runtime.ObjectConvertor
 }
 
 func (f *PrintFlags) Complete(successTemplate string) error {
@@ -95,13 +99,15 @@ func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
 	return f
 }
 
-func NewPrintFlags(operation string) *PrintFlags {
+func NewPrintFlags(operation string, scheme runtime.ObjectConvertor) *PrintFlags {
 	outputFormat := ""
 
 	return &PrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: NewJSONYamlPrintFlags(),
-		NamePrintFlags:     NewNamePrintFlags(operation),
+		Scheme: scheme,
+
+		JSONYamlPrintFlags: NewJSONYamlPrintFlags(scheme),
+		NamePrintFlags:     NewNamePrintFlags(operation, scheme),
 	}
 }
