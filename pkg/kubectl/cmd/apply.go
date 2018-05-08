@@ -197,7 +197,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DeleteOptions = o.DeleteFlags.ToOptions(o.Out, o.ErrOut)
+	o.DeleteOptions = o.DeleteFlags.ToOptions(o.IOStreams)
 	return nil
 }
 

@@ -17,9 +17,10 @@ limitations under the License.
 package plugins
 
 import (
-	"bytes"
 	"os"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestExecRunner(t *testing.T) {
@@ -50,7 +51,7 @@ func TestExecRunner(t *testing.T) {
 	defer os.Unsetenv("KUBECTL_PLUGINS_TEST")
 
 	for _, test := range tests {
-		outBuf := bytes.NewBuffer([]byte{})
+		streams, _, outBuf, _ := genericclioptions.NewTestIOStreams()
 
 		plugin := &Plugin{
 			Description: Description{
@@ -61,7 +62,7 @@ func TestExecRunner(t *testing.T) {
 		}
 
 		ctx := RunningContext{
-			Out:         outBuf,
+			IOStreams:   streams,
 			WorkingDir:  ".",
 			EnvProvider: &EmptyEnvProvider{},
 		}

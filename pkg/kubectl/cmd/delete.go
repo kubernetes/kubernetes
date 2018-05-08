@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -109,11 +109,10 @@ type DeleteOptions struct {
 	Mapper meta.RESTMapper
 	Result *resource.Result
 
-	Out    io.Writer
-	ErrOut io.Writer
+	genericclioptions.IOStreams
 }
 
-func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
+func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
 	cmd := &cobra.Command{
@@ -123,14 +122,14 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    delete_long,
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			options := deleteFlags.ToOptions(out, errOut)
-			if err := options.Complete(f, out, errOut, args, cmd); err != nil {
+			o := deleteFlags.ToOptions(streams)
+			if err := o.Complete(f, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
-			if err := options.Validate(cmd); err != nil {
+			if err := o.Validate(cmd); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
-			if err := options.RunDelete(); err != nil {
+			if err := o.RunDelete(); err != nil {
 				cmdutil.CheckErr(err)
 			}
 		},
@@ -143,7 +142,7 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string, cmd *cobra.Command) error {
+func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Command) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -194,10 +193,6 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 	if err != nil {
 		return err
 	}
-
-	// Set up writer
-	o.Out = out
-	o.ErrOut = errOut
 
 	return nil
 }

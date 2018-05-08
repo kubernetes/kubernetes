@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,6 +37,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -84,11 +84,10 @@ const (
 	defaultPodPortForwardWaitTimeout = 60 * time.Second
 )
 
-func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	opts := &PortForwardOptions{
 		PortForwarder: &defaultPortForwarder{
-			cmdOut: cmdOut,
-			cmdErr: cmdErr,
+			IOStreams: streams,
 		},
 	}
 	cmd := &cobra.Command{
@@ -119,7 +118,7 @@ type portForwarder interface {
 }
 
 type defaultPortForwarder struct {
-	cmdOut, cmdErr io.Writer
+	genericclioptions.IOStreams
 }
 
 func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
@@ -128,7 +127,7 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 		return err
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.cmdOut, f.cmdErr)
+	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
 	if err != nil {
 		return err
 	}
