@@ -39,6 +39,18 @@ func ValidateStatefulSetName(name string, prefix bool) []string {
 	return apivalidation.NameIsDNSSubdomain(name, prefix)
 }
 
+// Validates the given PersistentVolumeClaim of a statefulset.
+func ValidatePersistentVolumeClaimForStatefulset(pvc *api.PersistentVolumeClaim, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for _, msg := range apivalidation.ValidatePersistentVolumeName(pvc.Name, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "name"), pvc.Name, msg))
+	}
+
+	allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeClaimSpec(&pvc.Spec, fldPath.Child("spec"))...)
+	return allErrs
+}
+
 // Validates the given template and ensures that it is in accordance with the desired selector.
 func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, selector labels.Selector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -124,6 +136,10 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 	}
 	if spec.Template.Spec.ActiveDeadlineSeconds != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "spec", "activeDeadlineSeconds"), spec.Template.Spec.ActiveDeadlineSeconds, "must not be specified"))
+	}
+
+	for i, pvc := range spec.VolumeClaimTemplates {
+		allErrs = append(allErrs, ValidatePersistentVolumeClaimForStatefulset(&pvc, fldPath.Child("volumeClaimTemplates").Index(i))...)
 	}
 
 	return allErrs
