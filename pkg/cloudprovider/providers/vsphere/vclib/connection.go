@@ -40,6 +40,7 @@ type VSphereConnection struct {
 	Port              string
 	Insecure          bool
 	RoundTripperCount uint
+	credentialsLock   sync.Mutex
 }
 
 var (
@@ -85,6 +86,8 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 // otherwise calls SessionManager.Login with user and password.
 func (connection *VSphereConnection) login(ctx context.Context, client *vim25.Client) error {
 	m := session.NewManager(client)
+	connection.credentialsLock.Lock()
+	defer connection.credentialsLock.Unlock()
 
 	// TODO: Add separate fields for certificate and private-key.
 	// For now we can leave the config structs and validation as-is and
@@ -162,4 +165,11 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 	}
 	client.RoundTripper = vim25.Retry(client.RoundTripper, vim25.TemporaryNetworkError(int(connection.RoundTripperCount)))
 	return client, nil
+}
+
+func (connection *VSphereConnection) UpdateCredentials(username string, password string) {
+	connection.credentialsLock.Lock()
+	defer connection.credentialsLock.Unlock()
+	connection.Username = username
+	connection.Password = password
 }
