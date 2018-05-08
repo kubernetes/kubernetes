@@ -285,7 +285,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	return sw.Error()
 }
 
-// adjustTemplate adjust the origin verb template using the expansion name.
+// adjustTemplate adjusts the origin verb template using the expansion name.
 // TODO: Make the verbs in templates parametrized so the strings.Replace() is
 // not needed.
 func adjustTemplate(name, verbType, template string) string {
