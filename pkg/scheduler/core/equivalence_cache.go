@@ -85,9 +85,9 @@ func (ec *EquivalenceCache) RunPredicate(
 		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("nodeInfo is nil or node is invalid")
 	}
 
-	fit, reasons, invalid := ec.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash)
-	if !invalid {
-		return fit, reasons, nil
+	result, ok := ec.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash)
+	if ok {
+		return result.Fit, result.FailReasons, nil
 	}
 	fit, reasons, err := pred(pod, meta, nodeInfo)
 	if err != nil {
@@ -139,26 +139,18 @@ func (ec *EquivalenceCache) updateResult(
 	glog.V(5).Infof("Updated cached predicate: %v for pod: %v on node: %s, with item %v", predicateKey, podName, nodeName, predicateItem)
 }
 
-// lookupResult returns cached predicate results:
-// 1. if pod fit
-// 2. reasons if pod did not fit
-// 3. if cache item is not found
+// lookupResult returns cached predicate results and a bool saying whether a
+// cache entry was found.
 func (ec *EquivalenceCache) lookupResult(
 	podName, nodeName, predicateKey string,
 	equivalenceHash uint64,
-) (bool, []algorithm.PredicateFailureReason, bool) {
+) (value predicateResult, ok bool) {
 	ec.mu.RLock()
 	defer ec.mu.RUnlock()
 	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache",
 		predicateKey, podName, nodeName)
-	if result, exist := ec.cache[nodeName][predicateKey][equivalenceHash]; exist {
-		if result.Fit {
-			return true, []algorithm.PredicateFailureReason{}, false
-		}
-		return false, result.FailReasons, false
-	}
-	// is invalid
-	return false, []algorithm.PredicateFailureReason{}, true
+	value, ok = ec.cache[nodeName][predicateKey][equivalenceHash]
+	return value, ok
 }
 
 // InvalidateCachedPredicateItem marks all items of given predicateKeys, of all pods, on the given node as invalid

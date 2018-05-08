@@ -287,14 +287,14 @@ func TestRunPredicate(t *testing.T) {
 			if !test.expectCacheHit && test.pred.callCount == 0 {
 				t.Errorf("Predicate should be called")
 			}
-			_, _, invalid := ecache.lookupResult(pod.Name, node.Node().Name, "testPredicate", equivClass.hash)
-			if invalid && test.expectCacheWrite {
+			_, ok := ecache.lookupResult(pod.Name, node.Node().Name, "testPredicate", equivClass.hash)
+			if !ok && test.expectCacheWrite {
 				t.Errorf("Cache write should happen")
 			}
-			if !test.expectCacheHit && test.expectCacheWrite && invalid {
+			if !test.expectCacheHit && test.expectCacheWrite && !ok {
 				t.Errorf("Cache write should happen")
 			}
-			if !test.expectCacheHit && !test.expectCacheWrite && !invalid {
+			if !test.expectCacheHit && !test.expectCacheWrite && ok {
 				t.Errorf("Cache write should not happen")
 			}
 		})
@@ -396,8 +396,8 @@ func TestLookupResult(t *testing.T) {
 		equivalenceHashForUpdatePredicate uint64
 		equivalenceHashForCalPredicate    uint64
 		cachedItem                        predicateItemType
-		expectedInvalidPredicateKey       bool
-		expectedInvalidEquivalenceHash    bool
+		expectedPredicateKeyMiss          bool
+		expectedEquivalenceHashMiss       bool
 		expectedPredicateItem             predicateItemType
 		cache                             schedulercache.Cache
 	}{
@@ -412,7 +412,7 @@ func TestLookupResult(t *testing.T) {
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
 			},
-			expectedInvalidPredicateKey: true,
+			expectedPredicateKeyMiss: true,
 			expectedPredicateItem: predicateItemType{
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{},
@@ -429,7 +429,7 @@ func TestLookupResult(t *testing.T) {
 			cachedItem: predicateItemType{
 				fit: true,
 			},
-			expectedInvalidPredicateKey: false,
+			expectedPredicateKeyMiss: false,
 			expectedPredicateItem: predicateItemType{
 				fit:     true,
 				reasons: []algorithm.PredicateFailureReason{},
@@ -447,7 +447,7 @@ func TestLookupResult(t *testing.T) {
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
 			},
-			expectedInvalidPredicateKey: false,
+			expectedPredicateKeyMiss: false,
 			expectedPredicateItem: predicateItemType{
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
@@ -465,8 +465,8 @@ func TestLookupResult(t *testing.T) {
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
 			},
-			expectedInvalidPredicateKey:    false,
-			expectedInvalidEquivalenceHash: true,
+			expectedPredicateKeyMiss:    false,
+			expectedEquivalenceHashMiss: true,
 			expectedPredicateItem: predicateItemType{
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{},
@@ -490,27 +490,32 @@ func TestLookupResult(t *testing.T) {
 			node,
 		)
 		// if we want to do invalid, invalid the cached item
-		if test.expectedInvalidPredicateKey {
+		if test.expectedPredicateKeyMiss {
 			predicateKeys := sets.NewString()
 			predicateKeys.Insert(test.predicateKey)
 			ecache.InvalidateCachedPredicateItem(test.nodeName, predicateKeys)
 		}
 		// calculate predicate with equivalence cache
-		fit, reasons, invalid := ecache.lookupResult(test.podName,
+		result, ok := ecache.lookupResult(test.podName,
 			test.nodeName,
 			test.predicateKey,
 			test.equivalenceHashForCalPredicate,
 		)
-		// returned invalid should match expectedInvalidPredicateKey or expectedInvalidEquivalenceHash
+		fit, reasons := result.Fit, result.FailReasons
+		// returned invalid should match expectedPredicateKeyMiss or expectedEquivalenceHashMiss
 		if test.equivalenceHashForUpdatePredicate != test.equivalenceHashForCalPredicate {
-			if invalid != test.expectedInvalidEquivalenceHash {
-				t.Errorf("Failed: %s, expected invalid: %v, but got: %v",
-					test.name, test.expectedInvalidEquivalenceHash, invalid)
+			if ok && test.expectedEquivalenceHashMiss {
+				t.Errorf("Failed: %s, expected (equivalence hash) cache miss", test.name)
+			}
+			if !ok && !test.expectedEquivalenceHashMiss {
+				t.Errorf("Failed: %s, expected (equivalence hash) cache hit", test.name)
 			}
 		} else {
-			if invalid != test.expectedInvalidPredicateKey {
-				t.Errorf("Failed: %s, expected invalid: %v, but got: %v",
-					test.name, test.expectedInvalidPredicateKey, invalid)
+			if ok && test.expectedPredicateKeyMiss {
+				t.Errorf("Failed: %s, expected (predicate key) cache miss", test.name)
+			}
+			if !ok && !test.expectedPredicateKeyMiss {
+				t.Errorf("Failed: %s, expected (predicate key) cache hit", test.name)
 			}
 		}
 		// returned predicate result should match expected predicate item
