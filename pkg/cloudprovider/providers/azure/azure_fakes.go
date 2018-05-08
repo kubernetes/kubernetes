@@ -850,7 +850,7 @@ func (f *fakeVMSet) GetIPByNodeName(name, vmSetName string) (string, string, err
 	return ip, "", nil
 }
 
-func (f *fakeVMSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error) {
+func (f *fakeVMSet) GetPrimaryInterface(nodeName string) (network.Interface, error) {
 	return network.Interface{}, fmt.Errorf("unimplemented")
 }
 

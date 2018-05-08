@@ -289,7 +289,7 @@ outer:
 }
 
 func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error) {
-	return az.vmSet.GetIPByNodeName(string(nodeName), "")
+	return az.vmSet.GetIPByNodeName(string(nodeName))
 }
 
 var polyTable = crc32.MakeTable(crc32.Koopman)
@@ -429,8 +429,8 @@ func (as *availabilitySet) GetPrimaryVMSetName() string {
 }
 
 // GetIPByNodeName gets machine private IP and public IP by node name.
-func (as *availabilitySet) GetIPByNodeName(name, vmSetName string) (string, string, error) {
-	nic, err := as.GetPrimaryInterface(name, vmSetName)
+func (as *availabilitySet) GetIPByNodeName(name string) (string, string, error) {
+	nic, err := as.GetPrimaryInterface(name)
 	if err != nil {
 		return "", "", err
 	}
@@ -554,8 +554,13 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 	return availabilitySetNames, nil
 }
 
-// GetPrimaryInterface gets machine primary network interface by node name and vmSet.
-func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error) {
+// GetPrimaryInterface gets machine primary network interface by node name.
+func (as *availabilitySet) GetPrimaryInterface(nodeName string) (network.Interface, error) {
+	return as.getPrimaryInterfaceWithVMSet(nodeName, "")
+}
+
+// getPrimaryInterfaceWithVMSet gets machine primary network interface by node name and vmSet.
+func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, error) {
 	var machine compute.VirtualMachine
 
 	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName))
@@ -573,8 +578,13 @@ func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (netw
 		return network.Interface{}, err
 	}
 
-	// Check availability set.
-	// Backends of Standard load balancer could belong to multiple VMAS, so we don't check vmSet for it.
+	// Check availability set name. Note that vmSetName is empty string when getting
+	// the Node's IP address. While vmSetName is not empty, it should be checked with
+	// Node's real availability set name:
+	// - For basic SKU load balancer, errNotInVMSet should be returned if the node's
+	//   availability set is mismatched with vmSetName.
+	// - For standard SKU load balancer, backend could belong to multiple VMAS, so we
+	//   don't check vmSet for it.
 	if vmSetName != "" && !as.useStandardLoadBalancer() {
 		expectedAvailabilitySetName := as.getAvailabilitySetID(vmSetName)
 		if machine.AvailabilitySet == nil || !strings.EqualFold(*machine.AvailabilitySet.ID, expectedAvailabilitySetName) {
@@ -598,7 +608,7 @@ func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (netw
 // participating in the specified LoadBalancer Backend Pool.
 func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
 	vmName := mapNodeNameToVMName(nodeName)
-	nic, err := as.GetPrimaryInterface(vmName, vmSetName)
+	nic, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
 	if err != nil {
 		if err == errNotInVMSet {
 			glog.V(3).Infof("ensureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
