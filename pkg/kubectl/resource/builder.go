@@ -144,7 +144,7 @@ type resourceTuple struct {
 type FakeClientFunc func(version schema.GroupVersion) (RESTClient, error)
 
 func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper meta.RESTMapper, categoryExpander restmapper.CategoryExpander) *Builder {
-	ret := NewBuilder(nil, restMapper, categoryExpander)
+	ret := newBuilder(nil, restMapper, categoryExpander)
 	ret.fakeClientFn = fakeClientFn
 	return ret
 }
@@ -153,13 +153,28 @@ func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper meta.RESTMapper, cat
 // internal or unstructured must be specified.
 // TODO: Add versioned client (although versioned is still lossy)
 // TODO remove internal and unstructured mapper and instead have them set the negotiated serializer for use in the client
-func NewBuilder(clientConfigFn ClientConfigFunc, restMapper meta.RESTMapper, categoryExpander restmapper.CategoryExpander) *Builder {
+func newBuilder(clientConfigFn ClientConfigFunc, restMapper meta.RESTMapper, categoryExpander restmapper.CategoryExpander) *Builder {
 	return &Builder{
 		clientConfigFn:   clientConfigFn,
 		restMapper:       restMapper,
 		categoryExpander: categoryExpander,
 		requireObject:    true,
 	}
+}
+
+func NewBuilder(restClientGetter RESTClientGetter) *Builder {
+	restMapper, mapperErr := restClientGetter.ToRESTMapper()
+	discoveryClient, discoveryErr := restClientGetter.ToDiscoveryClient()
+	var categoryExpander restmapper.CategoryExpander
+	if discoveryErr == nil {
+		categoryExpander = restmapper.NewDiscoveryCategoryExpander(discoveryClient)
+	}
+
+	return newBuilder(
+		restClientGetter.ToRESTConfig,
+		restMapper,
+		categoryExpander,
+	).AddError(mapperErr).AddError(discoveryErr)
 }
 
 func (b *Builder) Schema(schema validation.Schema) *Builder {

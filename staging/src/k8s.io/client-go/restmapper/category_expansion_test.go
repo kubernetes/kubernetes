@@ -135,10 +135,7 @@ func TestDiscoveryCategoryExpander(t *testing.T) {
 		dc.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.serverResponse, nil
 		}
-		expander, err := NewDiscoveryCategoryExpander(dc)
-		if err != nil {
-			t.Fatalf("unexpected error %v", err)
-		}
+		expander := NewDiscoveryCategoryExpander(dc)
 		expanded, _ := expander.Expand(test.category)
 		if !reflect.DeepEqual(expanded, test.expected) {
 			t.Errorf("expected %v, got %v", test.expected, expanded)

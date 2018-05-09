@@ -81,7 +81,7 @@ func (f *ring1Factory) CategoryExpander() (restmapper.CategoryExpander, error) {
 		return nil, err
 	}
 
-	return restmapper.NewDiscoveryCategoryExpander(discoveryClient)
+	return restmapper.NewDiscoveryCategoryExpander(discoveryClient), nil
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
