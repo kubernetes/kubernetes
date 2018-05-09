@@ -64,6 +64,7 @@ import (
 type RESTClientGetter interface {
 	ToRESTConfig() (*restclient.Config, error)
 	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+	ToRESTMapper() (meta.RESTMapper, error)
 	ToRawKubeConfigLoader() clientcmd.ClientConfig
 }
 
@@ -141,6 +142,11 @@ func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
 	setKubernetesDefaults(clientConfig)
 	return clientConfig, nil
 }
+
+func (f *ring0Factory) RESTMapper() (meta.RESTMapper, error) {
+	return f.clientGetter.ToRESTMapper()
+}
+
 func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
 	return f.clientGetter.ToRESTConfig()
 }

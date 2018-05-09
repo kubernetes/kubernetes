@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -74,20 +73,6 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 		clientAccessFactory: clientAccessFactory,
 	}
 	return f
-}
-
-// RESTMapper returns a mapper.
-func (f *ring1Factory) RESTMapper() (meta.RESTMapper, error) {
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err != nil {
-		return nil, err
-	}
-
-	// allow conversion between typed and unstructured objects
-	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	// TODO: should this also indicate it recognizes typed objects?
-	expander := restmapper.NewShortcutExpander(mapper, discoveryClient)
-	return expander, nil
 }
 
 func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {
