@@ -229,7 +229,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		}
 	}
 
-	// Case 4: Schedule Pod with NetworkUnavailable toleration.
+	// Case 4: Schedule Pod with NetworkUnavailable and NotReady toleration.
 	networkDaemonPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "network-daemon-pod",
@@ -245,6 +245,11 @@ func TestTaintNodeByCondition(t *testing.T) {
 			Tolerations: []v1.Toleration{
 				{
 					Key:      algorithm.TaintNodeNetworkUnavailable,
+					Operator: v1.TolerationOpExists,
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      algorithm.TaintNodeNotReady,
 					Operator: v1.TolerationOpExists,
 					Effect:   v1.TaintEffectNoSchedule,
 				},

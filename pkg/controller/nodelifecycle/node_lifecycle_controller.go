@@ -80,15 +80,38 @@ var (
 		Effect: v1.TaintEffectNoExecute,
 	}
 
-	nodeConditionToTaintKeyMap = map[v1.NodeConditionType]string{
-		v1.NodeMemoryPressure:     algorithm.TaintNodeMemoryPressure,
-		v1.NodeOutOfDisk:          algorithm.TaintNodeOutOfDisk,
-		v1.NodeDiskPressure:       algorithm.TaintNodeDiskPressure,
-		v1.NodeNetworkUnavailable: algorithm.TaintNodeNetworkUnavailable,
-		v1.NodePIDPressure:        algorithm.TaintNodePIDPressure,
+	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]struct {
+		TaintKey string
+		Status   v1.ConditionStatus
+	}{
+		v1.NodeReady: {
+			TaintKey: algorithm.TaintNodeNotReady,
+			Status:   v1.ConditionFalse,
+		},
+		v1.NodeMemoryPressure: {
+			TaintKey: algorithm.TaintNodeMemoryPressure,
+			Status:   v1.ConditionTrue,
+		},
+		v1.NodeOutOfDisk: {
+			TaintKey: algorithm.TaintNodeOutOfDisk,
+			Status:   v1.ConditionTrue,
+		},
+		v1.NodeDiskPressure: {
+			TaintKey: algorithm.TaintNodeDiskPressure,
+			Status:   v1.ConditionTrue,
+		},
+		v1.NodeNetworkUnavailable: {
+			TaintKey: algorithm.TaintNodeNetworkUnavailable,
+			Status:   v1.ConditionTrue,
+		},
+		v1.NodePIDPressure: {
+			TaintKey: algorithm.TaintNodePIDPressure,
+			Status:   v1.ConditionTrue,
+		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
+		algorithm.TaintNodeNotReady:           v1.NodeReady,
 		algorithm.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
 		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
@@ -432,10 +455,10 @@ func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 	// Map node's condition to Taints.
 	taints := []v1.Taint{}
 	for _, condition := range node.Status.Conditions {
-		if _, found := nodeConditionToTaintKeyMap[condition.Type]; found {
-			if condition.Status == v1.ConditionTrue {
+		if taintKeyStatus, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
+			if condition.Status == taintKeyStatus.Status {
 				taints = append(taints, v1.Taint{
-					Key:    nodeConditionToTaintKeyMap[condition.Type],
+					Key:    taintKeyStatus.TaintKey,
 					Effect: v1.TaintEffectNoSchedule,
 				})
 			}
