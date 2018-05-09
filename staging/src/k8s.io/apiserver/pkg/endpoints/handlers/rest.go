@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -53,8 +52,6 @@ type RequestScope struct {
 	Defaulter       runtime.ObjectDefaulter
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
-
-	OpenAPIResourceSource openapi.ResourceSource
 
 	TableConvertor rest.TableConvertor
 
