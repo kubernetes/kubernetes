@@ -14,19 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package categories
+package restmapper
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/discovery"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/rest/fake"
 )
 
 func TestCategoryExpansion(t *testing.T) {
@@ -46,23 +41,28 @@ func TestCategoryExpansion(t *testing.T) {
 			name: "all-replacement",
 			arg:  "all",
 			expected: []schema.GroupResource{
-				{Resource: "pods"},
-				{Resource: "replicationcontrollers"},
-				{Resource: "services"},
-				{Resource: "statefulsets", Group: "apps"},
-				{Resource: "horizontalpodautoscalers", Group: "autoscaling"},
-				{Resource: "jobs", Group: "batch"},
-				{Resource: "cronjobs", Group: "batch"},
-				{Resource: "daemonsets", Group: "extensions"},
-				{Resource: "deployments", Group: "extensions"},
-				{Resource: "replicasets", Group: "extensions"},
+				{Resource: "one"},
+				{Resource: "two"},
+				{Resource: "three", Group: "alpha"},
+				{Resource: "four", Group: "bravo"},
 			},
 			expectedOk: true,
 		},
 	}
 
 	for _, test := range tests {
-		actual, actualOk := LegacyCategoryExpander.Expand(test.arg)
+		simpleCategoryExpander := SimpleCategoryExpander{
+			Expansions: map[string][]schema.GroupResource{
+				"all": {
+					{Group: "", Resource: "one"},
+					{Group: "", Resource: "two"},
+					{Group: "alpha", Resource: "three"},
+					{Group: "bravo", Resource: "four"},
+				},
+			},
+		}
+
+		actual, actualOk := simpleCategoryExpander.Expand(test.arg)
 		if e, a := test.expected, actual; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s:  expected %s, got %s", test.name, e, a)
 		}
@@ -145,42 +145,4 @@ func TestDiscoveryCategoryExpander(t *testing.T) {
 		}
 	}
 
-}
-
-type fakeDiscoveryClient struct {
-	serverResourcesHandler func() ([]*metav1.APIResourceList, error)
-}
-
-var _ discovery.DiscoveryInterface = &fakeDiscoveryClient{}
-
-func (c *fakeDiscoveryClient) RESTClient() restclient.Interface {
-	return &fake.RESTClient{}
-}
-
-func (c *fakeDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
-	return nil, nil
-}
-
-func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
-	return &metav1.APIResourceList{}, nil
-}
-
-func (c *fakeDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	return c.serverResourcesHandler()
-}
-
-func (c *fakeDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {
-	return &version.Info{}, nil
-}
-
-func (c *fakeDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	return &openapi_v2.Document{}, nil
 }

@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
@@ -47,7 +47,7 @@ const defaultHttpGetAttempts int = 3
 // from the command line and converting them to a list of resources to iterate
 // over using the Visitor interface.
 type Builder struct {
-	categoryExpander categories.CategoryExpander
+	categoryExpander restmapper.CategoryExpander
 
 	// mapper is set explicitly by resource builders
 	mapper       *mapper
@@ -143,7 +143,7 @@ type resourceTuple struct {
 
 type FakeClientFunc func(version schema.GroupVersion) (RESTClient, error)
 
-func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper meta.RESTMapper, categoryExpander categories.CategoryExpander) *Builder {
+func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper meta.RESTMapper, categoryExpander restmapper.CategoryExpander) *Builder {
 	ret := NewBuilder(nil, restMapper, categoryExpander)
 	ret.fakeClientFn = fakeClientFn
 	return ret
@@ -153,7 +153,7 @@ func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper meta.RESTMapper, cat
 // internal or unstructured must be specified.
 // TODO: Add versioned client (although versioned is still lossy)
 // TODO remove internal and unstructured mapper and instead have them set the negotiated serializer for use in the client
-func NewBuilder(clientConfigFn ClientConfigFunc, restMapper meta.RESTMapper, categoryExpander categories.CategoryExpander) *Builder {
+func NewBuilder(clientConfigFn ClientConfigFunc, restMapper meta.RESTMapper, categoryExpander restmapper.CategoryExpander) *Builder {
 	return &Builder{
 		clientConfigFn:   clientConfigFn,
 		restMapper:       restMapper,
