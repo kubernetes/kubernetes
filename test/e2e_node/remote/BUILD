@@ -19,6 +19,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e_node/remote",
     deps = [
         "//test/e2e_node/builder:go_default_library",
+        "//test/utils:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],

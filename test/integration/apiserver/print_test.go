@@ -19,9 +19,12 @@ package apiserver
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -31,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/gengo/examples/set-gen/sets"
@@ -146,9 +150,34 @@ func TestServerSidePrint(t *testing.T) {
 	tableParam := fmt.Sprintf("application/json;as=Table;g=%s;v=%s, application/json", metav1beta1.GroupName, metav1beta1.SchemeGroupVersion.Version)
 	printer := newFakePrinter(printersinternal.AddHandlers)
 
-	factory := util.NewFactory(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
-	mapper, _ := factory.Object()
+	configFlags := util.NewTestConfigFlags().
+		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
 
+	restConfig, err := configFlags.ToRESTConfig()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	cacheDir, err := ioutil.TempDir(os.TempDir(), "test-integration-apiserver-print")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer func() {
+		os.Remove(cacheDir)
+	}()
+
+	configFlags.WithDiscoveryClient(util.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)))
+
+	factory := util.NewFactory(configFlags)
+	mapper, err := factory.RESTMapper()
+	if err != nil {
+		t.Errorf("unexpected error getting mapper: %v", err)
+		return
+	}
 	for gvk, apiType := range legacyscheme.Scheme.AllKnownTypes() {
 		// we do not care about internal objects or lists // TODO make sure this is always true
 		if gvk.Version == runtime.APIVersionInternal || strings.HasSuffix(apiType.Name(), "List") {
@@ -174,7 +203,7 @@ func TestServerSidePrint(t *testing.T) {
 		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
 			req = req.Namespace(ns.Name)
 		}
-		body, err := req.Resource(mapping.Resource).SetHeader("Accept", tableParam).Do().Raw()
+		body, err := req.Resource(mapping.Resource.Resource).SetHeader("Accept", tableParam).Do().Raw()
 		if err != nil {
 			t.Errorf("unexpected error getting %s: %v", gvk, err)
 			continue
@@ -192,7 +221,7 @@ func TestServerSidePrint(t *testing.T) {
 			continue
 		}
 		intGV := gvk.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-		intObj, err := mapping.ConvertToVersion(obj, intGV)
+		intObj, err := legacyscheme.Scheme.ConvertToVersion(obj, intGV)
 		if err != nil {
 			t.Errorf("unexpected error converting %s to internal: %v", gvk, err)
 			continue

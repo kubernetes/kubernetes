@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -63,7 +64,7 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 			}
 
 			noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-			noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, f.ClientPool)
+			err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
 				framework.Failf("failed to create CustomResourceDefinition: %v", err)
 			}
@@ -76,7 +77,7 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 			}()
 
 			ns := ""
-			noxuResourceClient := newNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+			noxuResourceClient := newNamespacedCustomResourceClient(ns, f.DynamicClient, noxuDefinition)
 
 			watchA, err := watchCRWithName(noxuResourceClient, watchCRNameA)
 			Expect(err).NotTo(HaveOccurred())
@@ -114,7 +115,7 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 	})
 })
 
-func watchCRWithName(crdResourceClient dynamic.ResourceInterface, name string) (watch.Interface, error) {
+func watchCRWithName(crdResourceClient dynamic.DynamicResourceInterface, name string) (watch.Interface, error) {
 	return crdResourceClient.Watch(
 		metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + name,
@@ -123,7 +124,7 @@ func watchCRWithName(crdResourceClient dynamic.ResourceInterface, name string) (
 	)
 }
 
-func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
+func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, client dynamic.DynamicResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
 	createdInstance, err := client.Create(instanceToCreate)
 	if err != nil {
 		return nil, err
@@ -149,13 +150,17 @@ func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, clie
 	return createdInstance, nil
 }
 
-func deleteCustomResource(client dynamic.ResourceInterface, name string) error {
+func deleteCustomResource(client dynamic.DynamicResourceInterface, name string) error {
 	return client.Delete(name, &metav1.DeleteOptions{})
 }
 
-func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, definition *apiextensionsv1beta1.CustomResourceDefinition) dynamic.ResourceInterface {
-	return client.Resource(&metav1.APIResource{
-		Name:       definition.Spec.Names.Plural,
-		Namespaced: definition.Spec.Scope == apiextensionsv1beta1.NamespaceScoped,
-	}, ns)
+func newNamespacedCustomResourceClient(ns string, client dynamic.DynamicInterface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.DynamicResourceInterface {
+	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
+
+	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
+		return client.Resource(gvr).Namespace(ns)
+	} else {
+		return client.Resource(gvr)
+	}
+
 }

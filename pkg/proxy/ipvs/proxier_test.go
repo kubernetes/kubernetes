@@ -145,8 +145,9 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		loopbackSet:         NewIPSet(ipset, KubeLoopBackIPSet, utilipset.HashIPPortIP, false),
 		clusterIPSet:        NewIPSet(ipset, KubeClusterIPSet, utilipset.HashIPPort, false),
 		externalIPSet:       NewIPSet(ipset, KubeExternalIPSet, utilipset.HashIPPort, false),
-		lbIngressSet:        NewIPSet(ipset, KubeLoadBalancerSet, utilipset.HashIPPort, false),
-		lbIngressLocalSet:   NewIPSet(ipset, KubeLoadBalancerIngressLocalSet, utilipset.HashIPPort, false),
+		lbSet:               NewIPSet(ipset, KubeLoadBalancerSet, utilipset.HashIPPort, false),
+		lbFWSet:             NewIPSet(ipset, KubeLoadbalancerFWSet, utilipset.HashIPPort, false),
+		lbLocalSet:          NewIPSet(ipset, KubeLoadBalancerLocalSet, utilipset.HashIPPort, false),
 		lbWhiteListIPSet:    NewIPSet(ipset, KubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, false),
 		lbWhiteListCIDRSet:  NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, false),
 		nodePortSetTCP:      NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
@@ -957,6 +958,12 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 			Protocol: strings.ToLower(string(api.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		}},
+		KubeLoadbalancerFWSet: {{
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			SetType:  utilipset.HashIPPort,
+		}},
 		KubeLoadBalancerSourceCIDRSet: {{
 			IP:       svcLBIP,
 			Port:     svcPort,
@@ -970,13 +977,83 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeFireWallChain), MatchSet: KubeLoadBalancerSet,
+			JumpChain: string(KubeLoadBalancerChain), MatchSet: KubeLoadBalancerSet,
+		}},
+		string(KubeLoadBalancerChain): {{
+			JumpChain: string(KubeFireWallChain), MatchSet: KubeLoadbalancerFWSet,
+		}, {
+			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
 		}},
 		string(KubeFireWallChain): {{
-			JumpChain: "ACCEPT", MatchSet: KubeLoadBalancerSourceCIDRSet,
+			JumpChain: "RETURN", MatchSet: KubeLoadBalancerSourceCIDRSet,
 		}, {
 			JumpChain: string(KubeMarkDropChain), MatchSet: "",
 		}},
+	}
+	checkIptables(t, ipt, epIpt)
+}
+
+func TestAcceptIPVSTraffic(t *testing.T) {
+	ipt, fp := buildFakeProxier(nil)
+
+	ingressIP := "1.2.3.4"
+	externalIP := []string{"5.6.7.8"}
+	svcInfos := []struct {
+		svcType api.ServiceType
+		svcIP   string
+		svcName string
+		epIP    string
+	}{
+		{api.ServiceTypeClusterIP, "10.20.30.40", "svc1", "10.180.0.1"},
+		{api.ServiceTypeLoadBalancer, "10.20.30.41", "svc2", "10.180.0.2"},
+		{api.ServiceTypeNodePort, "10.20.30.42", "svc3", "10.180.0.3"},
+	}
+
+	for _, svcInfo := range svcInfos {
+		makeServiceMap(fp,
+			makeTestService("ns1", svcInfo.svcName, func(svc *api.Service) {
+				svc.Spec.Type = svcInfo.svcType
+				svc.Spec.ClusterIP = svcInfo.svcIP
+				svc.Spec.Ports = []api.ServicePort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: api.ProtocolTCP,
+					NodePort: 80,
+				}}
+				if svcInfo.svcType == api.ServiceTypeLoadBalancer {
+					svc.Status.LoadBalancer.Ingress = []api.LoadBalancerIngress{{
+						IP: ingressIP,
+					}}
+				}
+				if svcInfo.svcType == api.ServiceTypeClusterIP {
+					svc.Spec.ExternalIPs = externalIP
+				}
+			}),
+		)
+
+		makeEndpointsMap(fp,
+			makeTestEndpoints("ns1", "p80", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{
+						IP: svcInfo.epIP,
+					}},
+					Ports: []api.EndpointPort{{
+						Name: "p80",
+						Port: 80,
+					}},
+				}}
+			}),
+		)
+	}
+	fp.syncProxyRules()
+
+	// Check iptables chain and rules
+	epIpt := netlinktest.ExpectedIptablesChain{
+		string(kubeServicesChain): {
+			{JumpChain: "ACCEPT", MatchSet: KubeClusterIPSet},
+			{JumpChain: "ACCEPT", MatchSet: KubeLoadBalancerSet},
+			{JumpChain: "ACCEPT", MatchSet: KubeExternalIPSet},
+		},
 	}
 	checkIptables(t, ipt, epIpt)
 }
@@ -1044,7 +1121,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			Protocol: strings.ToLower(string(api.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		}},
-		KubeLoadBalancerIngressLocalSet: {{
+		KubeLoadBalancerLocalSet: {{
 			IP:       svcLBIP,
 			Port:     svcPort,
 			Protocol: strings.ToLower(string(api.ProtocolTCP)),
@@ -1056,10 +1133,10 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeFireWallChain), MatchSet: KubeLoadBalancerSet,
+			JumpChain: string(KubeLoadBalancerChain), MatchSet: KubeLoadBalancerSet,
 		}},
-		string(KubeFireWallChain): {{
-			JumpChain: "ACCEPT", MatchSet: KubeLoadBalancerIngressLocalSet,
+		string(KubeLoadBalancerChain): {{
+			JumpChain: "RETURN", MatchSet: KubeLoadBalancerLocalSet,
 		}, {
 			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
 		}},
@@ -2515,7 +2592,7 @@ func checkIPSet(t *testing.T, fp *Proxier, ipSet netlinktest.ExpectedIPSet) {
 	for set, entries := range ipSet {
 		ents, err := fp.ipset.ListEntries(set)
 		if err != nil || len(ents) != len(entries) {
-			t.Errorf("Check ipset entries failed for ipset: %q", set)
+			t.Errorf("Check ipset entries failed for ipset: %q, expect %d, got %d", set, len(entries), len(ents))
 			continue
 		}
 		if len(entries) == 1 {

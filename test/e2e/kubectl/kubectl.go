@@ -199,7 +199,7 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 		})
 
 		It("should create a CronJob", func() {
-			framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResourceAlpha, f.Namespace.Name)
+			framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResourceAlpha, f.Namespace.Name)
 
 			schedule := "*/5 * * * ?"
 			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v2alpha1",
@@ -1414,7 +1414,7 @@ metadata:
 		})
 
 		It("should create a CronJob", func() {
-			framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResourceBeta, f.Namespace.Name)
+			framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResourceBeta, f.Namespace.Name)
 
 			schedule := "*/5 * * * ?"
 			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v1beta1",

@@ -139,6 +139,7 @@ pkg/kubectl/cmd
 pkg/kubectl/cmd/auth
 pkg/kubectl/cmd/config
 pkg/kubectl/cmd/create
+pkg/kubectl/cmd/get
 pkg/kubectl/cmd/rollout
 pkg/kubectl/cmd/set
 pkg/kubectl/cmd/templates
@@ -179,7 +180,6 @@ pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
 pkg/kubelet/dockershim/network/cni
 pkg/kubelet/dockershim/network/cni/testing
-pkg/kubelet/dockershim/network/hairpin
 pkg/kubelet/dockershim/network/hostport
 pkg/kubelet/dockershim/network/hostport/testing
 pkg/kubelet/dockershim/network/kubenet

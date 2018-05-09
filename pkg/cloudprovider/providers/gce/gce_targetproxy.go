@@ -85,14 +85,10 @@ func (gce *GCECloud) SetUrlMapForTargetHttpsProxy(proxy *compute.TargetHttpsProx
 }
 
 // SetSslCertificateForTargetHttpsProxy sets the given SslCertificate for the given TargetHttpsProxy.
-func (gce *GCECloud) SetSslCertificateForTargetHttpsProxy(proxy *compute.TargetHttpsProxy, sslCerts []*compute.SslCertificate) error {
+func (gce *GCECloud) SetSslCertificateForTargetHttpsProxy(proxy *compute.TargetHttpsProxy, sslCertURLs []string) error {
 	mc := newTargetProxyMetricContext("set_ssl_cert")
-	var allCerts []string
-	for _, cert := range sslCerts {
-		allCerts = append(allCerts, cert.SelfLink)
-	}
 	req := &compute.TargetHttpsProxiesSetSslCertificatesRequest{
-		SslCertificates: allCerts,
+		SslCertificates: sslCertURLs,
 	}
 	return mc.Observe(gce.c.TargetHttpsProxies().SetSslCertificates(context.Background(), meta.GlobalKey(proxy.Name), req))
 }

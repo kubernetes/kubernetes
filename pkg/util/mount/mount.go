@@ -108,6 +108,12 @@ type Interface interface {
 	// subpath starts. On the other hand, Interface.CleanSubPaths must be called
 	// when the pod finishes.
 	PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error)
+	// GetMountRefs finds all mount references to the path, returns a
+	// list of paths. Path could be a mountpoint path, device or a normal
+	// directory (for bind mount).
+	GetMountRefs(pathname string) ([]string, error)
+	// GetFSGroup returns FSGroup of the path.
+	GetFSGroup(pathname string) (int64, error)
 }
 
 type Subpath struct {
@@ -123,6 +129,8 @@ type Subpath struct {
 	PodDir string
 	// Name of the container
 	ContainerName string
+	// True if the mount needs to be readonly
+	ReadOnly bool
 }
 
 // Exec executes command where mount utilities are. This can be either the host,
@@ -166,22 +174,19 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 	return mounter.formatAndMount(source, target, fstype, options)
 }
 
-// GetMountRefsByDev finds all references to the device provided
+// getMountRefsByDev finds all references to the device provided
 // by mountPath; returns a list of paths.
-func GetMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
+// Note that mountPath should be path after the evaluation of any symblolic links.
+func getMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
 	mps, err := mounter.List()
 	if err != nil {
 		return nil, err
-	}
-	slTarget, err := filepath.EvalSymlinks(mountPath)
-	if err != nil {
-		slTarget = mountPath
 	}
 
 	// Finding the device mounted to mountPath
 	diskDev := ""
 	for i := range mps {
-		if slTarget == mps[i].Path {
+		if mountPath == mps[i].Path {
 			diskDev = mps[i].Device
 			break
 		}
@@ -190,8 +195,8 @@ func GetMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
 	// Find all references to the device.
 	var refs []string
 	for i := range mps {
-		if mps[i].Device == diskDev || mps[i].Device == slTarget {
-			if mps[i].Path != slTarget {
+		if mps[i].Device == diskDev || mps[i].Device == mountPath {
+			if mps[i].Path != mountPath {
 				refs = append(refs, mps[i].Path)
 			}
 		}
@@ -274,7 +279,13 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
 func isBind(options []string) (bool, []string) {
-	bindRemountOpts := []string{"remount"}
+	// Because we have an FD opened on the subpath bind mount, the "bind" option
+	// needs to be included, otherwise the mount target will error as busy if you
+	// remount as readonly.
+	//
+	// As a consequence, all read only bind mounts will no longer change the underlying
+	// volume mount to be read only.
+	bindRemountOpts := []string{"bind", "remount"}
 	bind := false
 
 	if len(options) != 0 {

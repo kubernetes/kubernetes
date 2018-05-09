@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -79,7 +78,7 @@ func podWithID(id, desiredHost string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:     id,
 			UID:      types.UID(id),
-			SelfLink: util.Test.SelfLink(string(v1.ResourcePods), id),
+			SelfLink: schedulertesting.Test.SelfLink(string(v1.ResourcePods), id),
 		},
 		Spec: v1.PodSpec{
 			NodeName: desiredHost,
@@ -93,7 +92,7 @@ func deletingPod(id string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              id,
 			UID:               types.UID(id),
-			SelfLink:          util.Test.SelfLink(string(v1.ResourcePods), id),
+			SelfLink:          schedulertesting.Test.SelfLink(string(v1.ResourcePods), id),
 			DeletionTimestamp: &deletionTimestamp,
 		},
 		Spec: v1.PodSpec{

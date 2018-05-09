@@ -41,7 +41,7 @@ import (
 )
 
 func TestCRDShadowGroup(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
@@ -109,7 +109,7 @@ func TestCRDShadowGroup(t *testing.T) {
 func TestCRD(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
 
-	result := kubeapiservertesting.StartTestServerOrDie(t, []string{"--admission-control", "Initializers"}, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--admission-control", "Initializers"}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)

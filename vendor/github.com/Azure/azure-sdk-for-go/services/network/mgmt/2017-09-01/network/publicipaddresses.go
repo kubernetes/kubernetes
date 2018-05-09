@@ -53,7 +53,7 @@ func (client PublicIPAddressesClient) CreateOrUpdate(ctx context.Context, resour
 						Chain: []validation.Constraint{{Target: "parameters.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false, Chain: nil}}},
 					}},
 				}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.PublicIPAddressesClient", "CreateOrUpdate")
+		return result, validation.NewError("network.PublicIPAddressesClient", "CreateOrUpdate", err.Error())
 	}
 
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, publicIPAddressName, parameters)
@@ -261,10 +261,10 @@ func (client PublicIPAddressesClient) GetResponder(resp *http.Response) (result 
 
 // GetVirtualMachineScaleSetPublicIPAddress get the specified public IP address in a virtual machine scale set.
 //
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual machine
-// scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the name of the network
-// interface. IPConfigurationName is the name of the IP configuration. publicIPAddressName is the name of the public IP
-// Address. expand is expands referenced resources.
+// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
+// machine scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the name of the
+// network interface. IPConfigurationName is the name of the IP configuration. publicIPAddressName is the name of
+// the public IP Address. expand is expands referenced resources.
 func (client PublicIPAddressesClient) GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result PublicIPAddress, err error) {
 	req, err := client.GetVirtualMachineScaleSetPublicIPAddressPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName, expand)
 	if err != nil {
@@ -521,8 +521,8 @@ func (client PublicIPAddressesClient) ListAllComplete(ctx context.Context) (resu
 // ListVirtualMachineScaleSetPublicIPAddresses gets information about all public IP addresses on a virtual machine
 // scale set level.
 //
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual machine
-// scale set.
+// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
+// machine scale set.
 func (client PublicIPAddressesClient) ListVirtualMachineScaleSetPublicIPAddresses(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string) (result PublicIPAddressListResultPage, err error) {
 	result.fn = client.listVirtualMachineScaleSetPublicIPAddressesNextResults
 	req, err := client.ListVirtualMachineScaleSetPublicIPAddressesPreparer(ctx, resourceGroupName, virtualMachineScaleSetName)
@@ -617,9 +617,9 @@ func (client PublicIPAddressesClient) ListVirtualMachineScaleSetPublicIPAddresse
 // ListVirtualMachineScaleSetVMPublicIPAddresses gets information about all public IP addresses in a virtual machine IP
 // configuration in a virtual machine scale set.
 //
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual machine
-// scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the network interface name.
-// IPConfigurationName is the IP configuration name.
+// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
+// machine scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the network
+// interface name. IPConfigurationName is the IP configuration name.
 func (client PublicIPAddressesClient) ListVirtualMachineScaleSetVMPublicIPAddresses(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string) (result PublicIPAddressListResultPage, err error) {
 	result.fn = client.listVirtualMachineScaleSetVMPublicIPAddressesNextResults
 	req, err := client.ListVirtualMachineScaleSetVMPublicIPAddressesPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName)

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 )
@@ -31,7 +31,9 @@ type accountWithLocation struct {
 
 // getStorageAccounts gets name, type, location of all storage accounts in a resource group which matches matchingAccountType, matchingLocation
 func (az *Cloud) getStorageAccounts(matchingAccountType, matchingLocation string) ([]accountWithLocation, error) {
-	result, err := az.StorageAccountClient.ListByResourceGroup(az.ResourceGroup)
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	result, err := az.StorageAccountClient.ListByResourceGroup(ctx, az.ResourceGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +62,10 @@ func (az *Cloud) getStorageAccounts(matchingAccountType, matchingLocation string
 
 // getStorageAccesskey gets the storage account access key
 func (az *Cloud) getStorageAccesskey(account string) (string, error) {
-	result, err := az.StorageAccountClient.ListKeys(az.ResourceGroup, account)
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+
+	result, err := az.StorageAccountClient.ListKeys(ctx, az.ResourceGroup, account)
 	if err != nil {
 		return "", err
 	}
@@ -108,12 +113,12 @@ func (az *Cloud) ensureStorageAccount(accountName, accountType, location, genAcc
 				accountName, az.ResourceGroup, location, accountType)
 			cp := storage.AccountCreateParameters{
 				Sku:      &storage.Sku{Name: storage.SkuName(accountType)},
-				Tags:     &map[string]*string{"created-by": to.StringPtr("azure")},
+				Tags:     map[string]*string{"created-by": to.StringPtr("azure")},
 				Location: &location}
-			cancel := make(chan struct{})
 
-			_, errchan := az.StorageAccountClient.Create(az.ResourceGroup, accountName, cp, cancel)
-			err := <-errchan
+			ctx, cancel := getContextWithCancel()
+			defer cancel()
+			_, err := az.StorageAccountClient.Create(ctx, az.ResourceGroup, accountName, cp)
 			if err != nil {
 				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %s", accountName, err))
 			}

@@ -19,8 +19,6 @@ limitations under the License.
 package scheme
 
 import (
-	os "os"
-
 	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +31,7 @@ var Scheme = runtime.NewScheme()
 var Codecs = serializer.NewCodecFactory(Scheme)
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 
-var Registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
+var Registry = registered.NewAPIRegistrationManager()
 
 func init() {
 	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})

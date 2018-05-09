@@ -35,7 +35,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -55,11 +54,11 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	certutil "k8s.io/client-go/util/cert"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapi "k8s.io/kube-openapi/pkg/common"
@@ -177,19 +176,6 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, apiExtensionsServer.GenericAPIServer, sharedInformers, versionedInformers, admissionPostStartHook)
 	if err != nil {
 		return nil, err
-	}
-
-	// if we're starting up a hacked up version of this API server for a weird test case,
-	// just start the API server as is because clients don't get built correctly when you do this
-	if len(os.Getenv("KUBE_API_VERSIONS")) > 0 {
-		if insecureServingOptions != nil {
-			insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
-			if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, kubeAPIServerConfig.GenericConfig.RequestTimeout, stopCh); err != nil {
-				return nil, err
-			}
-		}
-
-		return kubeAPIServer.GenericAPIServer, nil
 	}
 
 	// otherwise go down the normal path of standing the aggregator up in front of the API server
@@ -474,18 +460,8 @@ func BuildGenericConfig(
 
 	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
-		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
-		if len(kubeAPIVersions) == 0 {
-			lastErr = fmt.Errorf("failed to create clientset: %v", err)
-			return
-		}
-
-		// KUBE_API_VERSIONS is used in test-update-storage-objects.sh, disabling a number of API
-		// groups. This leads to a nil client above and undefined behaviour further down.
-		//
-		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
-		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q: %v. KUBE_API_VERSIONS is only for testing. Things will break.",
-			kubeAPIVersions, err)
+		lastErr = fmt.Errorf("failed to create clientset: %v", err)
+		return
 	}
 
 	kubeClientConfig := genericConfig.LoopbackClientConfig
@@ -596,30 +572,20 @@ func BuildAdmissionPluginInitializers(
 		}
 	}
 
-	// TODO: drop this REST mapper once client is guaranteed to be non-nil
-	// See KUBE_API_VERSIONS comment above
-	restMapper := legacyscheme.Registry.RESTMapper()
-	admissionPostStartHook := func(_ genericapiserver.PostStartHookContext) error {
-		return nil
-	}
-
 	// We have a functional client so we can use that to build our discovery backed REST mapper
-	if client != nil && client.Discovery() != nil {
-		// Use a discovery client capable of being refreshed.
-		discoveryClient := cacheddiscovery.NewMemCacheClient(client.Discovery())
-		discoveryRESTMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
+	// Use a discovery client capable of being refreshed.
+	discoveryClient := cacheddiscovery.NewMemCacheClient(client.Discovery())
+	discoveryRESTMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 
-		restMapper = discoveryRESTMapper
-		admissionPostStartHook = func(context genericapiserver.PostStartHookContext) error {
-			discoveryRESTMapper.Reset()
-			go utilwait.Until(discoveryRESTMapper.Reset, 10*time.Second, context.StopCh)
-			return nil
-		}
+	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {
+		discoveryRESTMapper.Reset()
+		go utilwait.Until(discoveryRESTMapper.Reset, 10*time.Second, context.StopCh)
+		return nil
 	}
 
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForAdmission()
 
-	kubePluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaConfiguration)
+	kubePluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, discoveryRESTMapper, quotaConfiguration)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthWrapper, serviceResolver)
 
 	return []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}, admissionPostStartHook, nil
@@ -631,12 +597,9 @@ func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset
 	if s.Authentication.ServiceAccounts.Lookup {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(extclient)
 	}
-	kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
-	if len(kubeAPIVersions) == 0 {
-		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-			sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
-		)
-	}
+	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+		sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
+	)
 
 	return authenticatorConfig.New()
 }

@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -4025,7 +4024,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: "v1",
 					FieldPath:  "metadata.annotations['key']",
 				},
 			},
@@ -4034,7 +4033,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: "v1",
 					FieldPath:  "metadata.labels['key']",
 				},
 			},
@@ -4043,7 +4042,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: "v1",
 					FieldPath:  "metadata.name",
 				},
 			},
@@ -4052,7 +4051,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: "v1",
 					FieldPath:  "metadata.namespace",
 				},
 			},
@@ -4061,7 +4060,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: "v1",
 					FieldPath:  "metadata.uid",
 				},
 			},
@@ -4070,7 +4069,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: "v1",
 					FieldPath:  "spec.nodeName",
 				},
 			},
@@ -4079,7 +4078,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: "v1",
 					FieldPath:  "spec.serviceAccountName",
 				},
 			},
@@ -4088,7 +4087,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: "v1",
 					FieldPath:  "status.hostIP",
 				},
 			},
@@ -4097,7 +4096,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
 				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+					APIVersion: "v1",
 					FieldPath:  "status.podIP",
 				},
 			},
@@ -4166,7 +4165,7 @@ func TestValidateEnv(t *testing.T) {
 				Value: "foo",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: "v1",
 						FieldPath:  "metadata.name",
 					},
 				},
@@ -4187,7 +4186,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: "v1",
 						FieldPath:  "metadata.name",
 					},
 					SecretKeyRef: &core.SecretKeySelector{
@@ -4206,7 +4205,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "some_var_name",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: "v1",
 						FieldPath:  "metadata.name",
 					},
 					ConfigMapKeyRef: &core.ConfigMapKeySelector{
@@ -4225,7 +4224,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: "v1",
 						FieldPath:  "metadata.name",
 					},
 					SecretKeyRef: &core.SecretKeySelector{
@@ -4278,7 +4277,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: "v1",
 					},
 				},
 			}},
@@ -4303,7 +4302,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
 						FieldPath:  "metadata.whoops",
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: "v1",
 					},
 				},
 			}},
@@ -4381,7 +4380,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &core.EnvVarSource{
 					FieldRef: &core.ObjectFieldSelector{
 						FieldPath:  "status.phase",
-						APIVersion: legacyscheme.Registry.GroupOrDie(core.GroupName).GroupVersion.String(),
+						APIVersion: "v1",
 					},
 				},
 			}},
@@ -6343,12 +6342,22 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
+		{ // runtime default seccomp profile
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					core.SeccompPodAnnotationKey: core.SeccompProfileRuntimeDefault,
+				},
+			},
+			Spec: validPodSpec(nil),
+		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: "docker/default",
+					core.SeccompPodAnnotationKey: core.DeprecatedSeccompProfileDockerDefault,
 				},
 			},
 			Spec: validPodSpec(nil),
@@ -7503,7 +7512,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			"",
+			"metadata.deletionTimestamp",
 			"deletion timestamp removed",
 		},
 		{

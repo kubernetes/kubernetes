@@ -86,7 +86,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 			Name:            kubeadmconstants.KubeAPIServer,
 			Image:           images.GetCoreImage(kubeadmconstants.KubeAPIServer, cfg.GetControlPlaneImageRepository(), cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
 			ImagePullPolicy: cfg.ImagePullPolicy,
-			Command:         getAPIServerCommand(cfg, k8sVersion),
+			Command:         getAPIServerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
 			LivenessProbe:   staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeAPIServer, int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("250m"),
@@ -161,7 +161,7 @@ func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguratio
 }
 
 // getAPIServerCommand builds the right API server command from the given config object and version
-func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) []string {
+func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	defaultArguments := map[string]string{
 		"advertise-address":               cfg.API.AdvertiseAddress,
 		"insecure-port":                   "0",
@@ -194,29 +194,24 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 		defaultArguments["admission-control"] = deprecatedV19AdmissionControl
 	}
 
-	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.APIServerExtraArgs)...)
-	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
-
 	// If the user set endpoints for an external etcd cluster
 	if len(cfg.Etcd.Endpoints) > 0 {
-		command = append(command, fmt.Sprintf("--etcd-servers=%s", strings.Join(cfg.Etcd.Endpoints, ",")))
+		defaultArguments["etcd-servers"] = strings.Join(cfg.Etcd.Endpoints, ",")
 
 		// Use any user supplied etcd certificates
 		if cfg.Etcd.CAFile != "" {
-			command = append(command, fmt.Sprintf("--etcd-cafile=%s", cfg.Etcd.CAFile))
+			defaultArguments["etcd-cafile"] = cfg.Etcd.CAFile
 		}
 		if cfg.Etcd.CertFile != "" && cfg.Etcd.KeyFile != "" {
-			etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", cfg.Etcd.CertFile)
-			etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", cfg.Etcd.KeyFile)
-			command = append(command, etcdClientFileArg, etcdKeyFileArg)
+			defaultArguments["etcd-certfile"] = cfg.Etcd.CertFile
+			defaultArguments["etcd-keyfile"] = cfg.Etcd.KeyFile
 		}
 	} else {
 		// Default to etcd static pod on localhost
-		etcdEndpointsArg := "--etcd-servers=https://127.0.0.1:2379"
-		etcdCAFileArg := fmt.Sprintf("--etcd-cafile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName))
-		etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName))
-		etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName))
-		command = append(command, etcdEndpointsArg, etcdCAFileArg, etcdClientFileArg, etcdKeyFileArg)
+		defaultArguments["etcd-servers"] = "https://127.0.0.1:2379"
+		defaultArguments["etcd-cafile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName)
+		defaultArguments["etcd-certfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName)
+		defaultArguments["etcd-keyfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
 
 		// Warn for unused user supplied variables
 		if cfg.Etcd.CAFile != "" {
@@ -231,31 +226,34 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	}
 
 	if cfg.CloudProvider != "" {
-		command = append(command, "--cloud-provider="+cfg.CloudProvider)
+		defaultArguments["cloud-provider"] = cfg.CloudProvider
 
 		// Only append the --cloud-config option if there's a such file
 		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
-			command = append(command, "--cloud-config="+DefaultCloudConfigPath)
+			defaultArguments["cloud-config"] = DefaultCloudConfigPath
 		}
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
-		command = append(command, "--endpoint-reconciler-type="+reconcilers.LeaseEndpointReconcilerType)
+		defaultArguments["endpoint-reconciler-type"] = reconcilers.LeaseEndpointReconcilerType
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.DynamicKubeletConfig) {
-		command = append(command, "--feature-gates=DynamicKubeletConfig=true")
+		defaultArguments["feature-gates"] = "DynamicKubeletConfig=true"
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.Auditing) {
-		command = append(command, "--audit-policy-file="+kubeadmconstants.GetStaticPodAuditPolicyFile())
-		command = append(command, "--audit-log-path="+filepath.Join(kubeadmconstants.StaticPodAuditPolicyLogDir, kubeadmconstants.AuditPolicyLogFile))
+		defaultArguments["audit-policy-file"] = kubeadmconstants.GetStaticPodAuditPolicyFile()
+		defaultArguments["audit-log-path"] = filepath.Join(kubeadmconstants.StaticPodAuditPolicyLogDir, kubeadmconstants.AuditPolicyLogFile)
 		if cfg.AuditPolicyConfiguration.LogMaxAge == nil {
-			command = append(command, fmt.Sprintf("--audit-log-maxage=%d", kubeadmapiext.DefaultAuditPolicyLogMaxAge))
+			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", kubeadmapiext.DefaultAuditPolicyLogMaxAge)
 		} else {
-			command = append(command, fmt.Sprintf("--audit-log-maxage=%d", *cfg.AuditPolicyConfiguration.LogMaxAge))
+			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", *cfg.AuditPolicyConfiguration.LogMaxAge)
 		}
 	}
+
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.APIServerExtraArgs)...)
+	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
 
 	return command
 }

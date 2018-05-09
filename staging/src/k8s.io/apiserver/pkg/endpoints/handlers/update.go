@@ -34,7 +34,7 @@ import (
 )
 
 // UpdateResource returns a function that will handle a resource update
-func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
+func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Update " + req.URL.Path)
@@ -68,7 +68,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		decoder := scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: defaultGVK.Group, Version: runtime.APIVersionInternal})
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
-			err = transformDecodeError(typer, err, original, gvk, body)
+			err = transformDecodeError(scope.Typer, err, original, gvk, body)
 			scope.err(err, w, req)
 			return
 		}

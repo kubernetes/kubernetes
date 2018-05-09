@@ -244,8 +244,10 @@ func (e *endpointImpl) stop() {
 
 // dial establishes the gRPC communication with the registered device plugin. https://godoc.org/google.golang.org/grpc#Dial
 func dial(unixSocketPath string) (pluginapi.DevicePluginClient, *grpc.ClientConn, error) {
-	c, err := grpc.Dial(unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
-		grpc.WithTimeout(10*time.Second),
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	c, err := grpc.DialContext(ctx, unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
 		}),

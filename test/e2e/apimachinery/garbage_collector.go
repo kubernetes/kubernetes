@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
@@ -918,16 +917,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
-		client, err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.ClientPool)
+		err = apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
 
 		// Get a client for the custom resource.
-		resourceClient := client.Resource(&metav1.APIResource{
-			Name:       definition.Spec.Names.Plural,
-			Namespaced: false,
-		}, api.NamespaceNone)
+		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+		resourceClient := f.DynamicClient.Resource(gvr)
+
 		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
 
 		// Create a custom owner resource.
@@ -1001,7 +999,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	It("should delete jobs and pods created by cronjob", func() {
-		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource, f.Namespace.Name)
+		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 
 		By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")

@@ -29,8 +29,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -388,9 +390,13 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 	if err != nil {
 		return err
 	}
-	mapper, typer := f.Object()
+	mapper, err := f.RESTMapper()
+	if err != nil {
+		return err
+	}
 	if !options.DryRun {
-		gvks, _, err := typer.ObjectKinds(obj)
+		// create subcommands have compiled knowledge of things they create, so type them directly
+		gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
 		if err != nil {
 			return err
 		}
@@ -399,30 +405,29 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 		if err != nil {
 			return err
 		}
-		client, err := f.ClientForMapping(mapping)
-		if err != nil {
-			return err
-		}
-		resourceMapper := &resource.Mapper{
-			ObjectTyper:  typer,
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-		}
-		info, err := resourceMapper.InfoForObject(obj, nil)
-		if err != nil {
-			return err
-		}
-		if err := kubectl.CreateOrUpdateAnnotation(options.CreateAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+
+		if err := kubectl.CreateOrUpdateAnnotation(options.CreateAnnotation, obj, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
-		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
+		asUnstructured := &unstructured.Unstructured{}
+		if err := legacyscheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
+			return err
+		}
+		dynamicClient, err := f.DynamicClient()
+		if err != nil {
+			return err
+		}
+		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			namespace = ""
+		}
+		actualObject, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).Create(asUnstructured)
 		if err != nil {
 			return err
 		}
 
 		// ensure we pass a versioned object to the printer
-		obj = info.AsVersioned()
+		obj = actualObject
 	} else {
 		if meta, err := meta.Accessor(obj); err == nil && nsOverriden {
 			meta.SetNamespace(namespace)

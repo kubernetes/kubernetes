@@ -17,6 +17,8 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,11 +46,12 @@ var (
 )
 
 // NewCmdReset returns the "kubeadm reset" command
-func NewCmdReset(out io.Writer) *cobra.Command {
+func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	var certsDir string
 	var criSocketPath string
 	var ignorePreflightErrors []string
+	var forceReset bool
 
 	cmd := &cobra.Command{
 		Use:   "reset",
@@ -57,7 +60,7 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
-			r, err := NewReset(ignorePreflightErrorsSet, certsDir, criSocketPath)
+			r, err := NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(r.Run(out))
 		},
@@ -83,6 +86,11 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 		"The path to the CRI socket to use with crictl when cleaning up containers.",
 	)
 
+	cmd.PersistentFlags().BoolVar(
+		&forceReset, "force", false,
+		"Reset the node without prompting for confirmation.",
+	)
+
 	return cmd
 }
 
@@ -93,9 +101,21 @@ type Reset struct {
 }
 
 // NewReset instantiate Reset struct
-func NewReset(ignorePreflightErrors sets.String, certsDir, criSocketPath string) (*Reset, error) {
-	glog.Infoln("[preflight] running pre-flight checks")
+func NewReset(in io.Reader, ignorePreflightErrors sets.String, forceReset bool, certsDir, criSocketPath string) (*Reset, error) {
+	if !forceReset {
+		fmt.Println("[reset] WARNING: changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.")
+		fmt.Print("[reset] are you sure you want to proceed? [y/N]: ")
+		s := bufio.NewScanner(in)
+		s.Scan()
+		if err := s.Err(); err != nil {
+			return nil, err
+		}
+		if strings.ToLower(s.Text()) != "y" {
+			return nil, errors.New("Aborted reset operation")
+		}
+	}
 
+	glog.Infoln("[preflight] running pre-flight checks")
 	if err := preflight.RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return nil, err
 	}

@@ -73,7 +73,6 @@ var (
 	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
 	stringType             = reflect.TypeOf(string(""))
 	int64Type              = reflect.TypeOf(int64(0))
-	uint64Type             = reflect.TypeOf(uint64(0))
 	float64Type            = reflect.TypeOf(float64(0))
 	boolType               = reflect.TypeOf(bool(false))
 	fieldCache             = newFieldsCache()
@@ -438,13 +437,15 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 }
 
 // DeepCopyJSON deep copies the passed value, assuming it is a valid JSON representation i.e. only contains
-// types produced by json.Unmarshal().
+// types produced by json.Unmarshal() and also int64.
+// bool, int64, float64, string, []interface{}, map[string]interface{}, json.Number and nil
 func DeepCopyJSON(x map[string]interface{}) map[string]interface{} {
 	return DeepCopyJSONValue(x).(map[string]interface{})
 }
 
 // DeepCopyJSONValue deep copies the passed value, assuming it is a valid JSON representation i.e. only contains
-// types produced by json.Unmarshal().
+// types produced by json.Unmarshal() and also int64.
+// bool, int64, float64, string, []interface{}, map[string]interface{}, json.Number and nil
 func DeepCopyJSONValue(x interface{}) interface{} {
 	switch x := x.(type) {
 	case map[string]interface{}:
@@ -591,10 +592,14 @@ func toUnstructured(sv, dv reflect.Value) error {
 		dv.Set(reflect.ValueOf(sv.Int()))
 		return nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
-			dv.Set(reflect.New(uint64Type))
+		uVal := sv.Uint()
+		if uVal > math.MaxInt64 {
+			return fmt.Errorf("unsigned value %d does not fit into int64 (overflow)", uVal)
 		}
-		dv.Set(reflect.ValueOf(sv.Uint()))
+		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
+			dv.Set(reflect.New(int64Type))
+		}
+		dv.Set(reflect.ValueOf(int64(uVal)))
 		return nil
 	case reflect.Float32, reflect.Float64:
 		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {

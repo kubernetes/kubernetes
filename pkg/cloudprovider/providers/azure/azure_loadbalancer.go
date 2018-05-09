@@ -438,7 +438,7 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 			DomainNameLabel: &domainNameLabel,
 		}
 	}
-	pip.Tags = &map[string]*string{"service": &serviceName}
+	pip.Tags = map[string]*string{"service": &serviceName}
 	if az.useStandardLoadBalancer() {
 		pip.Sku = &network.PublicIPAddressSku{
 			Name: network.PublicIPAddressSkuNameStandard,
@@ -454,7 +454,9 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 	}
 	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%s, %q): end", pipResourceGroup, *pip.Name)
 
-	pip, err = az.PublicIPAddressesClient.Get(pipResourceGroup, *pip.Name, "")
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	pip, err = az.PublicIPAddressesClient.Get(ctx, pipResourceGroup, *pip.Name, "")
 	if err != nil {
 		return nil, err
 	}
@@ -1202,8 +1204,8 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, want
 
 	for _, pip := range pips {
 		if pip.Tags != nil &&
-			(*pip.Tags)["service"] != nil &&
-			*(*pip.Tags)["service"] == serviceName {
+			(pip.Tags)["service"] != nil &&
+			*(pip.Tags)["service"] == serviceName {
 			// We need to process for pips belong to this service
 			pipName := *pip.Name
 			if wantLb && !isInternal && pipName == desiredPipName {

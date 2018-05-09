@@ -116,7 +116,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 // authentication/v1beta1. We construct a registry that acknowledges
 // authentication/v1beta1 as an enabled version to pass a check enforced in
 // NewGenericWebhook.
-var registry = registered.NewOrDie("")
+var registry = registered.NewAPIRegistrationManager()
 
 func init() {
 	registry.RegisterVersions(groupVersions)

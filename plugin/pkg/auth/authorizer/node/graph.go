@@ -80,6 +80,11 @@ type Graph struct {
 	graph *simple.DirectedAcyclicGraph
 	// vertices is a map of type -> namespace -> name -> vertex
 	vertices map[vertexType]namespaceVertexMapping
+
+	// destinationEdgeIndex is a map of vertex -> set of destination IDs
+	destinationEdgeIndex map[int]*intSet
+	// destinationEdgeThreshold is the minimum number of distinct destination IDs at which to maintain an index
+	destinationEdgeThreshold int
 }
 
 // namespaceVertexMapping is a map of namespace -> name -> vertex
@@ -92,6 +97,11 @@ func NewGraph() *Graph {
 	return &Graph{
 		vertices: map[vertexType]namespaceVertexMapping{},
 		graph:    simple.NewDirectedAcyclicGraph(0, 0),
+
+		destinationEdgeIndex: map[int]*intSet{},
+		// experimentally determined to be the point at which iteration adds an order of magnitude to the authz check.
+		// since maintaining indexes costs time/memory while processing graph changes, we don't want to make this too low.
+		destinationEdgeThreshold: 200,
 	}
 }
 
@@ -165,6 +175,7 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 
 	// find existing neighbors with a single edge (meaning we are their only neighbor)
 	neighborsToRemove := []graph.Node{}
+	neighborsToRecompute := []graph.Node{}
 	g.graph.VisitFrom(vertex, func(neighbor graph.Node) bool {
 		// this downstream neighbor has only one edge (which must be from us), so remove them as well
 		if g.graph.Degree(neighbor) == 1 {
@@ -173,28 +184,27 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 		return true
 	})
 	g.graph.VisitTo(vertex, func(neighbor graph.Node) bool {
-		// this upstream neighbor has only one edge (which must be to us), so remove them as well
 		if g.graph.Degree(neighbor) == 1 {
+			// this upstream neighbor has only one edge (which must be to us), so remove them as well
 			neighborsToRemove = append(neighborsToRemove, neighbor)
+		} else {
+			// recompute the destination edge index on this neighbor
+			neighborsToRecompute = append(neighborsToRemove, neighbor)
 		}
 		return true
 	})
 
 	// remove the vertex
-	g.graph.RemoveNode(vertex)
-	delete(g.vertices[vertexType][namespace], name)
-	if len(g.vertices[vertexType][namespace]) == 0 {
-		delete(g.vertices[vertexType], namespace)
-	}
+	g.removeVertex_locked(vertex)
 
 	// remove neighbors that are now edgeless
 	for _, neighbor := range neighborsToRemove {
-		g.graph.RemoveNode(neighbor)
-		n := neighbor.(*namedVertex)
-		delete(g.vertices[n.vertexType][n.namespace], n.name)
-		if len(g.vertices[n.vertexType][n.namespace]) == 0 {
-			delete(g.vertices[n.vertexType], n.namespace)
-		}
+		g.removeVertex_locked(neighbor.(*namedVertex))
+	}
+
+	// recompute destination indexes for neighbors that dropped outbound edges
+	for _, neighbor := range neighborsToRecompute {
+		g.recomputeDestinationIndex_locked(neighbor)
 	}
 }
 
@@ -208,37 +218,81 @@ func (g *Graph) deleteEdges_locked(fromType, toType vertexType, toNamespace, toN
 		return
 	}
 
-	// get potential "from" verts that match fromType
-	namespaces, exists := g.vertices[fromType]
-	if !exists {
+	// delete all edges between vertices of fromType and toVert
+	neighborsToRemove := []*namedVertex{}
+	neighborsToRecompute := []*namedVertex{}
+	g.graph.VisitTo(toVert, func(from graph.Node) bool {
+		fromVert := from.(*namedVertex)
+		if fromVert.vertexType != fromType {
+			return true
+		}
+		// remove the edge
+		g.graph.RemoveEdge(simple.Edge{F: fromVert, T: toVert})
+		// track vertexes that changed edges
+		if g.graph.Degree(fromVert) == 0 {
+			neighborsToRemove = append(neighborsToRemove, fromVert)
+		} else {
+			neighborsToRecompute = append(neighborsToRecompute, fromVert)
+		}
+		return true
+	})
+
+	// clean up orphaned verts
+	for _, v := range neighborsToRemove {
+		g.removeVertex_locked(v)
+	}
+
+	// recompute destination indexes for neighbors that dropped outbound edges
+	for _, v := range neighborsToRecompute {
+		g.recomputeDestinationIndex_locked(v)
+	}
+}
+
+// must be called under write lock
+// removeVertex_locked removes the specified vertex from the graph and from the maintained indices.
+// It does nothing to indexes of neighbor vertices.
+func (g *Graph) removeVertex_locked(v *namedVertex) {
+	g.graph.RemoveNode(v)
+	delete(g.destinationEdgeIndex, v.ID())
+	delete(g.vertices[v.vertexType][v.namespace], v.name)
+	if len(g.vertices[v.vertexType][v.namespace]) == 0 {
+		delete(g.vertices[v.vertexType], v.namespace)
+	}
+}
+
+// must be called under write lock
+// recomputeDestinationIndex_locked recomputes the index of destination ids for the specified vertex
+func (g *Graph) recomputeDestinationIndex_locked(n graph.Node) {
+	// don't maintain indices for nodes with few edges
+	edgeCount := g.graph.Degree(n)
+	if edgeCount < g.destinationEdgeThreshold {
+		delete(g.destinationEdgeIndex, n.ID())
 		return
 	}
 
-	// delete all edges between vertices of fromType and toVert
-	removeVerts := []*namedVertex{}
-	for _, vertexMapping := range namespaces {
-		for _, fromVert := range vertexMapping {
-			if g.graph.HasEdgeBetween(fromVert, toVert) {
-				// remove the edge (no-op if edge doesn't exist)
-				g.graph.RemoveEdge(newDestinationEdge(fromVert, toVert, nil))
-				// remember to clean up the fromVert if we orphaned it
-				if g.graph.Degree(fromVert) == 0 {
-					removeVerts = append(removeVerts, fromVert)
-				}
-			}
-		}
+	// get or create the index
+	index := g.destinationEdgeIndex[n.ID()]
+	if index == nil {
+		index = newIntSet()
+	} else {
+		index.startNewGeneration()
 	}
 
-	// clean up orphaned verts
-	for _, v := range removeVerts {
-		g.graph.RemoveNode(v)
-		delete(g.vertices[v.vertexType][v.namespace], v.name)
-		if len(g.vertices[v.vertexType][v.namespace]) == 0 {
-			delete(g.vertices[v.vertexType], v.namespace)
+	// populate the index
+	g.graph.VisitFrom(n, func(dest graph.Node) bool {
+		if destinationEdge, ok := g.graph.EdgeBetween(n, dest).(*destinationEdge); ok {
+			index.mark(destinationEdge.DestinationID())
 		}
-		if len(g.vertices[v.vertexType]) == 0 {
-			delete(g.vertices, v.vertexType)
-		}
+		return true
+	})
+
+	// remove existing items no longer in the list
+	index.sweep()
+
+	if len(index.members) < g.destinationEdgeThreshold {
+		delete(g.destinationEdgeIndex, n.ID())
+	} else {
+		g.destinationEdgeIndex[n.ID()] = index
 	}
 }
 
@@ -265,22 +319,30 @@ func (g *Graph) AddPod(pod *api.Pod) {
 	//
 	// ref https://github.com/kubernetes/kubernetes/issues/58790
 	if len(pod.Spec.ServiceAccountName) > 0 {
-		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName), podVertex, nodeVertex))
+		serviceAccountVertex := g.getOrCreateVertex_locked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName)
+		g.graph.SetEdge(newDestinationEdge(serviceAccountVertex, podVertex, nodeVertex))
+		g.recomputeDestinationIndex_locked(serviceAccountVertex)
 	}
 
 	podutil.VisitPodSecretNames(pod, func(secret string) bool {
-		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(secretVertexType, pod.Namespace, secret), podVertex, nodeVertex))
+		secretVertex := g.getOrCreateVertex_locked(secretVertexType, pod.Namespace, secret)
+		g.graph.SetEdge(newDestinationEdge(secretVertex, podVertex, nodeVertex))
+		g.recomputeDestinationIndex_locked(secretVertex)
 		return true
 	})
 
 	podutil.VisitPodConfigmapNames(pod, func(configmap string) bool {
-		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(configMapVertexType, pod.Namespace, configmap), podVertex, nodeVertex))
+		configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, pod.Namespace, configmap)
+		g.graph.SetEdge(newDestinationEdge(configmapVertex, podVertex, nodeVertex))
+		g.recomputeDestinationIndex_locked(configmapVertex)
 		return true
 	})
 
 	for _, v := range pod.Spec.Volumes {
 		if v.PersistentVolumeClaim != nil {
-			g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, v.PersistentVolumeClaim.ClaimName), podVertex, nodeVertex))
+			pvcVertex := g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+			g.graph.SetEdge(newDestinationEdge(pvcVertex, podVertex, nodeVertex))
+			g.recomputeDestinationIndex_locked(pvcVertex)
 		}
 	}
 }

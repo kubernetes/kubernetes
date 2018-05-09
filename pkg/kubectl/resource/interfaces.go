@@ -17,36 +17,24 @@ limitations under the License.
 package resource
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
-	client "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest"
 )
+
+type ClientConfigFunc func() (*rest.Config, error)
 
 // RESTClient is a client helper for dealing with RESTful resources
 // in a generic way.
 type RESTClient interface {
-	Get() *client.Request
-	Post() *client.Request
-	Patch(types.PatchType) *client.Request
-	Delete() *client.Request
-	Put() *client.Request
-}
-
-// ClientMapper abstracts retrieving a Client for mapped objects.
-type ClientMapper interface {
-	ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error)
-}
-
-// ClientMapperFunc implements ClientMapper for a function
-type ClientMapperFunc func(mapping *meta.RESTMapping) (RESTClient, error)
-
-// ClientForMapping implements ClientMapper
-func (f ClientMapperFunc) ClientForMapping(mapping *meta.RESTMapping) (RESTClient, error) {
-	return f(mapping)
+	Get() *rest.Request
+	Post() *rest.Request
+	Patch(types.PatchType) *rest.Request
+	Delete() *rest.Request
+	Put() *rest.Request
 }
 
 // RequestTransform is a function that is given a chance to modify the outgoing request.
-type RequestTransform func(*client.Request)
+type RequestTransform func(*rest.Request)
 
 // NewClientWithOptions wraps the provided RESTClient and invokes each transform on each
 // newly created request.
@@ -59,26 +47,26 @@ type clientOptions struct {
 	transforms []RequestTransform
 }
 
-func (c *clientOptions) modify(req *client.Request) *client.Request {
+func (c *clientOptions) modify(req *rest.Request) *rest.Request {
 	for _, transform := range c.transforms {
 		transform(req)
 	}
 	return req
 }
 
-func (c *clientOptions) Get() *client.Request {
+func (c *clientOptions) Get() *rest.Request {
 	return c.modify(c.c.Get())
 }
 
-func (c *clientOptions) Post() *client.Request {
+func (c *clientOptions) Post() *rest.Request {
 	return c.modify(c.c.Post())
 }
-func (c *clientOptions) Patch(t types.PatchType) *client.Request {
+func (c *clientOptions) Patch(t types.PatchType) *rest.Request {
 	return c.modify(c.c.Patch(t))
 }
-func (c *clientOptions) Delete() *client.Request {
+func (c *clientOptions) Delete() *rest.Request {
 	return c.modify(c.c.Delete())
 }
-func (c *clientOptions) Put() *client.Request {
+func (c *clientOptions) Put() *rest.Request {
 	return c.modify(c.c.Put())
 }

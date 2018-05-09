@@ -39,7 +39,7 @@ type GoTemplatePrintFlags struct {
 // Returns false if the specified templateFormat does not match a template format.
 func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, error) {
 	if (f.TemplateArgument == nil || len(*f.TemplateArgument) == 0) && len(templateFormat) == 0 {
-		return nil, NoCompatiblePrinterError{f}
+		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
 	}
 
 	templateValue := ""
@@ -68,7 +68,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter
 	}
 
 	if _, supportedFormat := supportedFormats[templateFormat]; !supportedFormat {
-		return nil, NoCompatiblePrinterError{f}
+		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
 	}
 
 	if len(templateValue) == 0 {

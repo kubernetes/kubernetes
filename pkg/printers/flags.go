@@ -23,11 +23,17 @@ import (
 )
 
 type NoCompatiblePrinterError struct {
-	Options interface{}
+	OutputFormat *string
+	Options      interface{}
 }
 
 func (e NoCompatiblePrinterError) Error() string {
-	return fmt.Sprintf("unable to match a printer suitable for the options specified: %#v", e.Options)
+	output := ""
+	if e.OutputFormat != nil {
+		output = *e.OutputFormat
+	}
+
+	return fmt.Sprintf("unable to match a printer suitable for the output format %q and the options specified: %#v", output, e.Options)
 }
 
 func IsNoCompatiblePrinterError(err error) bool {
@@ -59,15 +65,19 @@ func (f *PrintFlags) ToPrinter() (ResourcePrinter, error) {
 		outputFormat = *f.OutputFormat
 	}
 
-	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
-		return p, err
+	if f.JSONYamlPrintFlags != nil {
+		if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+			return p, err
+		}
 	}
 
-	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
-		return p, err
+	if f.NamePrintFlags != nil {
+		if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+			return p, err
+		}
 	}
 
-	return nil, NoCompatiblePrinterError{f}
+	return nil, NoCompatiblePrinterError{Options: f, OutputFormat: f.OutputFormat}
 }
 
 func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
@@ -77,6 +87,12 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	if f.OutputFormat != nil {
 		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
 	}
+}
+
+// WithDefaultOutput sets a default output format if one is not provided through a flag value
+func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
+	f.OutputFormat = &output
+	return f
 }
 
 func NewPrintFlags(operation string) *PrintFlags {

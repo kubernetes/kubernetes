@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -58,7 +59,6 @@ type SetSelectorOptions struct {
 	Recorder genericclioptions.Recorder
 
 	builder *resource.Builder
-	mapper  meta.RESTMapper
 
 	genericclioptions.IOStreams
 }
@@ -139,9 +139,6 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	mapper, _ := f.Object()
-	o.mapper = mapper
-
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
 		return err
@@ -149,7 +146,7 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	o.builder = f.NewBuilder().
-		Internal().
+		WithScheme(legacyscheme.Scheme).
 		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -207,7 +204,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
 		CalculatePatch(patch, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-			versioned := info.AsVersioned()
+			versioned := cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 			patch.Info.Object = versioned
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
 			if selectErr != nil {
@@ -235,7 +232,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-		return o.PrintObj(patch.Info.AsVersioned(), o.Out)
+		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, info.Mapping), o.Out)
 	})
 }
 

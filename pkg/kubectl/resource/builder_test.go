@@ -34,6 +34,7 @@ import (
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,13 +49,17 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+
+	// install the pod scheme into the legacy scheme for test typer resolution
+	"github.com/davecgh/go-spew/spew"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 var (
 	corev1GV     = schema.GroupVersion{Version: "v1"}
 	corev1Codec  = scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
 	metaAccessor = meta.NewAccessor()
-	restmapper   = scheme.Registry.RESTMapper()
+	restmapper   = testrestmapper.TestOnlyStaticRESTMapper(scheme.Registry, scheme.Scheme)
 )
 
 func stringBody(body string) io.ReadCloser {
@@ -71,14 +76,14 @@ func watchBody(events ...watch.Event) string {
 	return buf.String()
 }
 
-func fakeClient() ClientMapper {
-	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
+func fakeClient() FakeClientFunc {
+	return func(version schema.GroupVersion) (RESTClient, error) {
 		return &fake.RESTClient{}, nil
-	})
+	}
 }
 
-func fakeClientWith(testName string, t *testing.T, data map[string]string) ClientMapper {
-	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
+func fakeClientWith(testName string, t *testing.T, data map[string]string) FakeClientFunc {
+	return func(version schema.GroupVersion) (RESTClient, error) {
 		return &fake.RESTClient{
 			GroupVersion:         corev1GV,
 			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
@@ -101,7 +106,7 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) Clien
 				}, nil
 			}),
 		}, nil
-	})
+	}
 }
 
 func testData() (*v1.PodList, *v1.ServiceList) {
@@ -267,17 +272,9 @@ func newDefaultBuilder() *Builder {
 	return newDefaultBuilderWith(fakeClient())
 }
 
-func newDefaultBuilderWith(client ClientMapper) *Builder {
-	return NewBuilder(
-		&Mapper{
-			RESTMapper:   restmapper,
-			ObjectTyper:  scheme.Scheme,
-			ClientMapper: client,
-			Decoder:      corev1Codec,
-		},
-		nil,
-		categories.LegacyCategoryExpander,
-	).Internal()
+func newDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
+	return NewFakeBuilder(fakeClientFn, restmapper, categories.LegacyCategoryExpander).
+		WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...)
 }
 
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
@@ -296,7 +293,8 @@ func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 	if info.Name != "update-demo-kitten" || info.Namespace != "" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
-	obj := info.AsVersioned()
+
+	obj := info.Object
 	version, ok := obj.(*v1.ReplicationController)
 	// versioned object does not have defaulting applied
 	if obj == nil || !ok || version.Spec.Replicas != nil {
@@ -402,11 +400,11 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 			switch test.object.(type) {
 			case *v1.Pod:
 				if _, ok := v.Object.(*v1.Pod); !ok || v.Name != test.expectedNames[i] || v.Namespace != "test" {
-					t.Errorf("unexpected info: %#v", v)
+					t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
 				}
 			case *v1.ReplicationController:
 				if _, ok := v.Object.(*v1.ReplicationController); !ok || v.Name != test.expectedNames[i] || v.Namespace != "test" {
-					t.Errorf("unexpected info: %#v", v)
+					t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
 				}
 			}
 		}
@@ -589,7 +587,7 @@ func TestResourceByName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "pods" {
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -721,7 +719,7 @@ func TestResourceByNameWithoutRequireObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.GroupVersionKind.Kind != "Pod" || mapping.Resource != "pods" {
+	if mapping.GroupVersionKind.Kind != "Pod" || mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -748,7 +746,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "pods" {
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
@@ -1119,7 +1117,7 @@ func TestListObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mapping.Resource != "pods" {
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }

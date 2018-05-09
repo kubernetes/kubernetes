@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"strings"
@@ -435,19 +434,6 @@ type ValidateOptions struct {
 	EnableValidation bool
 }
 
-func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
-	data, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(data) == 0 {
-		return nil, fmt.Errorf("Read from %s but no data found", source)
-	}
-
-	return data, nil
-}
-
 // Merge requires JSON serialization
 // TODO: merge assumes JSON serialization, and does not properly abstract API retrieval
 func Merge(codec runtime.Codec, dst runtime.Object, fragment string) (runtime.Object, error) {
@@ -491,26 +477,6 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 		}
 	}
 	return nil
-}
-
-// UpdateObject updates resource object with updateFn
-func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtime.Object) error) (runtime.Object, error) {
-	helper := resource.NewHelper(info.Client, info.Mapping)
-
-	if err := updateFn(info.Object); err != nil {
-		return nil, err
-	}
-
-	// Update the annotation used by kubectl apply
-	if err := kubectl.UpdateApplyAnnotation(info.Object, codec); err != nil {
-		return nil, err
-	}
-
-	if _, err := helper.Replace(info.Namespace, info.Name, true, info.Object); err != nil {
-		return nil, err
-	}
-
-	return info.Object, nil
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {
@@ -574,31 +540,6 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	}
 
 	return
-}
-
-// MustPrintWithKinds determines if printer is dealing
-// with multiple resource kinds, in which case it will
-// return true, indicating resource kind will be
-// included as part of printer output
-func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort) bool {
-	var lastMap *meta.RESTMapping
-
-	for ix := range objs {
-		var mapping *meta.RESTMapping
-		if sorter != nil {
-			mapping = infos[sorter.OriginalPosition(ix)].Mapping
-		} else {
-			mapping = infos[ix].Mapping
-		}
-
-		// display "kind" only if we have mixed resources
-		if lastMap != nil && mapping.Resource != lastMap.Resource {
-			return true
-		}
-		lastMap = mapping
-	}
-
-	return false
 }
 
 // IsSiblingCommandExists receives a pointer to a cobra command and a target string.

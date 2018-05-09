@@ -31,13 +31,13 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		{
 			groupMetas: []apimachinery.GroupMeta{
 				{
-					GroupVersion: schema.GroupVersion{Group: "group1", Version: "v1"},
+					GroupVersions: []schema.GroupVersion{{Group: "group1", Version: "v1"}},
 				},
 				{
-					GroupVersion: schema.GroupVersion{Group: "group2", Version: "v2"},
+					GroupVersions: []schema.GroupVersion{{Group: "group2", Version: "v2"}},
 				},
 				{
-					GroupVersion: schema.GroupVersion{Group: "", Version: "v1"},
+					GroupVersions: []schema.GroupVersion{{Group: "", Version: "v1"}},
 				},
 			},
 			expect: "group1/v1,group2/v2,v1",
@@ -45,7 +45,7 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		{
 			groupMetas: []apimachinery.GroupMeta{
 				{
-					GroupVersion: schema.GroupVersion{Group: "", Version: "v1"},
+					GroupVersions: []schema.GroupVersion{{Group: "", Version: "v1"}},
 				},
 			},
 			expect: "v1",
@@ -56,10 +56,7 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		m, err := NewAPIRegistrationManager("")
-		if err != nil {
-			t.Fatalf("Unexpected failure to make a manager: %v", err)
-		}
+		m := NewAPIRegistrationManager()
 		for _, groupMeta := range testCase.groupMetas {
 			m.RegisterGroup(groupMeta)
 		}

@@ -101,10 +101,6 @@ type etcdHelper struct {
 	cache utilcache.Cache
 }
 
-func init() {
-	metrics.Register()
-}
-
 // Implements storage.Interface.
 func (h *etcdHelper) Versioner() storage.Versioner {
 	return h.versioner

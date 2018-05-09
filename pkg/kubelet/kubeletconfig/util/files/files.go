@@ -67,6 +67,7 @@ func EnsureFile(fs utilfs.Filesystem, path string) error {
 }
 
 // WriteTmpFile creates a temporary file at `path`, writes `data` into it, and fsyncs the file
+// Expects the parent directory to exist.
 func WriteTmpFile(fs utilfs.Filesystem, path string, data []byte) (tmpPath string, retErr error) {
 	dir := filepath.Dir(path)
 	prefix := tmptag + filepath.Base(path)
@@ -103,7 +104,8 @@ func WriteTmpFile(fs utilfs.Filesystem, path string, data []byte) (tmpPath strin
 }
 
 // ReplaceFile replaces the contents of the file at `path` with `data` by writing to a tmp file in the same
-// dir as `path` and renaming the tmp file over `path`. The file does not have to exist to use ReplaceFile.
+// dir as `path` and renaming the tmp file over `path`. The file does not have to exist to use ReplaceFile,
+// but the parent directory must exist.
 // Note ReplaceFile calls fsync.
 func ReplaceFile(fs utilfs.Filesystem, path string, data []byte) error {
 	// write data to a temporary file
@@ -121,7 +123,7 @@ func DirExists(fs utilfs.Filesystem, path string) (bool, error) {
 		if info.IsDir() {
 			return true, nil
 		}
-		return false, fmt.Errorf("expected dir at %q, but mode is is %q", path, info.Mode().String())
+		return false, fmt.Errorf("expected dir at %q, but mode is %q", path, info.Mode().String())
 	} else if os.IsNotExist(err) {
 		return false, nil
 	} else {

@@ -19,6 +19,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/set",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_set_CONSUMERS"],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
@@ -26,6 +27,7 @@ go_library(
         "//pkg/kubectl/cmd/util/env:go_default_library",
         "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
         "//pkg/printers:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -81,6 +83,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/rest/fake:go_default_library",
     ],

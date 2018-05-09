@@ -42,15 +42,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 
 	if apiResourceConfigSource.VersionEnabled(appsapiv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = appsapiv1beta1.SchemeGroupVersion
 	}
 	if apiResourceConfigSource.VersionEnabled(appsapiv1beta2.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1beta2.SchemeGroupVersion.Version] = p.v1beta2Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = appsapiv1beta2.SchemeGroupVersion
 	}
 	if apiResourceConfigSource.VersionEnabled(appsapiv1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = appsapiv1.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true

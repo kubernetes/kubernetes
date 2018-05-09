@@ -18,119 +18,105 @@ limitations under the License.
 
 package cm
 
-import "testing"
+import (
+	"path"
+	"testing"
+)
 
-func TestLibcontainerAdapterAdaptToSystemd(t *testing.T) {
+func TestCgroupNameToSystemdBasename(t *testing.T) {
 	testCases := []struct {
-		input    string
+		input    CgroupName
 		expected string
 	}{
 		{
-			input:    "/",
-			expected: "-.slice",
+			input:    RootCgroupName,
+			expected: "/",
 		},
 		{
-			input:    "/system.slice",
+			input:    NewCgroupName(RootCgroupName, "system"),
 			expected: "system.slice",
 		},
 		{
-			input:    "/system.slice/Burstable",
+			input:    NewCgroupName(RootCgroupName, "system", "Burstable"),
 			expected: "system-Burstable.slice",
 		},
 		{
-			input:    "/Burstable.slice/Burstable-pod_123.slice",
+			input:    NewCgroupName(RootCgroupName, "Burstable", "pod-123"),
 			expected: "Burstable-pod_123.slice",
 		},
 		{
-			input:    "/test.slice/test-a.slice/test-a-b.slice",
+			input:    NewCgroupName(RootCgroupName, "test", "a", "b"),
 			expected: "test-a-b.slice",
 		},
 		{
-			input:    "/test.slice/test-a.slice/test-a-b.slice/Burstable",
+			input:    NewCgroupName(RootCgroupName, "test", "a", "b", "Burstable"),
 			expected: "test-a-b-Burstable.slice",
 		},
 		{
-			input:    "/Burstable",
+			input:    NewCgroupName(RootCgroupName, "Burstable"),
 			expected: "Burstable.slice",
 		},
 		{
-			input:    "/Burstable/pod_123",
-			expected: "Burstable-pod_123.slice",
-		},
-		{
-			input:    "/BestEffort/pod_6c1a4e95-6bb6-11e6-bc26-28d2444e470d",
+			input:    NewCgroupName(RootCgroupName, "BestEffort", "pod-6c1a4e95-6bb6-11e6-bc26-28d2444e470d"),
 			expected: "BestEffort-pod_6c1a4e95_6bb6_11e6_bc26_28d2444e470d.slice",
 		},
 	}
 	for _, testCase := range testCases {
-		f := newLibcontainerAdapter(libcontainerSystemd)
-		if actual := f.adaptName(CgroupName(testCase.input), false); actual != testCase.expected {
+		if actual := path.Base(testCase.input.ToSystemd()); actual != testCase.expected {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
 	}
 }
 
-func TestLibcontainerAdapterAdaptToSystemdAsCgroupFs(t *testing.T) {
+func TestCgroupNameToSystemd(t *testing.T) {
 	testCases := []struct {
-		input    string
+		input    CgroupName
 		expected string
 	}{
 		{
-			input:    "/",
+			input:    RootCgroupName,
 			expected: "/",
 		},
 		{
-			input:    "/Burstable",
+			input:    NewCgroupName(RootCgroupName, "Burstable"),
 			expected: "/Burstable.slice",
 		},
 		{
-			input:    "/Burstable/pod_123",
+			input:    NewCgroupName(RootCgroupName, "Burstable", "pod-123"),
 			expected: "/Burstable.slice/Burstable-pod_123.slice",
 		},
 		{
-			input:    "/BestEffort/pod_6c1a4e95-6bb6-11e6-bc26-28d2444e470d",
+			input:    NewCgroupName(RootCgroupName, "BestEffort", "pod-6c1a4e95-6bb6-11e6-bc26-28d2444e470d"),
 			expected: "/BestEffort.slice/BestEffort-pod_6c1a4e95_6bb6_11e6_bc26_28d2444e470d.slice",
 		},
 		{
-			input:    "/kubepods",
+			input:    NewCgroupName(RootCgroupName, "kubepods"),
 			expected: "/kubepods.slice",
 		},
 	}
 	for _, testCase := range testCases {
-		f := newLibcontainerAdapter(libcontainerSystemd)
-		if actual := f.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
+		if actual := testCase.input.ToSystemd(); actual != testCase.expected {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
 	}
 }
 
-func TestLibcontainerAdapterNotAdaptToSystemd(t *testing.T) {
-	cgroupfs := newLibcontainerAdapter(libcontainerCgroupfs)
-	otherAdatper := newLibcontainerAdapter(libcontainerCgroupManagerType("test"))
-
+func TestCgroupNameToCgroupfs(t *testing.T) {
 	testCases := []struct {
-		input    string
+		input    CgroupName
 		expected string
 	}{
 		{
-			input:    "/",
+			input:    RootCgroupName,
 			expected: "/",
 		},
 		{
-			input:    "/Burstable",
+			input:    NewCgroupName(RootCgroupName, "Burstable"),
 			expected: "/Burstable",
-		},
-		{
-			input:    "",
-			expected: "",
 		},
 	}
 	for _, testCase := range testCases {
-		if actual := cgroupfs.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
-			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
-		}
-
-		if actual := otherAdatper.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
+		if actual := testCase.input.ToCgroupfs(); actual != testCase.expected {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
 	}

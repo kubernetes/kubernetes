@@ -19,7 +19,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -37,6 +36,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 type TopPodOptions struct {
@@ -51,6 +51,8 @@ type TopPodOptions struct {
 	Printer         *metricsutil.TopCmdPrinter
 	DiscoveryClient discovery.DiscoveryInterface
 	MetricsClient   metricsclientset.Interface
+
+	genericclioptions.IOStreams
 }
 
 const metricsCreationDelay = 2 * time.Minute
@@ -78,9 +80,11 @@ var (
 		kubectl top pod -l name=myLabel`))
 )
 
-func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) *cobra.Command {
-	if options == nil {
-		options = &TopPodOptions{}
+func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions.IOStreams) *cobra.Command {
+	if o == nil {
+		o = &TopPodOptions{
+			IOStreams: streams,
+		}
 	}
 
 	cmd := &cobra.Command{
@@ -90,26 +94,26 @@ func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) *cob
 		Long:    topPodLong,
 		Example: topPodExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(f, cmd, args, out); err != nil {
+			if err := o.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(err)
 			}
-			if err := options.Validate(); err != nil {
+			if err := o.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
-			if err := options.RunTopPod(); err != nil {
+			if err := o.RunTopPod(); err != nil {
 				cmdutil.CheckErr(err)
 			}
 		},
 		Aliases: []string{"pods", "po"},
 	}
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.PrintContainers, "containers", options.PrintContainers, "If present, print usage of containers within a pod.")
-	cmd.Flags().BoolVar(&options.AllNamespaces, "all-namespaces", options.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	options.HeapsterOptions.Bind(cmd.Flags())
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
+	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	o.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
 
-func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 	if len(args) == 1 {
 		o.ResourceName = args[0]
@@ -139,7 +143,7 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	o.PodClient = clientset.CoreV1()
 	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.CoreV1(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
 
-	o.Printer = metricsutil.NewTopCmdPrinter(out)
+	o.Printer = metricsutil.NewTopCmdPrinter(o.Out)
 	return nil
 }
 

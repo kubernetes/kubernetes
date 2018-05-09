@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/usr/bin/env bash -e
 
 # Copyright 2018 The Kubernetes Authors.
 #

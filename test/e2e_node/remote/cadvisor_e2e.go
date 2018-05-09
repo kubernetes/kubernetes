@@ -23,8 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
-	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/utils"
 )
 
 // CAdvisorE2ERemote contains the specific functions in the cadvisor e2e test suite.
@@ -37,7 +36,7 @@ func InitCAdvisorE2ERemote() TestSuite {
 
 // SetupTestPackage implements TestSuite.SetupTestPackage
 func (n *CAdvisorE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
-	cadvisorRootDir, err := builder.GetCAdvisorRootDir()
+	cadvisorRootDir, err := utils.GetCAdvisorRootDir()
 	if err != nil {
 		return err
 	}

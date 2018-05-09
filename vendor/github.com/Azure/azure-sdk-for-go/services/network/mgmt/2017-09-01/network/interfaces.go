@@ -318,9 +318,10 @@ func (client InterfacesClient) GetEffectiveRouteTableResponder(resp *http.Respon
 // GetVirtualMachineScaleSetIPConfiguration get the specified network interface ip configuration in a virtual machine
 // scale set.
 //
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual machine
-// scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the name of the network
-// interface. IPConfigurationName is the name of the ip configuration. expand is expands referenced resources.
+// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
+// machine scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the name of the
+// network interface. IPConfigurationName is the name of the ip configuration. expand is expands referenced
+// resources.
 func (client InterfacesClient) GetVirtualMachineScaleSetIPConfiguration(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, expand string) (result InterfaceIPConfiguration, err error) {
 	req, err := client.GetVirtualMachineScaleSetIPConfigurationPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, expand)
 	if err != nil {
@@ -392,9 +393,9 @@ func (client InterfacesClient) GetVirtualMachineScaleSetIPConfigurationResponder
 
 // GetVirtualMachineScaleSetNetworkInterface get the specified network interface in a virtual machine scale set.
 //
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual machine
-// scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the name of the network
-// interface. expand is expands referenced resources.
+// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
+// machine scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the name of the
+// network interface. expand is expands referenced resources.
 func (client InterfacesClient) GetVirtualMachineScaleSetNetworkInterface(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result Interface, err error) {
 	req, err := client.GetVirtualMachineScaleSetNetworkInterfacePreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
 	if err != nil {
@@ -717,9 +718,9 @@ func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsResponder(resp 
 // ListVirtualMachineScaleSetIPConfigurations get the specified network interface ip configuration in a virtual machine
 // scale set.
 //
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual machine
-// scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the name of the network
-// interface. expand is expands referenced resources.
+// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
+// machine scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the name of the
+// network interface. expand is expands referenced resources.
 func (client InterfacesClient) ListVirtualMachineScaleSetIPConfigurations(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result InterfaceIPConfigurationListResultPage, err error) {
 	result.fn = client.listVirtualMachineScaleSetIPConfigurationsNextResults
 	req, err := client.ListVirtualMachineScaleSetIPConfigurationsPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
@@ -818,8 +819,8 @@ func (client InterfacesClient) ListVirtualMachineScaleSetIPConfigurationsComplet
 
 // ListVirtualMachineScaleSetNetworkInterfaces gets all network interfaces in a virtual machine scale set.
 //
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual machine
-// scale set.
+// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
+// machine scale set.
 func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfaces(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string) (result InterfaceListResultPage, err error) {
 	result.fn = client.listVirtualMachineScaleSetNetworkInterfacesNextResults
 	req, err := client.ListVirtualMachineScaleSetNetworkInterfacesPreparer(ctx, resourceGroupName, virtualMachineScaleSetName)
@@ -914,8 +915,8 @@ func (client InterfacesClient) ListVirtualMachineScaleSetNetworkInterfacesComple
 // ListVirtualMachineScaleSetVMNetworkInterfaces gets information about all network interfaces in a virtual machine in
 // a virtual machine scale set.
 //
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual machine
-// scale set. virtualmachineIndex is the virtual machine index.
+// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
+// machine scale set. virtualmachineIndex is the virtual machine index.
 func (client InterfacesClient) ListVirtualMachineScaleSetVMNetworkInterfaces(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string) (result InterfaceListResultPage, err error) {
 	result.fn = client.listVirtualMachineScaleSetVMNetworkInterfacesNextResults
 	req, err := client.ListVirtualMachineScaleSetVMNetworkInterfacesPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex)

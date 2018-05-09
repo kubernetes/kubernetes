@@ -31,17 +31,17 @@ import (
 )
 
 func TestFinalization(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	require.NoError(t, err)
 	defer close(stopCh)
 
 	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
 	ns := "not-the-default"
 	name := "foo123"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	instance := testserver.NewNoxuInstance(ns, name)
 	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
@@ -94,19 +94,19 @@ func TestFinalization(t *testing.T) {
 }
 
 func TestFinalizationAndDeletion(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	require.NoError(t, err)
 	defer close(stopCh)
 
 	// Create a CRD.
 	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
 	// Create a CR with a finalizer.
 	ns := "not-the-default"
 	name := "foo123"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	instance := testserver.NewNoxuInstance(ns, name)
 	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})

@@ -391,10 +391,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	if !ok {
 		framework.Failf("could not find group version resource for dynamic client and wardle/flunders.")
 	}
-	clientPool := f.ClientPool
-	dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
-	framework.ExpectNoError(err, "getting group version resources for dynamic client")
-	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
+	dynamicClient := f.DynamicClient.Resource(gvr).Namespace(namespace)
 
 	// kubectl create -f flunders-1.yaml
 	// Request Body: {"apiVersion":"wardle.k8s.io/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}
@@ -411,27 +408,23 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	unstruct := &unstructuredv1.Unstructured{}
 	err = unstruct.UnmarshalJSON(jsonFlunder)
 	framework.ExpectNoError(err, "unmarshalling test-flunder as unstructured for create using dynamic client")
-	unstruct, err = dynamicClient.Resource(&apiResource, namespace).Create(unstruct)
+	unstruct, err = dynamicClient.Create(unstruct)
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 
 	// kubectl get flunders
-	obj, err := dynamicClient.Resource(&apiResource, namespace).List(metav1.ListOptions{})
+	unstructuredList, err := dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
-	unstructuredList, ok := obj.(*unstructuredv1.UnstructuredList)
-	validateErrorWithDebugInfo(f, err, pods, "casting flunders list(%T) as unstructuredList using dynamic client", obj)
 	if len(unstructuredList.Items) != 1 {
 		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	// kubectl delete flunder test-flunder
-	err = dynamicClient.Resource(&apiResource, namespace).Delete(flunderName, &metav1.DeleteOptions{})
+	err = dynamicClient.Delete(flunderName, &metav1.DeleteOptions{})
 	validateErrorWithDebugInfo(f, err, pods, "deleting flunders(%v) using dynamic client", unstructuredList.Items)
 
 	// kubectl get flunders
-	obj, err = dynamicClient.Resource(&apiResource, namespace).List(metav1.ListOptions{})
+	unstructuredList, err = dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
-	unstructuredList, ok = obj.(*unstructuredv1.UnstructuredList)
-	validateErrorWithDebugInfo(f, err, pods, "casting flunders list(%T) as unstructuredList using dynamic client", obj)
 	if len(unstructuredList.Items) != 0 {
 		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}

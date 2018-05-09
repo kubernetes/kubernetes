@@ -18,8 +18,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
@@ -29,16 +27,24 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
 type ViewOptions struct {
+	PrintFlags  *kubectlConfigPrintFlags
+	PrintObject printers.ResourcePrinterFunc
+
 	ConfigAccess clientcmd.ConfigAccess
 	Merge        flag.Tristate
 	Flatten      bool
 	Minify       bool
 	RawByteData  bool
+
+	OutputFormat string
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -56,12 +62,17 @@ var (
 
 		# Get the password for the e2e user
 		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
+
+	defaultOutputFormat = "yaml"
 )
 
-func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &ViewOptions{ConfigAccess: ConfigAccess}
-	// Default to yaml
-	defaultOutputFormat := "yaml"
+func NewCmdConfigView(f cmdutil.Factory, streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
+	o := &ViewOptions{
+		PrintFlags:   newKubeConfigPrintFlags("").WithDefaultOutput("yaml"),
+		ConfigAccess: ConfigAccess,
+
+		IOStreams: streams,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "view",
@@ -69,40 +80,48 @@ func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess cli
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			options.Complete()
-			outputFormat := cmdutil.GetFlagString(cmd, "output")
-			if outputFormat == "wide" {
-				fmt.Fprintf(errOut, "--output wide is not available in kubectl config view; reset to default output format (%s)\n\n", defaultOutputFormat)
-				// TODO: once printing is abstracted, this should be handled at flag declaration time
-				cmd.Flags().Set("output", defaultOutputFormat)
-			}
-			if outputFormat == "" {
-				fmt.Fprintf(errOut, "Reset to default output format (%s) as --output is empty\n", defaultOutputFormat)
-				// TODO: once printing is abstracted, this should be handled at flag declaration time
-				cmd.Flags().Set("output", defaultOutputFormat)
-			}
-
-			printOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
-			printer, err := cmdutil.PrinterForOptions(printOpts)
-			cmdutil.CheckErr(err)
-
-			cmdutil.CheckErr(options.Run(out, printer))
+			cmdutil.CheckErr(o.Complete(cmd))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().Set("output", defaultOutputFormat)
+	o.PrintFlags.AddFlags(cmd)
 
-	options.Merge.Default(true)
-	mergeFlag := cmd.Flags().VarPF(&options.Merge, "merge", "", "Merge the full hierarchy of kubeconfig files")
+	o.Merge.Default(true)
+	mergeFlag := cmd.Flags().VarPF(&o.Merge, "merge", "", "Merge the full hierarchy of kubeconfig files")
 	mergeFlag.NoOptDefVal = "true"
-	cmd.Flags().BoolVar(&options.RawByteData, "raw", options.RawByteData, "Display raw byte data")
-	cmd.Flags().BoolVar(&options.Flatten, "flatten", options.Flatten, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
-	cmd.Flags().BoolVar(&options.Minify, "minify", options.Minify, "Remove all information not used by current-context from the output")
+	cmd.Flags().BoolVar(&o.RawByteData, "raw", o.RawByteData, "Display raw byte data")
+	cmd.Flags().BoolVar(&o.Flatten, "flatten", o.Flatten, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
+	cmd.Flags().BoolVar(&o.Minify, "minify", o.Minify, "Remove all information not used by current-context from the output")
 	return cmd
 }
 
-func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error {
+func (o *ViewOptions) Complete(cmd *cobra.Command) error {
+	if o.ConfigAccess.IsExplicitFile() {
+		if !o.Merge.Provided() {
+			o.Merge.Set("false")
+		}
+	}
+
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObject = printer.PrintObj
+
+	return nil
+}
+
+func (o ViewOptions) Validate() error {
+	if !o.Merge.Value() && !o.ConfigAccess.IsExplicitFile() {
+		return errors.New("if merge==false a precise file must to specified")
+	}
+
+	return nil
+}
+
+func (o ViewOptions) Run() error {
 	config, err := o.loadConfig()
 	if err != nil {
 		return err
@@ -127,22 +146,7 @@ func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error 
 		return err
 	}
 
-	err = printer.PrintObj(convertedObj, out)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (o *ViewOptions) Complete() bool {
-	if o.ConfigAccess.IsExplicitFile() {
-		if !o.Merge.Provided() {
-			o.Merge.Set("false")
-		}
-	}
-
-	return true
+	return o.PrintObject(convertedObj, o.Out)
 }
 
 func (o ViewOptions) loadConfig() (*clientcmdapi.Config, error) {
@@ -153,14 +157,6 @@ func (o ViewOptions) loadConfig() (*clientcmdapi.Config, error) {
 
 	config, err := o.getStartingConfig()
 	return config, err
-}
-
-func (o ViewOptions) Validate() error {
-	if !o.Merge.Value() && !o.ConfigAccess.IsExplicitFile() {
-		return errors.New("if merge==false a precise file must to specified")
-	}
-
-	return nil
 }
 
 // getStartingConfig returns the Config object built from the sources specified by the options, the filename read (only if it was a single file), and an error if something goes wrong

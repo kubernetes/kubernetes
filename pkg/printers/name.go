@@ -42,10 +42,6 @@ type NamePrinter struct {
 	Typer    runtime.ObjectTyper
 }
 
-func (p *NamePrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
 // and print "resource/name" pair. If the object is a List, print all items in it.
 func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
@@ -122,13 +118,4 @@ func printObj(w io.Writer, name string, operation string, shortOutput bool, grou
 
 	fmt.Fprintf(w, "%s.%s/%s%s\n", strings.ToLower(groupKind.Kind), groupKind.Group, name, operation)
 	return nil
-}
-
-// TODO: implement HandledResources()
-func (p *NamePrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (p *NamePrinter) IsGeneric() bool {
-	return true
 }

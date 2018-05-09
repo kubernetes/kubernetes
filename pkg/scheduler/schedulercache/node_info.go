@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/golang/glog"
 
@@ -30,7 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var emptyResource = Resource{}
+var (
+	emptyResource = Resource{}
+	generation    int64
+)
 
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
@@ -62,6 +66,7 @@ type NodeInfo struct {
 	// Cached conditions of node for faster lookup.
 	memoryPressureCondition v1.ConditionStatus
 	diskPressureCondition   v1.ConditionStatus
+	pidPressureCondition    v1.ConditionStatus
 
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
@@ -71,6 +76,14 @@ type NodeInfo struct {
 //initializeNodeTransientInfo initializes transient information pertaining to node.
 func initializeNodeTransientInfo() nodeTransientInfo {
 	return nodeTransientInfo{AllocatableVolumesCount: 0, RequestedVolumes: 0}
+}
+
+// nextGeneration: Let's make sure history never forgets the name...
+// Increments the generation number monotonically ensuring that generation numbers never collide.
+// Collision of the generation numbers would be particularly problematic if a node was deleted and
+// added back with the same name. See issue#63262.
+func nextGeneration() int64 {
+	return atomic.AddInt64(&generation, 1)
 }
 
 // nodeTransientInfo contains transient node information while scheduling.
@@ -211,7 +224,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		nonzeroRequest:      &Resource{},
 		allocatableResource: &Resource{},
 		TransientInfo:       newTransientSchedulerInfo(),
-		generation:          0,
+		generation:          nextGeneration(),
 		usedPorts:           make(util.HostPortInfo),
 	}
 	for _, pod := range pods {
@@ -284,6 +297,14 @@ func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
 	return n.diskPressureCondition
 }
 
+// PIDPressureCondition returns the pid pressure condition status on this node.
+func (n *NodeInfo) PIDPressureCondition() v1.ConditionStatus {
+	if n == nil {
+		return v1.ConditionUnknown
+	}
+	return n.pidPressureCondition
+}
+
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {
@@ -311,6 +332,7 @@ func (n *NodeInfo) AllocatableResource() Resource {
 // SetAllocatableResource sets the allocatableResource information of given node.
 func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
 	n.allocatableResource = allocatableResource
+	n.generation = nextGeneration()
 }
 
 // Clone returns a copy of this node.
@@ -324,6 +346,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		TransientInfo:           n.TransientInfo,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
+		pidPressureCondition:    n.pidPressureCondition,
 		usedPorts:               make(util.HostPortInfo),
 		generation:              n.generation,
 	}
@@ -381,7 +404,7 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	// Consume ports when pods added.
 	n.updateUsedPorts(pod, true)
 
-	n.generation++
+	n.generation = nextGeneration()
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
@@ -432,7 +455,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			// Release ports when remove Pods.
 			n.updateUsedPorts(pod, false)
 
-			n.generation++
+			n.generation = nextGeneration()
 
 			return nil
 		}
@@ -482,12 +505,14 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			n.memoryPressureCondition = cond.Status
 		case v1.NodeDiskPressure:
 			n.diskPressureCondition = cond.Status
+		case v1.NodePIDPressure:
+			n.pidPressureCondition = cond.Status
 		default:
 			// We ignore other conditions.
 		}
 	}
 	n.TransientInfo = newTransientSchedulerInfo()
-	n.generation++
+	n.generation = nextGeneration()
 	return nil
 }
 
@@ -502,7 +527,8 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	n.taints, n.taintsErr = nil, nil
 	n.memoryPressureCondition = v1.ConditionUnknown
 	n.diskPressureCondition = v1.ConditionUnknown
-	n.generation++
+	n.pidPressureCondition = v1.ConditionUnknown
+	n.generation = nextGeneration()
 	return nil
 }
 
