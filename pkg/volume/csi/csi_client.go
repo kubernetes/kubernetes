@@ -113,15 +113,22 @@ func (c *csiDriverClient) NodePublishVolume(
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
 			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
-				},
-			},
 		},
 	}
 	if stagingTargetPath != "" {
 		req.StagingTargetPath = stagingTargetPath
+	}
+
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Block{
+			Block: &csipb.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Mount{
+			Mount: &csipb.VolumeCapability_MountVolume{
+				FsType: fsType,
+			},
+		}
 	}
 
 	_, err = nodeClient.NodePublishVolume(ctx, req)
@@ -185,14 +192,21 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
 			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
-				},
-			},
 		},
 		NodeStageSecrets: nodeStageSecrets,
 		VolumeAttributes: volumeAttribs,
+	}
+
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Block{
+			Block: &csipb.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Mount{
+			Mount: &csipb.VolumeCapability_MountVolume{
+				FsType: fsType,
+			},
+		}
 	}
 
 	_, err = nodeClient.NodeStageVolume(ctx, req)
