@@ -84041,7 +84041,7 @@
       "type": "string"
      },
      "subresources": {
-      "description": "Subresources describes the subresources for CustomResources This field is alpha-level and should only be sent to servers that enable subresources via the CustomResourceSubresources feature gate.",
+      "description": "Subresources describes the subresources for CustomResources",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources"
      },
      "validation": {
