@@ -109,6 +109,10 @@ type ClientAccessFactory interface {
 	// just directions to the server. People use this to build RESTMappers on top of
 	BareClientConfig() (*restclient.Config, error)
 
+	// NewBuilder returns an object that assists in loading objects from both disk and the server
+	// and which implements the common patterns for CLI interactions with generic resources.
+	NewBuilder() *resource.Builder
+
 	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
 	// return false if no pod spec is supported, or return an error.
 	UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
@@ -204,9 +208,6 @@ type ObjectMappingFactory interface {
 // BuilderFactory holds the third level of factory methods. These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
-	// NewBuilder returns an object that assists in loading objects from both disk and the server
-	// and which implements the common patterns for CLI interactions with generic resources.
-	NewBuilder() *resource.Builder
 	// PluginLoader provides the implementation to be used to load cli plugins.
 	PluginLoader() plugins.PluginLoader
 	// PluginRunner provides the implementation to be used to run cli plugins.

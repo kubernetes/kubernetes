@@ -48,11 +48,11 @@ type discoveryCategoryExpander struct {
 // NewDiscoveryCategoryExpander returns a category expander that makes use of the "categories" fields from
 // the API, found through the discovery client. In case of any error or no category found (which likely
 // means we're at a cluster prior to categories support, fallback to the expander provided.
-func NewDiscoveryCategoryExpander(client discovery.DiscoveryInterface) (CategoryExpander, error) {
+func NewDiscoveryCategoryExpander(client discovery.DiscoveryInterface) CategoryExpander {
 	if client == nil {
 		panic("Please provide discovery client to shortcut expander")
 	}
-	return discoveryCategoryExpander{discoveryClient: client}, nil
+	return discoveryCategoryExpander{discoveryClient: client}
 }
 
 // Expand fulfills CategoryExpander

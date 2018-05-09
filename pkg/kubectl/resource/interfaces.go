@@ -17,9 +17,17 @@ limitations under the License.
 package resource
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 )
+
+type RESTClientGetter interface {
+	ToRESTConfig() (*rest.Config, error)
+	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+	ToRESTMapper() (meta.RESTMapper, error)
+}
 
 type ClientConfigFunc func() (*rest.Config, error)
 
