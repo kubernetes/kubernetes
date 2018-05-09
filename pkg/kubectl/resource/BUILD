@@ -10,6 +10,7 @@ go_library(
         "builder.go",
         "client.go",
         "doc.go",
+        "fake.go",
         "helper.go",
         "interfaces.go",
         "mapper.go",
@@ -22,7 +23,6 @@ go_library(
         "//build/visible_to:pkg_kubectl_resource_CONSUMERS",
     ],
     deps = [
-        "//pkg/kubectl/categories:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
         "//vendor/golang.org/x/text/encoding/unicode:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
@@ -44,6 +44,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/restmapper:go_default_library",
     ],
 )
 
@@ -61,7 +62,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core/install:go_default_library",
-        "//pkg/kubectl/categories:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
