@@ -113,8 +113,6 @@ message CustomResourceDefinitionSpec {
   optional CustomResourceValidation validation = 5;
 
   // Subresources describes the subresources for CustomResources
-  // This field is alpha-level and should only be sent to servers that enable
-  // subresources via the CustomResourceSubresources feature gate.
   // +optional
   optional CustomResourceSubresources subresources = 6;
 }
