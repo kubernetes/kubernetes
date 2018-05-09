@@ -28,7 +28,7 @@ import (
 // TODO update call sites to specify the scheme they want on their builder.
 func AsDefaultVersionedOrOriginal(obj runtime.Object, mapping *meta.RESTMapping) runtime.Object {
 	converter := runtime.ObjectConvertor(legacyscheme.Scheme)
-	groupVersioner := runtime.GroupVersioner(schema.GroupVersions(legacyscheme.Registry.RegisteredGroupVersions()))
+	groupVersioner := runtime.GroupVersioner(schema.GroupVersions(legacyscheme.Scheme.PrioritizedVersionsAllGroups()))
 	if mapping != nil {
 		groupVersioner = mapping.GroupVersionKind.GroupVersion()
 	}

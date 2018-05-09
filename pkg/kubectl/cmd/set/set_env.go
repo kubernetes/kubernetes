@@ -241,7 +241,7 @@ func (o *EnvOptions) RunEnv() error {
 
 	if len(o.From) != 0 {
 		b := o.builder().
-			WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...).
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(o.namespace).DefaultNamespace().
@@ -305,7 +305,7 @@ func (o *EnvOptions) RunEnv() error {
 	}
 
 	b := o.builder().
-		WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
