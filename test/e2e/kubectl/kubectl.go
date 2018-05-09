@@ -37,7 +37,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/elazarl/goproxy"
@@ -57,6 +56,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller"
+	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -98,25 +98,6 @@ var (
 	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
 )
 
-var testImages = struct {
-	GBFrontendImage   string
-	PauseImage        string
-	NginxImage        string
-	NginxNewImage     string
-	RedisImage        string
-	GBRedisSlaveImage string
-	NautilusImage     string
-	KittenImage       string
-}{
-	imageutils.GetE2EImage(imageutils.GBFrontend),
-	imageutils.GetE2EImage(imageutils.Pause),
-	imageutils.GetE2EImage(imageutils.Nginx),
-	imageutils.GetE2EImage(imageutils.NginxNew),
-	imageutils.GetE2EImage(imageutils.Redis),
-	imageutils.GetE2EImage(imageutils.GBRedisSlave),
-	imageutils.GetE2EImage(imageutils.Nautilus),
-	imageutils.GetE2EImage(imageutils.Kitten),
-}
 var (
 	proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 
@@ -136,19 +117,6 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 	// dependencies from this test.
 	framework.RunKubectlOrDieInput(fileContents, "delete", "--grace-period=0", "--force", "-f", "-", nsArg)
 	framework.AssertCleanup(ns, selectors...)
-}
-
-func substituteImageName(content string) string {
-	contentWithImageName := new(bytes.Buffer)
-	tmpl, err := template.New("imagemanifest").Parse(content)
-	if err != nil {
-		framework.Failf("Failed Parse the template: %v", err)
-	}
-	err = tmpl.Execute(contentWithImageName, testImages)
-	if err != nil {
-		framework.Failf("Failed executing template: %v", err)
-	}
-	return contentWithImageName.String()
 }
 
 func readTestFileOrDie(file string) []byte {
@@ -294,8 +262,8 @@ var _ = SIGDescribe("Kubectl client", func() {
 		var nautilus, kitten string
 		BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
-			nautilus = substituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"), Fail)))
-			kitten = substituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"), Fail)))
+			nautilus = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"), Fail)))
+			kitten = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"), Fail)))
 		})
 		/*
 			Release : v1.9
@@ -359,7 +327,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"redis-master-deployment.yaml.in",
 				"redis-slave-deployment.yaml.in",
 			} {
-				contents := substituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile), Fail)))
+				contents := commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile), Fail)))
 				run(contents)
 			}
 		}
@@ -388,7 +356,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		var podYaml string
 		BeforeEach(func() {
 			By(fmt.Sprintf("creating the pod from %v", podYaml))
-			podYaml = substituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
+			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(BeTrue())
 		})
@@ -748,7 +716,7 @@ metadata:
 
 	framework.KubeDescribe("Kubectl apply", func() {
 		It("should apply a new configuration to an existing RC", func() {
-			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJson := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
@@ -784,9 +752,9 @@ metadata:
 		})
 
 		It("apply set/view last-applied", func() {
-			deployment1Yaml := substituteImageName(string(readTestFileOrDie(nginxDeployment1Filename)))
-			deployment2Yaml := substituteImageName(string(readTestFileOrDie(nginxDeployment2Filename)))
-			deployment3Yaml := substituteImageName(string(readTestFileOrDie(nginxDeployment3Filename)))
+			deployment1Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(nginxDeployment1Filename)))
+			deployment2Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(nginxDeployment2Filename)))
+			deployment3Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(nginxDeployment3Filename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("deployment replicas number is 2")
@@ -864,7 +832,7 @@ metadata:
 			kv, err := framework.KubectlVersion()
 			Expect(err).NotTo(HaveOccurred())
 			framework.SkipUnlessServerVersionGTE(kv, c.Discovery())
-			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJson := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			serviceJson := readTestFileOrDie(redisServiceFilename)
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -969,7 +937,7 @@ metadata:
 			Description: Create a Pod running redis master listening to port 6379. Using kubectl expose the redis master  replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that redis master is listening. Using kubectl expose the redis master as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that redis master is listening.
 		*/
 		framework.ConformanceIt("should create services for rc ", func() {
-			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJson := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			redisPort := 6379
@@ -1051,7 +1019,7 @@ metadata:
 		var nsFlag string
 		BeforeEach(func() {
 			By("creating the pod")
-			podYaml = substituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
+			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(BeTrue())
@@ -1093,7 +1061,7 @@ metadata:
 		BeforeEach(func() {
 			By("creating the pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			podYaml = substituteImageName(string(readTestFileOrDie("busybox-pod.yaml")))
+			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml")))
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout)).To(BeTrue())
 		})
@@ -1133,7 +1101,7 @@ metadata:
 		containerName := "redis-master"
 		BeforeEach(func() {
 			By("creating an rc")
-			rc = substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			rc = commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(rc, "create", "-f", "-", nsFlag)
 		})
@@ -1209,7 +1177,7 @@ metadata:
 			Description: Start running a redis master and a replication controller. When the pod is running, using ‘kubectl patch’ command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
 		*/
 		framework.ConformanceIt("should add annotations for pods in rc ", func() {
-			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJson := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
 			framework.RunKubectlOrDieInput(controllerJson, "create", "-f", "-", nsFlag)
