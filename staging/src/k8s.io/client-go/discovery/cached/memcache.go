@@ -67,20 +67,7 @@ func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*m
 
 // ServerResources returns the supported resources for all groups and versions.
 func (d *memCacheClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	apiGroups, err := d.ServerGroups()
-	if err != nil {
-		return nil, err
-	}
-	groupVersions := metav1.ExtractGroupVersions(apiGroups)
-	result := []*metav1.APIResourceList{}
-	for _, groupVersion := range groupVersions {
-		resources, err := d.ServerResourcesForGroupVersion(groupVersion)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, resources)
-	}
-	return result, nil
+	return discovery.ServerResources(d)
 }
 
 func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
