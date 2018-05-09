@@ -398,7 +398,7 @@ func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
 	return clientset, nil
 }
 
-func (f *TestFactory) DynamicClient() (dynamic.DynamicInterface, error) {
+func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 	if f.FakeDynamicClient != nil {
 		return f.FakeDynamicClient, nil
 	}

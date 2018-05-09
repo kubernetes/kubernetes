@@ -58,7 +58,7 @@ func getObject(version, kind, name string) *unstructured.Unstructured {
 	}
 }
 
-func getClientServer(h func(http.ResponseWriter, *http.Request)) (DynamicInterface, *httptest.Server, error) {
+func getClientServer(h func(http.ResponseWriter, *http.Request)) (Interface, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
 	cl, err := NewForConfig(&restclient.Config{
 		Host: srv.URL,

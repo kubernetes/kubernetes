@@ -17,8 +17,33 @@ limitations under the License.
 package dynamic
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
+
+type Interface interface {
+	Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface
+}
+
+type ResourceInterface interface {
+	Create(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error)
+	Update(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error)
+	UpdateStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error)
+	Delete(name string, options *metav1.DeleteOptions, subresources ...string) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error)
+	List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*unstructured.Unstructured, error)
+}
+
+type NamespaceableResourceInterface interface {
+	Namespace(string) ResourceInterface
+	ResourceInterface
+}
 
 // APIPathResolverFunc knows how to convert a groupVersion to its API path. The Kind field is optional.
 // TODO find a better place to move this for existing callers

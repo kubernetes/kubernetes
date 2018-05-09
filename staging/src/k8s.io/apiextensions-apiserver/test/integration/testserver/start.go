@@ -139,7 +139,7 @@ func StartDefaultServer() (chan struct{}, *rest.Config, error) {
 	return StartServer(config)
 }
 
-func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynamic.DynamicInterface, error) {
+func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynamic.Interface, error) {
 	stopCh, config, err := StartDefaultServer()
 	if err != nil {
 		return nil, nil, nil, err

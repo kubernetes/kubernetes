@@ -85,7 +85,7 @@ type ClientAccessFactory interface {
 	ClientSet() (internalclientset.Interface, error)
 
 	// DynamicClient returns a dynamic client ready for use
-	DynamicClient() (dynamic.DynamicInterface, error)
+	DynamicClient() (dynamic.Interface, error)
 
 	// KubernetesClientSet gives you back an external clientset
 	KubernetesClientSet() (*kubernetes.Clientset, error)

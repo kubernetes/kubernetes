@@ -70,13 +70,13 @@ type dynamicResourceClient struct {
 	resource  schema.GroupVersionResource
 }
 
-var _ dynamic.DynamicInterface = &FakeDynamicClient{}
+var _ dynamic.Interface = &FakeDynamicClient{}
 
-func (c *FakeDynamicClient) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableDynamicResourceInterface {
+func (c *FakeDynamicClient) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
 	return &dynamicResourceClient{client: c, resource: resource}
 }
 
-func (c *dynamicResourceClient) Namespace(ns string) dynamic.DynamicResourceInterface {
+func (c *dynamicResourceClient) Namespace(ns string) dynamic.ResourceInterface {
 	ret := *c
 	ret.namespace = ns
 	return &ret
