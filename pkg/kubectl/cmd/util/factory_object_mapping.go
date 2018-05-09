@@ -117,7 +117,7 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 		cfg.APIPath = "/api"
 	}
 	gv := mapping.GroupVersionKind.GroupVersion()
-	cfg.ContentConfig = dynamic.ContentConfig()
+	cfg.ContentConfig = resource.UnstructuredPlusDefaultContentConfig()
 	cfg.GroupVersion = &gv
 	return restclient.RESTClientFor(cfg)
 }
