@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&iscsiPlugin{nil}}
 }
@@ -131,6 +131,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 
 // NewBlockVolumeMapper creates a new volume.BlockVolumeMapper from an API specification.
 func (plugin *iscsiPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+
 	// If this is called via GenerateUnmapDeviceFunc(), pod is nil.
 	// Pass empty string as dummy uid since uid isn't used in the case.
 	var uid types.UID
@@ -200,6 +201,7 @@ func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID,
 }
 
 func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+
 	// Find globalPDPath from pod volume directory(mountPath)
 	var globalPDPath string
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
@@ -213,6 +215,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 			break
 		}
 	}
+
 	// Couldn't fetch globalPDPath
 	if len(globalPDPath) == 0 {
 		return nil, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
@@ -249,6 +252,7 @@ func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName
 		return nil, err
 	}
 	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
+
 	// Retrieve volume information from globalMapPathUUID
 	// globalMapPathUUID example:
 	// plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
@@ -276,6 +280,7 @@ type iscsiDisk struct {
 
 func (iscsi *iscsiDisk) GetPath() string {
 	name := iscsiPluginName
+
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
 	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name), iscsi.VolName)
 }
@@ -327,6 +332,7 @@ func (b *iscsiDiskMounter) SetUp(fsGroup *int64) error {
 }
 
 func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {
@@ -381,12 +387,12 @@ var _ volume.BlockVolumeUnmapper = &iscsiDiskUnmapper{}
 func (c *iscsiDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 	err := c.manager.DetachBlockISCSIDisk(*c, mapPath)
 	if err != nil {
-		return fmt.Errorf("iscsi: failed to detach disk: %s\nError: %v", mapPath, err)
+		return fmt.Errorf("iscsi: failed to detach disk: %s, error: %v", mapPath, err)
 	}
 	glog.V(4).Infof("iscsi: %q is unmounted, deleting the directory", mapPath)
 	err = os.RemoveAll(mapPath)
 	if err != nil {
-		return fmt.Errorf("iscsi: failed to delete the directory: %s\nError: %v", mapPath, err)
+		return fmt.Errorf("iscsi: failed to delete the directory: %s, error: %v", mapPath, err)
 	}
 	glog.V(4).Infof("iscsi: successfully detached disk: %s", mapPath)
 	return nil
@@ -414,6 +420,7 @@ func portalMounter(portal string) string {
 
 // get iSCSI volume info: readOnly and fstype
 func getISCSIVolumeInfo(spec *volume.Spec) (bool, string, error) {
+
 	// for volume source, readonly is in volume spec
 	// for PV, readonly is in PV spec. PV gets the ReadOnly flag indirectly through the PVC source
 	if spec.Volume != nil && spec.Volume.ISCSI != nil {
@@ -561,6 +568,7 @@ func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (
 		}
 
 		if len(secretName) > 0 && len(secretNamespace) > 0 {
+
 			// if secret is provideded, retrieve it
 			kubeClient := plugin.host.GetKubeClient()
 			if kubeClient == nil {
@@ -606,6 +614,7 @@ func createPersistentVolumeFromISCSIPVSource(volumeName string, iscsi v1.ISCSIPe
 }
 
 func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.Spec, error) {
+
 	// Retrieve volume spec information from globalMapPath
 	// globalMapPath example:
 	// plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}
