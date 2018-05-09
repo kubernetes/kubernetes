@@ -70,15 +70,15 @@ func (s *simpleSecretManager) UnregisterPod(pod *v1.Pod) {
 // store is the interface for a secrets cache that
 // can be used by cacheBasedSecretManager.
 type store interface {
-	// Add a secret to the store.
+	// AddReference adds a reference to the secret to the store.
 	// Note that multiple additions to the store has to be allowed
 	// in the implementations and effectively treated as refcounted.
-	Add(namespace, name string)
-	// Delete a secret from the store.
+	AddReference(namespace, name string)
+	// DeleteReference deletes reference to the secret from the store.
 	// Note that secret should be deleted only when there was a
 	// corresponding Delete call for each of Add calls (effectively
 	// when refcount was reduced to zero).
-	Delete(namespace, name string)
+	DeleteReference(namespace, name string)
 	// Get a secret from a store.
 	Get(namespace, name string) (*v1.Secret, error)
 }
@@ -119,7 +119,7 @@ func (c *cacheBasedSecretManager) RegisterPod(pod *v1.Pod) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	for name := range names {
-		c.secretStore.Add(pod.Namespace, name)
+		c.secretStore.AddReference(pod.Namespace, name)
 	}
 	var prev *v1.Pod
 	key := objectKey{namespace: pod.Namespace, name: pod.Name}
@@ -132,7 +132,7 @@ func (c *cacheBasedSecretManager) RegisterPod(pod *v1.Pod) {
 			// names and prev need to have their ref counts decremented. Any that
 			// are only in prev need to be completely removed. This unconditional
 			// call takes care of both cases.
-			c.secretStore.Delete(prev.Namespace, name)
+			c.secretStore.DeleteReference(prev.Namespace, name)
 		}
 	}
 }
@@ -146,7 +146,7 @@ func (c *cacheBasedSecretManager) UnregisterPod(pod *v1.Pod) {
 	delete(c.registeredPods, key)
 	if prev != nil {
 		for name := range getSecretNames(prev) {
-			c.secretStore.Delete(prev.Namespace, name)
+			c.secretStore.DeleteReference(prev.Namespace, name)
 		}
 	}
 }
