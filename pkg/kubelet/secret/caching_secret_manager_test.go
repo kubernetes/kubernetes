@@ -53,13 +53,13 @@ func noObjectTTL() (time.Duration, bool) {
 func TestSecretStore(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	store.Add("ns1", "name1")
-	store.Add("ns2", "name2")
-	store.Add("ns1", "name1")
-	store.Add("ns1", "name1")
-	store.Delete("ns1", "name1")
-	store.Delete("ns2", "name2")
-	store.Add("ns3", "name3")
+	store.AddReference("ns1", "name1")
+	store.AddReference("ns2", "name2")
+	store.AddReference("ns1", "name1")
+	store.AddReference("ns1", "name1")
+	store.DeleteReference("ns1", "name1")
+	store.DeleteReference("ns2", "name2")
+	store.AddReference("ns3", "name3")
 
 	// Adds don't issue Get requests.
 	actions := fakeClient.Actions()
@@ -87,7 +87,7 @@ func TestSecretStore(t *testing.T) {
 func TestSecretStoreDeletingSecret(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	store.Add("ns", "name")
+	store.AddReference("ns", "name")
 
 	result := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "name", ResourceVersion: "10"}}
 	fakeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
@@ -119,7 +119,7 @@ func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, 0)
 
 	for i := 0; i < 10; i++ {
-		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
 	}
 	fakeClient.ClearActions()
 
@@ -146,7 +146,7 @@ func TestSecretStoreGetNeverRefresh(t *testing.T) {
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 
 	for i := 0; i < 10; i++ {
-		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
 	}
 	fakeClient.ClearActions()
 
@@ -175,7 +175,7 @@ func TestCustomTTL(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Time{})
 	store := newSecretStore(fakeClient, fakeClock, customTTL, time.Minute)
 
-	store.Add("ns", "name")
+	store.AddReference("ns", "name")
 	store.Get("ns", "name")
 	fakeClient.ClearActions()
 
