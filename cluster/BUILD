@@ -30,9 +30,9 @@ pkg_tar(
     package_dir = "kubernetes/gci-trusty",
     deps = [
         "//cluster/addons",
-        "//cluster/gce:gce-master-manifests",
-        "//cluster/gce:gci-trusty-manifests",
         "//cluster/gce/addons",
+        "//cluster/gce/gci:gci-trusty-manifests",
+        "//cluster/gce/manifests:gce-master-manifests",
     ],
 )
 
