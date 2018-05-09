@@ -51,7 +51,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
 
-	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Feature:FSGroup]", func() {
+	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
@@ -65,7 +65,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume as non-root with FSGroup [Feature:FSGroup]", func() {
+	It("should be consumable from pods in volume as non-root with FSGroup", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
@@ -97,7 +97,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings as non-root with FSGroup [Feature:FSGroup]", func() {
+	It("should be consumable from pods in volume with mappings as non-root with FSGroup", func() {
 		doConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 

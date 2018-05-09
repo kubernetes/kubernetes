@@ -83,7 +83,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		})
 	})
 
-	It("should provide podname as non-root with fsgroup [Feature:FSGroup]", func() {
+	It("should provide podname as non-root with fsgroup", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
@@ -97,7 +97,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		})
 	})
 
-	It("should provide podname as non-root with fsgroup and defaultMode [Feature:FSGroup]", func() {
+	It("should provide podname as non-root with fsgroup and defaultMode", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
