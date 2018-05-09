@@ -98,6 +98,9 @@ type ClientAccessFactory interface {
 	// KubernetesClientSet gives you back an external clientset
 	KubernetesClientSet() (*kubernetes.Clientset, error)
 
+	// Returns interfaces for dealing with arbitrary runtime.Objects.
+	RESTMapper() (meta.RESTMapper, error)
+
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
 	RESTClient() (*restclient.RESTClient, error)
 	// Returns a client.Config for accessing the Kubernetes server.
@@ -165,8 +168,6 @@ type ClientAccessFactory interface {
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
 // Generally they provide object typing and functions that build requests based on the negotiated clients.
 type ObjectMappingFactory interface {
-	// Returns interfaces for dealing with arbitrary runtime.Objects.
-	RESTMapper() (meta.RESTMapper, error)
 	// Returns interface for expanding categories like `all`.
 	CategoryExpander() categories.CategoryExpander
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
