@@ -581,6 +581,7 @@ staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook
+staging/src/k8s.io/client-go/deprecated-dynamic
 staging/src/k8s.io/client-go/discovery/cached
 staging/src/k8s.io/client-go/dynamic
 staging/src/k8s.io/client-go/dynamic/fake

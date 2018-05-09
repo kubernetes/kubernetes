@@ -92,9 +92,6 @@ type GraphBuilder struct {
 	running bool
 
 	dynamicClient dynamic.DynamicInterface
-	// metaOnlyClientPool uses a special codec, which removes fields except for
-	// apiVersion, kind, and metadata during decoding.
-	metaOnlyClientPool dynamic.ClientPool
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
