@@ -396,24 +396,15 @@ func globalPDPathOperation(b iscsiDiskMounter) func(iscsiDiskMounter, string, *I
 
 // DetachDisk unmounts and detaches a volume from node
 func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
-	_, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
-	if err != nil {
-		glog.Errorf("iscsi detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
-		return err
-	}
 	if pathExists, pathErr := volumeutil.PathExists(mntPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mntPath)
 		return nil
 	}
-	if err = c.mounter.Unmount(mntPath); err != nil {
+	if err := c.mounter.Unmount(mntPath); err != nil {
 		glog.Errorf("iscsi detach disk: failed to unmount: %s\nError: %v", mntPath, err)
 		return err
-	}
-	cnt--
-	if cnt != 0 {
-		return nil
 	}
 	// if device is no longer used, see if need to logout the target
 	device, prefix, err := extractDeviceAndPrefix(mntPath)
