@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
 )
 
 func init() {
@@ -33,6 +34,7 @@ func init() {
 // Install registers the API group and adds types to a scheme
 func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(scheduling.AddToScheme(scheme))
+	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1alpha1.SchemeGroupVersion))
+	utilruntime.Must(scheme.SetVersionPriority(v1beta1.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
 }
