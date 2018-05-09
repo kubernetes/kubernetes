@@ -29,6 +29,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
 
 	"k8s.io/api/core/v1"
@@ -47,11 +48,9 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 
-	// install the pod scheme into the legacy scheme for test typer resolution
-	"github.com/davecgh/go-spew/spew"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	// TODO we need to remove this linkage and create our own scheme
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var (

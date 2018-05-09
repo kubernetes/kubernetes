@@ -23,7 +23,6 @@ go_library(
         "//build/visible_to:pkg_kubectl_resource_CONSUMERS",
     ],
     deps = [
-        "//pkg/kubectl/validation:go_default_library",
         "//vendor/golang.org/x/text/encoding/unicode:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -62,8 +61,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core/install:go_default_library",
-        "//pkg/kubectl/scheme:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

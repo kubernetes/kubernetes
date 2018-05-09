@@ -35,7 +35,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 var FileExtensions = []string{".json", ".yaml", ".yml"}
@@ -105,7 +104,7 @@ type Builder struct {
 
 	export bool
 
-	schema validation.Schema
+	schema ContentValidator
 
 	// fakeClientFn is used for testing
 	fakeClientFn FakeClientFunc
@@ -177,7 +176,7 @@ func NewBuilder(restClientGetter RESTClientGetter) *Builder {
 	).AddError(mapperErr).AddError(discoveryErr)
 }
 
-func (b *Builder) Schema(schema validation.Schema) *Builder {
+func (b *Builder) Schema(schema ContentValidator) *Builder {
 	b.schema = schema
 	return b
 }
