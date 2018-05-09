@@ -198,11 +198,6 @@ func TestLogComplete(t *testing.T) {
 			flags:    map[string]string{"tail": "1"},
 			expected: "'logs (POD | TYPE/NAME) [CONTAINER_NAME]'.\nPOD or TYPE/NAME is a required argument for the logs command",
 		},
-		{
-			name:     "follow and selecter conflict",
-			flags:    map[string]string{"selector": "foo", "follow": "true"},
-			expected: "only one of follow (-f) or selector (-l) is allowed",
-		},
 	}
 	for _, test := range tests {
 		cmd := NewCmdLogs(f, genericclioptions.NewTestIOStreamsDiscard())

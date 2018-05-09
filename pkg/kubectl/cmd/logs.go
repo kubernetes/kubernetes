@@ -199,9 +199,6 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	o.LogsForObject = f.LogsForObject
 
 	if len(selector) != 0 {
-		if logOptions.Follow {
-			return cmdutil.UsageErrorf(cmd, "only one of follow (-f) or selector (-l) is allowed")
-		}
 		if logOptions.TailLines == nil && tail != -1 {
 			logOptions.TailLines = &selectorTail
 		}
