@@ -33,6 +33,6 @@ func Du(path string) (*resource.Quantity, error) {
 	return nil, fmt.Errorf("Du not supported for this build.")
 }
 
-func Find(path string) (int64, error) {
-	return 0, fmt.Errorf("Find not supported for this build.")
+func Find(path string) (*resource.Quantity, error) {
+	return nil, fmt.Errorf("Find not supported for this build.")
 }
