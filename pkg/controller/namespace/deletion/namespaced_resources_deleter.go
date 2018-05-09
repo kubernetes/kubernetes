@@ -43,7 +43,7 @@ type NamespacedResourcesDeleterInterface interface {
 }
 
 func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
-	dynamicClient dynamic.DynamicInterface, podsGetter v1clientset.PodsGetter,
+	dynamicClient dynamic.Interface, podsGetter v1clientset.PodsGetter,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	finalizerToken v1.FinalizerName, deleteNamespaceWhenDone bool) NamespacedResourcesDeleterInterface {
 	d := &namespacedResourcesDeleter{
@@ -68,7 +68,7 @@ type namespacedResourcesDeleter struct {
 	// Client to manipulate the namespace.
 	nsClient v1clientset.NamespaceInterface
 	// Dynamic client to list and delete all namespaced resources.
-	dynamicClient dynamic.DynamicInterface
+	dynamicClient dynamic.Interface
 	// Interface to get PodInterface.
 	podsGetter v1clientset.PodsGetter
 	// Cache of what operations are not supported on each group version resource.

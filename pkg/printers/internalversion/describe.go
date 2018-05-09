@@ -192,13 +192,13 @@ func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (printers.De
 
 // GenericDescriberFor returns a generic describer for the specified mapping
 // that uses only information available from runtime.Unstructured
-func GenericDescriberFor(mapping *meta.RESTMapping, dynamic dynamic.DynamicInterface, events coreclient.EventsGetter) printers.Describer {
+func GenericDescriberFor(mapping *meta.RESTMapping, dynamic dynamic.Interface, events coreclient.EventsGetter) printers.Describer {
 	return &genericDescriber{mapping, dynamic, events}
 }
 
 type genericDescriber struct {
 	mapping *meta.RESTMapping
-	dynamic dynamic.DynamicInterface
+	dynamic dynamic.Interface
 	events  coreclient.EventsGetter
 }
 

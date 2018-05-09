@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 

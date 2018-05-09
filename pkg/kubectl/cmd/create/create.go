@@ -348,7 +348,7 @@ type CreateSubcommandOptions struct {
 	EnforceNamespace bool
 
 	Mapper        meta.RESTMapper
-	DynamicClient dynamic.DynamicInterface
+	DynamicClient dynamic.Interface
 
 	PrintObj func(obj kruntime.Object) error
 

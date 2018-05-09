@@ -82,7 +82,7 @@ type ApplyOptions struct {
 	Builder       *resource.Builder
 	Mapper        meta.RESTMapper
 	Scaler        scaleclient.ScalesGetter
-	DynamicClient dynamic.DynamicInterface
+	DynamicClient dynamic.Interface
 	ClientSetFunc func() (internalclientset.Interface, error)
 	OpenAPISchema openapi.Resources
 
@@ -580,7 +580,7 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 
 type pruner struct {
 	mapper        meta.RESTMapper
-	dynamicClient dynamic.DynamicInterface
+	dynamicClient dynamic.Interface
 	clientsetFunc func() (internalclientset.Interface, error)
 
 	visitedUids   sets.String
@@ -649,7 +649,7 @@ func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, scale
 	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.clientsetFunc, scaleClient)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.DynamicInterface, cascade bool, gracePeriod int, clientsetFunc func() (internalclientset.Interface, error), scaleClient scaleclient.ScalesGetter) error {
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, clientsetFunc func() (internalclientset.Interface, error), scaleClient scaleclient.ScalesGetter) error {
 	if !cascade {
 		return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, nil)
 	}
@@ -681,7 +681,7 @@ func (p *patcher) delete(namespace, name string) error {
 type patcher struct {
 	mapping       *meta.RESTMapping
 	helper        *resource.Helper
-	dynamicClient dynamic.DynamicInterface
+	dynamicClient dynamic.Interface
 	clientsetFunc func() (internalclientset.Interface, error)
 
 	overwrite bool

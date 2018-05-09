@@ -38,7 +38,7 @@ type TestCrd struct {
 	ApiVersion         string
 	ApiExtensionClient *crdclientset.Clientset
 	Crd                *apiextensionsv1beta1.CustomResourceDefinition
-	DynamicClient      dynamic.DynamicResourceInterface
+	DynamicClient      dynamic.ResourceInterface
 	CleanUp            CleanCrdFn
 }
 
