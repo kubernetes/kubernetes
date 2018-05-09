@@ -143,6 +143,7 @@ k8s_deb(
     description = """Kubernetes Node Agent
 The node agent of Kubernetes, the container cluster manager
 """,
+    postinst = "kubelet-postinst.sh",
     version_file = "//build:os_package_version",
 )
 
