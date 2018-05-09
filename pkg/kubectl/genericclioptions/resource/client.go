@@ -19,7 +19,6 @@ package resource
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
@@ -47,7 +46,7 @@ func (clientConfigFn ClientConfigFunc) unstructuredClientForGroupVersion(gv sche
 	if err != nil {
 		return nil, err
 	}
-	cfg.ContentConfig = dynamic.ContentConfig()
+	cfg.ContentConfig = UnstructuredPlusDefaultContentConfig()
 	cfg.GroupVersion = &gv
 	if len(gv.Group) == 0 {
 		cfg.APIPath = "/api"

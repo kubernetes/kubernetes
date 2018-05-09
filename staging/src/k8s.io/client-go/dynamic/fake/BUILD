@@ -7,11 +7,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "client.go",
-        "client_pool.go",
-        "simple.go",
-    ],
+    srcs = ["simple.go"],
     importpath = "k8s.io/client-go/dynamic/fake",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -25,7 +21,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
-        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
 
