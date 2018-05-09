@@ -133,6 +133,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/listers/rbac/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/rbac/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/scheduling/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/client-go/listers/scheduling/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/settings/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/storage/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/storage/v1alpha1:all-srcs",

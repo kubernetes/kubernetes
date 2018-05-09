@@ -41,6 +41,7 @@ import (
 	rbac_v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbac_v1beta1 "k8s.io/api/rbac/v1beta1"
 	scheduling_v1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	scheduling_v1beta1 "k8s.io/api/scheduling/v1beta1"
 	settings_v1alpha1 "k8s.io/api/settings/v1alpha1"
 	storage_v1 "k8s.io/api/storage/v1"
 	storage_v1alpha1 "k8s.io/api/storage/v1alpha1"
@@ -234,6 +235,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=scheduling.k8s.io, Version=v1alpha1
 	case scheduling_v1alpha1.SchemeGroupVersion.WithResource("priorityclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha1().PriorityClasses().Informer()}, nil
+
+		// Group=scheduling.k8s.io, Version=v1beta1
+	case scheduling_v1beta1.SchemeGroupVersion.WithResource("priorityclasses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1beta1().PriorityClasses().Informer()}, nil
 
 		// Group=settings.k8s.io, Version=v1alpha1
 	case settings_v1alpha1.SchemeGroupVersion.WithResource("podpresets"):

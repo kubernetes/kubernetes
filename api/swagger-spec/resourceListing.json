@@ -122,6 +122,10 @@
     "description": "get information of a group"
    },
    {
+    "path": "/apis/scheduling.k8s.io/v1beta1",
+    "description": "API at /apis/scheduling.k8s.io/v1beta1"
+   },
+   {
     "path": "/apis/scheduling.k8s.io/v1alpha1",
     "description": "API at /apis/scheduling.k8s.io/v1alpha1"
    },
