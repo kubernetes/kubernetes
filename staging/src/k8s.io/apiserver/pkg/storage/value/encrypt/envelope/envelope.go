@@ -77,7 +77,7 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 	// length cannot fit in 8 bits (1 byte). Thus, we use 16 bits (2 bytes) to store the length.
 	keyLen := int(binary.BigEndian.Uint16(data[:2]))
 	if keyLen+2 > len(data) {
-		return nil, false, fmt.Errorf("invalid data encountered by genvelope transformer, length longer than available bytes: %q", data)
+		return nil, false, fmt.Errorf("invalid data encountered by envelope transformer, length longer than available bytes: %q", data)
 	}
 	encKey := data[2 : keyLen+2]
 	encData := data[2+keyLen:]
