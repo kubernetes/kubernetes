@@ -1,6 +1,6 @@
 # Kubernetes's OpenAPI Specification
 
-This folder contains an [OpenAPI specification][openapi] for Kubernetes API.
+This folder contains an [OpenAPI specification](https://github.com/OAI/OpenAPI-Specification) for Kubernetes API.
 
 ## Vendor Extensions
 
