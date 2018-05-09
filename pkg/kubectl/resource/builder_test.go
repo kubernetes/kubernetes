@@ -47,7 +47,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 
 	// install the pod scheme into the legacy scheme for test typer resolution
@@ -59,7 +58,6 @@ var (
 	corev1GV     = schema.GroupVersion{Version: "v1"}
 	corev1Codec  = scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
 	metaAccessor = meta.NewAccessor()
-	restmapper   = testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme)
 )
 
 func stringBody(body string) io.ReadCloser {
@@ -273,7 +271,7 @@ func newDefaultBuilder() *Builder {
 }
 
 func newDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
-	return NewFakeBuilder(fakeClientFn, restmapper, categories.LegacyCategoryExpander).
+	return NewFakeBuilder(fakeClientFn, testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme), FakeCategoryExpander).
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
 }
 
