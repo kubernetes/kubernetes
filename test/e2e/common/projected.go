@@ -419,7 +419,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
 
-	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Feature:FSGroup]", func() {
+	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
@@ -433,7 +433,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume as non-root with FSGroup [Feature:FSGroup]", func() {
+	It("should be consumable from pods in volume as non-root with FSGroup", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
@@ -466,7 +466,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings as non-root with FSGroup [Feature:FSGroup]", func() {
+	It("should be consumable from pods in volume with mappings as non-root with FSGroup", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
@@ -904,7 +904,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		})
 	})
 
-	It("should provide podname as non-root with fsgroup [Feature:FSGroup]", func() {
+	It("should provide podname as non-root with fsgroup", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
@@ -918,7 +918,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		})
 	})
 
-	It("should provide podname as non-root with fsgroup and defaultMode [Feature:FSGroup]", func() {
+	It("should provide podname as non-root with fsgroup and defaultMode", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
