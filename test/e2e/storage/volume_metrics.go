@@ -167,6 +167,37 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 	})
 
+	It("should create metrics for total time taken in volume operations in P/V Controller", func() {
+		var err error
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).ToNot(Equal(nil))
+
+		claims := []*v1.PersistentVolumeClaim{pvc}
+		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod, err = c.CoreV1().Pods(ns).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = framework.WaitForPodRunningInNamespace(c, pod)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+
+		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+		if err != nil {
+			framework.Skipf("Could not get controller-manager metrics - skipping")
+		}
+
+		metricKey := "volume_operation_total_seconds_count"
+		dimensions := []string{"operation_name", "plugin_name"}
+		valid := hasValidMetrics(metrics.Metrics(controllerMetrics), metricKey, dimensions...)
+		Expect(valid).To(BeTrue(), "Invalid metric in P/V Controller metrics: %q", metricKey)
+
+		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+	})
+
 	// Test for pv controller metrics, concretely: bound/unbound pv/pvc count.
 	Describe("PVController", func() {
 		const (
@@ -453,4 +484,24 @@ func calculateRelativeValues(originValues, updatedValues map[string]int64) map[s
 		}
 	}
 	return relativeValues
+}
+
+func hasValidMetrics(metrics metrics.Metrics, metricKey string, dimensions ...string) bool {
+	var errCount int
+	framework.Logf("Looking for sample in metric %q", metricKey)
+	samples, ok := metrics[metricKey]
+	if !ok {
+		framework.Logf("Key %q was not found in metrics", metricKey)
+		return false
+	}
+	for _, sample := range samples {
+		framework.Logf("Found sample %q", sample.String())
+		for _, d := range dimensions {
+			if _, ok := sample.Metric[model.LabelName(d)]; !ok {
+				framework.Logf("Error getting dimension %q for metric %q, sample %q", d, metricKey, sample.String())
+				errCount++
+			}
+		}
+	}
+	return errCount == 0
 }
