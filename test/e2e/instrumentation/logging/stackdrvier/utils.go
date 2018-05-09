@@ -49,6 +49,9 @@ const (
 
 	// The parallelism level of polling logs process.
 	sdLoggingPollParallelism = 10
+
+	// The limit on the number of stackdriver sinks that can be created within one project.
+	stackdriverSinkCountLimit = 90
 )
 
 type logProviderScope int
@@ -86,6 +89,10 @@ func newSdLogProvider(f *framework.Framework, scope logProviderScope) (*sdLogPro
 	if err != nil {
 		return nil, err
 	}
+	err = ensureProjectHasSinkCapacity(sdService.Projects.Sinks, framework.TestContext.CloudConfig.ProjectID)
+	if err != nil {
+		return nil, err
+	}
 
 	pubsubService, err := pubsub.New(hc)
 	if err != nil {
@@ -102,6 +109,36 @@ func newSdLogProvider(f *framework.Framework, scope logProviderScope) (*sdLogPro
 		queueCollection:    utils.NewLogsQueueCollection(maxQueueSize),
 	}
 	return provider, nil
+}
+
+func ensureProjectHasSinkCapacity(sinksService *sd.ProjectsSinksService, projectID string) error {
+	listResponse, err := listSinks(sinksService, projectID)
+	if err != nil {
+		return err
+	}
+	if len(listResponse.Sinks) >= stackdriverSinkCountLimit {
+		framework.Logf("Reached Stackdriver sink limit. Deleting all sinks")
+		deleteSinks(sinksService, projectID, listResponse.Sinks)
+	}
+	return nil
+}
+
+func listSinks(sinksService *sd.ProjectsSinksService, projectID string) (*sd.ListSinksResponse, error) {
+	projectDst := fmt.Sprintf("projects/%s", projectID)
+	listResponse, err := sinksService.List(projectDst).PageSize(stackdriverSinkCountLimit).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Stackdriver Logging sinks: %v", err)
+	}
+	return listResponse, nil
+}
+
+func deleteSinks(sinksService *sd.ProjectsSinksService, projectID string, sinks []*sd.LogSink) {
+	for _, sink := range sinks {
+		sinkNameID := fmt.Sprintf("projects/%s/sinks/%s", projectID, sink.Name)
+		if _, err := sinksService.Delete(sinkNameID).Do(); err != nil {
+			framework.Logf("Failed to delete LogSink: %v", err)
+		}
+	}
 }
 
 func (p *sdLogProvider) Init() error {
