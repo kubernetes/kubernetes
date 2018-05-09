@@ -345,14 +345,14 @@ func TestUpdateResult(t *testing.T) {
 	for _, test := range tests {
 		ecache := NewEquivalenceCache()
 		if test.expectPredicateMap {
-			ecache.algorithmCache[test.nodeName] = newAlgorithmCache()
+			ecache.algorithmCache[test.nodeName] = AlgorithmCache{}
 			predicateItem := HostPredicate{
 				Fit: true,
 			}
-			ecache.algorithmCache[test.nodeName].predicatesCache.Add(test.predicateKey,
+			ecache.algorithmCache[test.nodeName][test.predicateKey] =
 				PredicateMap{
 					test.equivalenceHash: predicateItem,
-				})
+				}
 		}
 		ecache.mu.Lock()
 		ecache.updateResult(
@@ -365,12 +365,11 @@ func TestUpdateResult(t *testing.T) {
 		)
 		ecache.mu.Unlock()
 
-		value, ok := ecache.algorithmCache[test.nodeName].predicatesCache.Get(test.predicateKey)
+		cachedMapItem, ok := ecache.algorithmCache[test.nodeName][test.predicateKey]
 		if !ok {
 			t.Errorf("Failed: %s, can't find expected cache item: %v",
 				test.name, test.expectCacheItem)
 		} else {
-			cachedMapItem := value.(PredicateMap)
 			if !reflect.DeepEqual(cachedMapItem[test.equivalenceHash], test.expectCacheItem) {
 				t.Errorf("Failed: %s, expected cached item: %v, but got: %v",
 					test.name, test.expectCacheItem, cachedMapItem[test.equivalenceHash])
@@ -693,7 +692,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 	// there should be no cached predicate any more
 	for _, test := range tests {
 		if algorithmCache, exist := ecache.algorithmCache[test.nodeName]; exist {
-			if _, exist := algorithmCache.predicatesCache.Get(testPredicate); exist {
+			if _, exist := algorithmCache[testPredicate]; exist {
 				t.Errorf("Failed: cached item for predicate key: %v on node: %v should be invalidated",
 					testPredicate, test.nodeName)
 				break
