@@ -382,14 +382,13 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	flunderName = generateFlunderName("dynamic-flunder")
 
 	// Rerun the Create/List/Delete tests using the Dynamic client.
-	resources, err := client.Discovery().ServerPreferredNamespacedResources()
-	framework.ExpectNoError(err, "getting server preferred namespaces resources for dynamic client")
+	resources, discoveryErr := client.Discovery().ServerPreferredNamespacedResources()
 	groupVersionResources, err := discovery.GroupVersionResources(resources)
 	framework.ExpectNoError(err, "getting group version resources for dynamic client")
 	gvr := schema.GroupVersionResource{Group: "wardle.k8s.io", Version: "v1alpha1", Resource: "flunders"}
 	_, ok := groupVersionResources[gvr]
 	if !ok {
-		framework.Failf("could not find group version resource for dynamic client and wardle/flunders.")
+		framework.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
 	}
 	dynamicClient := f.DynamicClient.Resource(gvr).Namespace(namespace)
 
