@@ -66,8 +66,10 @@ func TestGetNonzeroRequests(t *testing.T) {
 	}
 
 	for _, td := range tds {
-		realCPU, realMemory := GetNonzeroRequests(&td.requests)
-		assert.EqualValuesf(t, td.expectedCPU, realCPU, "Failed to test: %s", td.name)
-		assert.EqualValuesf(t, td.expectedMemory, realMemory, "Failed to test: %s", td.name)
+		t.Run(td.name, func(t *testing.T) {
+			realCPU, realMemory := GetNonzeroRequests(&td.requests)
+			assert.EqualValuesf(t, td.expectedCPU, realCPU, "Failed to test: %s", td.name)
+			assert.EqualValuesf(t, td.expectedMemory, realMemory, "Failed to test: %s", td.name)
+		})
 	}
 }

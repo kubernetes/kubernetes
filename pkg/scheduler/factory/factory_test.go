@@ -331,51 +331,61 @@ func TestNodeEnumerator(t *testing.T) {
 		t.Fatalf("expected %v, got %v", e, a)
 	}
 	for i := range testList.Items {
-		gotObj := me.Get(i)
-		if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-		if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %#v, got %v#", e, a)
-		}
+		t.Run(fmt.Sprintf("node enumerator/%v", i), func(t *testing.T) {
+			gotObj := me.Get(i)
+			if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
+				t.Errorf("Expected %v, got %v", e, a)
+			}
+			if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
+				t.Errorf("Expected %#v, got %v#", e, a)
+			}
+		})
 	}
 }
 
 func TestBind(t *testing.T) {
-	table := []struct {
+	table := map[string]struct {
 		binding *v1.Binding
 	}{
-		{binding: &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: metav1.NamespaceDefault,
-				Name:      "foo",
+		"binding can bind and validate request": {
+			binding: &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: metav1.NamespaceDefault,
+					Name:      "foo",
+				},
+				Target: v1.ObjectReference{
+					Name: "foohost.kubernetes.mydomain.com",
+				},
 			},
-			Target: v1.ObjectReference{
-				Name: "foohost.kubernetes.mydomain.com",
-			},
-		}},
+		},
 	}
 
-	for _, item := range table {
-		handler := utiltesting.FakeHandler{
-			StatusCode:   200,
-			ResponseBody: "",
-			T:            t,
-		}
-		server := httptest.NewServer(&handler)
-		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		b := binder{client}
-
-		if err := b.Bind(item.binding); err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		expectedBody := runtime.EncodeOrDie(schedulertesting.Test.Codec(), item.binding)
-		handler.ValidateRequest(t,
-			schedulertesting.Test.SubResourcePath(string(v1.ResourcePods), metav1.NamespaceDefault, "foo", "binding"),
-			"POST", &expectedBody)
+	for name, item := range table {
+		t.Run(name, func(t *testing.T) {
+			testBind(item.binding, t)
+		})
 	}
+}
+
+func testBind(binding *v1.Binding, t *testing.T) {
+	handler := utiltesting.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	b := binder{client}
+
+	if err := b.Bind(binding); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
+	expectedBody := runtime.EncodeOrDie(schedulertesting.Test.Codec(), binding)
+	handler.ValidateRequest(t,
+		schedulertesting.Test.SubResourcePath(string(v1.ResourcePods), metav1.NamespaceDefault, "foo", "binding"),
+		"POST", &expectedBody)
 }
 
 func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
@@ -405,39 +415,40 @@ func TestInvalidFactoryArgs(t *testing.T) {
 	defer server.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
-	testCases := []struct {
+	testCases := map[string]struct {
 		hardPodAffinitySymmetricWeight int32
 		expectErr                      string
 	}{
-		{
+		"symmetric weight below range": {
 			hardPodAffinitySymmetricWeight: -1,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: -1, must be in the range 0-100",
 		},
-		{
+		"symmetric weight above range": {
 			hardPodAffinitySymmetricWeight: 101,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: 101, must be in the range 0-100",
 		},
 	}
 
-	for _, test := range testCases {
-		factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight)
-		_, err := factory.Create()
-		if err == nil {
-			t.Errorf("expected err: %s, got nothing", test.expectErr)
-		}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight)
+			_, err := factory.Create()
+			if err == nil {
+				t.Errorf("expected err: %s, got nothing", test.expectErr)
+			}
+		})
 	}
 
 }
 
 func TestSkipPodUpdate(t *testing.T) {
-	for _, test := range []struct {
+	table := map[string]struct {
 		pod              *v1.Pod
 		isAssumedPodFunc func(*v1.Pod) bool
 		getPodFunc       func(*v1.Pod) *v1.Pod
 		expected         bool
 	}{
-		// Non-assumed pod should not be skipped.
-		{
+		"Non-assumed pod": {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-0",
@@ -453,9 +464,7 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: false,
 		},
-		// Pod update (with changes on ResourceVersion, Spec.NodeName and/or
-		// Annotations) for an already assumed pod should be skipped.
-		{
+		"with changes on ResourceVersion, Spec.NodeName and/or Annotations": {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "pod-0",
@@ -483,9 +492,7 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: true,
 		},
-		// Pod update (with changes on Labels) for an already assumed pod
-		// should not be skipped.
-		{
+		"with changes on Labels": {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "pod-0",
@@ -505,17 +512,20 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: false,
 		},
-	} {
-		c := &configFactory{
-			schedulerCache: &schedulertesting.FakeCache{
-				IsAssumedPodFunc: test.isAssumedPodFunc,
-				GetPodFunc:       test.getPodFunc,
-			},
-		}
-		got := c.skipPodUpdate(test.pod)
-		if got != test.expected {
-			t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
-		}
+	}
+	for name, test := range table {
+		t.Run(name, func(t *testing.T) {
+			c := &configFactory{
+				schedulerCache: &schedulertesting.FakeCache{
+					IsAssumedPodFunc: test.isAssumedPodFunc,
+					GetPodFunc:       test.getPodFunc,
+				},
+			}
+			got := c.skipPodUpdate(test.pod)
+			if got != test.expected {
+				t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
+			}
+		})
 	}
 }
 
@@ -593,24 +603,19 @@ func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
 }
 
 func TestGetBinderFunc(t *testing.T) {
-	for _, test := range []struct {
-		podName   string
-		extenders []algorithm.SchedulerExtender
-
+	table := map[string]struct {
+		podName            string
+		extenders          []algorithm.SchedulerExtender
 		expectedBinderType string
 	}{
-		// Expect to return the default binder because the extender is not a
-		// binder, even though it's interested in the pod.
-		{
+		"the extender is not a binder": {
 			podName: "pod0",
 			extenders: []algorithm.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 			},
 			expectedBinderType: "*factory.binder",
 		},
-		// Expect to return the fake binder because one of the extenders is a
-		// binder and it's interested in the pod.
-		{
+		"one of the extenders is a binder and interested in pod": {
 			podName: "pod0",
 			extenders: []algorithm.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
@@ -618,9 +623,7 @@ func TestGetBinderFunc(t *testing.T) {
 			},
 			expectedBinderType: "*factory.fakeExtender",
 		},
-		// Expect to return the default binder because one of the extenders is
-		// a binder but the binder is not interested in the pod.
-		{
+		"one of the extenders is a binder, but not interested in pod": {
 			podName: "pod1",
 			extenders: []algorithm.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
@@ -628,20 +631,28 @@ func TestGetBinderFunc(t *testing.T) {
 			},
 			expectedBinderType: "*factory.binder",
 		},
-	} {
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: test.podName,
-			},
-		}
+	}
 
-		f := &configFactory{}
-		binderFunc := f.getBinderFunc(test.extenders)
-		binder := binderFunc(pod)
+	for name, test := range table {
+		t.Run(name, func(t *testing.T) {
+			testGetBinderFunc(test.expectedBinderType, test.podName, test.extenders, t)
+		})
+	}
+}
 
-		binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
-		if binderType != test.expectedBinderType {
-			t.Errorf("Expected binder %q but got %q", test.expectedBinderType, binderType)
-		}
+func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm.SchedulerExtender, t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+	}
+
+	f := &configFactory{}
+	binderFunc := f.getBinderFunc(extenders)
+	binder := binderFunc(pod)
+
+	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
+	if binderType != expectedBinderType {
+		t.Errorf("Expected binder %q but got %q", expectedBinderType, binderType)
 	}
 }

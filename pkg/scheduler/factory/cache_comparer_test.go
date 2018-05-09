@@ -27,27 +27,25 @@ import (
 )
 
 func TestCompareNodes(t *testing.T) {
-	compare := compareStrategy{}
-
-	tests := []struct {
+	tests := map[string]struct {
 		actual    []string
 		cached    []string
 		missing   []string
 		redundant []string
 	}{
-		{
+		"redundant cached value": {
 			actual:    []string{"foo", "bar"},
 			cached:    []string{"bar", "foo", "foobar"},
 			missing:   []string{},
 			redundant: []string{"foobar"},
 		},
-		{
+		"missing cached value": {
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"bar", "foo"},
 			missing:   []string{"foobar"},
 			redundant: []string{},
 		},
-		{
+		"proper cache set": {
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"bar", "foobar", "foo"},
 			missing:   []string{},
@@ -55,77 +53,82 @@ func TestCompareNodes(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		nodes := []*v1.Node{}
-		for _, nodeName := range test.actual {
-			node := &v1.Node{}
-			node.Name = nodeName
-			nodes = append(nodes, node)
-		}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			testCompareNodes(test.actual, test.cached, test.missing, test.redundant, t)
+		})
+	}
+}
 
-		nodeInfo := make(map[string]*schedulercache.NodeInfo)
-		for _, nodeName := range test.cached {
-			nodeInfo[nodeName] = &schedulercache.NodeInfo{}
-		}
+func testCompareNodes(actual, cached, missing, redundant []string, t *testing.T) {
+	compare := compareStrategy{}
+	nodes := []*v1.Node{}
+	for _, nodeName := range actual {
+		node := &v1.Node{}
+		node.Name = nodeName
+		nodes = append(nodes, node)
+	}
 
-		m, r := compare.CompareNodes(nodes, nodeInfo)
+	nodeInfo := make(map[string]*schedulercache.NodeInfo)
+	for _, nodeName := range cached {
+		nodeInfo[nodeName] = &schedulercache.NodeInfo{}
+	}
 
-		if !reflect.DeepEqual(m, test.missing) {
-			t.Errorf("missing expected to be %s; got %s", test.missing, m)
-		}
+	m, r := compare.CompareNodes(nodes, nodeInfo)
 
-		if !reflect.DeepEqual(r, test.redundant) {
-			t.Errorf("redundant expected to be %s; got %s", test.redundant, r)
-		}
+	if !reflect.DeepEqual(m, missing) {
+		t.Errorf("missing expected to be %s; got %s", missing, m)
+	}
+
+	if !reflect.DeepEqual(r, redundant) {
+		t.Errorf("redundant expected to be %s; got %s", redundant, r)
 	}
 }
 
 func TestComparePods(t *testing.T) {
-	compare := compareStrategy{}
-
-	tests := []struct {
+	tests := map[string]struct {
 		actual    []string
 		cached    []string
 		queued    []string
 		missing   []string
 		redundant []string
 	}{
-		{
+		"redundant cached value": {
 			actual:    []string{"foo", "bar"},
 			cached:    []string{"bar", "foo", "foobar"},
 			queued:    []string{},
 			missing:   []string{},
 			redundant: []string{"foobar"},
 		},
-		{
+		"redundant and queued values": {
 			actual:    []string{"foo", "bar"},
 			cached:    []string{"foo", "foobar"},
 			queued:    []string{"bar"},
 			missing:   []string{},
 			redundant: []string{"foobar"},
 		},
-		{
+		"missing cached value": {
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"bar", "foo"},
 			queued:    []string{},
 			missing:   []string{"foobar"},
 			redundant: []string{},
 		},
-		{
+		"missing and queued values": {
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"foo"},
 			queued:    []string{"bar"},
 			missing:   []string{"foobar"},
 			redundant: []string{},
 		},
-		{
+		"correct cache set": {
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"bar", "foobar", "foo"},
 			queued:    []string{},
 			missing:   []string{},
 			redundant: []string{},
 		},
-		{
+		"queued cache value": {
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"foobar", "foo"},
 			queued:    []string{"bar"},
@@ -134,65 +137,70 @@ func TestComparePods(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		pods := []*v1.Pod{}
-		for _, uid := range test.actual {
-			pod := &v1.Pod{}
-			pod.UID = types.UID(uid)
-			pods = append(pods, pod)
-		}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			testComparePods(test.actual, test.cached, test.queued, test.missing, test.redundant, t)
+		})
+	}
+}
 
-		queuedPods := []*v1.Pod{}
-		for _, uid := range test.queued {
-			pod := &v1.Pod{}
-			pod.UID = types.UID(uid)
-			queuedPods = append(queuedPods, pod)
-		}
+func testComparePods(actual, cached, queued, missing, redundant []string, t *testing.T) {
+	compare := compareStrategy{}
+	pods := []*v1.Pod{}
+	for _, uid := range actual {
+		pod := &v1.Pod{}
+		pod.UID = types.UID(uid)
+		pods = append(pods, pod)
+	}
 
-		nodeInfo := make(map[string]*schedulercache.NodeInfo)
-		for _, uid := range test.cached {
-			pod := &v1.Pod{}
-			pod.UID = types.UID(uid)
-			pod.Namespace = "ns"
-			pod.Name = uid
+	queuedPods := []*v1.Pod{}
+	for _, uid := range queued {
+		pod := &v1.Pod{}
+		pod.UID = types.UID(uid)
+		queuedPods = append(queuedPods, pod)
+	}
 
-			nodeInfo[uid] = schedulercache.NewNodeInfo(pod)
-		}
+	nodeInfo := make(map[string]*schedulercache.NodeInfo)
+	for _, uid := range cached {
+		pod := &v1.Pod{}
+		pod.UID = types.UID(uid)
+		pod.Namespace = "ns"
+		pod.Name = uid
 
-		m, r := compare.ComparePods(pods, queuedPods, nodeInfo)
+		nodeInfo[uid] = schedulercache.NewNodeInfo(pod)
+	}
 
-		if !reflect.DeepEqual(m, test.missing) {
-			t.Errorf("missing expected to be %s; got %s", test.missing, m)
-		}
+	m, r := compare.ComparePods(pods, queuedPods, nodeInfo)
 
-		if !reflect.DeepEqual(r, test.redundant) {
-			t.Errorf("redundant expected to be %s; got %s", test.redundant, r)
-		}
+	if !reflect.DeepEqual(m, missing) {
+		t.Errorf("missing expected to be %s; got %s", missing, m)
+	}
+
+	if !reflect.DeepEqual(r, redundant) {
+		t.Errorf("redundant expected to be %s; got %s", redundant, r)
 	}
 }
 
 func TestComparePdbs(t *testing.T) {
-	compare := compareStrategy{}
-
-	tests := []struct {
+	tests := map[string]struct {
 		actual    []string
 		cached    []string
 		missing   []string
 		redundant []string
 	}{
-		{
+		"redundant cache value": {
 			actual:    []string{"foo", "bar"},
 			cached:    []string{"bar", "foo", "foobar"},
 			missing:   []string{},
 			redundant: []string{"foobar"},
 		},
-		{
+		"missing cache value": {
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"bar", "foo"},
 			missing:   []string{"foobar"},
 			redundant: []string{},
 		},
-		{
+		"correct cache": {
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"bar", "foobar", "foo"},
 			missing:   []string{},
@@ -200,29 +208,36 @@ func TestComparePdbs(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		pdbs := []*policy.PodDisruptionBudget{}
-		for _, uid := range test.actual {
-			pdb := &policy.PodDisruptionBudget{}
-			pdb.UID = types.UID(uid)
-			pdbs = append(pdbs, pdb)
-		}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			testComparePdbs(test.actual, test.cached, test.missing, test.redundant, t)
+		})
+	}
+}
 
-		cache := make(map[string]*policy.PodDisruptionBudget)
-		for _, uid := range test.cached {
-			pdb := &policy.PodDisruptionBudget{}
-			pdb.UID = types.UID(uid)
-			cache[uid] = pdb
-		}
+func testComparePdbs(actual, cached, missing, redundant []string, t *testing.T) {
+	compare := compareStrategy{}
+	pdbs := []*policy.PodDisruptionBudget{}
+	for _, uid := range actual {
+		pdb := &policy.PodDisruptionBudget{}
+		pdb.UID = types.UID(uid)
+		pdbs = append(pdbs, pdb)
+	}
 
-		m, r := compare.ComparePdbs(pdbs, cache)
+	cache := make(map[string]*policy.PodDisruptionBudget)
+	for _, uid := range cached {
+		pdb := &policy.PodDisruptionBudget{}
+		pdb.UID = types.UID(uid)
+		cache[uid] = pdb
+	}
 
-		if !reflect.DeepEqual(m, test.missing) {
-			t.Errorf("missing expected to be %s; got %s", test.missing, m)
-		}
+	m, r := compare.ComparePdbs(pdbs, cache)
 
-		if !reflect.DeepEqual(r, test.redundant) {
-			t.Errorf("redundant expected to be %s; got %s", test.redundant, r)
-		}
+	if !reflect.DeepEqual(m, missing) {
+		t.Errorf("missing expected to be %s; got %s", missing, m)
+	}
+
+	if !reflect.DeepEqual(r, redundant) {
+		t.Errorf("redundant expected to be %s; got %s", redundant, r)
 	}
 }

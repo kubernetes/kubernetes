@@ -109,11 +109,13 @@ func TestGetControllerRef(t *testing.T) {
 	}
 
 	for _, td := range tds {
-		realOR := GetControllerRef(&td.pod)
-		if td.expectedNil {
-			assert.Nilf(t, realOR, "Failed to test: %s", td.name)
-		} else {
-			assert.Equalf(t, &td.expectedOR, realOR, "Failed to test: %s", td.name)
-		}
+		t.Run(td.name, func(t *testing.T) {
+			realOR := GetControllerRef(&td.pod)
+			if td.expectedNil {
+				assert.Nilf(t, realOR, "Failed to test: %s", td.name)
+			} else {
+				assert.Equalf(t, &td.expectedOR, realOR, "Failed to test: %s", td.name)
+			}
+		})
 	}
 }

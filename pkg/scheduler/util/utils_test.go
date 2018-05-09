@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -52,10 +53,11 @@ func TestGetPodPriority(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if GetPodPriority(test.pod) != test.expectedPriority {
-			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
-		}
-
+		t.Run(test.name, func(t *testing.T) {
+			if GetPodPriority(test.pod) != test.expectedPriority {
+				t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
+			}
+		})
 	}
 }
 
@@ -87,10 +89,12 @@ func TestSortableList(t *testing.T) {
 		t.Errorf("expected length of list was 10, got: %v", len(podList.Items))
 	}
 	var prevPriority = int32(10)
-	for _, p := range podList.Items {
-		if *p.(*v1.Pod).Spec.Priority >= prevPriority {
-			t.Errorf("Pods are not soreted. Current pod pririty is %v, while previous one was %v.", *p.(*v1.Pod).Spec.Priority, prevPriority)
-		}
+	for i, p := range podList.Items {
+		t.Run(fmt.Sprintf("pod:%v", i), func(t *testing.T) {
+			if *p.(*v1.Pod).Spec.Priority >= prevPriority {
+				t.Errorf("Pods are not soreted. Current pod pririty is %v, while previous one was %v.", *p.(*v1.Pod).Spec.Priority, prevPriority)
+			}
+		})
 	}
 }
 
@@ -189,18 +193,20 @@ func TestHostPortInfo_AddRemove(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		hp := make(HostPortInfo)
-		for _, param := range test.added {
-			hp.Add(param.ip, param.protocol, param.port)
-		}
-		for _, param := range test.removed {
-			hp.Remove(param.ip, param.protocol, param.port)
-		}
-		if hp.Len() != test.length {
-			t.Errorf("%v failed: expect length %d; got %d", test.desc, test.length, hp.Len())
-			t.Error(hp)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%v/%v", i, test.desc), func(t *testing.T) {
+			hp := make(HostPortInfo)
+			for _, param := range test.added {
+				hp.Add(param.ip, param.protocol, param.port)
+			}
+			for _, param := range test.removed {
+				hp.Remove(param.ip, param.protocol, param.port)
+			}
+			if hp.Len() != test.length {
+				t.Errorf("%v failed: expect length %d; got %d", test.desc, test.length, hp.Len())
+				t.Error(hp)
+			}
+		})
 	}
 }
 
@@ -293,13 +299,15 @@ func TestHostPortInfo_Check(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		hp := make(HostPortInfo)
-		for _, param := range test.added {
-			hp.Add(param.ip, param.protocol, param.port)
-		}
-		if hp.CheckConflict(test.check.ip, test.check.protocol, test.check.port) != test.expect {
-			t.Errorf("%v failed, expected %t; got %t", test.desc, test.expect, !test.expect)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%v/%v", i, test.desc), func(t *testing.T) {
+			hp := make(HostPortInfo)
+			for _, param := range test.added {
+				hp.Add(param.ip, param.protocol, param.port)
+			}
+			if hp.CheckConflict(test.check.ip, test.check.protocol, test.check.port) != test.expect {
+				t.Errorf("%v failed, expected %t; got %t", test.desc, test.expect, !test.expect)
+			}
+		})
 	}
 }

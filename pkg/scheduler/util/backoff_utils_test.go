@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -63,24 +64,35 @@ func TestBackoff(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		duration := backoff.GetEntry(test.podID).getBackoff(backoff.maxDuration)
-		if duration != test.expectedDuration {
-			t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
-		}
-		clock.t = clock.t.Add(test.advanceClock)
-		backoff.Gc()
+	for i, test := range tests {
+		name := fmt.Sprintf("%v/%v", i, test.expectedDuration.String())
+		t.Run(name, func(t *testing.T) {
+			duration := backoff.GetEntry(test.podID).getBackoff(backoff.maxDuration)
+			if duration != test.expectedDuration {
+				t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
+			}
+
+			clock.t = clock.t.Add(test.advanceClock)
+			backoff.Gc()
+		})
 	}
+
 	fooID := ktypes.NamespacedName{Namespace: "default", Name: "foo"}
 	backoff.perPodBackoff[fooID].backoff = 60 * time.Second
-	duration := backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
-	if duration != 60*time.Second {
-		t.Errorf("expected: 60, got %s", duration.String())
-	}
-	// Verify that we split on namespaces correctly, same name, different namespace
-	fooID.Namespace = "other"
-	duration = backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
-	if duration != 1*time.Second {
-		t.Errorf("expected: 1, got %s", duration.String())
-	}
+	t.Run("Verify that we split on namespaces correctly, same name, different namespace", func(t *testing.T) {
+		t.Run("using default namespace", func(t *testing.T) {
+			duration := backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
+			if duration != 60*time.Second {
+				t.Errorf("expected: 60, got %s", duration.String())
+			}
+		})
+
+		t.Run("using other namespace", func(t *testing.T) {
+			fooID.Namespace = "other"
+			duration := backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
+			if duration != 1*time.Second {
+				t.Errorf("expected: 1, got %s", duration.String())
+			}
+		})
+	})
 }

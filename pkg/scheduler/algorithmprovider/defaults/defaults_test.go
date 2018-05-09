@@ -17,6 +17,7 @@ limitations under the License.
 package defaults
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,11 +44,13 @@ func TestCopyAndReplace(t *testing.T) {
 			expected:    sets.String{"A": sets.Empty{}, "B": sets.Empty{}},
 		},
 	}
-	for _, testCase := range testCases {
-		result := copyAndReplace(testCase.set, testCase.replaceWhat, testCase.replaceWith)
-		if !result.Equal(testCase.expected) {
-			t.Errorf("expected %v got %v", testCase.expected, result)
-		}
+	for i, testCase := range testCases {
+		t.Run(fmt.Sprintf("%v/replace %v with %v", i, testCase.replaceWhat, testCase.replaceWith), func(t *testing.T) {
+			result := copyAndReplace(testCase.set, testCase.replaceWhat, testCase.replaceWith)
+			if !result.Equal(testCase.expected) {
+				t.Errorf("expected %v got %v", testCase.expected, result)
+			}
+		})
 	}
 }
 
