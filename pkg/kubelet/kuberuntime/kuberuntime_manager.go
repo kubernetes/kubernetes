@@ -116,6 +116,8 @@ type kubeGenericRuntimeManager struct {
 
 	// A shim to legacy functions for backward compatibility.
 	legacyLogProvider LegacyLogProvider
+
+	cpuOvercommitRatioGetter func() float64
 }
 
 type KubeGenericRuntime interface {
@@ -150,21 +152,23 @@ func NewKubeGenericRuntimeManager(
 	imageService internalapi.ImageManagerService,
 	internalLifecycle cm.InternalContainerLifecycle,
 	legacyLogProvider LegacyLogProvider,
+	cpuOvercommitRatioGetter func() float64,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:            recorder,
-		cpuCFSQuota:         cpuCFSQuota,
-		seccompProfileRoot:  seccompProfileRoot,
-		livenessManager:     livenessManager,
-		containerRefManager: containerRefManager,
-		machineInfo:         machineInfo,
-		osInterface:         osInterface,
-		runtimeHelper:       runtimeHelper,
-		runtimeService:      newInstrumentedRuntimeService(runtimeService),
-		imageService:        newInstrumentedImageManagerService(imageService),
-		keyring:             credentialprovider.NewDockerKeyring(),
-		internalLifecycle:   internalLifecycle,
-		legacyLogProvider:   legacyLogProvider,
+		recorder:                 recorder,
+		cpuCFSQuota:              cpuCFSQuota,
+		seccompProfileRoot:       seccompProfileRoot,
+		livenessManager:          livenessManager,
+		containerRefManager:      containerRefManager,
+		machineInfo:              machineInfo,
+		osInterface:              osInterface,
+		runtimeHelper:            runtimeHelper,
+		runtimeService:           newInstrumentedRuntimeService(runtimeService),
+		imageService:             newInstrumentedImageManagerService(imageService),
+		keyring:                  credentialprovider.NewDockerKeyring(),
+		internalLifecycle:        internalLifecycle,
+		legacyLogProvider:        legacyLogProvider,
+		cpuOvercommitRatioGetter: cpuOvercommitRatioGetter,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)

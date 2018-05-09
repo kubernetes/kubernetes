@@ -72,18 +72,19 @@ func (f *fakePodStateProvider) IsPodTerminated(uid types.UID) bool {
 func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
 	recorder := &record.FakeRecorder{}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:            recorder,
-		cpuCFSQuota:         false,
-		livenessManager:     proberesults.NewManager(),
-		containerRefManager: kubecontainer.NewRefManager(),
-		machineInfo:         machineInfo,
-		osInterface:         osInterface,
-		runtimeHelper:       runtimeHelper,
-		runtimeService:      runtimeService,
-		imageService:        imageService,
-		keyring:             keyring,
-		seccompProfileRoot:  fakeSeccompProfileRoot,
-		internalLifecycle:   cm.NewFakeInternalContainerLifecycle(),
+		recorder:                 recorder,
+		cpuCFSQuota:              false,
+		livenessManager:          proberesults.NewManager(),
+		containerRefManager:      kubecontainer.NewRefManager(),
+		machineInfo:              machineInfo,
+		osInterface:              osInterface,
+		runtimeHelper:            runtimeHelper,
+		runtimeService:           runtimeService,
+		imageService:             imageService,
+		keyring:                  keyring,
+		seccompProfileRoot:       fakeSeccompProfileRoot,
+		internalLifecycle:        cm.NewFakeInternalContainerLifecycle(),
+		cpuOvercommitRatioGetter: func() float64 { return 1.0 },
 	}
 
 	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)

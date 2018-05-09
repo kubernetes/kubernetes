@@ -42,7 +42,7 @@ type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService) error
+	Start(*v1.Node, func() float64, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.

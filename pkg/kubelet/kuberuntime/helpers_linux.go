@@ -43,6 +43,14 @@ func milliCPUToShares(milliCPU int64) int64 {
 	return shares
 }
 
+func cpuSharesAfterCPUOvercommited(shares int64, ratio float64) int64 {
+	shares = int64(float64(shares) / ratio)
+	if shares < minShares {
+		return minShares
+	}
+	return shares
+}
+
 // milliCPUToQuota converts milliCPU to CFS quota and period values
 func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 	// CFS quota is measured in two values:
