@@ -77,24 +77,6 @@ func NewNamespacedCustomResourceClient(ns string, client dynamic.DynamicInterfac
 	return client.Resource(gvr)
 }
 
-func NewNamespacedCustomResourceStatusClient(ns string, client dynamic.DynamicInterface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.DynamicResourceInterface {
-	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
-
-	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
-		return client.NamespacedSubresource(gvr, "status", ns)
-	}
-	return client.ClusterSubresource(gvr, "status")
-}
-
-func NewNamespacedCustomResourceScaleClient(ns string, client dynamic.DynamicInterface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.DynamicResourceInterface {
-	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
-
-	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
-		return client.NamespacedSubresource(gvr, "scale", ns)
-	}
-	return client.ClusterSubresource(gvr, "scale")
-}
-
 func TestMultipleResourceInstances(t *testing.T) {
 	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
