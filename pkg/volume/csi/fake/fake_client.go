@@ -105,7 +105,7 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 	if req.GetTargetPath() == "" {
 		return nil, errors.New("missing target path")
 	}
-	fsTypes := "ext4|xfs|zfs"
+	fsTypes := "block|ext4|xfs|zfs"
 	fsType := req.GetVolumeCapability().GetMount().GetFsType()
 	if !strings.Contains(fsTypes, fsType) {
 		return nil, errors.New("invalid fstype")
@@ -144,7 +144,7 @@ func (f *NodeClient) NodeStageVolume(ctx context.Context, req *csipb.NodeStageVo
 	}
 
 	fsType := ""
-	fsTypes := "ext4|xfs|zfs"
+	fsTypes := "block|ext4|xfs|zfs"
 	mounted := req.GetVolumeCapability().GetMount()
 	if mounted != nil {
 		fsType = mounted.GetFsType()

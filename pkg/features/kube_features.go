@@ -331,6 +331,12 @@ const (
 	//
 	// Enable resource quota scope selectors
 	ResourceQuotaScopeSelectors utilfeature.Feature = "ResourceQuotaScopeSelectors"
+
+	// owner: @vladimirvivien
+	// alpha: v1.11
+	//
+	// Enables CSI to use raw block storage volumes
+	CSIBlockVolume utilfeature.Feature = "CSIBlockVolume"
 )
 
 func init() {
@@ -387,6 +393,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
 	ResourceQuotaScopeSelectors:                 {Default: false, PreRelease: utilfeature.Alpha},
+	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

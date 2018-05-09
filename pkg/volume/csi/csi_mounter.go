@@ -18,7 +18,6 @@ package csi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -292,45 +291,6 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	glog.V(4).Infof(log("mounte.TearDownAt successfully unmounted dir [%s]", dir))
 
 	return nil
-}
-
-// saveVolumeData persists parameter data as json file at the provided location
-func saveVolumeData(dir string, fileName string, data map[string]string) error {
-	dataFilePath := path.Join(dir, fileName)
-	glog.V(4).Info(log("saving volume data file [%s]", dataFilePath))
-	file, err := os.Create(dataFilePath)
-	if err != nil {
-		glog.Error(log("failed to save volume data file %s: %v", dataFilePath, err))
-		return err
-	}
-	defer file.Close()
-	if err := json.NewEncoder(file).Encode(data); err != nil {
-		glog.Error(log("failed to save volume data file %s: %v", dataFilePath, err))
-		return err
-	}
-	glog.V(4).Info(log("volume data file saved successfully [%s]", dataFilePath))
-	return nil
-}
-
-// loadVolumeData loads volume info from specified json file/location
-func loadVolumeData(dir string, fileName string) (map[string]string, error) {
-	// remove /mount at the end
-	dataFileName := path.Join(dir, fileName)
-	glog.V(4).Info(log("loading volume data file [%s]", dataFileName))
-
-	file, err := os.Open(dataFileName)
-	if err != nil {
-		glog.Error(log("failed to open volume data file [%s]: %v", dataFileName, err))
-		return nil, err
-	}
-	defer file.Close()
-	data := map[string]string{}
-	if err := json.NewDecoder(file).Decode(&data); err != nil {
-		glog.Error(log("failed to parse volume data file [%s]: %v", dataFileName, err))
-		return nil, err
-	}
-
-	return data, nil
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check

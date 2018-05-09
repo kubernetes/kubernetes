@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "csi_attacher.go",
+        "csi_block.go",
         "csi_client.go",
         "csi_mounter.go",
         "csi_plugin.go",
@@ -36,6 +37,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "csi_attacher_test.go",
+        "csi_block_test.go",
         "csi_client_test.go",
         "csi_mounter_test.go",
         "csi_plugin_test.go",
@@ -55,6 +57,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
