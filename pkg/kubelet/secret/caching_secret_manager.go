@@ -83,10 +83,10 @@ func isSecretOlder(newSecret, oldSecret *v1.Secret) bool {
 	return newVersion < oldVersion
 }
 
-func (s *secretStore) Add(namespace, name string) {
+func (s *secretStore) AddReference(namespace, name string) {
 	key := objectKey{namespace: namespace, name: name}
 
-	// Add is called from RegisterPod, thus it needs to be efficient.
+	// AddReference is called from RegisterPod, thus it needs to be efficient.
 	// Thus Add() is only increasing refCount and generation of a given secret.
 	// Then Get() is responsible for fetching if needed.
 	s.lock.Lock()
@@ -105,7 +105,7 @@ func (s *secretStore) Add(namespace, name string) {
 	item.secret = nil
 }
 
-func (s *secretStore) Delete(namespace, name string) {
+func (s *secretStore) DeleteReference(namespace, name string) {
 	key := objectKey{namespace: namespace, name: name}
 
 	s.lock.Lock()
