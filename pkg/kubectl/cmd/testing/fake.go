@@ -269,7 +269,8 @@ func NewTestFactory() *TestFactory {
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
 
 	configFlags := cmdutil.NewTestConfigFlags().
-		WithClientConfig(clientConfig)
+		WithClientConfig(clientConfig).
+		WithRESTMapper(testRESTMapper())
 
 	return &TestFactory{
 		Factory:           cmdutil.NewFactory(configFlags),
@@ -428,7 +429,7 @@ func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) 
 	return f.ClientSet()
 }
 
-func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
+func testRESTMapper() meta.RESTMapper {
 	groupResources := testDynamicResources()
 	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
 	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
@@ -440,10 +441,9 @@ func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
 		},
 	}
 
-	// TODO: should probably be the external scheme
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
-	return expander, nil
+	return expander
 }
 
 func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
