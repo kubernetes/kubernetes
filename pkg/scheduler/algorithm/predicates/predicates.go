@@ -672,29 +672,7 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
-		for rName, rQuantity := range container.Resources.Requests {
-			switch rName {
-			case v1.ResourceMemory:
-				if mem := rQuantity.Value(); mem > result.Memory {
-					result.Memory = mem
-				}
-			case v1.ResourceEphemeralStorage:
-				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > result.EphemeralStorage {
-					result.EphemeralStorage = ephemeralStorage
-				}
-			case v1.ResourceCPU:
-				if cpu := rQuantity.MilliValue(); cpu > result.MilliCPU {
-					result.MilliCPU = cpu
-				}
-			default:
-				if v1helper.IsScalarResourceName(rName) {
-					value := rQuantity.Value()
-					if value > result.ScalarResources[rName] {
-						result.SetScalar(rName, value)
-					}
-				}
-			}
-		}
+		result.SetMaxResource(container.Resources.Requests)
 	}
 
 	return result

@@ -185,6 +185,56 @@ func TestResourceAddScalar(t *testing.T) {
 	}
 }
 
+func TestSetMaxResource(t *testing.T) {
+	tests := []struct {
+		resource     *Resource
+		resourceList v1.ResourceList
+		expected     *Resource
+	}{
+		{
+			resource: &Resource{},
+			resourceList: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceCPU:              *resource.NewScaledQuantity(4, -3),
+				v1.ResourceMemory:           *resource.NewQuantity(2000, resource.BinarySI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+			},
+			expected: &Resource{
+				MilliCPU:         4,
+				Memory:           2000,
+				EphemeralStorage: 5000,
+			},
+		},
+		{
+			resource: &Resource{
+				MilliCPU:         4,
+				Memory:           4000,
+				EphemeralStorage: 5000,
+				ScalarResources:  map[v1.ResourceName]int64{"scalar.test/scalar1": 1, "hugepages-test": 2},
+			},
+			resourceList: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceCPU:                      *resource.NewScaledQuantity(4, -3),
+				v1.ResourceMemory:                   *resource.NewQuantity(2000, resource.BinarySI),
+				v1.ResourceEphemeralStorage:         *resource.NewQuantity(7000, resource.BinarySI),
+				"scalar.test/scalar1":               *resource.NewQuantity(4, resource.DecimalSI),
+				v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(5, resource.BinarySI),
+			},
+			expected: &Resource{
+				MilliCPU:         4,
+				Memory:           4000,
+				EphemeralStorage: 7000,
+				ScalarResources:  map[v1.ResourceName]int64{"scalar.test/scalar1": 4, "hugepages-test": 5},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test.resource.SetMaxResource(test.resourceList)
+		if !reflect.DeepEqual(test.expected, test.resource) {
+			t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
+		}
+	}
+}
+
 func TestNewNodeInfo(t *testing.T) {
 	nodeName := "test-node"
 	pods := []*v1.Pod{

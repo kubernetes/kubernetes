@@ -219,6 +219,37 @@ func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
 	r.ScalarResources[name] = quantity
 }
 
+// SetMaxResource compares with ResourceList and takes max value for each Resource.
+func (r *Resource) SetMaxResource(rl v1.ResourceList) {
+	if r == nil {
+		return
+	}
+
+	for rName, rQuantity := range rl {
+		switch rName {
+		case v1.ResourceMemory:
+			if mem := rQuantity.Value(); mem > r.Memory {
+				r.Memory = mem
+			}
+		case v1.ResourceCPU:
+			if cpu := rQuantity.MilliValue(); cpu > r.MilliCPU {
+				r.MilliCPU = cpu
+			}
+		case v1.ResourceEphemeralStorage:
+			if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
+				r.EphemeralStorage = ephemeralStorage
+			}
+		default:
+			if v1helper.IsScalarResourceName(rName) {
+				value := rQuantity.Value()
+				if value > r.ScalarResources[rName] {
+					r.SetScalar(rName, value)
+				}
+			}
+		}
+	}
+}
+
 // NewNodeInfo returns a ready to use empty NodeInfo object.
 // If any pods are given in arguments, their information will be aggregated in
 // the returned object.
