@@ -201,7 +201,6 @@ filegroup(
         ":package-srcs",
         "//pkg/kubectl/apply:all-srcs",
         "//pkg/kubectl/apps:all-srcs",
-        "//pkg/kubectl/categories:all-srcs",
         "//pkg/kubectl/cmd:all-srcs",
         "//pkg/kubectl/explain:all-srcs",
         "//pkg/kubectl/genericclioptions:all-srcs",

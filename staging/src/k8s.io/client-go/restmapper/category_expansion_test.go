@@ -135,7 +135,7 @@ func TestDiscoveryCategoryExpander(t *testing.T) {
 		dc.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.serverResponse, nil
 		}
-		expander, err := NewDiscoveryCategoryExpander(SimpleCategoryExpander{}, dc)
+		expander, err := NewDiscoveryCategoryExpander(dc)
 		if err != nil {
 			t.Fatalf("unexpected error %v", err)
 		}

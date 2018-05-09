@@ -46,13 +46,15 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 // NewBuilder returns a new resource builder for structured api objects.
 func (f *ring2Factory) NewBuilder() *resource.Builder {
 	mapper, mapperErr := f.clientAccessFactory.RESTMapper()
+	categoryExpander, categoryExpanderError := f.objectMappingFactory.CategoryExpander()
 
-	categoryExpander := f.objectMappingFactory.CategoryExpander()
 	return resource.NewBuilder(
 		f.clientAccessFactory.ClientConfig,
 		mapper,
 		categoryExpander,
-	).AddError(mapperErr)
+	).
+		AddError(mapperErr).
+		AddError(categoryExpanderError)
 }
 
 // PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.
