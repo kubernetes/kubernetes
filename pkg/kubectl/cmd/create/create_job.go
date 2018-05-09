@@ -18,6 +18,7 @@ package create
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -74,12 +75,13 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	o := NewCreateJobOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:     "job NAME [--from=CRONJOB]",
+		Use:     "job NAME --from=CRONJOB",
 		Short:   jobLong,
 		Long:    jobLong,
 		Example: jobExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunCreateJob())
 		},
 	}
@@ -90,15 +92,24 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
+	cmd.MarkFlagRequired("from")
 
 	return cmd
 }
 
-func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) (err error) {
-	if len(args) == 0 {
-		return cmdutil.UsageErrorf(cmd, "NAME is required")
+func (o *CreateJobOptions) Validate() (err error) {
+	if len(strings.Split(o.From, "/")) != 2 {
+		return fmt.Errorf("--from must be specified as RESOURCE/JOBNAME")
 	}
-	o.Name = args[0]
+	return nil
+}
+
+func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) (err error) {
+	name, err := NameFromCommandArgs(cmd, args)
+	if err != nil {
+		return err
+	}
+	o.Name = name
 
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {

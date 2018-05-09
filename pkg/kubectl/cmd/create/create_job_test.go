@@ -135,3 +135,34 @@ func TestCreateJobFromCronJob(t *testing.T) {
 		t.Errorf("expected '%s', got '%s'", testImageName, submittedJob.Spec.Template.Spec.Containers[0].Image)
 	}
 }
+
+func TestJobValidate(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	tf.Namespace = "test"
+
+	tests := map[string]struct {
+		jobOptions *CreateJobOptions
+		expectErr  bool
+	}{
+		"test-from-without-slash": {
+			jobOptions: &CreateJobOptions{From: "cronjob"},
+			expectErr:  true,
+		},
+		"test-from-extra-slash": {
+			jobOptions: &CreateJobOptions{From: "cronjob/a-cronjob/extra"},
+			expectErr:  true,
+		},
+	}
+	for name, test := range tests {
+		var err error
+		err = test.jobOptions.Validate()
+		if test.expectErr && err == nil {
+			t.Errorf("%s: expect error happens but validate passes.", name)
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("%s: unexpected error: %v", name, err)
+		}
+	}
+}
