@@ -48,6 +48,7 @@ import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
@@ -484,6 +485,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		rbacv1beta1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
+		schedulingapiv1beta1.SchemeGroupVersion,
 	)
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(

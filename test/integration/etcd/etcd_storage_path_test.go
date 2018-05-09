@@ -424,6 +424,14 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("scheduling.k8s.io", "v1alpha1", "priorityclasses"): {
 		stub:             `{"metadata":{"name":"pc1"},"Value":1000}`,
 		expectedEtcdPath: "/registry/priorityclasses/pc1",
+		expectedGVK:      gvkP("scheduling.k8s.io", "v1beta1", "PriorityClass"),
+	},
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/scheduling/v1beta1
+	gvr("scheduling.k8s.io", "v1beta1", "priorityclasses"): {
+		stub:             `{"metadata":{"name":"pc2"},"Value":1000}`,
+		expectedEtcdPath: "/registry/priorityclasses/pc2",
 	},
 	// --
 }
