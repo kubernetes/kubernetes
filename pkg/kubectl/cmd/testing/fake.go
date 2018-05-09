@@ -47,7 +47,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
@@ -287,8 +286,8 @@ func (f *TestFactory) Cleanup() {
 	os.Remove(f.tempConfigFile.Name())
 }
 
-func (f *TestFactory) CategoryExpander() restmapper.CategoryExpander {
-	return categories.LegacyCategoryExpander
+func (f *TestFactory) CategoryExpander() (restmapper.CategoryExpander, error) {
+	return resource.FakeCategoryExpander, nil
 }
 
 func (f *TestFactory) ClientConfig() (*restclient.Config, error) {

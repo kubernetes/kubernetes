@@ -543,6 +543,9 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 func (b *Builder) ReplaceAliases(input string) string {
 	replaced := []string{}
 	for _, arg := range strings.Split(input, ",") {
+		if b.categoryExpander == nil {
+			continue
+		}
 		if resources, ok := b.categoryExpander.Expand(arg); ok {
 			asStrings := []string{}
 			for _, resource := range resources {

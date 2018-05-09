@@ -33,6 +33,7 @@ type SimpleCategoryExpander struct {
 	Expansions map[string][]schema.GroupResource
 }
 
+// Expand fulfills CategoryExpander
 func (e SimpleCategoryExpander) Expand(category string) ([]schema.GroupResource, bool) {
 	ret, ok := e.Expansions[category]
 	return ret, ok
@@ -41,33 +42,32 @@ func (e SimpleCategoryExpander) Expand(category string) ([]schema.GroupResource,
 // discoveryCategoryExpander struct lets a REST Client wrapper (discoveryClient) to retrieve list of APIResourceList,
 // and then convert to fallbackExpander
 type discoveryCategoryExpander struct {
-	fallbackExpander CategoryExpander
-	discoveryClient  discovery.DiscoveryInterface
+	discoveryClient discovery.DiscoveryInterface
 }
 
 // NewDiscoveryCategoryExpander returns a category expander that makes use of the "categories" fields from
 // the API, found through the discovery client. In case of any error or no category found (which likely
 // means we're at a cluster prior to categories support, fallback to the expander provided.
-func NewDiscoveryCategoryExpander(fallbackExpander CategoryExpander, client discovery.DiscoveryInterface) (discoveryCategoryExpander, error) {
+func NewDiscoveryCategoryExpander(client discovery.DiscoveryInterface) (CategoryExpander, error) {
 	if client == nil {
 		panic("Please provide discovery client to shortcut expander")
 	}
-	return discoveryCategoryExpander{fallbackExpander: fallbackExpander, discoveryClient: client}, nil
+	return discoveryCategoryExpander{discoveryClient: client}, nil
 }
 
+// Expand fulfills CategoryExpander
 func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResource, bool) {
 	// Get all supported resources for groups and versions from server, if no resource found, fallback anyway.
 	apiResourceLists, _ := e.discoveryClient.ServerResources()
 	if len(apiResourceLists) == 0 {
-		return e.fallbackExpander.Expand(category)
+		return nil, false
 	}
 
 	discoveredExpansions := map[string][]schema.GroupResource{}
-
 	for _, apiResourceList := range apiResourceLists {
 		gv, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
 		if err != nil {
-			return e.fallbackExpander.Expand(category)
+			continue
 		}
 		// Collect GroupVersions by categories
 		for _, apiResource := range apiResourceList.APIResources {
@@ -83,64 +83,15 @@ func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResour
 		}
 	}
 
-	if len(discoveredExpansions) == 0 {
-		// We don't know if the server really don't have any resource with categories,
-		// or we're on a cluster version prior to categories support. Anyways, fallback.
-		return e.fallbackExpander.Expand(category)
-	}
-
 	ret, ok := discoveredExpansions[category]
 	return ret, ok
-}
-
-// discoveryFilteredExpander expands the given CategoryExpander (delegate) to filter group and resource returned from server
-type discoveryFilteredExpander struct {
-	delegate CategoryExpander
-
-	discoveryClient discovery.DiscoveryInterface
-}
-
-// NewDiscoveryFilteredExpander returns a category expander that filters the returned groupresources
-// by what the server has available
-func NewDiscoveryFilteredExpander(delegate CategoryExpander, client discovery.DiscoveryInterface) (discoveryFilteredExpander, error) {
-	if client == nil {
-		panic("Please provide discovery client to shortcut expander")
-	}
-	return discoveryFilteredExpander{delegate: delegate, discoveryClient: client}, nil
-}
-
-func (e discoveryFilteredExpander) Expand(category string) ([]schema.GroupResource, bool) {
-	delegateExpansion, ok := e.delegate.Expand(category)
-
-	// Check if we have access to server resources
-	apiResources, err := e.discoveryClient.ServerResources()
-	if err != nil {
-		return delegateExpansion, ok
-	}
-
-	availableResources, err := discovery.GroupVersionResources(apiResources)
-	if err != nil {
-		return delegateExpansion, ok
-	}
-
-	available := []schema.GroupResource{}
-	for _, requestedResource := range delegateExpansion {
-		for availableResource := range availableResources {
-			if requestedResource.Group == availableResource.Group &&
-				requestedResource.Resource == availableResource.Resource {
-				available = append(available, requestedResource)
-				break
-			}
-		}
-	}
-
-	return available, ok
 }
 
 // UnionCategoryExpander implements CategoryExpander interface.
 // It maps given category string to union of expansions returned by all the CategoryExpanders in the list.
 type UnionCategoryExpander []CategoryExpander
 
+// Expand fulfills CategoryExpander
 func (u UnionCategoryExpander) Expand(category string) ([]schema.GroupResource, bool) {
 	ret := []schema.GroupResource{}
 	ok := false
