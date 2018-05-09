@@ -70,7 +70,7 @@ type Framework struct {
 
 	InternalClientset *internalclientset.Clientset
 	AggregatorClient  *aggregatorclient.Clientset
-	DynamicClient     dynamic.DynamicInterface
+	DynamicClient     dynamic.Interface
 
 	ScalesGetter scaleclient.ScalesGetter
 

@@ -114,7 +114,7 @@ func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 	return internalclientset.NewForConfig(clientConfig)
 }
 
-func (f *ring0Factory) DynamicClient() (dynamic.DynamicInterface, error) {
+func (f *ring0Factory) DynamicClient() (dynamic.Interface, error) {
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return nil, err

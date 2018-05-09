@@ -33,7 +33,7 @@ import (
 // ClientBackedDryRunGetter implements the DryRunGetter interface for use in NewDryRunClient() and proxies all GET and LIST requests to the backing API server reachable via rest.Config
 type ClientBackedDryRunGetter struct {
 	client        clientset.Interface
-	dynamicClient dynamic.DynamicInterface
+	dynamicClient dynamic.Interface
 }
 
 // InitDryRunGetter should implement the DryRunGetter interface

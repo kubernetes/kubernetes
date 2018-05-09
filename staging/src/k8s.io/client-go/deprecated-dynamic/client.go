@@ -66,7 +66,7 @@ type ResourceInterface interface {
 // and manipulate metadata of a Kubernetes API group, and implements Interface.
 type Client struct {
 	version  schema.GroupVersion
-	delegate dynamic.DynamicInterface
+	delegate dynamic.Interface
 }
 
 // NewClient returns a new client based on the passed in config. The
@@ -97,35 +97,35 @@ func (c *Client) Resource(resource *metav1.APIResource, namespace string) Resour
 }
 
 // the old interfaces used the wrong type for lists.  this fixes that
-func oldResourceShim(in dynamic.DynamicResourceInterface, subresources []string) ResourceInterface {
-	return oldResourceShimType{DynamicResourceInterface: in, subresources: subresources}
+func oldResourceShim(in dynamic.ResourceInterface, subresources []string) ResourceInterface {
+	return oldResourceShimType{ResourceInterface: in, subresources: subresources}
 }
 
 type oldResourceShimType struct {
-	dynamic.DynamicResourceInterface
+	dynamic.ResourceInterface
 	subresources []string
 }
 
 func (s oldResourceShimType) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	return s.DynamicResourceInterface.Create(obj, s.subresources...)
+	return s.ResourceInterface.Create(obj, s.subresources...)
 }
 
 func (s oldResourceShimType) Update(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	return s.DynamicResourceInterface.Update(obj, s.subresources...)
+	return s.ResourceInterface.Update(obj, s.subresources...)
 }
 
 func (s oldResourceShimType) Delete(name string, opts *metav1.DeleteOptions) error {
-	return s.DynamicResourceInterface.Delete(name, opts, s.subresources...)
+	return s.ResourceInterface.Delete(name, opts, s.subresources...)
 }
 
 func (s oldResourceShimType) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
-	return s.DynamicResourceInterface.Get(name, opts, s.subresources...)
+	return s.ResourceInterface.Get(name, opts, s.subresources...)
 }
 
 func (s oldResourceShimType) List(opts metav1.ListOptions) (runtime.Object, error) {
-	return s.DynamicResourceInterface.List(opts)
+	return s.ResourceInterface.List(opts)
 }
 
 func (s oldResourceShimType) Patch(name string, pt types.PatchType, data []byte) (*unstructured.Unstructured, error) {
-	return s.DynamicResourceInterface.Patch(name, pt, data, s.subresources...)
+	return s.ResourceInterface.Patch(name, pt, data, s.subresources...)
 }

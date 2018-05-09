@@ -115,7 +115,7 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 	})
 })
 
-func watchCRWithName(crdResourceClient dynamic.DynamicResourceInterface, name string) (watch.Interface, error) {
+func watchCRWithName(crdResourceClient dynamic.ResourceInterface, name string) (watch.Interface, error) {
 	return crdResourceClient.Watch(
 		metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + name,
@@ -124,7 +124,7 @@ func watchCRWithName(crdResourceClient dynamic.DynamicResourceInterface, name st
 	)
 }
 
-func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, client dynamic.DynamicResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
+func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
 	createdInstance, err := client.Create(instanceToCreate)
 	if err != nil {
 		return nil, err
@@ -150,11 +150,11 @@ func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, clie
 	return createdInstance, nil
 }
 
-func deleteCustomResource(client dynamic.DynamicResourceInterface, name string) error {
+func deleteCustomResource(client dynamic.ResourceInterface, name string) error {
 	return client.Delete(name, &metav1.DeleteOptions{})
 }
 
-func newNamespacedCustomResourceClient(ns string, client dynamic.DynamicInterface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.DynamicResourceInterface {
+func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.ResourceInterface {
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
 
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {

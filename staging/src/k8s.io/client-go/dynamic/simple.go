@@ -30,34 +30,13 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type DynamicInterface interface {
-	Resource(resource schema.GroupVersionResource) NamespaceableDynamicResourceInterface
-}
-
-type DynamicResourceInterface interface {
-	Create(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error)
-	Update(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error)
-	UpdateStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error)
-	Delete(name string, options *metav1.DeleteOptions, subresources ...string) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error)
-	List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*unstructured.Unstructured, error)
-}
-
-type NamespaceableDynamicResourceInterface interface {
-	Namespace(string) DynamicResourceInterface
-	DynamicResourceInterface
-}
-
 type dynamicClient struct {
 	client *rest.RESTClient
 }
 
-var _ DynamicInterface = &dynamicClient{}
+var _ Interface = &dynamicClient{}
 
-func NewForConfig(inConfig *rest.Config) (DynamicInterface, error) {
+func NewForConfig(inConfig *rest.Config) (Interface, error) {
 	config := rest.CopyConfig(inConfig)
 	// for serializing the options
 	config.GroupVersion = &schema.GroupVersion{}
@@ -83,11 +62,11 @@ type dynamicResourceClient struct {
 	resource  schema.GroupVersionResource
 }
 
-func (c *dynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableDynamicResourceInterface {
+func (c *dynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface {
 	return &dynamicResourceClient{client: c, resource: resource}
 }
 
-func (c *dynamicResourceClient) Namespace(ns string) DynamicResourceInterface {
+func (c *dynamicResourceClient) Namespace(ns string) ResourceInterface {
 	ret := *c
 	ret.namespace = ns
 	return &ret
@@ -161,6 +140,10 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured) (*u
 	}
 
 	result := c.client.client.Put().AbsPath(append(c.makeURLSegments(accessor.GetName()), "status")...).Body(outBytes).Do()
+	if err := result.Error(); err != nil {
+		return nil, err
+	}
+
 	retBytes, err := result.Raw()
 	if err != nil {
 		return nil, err

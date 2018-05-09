@@ -60,7 +60,7 @@ const ResourceResyncTime time.Duration = 0
 // up to date as the notification is sent.
 type GarbageCollector struct {
 	restMapper    resettableRESTMapper
-	dynamicClient dynamic.DynamicInterface
+	dynamicClient dynamic.Interface
 	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
 	attemptToDelete workqueue.RateLimitingInterface
 	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
@@ -74,7 +74,7 @@ type GarbageCollector struct {
 }
 
 func NewGarbageCollector(
-	dynamicClient dynamic.DynamicInterface,
+	dynamicClient dynamic.Interface,
 	mapper resettableRESTMapper,
 	deletableResources map[schema.GroupVersionResource]struct{},
 	ignoredResources map[schema.GroupResource]struct{},
