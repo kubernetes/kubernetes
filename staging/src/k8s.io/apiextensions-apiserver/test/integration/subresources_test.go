@@ -99,7 +99,6 @@ func TestStatusSubresource(t *testing.T) {
 
 	ns := "not-the-default"
 	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -129,7 +128,7 @@ func TestStatusSubresource(t *testing.T) {
 
 	// UpdateStatus should not update spec.
 	// Check that .spec.num = 10 and .status.num = 20
-	updatedStatusInstance, err := noxuStatusResourceClient.Update(gottenNoxuInstance)
+	updatedStatusInstance, err := noxuResourceClient.UpdateStatus(gottenNoxuInstance)
 	if err != nil {
 		t.Fatalf("unable to update status: %v", err)
 	}
@@ -229,7 +228,6 @@ func TestScaleSubresource(t *testing.T) {
 
 	ns := "not-the-default"
 	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -249,7 +247,7 @@ func TestScaleSubresource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	_, err = noxuStatusResourceClient.Update(gottenNoxuInstance)
+	_, err = noxuResourceClient.UpdateStatus(gottenNoxuInstance)
 	if err != nil {
 		t.Fatalf("unable to update status: %v", err)
 	}
@@ -415,7 +413,6 @@ func TestValidateOnlyStatus(t *testing.T) {
 	}
 	ns := "not-the-default"
 	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, dynamicClient, noxuDefinition)
 
 	// set .spec.num = 10 and .status.num = 10
 	noxuInstance := NewNoxuSubresourceInstance(ns, "foo")
@@ -434,7 +431,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error setting .spec.num: %v", err)
 	}
-	createdNoxuInstance, err = noxuStatusResourceClient.Update(createdNoxuInstance)
+	createdNoxuInstance, err = noxuResourceClient.UpdateStatus(createdNoxuInstance)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -444,7 +441,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error setting .status.num: %v", err)
 	}
-	createdNoxuInstance, err = noxuStatusResourceClient.Update(createdNoxuInstance)
+	createdNoxuInstance, err = noxuResourceClient.UpdateStatus(createdNoxuInstance)
 	if err == nil {
 		t.Fatal("expected error, but got none")
 	}
@@ -556,7 +553,6 @@ func TestGeneration(t *testing.T) {
 
 	ns := "not-the-default"
 	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -578,7 +574,7 @@ func TestGeneration(t *testing.T) {
 	}
 
 	// UpdateStatus does not increment generation
-	updatedStatusInstance, err := noxuStatusResourceClient.Update(gottenNoxuInstance)
+	updatedStatusInstance, err := noxuResourceClient.UpdateStatus(gottenNoxuInstance)
 	if err != nil {
 		t.Fatalf("unable to update status: %v", err)
 	}
@@ -636,8 +632,6 @@ func TestSubresourcePatch(t *testing.T) {
 
 	ns := "not-the-default"
 	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, dynamicClient, noxuDefinition)
-	noxuScaleResourceClient := NewNamespacedCustomResourceScaleClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -649,7 +643,7 @@ func TestSubresourcePatch(t *testing.T) {
 	}
 
 	patch := []byte(`{"spec": {"num":999}, "status": {"num":999}}`)
-	patchedNoxuInstance, err := noxuStatusResourceClient.Patch("foo", types.MergePatchType, patch)
+	patchedNoxuInstance, err := noxuResourceClient.Patch("foo", types.MergePatchType, patch, "status")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -684,19 +678,19 @@ func TestSubresourcePatch(t *testing.T) {
 	}
 
 	// no-op patch
-	_, err = noxuStatusResourceClient.Patch("foo", types.MergePatchType, patch)
+	_, err = noxuResourceClient.Patch("foo", types.MergePatchType, patch, "status")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// empty patch
-	_, err = noxuStatusResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`))
+	_, err = noxuResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), "status")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	patch = []byte(`{"spec": {"replicas":7}, "status": {"replicas":7}}`)
-	patchedNoxuInstance, err = noxuScaleResourceClient.Patch("foo", types.MergePatchType, patch)
+	patchedNoxuInstance, err = noxuResourceClient.Patch("foo", types.MergePatchType, patch, "scale")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -725,24 +719,24 @@ func TestSubresourcePatch(t *testing.T) {
 	}
 
 	// no-op patch
-	_, err = noxuScaleResourceClient.Patch("foo", types.MergePatchType, patch)
+	_, err = noxuResourceClient.Patch("foo", types.MergePatchType, patch, "scale")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// empty patch
-	_, err = noxuScaleResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`))
+	_, err = noxuResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), "scale")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// make sure strategic merge patch is not supported for both status and scale
-	_, err = noxuStatusResourceClient.Patch("foo", types.StrategicMergePatchType, patch)
+	_, err = noxuResourceClient.Patch("foo", types.StrategicMergePatchType, patch, "status")
 	if err == nil {
 		t.Fatalf("unexpected non-error: strategic merge patch is not supported for custom resources")
 	}
 
-	_, err = noxuScaleResourceClient.Patch("foo", types.StrategicMergePatchType, patch)
+	_, err = noxuResourceClient.Patch("foo", types.StrategicMergePatchType, patch, "scale")
 	if err == nil {
 		t.Fatalf("unexpected non-error: strategic merge patch is not supported for custom resources")
 	}
