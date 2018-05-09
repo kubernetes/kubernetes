@@ -29,13 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
 )
 
@@ -88,9 +85,6 @@ func NewNoxuSubresourceInstance(namespace, name string) *unstructured.Unstructur
 }
 
 func TestStatusSubresource(t *testing.T) {
-	// enable alpha feature CustomResourceSubresources
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
-
 	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
@@ -198,9 +192,6 @@ func TestStatusSubresource(t *testing.T) {
 }
 
 func TestScaleSubresource(t *testing.T) {
-	// enable alpha feature CustomResourceSubresources
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
-
 	groupResource := schema.GroupResource{
 		Group:    "mygroup.example.com",
 		Resource: "noxus",
@@ -333,9 +324,6 @@ func TestScaleSubresource(t *testing.T) {
 }
 
 func TestValidationSchema(t *testing.T) {
-	// enable alpha feature CustomResourceSubresources
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
-
 	stopCh, config, err := testserver.StartDefaultServer()
 	if err != nil {
 		t.Fatal(err)
@@ -382,9 +370,6 @@ func TestValidationSchema(t *testing.T) {
 }
 
 func TestValidateOnlyStatus(t *testing.T) {
-	// enable alpha feature CustomResourceSubresources
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
-
 	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
@@ -473,9 +458,6 @@ func TestValidateOnlyStatus(t *testing.T) {
 }
 
 func TestSubresourcesDiscovery(t *testing.T) {
-	// enable alpha feature CustomResourceSubresources
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
-
 	stopCh, config, err := testserver.StartDefaultServer()
 	if err != nil {
 		t.Fatal(err)
@@ -560,9 +542,6 @@ func TestSubresourcesDiscovery(t *testing.T) {
 }
 
 func TestGeneration(t *testing.T) {
-	// enable alpha feature CustomResourceSubresources
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
-
 	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
@@ -629,9 +608,6 @@ func TestGeneration(t *testing.T) {
 }
 
 func TestSubresourcePatch(t *testing.T) {
-	// enable alpha feature CustomResourceSubresources
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
-
 	groupResource := schema.GroupResource{
 		Group:    "mygroup.example.com",
 		Resource: "noxus",

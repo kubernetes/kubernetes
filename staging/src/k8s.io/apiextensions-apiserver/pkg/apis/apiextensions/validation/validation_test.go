@@ -21,11 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/features"
 )
 
 type validationMatch struct {
@@ -523,8 +520,6 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 }
 
 func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
-
 	tests := []struct {
 		name          string
 		input         apiextensions.CustomResourceValidation
