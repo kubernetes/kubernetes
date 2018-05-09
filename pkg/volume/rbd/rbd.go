@@ -936,14 +936,20 @@ func (rbd *rbdDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
 	loop, err := volumepathhandler.BlockVolumePathHandler.GetLoopDevice(blkUtil, device)
 	if err != nil {
-		return fmt.Errorf("rbd: failed to get loopback for device: %v, err: %v", device, err)
+		if err.Error() != volumepathhandler.ErrDeviceNotFound {
+			return fmt.Errorf("rbd: failed to get loopback for device: %v, err: %v", device, err)
+		}
+		glog.Warning("rbd: loopback for device: % not found", device)
+	} else {
+		if len(loop) != 0 {
+			// Remove loop device before detaching volume since volume detach operation gets busy if volume is opened by loopback.
+			err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
+			if err != nil {
+				return fmt.Errorf("rbd: failed to remove loopback :%v, err: %v", loop, err)
+			}
+			glog.V(4).Infof("rbd: successfully removed loop device: %s", loop)
+		}
 	}
-	// Remove loop device before detaching volume since volume detach operation gets busy if volume is opened by loopback.
-	err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
-	if err != nil {
-		return fmt.Errorf("rbd: failed to remove loopback :%v, err: %v", loop, err)
-	}
-	glog.V(4).Infof("rbd: successfully removed loop device: %s", loop)
 
 	err = rbd.manager.DetachBlockDisk(*rbd, mapPath)
 	if err != nil {
