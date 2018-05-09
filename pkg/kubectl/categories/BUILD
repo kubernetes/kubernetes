@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -7,22 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/client-go/discovery:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["categories_test.go"],
-    embed = [":go_default_library"],
-    deps = [
-        "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
-        "//vendor/k8s.io/client-go/discovery:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/rest/fake:go_default_library",
+        "//vendor/k8s.io/client-go/restmapper:go_default_library",
     ],
 )
 

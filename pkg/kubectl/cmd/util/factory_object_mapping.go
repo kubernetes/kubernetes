@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -75,17 +76,17 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
-func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {
+func (f *ring1Factory) CategoryExpander() restmapper.CategoryExpander {
 	legacyExpander := categories.LegacyCategoryExpander
 
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err == nil {
 		// fallback is the legacy expander wrapped with discovery based filtering
-		fallbackExpander, err := categories.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
+		fallbackExpander, err := restmapper.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
 		CheckErr(err)
 
 		// by default use the expander that discovers based on "categories" field from the API
-		discoveryCategoryExpander, err := categories.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
+		discoveryCategoryExpander, err := restmapper.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
 		CheckErr(err)
 
 		return discoveryCategoryExpander
