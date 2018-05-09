@@ -20,6 +20,7 @@ limitations under the License.
 package storage
 
 import (
+	"flag"
 	"fmt"
 	"time"
 
@@ -37,12 +38,30 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-const (
-	csiHostPathPluginImage      string = "quay.io/k8scsi/hostpathplugin:v0.2.0"
-	csiExternalAttacherImage    string = "quay.io/k8scsi/csi-attacher:v0.2.0"
-	csiExternalProvisionerImage string = "quay.io/k8scsi/csi-provisioner:v0.2.1"
-	csiDriverRegistrarImage     string = "quay.io/k8scsi/driver-registrar:v0.2.0"
-)
+var csiImageVersions = map[string]string{
+	"hostpathplugin":   "v0.2.0",
+	"csi-attacher":     "v0.2.0",
+	"csi-provisioner":  "v0.2.1",
+	"driver-registrar": "v0.2.0",
+}
+var csiImageVersion string
+var csiImageRegistry string
+
+func init() {
+	flag.StringVar(&csiImageVersion, "csiImageVersion", "", "overrides the default tag used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
+	flag.StringVar(&csiImageRegistry, "csiImageRegistry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
+}
+
+func csiContainerImage(image string) string {
+	var fullName string
+	fullName += csiImageRegistry + "/" + image + ":"
+	if csiImageVersion != "" {
+		fullName += csiImageVersion
+	} else {
+		fullName += csiImageVersions[image]
+	}
+	return fullName
+}
 
 // Create the driver registrar cluster role if it doesn't exist, no teardown so that tests
 // are parallelizable. This role will be shared with many of the CSI tests.
@@ -207,7 +226,7 @@ func csiHostPathPod(
 			Containers: []v1.Container{
 				{
 					Name:            "external-provisioner",
-					Image:           csiExternalProvisionerImage,
+					Image:           csiContainerImage("csi-provisioner"),
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -223,7 +242,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "driver-registrar",
-					Image:           csiDriverRegistrarImage,
+					Image:           csiContainerImage("driver-registrar"),
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -248,7 +267,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "external-attacher",
-					Image:           csiExternalAttacherImage,
+					Image:           csiContainerImage("csi-attacher"),
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -269,7 +288,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "hostpath-driver",
-					Image:           csiHostPathPluginImage,
+					Image:           csiContainerImage("hostpathplugin"),
 					ImagePullPolicy: v1.PullAlways,
 					SecurityContext: &v1.SecurityContext{
 						Privileged: &priv,
