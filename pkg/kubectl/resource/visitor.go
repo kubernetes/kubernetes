@@ -38,7 +38,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 const (
@@ -219,7 +218,7 @@ func (l EagerVisitorList) Visit(fn VisitorFunc) error {
 	return utilerrors.NewAggregate(errs)
 }
 
-func ValidateSchema(data []byte, schema validation.Schema) error {
+func ValidateSchema(data []byte, schema ContentValidator) error {
 	if schema == nil {
 		return nil
 	}
@@ -433,7 +432,7 @@ func ignoreFile(path string, extensions []string) bool {
 }
 
 // FileVisitorForSTDIN return a special FileVisitor just for STDIN
-func FileVisitorForSTDIN(mapper *mapper, schema validation.Schema) Visitor {
+func FileVisitorForSTDIN(mapper *mapper, schema ContentValidator) Visitor {
 	return &FileVisitor{
 		Path:          constSTDINstr,
 		StreamVisitor: NewStreamVisitor(nil, mapper, constSTDINstr, schema),
@@ -443,7 +442,7 @@ func FileVisitorForSTDIN(mapper *mapper, schema validation.Schema) Visitor {
 // ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
 // After FileVisitors open the files, they will pass an io.Reader to a StreamVisitor to do the reading. (stdin
 // is also taken care of). Paths argument also accepts a single file, and will return a single visitor
-func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
+func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, extensions []string, schema ContentValidator) ([]Visitor, error) {
 	var visitors []Visitor
 	err := filepath.Walk(paths, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -513,11 +512,11 @@ type StreamVisitor struct {
 	*mapper
 
 	Source string
-	Schema validation.Schema
+	Schema ContentValidator
 }
 
 // NewStreamVisitor is a helper function that is useful when we want to change the fields of the struct but keep calls the same.
-func NewStreamVisitor(r io.Reader, mapper *mapper, source string, schema validation.Schema) *StreamVisitor {
+func NewStreamVisitor(r io.Reader, mapper *mapper, source string, schema ContentValidator) *StreamVisitor {
 	return &StreamVisitor{
 		Reader: r,
 		mapper: mapper,
