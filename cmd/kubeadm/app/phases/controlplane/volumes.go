@@ -107,9 +107,9 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 
 	// Merge user defined mounts and ensure unique volume and volume mount
 	// names
-	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeAPIServer, cfg.APIServerExtraVolumes, &hostPathDirectoryOrCreate)
-	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeControllerManager, cfg.ControllerManagerExtraVolumes, &hostPathDirectoryOrCreate)
-	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeScheduler, cfg.SchedulerExtraVolumes, &hostPathDirectoryOrCreate)
+	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeAPIServer, cfg.APIServerExtraVolumes)
+	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeControllerManager, cfg.ControllerManagerExtraVolumes)
+	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeScheduler, cfg.SchedulerExtraVolumes)
 
 	return mounts
 }
@@ -155,10 +155,11 @@ func (c *controlPlaneHostPathMounts) AddHostPathMounts(component string, vols []
 
 // AddExtraHostPathMounts adds host path mounts and overwrites the default
 // paths in the case that a user specifies the same volume/volume mount name.
-func (c *controlPlaneHostPathMounts) AddExtraHostPathMounts(component string, extraVols []kubeadmapi.HostPathMount, hostPathType *v1.HostPathType) {
+func (c *controlPlaneHostPathMounts) AddExtraHostPathMounts(component string, extraVols []kubeadmapi.HostPathMount) {
 	for _, extraVol := range extraVols {
 		fmt.Printf("[controlplane] Adding extra host path mount %q to %q\n", extraVol.Name, component)
-		c.NewHostPathMount(component, extraVol.Name, extraVol.HostPath, extraVol.MountPath, !extraVol.Writable, hostPathType)
+		hostPathType := extraVol.PathType
+		c.NewHostPathMount(component, extraVol.Name, extraVol.HostPath, extraVol.MountPath, !extraVol.Writable, &hostPathType)
 	}
 }
 
