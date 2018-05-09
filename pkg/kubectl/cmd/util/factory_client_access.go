@@ -151,6 +151,11 @@ func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
 	return f.clientGetter.ToRESTConfig()
 }
 
+// NewBuilder returns a new resource builder for structured api objects.
+func (f *ring0Factory) NewBuilder() *resource.Builder {
+	return resource.NewBuilder(f.clientGetter)
+}
+
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
 	clientConfig, err := f.ClientConfig()
 	if err != nil {

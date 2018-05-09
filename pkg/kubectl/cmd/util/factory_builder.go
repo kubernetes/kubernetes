@@ -26,7 +26,6 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 type ring2Factory struct {
@@ -41,20 +40,6 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	}
 
 	return f
-}
-
-// NewBuilder returns a new resource builder for structured api objects.
-func (f *ring2Factory) NewBuilder() *resource.Builder {
-	mapper, mapperErr := f.clientAccessFactory.RESTMapper()
-	categoryExpander, categoryExpanderError := f.objectMappingFactory.CategoryExpander()
-
-	return resource.NewBuilder(
-		f.clientAccessFactory.ClientConfig,
-		mapper,
-		categoryExpander,
-	).
-		AddError(mapperErr).
-		AddError(categoryExpanderError)
 }
 
 // PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.
