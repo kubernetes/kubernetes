@@ -472,15 +472,15 @@ func (r *RemoteRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.Run
 	return nil
 }
 
+// GetRuntimeConfigInfo returns the configuration information from the runtime
 func (r *RemoteRuntimeService) GetRuntimeConfigInfo() (*runtimeapi.ActiveRuntimeConfig, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
 	resp, err := r.runtimeClient.GetRuntimeConfigInfo(ctx, &runtimeapi.GetRuntimeConfigInfoRequest{})
 	if err != nil {
-		errorMessage := "failed to get runtime configuration details"
-		glog.Errorf("GetRuntimeConfigInfo failed: %s", errorMessage)
-		return nil, errors.New(errorMessage)
+		klog.Errorf("GetRuntimeConfigInfo failed: %s", err)
+		return nil, err
 	}
 
 	return resp.RuntimeConfig, nil

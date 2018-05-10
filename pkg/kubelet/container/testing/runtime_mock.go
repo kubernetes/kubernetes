@@ -61,14 +61,19 @@ func (r *Mock) Status() (*RuntimeStatus, error) {
 	return args.Get(0).(*RuntimeStatus), args.Error(0)
 }
 
-func (r *Mock) GetRuntimeConfigInfo() *RuntimeConfigInfo {
+func (r *Mock) GetRuntimeConfigInfo() (*RuntimeConfigInfo, error) {
 	args := r.Called()
-	return args.Get(0).(*RuntimeConfigInfo)
+	return args.Get(0).(*RuntimeConfigInfo), args.Error(1)
 }
 
-func (r *Mock) GetRemappedIds() (int, int) {
-	args := r.Called()
-	return args.Get(0).(int), args.Get(1).(int)
+func (r *Mock) GetHostUID(containerUID int) (int, error) {
+	args := r.Called(containerUID)
+	return args.Get(0).(int), args.Error(1)
+}
+
+func (r *Mock) GetHostGID(containerGID int) (int, error) {
+	args := r.Called(containerGID)
+	return args.Get(0).(int), args.Error(1)
 }
 
 func (r *Mock) GetPods(all bool) ([]*Pod, error) {

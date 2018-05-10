@@ -40,26 +40,27 @@ type FakePod struct {
 // FakeRuntime is a fake container runtime for testing.
 type FakeRuntime struct {
 	sync.Mutex
-	CalledFunctions   []string
-	PodList           []*FakePod
-	AllPodList        []*FakePod
-	ImageList         []Image
-	APIPodStatus      v1.PodStatus
-	PodStatus         PodStatus
-	StartedPods       []string
-	KilledPods        []string
-	StartedContainers []string
-	KilledContainers  []string
-	RuntimeStatus     *RuntimeStatus
-	RuntimeConfigInfo *RuntimeConfigInfo
-	VersionInfo       string
-	APIVersionInfo    string
-	RuntimeType       string
-	Err               error
-	InspectErr        error
-	StatusErr         error
-	RemappedUID       int
-	RemappedGID       int
+	CalledFunctions      []string
+	PodList              []*FakePod
+	AllPodList           []*FakePod
+	ImageList            []Image
+	APIPodStatus         v1.PodStatus
+	PodStatus            PodStatus
+	StartedPods          []string
+	KilledPods           []string
+	StartedContainers    []string
+	KilledContainers     []string
+	RuntimeStatus        *RuntimeStatus
+	RuntimeConfigInfo    *RuntimeConfigInfo
+	RuntimeConfigInfoErr error
+	VersionInfo          string
+	APIVersionInfo       string
+	RuntimeType          string
+	Err                  error
+	InspectErr           error
+	StatusErr            error
+	RemappedUID          int
+	RemappedGID          int
 }
 
 const FakeHost = "localhost:12345"
@@ -126,6 +127,7 @@ func (f *FakeRuntime) ClearCalls() {
 	f.KilledContainers = []string{}
 	f.RuntimeStatus = nil
 	f.RuntimeConfigInfo = nil
+	f.RuntimeConfigInfoErr = nil
 	f.VersionInfo = ""
 	f.RuntimeType = ""
 	f.Err = nil
@@ -204,12 +206,12 @@ func (f *FakeRuntime) Status() (*RuntimeStatus, error) {
 	return f.RuntimeStatus, f.StatusErr
 }
 
-func (f *FakeRuntime) GetRuntimeConfigInfo() *RuntimeConfigInfo {
+func (f *FakeRuntime) GetRuntimeConfigInfo() (*RuntimeConfigInfo, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetRuntimeConfigInfo")
-	return f.RuntimeConfigInfo
+	return f.RuntimeConfigInfo, f.RuntimeConfigInfoErr
 }
 
 func (f *FakeRuntime) GetRemappedIds() (int, int) {

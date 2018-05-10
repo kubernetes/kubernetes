@@ -2663,6 +2663,12 @@ type PodSecurityContext struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	HostIPC bool
+	// Use host's user namespace for the pods.
+	// This field is alpha-level and can be set to true/false only if HostUserNamespace feature-gate is enabled.
+	// Optional: Defaults to nil which means behavior will be container runtime defined.
+	// +k8s:conversion-gen=false
+	// +optional
+	HostUserNamespace *bool
 	// Share a single process namespace between all of the containers in a pod.
 	// When this is set containers will be able to view and signal processes from other containers
 	// in the same pod, and the first process in each container will not be assigned PID 1.

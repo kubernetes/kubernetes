@@ -3489,6 +3489,12 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("sysctls"), "Sysctls are disabled by Sysctls feature-gate"))
 			}
 		}
+
+		if securityContext.HostUserNamespace != nil {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.HostUserNamespace) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostUserNamespace"), "setting hostUserNamespace explicitly is disabled by UserNamespaceRemapping feature-gate"))
+			}
+		}
 	}
 
 	return allErrs

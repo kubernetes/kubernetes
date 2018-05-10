@@ -124,9 +124,11 @@ type Runtime interface {
 	// CIDR value down to the runtime shim.
 	UpdatePodCIDR(podCIDR string) error
 	// GetRuntimeConfigInfo returns runtime's configuration details, eg: if user-namespaces are enabled or not
-	GetRuntimeConfigInfo() *RuntimeConfigInfo
-	// GetRemappedIds returns UID and GID on host namespace which are mapped to container namespace
-	GetRemappedIds() (int, int)
+	GetRuntimeConfigInfo() (*RuntimeConfigInfo, error)
+	// GetHostUID returns the uid from the host usernamespace that is mapped to the container usernamespace uid, containerUID
+	GetHostUID(containerUID int) (int, error)
+	// GetHostGID returns the gid from the host usernamespace that is mapped to the container usernamespace gid, containerGID
+	GetHostGID(containerUID int) (int, error)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
@@ -491,8 +493,8 @@ type RuntimeConfigInfo struct {
 
 // UserNamespaceConfigInfo contains runtime's user-namespace configuration
 type UserNamespaceConfigInfo struct {
-	UidMapping UserNSMapping
-	GidMapping UserNSMapping
+	UidMappings []*UserNSMapping
+	GidMappings []*UserNSMapping
 }
 
 // UserNSMaping represents mapping of user-namespaces between host and container
@@ -504,20 +506,40 @@ type UserNSMapping struct {
 
 // IsUserNamespaceEnabled returns true if user-namespace feature is enabled at runtime
 func (c *RuntimeConfigInfo) IsUserNamespaceEnabled() bool {
-	if c.UserNamespaceConfig.UidMapping.Size != 0 {
-		return true
+	if len(c.UserNamespaceConfig.UidMappings) == 1 &&
+		c.UserNamespaceConfig.UidMappings[0].HostID == uint32(0) && c.UserNamespaceConfig.UidMappings[0].Size == uint32(4294967295) {
+		return false
 	}
-	return false
+	return true
 }
 
-// GetHostUserNamespaceRemappedHostIds returns uid and gid on host usernamespace that are mapped to first uid/gid of container user-namespace
-func (c *RuntimeConfigInfo) GetHostUserNamespaceRemappedHostIds() (int, int) {
-	return int(c.UserNamespaceConfig.UidMapping.HostID), int(c.UserNamespaceConfig.GidMapping.HostID)
+// IsUserNamespaceSupported returns true if user-namespace feature is supported at runtime
+func (c *RuntimeConfigInfo) IsUserNamespaceSupported() bool {
+	if len(c.UserNamespaceConfig.UidMappings) == 1 &&
+		c.UserNamespaceConfig.UidMappings[0].HostID == uint32(0) && c.UserNamespaceConfig.UidMappings[0].Size == uint32(0) {
+		return false
+	}
+	return true
 }
 
-// GetContainerUserNamespaceIds returns first uid and gid on container user-namespace which are mapped to {U/G}IDs on the host user-namespace
-func (c *RuntimeConfigInfo) GetContainerUserNamespaceIds() (uid uint32, gid uint32) {
-	return c.UserNamespaceConfig.UidMapping.ContainerID, c.UserNamespaceConfig.GidMapping.ContainerID
+// GetHostUIDFor returns uid on host usernamespace that is mapped to the given uid in container usernamespace
+func (c *RuntimeConfigInfo) GetHostUIDFor(containerUID uint32) (int, error) {
+	for _, mapping := range c.UserNamespaceConfig.UidMappings {
+		if containerUID >= mapping.ContainerID && containerUID < mapping.ContainerID+mapping.Size {
+			return int(mapping.HostID + (containerUID - mapping.ContainerID)), nil
+		}
+	}
+	return -1, fmt.Errorf("IdMapping not found for container usernamespace UID %v", containerUID)
+}
+
+// GetHostGIDFor returns gid on host usernamespace that is mapped to the given gid in container usernamespace
+func (c *RuntimeConfigInfo) GetHostGIDFor(containerGID uint32) (int, error) {
+	for _, mapping := range c.UserNamespaceConfig.GidMappings {
+		if containerGID >= mapping.ContainerID && containerGID < mapping.ContainerID+mapping.Size {
+			return int(mapping.HostID + (containerGID - mapping.ContainerID)), nil
+		}
+	}
+	return -1, fmt.Errorf("IdMapping not found for container usernamespace GID %v", containerGID)
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.

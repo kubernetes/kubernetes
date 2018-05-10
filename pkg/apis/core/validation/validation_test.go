@@ -6049,6 +6049,7 @@ func TestValidatePodSpec(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostUserNamespace, true)()
 
 	successCases := []core.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
@@ -6188,6 +6189,9 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy:    core.RestartPolicyAlways,
 			DNSPolicy:        core.DNSClusterFirst,
 			RuntimeClassName: utilpointer.StringPtr("valid-sandbox"),
+			SecurityContext: &core.PodSecurityContext{
+				HostUserNamespace: &[]bool{true}[0],
+			},
 		},
 	}
 	for i := range successCases {
@@ -6384,21 +6388,45 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, false)()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostUserNamespace, false)()
 
-	featuregatedCases := map[string]core.PodSpec{
-		"set ShareProcessNamespace": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			SecurityContext: &core.PodSecurityContext{
-				ShareProcessNamespace: &[]bool{true}[0],
+	featuregatedCases := []struct {
+		desc        string
+		podSpec     core.PodSpec
+		expectedErr string
+	}{
+		{
+			desc: "set ShareProcessNamespace",
+			podSpec: core.PodSpec{
+				Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+				SecurityContext: &core.PodSecurityContext{
+					ShareProcessNamespace: &[]bool{true}[0],
+				},
 			},
+			expectedErr: "Process Namespace Sharing is disabled by PodShareProcessNamespace feature-gate",
+		},
+		{
+			desc: "set HostUserNamespace",
+			podSpec: core.PodSpec{
+				Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+				SecurityContext: &core.PodSecurityContext{
+					HostUserNamespace: &[]bool{false}[0],
+				},
+			},
+			expectedErr: "setting hostUserNamespace explicitly is disabled by UserNamespaceRemapping feature-gate",
 		},
 	}
-	for k, v := range featuregatedCases {
-		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
-			t.Errorf("expected failure due to gated feature: %q", k)
+	for _, v := range featuregatedCases {
+		if errs := ValidatePodSpec(&v.podSpec, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure due to gated feature: %q", v.desc)
+		} else if actualError := errs.ToAggregate().Error(); !strings.Contains(actualError, v.expectedErr) {
+			t.Errorf("expected error for %q to contain %q, got %q", v.desc, v.expectedErr, actualError)
 		}
 	}
 }
