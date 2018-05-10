@@ -32,6 +32,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -114,7 +115,7 @@ func NewLabelOptions(ioStreams genericclioptions.IOStreams) *LabelOptions {
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		Recorder:    genericclioptions.NoopRecorder{},
 
-		PrintFlags: printers.NewPrintFlags("labeled"),
+		PrintFlags: printers.NewPrintFlags("labeled", legacyscheme.Scheme),
 
 		IOStreams: ioStreams,
 	}

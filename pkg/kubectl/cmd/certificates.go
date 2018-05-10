@@ -98,7 +98,7 @@ func (o *CertificateOptions) Validate() error {
 
 func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := CertificateOptions{
-		PrintFlags: printers.NewPrintFlags("approved"),
+		PrintFlags: printers.NewPrintFlags("approved", legacyscheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 	cmd := &cobra.Command{
@@ -155,7 +155,7 @@ func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 
 func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := CertificateOptions{
-		PrintFlags: printers.NewPrintFlags("denied"),
+		PrintFlags: printers.NewPrintFlags("denied", legacyscheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 	cmd := &cobra.Command{

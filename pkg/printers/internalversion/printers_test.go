@@ -400,7 +400,7 @@ func TestNamePrinter(t *testing.T) {
 			"pod/foo\npod/bar\n"},
 	}
 
-	printFlags := printers.NewPrintFlags("").WithDefaultOutput("name")
+	printFlags := printers.NewPrintFlags("", legacyscheme.Scheme).WithDefaultOutput("name")
 	printer, err := printFlags.ToPrinter()
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)

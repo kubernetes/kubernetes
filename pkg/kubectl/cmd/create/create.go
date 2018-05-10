@@ -78,7 +78,7 @@ var (
 
 func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
-		PrintFlags:  NewPrintFlags("created"),
+		PrintFlags:  NewPrintFlags("created", legacyscheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -353,7 +353,7 @@ type CreateSubcommandOptions struct {
 
 func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
 	return &CreateSubcommandOptions{
-		PrintFlags: NewPrintFlags("created"),
+		PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }
