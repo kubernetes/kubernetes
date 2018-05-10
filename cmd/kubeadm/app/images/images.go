@@ -20,7 +20,10 @@ import (
 	"fmt"
 	"runtime"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
@@ -41,4 +44,26 @@ func GetCoreImage(image, repoPrefix, k8sVersion, overrideImage string) string {
 		constants.KubeControllerManager: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-controller-manager", runtime.GOARCH, kubernetesImageTag),
 		constants.KubeScheduler:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-scheduler", runtime.GOARCH, kubernetesImageTag),
 	}[image]
+}
+
+// GetAllImages returns a list of container images kubeadm expects to use on a control plane node
+func GetAllImages(cfg *kubeadmapi.MasterConfiguration) []string {
+	imgs := []string{}
+	imgs = append(imgs, GetCoreImage(constants.KubeAPIServer, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage))
+	imgs = append(imgs, GetCoreImage(constants.KubeControllerManager, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage))
+	imgs = append(imgs, GetCoreImage(constants.KubeScheduler, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage))
+	imgs = append(imgs, fmt.Sprintf("%v/%v-%v:%v", cfg.ImageRepository, constants.KubeProxy, runtime.GOARCH, kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)))
+	imgs = append(imgs, fmt.Sprintf("%v/pause-%v:%v", cfg.ImageRepository, runtime.GOARCH, "3.1"))
+
+	// if etcd is not external then add the image as it will be required
+	if len(cfg.Etcd.Endpoints) == 0 {
+		imgs = append(imgs, GetCoreImage(constants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.Image))
+	}
+
+	dnsImage := fmt.Sprintf("%v/k8s-dns-kube-dns-%v:%v", cfg.ImageRepository, runtime.GOARCH, dns.GetDNSVersion(nil, constants.KubeDNS))
+	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
+		dnsImage = fmt.Sprintf("coredns/coredns:%v", dns.GetDNSVersion(nil, constants.CoreDNS))
+	}
+	imgs = append(imgs, dnsImage)
+	return imgs
 }

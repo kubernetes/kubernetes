@@ -19,17 +19,21 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -62,7 +66,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 
 	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
-
+	cmd.AddCommand(NewCmdConfigListImages(out))
 	return cmd
 }
 
@@ -200,4 +204,71 @@ func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg 
 
 	// Then just call the uploadconfig phase to do the rest of the work
 	return uploadconfig.UploadConfiguration(internalcfg, client)
+}
+
+// NewCmdConfigListImages returns the "kubeadm images" command
+func NewCmdConfigListImages(out io.Writer) *cobra.Command {
+	cfg := &kubeadmapiext.MasterConfiguration{}
+	kubeadmapiext.SetDefaults_MasterConfiguration(cfg)
+	var cfgPath, featureGatesString string
+	var err error
+
+	cmd := &cobra.Command{
+		Use:   "list-images",
+		Short: "Print a list of images kubeadm will use. The configuration file is used in case any images or image repositories are customized.",
+		Run: func(_ *cobra.Command, _ []string) {
+			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
+				kubeadmutil.CheckErr(err)
+			}
+			listImages, err := NewListImages(cfgPath, cfg)
+			kubeadmutil.CheckErr(err)
+			kubeadmutil.CheckErr(listImages.Run(out))
+		},
+	}
+	AddListImagesConfigFlag(cmd.PersistentFlags(), cfg, &featureGatesString)
+	AddListImagesFlags(cmd.PersistentFlags(), &cfgPath)
+
+	return cmd
+}
+
+// NewListImages returns a "kubeadm images" command
+func NewListImages(cfgPath string, cfg *kubeadmapiext.MasterConfiguration) (*ListImages, error) {
+	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert cfg to an internal cfg: %v", err)
+	}
+
+	return &ListImages{
+		cfg: internalcfg,
+	}, nil
+}
+
+// ListImages defines the struct used for "kubeadm images"
+type ListImages struct {
+	cfg *kubeadmapi.MasterConfiguration
+}
+
+// Run runs the images command and writes the result to the io.Writer passed in
+func (i *ListImages) Run(out io.Writer) error {
+	imgs := images.GetAllImages(i.cfg)
+	for _, img := range imgs {
+		fmt.Fprintln(out, img)
+	}
+
+	return nil
+}
+
+// AddListImagesConfigFlag adds the flags that configure kubeadm
+func AddListImagesConfigFlag(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, featureGatesString *string) {
+	flagSet.StringVar(
+		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
+		`Choose a specific Kubernetes version for the control plane.`,
+	)
+	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
+		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
+}
+
+// AddListImagesFlags adds the flag that defines the location of the config file
+func AddListImagesFlags(flagSet *flag.FlagSet, cfgPath *string) {
+	flagSet.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file.")
 }
