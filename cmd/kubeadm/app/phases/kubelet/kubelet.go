@@ -33,19 +33,20 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	"k8s.io/kubernetes/pkg/util/version"
+	utilsexec "k8s.io/utils/exec"
 )
 
 // CreateBaseKubeletConfiguration creates base kubelet configuration for dynamic kubelet configuration feature.
 func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
-	fmt.Printf("[kubelet] Uploading a ConfigMap %q in namespace %s with base configuration for the kubelets in the cluster\n",
-		kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.NamespaceSystem)
-
 	_, kubeletCodecs, err := kubeletconfigscheme.NewSchemeAndCodecs()
 	if err != nil {
 		return err
@@ -55,9 +56,25 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 		return err
 	}
 
+	var configmapName string
+	k8sVer, k8sErr := version.ParseSemantic(cfg.KubernetesVersion)
+	if k8sErr != nil {
+		_, kubeadmVer, kubeadmErr := upgrade.NewKubeVersionGetter(client, os.Stdout).KubeadmVersion()
+		if kubeadmErr != nil {
+			return fmt.Errorf("couldn't determine configmap version, parsing kubernetes version: %v, getting kubeadm version: %v", k8sErr, kubeadmErr)
+		}
+		// if parsing kubernetes version fails, defaults to kubeadm version.
+		configmapName = fmt.Sprintf("%s-%d.%d", kubeadmconstants.KubeletBaseConfigurationConfigMap, kubeadmVer.Major(), kubeadmVer.Minor())
+	} else {
+		configmapName = fmt.Sprintf("%s-%d.%d", kubeadmconstants.KubeletBaseConfigurationConfigMap, k8sVer.Major(), k8sVer.Minor())
+	}
+
+	fmt.Printf("[kubelet] Uploading a ConfigMap %q in namespace %s with base configuration for the kubelets in the cluster\n",
+		configmapName, metav1.NamespaceSystem)
+
 	if err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.KubeletBaseConfigurationConfigMap,
+			Name:      configmapName,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
@@ -67,11 +84,11 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 		return err
 	}
 
-	if err := createKubeletBaseConfigMapRBACRules(client); err != nil {
+	if err := createKubeletBaseConfigMapRBACRules(client, configmapName); err != nil {
 		return fmt.Errorf("error creating base kubelet configmap RBAC rules: %v", err)
 	}
 
-	return updateNodeWithConfigMap(client, cfg.NodeName)
+	return updateNodeWithConfigMap(client, cfg.NodeName, configmapName)
 }
 
 // ConsumeBaseKubeletConfiguration consumes base kubelet configuration for dynamic kubelet configuration feature.
@@ -81,7 +98,20 @@ func ConsumeBaseKubeletConfiguration(nodeName string) error {
 		return err
 	}
 
-	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.GetOptions{})
+	var configmapName string
+	kubeletVer, kubeletErr := preflight.GetKubeletVersion(utilsexec.New())
+	if kubeletErr != nil {
+		_, kubeadmVer, kubeadmErr := upgrade.NewKubeVersionGetter(client, os.Stdout).KubeadmVersion()
+		if kubeadmErr != nil {
+			return fmt.Errorf("couldn't determine configmap version, gettinging kubelet version: %v, getting kubeadm version: %v", kubeletErr, kubeadmErr)
+		}
+		// if getting kubelet version fails, defaults to kubeadm version.
+		configmapName = fmt.Sprintf("%s-%d.%d", kubeadmconstants.KubeletBaseConfigurationConfigMap, kubeadmVer.Major(), kubeadmVer.Minor())
+	} else {
+		configmapName = fmt.Sprintf("%s-%d.%d", kubeadmconstants.KubeletBaseConfigurationConfigMap, kubeletVer.Major(), kubeletVer.Minor())
+	}
+
+	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configmapName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -90,13 +120,13 @@ func ConsumeBaseKubeletConfiguration(nodeName string) error {
 		return fmt.Errorf("failed to write initial remote configuration of kubelet to disk for node %s: %v", nodeName, err)
 	}
 
-	return updateNodeWithConfigMap(client, nodeName)
+	return updateNodeWithConfigMap(client, nodeName, configmapName)
 }
 
-// updateNodeWithConfigMap updates node ConfigSource with KubeletBaseConfigurationConfigMap
-func updateNodeWithConfigMap(client clientset.Interface, nodeName string) error {
+// updateNodeWithConfigMap updates node ConfigSource with specified ConfigMap
+func updateNodeWithConfigMap(client clientset.Interface, nodeName, configmapName string) error {
 	fmt.Printf("[kubelet] Using Dynamic Kubelet Config for node %q; config sourced from ConfigMap %q in namespace %s\n",
-		nodeName, kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.NamespaceSystem)
+		nodeName, configmapName, metav1.NamespaceSystem)
 
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
 	return wait.Poll(kubeadmconstants.APICallRetryInterval, kubeadmconstants.UpdateNodeTimeout, func() (bool, error) {
@@ -110,14 +140,14 @@ func updateNodeWithConfigMap(client clientset.Interface, nodeName string) error 
 			return false, err
 		}
 
-		kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeletBaseConfigurationConfigMap, metav1.GetOptions{})
+		kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configmapName, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
 
 		node.Spec.ConfigSource = &v1.NodeConfigSource{
 			ConfigMapRef: &v1.ObjectReference{
-				Name:      kubeadmconstants.KubeletBaseConfigurationConfigMap,
+				Name:      configmapName,
 				Namespace: metav1.NamespaceSystem,
 				UID:       kubeletCfg.UID,
 			},
@@ -146,14 +176,14 @@ func updateNodeWithConfigMap(client clientset.Interface, nodeName string) error 
 }
 
 // createKubeletBaseConfigMapRBACRules creates the RBAC rules for exposing the base kubelet ConfigMap in the kube-system namespace to unauthenticated users
-func createKubeletBaseConfigMapRBACRules(client clientset.Interface) error {
+func createKubeletBaseConfigMapRBACRules(client clientset.Interface, configmapName string) error {
 	if err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigMapRoleName,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeletBaseConfigurationConfigMap).RuleOrDie(),
+			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(configmapName).RuleOrDie(),
 		},
 	}); err != nil {
 		return err

@@ -33,7 +33,8 @@ func TestCreateBaseKubeletConfiguration(t *testing.T) {
 	nodeName := "fake-node"
 	client := fake.NewSimpleClientset()
 	cfg := &kubeadmapi.MasterConfiguration{
-		NodeName: nodeName,
+		NodeName:          nodeName,
+		KubernetesVersion: "v1.9.0",
 		KubeletConfiguration: kubeadmapi.KubeletConfiguration{
 			BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 				TypeMeta: metav1.TypeMeta{
@@ -114,7 +115,7 @@ func TestUpdateNodeWithConfigMap(t *testing.T) {
 		return true, nil, nil
 	})
 
-	if err := updateNodeWithConfigMap(client, nodeName); err != nil {
+	if err := updateNodeWithConfigMap(client, nodeName, kubeadmconstants.KubeletBaseConfigurationConfigMap); err != nil {
 		t.Errorf("UpdateNodeWithConfigMap: unexepected error %v", err)
 	}
 }
@@ -128,7 +129,7 @@ func TestCreateKubeletBaseConfigMapRBACRules(t *testing.T) {
 		return true, nil, nil
 	})
 
-	if err := createKubeletBaseConfigMapRBACRules(client); err != nil {
+	if err := createKubeletBaseConfigMapRBACRules(client, kubeadmconstants.KubeletBaseConfigurationConfigMap); err != nil {
 		t.Errorf("createKubeletBaseConfigMapRBACRules: unexepected error %v", err)
 	}
 }
