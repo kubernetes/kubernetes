@@ -80,7 +80,7 @@ func (md *metricsDu) runFind(metrics *Metrics) error {
 	if err != nil {
 		return err
 	}
-	metrics.InodesUsed = resource.NewQuantity(inodesUsed, resource.BinarySI)
+	metrics.InodesUsed = inodesUsed
 	return nil
 }
 
