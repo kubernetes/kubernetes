@@ -217,7 +217,9 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	bootstrapCheckpointPath string) (Bootstrap, error)
+	bootstrapCheckpointPath string,
+	experimentalUserNSRootUID int32,
+	experimentalUserNSRootGID int32) (Bootstrap, error)
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -341,7 +343,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	bootstrapCheckpointPath string) (*Kubelet, error) {
+	bootstrapCheckpointPath string,
+	experimentalUserNSRootUID int32,
+	experimentalUserNSRootGID int32) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -528,6 +532,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
+		experimentalUserNSRootUID:               experimentalUserNSRootUID,
+		experimentalUserNSRootGID:               experimentalUserNSRootGID,
 	}
 
 	if klet.cloud != nil {
@@ -1138,6 +1144,11 @@ type Kubelet struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	keepTerminatedPodVolumes bool // DEPRECATED
+
+	// When user namespaces are enabled, use this uid for root uid in the containers
+	experimentalUserNSRootUID int32
+	// When user namespaces are enabled, use this gid for root gid in the containers
+	experimentalUserNSRootGID int32
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1177,6 +1188,9 @@ func (kl *Kubelet) setupDataDirs() error {
 	}
 	if err := os.MkdirAll(kl.getPodsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating pods directory: %v", err)
+	}
+	if err := kl.experimentalChownRemap(kl.getPodsDir()); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(kl.getPluginsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating plugins directory: %v", err)
@@ -2137,4 +2151,16 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 		config.TLSConfig = kubeDeps.TLSOptions.Config
 	}
 	return config
+}
+
+// Helper function to change ownership to match userns remap settings of docker
+func (kl *Kubelet) experimentalChownRemap(path string) error {
+	if kl.experimentalUserNSRootUID > 0 {
+		if err := os.Chown(path, int(kl.experimentalUserNSRootUID), int(kl.experimentalUserNSRootGID)); err != nil {
+			return fmt.Errorf("error setting remapped ownership %d:%d on %q: %v",
+				int(kl.experimentalUserNSRootUID), int(kl.experimentalUserNSRootGID),
+				path, err)
+		}
+	}
+	return nil
 }

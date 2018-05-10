@@ -474,6 +474,12 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 			glog.Errorf("Error on creating %q: %v", p, err)
 		} else {
 			opts.PodContainerDir = p
+			if err := kl.experimentalChownRemap(p); err != nil {
+				glog.Error(err)
+			}
+			if err := kl.experimentalChownRemap(filepath.Join(p, "..")); err != nil {
+				glog.Error(err)
+			}
 		}
 	}
 
@@ -823,7 +829,13 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	if err := os.MkdirAll(kl.getPodDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
 	}
+	if err := kl.experimentalChownRemap(kl.getPodDir(uid)); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(kl.getPodVolumesDir(uid), 0750); err != nil && !os.IsExist(err) {
+		return err
+	}
+	if err := kl.experimentalChownRemap(kl.getPodVolumesDir(uid)); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(kl.getPodPluginsDir(uid), 0750); err != nil && !os.IsExist(err) {
