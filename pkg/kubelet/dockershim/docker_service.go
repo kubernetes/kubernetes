@@ -19,9 +19,13 @@ package dockershim
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,6 +83,10 @@ const (
 	// Dockershim should provide detection support for a remapping environment .
 	// This should be included in the feature proposal.  Defaulting may still occur according
 	// to kubelet behavior and system settings in addition to any API flags that may be introduced.
+)
+
+var (
+	linuxIDMappingRegexp = regexp.MustCompile("([aA-zZ]+):([0-9]+):([0-9]+)")
 )
 
 // CRIService includes all methods necessary for a CRI server.
@@ -308,6 +316,108 @@ type dockerService struct {
 }
 
 // TODO: handle context.
+
+// GetRuntimeConfigInfo returns the runtime config.
+func (ds *dockerService) GetRuntimeConfigInfo(_ context.Context, r *runtimeapi.GetRuntimeConfigInfoRequest) (*runtimeapi.GetRuntimeConfigInfoResponse, error) {
+	dockerInfo, err := ds.client.Info()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute Info() call to the Docker client: %v", err)
+	}
+	uidMapping := &runtimeapi.LinuxIDMapping{ContainerId: uint32(0)}
+	gidMapping := &runtimeapi.LinuxIDMapping{ContainerId: uint32(0)}
+
+	if isUserNsEnabled(dockerInfo) {
+		remappedNonRootHostID, err := getRemappedNonRootHostID(dockerInfo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get remappedNonRootHostID. err: %v", err)
+		}
+		uidMappingSize, gidMappingSize, err := getUserNsMappingSizes(remappedNonRootHostID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user-namespace mapping sizes. err: %v", err)
+		}
+
+		uidMapping.HostId = remappedNonRootHostID
+		gidMapping.HostId = remappedNonRootHostID
+		uidMapping.Size_ = uidMappingSize
+		gidMapping.Size_ = gidMappingSize
+	} else {
+		uidMapping.Size_ = uint32(4294967295)
+		gidMapping.Size_ = uint32(4294967295)
+	}
+
+	linuxConfig := &runtimeapi.LinuxUserNamespaceConfig{
+		UidMappings: []*runtimeapi.LinuxIDMapping{uidMapping},
+		GidMappings: []*runtimeapi.LinuxIDMapping{gidMapping},
+	}
+	activeRuntimeConfig := &runtimeapi.ActiveRuntimeConfig{UserNamespaceConfig: linuxConfig}
+	return &runtimeapi.GetRuntimeConfigInfoResponse{RuntimeConfig: activeRuntimeConfig}, nil
+}
+
+// isUserNsEnabled parses docker info. Returns true if user-namespace feature is found to enabled, otherwise false
+func isUserNsEnabled(dockerInfo *dockertypes.Info) bool {
+	var usernsEnabled bool
+	for _, secOpt := range dockerInfo.SecurityOptions {
+		if strings.Contains(secOpt, "userns") {
+			usernsEnabled = true
+			break
+		}
+	}
+	return usernsEnabled
+}
+
+// getRremappedNonRootHostID parses docker info to determine ID on the host usernamespace which is mapped to {U/G}ID 0 in the container user-namespace
+func getRemappedNonRootHostID(dockerInfo *dockertypes.Info) (uint32, error) {
+	if strings.HasPrefix(dockerInfo.DockerRootDir, "/var/lib/docker/") {
+		remappedNonRootHostID64, err := strconv.ParseUint(strings.Split(strings.TrimPrefix(dockerInfo.DockerRootDir, "/var/lib/docker/"), ".")[0], 10, 0)
+		if err != nil {
+			return uint32(0), fmt.Errorf("failed to parse DockerRootDir, %v: %v", dockerInfo.DockerRootDir, err)
+		}
+		return uint32(remappedNonRootHostID64), nil
+	} else {
+		return uint32(0), fmt.Errorf("unexpected DockerRootDir, %v. Expected prefixed with '/var/lib/docker' ", dockerInfo.DockerRootDir)
+	}
+}
+
+// getUserNsMappingSizes return uid and gid mapping sizes
+func getUserNsMappingSizes(remappedNonRootHostID uint32) (uint32, uint32, error) {
+	mappings, err := ioutil.ReadFile("/etc/subuid")
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read /etc/subuid: %v", err)
+	}
+	uidMappingSize, err := getIDMappingSize(mappings, remappedNonRootHostID)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get uid mapping size. err: %v", err)
+	}
+
+	mappings, err = ioutil.ReadFile("/etc/subgid")
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read /etc/subgid: %v", err)
+	}
+	gidMappingSize, err := getIDMappingSize(mappings, remappedNonRootHostID)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get gid mapping size. err: %v", err)
+	}
+	return uidMappingSize, gidMappingSize, nil
+}
+
+// getIDMappingSize parses input byte array and returns mapping size
+func getIDMappingSize(mappings []byte, hostID uint32) (uint32, error) {
+	matches := linuxIDMappingRegexp.FindAllSubmatch(mappings, -1)
+	for _, match := range matches {
+		uid, err := strconv.ParseUint(string(match[2]), 10, 32)
+		if err != nil {
+			return 0, fmt.Errorf("error in parsing linux user-namespace mapping entry: %s", match)
+		}
+		if uint32(uid) == hostID {
+			size, err := strconv.ParseUint(string(match[3]), 10, 32)
+			if err != nil {
+				return 0, fmt.Errorf("error in parsing linux user-namespace mapping entry: %s", match)
+			}
+			return uint32(size), nil
+		}
+	}
+	return 0, fmt.Errorf("could not find user-namespace mapping entry for ID %v", hostID)
+}
 
 // Version returns the runtime name, runtime version and runtime API version
 func (ds *dockerService) Version(_ context.Context, r *runtimeapi.VersionRequest) (*runtimeapi.VersionResponse, error) {

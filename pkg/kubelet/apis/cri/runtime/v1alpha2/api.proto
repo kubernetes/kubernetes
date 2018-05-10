@@ -107,6 +107,9 @@ service RuntimeService {
 
     // Status returns the status of the runtime.
     rpc Status(StatusRequest) returns (StatusResponse) {}
+
+    //  GetRuntimeConfigInfo returns the configuration details of the runtime.
+    rpc GetRuntimeConfigInfo(GetRuntimeConfigInfoRequest) returns (GetRuntimeConfigInfoResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -216,6 +219,14 @@ enum NamespaceMode {
     // For example, a container with a PID namespace of NODE expects to view
     // all of the processes on the host running the kubelet.
     NODE      = 2;
+    // A NODE_WIDE_REMAPPED namespace applies to all pods on a given kubernetes node.
+    // The uid/gids of the pods/containers on a given node are mapped to a range of uids/gids
+    // from that Node's namespace. For e.g. starting with 200000 id on the nodes namespace,
+    // 10000 ids are allocated for a pod. This means uid/gid 0 inside the pod would map to 200000 id on the nodes namespace.
+    // For example, starting from uid/gid 0, 10000 uids/gids in this namespace are mapped to
+    // 10000 ids on node namespace,starting with id 200000. i.e uid/gid 0 in this namespace is
+    // mapped to uid/gid 200000 on node namespace.
+    NODE_WIDE_REMAPPED = 3;
 }
 
 // NamespaceOption provides options for Linux namespaces.
@@ -233,6 +244,12 @@ message NamespaceOption {
     // Note: There is currently no way to set CONTAINER scoped IPC in the Kubernetes API.
     // Namespaces currently set by the kubelet: POD, NODE
     NamespaceMode ipc = 3;
+    // User namespace for this container/sandbox.
+    // Note: There is currently no way to set CONTAINER scoped user namespace in the Kubernetes API.
+    // The container runtime should ignore this if user namespace is NOT enabled.
+    // NODE is the default value. Kubelet will set it to NODE_WIDE_REMAPPED if pod spec indicates to use user-namespace remapping
+    // Namespaces currently set by the kubelet: NODE, NODE_WIDE_REMAPPED
+    NamespaceMode user = 4;
 }
 
 // Int64Value is the wrapper of int64.
@@ -1145,6 +1162,40 @@ message StatusResponse {
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
 }
+
+// LinuxIDMapping represents a single user namespace mapping in Linux.
+message LinuxIDMapping {
+   // container_id is the starting id for the mapping inside the container.
+   uint32 container_id = 1;
+   // host_id is the starting id for the mapping on the host.
+   uint32 host_id = 2;
+   // size is the length of the mapping.
+   uint32 size = 3;
+}
+
+// LinuxUserNamespaceConfig represents runtime's user-namespace configuration on a linux host.
+message LinuxUserNamespaceConfig {
+   // uid_mappings is an array of user id mappings.
+   repeated LinuxIDMapping uid_mappings = 1;
+   // gid_mappings is an array of group id mappings.
+   repeated LinuxIDMapping gid_mappings = 2;
+}
+
+// ActiveRuntimeConfig contains the configuration details from the runtime.
+message ActiveRuntimeConfig {
+    // LinuxUserNamespaceConfig represents runtime's user-namespace configuration on a linux host.
+    LinuxUserNamespaceConfig user_namespace_config = 1;
+}
+
+// GetRuntimeConfigInfoRequest is the message sent for requesting runtime configuration details.
+message GetRuntimeConfigInfoRequest {}
+
+// GetRuntimeConfigInfoResponse is the response message from runtime that includes configuration details
+message GetRuntimeConfigInfoResponse {
+    // GetRuntimeConfig are the configuration details from the runtime.
+    ActiveRuntimeConfig runtime_config = 1;
+}
+
 
 message ImageFsInfoRequest {}
 
