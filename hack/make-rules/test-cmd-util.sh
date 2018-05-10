@@ -863,6 +863,10 @@ __EOF__
   kubectl create -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml "${kube_flags[@]}"
   # Post-condition: redis-master and valid-pod PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:valid-pod:'
+  # Command succeeds when run again with --ignore-already-exists
+  kubectl create --ignore-already-exists -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml "${kube_flags[@]}"
+  # Command fails when run again without --ignore-already-exists
+  ! kubectl create --ignore-already-exists -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml "${kube_flags[@]}"
 
   ### Delete two PODs from 1 yaml file
   # Pre-condition: redis-master and valid-pod PODs exist
@@ -2413,6 +2417,10 @@ run_secrets_test() {
   kubectl create namespace test-secrets
   # Post-condition: namespace 'test-secrets' is created.
   kube::test::get_object_assert 'namespaces/test-secrets' "{{$id_field}}" 'test-secrets'
+  # Command succeeds when --ignore-already-exists is passed
+  kubectl create namespace test-secrets --ignore-already-exists
+  # Command fails when --ignore-already-exists is not passed
+  ! kubectl create namespace test-secrets --ignore-already-exists
 
   ### Create a generic secret in a specific namespace
   # Pre-condition: no SECRET exists
