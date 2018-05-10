@@ -2608,6 +2608,18 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 	return nodes
 }
 
+// GetReadyNodesIncludingTaintedOrDie returns all ready nodes, even those which are tainted.
+// There are cases when we care about tainted nodes
+// E.g. in tests related to nodes with gpu we care about nodes despite
+// presence of nvidia.com/gpu=present:NoSchedule taint
+func GetReadyNodesIncludingTaintedOrDie(c clientset.Interface) (nodes *v1.NodeList) {
+	nodes = waitListSchedulableNodesOrDie(c)
+	FilterNodes(nodes, func(node v1.Node) bool {
+		return isNodeSchedulable(&node)
+	})
+	return nodes
+}
+
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
 	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
