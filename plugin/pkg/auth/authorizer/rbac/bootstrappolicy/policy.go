@@ -126,7 +126,7 @@ func NodeRules() []rbac.PolicyRule {
 		// Needed for imagepullsecrets, rbd/ceph and secret volumes, and secrets in envs
 		// Needed for configmap volume and envs
 		// Use the Node authorization mode to limit a node to get secrets/configmaps referenced by pods bound to itself.
-		rbac.NewRule("get").Groups(legacyGroup).Resources("secrets", "configmaps").RuleOrDie(),
+		rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("secrets", "configmaps").RuleOrDie(),
 		// Needed for persistent volumes
 		// Use the Node authorization mode to limit a node to get pv/pvc objects referenced by pods bound to itself.
 		rbac.NewRule("get").Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
