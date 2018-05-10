@@ -272,6 +272,15 @@ func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, erro
 	return toKubeRuntimeStatus(status), nil
 }
 
+func (m *kubeGenericRuntimeManager) GetRuntimeConfigInfo() (*kubecontainer.RuntimeConfigInfo, error) {
+	runtimeConfig, err := m.runtimeService.GetRuntimeConfigInfo()
+	if err != nil {
+		glog.Errorf("Get runtime config failed: %v", err)
+		return nil, err
+	}
+	return toKubeRuntimeConfig(runtimeConfig), nil
+}
+
 // GetPods returns a list of containers grouped by pods. The boolean parameter
 // specifies whether the runtime returns all containers including those already
 // exited and dead containers (used for garbage collection).

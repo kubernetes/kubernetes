@@ -279,6 +279,12 @@ const (
 	// A node which has closer cpu,memory utilization and volume count is favoured by scheduler
 	// while making decisions.
 	BalanceAttachedNodeVolumes utilfeature.Feature = "BalanceAttachedNodeVolumes"
+
+	// owner: @vikaschoudhary16
+	// alpha: v1.11
+	//
+	// Enables support for node-level user-namepsaces
+	NodeUserNamespace utilfeature.Feature = "NodeUserNamespace"
 )
 
 func init() {
@@ -289,44 +295,44 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
-	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
-	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
-	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
-	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},
-	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
-	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
-	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
-	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.Beta},
-	LocalStorageCapacityIsolation:               {Default: true, PreRelease: utilfeature.Beta},
-	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
-	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
-	PodShareProcessNamespace:                    {Default: false, PreRelease: utilfeature.Alpha},
-	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
-	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
-	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
-	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},
-	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
-	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
-	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
-	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
-	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
-	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
-	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
-	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
-	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
-	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
-	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
-	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.Beta},
-	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
-	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
-	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
-	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
-	CRIContainerLogRotation:                     {Default: false, PreRelease: utilfeature.Alpha},
-	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
-	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
-	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
-	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
+	AppArmor:                          {Default: true, PreRelease: utilfeature.Beta},
+	DynamicKubeletConfig:              {Default: false, PreRelease: utilfeature.Alpha},
+	ExperimentalCriticalPodAnnotation: {Default: false, PreRelease: utilfeature.Alpha},
+	DevicePlugins:                     {Default: true, PreRelease: utilfeature.Beta},
+	TaintBasedEvictions:               {Default: false, PreRelease: utilfeature.Alpha},
+	RotateKubeletServerCertificate:    {Default: false, PreRelease: utilfeature.Alpha},
+	RotateKubeletClientCertificate:    {Default: true, PreRelease: utilfeature.Beta},
+	PersistentLocalVolumes:            {Default: true, PreRelease: utilfeature.Beta},
+	LocalStorageCapacityIsolation:     {Default: true, PreRelease: utilfeature.Beta},
+	HugePages:                         {Default: true, PreRelease: utilfeature.Beta},
+	DebugContainers:                   {Default: false, PreRelease: utilfeature.Alpha},
+	PodShareProcessNamespace:          {Default: false, PreRelease: utilfeature.Alpha},
+	PodPriority:                       {Default: false, PreRelease: utilfeature.Alpha},
+	EnableEquivalenceClassCache:       {Default: false, PreRelease: utilfeature.Alpha},
+	TaintNodesByCondition:             {Default: false, PreRelease: utilfeature.Alpha},
+	MountPropagation:                  {Default: true, PreRelease: utilfeature.Beta},
+	QOSReserved:                       {Default: false, PreRelease: utilfeature.Alpha},
+	ExpandPersistentVolumes:           {Default: false, PreRelease: utilfeature.Alpha},
+	CPUManager:                        {Default: true, PreRelease: utilfeature.Beta},
+	ServiceNodeExclusion:              {Default: false, PreRelease: utilfeature.Alpha},
+	MountContainers:                   {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeScheduling:                  {Default: true, PreRelease: utilfeature.Beta},
+	CSIPersistentVolume:               {Default: true, PreRelease: utilfeature.Beta},
+	CustomPodDNS:                      {Default: true, PreRelease: utilfeature.Beta},
+	BlockVolume:                       {Default: false, PreRelease: utilfeature.Alpha},
+	StorageObjectInUseProtection:      {Default: true, PreRelease: utilfeature.GA},
+	ResourceLimitsPriorityFunction:    {Default: false, PreRelease: utilfeature.Alpha},
+	SupportIPVSProxyMode:              {Default: true, PreRelease: utilfeature.Beta},
+	SupportPodPidsLimit:               {Default: false, PreRelease: utilfeature.Alpha},
+	HyperVContainer:                   {Default: false, PreRelease: utilfeature.Alpha},
+	ScheduleDaemonSetPods:             {Default: false, PreRelease: utilfeature.Alpha},
+	TokenRequest:                      {Default: false, PreRelease: utilfeature.Alpha},
+	CRIContainerLogRotation:           {Default: false, PreRelease: utilfeature.Alpha},
+	GCERegionalPersistentDisk:         {Default: true, PreRelease: utilfeature.Beta},
+	RunAsGroup:                        {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSubpath:                     {Default: true, PreRelease: utilfeature.GA},
+	BalanceAttachedNodeVolumes:        {Default: false, PreRelease: utilfeature.Alpha},
+	NodeUserNamespace:                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

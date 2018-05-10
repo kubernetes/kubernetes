@@ -434,6 +434,7 @@ func (ds *dockerService) PodSandboxStatus(ctx context.Context, req *runtimeapi.P
 					Network: networkNamespaceMode(r),
 					Pid:     pidNamespaceMode(r),
 					Ipc:     ipcNamespaceMode(r),
+					User:    userNamespaceMode(r),
 				},
 			},
 		},
@@ -646,6 +647,17 @@ func pidNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.Namespace
 func ipcNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {
 	if container != nil && container.HostConfig != nil && string(container.HostConfig.IpcMode) == namespaceModeHost {
 		return runtimeapi.NamespaceMode_NODE
+	}
+	return runtimeapi.NamespaceMode_POD
+}
+
+// userNamespaceMode returns the user runtimeapi.NamespaceMode for this container.
+// Supports: POD, NODE
+func userNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {
+	if container != nil && container.HostConfig != nil {
+		if string(container.HostConfig.UsernsMode) == namespaceModeHost {
+			return runtimeapi.NamespaceMode_NODE
+		}
 	}
 	return runtimeapi.NamespaceMode_POD
 }

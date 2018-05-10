@@ -165,6 +165,9 @@ func modifyCommonNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig
 
 // modifyHostOptionsForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
 func modifyHostOptionsForSandbox(nsOpts *runtimeapi.NamespaceOption, network *knetwork.PluginManager, hc *dockercontainer.HostConfig) {
+	if nsOpts.GetUser() == runtimeapi.NamespaceMode_NODE {
+		hc.UsernsMode = namespaceModeHost
+	}
 	if nsOpts.GetIpc() == runtimeapi.NamespaceMode_NODE {
 		hc.IpcMode = namespaceModeHost
 	}
@@ -194,6 +197,9 @@ func modifyHostOptionsForContainer(nsOpts *runtimeapi.NamespaceOption, podSandbo
 	hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
 	hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
 	hc.UTSMode = ""
+	if nsOpts.GetUser() == runtimeapi.NamespaceMode_NODE {
+		hc.UsernsMode = namespaceModeHost
+	}
 
 	if nsOpts.GetNetwork() == runtimeapi.NamespaceMode_NODE {
 		hc.UTSMode = namespaceModeHost
