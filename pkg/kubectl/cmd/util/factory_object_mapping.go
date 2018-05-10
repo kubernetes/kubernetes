@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -73,15 +72,6 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 		clientAccessFactory: clientAccessFactory,
 	}
 	return f
-}
-
-func (f *ring1Factory) CategoryExpander() (restmapper.CategoryExpander, error) {
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err != nil {
-		return nil, err
-	}
-
-	return restmapper.NewDiscoveryCategoryExpander(discoveryClient), nil
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
