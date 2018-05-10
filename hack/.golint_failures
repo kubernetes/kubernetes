@@ -159,7 +159,7 @@ pkg/kubectl/util/crlf
 pkg/kubectl/util/slice
 pkg/kubelet
 pkg/kubelet/apis
-pkg/kubelet/apis/cri/runtime/v1alpha2
+pkg/kubelet/apis/cri/runtime/v1alpha3
 pkg/kubelet/apis/cri/testing
 pkg/kubelet/apis/deviceplugin/v1alpha
 pkg/kubelet/apis/deviceplugin/v1beta1

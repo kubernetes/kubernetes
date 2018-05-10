@@ -22,7 +22,7 @@ import (
 	"context"
 	"fmt"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 )
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
