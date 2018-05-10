@@ -17,12 +17,16 @@ limitations under the License.
 package token
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 )
 
 // testCertPEM is a simple self-signed test certificate issued with the openssl CLI:
@@ -48,6 +52,306 @@ y4h5rWdNnzBHWAGf7zJ0oEDV6W6RSwNXtC0JNnLaeIUm/6xdSddJlQPwUv8YH4jX
 c1vuFqTnJBPcb7W//R/GI2Paicm1cmns9NLnPR35exHxFTy+D1yxmGokpoPMdife
 aH+sfuxT8xeTPb3kjzF9eJTlnEquUDLM
 -----END CERTIFICATE-----`
+
+// testCertPEM is a simple self-signed test certificate issued with the openssl CLI:
+// openssl req -new -newkey rsa:2048 -days 36500 -nodes -x509 -keyout /dev/null -out test.crt
+const testCertPEM2 = `
+-----BEGIN CERTIFICATE-----
+MIIDRDCCAiygAwIBAgIJAJgVaCXvC6HkMA0GCSqGSIb3DQEBBQUAMB8xHTAbBgNV
+BAMTFGt1YmVhZG0ta2V5cGlucy10ZXN0MCAXDTE3MDcwNTE3NDMxMFoYDzIxMTcw
+NjExMTc0MzEwWjAfMR0wGwYDVQQDExRrdWJlYWRtLWtleXBpbnMtdGVzdDCCASIw
+DQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAK0ba8mHU9UtYlzM1Own2Fk/XGjR
+J4uJQvSeGLtz1hID1IA0dLwruvgLCPadXEOw/f/IWIWcmT+ZmvIHZKa/woq2iHi5
++HLhXs7aG4tjKGLYhag1hLjBI7icqV7ovkjdGAt9pWkxEzhIYClFMXDjKpMSynu+
+YX6nZ9tic1cOkHmx2yiZdMkuriRQnpTOa7bb03OC1VfGl7gHlOAIYaj4539WCOr8
++ACTUMJUFEHcRZ2o8a/v6F9GMK+7SC8SJUI+GuroXqlMAdhEv4lX5Co52enYaClN
++D9FJLRpBv2YfiCQdJRaiTvCBSxEFz6BN+PtP5l2Hs703ZWEkOqCByM6HV8CAwEA
+AaOBgDB+MB0GA1UdDgQWBBRQgUX8MhK2rWBWQiPHWcKzoWDH5DBPBgNVHSMESDBG
+gBRQgUX8MhK2rWBWQiPHWcKzoWDH5KEjpCEwHzEdMBsGA1UEAxMUa3ViZWFkbS1r
+ZXlwaW5zLXRlc3SCCQCYFWgl7wuh5DAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEB
+BQUAA4IBAQCaAUif7Pfx3X0F08cxhx8/Hdx4jcJw6MCq6iq6rsXM32ge43t8OHKC
+pJW08dk58a3O1YQSMMvD6GJDAiAfXzfwcwY6j258b1ZlI9Ag0VokvhMl/XfdCsdh
+AWImnL1t4hvU5jLaImUUMlYxMcSfHBGAm7WJIZ2LdEfg6YWfZh+WGbg1W7uxLxk6
+y4h5rWdNnzBHWAGf7zJ0oEDV6W6RSwNXtC0JNnLaeIUm/6xdSddJlQPwUv8YH4jX
+c1vuFqTnJBPcb7W//R/GI2Paicm1cmns9NLnPR35exHxFTy+D1yxmGokpoPMdife
+aH+sfuxT8xeTPb3kjzF9eJTlnEquUDLM
+-----END CERTIFICATE-----`
+
+// expectedHash can be verified using the openssl CLI:
+// openssl x509 -pubkey -in test.crt openssl rsa -pubin -outform der 2>&/dev/null | openssl dgst -sha256 -hex
+const expectedHash2 = `sha256:345959acb2c3b2feb87d281961c893f62a314207ef02599f1cc4a5fb255480b3`
+
+const (
+	userID      = "johndoe"
+	userSecret  = "John's secret"
+	validConfig = `
+apiVersion: v1
+kind: Config
+current-context: example-context
+clusters:
+- cluster:
+    api-version: v1
+    server: https://example.com:8000
+  name: example-cluster
+contexts:
+- context:
+    cluster: example-cluster
+    namespace: example-ns
+    user: example-user
+  name: example-context
+preferences:
+  colors: true
+users:
+- name: example-user
+  user:
+    token: example-user-token`
+	validToken = "eyJhbGciOiJIUzI1NiIsImtpZCI6ImpvaG5kb2UifQ..VoFkSb03kjPpER6qoyr4Gv3idDJE54xRvQUHjtwxt-c"
+)
+
+func TestFetchInsecureClusterInfo(t *testing.T) {
+	const (
+		endpoint = "E"
+		cluster  = "C"
+	)
+	resultCluster, client, server, err := fetchInsecureClusterInfo(endpoint, cluster)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if resultCluster != cluster {
+		t.Errorf("unexpected cluster name: %v", resultCluster)
+	}
+	if server != "https://"+endpoint {
+		t.Errorf("unexpected server: %v", server)
+	}
+	if client == nil {
+		t.Error("client should not be nil")
+	}
+}
+
+func TestValidateAndLoadInsecureConfig(t *testing.T) {
+	tests := []struct {
+		description string
+		clusterInfo *v1.ConfigMap
+		tokenID     string
+		tokenSecret string
+		expectError bool
+	}{
+		{
+			description: "Valid config is loaded",
+			expectError: false,
+			tokenID:     userID,
+			tokenSecret: userSecret,
+			clusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey:                  validConfig,
+					bootstrapapi.JWSSignatureKeyPrefix + userID: validToken,
+				},
+			},
+		},
+		{
+			description: "Empty KubeConfig returns error",
+			expectError: true,
+			tokenID:     "",
+			tokenSecret: "",
+			clusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey: "",
+				},
+			},
+		},
+		{
+			description: "Missing KubeConfig returns error",
+			expectError: true,
+			tokenID:     "",
+			tokenSecret: "",
+			clusterInfo: &v1.ConfigMap{
+				Data: map[string]string{},
+			},
+		},
+		{
+			description: "Missing JWSSignatureKeyPrefix returns error",
+			expectError: true,
+			tokenID:     userID,
+			tokenSecret: "",
+			clusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey: "XYZ",
+				},
+			},
+		},
+		{
+			description: "Empty JWSSignatureKeyPrefix returns error",
+			expectError: true,
+			tokenID:     userID,
+			tokenSecret: "",
+			clusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey:                  "#$%",
+					bootstrapapi.JWSSignatureKeyPrefix + userID: "",
+				},
+			},
+		},
+		{
+			description: "Mismatching signature returns error",
+			expectError: true,
+			tokenID:     userID,
+			tokenSecret: userSecret,
+			clusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey:                  "#$%",
+					bootstrapapi.JWSSignatureKeyPrefix + userID: "#$%",
+				},
+			},
+		},
+		{
+			description: "Invalid but signed KubeConfig returns error",
+			expectError: true,
+			tokenID:     userID,
+			tokenSecret: userSecret,
+			clusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey:                  "%$^*",
+					bootstrapapi.JWSSignatureKeyPrefix + userID: "eyJhbGciOiJIUzI1NiIsImtpZCI6ImpvaG5kb2UifQ..zGIAkO6lW_-9a2FVLjYwfAS52VcJrK-8F52PoPPHy_M",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		config, err := validateAndLoadInsecureConfig(test.clusterInfo, test.tokenID, test.tokenSecret)
+		if err == nil && test.expectError {
+			t.Errorf("%s: unexpected success", test.description)
+		} else if err != nil && test.expectError == false {
+			t.Errorf("%s: unexpected error on case: %v", test.description, err)
+		} else if err == nil && test.expectError == false && config == nil {
+			t.Errorf("%s: no error and no config", test.description)
+		}
+	}
+}
+
+func prepareTestConfig(clusters int) *clientcmdapi.Config {
+	config := clientcmdapi.NewConfig()
+	for i := 0; i < clusters; i++ {
+		name := fmt.Sprintf("C%d", i+1)
+		config.Clusters[name] = clientcmdapi.NewCluster()
+		config.Clusters[name].CertificateAuthorityData = []byte(testCertPEM2)
+	}
+	return config
+}
+
+func TestFetchSecureClient(t *testing.T) {
+	const (
+		endpoint = "E"
+		cluster  = "C"
+	)
+
+	pubkeyset := pubkeypin.NewSet()
+	emptyConfig := prepareTestConfig(0)
+	oneClusterConfig := prepareTestConfig(1)
+	twoClusterConfig := prepareTestConfig(2)
+
+	_, err := fetchSecureClient(endpoint, emptyConfig, cluster, pubkeyset)
+	if err == nil {
+		t.Error("unexpected success")
+	}
+
+	_, err = fetchSecureClient(endpoint, oneClusterConfig, cluster, pubkeyset)
+	if err == nil {
+		t.Error("unexpected success")
+	}
+
+	_, err = fetchSecureClient(endpoint, twoClusterConfig, cluster, pubkeyset)
+	if err == nil {
+		t.Error("unexpected success")
+	}
+
+	err = pubkeyset.Allow(expectedHash2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = fetchSecureClient(endpoint, emptyConfig, cluster, pubkeyset)
+	if err == nil {
+		t.Error("unexpected success")
+	}
+
+	_, err = fetchSecureClient(endpoint, twoClusterConfig, cluster, pubkeyset)
+	if err == nil {
+		t.Error("unexpected success")
+	}
+
+	client, err := fetchSecureClient(endpoint, oneClusterConfig, cluster, pubkeyset)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if client == nil {
+		t.Fatal("fetchSecureClient returned success, but no client")
+	}
+}
+
+func TestLoadSecureConfig(t *testing.T) {
+	tests := []struct {
+		description         string
+		expectError         bool
+		secureClusterInfo   *v1.ConfigMap
+		insecureClusterInfo *v1.ConfigMap
+	}{
+		{
+			description: "Mismatching configs return error",
+			expectError: true,
+			secureClusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey: "ABC",
+				},
+			},
+			insecureClusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey: "XYZ",
+				},
+			},
+		},
+		{
+			description: "Matching invalid configs result in error",
+			expectError: true,
+			secureClusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey: "%$^*",
+				},
+			},
+			insecureClusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey: "%$^*",
+				},
+			},
+		},
+		{
+			description: "Matching valid configs gets loaded",
+			expectError: false,
+			secureClusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey:                  validConfig,
+					bootstrapapi.JWSSignatureKeyPrefix + userID: validToken,
+				},
+			},
+			insecureClusterInfo: &v1.ConfigMap{
+				Data: map[string]string{
+					bootstrapapi.KubeConfigKey: validConfig,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		config, err := loadSecureConfig(test.secureClusterInfo, test.insecureClusterInfo)
+		if err != nil && !test.expectError {
+			t.Errorf("%s: unexpected error: %v", test.description, err)
+		} else if err == nil && test.expectError {
+			t.Errorf("%s: unexpected success", test.description)
+		} else if err == nil && config == nil && !test.expectError {
+			t.Errorf("%s: returned success, but no config", test.description)
+		}
+	}
+}
 
 func TestRunForEndpointsAndReturnFirst(t *testing.T) {
 	tests := []struct {
