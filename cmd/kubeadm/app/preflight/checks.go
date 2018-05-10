@@ -50,6 +50,7 @@ import (
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
+	"k8s.io/kubernetes/pkg/util/procfs"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -813,6 +814,33 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 	return err
 }
 
+// ResolveCheck tests for potential issues related to the system resolver configuration
+type ResolveCheck struct{}
+
+// Name returns label for ResolveCheck
+func (ResolveCheck) Name() string {
+	return "Resolve"
+}
+
+// Check validates the system resolver configuration
+func (ResolveCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("validating the system resolver configuration")
+
+	warnings = []error{}
+
+	// procfs.PidOf only returns an error if the string passed is empty
+	// or there is an issue compiling the regex, so we can ignore it here
+	pids, _ := procfs.PidOf("systemd-resolved")
+	if len(pids) > 0 {
+		warnings = append(warnings, fmt.Errorf(
+			"systemd-resolved was detected, for cluster dns resolution to work "+
+				"properly --resolv-conf=/run/systemd/resolve/resolv.conf must be set "+
+				"for the kubelet. (/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)\n"))
+	}
+
+	return warnings, errors
+}
+
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
 func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
@@ -951,7 +979,8 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 			InPathCheck{executable: "socat", mandatory: false, exec: execer},
 			InPathCheck{executable: "tc", mandatory: false, exec: execer},
 			InPathCheck{executable: "touch", mandatory: false, exec: execer},
-			criCtlChecker)
+			criCtlChecker,
+			ResolveCheck{})
 	}
 	checks = append(checks,
 		SystemVerificationCheck{CRISocket: cfg.GetCRISocket()},
