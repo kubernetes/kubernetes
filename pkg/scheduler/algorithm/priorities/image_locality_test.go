@@ -110,7 +110,7 @@ func TestImageLocalityPriority(t *testing.T) {
 		pods         []*v1.Pod
 		nodes        []*v1.Node
 		expectedList schedulerapi.HostPriorityList
-		test         string
+		name         string
 	}{
 		{
 			// Pod: gcr.io/40 gcr.io/250
@@ -125,7 +125,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			pod:          &v1.Pod{Spec: test40250},
 			nodes:        []*v1.Node{makeImageNode("machine1", node401402000), makeImageNode("machine2", node25010)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 3}},
-			test:         "two images spread on two nodes, prefer the larger image one",
+			name:         "two images spread on two nodes, prefer the larger image one",
 		},
 		{
 			// Pod: gcr.io/40 gcr.io/140
@@ -140,7 +140,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			pod:          &v1.Pod{Spec: test40140},
 			nodes:        []*v1.Node{makeImageNode("machine1", node401402000), makeImageNode("machine2", node25010)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 2}, {Host: "machine2", Score: 0}},
-			test:         "two images on one node, prefer this node",
+			name:         "two images on one node, prefer this node",
 		},
 		{
 			// Pod: gcr.io/2000 gcr.io/10
@@ -155,23 +155,25 @@ func TestImageLocalityPriority(t *testing.T) {
 			pod:          &v1.Pod{Spec: testMinMax},
 			nodes:        []*v1.Node{makeImageNode("machine1", node401402000), makeImageNode("machine2", node25010)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}},
-			test:         "if exceed limit, use limit",
+			name:         "if exceed limit, use limit",
 		},
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
-		list, err := priorityFunction(ImageLocalityPriorityMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			list, err := priorityFunction(ImageLocalityPriorityMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 
-		sort.Sort(test.expectedList)
-		sort.Sort(list)
+			sort.Sort(test.expectedList)
+			sort.Sort(list)
 
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
-		}
+			if !reflect.DeepEqual(test.expectedList, list) {
+				t.Errorf("expected %#v, got %#v", test.expectedList, list)
+			}
+		})
 	}
 }
 
