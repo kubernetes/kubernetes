@@ -2526,6 +2526,7 @@ type BackendServices interface {
 	Insert(ctx context.Context, key *meta.Key, obj *ga.BackendService) error
 	Delete(ctx context.Context, key *meta.Key) error
 	GetHealth(context.Context, *meta.Key, *ga.ResourceGroupReference) (*ga.BackendServiceGroupHealth, error)
+	Patch(context.Context, *meta.Key, *ga.BackendService) error
 	Update(context.Context, *meta.Key, *ga.BackendService) error
 }
 
@@ -2567,6 +2568,7 @@ type MockBackendServices struct {
 	InsertHook    func(ctx context.Context, key *meta.Key, obj *ga.BackendService, m *MockBackendServices) (bool, error)
 	DeleteHook    func(ctx context.Context, key *meta.Key, m *MockBackendServices) (bool, error)
 	GetHealthHook func(context.Context, *meta.Key, *ga.ResourceGroupReference, *MockBackendServices) (*ga.BackendServiceGroupHealth, error)
+	PatchHook     func(context.Context, *meta.Key, *ga.BackendService, *MockBackendServices) error
 	UpdateHook    func(context.Context, *meta.Key, *ga.BackendService, *MockBackendServices) error
 
 	// X is extra state that can be used as part of the mock. Generated code
@@ -2719,6 +2721,14 @@ func (m *MockBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0
 		return m.GetHealthHook(ctx, key, arg0, m)
 	}
 	return nil, fmt.Errorf("GetHealthHook must be set")
+}
+
+// Patch is a mock for the corresponding method.
+func (m *MockBackendServices) Patch(ctx context.Context, key *meta.Key, arg0 *ga.BackendService) error {
+	if m.PatchHook != nil {
+		return m.PatchHook(ctx, key, arg0, m)
+	}
+	return nil
 }
 
 // Update is a mock for the corresponding method.
@@ -2897,6 +2907,39 @@ func (g *GCEBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 
 	v, err := call.Do()
 	glog.V(4).Infof("GCEBackendServices.GetHealth(%v, %v, ...) = %+v, %v", ctx, key, v, err)
 	return v, err
+}
+
+// Patch is a method on GCEBackendServices.
+func (g *GCEBackendServices) Patch(ctx context.Context, key *meta.Key, arg0 *ga.BackendService) error {
+	glog.V(5).Infof("GCEBackendServices.Patch(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBackendServices.Patch(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "BackendServices")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Patch",
+		Version:   meta.Version("ga"),
+		Service:   "BackendServices",
+	}
+	glog.V(5).Infof("GCEBackendServices.Patch(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBackendServices.Patch(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.GA.BackendServices.Patch(projectID, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBackendServices.Patch(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBackendServices.Patch(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
 // Update is a method on GCEBackendServices.
