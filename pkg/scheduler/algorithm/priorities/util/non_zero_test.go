@@ -26,7 +26,7 @@ import (
 )
 
 func TestGetNonzeroRequests(t *testing.T) {
-	tds := []struct {
+	tests := []struct {
 		name           string
 		requests       v1.ResourceList
 		expectedCPU    int64
@@ -65,9 +65,11 @@ func TestGetNonzeroRequests(t *testing.T) {
 		},
 	}
 
-	for _, td := range tds {
-		realCPU, realMemory := GetNonzeroRequests(&td.requests)
-		assert.EqualValuesf(t, td.expectedCPU, realCPU, "Failed to test: %s", td.name)
-		assert.EqualValuesf(t, td.expectedMemory, realMemory, "Failed to test: %s", td.name)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			realCPU, realMemory := GetNonzeroRequests(&test.requests)
+			assert.EqualValuesf(t, test.expectedCPU, realCPU, "Failed to test: %s", test.name)
+			assert.EqualValuesf(t, test.expectedMemory, realMemory, "Failed to test: %s", test.name)
+		})
 	}
 }
