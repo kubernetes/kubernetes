@@ -290,14 +290,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				})
 
 				It("should set fsGroup for one pod", func() {
-					skipTypes := sets.NewString(
-						string(DirectoryBindMountedLocalVolumeType),
-						string(DirectoryLinkBindMountedLocalVolumeType),
-					)
-					if skipTypes.Has(string(testVolType)) {
-						// TODO(cofyc): Test it when bug is fixed.
-						framework.Skipf("Skipped when volume type is %v", testVolType)
-					}
 					By("Checking fsGroup is set")
 					pod := createPodWithFsGroupTest(config, testVol, 1234, 1234)
 					By("Deleting pod")
@@ -305,14 +297,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				})
 
 				It("should set same fsGroup for two pods simultaneously", func() {
-					skipTypes := sets.NewString(
-						string(DirectoryBindMountedLocalVolumeType),
-						string(DirectoryLinkBindMountedLocalVolumeType),
-					)
-					if skipTypes.Has(string(testVolType)) {
-						// TODO(cofyc): Test it when bug is fixed.
-						framework.Skipf("Skipped when volume type is %v", testVolType)
-					}
 					fsGroup := int64(1234)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup, fsGroup)
@@ -325,14 +309,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				})
 
 				It("should set different fsGroup for second pod if first pod is deleted", func() {
-					skipTypes := sets.NewString(
-						string(DirectoryBindMountedLocalVolumeType),
-						string(DirectoryLinkBindMountedLocalVolumeType),
-					)
-					if skipTypes.Has(string(testVolType)) {
-						// TODO(cofyc): Test it when bug is fixed.
-						framework.Skipf("Skipped when volume type is %v", testVolType)
-					}
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)
@@ -346,16 +322,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				})
 
 				It("should not set different fsGroups for two pods simultaneously", func() {
-					skipTypes := sets.NewString(
-						string(DirectoryLocalVolumeType),
-						string(DirectoryLinkLocalVolumeType),
-						string(DirectoryBindMountedLocalVolumeType),
-						string(DirectoryLinkBindMountedLocalVolumeType),
-					)
-					if skipTypes.Has(string(testVolType)) {
-						// TODO(cofyc): Test it when bug is fixed.
-						framework.Skipf("Skipped when volume type is %v", testVolType)
-					}
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)
