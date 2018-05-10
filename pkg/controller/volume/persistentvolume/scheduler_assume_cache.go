@@ -158,8 +158,30 @@ func (c *assumeCache) add(obj interface{}) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
+		newVersion, err := c.getObjVersion(name, obj)
+		if err != nil {
+			glog.Errorf("add: couldn't get object version: %v", err)
+			return
+		}
+
+		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
+		if err != nil {
+			glog.Errorf("add: couldn't get stored object version: %v", err)
+			return
+		}
+
+		// Only update object if version is newer.
+		// This is so we don't override assumed objects due to informer resync.
+		if newVersion <= storedVersion {
+			glog.V(10).Infof("Skip adding %v %v to assume cache because version %v is not newer than %v", c.description, name, newVersion, storedVersion)
+			return
+		}
+	}
+
 	objInfo := &objInfo{name: name, latestObj: obj, apiObj: obj}
 	c.store.Update(objInfo)
+	glog.V(10).Infof("Adding %v %v to assume cache: %+v ", c.description, name, obj)
 }
 
 func (c *assumeCache) update(oldObj interface{}, newObj interface{}) {

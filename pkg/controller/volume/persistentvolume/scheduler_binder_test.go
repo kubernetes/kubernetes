@@ -51,6 +51,7 @@ var (
 	pvNoNode                   = makeTestPV("pv-no-node", "", "1G", "1", nil, waitClass)
 	pvNode1a                   = makeTestPV("pv-node1a", "node1", "5G", "1", nil, waitClass)
 	pvNode1b                   = makeTestPV("pv-node1b", "node1", "10G", "1", nil, waitClass)
+	pvNode1c                   = makeTestPV("pv-node1b", "node1", "5G", "1", nil, waitClass)
 	pvNode2                    = makeTestPV("pv-node2", "node2", "1G", "1", nil, waitClass)
 	pvPrebound                 = makeTestPV("pv-prebound", "node1", "1G", "1", unboundPVC, waitClass)
 	pvBound                    = makeTestPV("pv-bound", "node1", "1G", "1", boundPVC, waitClass)
@@ -188,6 +189,11 @@ func (env *testEnv) validatePodCache(t *testing.T, name, node string, pod *v1.Po
 	if !reflect.DeepEqual(expectedBindings, bindings) {
 		t.Errorf("Test %q failed: Expected bindings %+v, got %+v", name, expectedBindings, bindings)
 	}
+}
+
+func (env *testEnv) getPodBindings(t *testing.T, name, node string, pod *v1.Pod) []*bindingInfo {
+	cache := env.internalBinder.podBindingCache
+	return cache.GetBindings(pod, node)
 }
 
 func (env *testEnv) validateAssume(t *testing.T, name string, pod *v1.Pod, bindings []*bindingInfo) {
@@ -732,5 +738,71 @@ func TestBindPodVolumes(t *testing.T) {
 			scenario.expectedAPIPVs = scenario.expectedPVs
 		}
 		testEnv.validateBind(t, name, pod, scenario.expectedPVs, scenario.expectedAPIPVs)
+	}
+}
+
+func TestFindAssumeVolumes(t *testing.T) {
+	// Set feature gate
+	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+
+	// Test case
+	podPVCs := []*v1.PersistentVolumeClaim{unboundPVC}
+	pvs := []*v1.PersistentVolume{pvNode2, pvNode1a, pvNode1c}
+
+	// Setup
+	testEnv := newTestBinder(t)
+	testEnv.initVolumes(pvs, pvs)
+	testEnv.initClaims(t, podPVCs)
+	pod := makePod(podPVCs)
+
+	testNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+			Labels: map[string]string{
+				nodeLabelKey: "node1",
+			},
+		},
+	}
+
+	// Execute
+	// 1. Find matching PVs
+	unboundSatisfied, _, err := testEnv.binder.FindPodVolumes(pod, testNode)
+	if err != nil {
+		t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
+	}
+	if !unboundSatisfied {
+		t.Errorf("Test failed: couldn't find PVs for all PVCs")
+	}
+	expectedBindings := testEnv.getPodBindings(t, "before-assume", testNode.Name, pod)
+
+	// 2. Assume matches
+	allBound, bindingRequired, err := testEnv.binder.AssumePodVolumes(pod, testNode.Name)
+	if err != nil {
+		t.Errorf("Test failed: AssumePodVolumes returned error: %v", err)
+	}
+	if allBound {
+		t.Errorf("Test failed: detected unbound volumes as bound")
+	}
+	if !bindingRequired {
+		t.Errorf("Test failed: binding not required")
+	}
+	testEnv.validateAssume(t, "assume", pod, expectedBindings)
+	// After assume, claimref should be set on pv
+	expectedBindings = testEnv.getPodBindings(t, "after-assume", testNode.Name, pod)
+
+	// 3. Find matching PVs again
+	// This should always return the original chosen pv
+	// Run this many times in case sorting returns different orders for the two PVs.
+	t.Logf("Testing FindPodVolumes after Assume")
+	for i := 0; i < 50; i++ {
+		unboundSatisfied, _, err := testEnv.binder.FindPodVolumes(pod, testNode)
+		if err != nil {
+			t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
+		}
+		if !unboundSatisfied {
+			t.Errorf("Test failed: couldn't find PVs for all PVCs")
+		}
+		testEnv.validatePodCache(t, "after-assume", testNode.Name, pod, expectedBindings)
 	}
 }
