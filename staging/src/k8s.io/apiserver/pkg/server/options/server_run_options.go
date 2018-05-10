@@ -38,6 +38,7 @@ type ServerRunOptions struct {
 
 	CorsAllowedOriginList       []string
 	ExternalHost                string
+	MaxRequestsPerUserInFlight  int
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	RequestTimeout              time.Duration
@@ -48,6 +49,7 @@ type ServerRunOptions struct {
 func NewServerRunOptions() *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
 	return &ServerRunOptions{
+		MaxRequestsPerUserInFlight:  defaults.MaxRequestsPerUserInFlight,
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		RequestTimeout:              defaults.RequestTimeout,
@@ -59,6 +61,7 @@ func NewServerRunOptions() *ServerRunOptions {
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
 	c.ExternalAddress = s.ExternalHost
+	c.MaxRequestsPerUserInFlight = s.MaxRequestsPerUserInFlight
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
 	c.RequestTimeout = s.RequestTimeout
@@ -91,6 +94,9 @@ func (s *ServerRunOptions) Validate() []error {
 	errors := []error{}
 	if s.TargetRAMMB < 0 {
 		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
+	}
+	if s.MaxRequestsPerUserInFlight < 0 {
+		errors = append(errors, fmt.Errorf("--max-requests-per-user-inflight can not be negative value"))
 	}
 	if s.MaxRequestsInFlight < 0 {
 		errors = append(errors, fmt.Errorf("--max-requests-inflight can not be negative value"))
@@ -134,6 +140,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	deprecatedMasterServiceNamespace := metav1.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
 		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")
+
+	fs.IntVar(&s.MaxRequestsPerUserInFlight, "max-requests-per-user-inflight", s.MaxRequestsPerUserInFlight, ""+
+		"The maximum number of requests per one user in flight at a given time. When the server exceeds this, "+
+		"it rejects requests. Zero for no limit.")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
 		"The maximum number of non-mutating requests in flight at a given time. When the server exceeds this, "+

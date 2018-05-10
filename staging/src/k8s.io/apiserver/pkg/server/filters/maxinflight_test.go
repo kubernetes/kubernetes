@@ -58,13 +58,47 @@ func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *b
 	return httptest.NewServer(handler)
 }
 
+func createMaxInflightPerUserServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, limit int) *httptest.Server {
+	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
+
+	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
+	handler := WithMaxInFlightPerUserLimit(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// A short, accounted request that does not wait for block WaitGroup.
+			if strings.Contains(r.URL.Path, "dontwait") {
+				return
+			}
+			disableCallsWgMutex.Lock()
+			waitForCalls := *disableCallsWg
+			disableCallsWgMutex.Unlock()
+			if waitForCalls {
+				callsWg.Done()
+			}
+			blockWg.Wait()
+		}),
+		limit,
+		longRunningRequestCheck,
+	)
+	handler = withFakeUser(handler)
+	handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
+
+	return httptest.NewServer(handler)
+}
+
 func withFakeUser(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if len(r.Header["Groups"]) > 0 {
-			r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
-				Groups: r.Header["Groups"],
-			}))
+		userInfo := new(user.DefaultInfo)
+
+		if userName := r.URL.Query().Get("user"); userName != "" {
+			userInfo.Name = userName
 		}
+
+		if len(r.Header["Groups"]) > 0 {
+			userInfo.Groups = r.Header["Groups"]
+		}
+
+		r = r.WithContext(apirequest.WithUser(r.Context(), userInfo))
+
 		handler.ServeHTTP(w, r)
 	})
 }
@@ -304,4 +338,121 @@ func TestMaxInFlightSkipsMasters(t *testing.T) {
 	block.Done()
 
 	responses.Wait()
+}
+
+// Tests that TestMaxInFlightPerUser works, i.e.
+// - "long" requests such as proxy or watch, identified by regexp are not accounted despite
+//   hanging for the long time,
+// - "short" requests are correctly accounted, i.e. there can be only size of channel passed to the
+//   constructor in flight at any given moment,
+// - subsequent "short" requests are rejected instantly with appropriate error,
+// - subsequent "long" requests are handled normally,
+// - we correctly recover after some "short" requests finish, i.e. we can process new ones.
+// - this limit accounted for different users separately
+func TestMaxInFlightPerUser(t *testing.T) {
+	const AllowedInFlightPerUserRequestsNo = 3
+
+	// Calls is used to wait until all server calls are received. We are sending
+	// AllowedNonMutatingInflightRequestsNo of 'long' not-accounted requests and the same number of
+	// 'short' accounted ones.
+	calls := &sync.WaitGroup{}
+
+	// Responses is used to wait until all responses are
+	// received. This prevents some async requests getting EOF
+	// errors from prematurely closing the server
+	responses := &sync.WaitGroup{}
+
+	// Block is used to keep requests in flight for as long as we need to. All requests will
+	// be unblocked at the same time.
+	block := &sync.WaitGroup{}
+	block.Add(1)
+
+	waitForCalls := true
+	waitForCallsMutex := sync.Mutex{}
+
+	server := createMaxInflightPerUserServer(calls, block, &waitForCalls, &waitForCallsMutex, AllowedInFlightPerUserRequestsNo)
+	defer server.Close()
+
+	usernames := []string{"test", "test2"}
+
+	for _, username := range usernames {
+		waitForCallsMutex.Lock()
+		waitForCalls = true
+		waitForCallsMutex.Unlock()
+
+		// These should hang, but not affect accounting.  use a query param match
+		for i := 0; i < AllowedInFlightPerUserRequestsNo; i++ {
+			// These should hang waiting on block...
+			calls.Add(1)
+			responses.Add(1)
+			go func() {
+				if err := expectHTTPGet(server.URL+"/api/v1/watch/namespaces/default/?user="+username, http.StatusOK); err != nil {
+					t.Error(err)
+					calls.Done() //decrease WG to prevemnt test hang, due to when `StatusTooManyRequests`, calls.Done() didn't done by handler
+				}
+				responses.Done()
+			}()
+		}
+
+		// We wait for all calls to be received by the server
+		calls.Wait()
+		// Disable calls notifications in the server
+		waitForCallsMutex.Lock()
+		waitForCalls = false
+		waitForCallsMutex.Unlock()
+
+		// Check that sever is not saturated by not-accounted calls
+		if err := expectHTTPGet(server.URL+"/dontwait?user="+username, http.StatusOK); err != nil {
+			t.Error(err)
+		}
+
+		waitForCallsMutex.Lock()
+		waitForCalls = true
+		waitForCallsMutex.Unlock()
+
+		// These should hang and be accounted, i.e. saturate the server for user 'test'
+		for i := 0; i < AllowedInFlightPerUserRequestsNo; i++ {
+			// These should hang waiting on block...
+			calls.Add(1)
+			responses.Add(1)
+			go func() {
+				if err := expectHTTPGet(server.URL+"/user?&user="+username, http.StatusOK); err != nil {
+					t.Error(err)
+					calls.Done()
+				}
+				responses.Done()
+			}()
+		}
+
+		// We wait for all calls to be received by the server
+		calls.Wait()
+	}
+
+	// Disable calls notifications in the server
+	waitForCallsMutex.Lock()
+	waitForCalls = false
+	waitForCallsMutex.Unlock()
+
+	// Validate that all users are saturated
+	for _, username := range usernames {
+		// Do this multiple times to show that rate limit rejected requests don't block.
+		for i := 0; i < 2; i++ {
+			if err := expectHTTPGet(server.URL+"/dontwait?user="+username, http.StatusTooManyRequests); err != nil {
+				t.Error(err)
+			}
+		}
+		// Validate that non-accounted URLs still work.  use a path regex match
+		if err := expectHTTPGet(server.URL+"/api/v1/watch/namespaces/default/dontwait?user="+username, http.StatusOK); err != nil {
+			t.Error(err)
+		}
+	}
+	// Let all hanging requests finish
+	block.Done()
+
+	// Show that we recover from being blocked up.
+	// Too avoid flakyness we need to wait until at least one of the requests really finishes.
+	responses.Wait()
+	if err := expectHTTPGet(server.URL, http.StatusOK); err != nil {
+		t.Error(err)
+	}
 }
