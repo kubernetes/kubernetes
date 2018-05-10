@@ -236,7 +236,7 @@ func resolvePackageTree(treeBase string) ([]Package, error) {
 	if err != nil {
 		var message string
 		if ee, ok := err.(*exec.ExitError); ok {
-			message = fmt.Sprintf("%v\n%v", ee, ee.Stderr)
+			message = fmt.Sprintf("%v\n%v", ee, string(ee.Stderr))
 		} else {
 			message = fmt.Sprintf("%v", err)
 		}
