@@ -79134,6 +79134,10 @@
       "description": "Use the host's pid namespace. Optional: Default to false.",
       "type": "boolean"
      },
+     "hostUserNamespace": {
+      "description": "Use the host's user namespace. Optional: Default to false.",
+      "type": "boolean"
+     },
      "hostname": {
       "description": "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
       "type": "string"
