@@ -66,6 +66,15 @@ func NamedCheck(name string, check func(r *http.Request) error) HealthzChecker {
 // exactly one call to InstallHandler. Calling InstallHandler more
 // than once for the same mux will result in a panic.
 func InstallHandler(mux mux, checks ...HealthzChecker) {
+	InstallPathHandler(mux, "/healthz", checks...)
+}
+
+// InstallPathHandler registers handlers for health checking on
+// a specific path to mux. *All handlers* for the path must be
+// specified in exactly one call to InstallPathHandler. Calling
+// InstallPathHandler more than once for the same path and mux will
+// result in a panic.
+func InstallPathHandler(mux mux, path string, checks ...HealthzChecker) {
 	if len(checks) == 0 {
 		glog.V(5).Info("No default health checks specified. Installing the ping handler.")
 		checks = []HealthzChecker{PingHealthz}
@@ -73,9 +82,9 @@ func InstallHandler(mux mux, checks ...HealthzChecker) {
 
 	glog.V(5).Info("Installing healthz checkers:", strings.Join(checkerNames(checks...), ", "))
 
-	mux.Handle("/healthz", handleRootHealthz(checks...))
+	mux.Handle(path, handleRootHealthz(checks...))
 	for _, check := range checks {
-		mux.Handle(fmt.Sprintf("/healthz/%v", check.Name()), adaptCheckToHandler(check.Check))
+		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check))
 	}
 }
 

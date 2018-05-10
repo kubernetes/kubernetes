@@ -42,6 +42,38 @@ func TestInstallHandler(t *testing.T) {
 	}
 }
 
+func TestInstallPathHandler(t *testing.T) {
+	mux := http.NewServeMux()
+	InstallPathHandler(mux, "/healthz/test")
+	InstallPathHandler(mux, "/healthz/ready")
+	req, err := http.NewRequest("GET", "http://example.com/healthz/test", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
+	}
+	if w.Body.String() != "ok" {
+		t.Errorf("expected %v, got %v", "ok", w.Body.String())
+	}
+
+	req, err = http.NewRequest("GET", "http://example.com/healthz/ready", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
+	}
+	if w.Body.String() != "ok" {
+		t.Errorf("expected %v, got %v", "ok", w.Body.String())
+	}
+
+}
+
 func TestMulitipleChecks(t *testing.T) {
 	tests := []struct {
 		path             string
