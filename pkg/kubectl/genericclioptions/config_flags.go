@@ -41,7 +41,9 @@ const (
 	flagAPIServer        = "server"
 	flagInsecure         = "insecure-skip-tls-verify"
 	flagCertFile         = "client-certificate"
+	flagCertData         = "client-certificate-data"
 	flagKeyFile          = "client-key"
+	flagKeyData          = "client-key-data"
 	flagCAFile           = "certificate-authority"
 	flagBearerToken      = "token"
 	flagImpersonate      = "as"
@@ -84,7 +86,9 @@ type ConfigFlags struct {
 	APIServer        *string
 	Insecure         *bool
 	CertFile         *string
+	CertData         *string
 	KeyFile          *string
+	KeyData          *string
 	CAFile           *string
 	BearerToken      *string
 	Impersonate      *string
@@ -231,8 +235,14 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.CertFile != nil {
 		flags.StringVar(f.CertFile, flagCertFile, *f.CertFile, "Path to a client certificate file for TLS")
 	}
+	if f.CertData != nil {
+		flags.StringVar(f.CertFile, flagCertData, *f.CertData, "Client certificate data for TLS")
+	}
 	if f.KeyFile != nil {
 		flags.StringVar(f.KeyFile, flagKeyFile, *f.KeyFile, "Path to a client key file for TLS")
+	}
+	if f.KeyData != nil {
+		flags.StringVar(f.KeyData, flagKeyData, *f.KeyData, "Client key data for TLS")
 	}
 	if f.BearerToken != nil {
 		flags.StringVar(f.BearerToken, flagBearerToken, *f.BearerToken, "Bearer token for authentication to the API server")

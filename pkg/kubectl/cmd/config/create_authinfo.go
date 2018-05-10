@@ -182,6 +182,8 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 				modifiedAuthInfo.ClientCertificateData = nil
 			}
 		}
+	} else if o.clientCertificateData.Provided() {
+		modifiedAuthInfo.ClientCertificateData = []byte(o.clientCertificateData.Value())
 	}
 	if o.clientKey.Provided() {
 		keyPath := o.clientKey.Value()
@@ -195,11 +197,7 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 				modifiedAuthInfo.ClientKeyData = nil
 			}
 		}
-	}
-	if o.clientCertificateData.Provided() {
-		modifiedAuthInfo.ClientCertificateData = []byte(o.clientCertificateData.Value())
-	}
-	if o.clientKeyData.Provided() {
+	} else if o.clientKeyData.Provided() {
 		modifiedAuthInfo.ClientKeyData = []byte(o.clientKeyData.Value())
 	}
 	if o.token.Provided() {
