@@ -121,6 +121,7 @@ const (
 // necessary to perform the update for the indicated strategy.
 type StatefulSetUpdateStrategy struct {
 	// Type indicates the type of the StatefulSetUpdateStrategy.
+	// Default is OnDelete.
 	Type StatefulSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=StatefulSetStrategyType"`
 	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
 	RollingUpdate *RollingUpdateStatefulSetStrategy `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
