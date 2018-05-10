@@ -163,8 +163,9 @@ type ExtraConfig struct {
 	// Selects which reconciler to use
 	EndpointReconcilerType reconcilers.Type
 
-	ServiceAccountIssuer       serviceaccount.TokenGenerator
-	ServiceAccountAPIAudiences []string
+	ServiceAccountIssuer        serviceaccount.TokenGenerator
+	ServiceAccountAPIAudiences  []string
+	ServiceAccountMaxExpiration time.Duration
 }
 
 type Config struct {
@@ -318,15 +319,16 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// install legacy rest storage
 	if c.ExtraConfig.APIResourceConfigSource.VersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-			StorageFactory:             c.ExtraConfig.StorageFactory,
-			ProxyTransport:             c.ExtraConfig.ProxyTransport,
-			KubeletClientConfig:        c.ExtraConfig.KubeletClientConfig,
-			EventTTL:                   c.ExtraConfig.EventTTL,
-			ServiceIPRange:             c.ExtraConfig.ServiceIPRange,
-			ServiceNodePortRange:       c.ExtraConfig.ServiceNodePortRange,
-			LoopbackClientConfig:       c.GenericConfig.LoopbackClientConfig,
-			ServiceAccountIssuer:       c.ExtraConfig.ServiceAccountIssuer,
-			ServiceAccountAPIAudiences: c.ExtraConfig.ServiceAccountAPIAudiences,
+			StorageFactory:              c.ExtraConfig.StorageFactory,
+			ProxyTransport:              c.ExtraConfig.ProxyTransport,
+			KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
+			EventTTL:                    c.ExtraConfig.EventTTL,
+			ServiceIPRange:              c.ExtraConfig.ServiceIPRange,
+			ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
+			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+			ServiceAccountAPIAudiences:  c.ExtraConfig.ServiceAccountAPIAudiences,
+			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
 		}
 		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
