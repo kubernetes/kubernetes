@@ -612,52 +612,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 
 	for v, tc := range schedulerFiles {
 		fmt.Printf("%s: Testing scheduler config\n", v)
-
-		policy := schedulerapi.Policy{}
-		if err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(tc.JSON), &policy); err != nil {
-			t.Errorf("%s: Error decoding: %v", v, err)
-			continue
-		}
-		for _, predicate := range policy.Predicates {
-			seenPredicates.Insert(predicate.Name)
-		}
-		for _, priority := range policy.Priorities {
-			seenPriorities.Insert(priority.Name)
-		}
-		if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
-			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
-		}
-
-		handler := utiltesting.FakeHandler{
-			StatusCode:   500,
-			ResponseBody: "",
-			T:            t,
-		}
-		server := httptest.NewServer(&handler)
-		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		informerFactory := informers.NewSharedInformerFactory(client, 0)
-
-		if _, err := factory.NewConfigFactory(
-			"some-scheduler-name",
-			client,
-			informerFactory.Core().V1().Nodes(),
-			informerFactory.Core().V1().Pods(),
-			informerFactory.Core().V1().PersistentVolumes(),
-			informerFactory.Core().V1().PersistentVolumeClaims(),
-			informerFactory.Core().V1().ReplicationControllers(),
-			informerFactory.Extensions().V1beta1().ReplicaSets(),
-			informerFactory.Apps().V1beta1().StatefulSets(),
-			informerFactory.Core().V1().Services(),
-			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-			informerFactory.Storage().V1().StorageClasses(),
-			v1.DefaultHardPodAffinitySymmetricWeight,
-			enableEquivalenceCache,
-			false,
-		).CreateFromConfig(policy); err != nil {
-			t.Errorf("%s: Error constructing: %v", v, err)
-			continue
-		}
+		t.Run(v, func(t *testing.T) {
+			testCompatibilityV1Scheduler(
+				registeredPredicates,
+				registeredPriorities,
+				seenPredicates,
+				seenPriorities,
+				tc.JSON,
+				tc.ExpectedPolicy,
+				t,
+			)
+		})
 	}
 
 	if !seenPredicates.HasAll(registeredPredicates.List()...) {
@@ -665,5 +630,62 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	}
 	if !seenPriorities.HasAll(registeredPriorities.List()...) {
 		t.Errorf("Registered priorities are missing from compatibility test (add to test stanza for version currently in development): %#v", registeredPriorities.Difference(seenPriorities).List())
+	}
+}
+
+func testCompatibilityV1Scheduler(
+	registeredPredicates,
+	registeredPriorities,
+	seenPredicates,
+	seenPriorities sets.String,
+	JSON string,
+	ExpectedPolicy schedulerapi.Policy,
+	t *testing.T,
+) {
+
+	policy := schedulerapi.Policy{}
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, []byte(JSON), &policy); err != nil {
+		t.Errorf("Error decoding: %v", err)
+		return
+	}
+	for _, predicate := range policy.Predicates {
+		seenPredicates.Insert(predicate.Name)
+	}
+	for _, priority := range policy.Priorities {
+		seenPriorities.Insert(priority.Name)
+	}
+	if !reflect.DeepEqual(policy, ExpectedPolicy) {
+		t.Errorf("Expected:\n\t%#v\nGot:\n\t%#v", ExpectedPolicy, policy)
+	}
+
+	handler := utiltesting.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	if _, err := factory.NewConfigFactory(
+		"some-scheduler-name",
+		client,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Storage().V1().StorageClasses(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
+		false,
+	).CreateFromConfig(policy); err != nil {
+		t.Errorf("Error constructing: %v", err)
+		return
 	}
 }
