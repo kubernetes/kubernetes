@@ -216,7 +216,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
+			"Rev": "0c329704159e3b051aafac400b15baacf2a94a04"
 		}
 	]
 }
