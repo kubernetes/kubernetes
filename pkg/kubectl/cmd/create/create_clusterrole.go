@@ -111,6 +111,10 @@ func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 }
 
 func (c *CreateClusterRoleOptions) Validate() error {
+	if c.Name == "" {
+		return fmt.Errorf("name must be specified")
+	}
+
 	if len(c.AggregationRule) > 0 {
 		if len(c.NonResourceURLs) > 0 || len(c.Verbs) > 0 || len(c.Resources) > 0 || len(c.ResourceNames) > 0 {
 			return fmt.Errorf("aggregation rule must be specified without nonResourceURLs, verbs, resources or resourceNames")
