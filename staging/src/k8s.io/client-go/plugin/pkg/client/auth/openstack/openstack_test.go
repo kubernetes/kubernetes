@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,100 +17,248 @@ limitations under the License.
 package openstack
 
 import (
-	"math/rand"
+	"fmt"
 	"net/http"
+	"reflect"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
-// testTokenGetter is a simple random token getter.
-type testTokenGetter struct{}
-
-const LetterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func RandStringBytes(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = LetterBytes[rand.Intn(len(LetterBytes))]
-	}
-	return string(b)
+type fakeTokenGetter struct {
+	tok *openstackToken
+	err error
 }
 
-func (*testTokenGetter) Token() (string, error) {
-	return RandStringBytes(32), nil
+func (f *fakeTokenGetter) Token() (*openstackToken, error) {
+	return f.tok, f.err
 }
 
-// testRoundTripper is mocked roundtripper which responds with unauthorized when
-// there is no authorization header, otherwise returns status ok.
-type testRoundTripper struct{}
-
-func (trt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	authHeader := req.Header.Get("Authorization")
-	if authHeader == "" || authHeader == "Bearer " {
-		return &http.Response{
-			StatusCode: http.StatusUnauthorized,
-		}, nil
-	}
-	return &http.Response{StatusCode: http.StatusOK}, nil
+type fakePersister struct {
+	lk    sync.Mutex
+	cache map[string]string
 }
 
-func TestOpenstackAuthProvider(t *testing.T) {
-	trt := &tokenRoundTripper{
-		RoundTripper: &testRoundTripper{},
+func (f *fakePersister) Persist(cache map[string]string) error {
+	f.lk.Lock()
+	defer f.lk.Unlock()
+	f.cache = map[string]string{}
+	for k, v := range cache {
+		f.cache[k] = v
 	}
+	return nil
+}
+
+func (f *fakePersister) read() map[string]string {
+	ret := map[string]string{}
+	f.lk.Lock()
+	defer f.lk.Unlock()
+	for k, v := range f.cache {
+		ret[k] = v
+	}
+	return ret
+}
+
+func TestGettingCachedOrNewToken(t *testing.T) {
+	now := time.Now()
 
 	tests := []struct {
-		name     string
-		ttl      time.Duration
-		interval time.Duration
-		same     bool
+		name      string
+		cache     map[string]string
+		cachedTok *openstackToken
+		newTok    *openstackToken
+		wantErr   error
+		wantTok   *openstackToken
 	}{
 		{
-			name:     "normal",
-			ttl:      2 * time.Second,
-			interval: 1 * time.Second,
-			same:     true,
+			"token not in cache, must get new token",
+			map[string]string{},
+			nil,
+			&openstackToken{
+				ID:        "validNewToken",
+				ExpiresAt: now.Add(time.Hour),
+			},
+			nil,
+			&openstackToken{
+				ID:        "validNewToken",
+				ExpiresAt: now.Add(time.Hour),
+			},
 		},
 		{
-			name:     "expire",
-			ttl:      1 * time.Second,
-			interval: 2 * time.Second,
-			same:     false,
+			"cached token is valid, must use cached token",
+			map[string]string{
+				"token-id":   "validCachedToken",
+				"expires-at": now.Add(time.Hour).Format(time.RFC3339Nano),
+			},
+			&openstackToken{
+				ID:        "validCachedToken",
+				ExpiresAt: now.Add(time.Hour),
+			},
+			&openstackToken{
+				ID:        "validNewToken",
+				ExpiresAt: now.Add(time.Hour),
+			},
+			nil,
+			&openstackToken{
+				ID:        "validCachedToken",
+				ExpiresAt: now.Add(time.Hour),
+			},
+		},
+		{
+			"cached token is expired, must get new token",
+			map[string]string{
+				"token-id":   "expiredCachedToken",
+				"expires-at": now.Add(-time.Hour).Format(time.RFC3339Nano),
+			},
+			&openstackToken{
+				ID:        "expiredCachedToken",
+				ExpiresAt: now.Add(-time.Hour),
+			},
+			&openstackToken{
+				ID:        "validNewToken",
+				ExpiresAt: now.Add(time.Hour),
+			},
+			nil,
+			&openstackToken{
+				ID:        "validNewToken",
+				ExpiresAt: now.Add(time.Hour),
+			},
+		},
+		{
+			"no token in cache and unable to get new token, must throw error",
+			map[string]string{},
+			nil,
+			nil,
+			fmt.Errorf("error getting openstack token"),
+			nil,
 		},
 	}
 
-	for _, test := range tests {
-		trt.tokenGetter = &cachedGetter{
-			tokenGetter: &testTokenGetter{},
-			ttl:         test.ttl,
+	for _, tc := range tests {
+		persister := &fakePersister{}
+		tokenGetter := &fakeTokenGetter{
+			tok: tc.newTok,
+			err: tc.wantErr,
 		}
-
-		req, err := http.NewRequest(http.MethodPost, "https://test-api-server.com", nil)
-		if err != nil {
-			t.Errorf("failed to new request: %s", err)
+		cachedGetter := newCachedGetter(tokenGetter, persister, tc.cache)
+		gotTok, gotErr := cachedGetter.Token()
+		if gotErr != nil {
+			if !errEquiv(gotErr, tc.wantErr) {
+				t.Errorf("%q Token() error: got %v, want %v", tc.name, gotErr, tc.wantErr)
+			}
+			continue
 		}
-		trt.RoundTrip(req)
-		header := req.Header.Get("Authorization")
-		if header == "" {
-			t.Errorf("expect to see token in header, but is absent")
-		}
-
-		time.Sleep(test.interval)
-
-		req, err = http.NewRequest(http.MethodPost, "https://test-api-server.com", nil)
-		if err != nil {
-			t.Errorf("failed to new request: %s", err)
-		}
-		trt.RoundTrip(req)
-		newHeader := req.Header.Get("Authorization")
-		if newHeader == "" {
-			t.Errorf("expect to see token in header, but is absent")
-		}
-
-		same := newHeader == header
-		if same != test.same {
-			t.Errorf("expect to get %t when compare header, but saw %t", test.same, same)
+		if !(gotTok.ID == tc.wantTok.ID && gotTok.ExpiresAt.Equal(tc.wantTok.ExpiresAt)) {
+			t.Errorf("%q Token() got %v, want %v", tc.name, gotTok, tc.wantTok)
 		}
 	}
+}
 
+type MockTransport struct {
+	res *http.Response
+}
+
+func (t *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.res, nil
+}
+
+func TestClearingCache(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name      string
+		res       http.Response
+		cache     map[string]string
+		wantCache map[string]string
+	}{
+		{
+			"unauthorized request, must clear cache",
+			http.Response{StatusCode: 401},
+			map[string]string{
+				"token-id":   "unexpiredToken",
+				"expires-at": now.Add(time.Hour).Format(time.RFC3339Nano),
+			},
+			map[string]string{},
+		},
+		{
+			"authorized request, must preserve cache",
+			http.Response{StatusCode: 200},
+			map[string]string{
+				"token-id":   "validToken",
+				"expires-at": now.Add(time.Hour).Format(time.RFC3339Nano),
+			},
+			map[string]string{
+				"token-id":   "validToken",
+				"expires-at": now.Add(time.Hour).Format(time.RFC3339Nano),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		persister := &fakePersister{}
+		tokenGetter := &fakeTokenGetter{}
+		cachedGetter := newCachedGetter(tokenGetter, persister, tc.cache)
+		oap := &openstackAuthProvider{
+			cachedGetter,
+			persister,
+		}
+		persister.Persist(tc.cache)
+
+		req := http.Request{Header: http.Header{}}
+		fakeTransport := MockTransport{&tc.res}
+		transport := (oap.WrapTransport(&fakeTransport))
+		transport.RoundTrip(&req)
+
+		if got := persister.read(); !reflect.DeepEqual(got, tc.wantCache) {
+			t.Errorf("%q WrapTransport(): got cache %v, want %v", tc.name, got, tc.wantCache)
+		}
+	}
+}
+
+func TestCacheConcurrentWrites(t *testing.T) {
+	now := time.Now()
+	tok := &openstackToken{
+		ID:        "validNewToken",
+		ExpiresAt: now.Add(time.Hour),
+	}
+	persister := &fakePersister{}
+	tokenGetter := &fakeTokenGetter{
+		tok,
+		nil,
+	}
+	cache := map[string]string{
+		"foo": "bar",
+		"baz": "bazinga",
+	}
+	cachedGetter := newCachedGetter(tokenGetter, persister, cache)
+
+	var wg sync.WaitGroup
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			_, err := cachedGetter.Token()
+			if err != nil {
+				t.Errorf("unexpected error: %s", err)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	cache["token-id"] = tok.ID
+	cache["expires-at"] = tok.ExpiresAt.Format(time.RFC3339Nano)
+	if got := persister.read(); !reflect.DeepEqual(got, cache) {
+		t.Errorf("got cache %v, want %v", got, cache)
+	}
+}
+
+func errEquiv(got, want error) bool {
+	if got == want {
+		return true
+	}
+	if got != nil && want != nil {
+		return strings.Contains(got.Error(), want.Error())
+	}
+	return false
 }
