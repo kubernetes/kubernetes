@@ -93,64 +93,94 @@ func TestListSandboxes(t *testing.T) {
 // TestSandboxStatus tests the basic lifecycle operations and verify that
 // the status returned reflects the operations performed.
 func TestSandboxStatus(t *testing.T) {
-	ds, fDocker, fClock := newTestDockerService()
-	labels := map[string]string{"label": "foobar1"}
-	annotations := map[string]string{"annotation": "abc"}
-	config := makeSandboxConfigWithLabelsAndAnnotations("foo", "bar", "1", 0, labels, annotations)
-	r := rand.New(rand.NewSource(0)).Uint32()
-	podIP := fmt.Sprintf("10.%d.%d.%d", byte(r>>16), byte(r>>8), byte(r))
-
-	state := runtimeapi.PodSandboxState_SANDBOX_READY
-	ct := int64(0)
-	expected := &runtimeapi.PodSandboxStatus{
-		State:     state,
-		CreatedAt: ct,
-		Metadata:  config.Metadata,
-		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: podIP},
-		Linux: &runtimeapi.LinuxPodSandboxStatus{
-			Namespaces: &runtimeapi.Namespace{
-				Options: &runtimeapi.NamespaceOption{
-					Pid: runtimeapi.NamespaceMode_CONTAINER,
-				},
-			},
+	testCases := []struct {
+		description string
+		labels      map[string]string
+		annotations map[string]string
+		linux       *runtimeapi.LinuxPodSandboxStatus
+	}{
+		{
+			description: "Tests that default value of User namespace option is NamespaceMode_POD",
+			labels:      map[string]string{"label": "foobar1"},
+			annotations: map[string]string{"annotation": "abc"},
+			linux: &runtimeapi.LinuxPodSandboxStatus{
+				Namespaces: &runtimeapi.Namespace{
+					Options: &runtimeapi.NamespaceOption{
+						Pid:  runtimeapi.NamespaceMode_CONTAINER,
+						User: runtimeapi.NamespaceMode_POD,
+					},
+				}},
 		},
-		Labels:      labels,
-		Annotations: annotations,
+		{
+			description: "Tests that if User namespace option is NamespaceMode_NODE, same is received back in status",
+			labels:      map[string]string{"label": "foobar1"},
+			annotations: map[string]string{"annotation": "abc"},
+			linux: &runtimeapi.LinuxPodSandboxStatus{
+				Namespaces: &runtimeapi.Namespace{
+					Options: &runtimeapi.NamespaceOption{
+						Pid:  runtimeapi.NamespaceMode_CONTAINER,
+						User: runtimeapi.NamespaceMode_NODE,
+					},
+				}},
+		},
 	}
+	for _, test := range testCases {
+		ds, fDocker, fClock := newTestDockerService()
+		config := makeSandboxConfigWithLabelsAndAnnotations("foo", "bar", "1", 0, test.labels, test.annotations)
+		config.Linux = &runtimeapi.LinuxPodSandboxConfig{
+			SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
+				NamespaceOptions: test.linux.Namespaces.Options,
+			},
+		}
+		r := rand.New(rand.NewSource(0)).Uint32()
+		podIP := fmt.Sprintf("10.%d.%d.%d", byte(r>>16), byte(r>>8), byte(r))
 
-	// Create the sandbox.
-	fClock.SetTime(time.Now())
-	expected.CreatedAt = fClock.Now().UnixNano()
-	runResp, err := ds.RunPodSandbox(getTestCTX(), &runtimeapi.RunPodSandboxRequest{Config: config})
-	require.NoError(t, err)
-	id := runResp.PodSandboxId
+		state := runtimeapi.PodSandboxState_SANDBOX_READY
+		ct := int64(0)
+		expected := &runtimeapi.PodSandboxStatus{
+			State:       state,
+			CreatedAt:   ct,
+			Metadata:    config.Metadata,
+			Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: podIP},
+			Linux:       test.linux,
+			Labels:      test.labels,
+			Annotations: test.annotations,
+		}
 
-	// Check internal labels
-	c, err := fDocker.InspectContainer(id)
-	assert.NoError(t, err)
-	assert.Equal(t, c.Config.Labels[containerTypeLabelKey], containerTypeLabelSandbox)
-	assert.Equal(t, c.Config.Labels[types.KubernetesContainerNameLabel], sandboxContainerName)
+		// Create the sandbox.
+		fClock.SetTime(time.Now())
+		expected.CreatedAt = fClock.Now().UnixNano()
+		runResp, err := ds.RunPodSandbox(getTestCTX(), &runtimeapi.RunPodSandboxRequest{Config: config})
+		require.NoError(t, err)
+		id := runResp.PodSandboxId
 
-	expected.Id = id // ID is only known after the creation.
-	statusResp, err := ds.PodSandboxStatus(getTestCTX(), &runtimeapi.PodSandboxStatusRequest{PodSandboxId: id})
-	require.NoError(t, err)
-	assert.Equal(t, expected, statusResp.Status)
+		// Check internal labels
+		c, err := fDocker.InspectContainer(id)
+		assert.NoError(t, err)
+		assert.Equal(t, c.Config.Labels[containerTypeLabelKey], containerTypeLabelSandbox)
+		assert.Equal(t, c.Config.Labels[types.KubernetesContainerNameLabel], sandboxContainerName)
 
-	// Stop the sandbox.
-	expected.State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
-	_, err = ds.StopPodSandbox(getTestCTX(), &runtimeapi.StopPodSandboxRequest{PodSandboxId: id})
-	require.NoError(t, err)
-	// IP not valid after sandbox stop
-	expected.Network.Ip = ""
-	statusResp, err = ds.PodSandboxStatus(getTestCTX(), &runtimeapi.PodSandboxStatusRequest{PodSandboxId: id})
-	require.NoError(t, err)
-	assert.Equal(t, expected, statusResp.Status)
+		expected.Id = id // ID is only known after the creation.
+		statusResp, err := ds.PodSandboxStatus(getTestCTX(), &runtimeapi.PodSandboxStatusRequest{PodSandboxId: id})
+		require.NoError(t, err)
+		assert.Equal(t, expected, statusResp.Status)
 
-	// Remove the container.
-	_, err = ds.RemovePodSandbox(getTestCTX(), &runtimeapi.RemovePodSandboxRequest{PodSandboxId: id})
-	require.NoError(t, err)
-	statusResp, err = ds.PodSandboxStatus(getTestCTX(), &runtimeapi.PodSandboxStatusRequest{PodSandboxId: id})
-	assert.Error(t, err, fmt.Sprintf("status of sandbox: %+v", statusResp))
+		// Stop the sandbox.
+		expected.State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+		_, err = ds.StopPodSandbox(getTestCTX(), &runtimeapi.StopPodSandboxRequest{PodSandboxId: id})
+		require.NoError(t, err)
+		// IP not valid after sandbox stop
+		expected.Network.Ip = ""
+		statusResp, err = ds.PodSandboxStatus(getTestCTX(), &runtimeapi.PodSandboxStatusRequest{PodSandboxId: id})
+		require.NoError(t, err)
+		assert.Equal(t, expected, statusResp.Status)
+
+		// Remove the container.
+		_, err = ds.RemovePodSandbox(getTestCTX(), &runtimeapi.RemovePodSandboxRequest{PodSandboxId: id})
+		require.NoError(t, err)
+		statusResp, err = ds.PodSandboxStatus(getTestCTX(), &runtimeapi.PodSandboxStatusRequest{PodSandboxId: id})
+		assert.Error(t, err, fmt.Sprintf("status of sandbox: %+v", statusResp))
+	}
 }
 
 // TestSandboxStatusAfterRestart tests that retrieving sandbox status returns

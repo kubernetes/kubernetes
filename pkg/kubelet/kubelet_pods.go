@@ -466,13 +466,17 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 			klog.Errorf("Error on creating %q: %v", p, err)
 		} else {
 			opts.PodContainerDir = p
+			//if err := kl.chownDirForRemappedIDs(p); err != nil {
+			//	return nil, nil, fmt.Errorf("error while chowning %s", p)
+			//}
+			//if err := kl.chownDirForRemappedIDs(filepath.Join(p, "..")); err != nil {
+			//	return nil, nil, fmt.Errorf("error while chowning %s", filepath.Join(p, ".."))
+			//}
 		}
 	}
 
-	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
-	if kl.experimentalHostUserNamespaceDefaulting {
-		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
-	}
+	opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
+	klog.V(5).Infof("opts.EnableHostUserNamespace %v for pod %s", opts.EnableHostUserNamespace, pod.Name)
 
 	return opts, cleanupAction, nil
 }
@@ -812,12 +816,21 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	if err := os.MkdirAll(kl.getPodDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
 	}
+	//if err := kl.chownDirForRemappedIDs(kl.getPodDir(uid)); err != nil {
+	//	return err
+	//}
 	if err := os.MkdirAll(kl.getPodVolumesDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
 	}
+	//if err := kl.chownDirForRemappedIDs(kl.getPodVolumesDir(uid)); err != nil {
+	//	return err
+	//}
 	if err := os.MkdirAll(kl.getPodPluginsDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
 	}
+	//if err := kl.chownDirForRemappedIDs(kl.getPodPluginsDir(uid)); err != nil {
+	//	return err
+	//}
 	return nil
 }
 
@@ -1718,12 +1731,9 @@ func hasHostVolume(pod *v1.Pod) bool {
 	return false
 }
 
-// hasHostNamespace returns true if hostIPC, hostNetwork, or hostPID are set to true.
+// hasHostNamespace returns true if hostIPC, hostNetwork, or hostPID are set to true or userNamespaceRemapping is set to false.
 func hasHostNamespace(pod *v1.Pod) bool {
-	if pod.Spec.SecurityContext == nil {
-		return false
-	}
-	return pod.Spec.HostIPC || pod.Spec.HostNetwork || pod.Spec.HostPID
+	return pod.Spec.HostIPC || pod.Spec.HostNetwork || pod.Spec.HostPID || (pod.Spec.HostUserNamespace != nil && *pod.Spec.HostUserNamespace)
 }
 
 // hasHostMountPVC returns true if a PVC is referencing a HostPath volume.

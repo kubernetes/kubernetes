@@ -52,6 +52,15 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 
 	// set namespace options and supplemental groups.
 	synthesized.NamespaceOptions = namespacesForPod(pod)
+	if m.runtimeConfig != nil && m.runtimeConfig.IsUserNamespaceSupported() && pod.Spec.HostUserNamespace == nil {
+		// if HostUserNamespace is not specified explicitly in pod, behavior is runtime defined
+		if m.runtimeConfig.IsUserNamespaceEnabled() {
+			synthesized.NamespaceOptions.User = runtimeapi.NamespaceMode_NODE_WIDE_REMAPPED
+		} else {
+			synthesized.NamespaceOptions.User = runtimeapi.NamespaceMode_NODE
+		}
+	}
+
 	podSc := pod.Spec.SecurityContext
 	if podSc != nil {
 		if podSc.FSGroup != nil {

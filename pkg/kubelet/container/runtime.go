@@ -123,6 +123,10 @@ type Runtime interface {
 	// This method just proxies a new runtimeConfig with the updated
 	// CIDR value down to the runtime shim.
 	UpdatePodCIDR(podCIDR string) error
+	// GetRuntimeConfigInfo returns runtime's configuration details, eg: if user-namespaces are enabled or not
+	GetRuntimeConfigInfo() *RuntimeConfigInfo
+	// GetRemappedIds returns UID and GID on host namespace which are mapped to container namespace
+	GetRemappedIds() (int, int)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
@@ -478,6 +482,42 @@ const (
 type RuntimeStatus struct {
 	// Conditions is an array of current observed runtime conditions.
 	Conditions []RuntimeCondition
+}
+
+// RuntimeConfigInfo contains runtime's configuration details, eg: user-namespaces mapping between host and container
+type RuntimeConfigInfo struct {
+	UserNamespaceConfig UserNamespaceConfigInfo
+}
+
+// UserNamespaceConfigInfo contains runtime's user-namespace configuration
+type UserNamespaceConfigInfo struct {
+	UidMapping UserNSMapping
+	GidMapping UserNSMapping
+}
+
+// UserNSMaping represents mapping of user-namespaces between host and container
+type UserNSMapping struct {
+	ContainerID uint32
+	HostID      uint32
+	Size        uint32
+}
+
+// IsUserNamespaceEnabled returns true if user-namespace feature is enabled at runtime
+func (c *RuntimeConfigInfo) IsUserNamespaceEnabled() bool {
+	if c.UserNamespaceConfig.UidMapping.Size != 0 {
+		return true
+	}
+	return false
+}
+
+// GetHostUserNamespaceRemappedHostIds returns uid and gid on host usernamespace that are mapped to first uid/gid of container user-namespace
+func (c *RuntimeConfigInfo) GetHostUserNamespaceRemappedHostIds() (int, int) {
+	return int(c.UserNamespaceConfig.UidMapping.HostID), int(c.UserNamespaceConfig.GidMapping.HostID)
+}
+
+// GetContainerUserNamespaceIds returns first uid and gid on container user-namespace which are mapped to {U/G}IDs on the host user-namespace
+func (c *RuntimeConfigInfo) GetContainerUserNamespaceIds() (uid uint32, gid uint32) {
+	return c.UserNamespaceConfig.UidMapping.ContainerID, c.UserNamespaceConfig.GidMapping.ContainerID
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.

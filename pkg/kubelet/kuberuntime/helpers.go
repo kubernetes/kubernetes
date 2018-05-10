@@ -192,6 +192,51 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
+// getRootIDMapping returns {U/G}ID mapping corresponding to ID '0' in container usernamespace
+func getRootIDMapping(idMappings []*runtimeapi.LinuxIDMapping) *runtimeapi.LinuxIDMapping {
+	for _, mapping := range idMappings {
+		if mapping.ContainerId == uint32(0) {
+			return mapping
+		}
+	}
+	return nil
+}
+
+// toKubeRuntimeConfig converts the runtimeapi.ActiveRuntimeConfig to kubecontainer.RuntimeConfigInfo
+func toKubeRuntimeConfig(config *runtimeapi.ActiveRuntimeConfig) *kubecontainer.RuntimeConfigInfo {
+	usernsConfig := config.GetUserNamespaceConfig()
+	if usernsConfig == nil {
+		return &kubecontainer.RuntimeConfigInfo{}
+	}
+	uidMappingsRuntime := usernsConfig.GetUidMappings()
+	if uidMappingsRuntime == nil || len(uidMappingsRuntime) == 0 {
+		return &kubecontainer.RuntimeConfigInfo{}
+	}
+	gidMappingsRuntime := usernsConfig.GetGidMappings()
+	if gidMappingsRuntime == nil || len(gidMappingsRuntime) == 0 {
+		return &kubecontainer.RuntimeConfigInfo{}
+	}
+	var uidMappings []*kubecontainer.UserNSMapping
+	var gidMappings []*kubecontainer.UserNSMapping
+	for _, runtimeMapping := range uidMappingsRuntime {
+		uidMappings = append(uidMappings, &kubecontainer.UserNSMapping{
+			ContainerID: runtimeMapping.ContainerId,
+			HostID:      runtimeMapping.HostId,
+			Size:        runtimeMapping.Size_})
+	}
+	for _, runtimeMapping := range gidMappingsRuntime {
+		gidMappings = append(gidMappings, &kubecontainer.UserNSMapping{
+			ContainerID: runtimeMapping.ContainerId,
+			HostID:      runtimeMapping.HostId,
+			Size:        runtimeMapping.Size_})
+	}
+	userNSConfig := kubecontainer.UserNamespaceConfigInfo{
+		UidMappings: uidMappings,
+		GidMappings: gidMappings,
+	}
+	return &kubecontainer.RuntimeConfigInfo{UserNamespaceConfig: userNSConfig}
+}
+
 // getSeccompProfileFromAnnotations gets seccomp profile from annotations.
 // It gets pod's profile if containerName is empty.
 func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations map[string]string, containerName string) string {
@@ -246,6 +291,16 @@ func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 	return runtimeapi.NamespaceMode_CONTAINER
 }
 
+func userNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+	if pod != nil && pod.Spec.HostUserNamespace != nil {
+		if *pod.Spec.HostUserNamespace {
+			return runtimeapi.NamespaceMode_NODE
+		}
+		return runtimeapi.NamespaceMode_NODE_WIDE_REMAPPED
+	}
+	return runtimeapi.NamespaceMode_POD
+}
+
 // namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
 // An empty or nil pod can be used to get the namespace defaults for v1.Pod.
 func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
@@ -253,5 +308,6 @@ func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
 		Ipc:     ipcNamespaceForPod(pod),
 		Network: networkNamespaceForPod(pod),
 		Pid:     pidNamespaceForPod(pod),
+		User:    userNamespaceForPod(pod),
 	}
 }

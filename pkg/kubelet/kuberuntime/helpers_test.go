@@ -286,7 +286,7 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 
 func TestNamespacesForPod(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, true)()
-
+	falseObj := false
 	for desc, test := range map[string]struct {
 		input    *v1.Pod
 		expected *runtimeapi.NamespaceOption
@@ -297,6 +297,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_POD,
 			},
 		},
 		"v1.Pod default namespaces": {
@@ -305,20 +306,23 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_POD,
 			},
 		},
 		"Host Namespaces": {
 			&v1.Pod{
 				Spec: v1.PodSpec{
-					HostIPC:     true,
-					HostNetwork: true,
-					HostPID:     true,
+					HostIPC:           true,
+					HostNetwork:       true,
+					HostPID:           true,
+					HostUserNamespace: &falseObj,
 				},
 			},
 			&runtimeapi.NamespaceOption{
 				Ipc:     runtimeapi.NamespaceMode_NODE,
 				Network: runtimeapi.NamespaceMode_NODE,
 				Pid:     runtimeapi.NamespaceMode_NODE,
+				User:    runtimeapi.NamespaceMode_NODE_WIDE_REMAPPED,
 			},
 		},
 		"Shared Process Namespace (feature enabled)": {
@@ -331,6 +335,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_POD,
+				User:    runtimeapi.NamespaceMode_POD,
 			},
 		},
 		"Shared Process Namespace, redundant flag (feature enabled)": {
@@ -343,6 +348,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_POD,
 			},
 		},
 	} {
@@ -363,6 +369,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_POD,
 			},
 		},
 		"Shared Process Namespace (feature disabled)": {
@@ -375,6 +382,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_POD,
 			},
 		},
 		"Shared Process Namespace, redundant flag (feature disabled)": {
@@ -387,6 +395,7 @@ func TestNamespacesForPod(t *testing.T) {
 				Ipc:     runtimeapi.NamespaceMode_POD,
 				Network: runtimeapi.NamespaceMode_POD,
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				User:    runtimeapi.NamespaceMode_POD,
 			},
 		},
 	} {

@@ -285,6 +285,10 @@ func DropDisabledFields(podSpec, oldPodSpec *api.PodSpec) {
 	}
 
 	dropDisabledProcMountField(podSpec, oldPodSpec)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HostUserNamespace) && podSpec.SecurityContext != nil {
+		podSpec.SecurityContext.HostUserNamespace = nil
+	}
 }
 
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related

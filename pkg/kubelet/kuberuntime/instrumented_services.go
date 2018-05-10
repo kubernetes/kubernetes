@@ -257,6 +257,15 @@ func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimea
 	return err
 }
 
+func (in instrumentedRuntimeService) GetRuntimeConfigInfo() (*runtimeapi.ActiveRuntimeConfig, error) {
+	const operation = "get_runtime_config"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.GetRuntimeConfigInfo()
+	recordError(operation, err)
+	return out, err
+}
+
 func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	const operation = "list_images"
 	defer recordOperation(operation, time.Now())

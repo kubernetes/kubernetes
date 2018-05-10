@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -487,57 +488,56 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	klet := &Kubelet{
-		hostname:                                hostname,
-		hostnameOverridden:                      len(hostnameOverride) > 0,
-		nodeName:                                nodeName,
-		kubeClient:                              kubeDeps.KubeClient,
-		csiClient:                               kubeDeps.CSIClient,
-		heartbeatClient:                         kubeDeps.HeartbeatClient,
-		onRepeatedHeartbeatFailure:              kubeDeps.OnHeartbeatFailure,
-		rootDirectory:                           rootDirectory,
-		resyncInterval:                          kubeCfg.SyncFrequency.Duration,
-		sourcesReady:                            config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
-		registerNode:                            registerNode,
-		registerWithTaints:                      registerWithTaints,
-		registerSchedulable:                     registerSchedulable,
-		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
-		serviceLister:                           serviceLister,
-		nodeInfo:                                nodeInfo,
-		masterServiceNamespace:                  masterServiceNamespace,
-		streamingConnectionIdleTimeout:          kubeCfg.StreamingConnectionIdleTimeout.Duration,
-		recorder:                                kubeDeps.Recorder,
-		cadvisor:                                kubeDeps.CAdvisorInterface,
-		cloud:                                   kubeDeps.Cloud,
-		externalCloudProvider:                   cloudprovider.IsExternal(cloudProvider),
-		providerID:                              providerID,
-		nodeRef:                                 nodeRef,
-		nodeLabels:                              nodeLabels,
-		nodeStatusUpdateFrequency:               kubeCfg.NodeStatusUpdateFrequency.Duration,
-		nodeStatusReportFrequency:               kubeCfg.NodeStatusReportFrequency.Duration,
-		os:                                      kubeDeps.OSInterface,
-		oomWatcher:                              oomWatcher,
-		cgroupsPerQOS:                           kubeCfg.CgroupsPerQOS,
-		cgroupRoot:                              kubeCfg.CgroupRoot,
-		mounter:                                 kubeDeps.Mounter,
-		maxPods:                                 int(kubeCfg.MaxPods),
-		podsPerCore:                             int(kubeCfg.PodsPerCore),
-		syncLoopMonitor:                         atomic.Value{},
-		daemonEndpoints:                         daemonEndpoints,
-		containerManager:                        kubeDeps.ContainerManager,
-		containerRuntimeName:                    containerRuntime,
-		redirectContainerStreaming:              crOptions.RedirectContainerStreaming,
-		nodeIP:                                  parsedNodeIP,
-		nodeIPValidator:                         validateNodeIP,
-		clock:                                   clock.RealClock{},
-		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
-		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), protocol),
-		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
-		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
-		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
-		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
-		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
-		nodeStatusMaxImages:                     nodeStatusMaxImages,
-		enablePluginsWatcher:                    utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher),
+		hostname:                       hostname,
+		hostnameOverridden:             len(hostnameOverride) > 0,
+		nodeName:                       nodeName,
+		kubeClient:                     kubeDeps.KubeClient,
+		csiClient:                      kubeDeps.CSIClient,
+		heartbeatClient:                kubeDeps.HeartbeatClient,
+		onRepeatedHeartbeatFailure:     kubeDeps.OnHeartbeatFailure,
+		rootDirectory:                  rootDirectory,
+		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
+		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
+		registerNode:                   registerNode,
+		registerWithTaints:             registerWithTaints,
+		registerSchedulable:            registerSchedulable,
+		dnsConfigurer:                  dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
+		serviceLister:                  serviceLister,
+		nodeInfo:                       nodeInfo,
+		masterServiceNamespace:         masterServiceNamespace,
+		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
+		recorder:                       kubeDeps.Recorder,
+		cadvisor:                       kubeDeps.CAdvisorInterface,
+		cloud:                          kubeDeps.Cloud,
+		externalCloudProvider:          cloudprovider.IsExternal(cloudProvider),
+		providerID:                     providerID,
+		nodeRef:                        nodeRef,
+		nodeLabels:                     nodeLabels,
+		nodeStatusUpdateFrequency:      kubeCfg.NodeStatusUpdateFrequency.Duration,
+		nodeStatusReportFrequency:      kubeCfg.NodeStatusReportFrequency.Duration,
+		os:                             kubeDeps.OSInterface,
+		oomWatcher:                     oomWatcher,
+		cgroupsPerQOS:                  kubeCfg.CgroupsPerQOS,
+		cgroupRoot:                     kubeCfg.CgroupRoot,
+		mounter:                        kubeDeps.Mounter,
+		maxPods:                        int(kubeCfg.MaxPods),
+		podsPerCore:                    int(kubeCfg.PodsPerCore),
+		syncLoopMonitor:                atomic.Value{},
+		daemonEndpoints:                daemonEndpoints,
+		containerManager:               kubeDeps.ContainerManager,
+		containerRuntimeName:           containerRuntime,
+		redirectContainerStreaming:     crOptions.RedirectContainerStreaming,
+		nodeIP:                         parsedNodeIP,
+		nodeIPValidator:                validateNodeIP,
+		clock:                          clock.RealClock{},
+		enableControllerAttachDetach:   kubeCfg.EnableControllerAttachDetach,
+		iptClient:                      utilipt.New(utilexec.New(), utildbus.New(), protocol),
+		makeIPTablesUtilChains:         kubeCfg.MakeIPTablesUtilChains,
+		iptablesMasqueradeBit:          int(kubeCfg.IPTablesMasqueradeBit),
+		iptablesDropBit:                int(kubeCfg.IPTablesDropBit),
+		keepTerminatedPodVolumes:       keepTerminatedPodVolumes,
+		nodeStatusMaxImages:            nodeStatusMaxImages,
+		enablePluginsWatcher:           utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher),
 	}
 
 	if klet.cloud != nil {
@@ -564,10 +564,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet.secretManager = secretManager
 	klet.configMapManager = configMapManager
-
-	if klet.experimentalHostUserNamespaceDefaulting {
-		klog.Infof("Experimental host user namespace defaulting is enabled.")
-	}
 
 	machineInfo, err := klet.cadvisor.MachineInfo()
 	if err != nil {
@@ -1189,13 +1185,6 @@ type Kubelet struct {
 	// The handler serving CRI streaming calls (exec/attach/port-forward).
 	criHandler http.Handler
 
-	// experimentalHostUserNamespaceDefaulting sets userns=true when users request host namespaces (pid, ipc, net),
-	// are using non-namespaced capabilities (mknod, sys_time, sys_module), the pod contains a privileged container,
-	// or using host path volumes.
-	// This should only be enabled when the container runtime is performing user remapping AND if the
-	// experimental behavior is desired.
-	experimentalHostUserNamespaceDefaulting bool
-
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
@@ -1220,6 +1209,17 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+}
+
+// isUserNamespaceRemappingEnabledAtRuntime return true if usernamespace remapping is enabled in configurations
+func (kl *Kubelet) isUserNamespaceRemappingEnabledAtRuntime() (bool, error) {
+	ci, err := kl.containerRuntime.GetRuntimeConfigInfo()
+	if err != nil {
+		return false, fmt.Errorf("failed to get container runtime info: %v", err)
+	}
+	klog.V(4).Infof("Container runtime config info: %v", ci)
+
+	return ci.IsUserNamespaceSupported() && ci.IsUserNamespaceEnabled(), nil
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1264,11 +1264,89 @@ func (kl *Kubelet) setupDataDirs() error {
 	if err := os.MkdirAll(kl.getPluginsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating plugins directory: %v", err)
 	}
+
 	if err := os.MkdirAll(kl.getPluginsRegistrationDir(), 0750); err != nil {
 		return fmt.Errorf("error creating plugins registry directory: %v", err)
 	}
 	if err := os.MkdirAll(kl.getPodResourcesDir(), 0750); err != nil {
 		return fmt.Errorf("error creating podresources directory: %v", err)
+	}
+
+	return nil
+}
+
+//func (kl *Kubelet) chownDataDirs() erroat{
+//if err := kl.chownDirForRemappedIDs(kl.getPodsDir()); err != nil {
+//return fmt.Errorf("error Chowning pods directory: %v", err)
+//}
+//if err := kl.chownDirForRemappedIDs(kl.getPluginsDir()); err != nil {
+//	return fmt.Errorf("error Chowning plugins directory: %v", err)
+//	}
+//	if err := kl.chownDirForRemappedIDs(kl.getPodResourcesDir()); err != nil {
+//		return fmt.Errorf("error chowning pod resources directory: %v", err)
+//	}
+
+//	if err := kl.chownDirForRemappedIDs(kl.getPluginsRegistrationDir()); err != nil {
+//		return fmt.Errorf("error chowning plugins registry directory: %v", err)
+//	}
+//return nil
+//}
+
+// chownDirForRemappedIDs change dir and path ownerships if UserNamespace is enabled at container runtime
+func (kl *Kubelet) chownDirForRemappedIDs(path string) error {
+	isUseNamespaceSupportedAndEnabled, err := kl.isUserNamespaceRemappingEnabledAtRuntime()
+	if !isUseNamespaceSupportedAndEnabled {
+		// No-Op if UserNamespace remapping is not enabled at runtime
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("error while determining usernamespace configuration at runtime: %v", err)
+	}
+	if path == "" {
+		return fmt.Errorf("path to be setup is empty")
+	}
+	if err := kl.chownAllFilesAt(path); err != nil {
+		return fmt.Errorf("error setting ownership to remapped IDs on %s: %v", path, err)
+	}
+	return nil
+}
+
+// chownAllFilesAt traverses the directory tree at the give path and chowns the paths to adjust for the remapped usernamespaces
+func (kl *Kubelet) chownAllFilesAt(dir string) error {
+	var files []string
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	klog.V(5).Infof("Chowned paths %v", files)
+	for _, file := range files {
+		_, fileGID, err := kl.getOwnerIDsFor(file)
+		if err != nil {
+			return fmt.Errorf("error in getting volume path owner UID/GID: %v", err)
+		}
+		if fileGID != 0 {
+			klog.V(5).Infof("GID, %v, for path %v is not equal to 0. Skipping chowing assuming it to be FsGroup GID ", fileGID, file)
+			continue
+		}
+		containerUID := 0
+		containerGID := 0
+		uid, err := kl.getHostUID(containerUID)
+		if err != nil {
+			return fmt.Errorf("Failed to get remapped host UID corresponding to UID 0 in container namespace: %v", err)
+		}
+		gid, err := kl.getHostGID(containerGID)
+		if err != nil {
+			return fmt.Errorf("Failed to get remapped host GID corresponding to GID 0 in container namespace: %v", err)
+		}
+		klog.V(5).Infof("Remapped default uid %d, default gid %d path %s", uid, gid, file)
+		err = os.Chown(file, uid, gid)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1364,6 +1442,10 @@ func (kl *Kubelet) initializeModules() error {
 
 // initializeRuntimeDependentModules will initialize internal modules that require the container runtime to be up.
 func (kl *Kubelet) initializeRuntimeDependentModules() {
+	if err := kl.chownDirForRemappedIDs(kl.getPodsDir()); err != nil {
+		klog.Fatalf("Kubelet failed to change kubelet pod dir ownership to remapped user: %v", err)
+	}
+
 	if err := kl.cadvisor.Start(); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		// TODO(random-liu): Add backoff logic in the babysitter
@@ -1688,6 +1770,14 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
+	klog.V(4).Infof("pod.Spec.HostUserNamespace %v", pod.Spec.HostUserNamespace)
+	if pod.Spec.HostUserNamespace == nil || *pod.Spec.HostUserNamespace == false {
+		if err := kl.chownDirForRemappedIDs(kl.getPodVolumesDir(pod.UID)); err != nil {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to set ownership on mount volumes for pod %q: %v", format.Pod(pod), err)
+			klog.Errorf("Unable to chown volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
+			return err
+		}
+	}
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
@@ -2205,6 +2295,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 		klog.Errorf("Container runtime not ready: %v", runtimeReady)
 		return
 	}
+
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }

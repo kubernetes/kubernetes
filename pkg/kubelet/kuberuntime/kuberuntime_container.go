@@ -230,6 +230,10 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 		StdinOnce:   container.StdinOnce,
 		Tty:         container.TTY,
 	}
+	trueObj := true
+	if opts.EnableHostUserNamespace {
+		pod.Spec.HostUserNamespace = &trueObj
+	}
 
 	// set platform specific configurations.
 	if err := m.applyPlatformSpecificContainerConfig(config, container, pod, uid, username); err != nil {

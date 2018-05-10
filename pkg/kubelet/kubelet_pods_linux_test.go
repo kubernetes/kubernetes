@@ -268,7 +268,7 @@ func TestMakeMounts(t *testing.T) {
 }
 
 func TestMakeBlockVolumes(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	testCases := map[string]struct {

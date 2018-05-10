@@ -207,6 +207,16 @@ func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 	return kl.containerRuntime
 }
 
+// getHostUID returns the uid from the host usernamespace that is mapped to given UID on container user-namespace
+func (kl *Kubelet) getHostUID(containerUID int) (int, error) {
+	return kl.containerRuntime.GetHostUID(containerUID)
+}
+
+// getHostGID returns the gid from the host usernamespace that is mapped to given GID on container user-namespace
+func (kl *Kubelet) getHostGID(containerGID int) (int, error) {
+	return kl.containerRuntime.GetHostGID(containerGID)
+}
+
 // GetNode returns the node info for the configured node name of this Kubelet.
 func (kl *Kubelet) GetNode() (*v1.Node, error) {
 	if kl.kubeClient == nil {

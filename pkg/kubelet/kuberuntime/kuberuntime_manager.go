@@ -133,6 +133,9 @@ type kubeGenericRuntimeManager struct {
 	// Time last per-container error message was printed
 	errorPrinted map[string]time.Time
 	errorMapLock sync.Mutex
+
+	// cache of runtime configuration eg, user-namespace configuration
+	runtimeConfig *kubecontainer.RuntimeConfigInfo
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -294,6 +297,32 @@ func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, erro
 		return nil, err
 	}
 	return toKubeRuntimeStatus(status), nil
+}
+
+// GetRuntimeConfigInfo returns runtime configuration details cached at runtime manager
+func (m *kubeGenericRuntimeManager) GetRuntimeConfigInfo() (*kubecontainer.RuntimeConfigInfo, error) {
+	if m.runtimeConfig != nil {
+		return m.runtimeConfig, nil
+	}
+	runtimeConfig, err := m.runtimeService.GetRuntimeConfigInfo()
+	if err != nil {
+		return nil, fmt.Errorf("container runtime info get failed: %v", err)
+	}
+	ci := toKubeRuntimeConfig(runtimeConfig)
+	klog.V(4).Infof("Container runtime config info: %v", ci)
+	m.runtimeConfig = ci
+
+	return ci, nil
+}
+
+// GetHostUID returns UID on host namespace which is mapped to given UID on container namespace
+func (m *kubeGenericRuntimeManager) GetHostUID(containerUID int) (int, error) {
+	return m.runtimeConfig.GetHostUIDFor(uint32(containerUID))
+}
+
+// GetHostGID returns GID on host namespace which is mapped to given GID on container namespace
+func (m *kubeGenericRuntimeManager) GetHostGID(containerGID int) (int, error) {
+	return m.runtimeConfig.GetHostGIDFor(uint32(containerGID))
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter

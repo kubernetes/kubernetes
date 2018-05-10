@@ -51,12 +51,15 @@ type FakeRuntime struct {
 	StartedContainers []string
 	KilledContainers  []string
 	RuntimeStatus     *RuntimeStatus
+	RuntimeConfigInfo *RuntimeConfigInfo
 	VersionInfo       string
 	APIVersionInfo    string
 	RuntimeType       string
 	Err               error
 	InspectErr        error
 	StatusErr         error
+	RemappedUID       int
+	RemappedGID       int
 }
 
 const FakeHost = "localhost:12345"
@@ -122,6 +125,7 @@ func (f *FakeRuntime) ClearCalls() {
 	f.StartedContainers = []string{}
 	f.KilledContainers = []string{}
 	f.RuntimeStatus = nil
+	f.RuntimeConfigInfo = nil
 	f.VersionInfo = ""
 	f.RuntimeType = ""
 	f.Err = nil
@@ -198,6 +202,22 @@ func (f *FakeRuntime) Status() (*RuntimeStatus, error) {
 
 	f.CalledFunctions = append(f.CalledFunctions, "Status")
 	return f.RuntimeStatus, f.StatusErr
+}
+
+func (f *FakeRuntime) GetRuntimeConfigInfo() *RuntimeConfigInfo {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetRuntimeConfigInfo")
+	return f.RuntimeConfigInfo
+}
+
+func (f *FakeRuntime) GetRemappedIds() (int, int) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetRemappedIds")
+	return f.RemappedUID, f.RemappedGID
 }
 
 func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {

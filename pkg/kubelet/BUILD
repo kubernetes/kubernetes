@@ -20,6 +20,8 @@ go_library(
         "kubelet_node_status.go",
         "kubelet_pods.go",
         "kubelet_resources.go",
+        "kubelet_usernamespace_linux.go",
+        "kubelet_usernamespace_others.go",
         "kubelet_volumes.go",
         "oom_watcher.go",
         "pod_container_deletor.go",
