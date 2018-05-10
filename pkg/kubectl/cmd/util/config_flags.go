@@ -53,6 +53,7 @@ const (
 	flagUsername         = "username"
 	flagPassword         = "password"
 	flagTimeout          = "request-timeout"
+	flagHTTPCacheDir     = "cache-dir"
 )
 
 // TODO(juanvallejo): move to pkg/kubectl/genericclioptions once
@@ -225,7 +226,7 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 		flags.StringVar(f.KubeConfig, "kubeconfig", *f.KubeConfig, "Path to the kubeconfig file to use for CLI requests.")
 	}
 	if f.CacheDir != nil {
-		flags.StringVar(f.CacheDir, FlagHTTPCacheDir, *f.CacheDir, "Default HTTP cache directory")
+		flags.StringVar(f.CacheDir, flagHTTPCacheDir, *f.CacheDir, "Default HTTP cache directory")
 	}
 
 	// add config options
