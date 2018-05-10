@@ -37,6 +37,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 var (
@@ -221,6 +222,12 @@ func (p *AttachOptions) Run() error {
 
 		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
 			return fmt.Errorf("cannot attach a container in a completed pod; current phase is %s", pod.Status.Phase)
+		}
+		if pod.DeletionTimestamp != nil {
+			if pod.Status.Reason == nodeutil.NodeUnreachablePodReason {
+				return fmt.Errorf("cannot attach to a container in an unknown pod")
+			}
+			return fmt.Errorf("cannot attach to a container in a terminating pod")
 		}
 
 		p.Pod = pod
