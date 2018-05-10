@@ -103,6 +103,7 @@ var AllServices = []*ServiceInfo{
 		serviceType: reflect.TypeOf(&ga.BackendServicesService{}),
 		additionalMethods: []string{
 			"GetHealth",
+			"Patch",
 			"Update",
 		},
 	},
