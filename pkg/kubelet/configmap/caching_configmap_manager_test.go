@@ -352,10 +352,7 @@ func TestCacheInvalidation(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newConfigMapStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
-	manager := &cachingConfigMapManager{
-		configMapStore: store,
-		registeredPods: make(map[objectKey]*v1.Pod),
-	}
+	manager := newCacheBasedConfigMapManager(store)
 
 	// Create a pod with some configMaps.
 	s1 := configMapsToAttach{
@@ -408,10 +405,7 @@ func TestCacheRefcounts(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newConfigMapStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
-	manager := &cachingConfigMapManager{
-		configMapStore: store,
-		registeredPods: make(map[objectKey]*v1.Pod),
-	}
+	manager := newCacheBasedConfigMapManager(store)
 
 	s1 := configMapsToAttach{
 		containerEnvConfigMaps: []envConfigMaps{
@@ -491,10 +485,7 @@ func TestCacheRefcounts(t *testing.T) {
 func TestCachingConfigMapManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	configMapStore := newConfigMapStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	manager := &cachingConfigMapManager{
-		configMapStore: configMapStore,
-		registeredPods: make(map[objectKey]*v1.Pod),
-	}
+	manager := newCacheBasedConfigMapManager(configMapStore)
 
 	// Create a pod with some configMaps.
 	s1 := configMapsToAttach{

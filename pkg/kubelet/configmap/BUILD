@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "caching_configmap_manager.go",
         "configmap_manager.go",
         "fake_manager.go",
     ],
@@ -41,7 +42,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["configmap_manager_test.go"],
+    srcs = ["caching_configmap_manager_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
