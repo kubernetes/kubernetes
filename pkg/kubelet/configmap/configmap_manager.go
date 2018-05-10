@@ -70,15 +70,15 @@ func (s *simpleConfigMapManager) UnregisterPod(pod *v1.Pod) {
 // store is the interface for a configmap cache that
 // can be used be cacheBasedConfigMapManager.
 type store interface {
-	// Add a configmap to the store.
+	// AddReference adds a reference to the configmap to the store.
 	// Note that multiple additions to the store has to be allowed
 	// in the implementations and effectively treated as refcounted.
-	Add(namespace, name string)
-	// Delete a configmap from the store.
+	AddReference(namespace, name string)
+	// DeleteReference deletes reference to the configmap from the store.
 	// Note that configmap should be deleted only when there was a
 	// corresponding Delete call for each of Add calls (effectively
 	// when refcount was reduced to zero).
-	Delete(namespace, name string)
+	DeleteReference(namespace, name string)
 	// get a configmap from a store.
 	Get(namespace, name string) (*v1.ConfigMap, error)
 }
@@ -120,7 +120,7 @@ func (c *cacheBasedConfigMapManager) RegisterPod(pod *v1.Pod) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	for name := range names {
-		c.configMapStore.Add(pod.Namespace, name)
+		c.configMapStore.AddReference(pod.Namespace, name)
 	}
 	var prev *v1.Pod
 	key := objectKey{namespace: pod.Namespace, name: pod.Name}
@@ -133,7 +133,7 @@ func (c *cacheBasedConfigMapManager) RegisterPod(pod *v1.Pod) {
 			// names and prev need to have their ref counts decremented. Any that
 			// are only in prev need to be completely removed. This unconditional
 			// call takes care of both cases.
-			c.configMapStore.Delete(prev.Namespace, name)
+			c.configMapStore.DeleteReference(prev.Namespace, name)
 		}
 	}
 }
@@ -147,7 +147,7 @@ func (c *cacheBasedConfigMapManager) UnregisterPod(pod *v1.Pod) {
 	delete(c.registeredPods, key)
 	if prev != nil {
 		for name := range getConfigMapNames(prev) {
-			c.configMapStore.Delete(prev.Namespace, name)
+			c.configMapStore.DeleteReference(prev.Namespace, name)
 		}
 	}
 }

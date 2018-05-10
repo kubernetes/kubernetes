@@ -83,10 +83,10 @@ func isConfigMapOlder(newConfigMap, oldConfigMap *v1.ConfigMap) bool {
 	return newVersion < oldVersion
 }
 
-func (s *configMapStore) Add(namespace, name string) {
+func (s *configMapStore) AddReference(namespace, name string) {
 	key := objectKey{namespace: namespace, name: name}
 
-	// Add is called from RegisterPod, thus it needs to be efficient.
+	// AddReference is called from RegisterPod, thus it needs to be efficient.
 	// Thus Add() is only increasing refCount and generation of a given configmap.
 	// Then Get() is responsible for fetching if needed.
 	s.lock.Lock()
@@ -105,7 +105,7 @@ func (s *configMapStore) Add(namespace, name string) {
 	item.configMap = nil
 }
 
-func (s *configMapStore) Delete(namespace, name string) {
+func (s *configMapStore) DeleteReference(namespace, name string) {
 	key := objectKey{namespace: namespace, name: name}
 
 	s.lock.Lock()
