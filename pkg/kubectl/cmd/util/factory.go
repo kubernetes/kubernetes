@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -45,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -64,14 +61,6 @@ type Factory interface {
 	ClientAccessFactory
 	ObjectMappingFactory
 	BuilderFactory
-}
-
-type DiscoveryClientFactory interface {
-	// Returns a discovery client
-	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
-
-	// BindFlags adds any discovery flags that are common to all kubectl sub commands.
-	BindFlags(flags *pflag.FlagSet)
 }
 
 // ClientAccessFactory holds the first level of factory methods.
@@ -151,18 +140,11 @@ type ClientAccessFactory interface {
 	CanBeExposed(kind schema.GroupKind) error
 	// Check whether the kind of resources could be autoscaled
 	CanBeAutoscaled(kind schema.GroupKind) error
-
-	// EditorEnvs returns a group of environment variables that the edit command
-	// can range over in order to determine if the user has specified an editor
-	// of their choice.
-	EditorEnvs() []string
 }
 
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
 // Generally they provide object typing and functions that build requests based on the negotiated clients.
 type ObjectMappingFactory interface {
-	// Returns interface for expanding categories like `all`.
-	CategoryExpander() (restmapper.CategoryExpander, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -197,12 +179,6 @@ type ObjectMappingFactory interface {
 // BuilderFactory holds the third level of factory methods. These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
-	// PluginLoader provides the implementation to be used to load cli plugins.
-	PluginLoader() plugins.PluginLoader
-	// PluginRunner provides the implementation to be used to run cli plugins.
-	PluginRunner() plugins.PluginRunner
-	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
-	Scaler() (kubectl.Scaler, error)
 	// ScaleClient gives you back scale getter
 	ScaleClient() (scaleclient.ScalesGetter, error)
 	// Returns a Reaper for gracefully shutting down resources.

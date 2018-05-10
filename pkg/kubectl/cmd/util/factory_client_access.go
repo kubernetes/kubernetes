@@ -578,10 +578,6 @@ func (f *ring0Factory) CanBeAutoscaled(kind schema.GroupKind) error {
 	return nil
 }
 
-func (f *ring0Factory) EditorEnvs() []string {
-	return []string{"KUBE_EDITOR", "EDITOR"}
-}
-
 // overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
 var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
 
