@@ -54,7 +54,6 @@ go_library(
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/schedulercache:go_default_library",
         "//pkg/scheduler/util:go_default_library",
-        "//pkg/scheduler/util/cache:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
