@@ -276,11 +276,12 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	kubeConfigFlags := cmdutil.NewConfigFlags()
 	kubeConfigFlags.AddFlags(cmds.PersistentFlags())
+	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
+	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
 
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
-	f := cmdutil.NewFactory(kubeConfigFlags)
-	f.BindFlags(cmds.PersistentFlags())
+	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
 	// Sending in 'nil' for the getLanguageFn() results in using
 	// the LANG environment variable.

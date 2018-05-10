@@ -50,14 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 )
 
-const (
-	FlagMatchBinaryVersion = "match-server-version"
-)
-
-var (
-	FlagHTTPCacheDir = "cache-dir"
-)
-
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
 // of resources and different API sets.
 // The rings are here for a reason. In order for composers to be able to provide alternative factory implementations
@@ -131,9 +123,6 @@ type ClientAccessFactory interface {
 	// Command will stringify and return all environment arguments ie. a command run by a client
 	// using the factory.
 	Command(cmd *cobra.Command, showSecrets bool) string
-
-	// BindFlags adds any flags that are common to all kubectl sub commands.
-	BindFlags(flags *pflag.FlagSet)
 
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
