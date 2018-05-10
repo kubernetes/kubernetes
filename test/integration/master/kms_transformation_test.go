@@ -39,8 +39,8 @@ const (
 	dekKeySizeLen = 2
 
 	kmsConfigYAML = `
-kind: EncryptionConfiguration
-apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfig
+apiVersion: v1
 resources:
   - resources:
     - secrets

@@ -33,8 +33,8 @@ const (
 	aesCBCPrefix = "k8s:enc:aescbc:v1:key1:"
 
 	aesGCMConfigYAML = `
-kind: EncryptionConfiguration
-apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfig
+apiVersion: v1
 resources:
   - resources:
     - secrets
@@ -46,8 +46,8 @@ resources:
 `
 
 	aesCBCConfigYAML = `
-kind: EncryptionConfiguration
-apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfig
+apiVersion: v1
 resources:
   - resources:
     - secrets
@@ -59,8 +59,8 @@ resources:
 `
 
 	identityConfigYAML = `
-kind: EncryptionConfiguration
-apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfig
+apiVersion: v1
 resources:
   - resources:
     - secrets

@@ -1748,8 +1748,8 @@ function start-kube-apiserver {
 
   if [[ -n "${ETCD_KMS_KEY_ID:-}" ]]; then
     ENCRYPTION_PROVIDER_CONFIG=$(cat << EOM | base64 | tr -d '\r\n'
-kind: EncryptionConfiguration
-apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfig
+apiVersion: v1
 resources:
   - resources:
     - secrets
