@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -52,10 +53,11 @@ func TestGetPodPriority(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if GetPodPriority(test.pod) != test.expectedPriority {
-			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
-		}
-
+		t.Run(test.name, func(t *testing.T) {
+			if GetPodPriority(test.pod) != test.expectedPriority {
+				t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
+			}
+		})
 	}
 }
 
@@ -87,10 +89,12 @@ func TestSortableList(t *testing.T) {
 		t.Errorf("expected length of list was 10, got: %v", len(podList.Items))
 	}
 	var prevPriority = int32(10)
-	for _, p := range podList.Items {
-		if *p.(*v1.Pod).Spec.Priority >= prevPriority {
-			t.Errorf("Pods are not soreted. Current pod pririty is %v, while previous one was %v.", *p.(*v1.Pod).Spec.Priority, prevPriority)
-		}
+	for i, p := range podList.Items {
+		t.Run(fmt.Sprintf("pod:%v", i), func(t *testing.T) {
+			if *p.(*v1.Pod).Spec.Priority >= prevPriority {
+				t.Errorf("Pods are not soreted. Current pod pririty is %v, while previous one was %v.", *p.(*v1.Pod).Spec.Priority, prevPriority)
+			}
+		})
 	}
 }
 
@@ -101,13 +105,13 @@ type hostPortInfoParam struct {
 
 func TestHostPortInfo_AddRemove(t *testing.T) {
 	tests := []struct {
-		desc    string
+		name    string
 		added   []hostPortInfoParam
 		removed []hostPortInfoParam
 		length  int
 	}{
 		{
-			desc: "normal add case",
+			name: "normal add case",
 			added: []hostPortInfoParam{
 				{"TCP", "127.0.0.1", 79},
 				{"UDP", "127.0.0.1", 80},
@@ -124,7 +128,7 @@ func TestHostPortInfo_AddRemove(t *testing.T) {
 			length: 8,
 		},
 		{
-			desc: "empty ip and protocol add should work",
+			name: "empty ip and protocol add should work",
 			added: []hostPortInfoParam{
 				{"", "127.0.0.1", 79},
 				{"UDP", "127.0.0.1", 80},
@@ -140,7 +144,7 @@ func TestHostPortInfo_AddRemove(t *testing.T) {
 			length: 8,
 		},
 		{
-			desc: "normal remove case",
+			name: "normal remove case",
 			added: []hostPortInfoParam{
 				{"TCP", "127.0.0.1", 79},
 				{"UDP", "127.0.0.1", 80},
@@ -164,7 +168,7 @@ func TestHostPortInfo_AddRemove(t *testing.T) {
 			length: 0,
 		},
 		{
-			desc: "empty ip and protocol remove should work",
+			name: "empty ip and protocol remove should work",
 			added: []hostPortInfoParam{
 				{"TCP", "127.0.0.1", 79},
 				{"UDP", "127.0.0.1", 80},
@@ -190,29 +194,31 @@ func TestHostPortInfo_AddRemove(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		hp := make(HostPortInfo)
-		for _, param := range test.added {
-			hp.Add(param.ip, param.protocol, param.port)
-		}
-		for _, param := range test.removed {
-			hp.Remove(param.ip, param.protocol, param.port)
-		}
-		if hp.Len() != test.length {
-			t.Errorf("%v failed: expect length %d; got %d", test.desc, test.length, hp.Len())
-			t.Error(hp)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			hp := make(HostPortInfo)
+			for _, param := range test.added {
+				hp.Add(param.ip, param.protocol, param.port)
+			}
+			for _, param := range test.removed {
+				hp.Remove(param.ip, param.protocol, param.port)
+			}
+			if hp.Len() != test.length {
+				t.Errorf("failed: expect length %d; got %d", test.length, hp.Len())
+				t.Error(hp)
+			}
+		})
 	}
 }
 
 func TestHostPortInfo_Check(t *testing.T) {
 	tests := []struct {
-		desc   string
+		name   string
 		added  []hostPortInfoParam
 		check  hostPortInfoParam
 		expect bool
 	}{
 		{
-			desc: "empty check should check 0.0.0.0 and TCP",
+			name: "empty check should check 0.0.0.0 and TCP",
 			added: []hostPortInfoParam{
 				{"TCP", "127.0.0.1", 80},
 			},
@@ -220,7 +226,7 @@ func TestHostPortInfo_Check(t *testing.T) {
 			expect: false,
 		},
 		{
-			desc: "empty check should check 0.0.0.0 and TCP (conflicted)",
+			name: "empty check should check 0.0.0.0 and TCP (conflicted)",
 			added: []hostPortInfoParam{
 				{"TCP", "127.0.0.1", 80},
 			},
@@ -228,7 +234,7 @@ func TestHostPortInfo_Check(t *testing.T) {
 			expect: true,
 		},
 		{
-			desc: "empty port check should pass",
+			name: "empty port check should pass",
 			added: []hostPortInfoParam{
 				{"TCP", "127.0.0.1", 80},
 			},
@@ -236,7 +242,7 @@ func TestHostPortInfo_Check(t *testing.T) {
 			expect: false,
 		},
 		{
-			desc: "0.0.0.0 should check all registered IPs",
+			name: "0.0.0.0 should check all registered IPs",
 			added: []hostPortInfoParam{
 				{"TCP", "127.0.0.1", 80},
 			},
@@ -244,7 +250,7 @@ func TestHostPortInfo_Check(t *testing.T) {
 			expect: true,
 		},
 		{
-			desc: "0.0.0.0 with different protocol should be allowed",
+			name: "0.0.0.0 with different protocol should be allowed",
 			added: []hostPortInfoParam{
 				{"UDP", "127.0.0.1", 80},
 			},
@@ -252,7 +258,7 @@ func TestHostPortInfo_Check(t *testing.T) {
 			expect: false,
 		},
 		{
-			desc: "0.0.0.0 with different port should be allowed",
+			name: "0.0.0.0 with different port should be allowed",
 			added: []hostPortInfoParam{
 				{"TCP", "127.0.0.1", 79},
 				{"TCP", "127.0.0.1", 81},
@@ -262,7 +268,7 @@ func TestHostPortInfo_Check(t *testing.T) {
 			expect: false,
 		},
 		{
-			desc: "normal ip should check all registered 0.0.0.0",
+			name: "normal ip should check all registered 0.0.0.0",
 			added: []hostPortInfoParam{
 				{"TCP", "0.0.0.0", 80},
 			},
@@ -270,7 +276,7 @@ func TestHostPortInfo_Check(t *testing.T) {
 			expect: true,
 		},
 		{
-			desc: "normal ip with different port/protocol should be allowed (0.0.0.0)",
+			name: "normal ip with different port/protocol should be allowed (0.0.0.0)",
 			added: []hostPortInfoParam{
 				{"TCP", "0.0.0.0", 79},
 				{"UDP", "0.0.0.0", 80},
@@ -281,7 +287,7 @@ func TestHostPortInfo_Check(t *testing.T) {
 			expect: false,
 		},
 		{
-			desc: "normal ip with different port/protocol should be allowed",
+			name: "normal ip with different port/protocol should be allowed",
 			added: []hostPortInfoParam{
 				{"TCP", "127.0.0.1", 79},
 				{"UDP", "127.0.0.1", 80},
@@ -294,12 +300,14 @@ func TestHostPortInfo_Check(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		hp := make(HostPortInfo)
-		for _, param := range test.added {
-			hp.Add(param.ip, param.protocol, param.port)
-		}
-		if hp.CheckConflict(test.check.ip, test.check.protocol, test.check.port) != test.expect {
-			t.Errorf("%v failed, expected %t; got %t", test.desc, test.expect, !test.expect)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			hp := make(HostPortInfo)
+			for _, param := range test.added {
+				hp.Add(param.ip, param.protocol, param.port)
+			}
+			if hp.CheckConflict(test.check.ip, test.check.protocol, test.check.port) != test.expect {
+				t.Errorf("failed, expected %t; got %t", test.expect, !test.expect)
+			}
+		})
 	}
 }
