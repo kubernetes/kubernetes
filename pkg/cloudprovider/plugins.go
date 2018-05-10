@@ -35,8 +35,13 @@ type Factory func(config io.Reader) (Interface, error)
 var (
 	providersMutex           sync.Mutex
 	providers                = make(map[string]Factory)
-	deprecatedCloudProviders = []string{
-		"openstack",
+	deprecatedCloudProviders = []struct {
+		name     string
+		external bool
+		detail   string
+	}{
+		{"openstack", true, "https://github.com/kubernetes/cloud-provider-openstack"},
+		{"photon", false, "The Photon Controller project is no longer maintained."},
 	}
 )
 
@@ -99,9 +104,13 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 	}
 
 	for _, provider := range deprecatedCloudProviders {
-		if provider == name {
-			glog.Warningf("WARNING: %s built-in cloud provider is now deprecated. "+
-				"Please use 'external' cloud provider for %s", name, name)
+		if provider.name == name {
+			detail := provider.detail
+			if provider.external {
+				detail = fmt.Sprintf("Please use 'external' cloud provider for %s: %s", name, provider.detail)
+			}
+			glog.Warningf("WARNING: %s built-in cloud provider is now deprecated. %s", name, detail)
+
 			break
 		}
 	}
