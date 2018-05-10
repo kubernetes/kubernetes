@@ -1592,8 +1592,8 @@ function start-kube-apiserver {
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
     params+=" --enable-logs-handler=false"
   fi
-  if [[ -n "${APISERVER_KUBELET_CA:-}" ]]; then
-    params+=" --kubelet-certificate-authority=${APISERVER_KUBELET_CA}"
+  if [[ "${APISERVER_SET_KUBELET_CA:-false}" == "true" ]]; then
+    params+=" --kubelet-certificate-authority=${CA_CERT_BUNDLE_PATH}"
   fi
 
   local admission_controller_config_mount=""
