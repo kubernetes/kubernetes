@@ -198,6 +198,36 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 	})
 
+	It("should create volume metrics in Volume Manager", func() {
+		var err error
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).ToNot(Equal(nil))
+
+		claims := []*v1.PersistentVolumeClaim{pvc}
+		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod, err = c.CoreV1().Pods(ns).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = framework.WaitForPodRunningInNamespace(c, pod)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+
+		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		kubeMetrics, err := metricsGrabber.GrabFromKubelet(pod.Spec.NodeName)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Metrics should have dimensions plugin_name and state available
+		totalVolumesKey := "volume_manager_total_volumes"
+		dimensions := []string{"state", "plugin_name"}
+		valid := hasValidMetrics(metrics.Metrics(kubeMetrics), totalVolumesKey, dimensions...)
+		Expect(valid).To(BeTrue(), "Invalid metric in Volume Manager metrics: %q", totalVolumesKey)
+
+		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+	})
+
 	// Test for pv controller metrics, concretely: bound/unbound pv/pvc count.
 	Describe("PVController", func() {
 		const (
