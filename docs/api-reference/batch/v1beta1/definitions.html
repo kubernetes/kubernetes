@@ -3312,6 +3312,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">hostUserNamespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Use host&#8217;s user namespace for the pods. This field is alpha-level and can be set to true/false only if HostUserNamespace feature-gate is enabled. Optional: Defaults to nil which means behavior will be container runtime defined.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">shareProcessNamespace</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Share a single process namespace between all of the containers in a pod. When this is set containers will be able to view and signal processes from other containers in the same pod, and the first process in each container will not be assigned PID 1. HostPID and ShareProcessNamespace cannot both be set. Optional: Default to false. This field is beta-level and may be disabled with the PodShareProcessNamespace feature.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>

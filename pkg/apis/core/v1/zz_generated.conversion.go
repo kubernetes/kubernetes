@@ -5487,6 +5487,7 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	// INFO: in.HostNetwork opted out of conversion generation
 	// INFO: in.HostPID opted out of conversion generation
 	// INFO: in.HostIPC opted out of conversion generation
+	// INFO: in.HostUserNamespace opted out of conversion generation
 	// INFO: in.ShareProcessNamespace opted out of conversion generation
 	out.SELinuxOptions = (*v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
@@ -5564,6 +5565,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	// INFO: in.HostNetwork opted out of conversion generation
 	// INFO: in.HostPID opted out of conversion generation
 	// INFO: in.HostIPC opted out of conversion generation
+	// INFO: in.HostUserNamespace opted out of conversion generation
 	// INFO: in.ShareProcessNamespace opted out of conversion generation
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
