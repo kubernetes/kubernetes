@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 )
 
 func DefaultMemorySwap() int64 {
