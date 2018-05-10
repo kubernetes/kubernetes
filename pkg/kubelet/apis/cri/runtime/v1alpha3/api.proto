@@ -1,8 +1,8 @@
 // To regenerate api.pb.go run hack/update-generated-runtime.sh
 syntax = 'proto3';
 
-package runtime.v1alpha2;
-option go_package = "v1alpha2";
+package runtime.v1alpha3;
+option go_package = "v1alpha3";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -91,6 +91,9 @@ service RuntimeService {
 
     // Status returns the status of the runtime.
     rpc Status(StatusRequest) returns (StatusResponse) {}
+
+    //  GetRuntimeConfigInfo returns the configuration details of the runtime.
+    rpc GetRuntimeConfigInfo(GetRuntimeConfigInfoRequest) returns (GetRuntimeConfigInfoResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -216,6 +219,12 @@ message NamespaceOption {
     // Note: There is currently no way to set CONTAINER scoped IPC in the Kubernetes API.
     // Namespaces currently set by the kubelet: POD, NODE
     NamespaceMode ipc = 3;
+    // User namespace for this container/sandbox.
+    // Note: There is currently no way to set CONTAINER scoped user namespace in the Kubernetes API.
+    // The container runtime should ignore this if user namespace is NOT enabled.
+    // POD is the default value. Kubelet will set it to NODE when trying to use host user-namespace
+    // Namespaces currently set by the kubelet: POD, NODE
+    NamespaceMode user = 4;
 }
 
 // Int64Value is the wrapper of int64.
@@ -1106,6 +1115,35 @@ message StatusResponse {
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
 }
+
+// LinuxIDMapping represents a single user namespace mapping in Linux.
+message LinuxIDMapping {
+   // container_id is the starting id for the mapping inside the container.
+   uint32 container_id = 1;
+   // host_id is the starting id for the mapping on the host.
+   uint32 host_id = 2;
+   // size is the length of the mapping.
+   uint32 size = 3;
+}
+
+message LinuxUserNamespaceConfig {
+   // is_enabled, if true indicates that user-namespaces are supported and enabled in the container runtime
+   bool is_enabled = 1;
+   // uid_mappings is an array of user id mappings.
+   repeated LinuxIDMapping uid_mappings = 2;
+   // gid_mappings is an array of group id mappings.
+   repeated LinuxIDMapping gid_mappings = 3;
+}
+message GetRuntimeConfig {
+    LinuxUserNamespaceConfig user_namespace_config = 1;
+}
+
+message GetRuntimeConfigInfoRequest {}
+
+message GetRuntimeConfigInfoResponse {
+    GetRuntimeConfig runtime_config = 1;
+}
+
 
 message ImageFsInfoRequest {}
 
