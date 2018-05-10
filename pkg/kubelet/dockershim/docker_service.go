@@ -19,9 +19,13 @@ package dockershim
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,7 +34,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -79,6 +83,10 @@ const (
 	// Dockershim should provide detection support for a remapping environment .
 	// This should be included in the feature proposal.  Defaulting may still occur according
 	// to kubelet behavior and system settings in addition to any API flags that may be introduced.
+)
+
+var (
+	linuxIDMappingRegexp = regexp.MustCompile("([aA-zZ]+):([0-9]+):([0-9]+)")
 )
 
 // CRIService includes all methods necessary for a CRI server.
@@ -310,6 +318,89 @@ type dockerService struct {
 }
 
 // TODO: handle context.
+
+// GetRuntimeConfigInfo returns the runtime config.
+func (ds *dockerService) GetRuntimeConfigInfo(_ context.Context, r *runtimeapi.GetRuntimeConfigInfoRequest) (*runtimeapi.GetRuntimeConfigInfoResponse, error) {
+	dockerInfo, err := ds.client.Info()
+	glog.Infof("Docker Info: %+v", dockerInfo)
+	if err != nil {
+		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
+		return nil, err
+	}
+	uidMapping := &runtimeapi.LinuxIDMapping{ContainerId: uint32(0)}
+	gidMapping := &runtimeapi.LinuxIDMapping{ContainerId: uint32(0)}
+
+	var usernsEnabled bool
+	var remappedNonRootHostID uint32
+	for _, secOpt := range dockerInfo.SecurityOptions {
+		if strings.Contains(secOpt, "userns") {
+			usernsEnabled = true
+			break
+		}
+	}
+	if usernsEnabled {
+		if strings.HasPrefix(dockerInfo.DockerRootDir, "/var/lib/docker/") {
+			remappedNonRootHostID64, err := strconv.ParseUint(strings.Split(strings.TrimPrefix(dockerInfo.DockerRootDir, "/var/lib/docker/"), ".")[0], 10, 0)
+			if err != nil {
+				glog.Errorf("Failed to parse DockerRootDir: %v", err)
+				return nil, err
+			}
+			remappedNonRootHostID = uint32(remappedNonRootHostID64)
+			uidMapping.ContainerId = uint32(0)
+			gidMapping.ContainerId = uint32(0)
+
+			uidMapping.HostId = remappedNonRootHostID
+			gidMapping.HostId = remappedNonRootHostID
+		} else {
+			glog.Errorf("Failed in parsing DockerRootDir, %s, from Info(): %v", dockerInfo.DockerRootDir, err)
+			return nil, err
+		}
+		mappings, err := ioutil.ReadFile("/etc/subuid")
+		if err != nil {
+			glog.Errorf("Failed to read /etc/subuid: %v", err)
+			return nil, err
+		}
+		uidMapping.Size_, err = getIDMappingSize(mappings, remappedNonRootHostID)
+		if err != nil {
+			return nil, err
+		}
+
+		mappings, err = ioutil.ReadFile("/etc/subgid")
+		if err != nil {
+			glog.Errorf("Failed to read /etc/subgid: %v", err)
+			return nil, err
+		}
+		gidMapping.Size_, err = getIDMappingSize(mappings, remappedNonRootHostID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	linuxConfig := &runtimeapi.LinuxUserNamespaceConfig{
+		IsEnabled:   usernsEnabled,
+		UidMappings: []*runtimeapi.LinuxIDMapping{uidMapping},
+		GidMappings: []*runtimeapi.LinuxIDMapping{gidMapping},
+	}
+	getRuntimeConfig := &runtimeapi.GetRuntimeConfig{UserNamespaceConfig: linuxConfig}
+	return &runtimeapi.GetRuntimeConfigInfoResponse{RuntimeConfig: getRuntimeConfig}, nil
+}
+
+func getIDMappingSize(mappings []byte, hostID uint32) (uint32, error) {
+	matches := linuxIDMappingRegexp.FindAllSubmatch(mappings, -1)
+	for _, match := range matches {
+		uid, err := strconv.ParseUint(string(match[2]), 10, 32)
+		if err != nil {
+			return 0, fmt.Errorf("Error in parsing linux user-namespace mapping entry: %s", match)
+		}
+		if uint32(uid) == hostID {
+			size, err := strconv.ParseUint(string(match[3]), 10, 32)
+			if err != nil {
+				return 0, fmt.Errorf("Error in parsing linux user-namespace mapping entry: %s", match)
+			}
+			return uint32(size), nil
+		}
+	}
+	return 0, fmt.Errorf("Error: could not find user-namespace mapping entry for ID %v", hostID)
+}
 
 // Version returns the runtime name, runtime version and runtime API version
 func (ds *dockerService) Version(_ context.Context, r *runtimeapi.VersionRequest) (*runtimeapi.VersionResponse, error) {
