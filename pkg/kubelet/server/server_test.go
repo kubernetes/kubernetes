@@ -166,10 +166,10 @@ func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 }
 
 // Unused functions
-func (_ *fakeKubelet) GetNode() (*v1.Node, error)   { return nil, nil }
-func (_ *fakeKubelet) GetNodeConfig() cm.NodeConfig { return cm.NodeConfig{} }
-func (_ *fakeKubelet) GetPodCgroupRoot() string     { return "" }
-
+func (_ *fakeKubelet) GetNode() (*v1.Node, error)                       { return nil, nil }
+func (_ *fakeKubelet) GetNodeConfig() cm.NodeConfig                     { return cm.NodeConfig{} }
+func (_ *fakeKubelet) GetPodCgroupRoot() string                         { return "" }
+func (_ *fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return nil, false }
 func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
 	return map[string]volume.Volume{}, true
 }
