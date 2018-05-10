@@ -164,7 +164,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
 		// into --grace-period=1 and wait until the object is successfully deleted.
 		deleteOpts.GracePeriod = 1
-		deleteOpts.WaitForDeletion = true
+		deleteOpts.WaitForGracefulDeletion = true
 	}
 	o.DeleteOptions = deleteOpts
 

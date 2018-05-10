@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -90,14 +91,21 @@ var (
 type DeleteOptions struct {
 	resource.FilenameOptions
 
-	LabelSelector   string
-	FieldSelector   string
-	DeleteAll       bool
-	IgnoreNotFound  bool
-	Cascade         bool
-	DeleteNow       bool
-	ForceDeletion   bool
+	LabelSelector  string
+	FieldSelector  string
+	DeleteAll      bool
+	IgnoreNotFound bool
+	Cascade        bool
+	DeleteNow      bool
+	ForceDeletion  bool
+	// Whether we should wait for resource deletion.
+	// Tied to `--wait` flag.
 	WaitForDeletion bool
+	// Whether we should wait for deletion when the resource is deleted gracefully.
+	// This is to support backwards compatibility when graceful deletion was introduced.
+	// This option is not exposed to the user.
+	// Deprecated: Remove this flag once the reapers are replaced with foreground deletion mode
+	WaitForGracefulDeletion bool
 
 	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 
@@ -164,7 +172,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
 		// into --grace-period=1 and wait until the object is successfully deleted. Users may provide --force
 		// to bypass this wait.
-		o.WaitForDeletion = true
+		o.WaitForGracefulDeletion = true
 		o.GracePeriod = 1
 	}
 
@@ -245,7 +253,8 @@ func (o *DeleteOptions) ReapResult(r *resource.Result, isDefaultDelete, quiet bo
 			// If there is no reaper for this resources and the user didn't explicitly ask for stop.
 			if kubectl.IsNoSuchReaperError(err) && isDefaultDelete {
 				// No client side reaper found. Let the server do cascading deletion.
-				return o.cascadingDeleteResource(info)
+				falseVar := false
+				return o.deleteResourceAndWait(info, &metav1.DeleteOptions{OrphanDependents: &falseVar})
 			}
 			return cmdutil.AddSourceToErr("reaping", info.Source, err)
 		}
@@ -256,7 +265,7 @@ func (o *DeleteOptions) ReapResult(r *resource.Result, isDefaultDelete, quiet bo
 		if err := reaper.Stop(info.Namespace, info.Name, o.Timeout, options); err != nil {
 			return cmdutil.AddSourceToErr("stopping", info.Source, err)
 		}
-		if o.WaitForDeletion {
+		if o.WaitForGracefulDeletion {
 			if err := waitForObjectDeletion(info, o.Timeout); err != nil {
 				return cmdutil.AddSourceToErr("stopping", info.Source, err)
 			}
@@ -293,7 +302,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
 		options.OrphanDependents = &orphan
-		return o.deleteResource(info, options)
+		return o.deleteResourceAndWait(info, options)
 	})
 	if err != nil {
 		return err
@@ -304,13 +313,26 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	return nil
 }
 
-func (o *DeleteOptions) cascadingDeleteResource(info *resource.Info) error {
-	falseVar := false
-	return o.deleteResource(info, &metav1.DeleteOptions{OrphanDependents: &falseVar})
+// Deletes the given resource and then waits to confirm that the resource is deleted.
+func (o *DeleteOptions) deleteResourceAndWait(info *resource.Info, options *metav1.DeleteOptions) error {
+	if !o.WaitForDeletion {
+		return o.deleteResource(info, options)
+	}
+
+	deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+		return resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, options)
+	}
+	err := kubectl.WaitForDeletion(deleteFunc, options, timeout)
+	if err != nil {
+		return err
+	}
+
+	o.PrintObj(info)
+	return nil
 }
 
 func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) error {
-	if err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions); err != nil {
+	if _, err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions); err != nil {
 		return cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
