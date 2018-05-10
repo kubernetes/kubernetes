@@ -21,10 +21,16 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+
+	. "github.com/onsi/ginkgo"
 )
 
 func scheduleSuccessEvent(ns, podName, nodeName string) func(*v1.Event) bool {
 	return func(e *v1.Event) bool {
+		By(fmt.Sprintf("Considering event:\nType: [%s] vs. [%s], Reason: [%s] vs. [%s], Name: [%s] vs. [%s], Message: [%s] vs. [%s]",
+			e.Type, v1.EventTypeNormal, e.Reason, "Scheduled", e.Name, podName,
+			e.Message, fmt.Sprintf("Successfully assigned %v/%v to %v", ns, podName, nodeName)))
+
 		return e.Type == v1.EventTypeNormal &&
 			e.Reason == "Scheduled" &&
 			strings.HasPrefix(e.Name, podName) &&
@@ -34,8 +40,11 @@ func scheduleSuccessEvent(ns, podName, nodeName string) func(*v1.Event) bool {
 
 func scheduleFailureEvent(podName string) func(*v1.Event) bool {
 	return func(e *v1.Event) bool {
-		return strings.HasPrefix(e.Name, podName) &&
-			e.Type == "Warning" &&
-			e.Reason == "FailedScheduling"
+		By(fmt.Sprintf("Considering event:\nType: [%s] vs. [%s], Reason: [%s] vs. [%s], Name: [%s] vs. [%s]",
+			e.Type, v1.EventTypeNormal, e.Reason, "FailedScheduling", e.Name, podName))
+
+		return e.Type == v1.EventTypeWarning &&
+			e.Reason == "FailedScheduling" &&
+			strings.HasPrefix(e.Name, podName)
 	}
 }
