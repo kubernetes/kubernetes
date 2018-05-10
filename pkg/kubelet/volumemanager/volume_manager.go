@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -87,6 +88,10 @@ const (
 	// operation is waiting it only blocks other operations on the same device,
 	// other devices are not affected.
 	waitForAttachTimeout time.Duration = 10 * time.Minute
+
+	// metricsLoopSleepPeriod is the amount of time the metrics loop waits
+	// between successive executions.
+	metricsLoopSleepPeriod time.Duration = 10 * time.Second
 )
 
 // VolumeManager runs a set of asynchronous loops that figure out which volumes
@@ -246,6 +251,7 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 
 	glog.Infof("Starting Kubelet Volume Manager")
 	go vm.reconciler.Run(stopCh)
+	go vm.recordVolumeMetrics(stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Kubelet Volume Manager")
@@ -410,6 +416,24 @@ func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expect
 		mountedVolumes.Insert(mountedVolume.OuterVolumeSpecName)
 	}
 	return filterUnmountedVolumes(mountedVolumes, expectedVolumes)
+}
+
+// recordVolumeMetrics runs a metrics-gathering function in a loop.
+func (vm *volumeManager) recordVolumeMetrics(stopCh <-chan struct{}) {
+	metricsLoop := func() {
+		metrics.ResetVolumeManagerVolumesMetric()
+		for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumes() {
+			metrics.RecordVolumeManagerVolumesMetric(mountedVolume.PluginName, "actual_state_of_world")
+		}
+		for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
+			var pluginName string
+			if plugin, err := vm.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec); err == nil {
+				pluginName = plugin.GetPluginName()
+			}
+			metrics.RecordVolumeManagerVolumesMetric(pluginName, "desired_state_of_world")
+		}
+	}
+	wait.Until(metricsLoop, metricsLoopSleepPeriod, stopCh)
 }
 
 // filterUnmountedVolumes adds each element of expectedVolumes that is not in

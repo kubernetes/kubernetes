@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -476,6 +477,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		volume.mountPath,
 		volume.pluginName)
 	if err != nil {
+		metrics.RecordReconstructionErrorsMetric(volume.pluginName)
 		return nil, err
 	}
 
