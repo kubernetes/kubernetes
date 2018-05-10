@@ -33,11 +33,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	cfg "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	cfg "k8s.io/kubernetes/pkg/apis/componentconfig/v1"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )

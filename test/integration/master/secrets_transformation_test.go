@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"testing"
 
-	cfg "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
+	cfg "k8s.io/kubernetes/pkg/apis/componentconfig/v1"
 )
 
 const (
