@@ -194,6 +194,21 @@ func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 	return kl.containerRuntime
 }
 
+// getRemappedIDs returns the uid and gid from the host usernamespace that are mapped to container user-namespace
+func (kl *Kubelet) getRemappedIDs() (error, int, int) {
+	ci, err := kl.containerRuntime.GetRuntimeConfigInfo()
+	if err != nil {
+		return fmt.Errorf("Container runtime info get failed: %v", err), -1, -1
+	}
+
+	if ci.IsUserNamespaceEnabled() {
+		firstRemappedUIDOnHost, firstRemappedGIDOnHost := ci.GetHostUserNamespaceRemappedHostIds()
+		return nil, int(firstRemappedUIDOnHost), int(firstRemappedGIDOnHost)
+	} else {
+		return fmt.Errorf("User-Namespaces not enabled at runtime"), -1, -1
+	}
+}
+
 // GetNode returns the node info for the configured node name of this Kubelet.
 func (kl *Kubelet) GetNode() (*v1.Node, error) {
 	if kl.kubeClient == nil {

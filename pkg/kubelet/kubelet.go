@@ -526,13 +526,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeIP:               parsedNodeIP,
 		nodeIPValidator:      validateNodeIP,
 		clock:                clock.RealClock{},
-		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
-		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
-		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
-		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
-		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
-		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
-		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
+		enableControllerAttachDetach: kubeCfg.EnableControllerAttachDetach,
+		iptClient:                    utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
+		makeIPTablesUtilChains:       kubeCfg.MakeIPTablesUtilChains,
+		iptablesMasqueradeBit:        int(kubeCfg.IPTablesMasqueradeBit),
+		iptablesDropBit:              int(kubeCfg.IPTablesDropBit),
+		nodeUserNamespace:            utilfeature.DefaultFeatureGate.Enabled(features.NodeUserNamespace),
+		keepTerminatedPodVolumes:     keepTerminatedPodVolumes,
 	}
 
 	if klet.cloud != nil {
@@ -550,8 +550,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.KubeClient, configmap.GetObjectTTLFromNodeFunc(klet.GetNode))
 	klet.configMapManager = configMapManager
 
-	if klet.experimentalHostUserNamespaceDefaulting {
-		glog.Infof("Experimental host user namespace defaulting is enabled.")
+	//if klet.experimentalHostUserNamespaceDefaulting {
+	if klet.nodeUserNamespace {
+		glog.Infof("Node-level user namespace support is enabled.")
 	}
 
 	machineInfo, err := klet.cadvisor.MachineInfo()
@@ -1137,7 +1138,8 @@ type Kubelet struct {
 	// or using host path volumes.
 	// This should only be enabled when the container runtime is performing user remapping AND if the
 	// experimental behavior is desired.
-	experimentalHostUserNamespaceDefaulting bool
+	nodeUserNamespace bool
+	//experimentalHostUserNamespaceDefaulting bool
 
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
@@ -1189,8 +1191,34 @@ func (kl *Kubelet) setupDataDirs() error {
 	if err := os.MkdirAll(kl.getPodsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating pods directory: %v", err)
 	}
+	if err := kl.chownDirForRemappedIDs(kl.getPodsDir()); err != nil {
+		return fmt.Errorf("error chowning pods directory: %v", err)
+	}
 	if err := os.MkdirAll(kl.getPluginsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating plugins directory: %v", err)
+	}
+	if err := kl.chownDirForRemappedIDs(kl.getPluginsDir()); err != nil {
+		return fmt.Errorf("error chowning plugins directory: %v", err)
+	}
+
+	return nil
+}
+
+func (kl *Kubelet) chownDirForRemappedIDs(path string) error {
+	if !kl.nodeUserNamespace {
+		return nil
+	}
+	if path == "" {
+		return fmt.Errorf("Path to be setup is empty.")
+	}
+	err, uid, gid := kl.getRemappedIDs()
+	if err != nil {
+		return fmt.Errorf("Failed to get remapped ids: %v", err)
+	}
+	if err = os.Chown(path, uid, gid); err != nil {
+		return fmt.Errorf("error setting ownership to remapped IDs %d:%d on %q: %v",
+			uid, gid,
+			path, err)
 	}
 	return nil
 }
@@ -2077,6 +2105,28 @@ func (kl *Kubelet) updateRuntimeUp() {
 		glog.Errorf("Container runtime not ready: %v", runtimeReady)
 		return
 	}
+
+	ci, err := kl.containerRuntime.GetRuntimeConfigInfo()
+	if err != nil {
+		glog.Errorf("Container runtime info get failed: %v", err)
+		return
+	}
+	glog.V(4).Infof("Container runtime config info: %v", ci)
+
+	// First verify that kubelet's user-namespace configuration is consistent with runtime's
+	// userns configuration
+	if kl.nodeUserNamespace != ci.IsUserNamespaceEnabled() {
+		glog.Errorf("Container runtime and Kubelet configuration mismatch. Either both should enable or disable user-namespaces")
+		return
+	}
+	if ci.IsUserNamespaceEnabled() {
+		containerFirstUID, containerFirstGID := ci.GetContainerUserNamespaceIds()
+		if containerFirstUID != 0 || containerFirstGID != 0 {
+			glog.Errorf("Unsupported runtime usernamespace configuration. First {U/G}ID must from the container must be 0")
+			return
+		}
+	}
+
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }
