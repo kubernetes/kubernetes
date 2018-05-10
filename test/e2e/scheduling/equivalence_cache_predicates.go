@@ -91,7 +91,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		WaitForSchedulerAfterAction(f, func() error {
 			err := CreateNodeSelectorPods(f, rcName, 2, nodeSelector, false)
 			return err
-		}, rcName, false)
+		}, ns, rcName, false)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, rcName)
 		// the first replica pod is scheduled, and the second pod will be rejected.
 		verifyResult(cs, 1, 1, ns)
@@ -157,7 +157,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		WaitForSchedulerAfterAction(f, func() error {
 			err := framework.ScaleRC(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, affinityRCName, uint(replica+1), false)
 			return err
-		}, affinityRCName, false)
+		}, ns, affinityRCName, false)
 		// and this new pod should be rejected since node label has been updated
 		verifyReplicasResult(cs, replica, 1, ns, affinityRCName)
 	})
@@ -222,7 +222,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		WaitForSchedulerAfterAction(f, func() error {
 			_, err := cs.CoreV1().ReplicationControllers(ns).Create(rc)
 			return err
-		}, labelRCName, false)
+		}, ns, labelRCName, false)
 
 		// these two replicas should all be rejected since podAntiAffinity says it they anit-affinity with pod {"service": "S1"}
 		verifyReplicasResult(cs, 0, replica, ns, labelRCName)
