@@ -42,6 +42,8 @@ const (
 	maxListTries = 3
 	// Number of fields per line in /proc/mounts as per the fstab man page.
 	expectedNumFieldsPerLine = 6
+	// At least number of fields per line in /proc/<pid>/mountinfo.
+	expectedAtLeastNumFieldsPerMountInfo = 10
 	// Location of the mount file to use
 	procMountsPath = "/proc/mounts"
 	// Location of the mountinfo file
@@ -598,7 +600,7 @@ func isShared(mount string, mountInfoPath string) (bool, error) {
 	}
 
 	// parse optional parameters
-	for _, opt := range info.optional {
+	for _, opt := range info.optionalFields {
 		if strings.HasPrefix(opt, "shared:") {
 			return true, nil
 		}
@@ -606,14 +608,27 @@ func isShared(mount string, mountInfoPath string) (bool, error) {
 	return false, nil
 }
 
+// This represents a single line in /proc/<pid>/mountinfo.
 type mountInfo struct {
-	// Path of the mount point
+	// Unique ID for the mount (maybe reused after umount).
+	id int
+	// The ID of the parent mount (or of self for the root of this mount namespace's mount tree).
+	parentID int
+	// The value of `st_dev` for files on this filesystem.
+	majorMinor string
+	// The pathname of the directory in the filesystem which forms the root of this mount.
+	root string
+	// Mount source, filesystem-specific information. e.g. device, tmpfs name.
+	source string
+	// Mount point, the pathname of the mount point.
 	mountPoint string
-	// list of "optional parameters", mount propagation is one of them
-	optional []string
-	// mount options
+	// Optional fieds, zero or more fields of the form "tag[:value]".
+	optionalFields []string
+	// The filesystem type in the form "type[.subtype]".
+	fsType string
+	// Per-mount options.
 	mountOptions []string
-	// super options: per-superblock options.
+	// Per-superblock options.
 	superOptions []string
 }
 
@@ -633,20 +648,38 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 		}
 		// See `man proc` for authoritative description of format of the file.
 		fields := strings.Fields(line)
-		if len(fields) < 10 {
-			return nil, fmt.Errorf("wrong number of fields in (expected %d, got %d): %s", 10, len(fields), line)
+		if len(fields) < expectedAtLeastNumFieldsPerMountInfo {
+			return nil, fmt.Errorf("wrong number of fields in (expected at least %d, got %d): %s", expectedAtLeastNumFieldsPerMountInfo, len(fields), line)
+		}
+		id, err := strconv.Atoi(fields[0])
+		if err != nil {
+			return nil, err
+		}
+		parentID, err := strconv.Atoi(fields[1])
+		if err != nil {
+			return nil, err
 		}
 		info := mountInfo{
+			id:           id,
+			parentID:     parentID,
+			majorMinor:   fields[2],
+			root:         fields[3],
 			mountPoint:   fields[4],
 			mountOptions: strings.Split(fields[5], ","),
-			optional:     []string{},
 		}
 		// All fields until "-" are "optional fields".
-		for i := 6; i < len(fields) && fields[i] != "-"; i++ {
-			info.optional = append(info.optional, fields[i])
+		i := 6
+		for ; i < len(fields) && fields[i] != "-"; i++ {
+			info.optionalFields = append(info.optionalFields, fields[i])
 		}
-		superOpts := fields[len(fields)-1]
-		info.superOptions = strings.Split(superOpts, ",")
+		// Parse the rest 3 fields.
+		i += 1
+		if len(fields)-i < 3 {
+			return nil, fmt.Errorf("expect 3 fields in %s, got %d", line, len(fields)-i)
+		}
+		info.fsType = fields[i]
+		info.source = fields[i+1]
+		info.superOptions = strings.Split(fields[i+2], ",")
 		infos = append(infos, info)
 	}
 	return infos, nil
@@ -967,7 +1000,7 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return getMountRefsByDev(mounter, realpath)
+	return searchMountPoints(realpath, procMountInfoPath)
 }
 
 func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
@@ -1215,4 +1248,52 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	parentFD = -1
 
 	return finalFD, nil
+}
+
+// searchMountPoints finds all mount references to the source, returns a list of
+// mountpoints.
+// This function assumes source cannot be device.
+// Some filesystems may share a source name, e.g. tmpfs. And for bind mounting,
+// it's possible to mount a non-root path of a filesystem, so we need to use
+// root path and major:minor to represent mount source uniquely.
+// This implementation is shared between Linux and NsEnterMounter
+func searchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
+	mis, err := parseMountInfo(mountInfoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	mountID := 0
+	rootPath := ""
+	majorMinor := ""
+
+	// Finding the underlying root path and major:minor if possible.
+	// We need search in backward order because it's possible for later mounts
+	// to overlap earlier mounts.
+	for i := len(mis) - 1; i >= 0; i-- {
+		if hostSource == mis[i].mountPoint || pathWithinBase(hostSource, mis[i].mountPoint) {
+			// If it's a mount point or path under a mount point.
+			mountID = mis[i].id
+			rootPath = filepath.Join(mis[i].root, strings.TrimPrefix(hostSource, mis[i].mountPoint))
+			majorMinor = mis[i].majorMinor
+			break
+		}
+	}
+
+	if rootPath == "" || majorMinor == "" {
+		return nil, fmt.Errorf("failed to get root path and major:minor for %s", hostSource)
+	}
+
+	var refs []string
+	for i := range mis {
+		if mis[i].id == mountID {
+			// Ignore mount entry for mount source itself.
+			continue
+		}
+		if mis[i].root == rootPath && mis[i].majorMinor == majorMinor {
+			refs = append(refs, mis[i].mountPoint)
+		}
+	}
+
+	return refs, nil
 }
