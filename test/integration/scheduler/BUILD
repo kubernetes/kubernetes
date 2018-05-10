@@ -23,6 +23,7 @@ go_test(
     tags = ["integration"],
     deps = [
         "//cmd/kube-scheduler/app:go_default_library",
+        "//cmd/kube-scheduler/app/config:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
