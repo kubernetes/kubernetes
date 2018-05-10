@@ -11,6 +11,7 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/componentconfig:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -29,7 +30,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/install:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],

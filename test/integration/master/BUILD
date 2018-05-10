@@ -53,6 +53,7 @@ go_test(
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/apis/componentconfig/v1:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/master:go_default_library",
@@ -72,7 +73,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/group:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/request/bearertoken:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
@@ -178,6 +178,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/integration/master",
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
+        "//pkg/apis/componentconfig/v1:go_default_library",
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
@@ -185,7 +186,6 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",

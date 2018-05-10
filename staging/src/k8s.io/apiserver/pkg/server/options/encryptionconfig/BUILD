@@ -11,11 +11,11 @@ go_library(
     srcs = ["config.go"],
     importpath = "k8s.io/apiserver/pkg/server/options/encryptionconfig",
     deps = [
+        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/apis/componentconfig/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/aes:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope:go_default_library",
