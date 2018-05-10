@@ -228,6 +228,9 @@ type AllowedHostPath struct {
 	// `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
 	// `/foo` would not allow `/food` or `/etc/foo`
 	PathPrefix string
+
+	// when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.
+	ReadOnly bool
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy
