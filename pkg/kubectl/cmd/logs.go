@@ -93,15 +93,16 @@ type LogsOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewLogsOptions(streams genericclioptions.IOStreams) *LogsOptions {
+func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
 	return &LogsOptions{
-		IOStreams: streams,
+		IOStreams:     streams,
+		AllContainers: allContainers,
 	}
 }
 
 // NewCmdLogs creates a new pod logs command
 func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewLogsOptions(streams)
+	o := NewLogsOptions(streams, false)
 
 	cmd := &cobra.Command{
 		Use: "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
@@ -121,7 +122,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 		Aliases: []string{"log"},
 	}
-	cmd.Flags().Bool("all-containers", false, "Get all containers's logs in the pod(s).")
+	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers's logs in the pod(s).")
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
 	cmd.Flags().Bool("timestamps", false, "Include timestamps on each line in the log output")
 	cmd.Flags().Int64("limit-bytes", 0, "Maximum bytes of logs to return. Defaults to no limit.")
@@ -140,7 +141,6 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	selector := cmdutil.GetFlagString(cmd, "selector")
-	o.AllContainers = cmdutil.GetFlagBool(cmd, "all-containers")
 	switch len(args) {
 	case 0:
 		if len(selector) == 0 {
@@ -237,7 +237,7 @@ func (o LogsOptions) Validate() error {
 		return errors.New("unexpected logs options object")
 	}
 	if o.AllContainers && len(logsOptions.Container) > 0 {
-		return fmt.Errorf("--all-containers=true should not be specifiled with container name %s", logsOptions.Container)
+		return fmt.Errorf("--all-containers=true should not be specified with container name %s", logsOptions.Container)
 	}
 	if errs := validation.ValidatePodLogOptions(logsOptions); len(errs) > 0 {
 		return errs.ToAggregate()

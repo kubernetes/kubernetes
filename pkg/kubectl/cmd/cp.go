@@ -96,7 +96,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 			cmdutil.CheckErr(o.Run(args))
 		},
 	}
-	cmd.Flags().StringP("container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
+	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Container name. If omitted, the first container in the pod will be chosen")
 
 	return cmd
 }
@@ -143,8 +143,6 @@ func extractFileSpec(arg string) (fileSpec, error) {
 }
 
 func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.Container = cmdutil.GetFlagString(cmd, "container")
-
 	var err error
 	o.Namespace, _, err = f.DefaultNamespace()
 	if err != nil {

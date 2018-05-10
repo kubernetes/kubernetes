@@ -89,7 +89,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().String("from", "", "The name of the resource to create a Job from (only cronjob is supported).")
+	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
 
 	return cmd
 }
@@ -100,7 +100,6 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 	o.Name = args[0]
 
-	o.From = cmdutil.GetFlagString(cmd, "from")
 	o.Namespace, _, err = f.DefaultNamespace()
 	if err != nil {
 		return err

@@ -108,8 +108,8 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
-	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().Bool("local", false, "If true, set selector will NOT contact api-server but run locally.")
+	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, set selector will NOT contact api-server but run locally.")
 	cmd.Flags().String("resource-version", "", "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "the resource to update the selectors"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.fileOptions, usage)
@@ -129,8 +129,6 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	o.local = cmdutil.GetFlagBool(cmd, "local")
-	o.all = cmdutil.GetFlagBool(cmd, "all")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 

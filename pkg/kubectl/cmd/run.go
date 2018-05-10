@@ -155,16 +155,16 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
-	addRunFlags(cmd)
+	addRunFlags(cmd, o)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 	return cmd
 }
 
-func addRunFlags(cmd *cobra.Command) {
+func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().String("generator", "", i18n.T("The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."))
-	cmd.Flags().String("image", "", i18n.T("The image for the container to run."))
+	cmd.Flags().StringVar(&opt.Generator, "generator", opt.Generator, i18n.T("The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."))
+	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("The image for the container to run."))
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
@@ -172,22 +172,22 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
 	cmd.Flags().StringArray("env", []string{}, "Environment variables to set in the container")
 	cmd.Flags().String("serviceaccount", "", "Service account to set in the pod spec")
-	cmd.Flags().String("port", "", i18n.T("The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."))
+	cmd.Flags().StringVar(&opt.Port, "port", opt.Port, i18n.T("The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."))
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
 	cmd.Flags().StringP("labels", "l", "", "Comma separated labels to apply to the pod(s). Will override previous values.")
-	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
-	cmd.Flags().BoolP("tty", "t", false, "Allocated a TTY for each container in the pod.")
-	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
-	cmd.Flags().Bool("leave-stdin-open", false, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
+	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
+	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, "Allocated a TTY for each container in the pod.")
+	cmd.Flags().BoolVar(&opt.Attach, "attach", opt.Attach, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
+	cmd.Flags().BoolVar(&opt.LeaveStdinOpen, "leave-stdin-open", opt.LeaveStdinOpen, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
 	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`."))
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
 	cmd.Flags().String("requests", "", i18n.T("The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."))
 	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
-	cmd.Flags().Bool("expose", false, "If true, a public, external service is created for the container(s) which are run")
+	cmd.Flags().BoolVar(&opt.Expose, "expose", opt.Expose, "If true, a public, external service is created for the container(s) which are run")
 	cmd.Flags().String("service-generator", "service/v2", i18n.T("The name of the generator to use for creating a service.  Only used if --expose is true"))
 	cmd.Flags().String("service-overrides", "", i18n.T("An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."))
-	cmd.Flags().Bool("quiet", false, "If true, suppress prompt messages.")
-	cmd.Flags().String("schedule", "", i18n.T("A schedule in the Cron format the job should be run with."))
+	cmd.Flags().BoolVar(&opt.Quiet, "quiet", opt.Quiet, "If true, suppress prompt messages.")
+	cmd.Flags().StringVar(&opt.Schedule, "schedule", opt.Schedule, i18n.T("A schedule in the Cron format the job should be run with."))
 }
 
 func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
@@ -206,18 +206,8 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	o.ArgsLenAtDash = cmd.ArgsLenAtDash()
 	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
-	o.Expose = cmdutil.GetFlagBool(cmd, "expose")
-	o.Generator = cmdutil.GetFlagString(cmd, "generator")
-	o.Image = cmdutil.GetFlagString(cmd, "image")
-	o.Interactive = cmdutil.GetFlagBool(cmd, "stdin")
-	o.LeaveStdinOpen = cmdutil.GetFlagBool(cmd, "leave-stdin-open")
-	o.Port = cmdutil.GetFlagString(cmd, "port")
-	o.Quiet = cmdutil.GetFlagBool(cmd, "quiet")
-	o.Schedule = cmdutil.GetFlagString(cmd, "schedule")
-	o.TTY = cmdutil.GetFlagBool(cmd, "tty")
 
 	attachFlag := cmd.Flags().Lookup("attach")
-	o.Attach = cmdutil.GetFlagBool(cmd, "attach")
 	if !attachFlag.Changed && o.Interactive {
 		o.Attach = true
 	}
