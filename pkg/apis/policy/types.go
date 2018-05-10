@@ -269,7 +269,6 @@ var (
 	VsphereVolume         FSType = "vsphereVolume"
 	Quobyte               FSType = "quobyte"
 	AzureDisk             FSType = "azureDisk"
-	PhotonPersistentDisk  FSType = "photonPersistentDisk"
 	StorageOS             FSType = "storageos"
 	Projected             FSType = "projected"
 	PortworxVolume        FSType = "portworxVolume"

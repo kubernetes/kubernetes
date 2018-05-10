@@ -136,8 +136,6 @@ type VolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource
-	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
-	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
 	// Items for all in one resources secrets, configmaps, and downward API
 	Projected *ProjectedVolumeSource
 	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
@@ -209,8 +207,6 @@ type PersistentVolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource
-	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
-	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
 	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
 	// +optional
 	PortworxVolume *PortworxVolumeSource
@@ -1150,16 +1146,6 @@ type VsphereVirtualDiskVolumeSource struct {
 	// Storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.
 	// +optional
 	StoragePolicyID string
-}
-
-// Represents a Photon Controller persistent disk resource.
-type PhotonPersistentDiskVolumeSource struct {
-	// ID that identifies Photon Controller persistent disk
-	PdID string
-	// Filesystem type to mount.
-	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-	FSType string
 }
 
 // PortworxVolumeSource represents a Portworx volume resource.

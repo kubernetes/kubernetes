@@ -46,8 +46,7 @@ func checkMountOption(pv *api.PersistentVolume) field.ErrorList {
 		pv.Spec.CephFS != nil ||
 		pv.Spec.AzureFile != nil ||
 		pv.Spec.VsphereVolume != nil ||
-		pv.Spec.AzureDisk != nil ||
-		pv.Spec.PhotonPersistentDisk != nil {
+		pv.Spec.AzureDisk != nil {
 		return allErrs
 	}
 	// any other type if mount option is present lets return error

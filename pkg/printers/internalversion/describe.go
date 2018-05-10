@@ -742,8 +742,6 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, w)
 		case volume.VolumeSource.Cinder != nil:
 			printCinderVolumeSource(volume.VolumeSource.Cinder, w)
-		case volume.VolumeSource.PhotonPersistentDisk != nil:
-			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, w)
 		case volume.VolumeSource.PortworxVolume != nil:
 			printPortworxVolumeSource(volume.VolumeSource.PortworxVolume, w)
 		case volume.VolumeSource.ScaleIO != nil:
@@ -955,13 +953,6 @@ func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, w Pre
 		"    FSType:\t%v\n"+
 		"    StoragePolicyName:\t%v\n",
 		vsphere.VolumePath, vsphere.FSType, vsphere.StoragePolicyName)
-}
-
-func printPhotonPersistentDiskVolumeSource(photon *api.PhotonPersistentDiskVolumeSource, w PrefixWriter) {
-	w.Write(LEVEL_2, "Type:\tPhotonPersistentDisk (a Persistent Disk resource in photon platform)\n"+
-		"    PdID:\t%v\n"+
-		"    FSType:\t%v\n",
-		photon.PdID, photon.FSType)
 }
 
 func printCinderVolumeSource(cinder *api.CinderVolumeSource, w PrefixWriter) {
@@ -1234,8 +1225,6 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printCinderVolumeSource(pv.Spec.Cinder, w)
 		case pv.Spec.AzureDisk != nil:
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, w)
-		case pv.Spec.PhotonPersistentDisk != nil:
-			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, w)
 		case pv.Spec.PortworxVolume != nil:
 			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
 		case pv.Spec.ScaleIO != nil:

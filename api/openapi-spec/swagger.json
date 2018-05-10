@@ -77910,10 +77910,6 @@
       "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default for manually created PersistentVolumes), Delete (default for dynamically provisioned PersistentVolumes), and Recycle (deprecated). Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
       "type": "string"
      },
-     "photonPersistentDisk": {
-      "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
-      "$ref": "#/definitions/io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource"
-     },
      "portworxVolume": {
       "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
       "$ref": "#/definitions/io.k8s.api.core.v1.PortworxVolumeSource"
@@ -77961,22 +77957,6 @@
      },
      "reason": {
       "description": "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.",
-      "type": "string"
-     }
-    }
-   },
-   "io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource": {
-    "description": "Represents a Photon Controller persistent disk resource.",
-    "required": [
-     "pdID"
-    ],
-    "properties": {
-     "fsType": {
-      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
-      "type": "string"
-     },
-     "pdID": {
-      "description": "ID that identifies Photon Controller persistent disk",
       "type": "string"
      }
     }
@@ -79813,10 +79793,6 @@
      "persistentVolumeClaim": {
       "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
       "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaimVolumeSource"
-     },
-     "photonPersistentDisk": {
-      "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
-      "$ref": "#/definitions/io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource"
      },
      "portworxVolume": {
       "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
@@ -85973,10 +85949,6 @@
    "io.k8s.kubernetes.pkg.api.v1.PersistentVolumeStatus": {
     "description": "Deprecated. Please use io.k8s.api.core.v1.PersistentVolumeStatus instead.",
     "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeStatus"
-   },
-   "io.k8s.kubernetes.pkg.api.v1.PhotonPersistentDiskVolumeSource": {
-    "description": "Deprecated. Please use io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource instead.",
-    "$ref": "#/definitions/io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource"
    },
    "io.k8s.kubernetes.pkg.api.v1.Pod": {
     "description": "Deprecated. Please use io.k8s.api.core.v1.Pod instead.",

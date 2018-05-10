@@ -83,7 +83,6 @@ pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/gce
 pkg/cloudprovider/providers/gce/cloud
 pkg/cloudprovider/providers/ovirt
-pkg/cloudprovider/providers/photon
 pkg/cloudprovider/providers/vsphere
 pkg/controller
 pkg/controller/bootstrap
@@ -384,7 +383,6 @@ pkg/volume/host_path
 pkg/volume/iscsi
 pkg/volume/local
 pkg/volume/nfs
-pkg/volume/photon_pd
 pkg/volume/portworx
 pkg/volume/rbd
 pkg/volume/scaleio

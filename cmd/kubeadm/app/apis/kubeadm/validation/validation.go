@@ -59,7 +59,6 @@ var cloudproviders = []string{
 	"external", // Support for out-of-tree cloud providers
 	"openstack",
 	"ovirt",
-	"photon",
 	"vsphere",
 }
 
