@@ -19,7 +19,7 @@ go_library(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/genericclioptions:go_default_library",
-        "//pkg/kubectl/resource:go_default_library",
+        "//pkg/kubectl/genericclioptions/resource:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/crlf:go_default_library",
         "//pkg/kubectl/util/term:go_default_library",

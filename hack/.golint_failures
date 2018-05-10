@@ -148,8 +148,8 @@ pkg/kubectl/cmd/util
 pkg/kubectl/cmd/util/editor
 pkg/kubectl/cmd/util/jsonmerge
 pkg/kubectl/cmd/util/sanity
+pkg/kubectl/genericclioptions/resource
 pkg/kubectl/metricsutil
-pkg/kubectl/resource
 pkg/kubectl/util
 pkg/kubectl/util/crlf
 pkg/kubectl/util/slice
