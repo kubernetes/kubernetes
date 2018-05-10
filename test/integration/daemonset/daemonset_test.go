@@ -264,7 +264,6 @@ func validateDaemonSetPodsAndMarkReady(
 func validateDaemonSetStatus(
 	dsClient appstyped.DaemonSetInterface,
 	dsName string,
-	dsNamespace string,
 	expectedNumberReady int32,
 	t *testing.T) {
 	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
@@ -341,7 +340,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 		}
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
-		validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 1, t)
+		validateDaemonSetStatus(dsClient, ds.Name, 1, t)
 	})
 }
 
@@ -373,7 +372,7 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 		addNodes(nodeClient, 0, 5, nil, t)
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 5, t)
-		validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 5, t)
+		validateDaemonSetStatus(dsClient, ds.Name, 5, t)
 	})
 }
 
@@ -412,7 +411,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		}
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
-		validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 1, t)
+		validateDaemonSetStatus(dsClient, ds.Name, 1, t)
 	})
 }
 
