@@ -11,6 +11,7 @@ go_library(
         "factory_client_access.go",
         "factory_object_mapping.go",
         "helpers.go",
+        "kubectl_match_version.go",
         "printing.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
