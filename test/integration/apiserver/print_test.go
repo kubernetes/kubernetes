@@ -165,7 +165,7 @@ func TestServerSidePrint(t *testing.T) {
 		os.Remove(cacheDir)
 	}()
 
-	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, time.Duration(10*time.Minute))
+	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, "", time.Duration(10*time.Minute))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

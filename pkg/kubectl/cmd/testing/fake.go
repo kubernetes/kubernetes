@@ -420,7 +420,7 @@ func (f *TestFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, err
 	fakeClient := f.Client.(*fake.RESTClient)
 
 	cacheDir := filepath.Join("", ".kube", "cache", "discovery")
-	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(f.ClientConfigVal, cacheDir, time.Duration(10*time.Minute))
+	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(f.ClientConfigVal, cacheDir, "", time.Duration(10*time.Minute))
 	if err != nil {
 		return nil, err
 	}
