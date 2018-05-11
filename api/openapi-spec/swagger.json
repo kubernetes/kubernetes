@@ -20060,6 +20060,41 @@
     ]
    },
    "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}/status": {
+    "get": {
+     "description": "read status of the specified CustomResourceDefinition",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiextensions_v1beta1"
+     ],
+     "operationId": "readApiextensionsV1beta1CustomResourceDefinitionStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinition",
+      "version": "v1beta1"
+     }
+    },
     "put": {
      "description": "replace status of the specified CustomResourceDefinition",
      "consumes": [
@@ -20105,6 +20140,53 @@
       }
      },
      "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinition",
+      "version": "v1beta1"
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified CustomResourceDefinition",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiextensions_v1beta1"
+     ],
+     "operationId": "patchApiextensionsV1beta1CustomResourceDefinitionStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
       "group": "apiextensions.k8s.io",
       "kind": "CustomResourceDefinition",
