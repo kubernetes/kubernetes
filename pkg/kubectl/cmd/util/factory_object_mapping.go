@@ -117,7 +117,7 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 		cfg.APIPath = "/api"
 	}
 	gv := mapping.GroupVersionKind.GroupVersion()
-	cfg.ContentConfig = dynamic.ContentConfig()
+	cfg.ContentConfig = resource.UnstructuredPlusDefaultContentConfig()
 	cfg.GroupVersion = &gv
 	return restclient.RESTClientFor(cfg)
 }
@@ -146,13 +146,8 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 		return nil, err
 	}
 
-	clientConfigCopy := *clientConfig
-	clientConfigCopy.APIPath = dynamic.LegacyAPIPathResolverFunc(mapping.GroupVersionKind)
-	gv := mapping.GroupVersionKind.GroupVersion()
-	clientConfigCopy.GroupVersion = &gv
-
 	// used to fetch the resource
-	dynamicClient, err := dynamic.NewClient(&clientConfigCopy, gv)
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}

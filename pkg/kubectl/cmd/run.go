@@ -107,7 +107,7 @@ type RunOptions struct {
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
 
-	DynamicClient dynamic.DynamicInterface
+	DynamicClient dynamic.Interface
 
 	ArgsLenAtDash  int
 	Attach         bool

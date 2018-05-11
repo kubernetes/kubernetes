@@ -100,7 +100,7 @@ type ExposeServiceOptions struct {
 	Namespace string
 	Mapper    meta.RESTMapper
 
-	DynamicClient dynamic.DynamicInterface
+	DynamicClient dynamic.Interface
 	Builder       *resource.Builder
 
 	Recorder genericclioptions.Recorder

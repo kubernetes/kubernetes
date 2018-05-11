@@ -17,7 +17,7 @@ limitations under the License.
 // Package dynamic provides a client interface to arbitrary Kubernetes
 // APIs that exposes common high level operations and exposes common
 // metadata.
-package dynamic
+package deprecated_dynamic
 
 import (
 	"strings"
@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -65,13 +66,13 @@ type ResourceInterface interface {
 // and manipulate metadata of a Kubernetes API group, and implements Interface.
 type Client struct {
 	version  schema.GroupVersion
-	delegate DynamicInterface
+	delegate dynamic.Interface
 }
 
 // NewClient returns a new client based on the passed in config. The
 // codec is ignored, as the dynamic client uses it's own codec.
 func NewClient(conf *restclient.Config, version schema.GroupVersion) (*Client, error) {
-	delegate, err := NewForConfig(conf)
+	delegate, err := dynamic.NewForConfig(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -84,30 +85,47 @@ func NewClient(conf *restclient.Config, version schema.GroupVersion) (*Client, e
 // is ignored. The ResourceInterface inherits the parameter codec of c.
 func (c *Client) Resource(resource *metav1.APIResource, namespace string) ResourceInterface {
 	resourceTokens := strings.SplitN(resource.Name, "/", 2)
-	subresource := ""
+	subresources := []string{}
 	if len(resourceTokens) > 1 {
-		subresource = resourceTokens[1]
+		subresources = strings.Split(resourceTokens[1], "/")
 	}
 
 	if len(namespace) == 0 {
-		return oldResourceShim(c.delegate.ClusterSubresource(c.version.WithResource(resourceTokens[0]), subresource))
+		return oldResourceShim(c.delegate.Resource(c.version.WithResource(resourceTokens[0])), subresources)
 	}
-	return oldResourceShim(c.delegate.NamespacedSubresource(c.version.WithResource(resourceTokens[0]), subresource, namespace))
+	return oldResourceShim(c.delegate.Resource(c.version.WithResource(resourceTokens[0])).Namespace(namespace), subresources)
 }
 
 // the old interfaces used the wrong type for lists.  this fixes that
-func oldResourceShim(in DynamicResourceInterface) ResourceInterface {
-	return oldResourceShimType{DynamicResourceInterface: in}
+func oldResourceShim(in dynamic.ResourceInterface, subresources []string) ResourceInterface {
+	return oldResourceShimType{ResourceInterface: in, subresources: subresources}
 }
 
 type oldResourceShimType struct {
-	DynamicResourceInterface
+	dynamic.ResourceInterface
+	subresources []string
+}
+
+func (s oldResourceShimType) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	return s.ResourceInterface.Create(obj, s.subresources...)
+}
+
+func (s oldResourceShimType) Update(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	return s.ResourceInterface.Update(obj, s.subresources...)
+}
+
+func (s oldResourceShimType) Delete(name string, opts *metav1.DeleteOptions) error {
+	return s.ResourceInterface.Delete(name, opts, s.subresources...)
+}
+
+func (s oldResourceShimType) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
+	return s.ResourceInterface.Get(name, opts, s.subresources...)
 }
 
 func (s oldResourceShimType) List(opts metav1.ListOptions) (runtime.Object, error) {
-	return s.DynamicResourceInterface.List(opts)
+	return s.ResourceInterface.List(opts)
 }
 
 func (s oldResourceShimType) Patch(name string, pt types.PatchType, data []byte) (*unstructured.Unstructured, error) {
-	return s.DynamicResourceInterface.Patch(name, pt, data)
+	return s.ResourceInterface.Patch(name, pt, data, s.subresources...)
 }

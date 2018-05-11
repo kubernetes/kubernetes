@@ -91,10 +91,7 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
-	dynamicClient dynamic.DynamicInterface
-	// metaOnlyClientPool uses a special codec, which removes fields except for
-	// apiVersion, kind, and metadata during decoding.
-	metaOnlyClientPool dynamic.ClientPool
+	dynamicClient dynamic.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
@@ -128,7 +125,7 @@ func (m *monitor) Run() {
 
 type monitors map[schema.GroupVersionResource]*monitor
 
-func listWatcher(client dynamic.DynamicInterface, resource schema.GroupVersionResource) *cache.ListWatch {
+func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
