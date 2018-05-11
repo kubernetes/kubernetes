@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -795,6 +796,41 @@ func TestNameConflict(t *testing.T) {
 		}
 		return false, nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStatusGetAndPatch(t *testing.T) {
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure we don't get 405 Method Not Allowed from Getting CRD/status subresource
+	result := &apiextensionsv1beta1.CustomResourceDefinition{}
+	err = apiExtensionClient.ApiextensionsV1beta1().RESTClient().Get().
+		Resource("customresourcedefinitions").
+		Name(noxuDefinition.Name).
+		SubResource("status").
+		Do().
+		Into(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure we don't get 405 Method Not Allowed from Patching CRD/status subresource
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().
+		Patch(noxuDefinition.Name, types.StrategicMergePatchType,
+			[]byte(fmt.Sprintf(`{"labels":{"test-label":"dummy"}}`)),
+			"status")
 	if err != nil {
 		t.Fatal(err)
 	}
