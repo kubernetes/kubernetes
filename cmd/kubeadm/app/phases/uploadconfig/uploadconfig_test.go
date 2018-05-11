@@ -113,6 +113,14 @@ func TestUploadConfiguration(t *testing.T) {
 				if decodedCfg.Token != "" {
 					t.Errorf("Decoded value contains token (sensitive info), decoded = %#v, expected = empty", decodedCfg.Token)
 				}
+
+				if decodedExtCfg.Kind != "MasterConfiguration" {
+					t.Errorf("Expected kind MasterConfiguration, got %v", decodedExtCfg.Kind)
+				}
+
+				if decodedExtCfg.APIVersion != "kubeadm.k8s.io/v1alpha1" {
+					t.Errorf("Expected apiVersion kubeadm.k8s.io/v1alpha1, got %v", decodedExtCfg.APIVersion)
+				}
 			}
 		})
 	}
