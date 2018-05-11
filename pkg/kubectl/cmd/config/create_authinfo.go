@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -183,7 +184,8 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 			}
 		}
 	} else if o.clientCertificateData.Provided() {
-		modifiedAuthInfo.ClientCertificateData = []byte(o.clientCertificateData.Value())
+		clientCertificateDataBytes, _ := base64.StdEncoding.DecodeString(o.clientCertificateData.Value())
+		modifiedAuthInfo.ClientCertificateData = clientCertificateDataBytes
 	}
 	if o.clientKey.Provided() {
 		keyPath := o.clientKey.Value()
@@ -198,7 +200,8 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 			}
 		}
 	} else if o.clientKeyData.Provided() {
-		modifiedAuthInfo.ClientKeyData = []byte(o.clientKeyData.Value())
+		clientKeyDataBytes, _ := base64.StdEncoding.DecodeString(o.clientKeyData.Value())
+		modifiedAuthInfo.ClientKeyData = clientKeyDataBytes
 	}
 	if o.token.Provided() {
 		modifiedAuthInfo.Token = o.token.Value()
