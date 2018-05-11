@@ -32,10 +32,12 @@ import (
 
 // ClusterInterrogator is an interface to get etcd cluster related information
 type ClusterInterrogator interface {
-	GetStatus() (*clientv3.StatusResponse, error)
-	WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error)
+	ClusterAvailable() (bool, error)
+	GetClusterStatus() (map[string]*clientv3.StatusResponse, error)
+	GetClusterVersions() (map[string]string, error)
+	GetVersion() (string, error)
 	HasTLS() bool
-	GetClusterStatus() ([]*clientv3.StatusResponse, error)
+	WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error)
 }
 
 // Client provides connection parameters for an etcd cluster
@@ -84,54 +86,6 @@ FlagLoop:
 	return true, nil
 }
 
-// GetStatus gets server status
-func (c Client) GetStatus() (*clientv3.StatusResponse, error) {
-	const dialTimeout = 5 * time.Second
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: dialTimeout,
-		TLS:         c.TLS,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer cli.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	resp, err := cli.Status(ctx, c.Endpoints[0])
-	cancel()
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-// WaitForStatus returns a StatusResponse after an initial delay and retry attempts
-func (c Client) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
-	fmt.Printf("[util/etcd] Waiting %v for initial delay\n", delay)
-	time.Sleep(delay)
-	for i := 0; i < retries; i++ {
-		if i > 0 {
-			fmt.Printf("[util/etcd] Waiting %v until next retry\n", retryInterval)
-			time.Sleep(retryInterval)
-		}
-		fmt.Printf("[util/etcd] Attempting to get etcd status %d/%d\n", i+1, retries)
-		resp, err := c.GetStatus()
-		if err != nil {
-			switch err {
-			case context.DeadlineExceeded:
-				fmt.Println("[util/etcd] Attempt timed out")
-			default:
-				fmt.Printf("[util/etcd] Attempt failed with error: %v\n", err)
-			}
-			continue
-		}
-		return resp, nil
-	}
-	return nil, fmt.Errorf("timeout waiting for etcd cluster status")
-}
-
 // New creates a new EtcdCluster client
 func New(endpoints []string, ca, cert, key string) (*Client, error) {
 	client := Client{Endpoints: endpoints}
@@ -169,26 +123,100 @@ func NewFromStaticPod(endpoints []string, manifestDir string, certificatesDir st
 	return New(endpoints, "", "", "")
 }
 
-// GetClusterStatus returns nil for status Up or error for status Down
-func (c Client) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
+// GetVersion returns the etcd version of the cluster.
+// An error is returned if the version of all endpoints do not match
+func (c Client) GetVersion() (string, error) {
+	var clusterVersion string
 
-	var resp []*clientv3.StatusResponse
-	for _, ep := range c.Endpoints {
-		cli, err := clientv3.New(clientv3.Config{
-			Endpoints:   []string{ep},
-			DialTimeout: 5 * time.Second,
-			TLS:         c.TLS,
-		})
-		if err != nil {
-			return nil, err
-		}
-		defer cli.Close()
-
-		r, err := cli.Status(context.Background(), ep)
-		if err != nil {
-			return nil, err
-		}
-		resp = append(resp, r)
+	versions, err := c.GetClusterVersions()
+	if err != nil {
+		return "", err
 	}
-	return resp, nil
+	for _, v := range versions {
+		if clusterVersion == "" {
+			// This is the first version we've seen
+			clusterVersion = v
+		} else if v != clusterVersion {
+			return "", fmt.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
+		} else {
+			clusterVersion = v
+		}
+	}
+	if clusterVersion == "" {
+		return "", fmt.Errorf("could not determine cluster etcd version")
+	}
+	return clusterVersion, nil
+}
+
+// GetClusterVersions returns a map of the endpoints and their associated versions
+func (c Client) GetClusterVersions() (map[string]string, error) {
+	versions := make(map[string]string)
+	statuses, err := c.GetClusterStatus()
+	if err != nil {
+		return versions, err
+	}
+
+	for ep, status := range statuses {
+		versions[ep] = status.Version
+	}
+	return versions, nil
+}
+
+// ClusterAvailable returns true if the cluster status indicates the cluster is available.
+func (c Client) ClusterAvailable() (bool, error) {
+	_, err := c.GetClusterStatus()
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// GetClusterStatus returns nil for status Up or error for status Down
+func (c Client) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: 5 * time.Second,
+		TLS:         c.TLS,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	clusterStatus := make(map[string]*clientv3.StatusResponse)
+	for _, ep := range c.Endpoints {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		resp, err := cli.Status(ctx, ep)
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		clusterStatus[ep] = resp
+	}
+	return clusterStatus, nil
+}
+
+// WaitForClusterAvailable returns true if all endpoints in the cluster are available after an initial delay and retry attempts, an error is returned otherwise
+func (c Client) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
+	fmt.Printf("[util/etcd] Waiting %v for initial delay\n", delay)
+	time.Sleep(delay)
+	for i := 0; i < retries; i++ {
+		if i > 0 {
+			fmt.Printf("[util/etcd] Waiting %v until next retry\n", retryInterval)
+			time.Sleep(retryInterval)
+		}
+		fmt.Printf("[util/etcd] Attempting to see if all cluster endpoints are available %d/%d\n", i+1, retries)
+		resp, err := c.ClusterAvailable()
+		if err != nil {
+			switch err {
+			case context.DeadlineExceeded:
+				fmt.Println("[util/etcd] Attempt timed out")
+			default:
+				fmt.Printf("[util/etcd] Attempt failed with error: %v\n", err)
+			}
+			continue
+		}
+		return resp, nil
+	}
+	return false, fmt.Errorf("timeout waiting for etcd cluster to be available")
 }

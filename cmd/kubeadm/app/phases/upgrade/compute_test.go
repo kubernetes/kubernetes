@@ -64,69 +64,42 @@ func (f *fakeVersionGetter) KubeletVersions() (map[string]uint16, error) {
 	}, nil
 }
 
-type fakeEtcdClient struct{ TLS bool }
+type fakeEtcdClient struct {
+	TLS                bool
+	mismatchedVersions bool
+}
 
 func (f fakeEtcdClient) HasTLS() bool { return f.TLS }
 
-func (f fakeEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
-	//	clusterStatus, err := f.GetClusterStatus()
-	//	return clusterStatus[0], err
-	return &clientv3.StatusResponse{
-		Version: "3.1.12",
+func (f fakeEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
+
+func (f fakeEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
+	return true, nil
+}
+
+func (f fakeEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+	return make(map[string]*clientv3.StatusResponse), nil
+}
+
+func (f fakeEtcdClient) GetVersion() (string, error) {
+	versions, _ := f.GetClusterVersions()
+	if f.mismatchedVersions {
+		return "", fmt.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
+	}
+	return "3.1.12", nil
+}
+
+func (f fakeEtcdClient) GetClusterVersions() (map[string]string, error) {
+	if f.mismatchedVersions {
+		return map[string]string{
+			"foo": "3.1.12",
+			"bar": "3.2.0",
+		}, nil
+	}
+	return map[string]string{
+		"foo": "3.1.12",
+		"bar": "3.1.12",
 	}, nil
-}
-
-func (f fakeEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
-	var responses []*clientv3.StatusResponse
-	responses = append(responses, &clientv3.StatusResponse{
-		Version: "3.1.12",
-	})
-	return responses, nil
-}
-
-func (f fakeEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
-	return f.GetStatus()
-}
-
-type mismatchEtcdClient struct{}
-
-func (f mismatchEtcdClient) HasTLS() bool { return true }
-
-func (f mismatchEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
-	clusterStatus, err := f.GetClusterStatus()
-	return clusterStatus[0], err
-}
-
-func (f mismatchEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
-	return []*clientv3.StatusResponse{
-		&clientv3.StatusResponse{
-			Version: "3.1.12",
-		},
-		&clientv3.StatusResponse{
-			Version: "3.2.0",
-		},
-	}, nil
-}
-
-func (f mismatchEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
-	return f.GetStatus()
-}
-
-type degradedEtcdClient struct{}
-
-func (f degradedEtcdClient) HasTLS() bool { return true }
-
-func (f degradedEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
-	return nil, fmt.Errorf("Degraded etcd cluster")
-}
-
-func (f degradedEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
-	var res []*clientv3.StatusResponse
-	return res, fmt.Errorf("Degraded etcd cluster")
-}
-
-func (f degradedEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
-	return f.GetStatus()
 }
 
 func TestGetAvailableUpgrades(t *testing.T) {
@@ -569,22 +542,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowRCs:          false,
 			allowExperimental: false,
-			etcdClient:        mismatchEtcdClient{},
-			expectedUpgrades:  []Upgrade{},
-			errExpected:       true,
-		},
-		{
-			name: "Upgrades with external etcd with a degraded status should not be allowed.",
-			vg: &fakeVersionGetter{
-				clusterVersion:     "v1.9.3",
-				kubeletVersion:     "v1.9.3",
-				kubeadmVersion:     "v1.9.3",
-				stablePatchVersion: "v1.9.3",
-				stableVersion:      "v1.9.3",
-			},
-			allowRCs:          false,
-			allowExperimental: false,
-			etcdClient:        degradedEtcdClient{},
+			etcdClient:        fakeEtcdClient{mismatchedVersions: true},
 			expectedUpgrades:  []Upgrade{},
 			errExpected:       true,
 		},
@@ -624,11 +582,15 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.etcdClient, featureGates)
+			fmt.Printf("actualErr: %v\n", actualErr)
+			fmt.Printf("actualErr != nil: %v\n", actualErr != nil)
+			fmt.Printf("errExpected: %v\n", rt.errExpected)
+			if (actualErr != nil) != rt.errExpected {
+				fmt.Printf("Hello error")
+				t.Errorf("failed TestGetAvailableUpgrades\n\texpected error: %t\n\tgot error: %t", rt.errExpected, (actualErr != nil))
+			}
 			if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)
-			}
-			if (actualErr != nil) != rt.errExpected {
-				t.Errorf("failed TestGetAvailableUpgrades\n\texpected error: %t\n\tgot error: %t", rt.errExpected, (actualErr != nil))
 			}
 		})
 	}
