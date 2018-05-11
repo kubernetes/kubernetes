@@ -17,15 +17,16 @@ limitations under the License.
 package uploadconfig
 
 import (
-	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
@@ -42,7 +43,7 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 	// Removes sensitive info from the data that will be stored in the config map
 	externalcfg.Token = ""
 
-	cfgYaml, err := yaml.Marshal(*externalcfg)
+	cfgYaml, err := util.MarshalToYamlForCodecs(externalcfg, kubeadmapiext.SchemeGroupVersion, scheme.Codecs)
 	if err != nil {
 		return err
 	}
