@@ -501,7 +501,6 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 			vsphereInstanceMap: vsphereInstanceMap,
 			nodeInfoMap:        make(map[string]*NodeInfo),
 			registeredNodes:    make(map[string]*v1.Node),
-			removedNodes:       make(map[string]*v1.Node),
 		},
 		isSecretInfoProvided: isSecretInfoProvided,
 		cfg:                  &cfg,
@@ -878,26 +877,12 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		vsi, err := vs.getVSphereInstance(nodeName)
-		if err == vclib.ErrNoVMFound {
-			// If node doesn't exist, discover the node to check if node is still in vcenter inventory
-			node, err := vs.nodeManager.GetRemovedNode(nodeName)
-			if err != nil {
-				return err
-			}
-			// If discovery failed, node isn't in vcenter inventory and disk is already detached from node.
-			if err := vs.nodeManager.DiscoverNode(&node); err != nil {
-				glog.Infof("Node %q does not exist in vcenter inventory, disk %s is already detached from node.", convertToString(nodeName), volPath)
+		if err != nil {
+			// If node doesn't exist, disk is already detached from node.
+			if err == vclib.ErrNoVMFound {
+				glog.Infof("Node %q does not exist, disk %s is already detached from node.", convertToString(nodeName), volPath)
 				return nil
 			}
-			glog.Infof("Node %q does not exist in nodemanager, register node temporarily to detach disk %s.", convertToString(nodeName), volPath)
-			// To detach disks properly, temporarily register node to nodemanager
-			vs.nodeManager.RegisterNode(&node)
-			defer vs.nodeManager.UnRegisterNode(&node)
-			vsi, err = vs.getVSphereInstance(nodeName)
-			if err != nil {
-				return err
-			}
-		} else if err != nil {
 			return err
 		}
 		// Ensure client is logged in and session is valid
