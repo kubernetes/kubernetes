@@ -207,6 +207,76 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	It("should increase cluster size if pending pods are small [Feature:ClusterSizeAutoscalingScaleUp]",
 		func() { simpleScaleUpTest(0) })
 
+	It("Should scale up GPU pool from 0 [Feature:ClusterSizeAutoscalingGpu]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		const gpuPoolName = "gpu-pool"
+		addGpuNodePool(gpuPoolName, "nvidia-tesla-k80", 1, 0)
+		defer deleteNodePool(gpuPoolName)
+
+		installNvidiaDriversDaemonSet()
+
+		By("Enable autoscaler")
+		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 1))
+		defer disableAutoscaler(gpuPoolName, 0, 1)
+		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(0))
+
+		By("Schedule a pod which requires GPU")
+		framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount+1 }, scaleUpTimeout))
+		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(1))
+	})
+
+	It("Should scale up GPU pool from 1 [Feature:ClusterSizeAutoscalingGpu]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		const gpuPoolName = "gpu-pool"
+		addGpuNodePool(gpuPoolName, "nvidia-tesla-k80", 1, 1)
+		defer deleteNodePool(gpuPoolName)
+
+		installNvidiaDriversDaemonSet()
+
+		By("Schedule a single pod which requires GPU")
+		framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+
+		By("Enable autoscaler")
+		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 2))
+		defer disableAutoscaler(gpuPoolName, 0, 2)
+		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(1))
+
+		framework.ScaleRC(f.ClientSet, f.ScalesGetter, f.Namespace.Name, "gpu-pod-rc", 2, false)
+
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount+2 }, scaleUpTimeout))
+		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(2))
+	})
+
+	It("Should scale down GPU pool from 1 [Feature:ClusterSizeAutoscalingGpu]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		const gpuPoolName = "gpu-pool"
+		addGpuNodePool(gpuPoolName, "nvidia-tesla-k80", 1, 1)
+		defer deleteNodePool(gpuPoolName)
+
+		installNvidiaDriversDaemonSet()
+
+		By("Schedule a single pod which requires GPU")
+		framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+
+		By("Enable autoscaler")
+		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 1))
+		defer disableAutoscaler(gpuPoolName, 0, 1)
+		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(1))
+
+		framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, "gpu-pod-rc")
+
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount }, scaleDownTimeout))
+		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(0))
+	})
+
 	It("should increase cluster size if pending pods are small and one node is broken [Feature:ClusterSizeAutoscalingScaleUp]",
 		func() {
 			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleUpTest(1) })
@@ -957,6 +1027,12 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 })
 
+func installNvidiaDriversDaemonSet() {
+	By("Add daemonset which installs nvidia drivers")
+	// the link differs from one in GKE documentation; discussed with @mindprince this one should be used
+	framework.RunKubectlOrDie("apply", "-f", "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml")
+}
+
 func execCmd(args ...string) *exec.Cmd {
 	glog.Infof("Executing: %s", strings.Join(args, " "))
 	return exec.Command(args[0], args[1:]...)
@@ -1300,6 +1376,16 @@ func addNodePool(name string, machineType string, numNodes int) {
 	framework.ExpectNoError(err, string(output))
 }
 
+func addGpuNodePool(name string, gpuType string, gpuCount int, numNodes int) {
+	args := []string{"beta", "container", "node-pools", "create", name, "--quiet",
+		"--accelerator", "type=" + gpuType + ",count=" + strconv.Itoa(gpuCount),
+		"--num-nodes=" + strconv.Itoa(numNodes),
+		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
+	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
+	glog.Infof("Creating node-pool %s: %s", name, output)
+	framework.ExpectNoError(err, string(output))
+}
+
 func deleteNodePool(name string) {
 	glog.Infof("Deleting node pool %s", name)
 	args := []string{"container", "node-pools", "delete", name, "--quiet",
@@ -1320,7 +1406,7 @@ func deleteNodePool(name string) {
 
 func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 	nodes := make([]*v1.Node, 0, 1)
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	nodeList := framework.GetReadyNodesIncludingTaintedOrDie(f.ClientSet)
 	for _, node := range nodeList.Items {
 		if node.Labels[gkeNodepoolNameKey] == poolName {
 			nodes = append(nodes, &node)
@@ -1622,6 +1708,26 @@ func makeNodeSchedulable(c clientset.Interface, node *v1.Node, failOnCriticalAdd
 		glog.Warningf("Got 409 conflict when trying to taint node, retries left: %v", 3-j)
 	}
 	return fmt.Errorf("Failed to remove taint from node in allowed number of retries")
+}
+
+func scheduleGpuPod(f *framework.Framework, id string) error {
+	config := &testutils.RCConfig{
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           id,
+		Namespace:      f.Namespace.Name,
+		Timeout:        3 * scaleUpTimeout, // spinning up GPU node is slow
+		Image:          imageutils.GetPauseImageName(),
+		Replicas:       1,
+		GpuLimit:       1,
+		Labels:         map[string]string{"requires-gpu": "yes"},
+	}
+
+	err := framework.RunRC(*config)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Create an RC running a given number of pods with anti-affinity
