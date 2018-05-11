@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
@@ -39,8 +38,7 @@ type NamePrinter struct {
 	// finalized "successful" message.
 	Operation string
 
-	Decoders []runtime.Decoder
-	Typer    runtime.ObjectTyper
+	Typer runtime.ObjectTyper
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
@@ -57,9 +55,6 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		items, err := meta.ExtractList(obj)
 		if err != nil {
 			return err
-		}
-		if errs := runtime.DecodeList(items, p.Decoders...); len(errs) > 0 {
-			return utilerrors.NewAggregate(errs)
 		}
 		for _, obj := range items {
 			if err := p.PrintObj(obj, w); err != nil {
