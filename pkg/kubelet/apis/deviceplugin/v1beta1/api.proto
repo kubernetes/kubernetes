@@ -37,8 +37,8 @@ message RegisterRequest {
 	string endpoint = 2;
 	// Schedulable resource name. As of now it's expected to be a DNS Label
 	string resource_name = 3;
-        // Options to be communicated with Device Manager
-        DevicePluginOptions options = 4;
+	// Options to be communicated with Device Manager
+	DevicePluginOptions options = 4;
 }
 
 message Empty {
@@ -47,7 +47,7 @@ message Empty {
 // DevicePlugin is the service advertised by Device Plugins
 service DevicePlugin {
 	// GetDevicePluginOptions returns options to be communicated with Device
-        // Manager
+	// Manager
 	rpc GetDevicePluginOptions(Empty) returns (DevicePluginOptions) {}
 
 	// ListAndWatch returns a stream of List of Devices
@@ -60,9 +60,9 @@ service DevicePlugin {
 	// of the steps to make the Device available in the container
 	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
 
-        // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
-        // before each container start. Device plugin can run device specific operations
-        // such as reseting the device before making devices available to the container
+	// PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+	// before each container start. Device plugin can run device specific operations
+	// such as reseting the device before making devices available to the container
 	rpc PreStartContainer(PreStartContainerRequest) returns (PreStartContainerResponse) {}
 }
 
@@ -92,7 +92,7 @@ message Device {
 // - PreStartContainer allows Device Plugin to run device specific operations on
 //   the Devices requested
 message PreStartContainerRequest {
-        repeated string devicesIDs = 1;
+	repeated string devicesIDs = 1;
 }
 
 // PreStartContainerResponse will be send by plugin in response to PreStartContainerRequest
