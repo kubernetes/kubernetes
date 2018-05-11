@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"text/template"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,6 +60,10 @@ func (p *GoTemplatePrinter) AllowMissingKeys(allow bool) {
 
 // PrintObj formats the obj with the Go Template.
 func (p *GoTemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	if internalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
+		return fmt.Errorf(internalObjectPrinterErr)
+	}
+
 	var data []byte
 	var err error
 	data, err = json.Marshal(obj)
