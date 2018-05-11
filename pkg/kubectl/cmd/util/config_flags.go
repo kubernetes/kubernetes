@@ -52,6 +52,8 @@ const (
 	flagHTTPCacheDir     = "cache-dir"
 )
 
+var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+
 // TODO(juanvallejo): move to pkg/kubectl/genericclioptions once
 // the dependency on cmdutil is broken here.
 // ConfigFlags composes the set of values necessary
@@ -176,8 +178,15 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	// double it just so we don't end up here again for a while.  This config is only used for discovery.
 	config.Burst = 100
 
-	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), config.Host)
-	return discovery.NewCachedDiscoveryClientForConfig(config, cacheDir, time.Duration(10*time.Minute))
+	// retrieve a user-provided value for the "cache-dir"
+	// defaulting to ~/.kube/http-cache if no user-value is given.
+	httpCacheDir := defaultCacheDir
+	if f.CacheDir != nil {
+		httpCacheDir = *f.CacheDir
+	}
+
+	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), config.Host)
+	return discovery.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
 
 // RESTMapper returns a mapper.
@@ -271,6 +280,7 @@ func NewConfigFlags() *ConfigFlags {
 		Timeout:    stringptr("0"),
 		KubeConfig: stringptr(""),
 
+		CacheDir:         stringptr(defaultCacheDir),
 		ClusterName:      stringptr(""),
 		AuthInfoName:     stringptr(""),
 		Context:          stringptr(""),

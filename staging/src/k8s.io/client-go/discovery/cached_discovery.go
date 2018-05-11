@@ -239,10 +239,18 @@ func (d *CachedDiscoveryClient) Invalidate() {
 }
 
 // NewCachedDiscoveryClientForConfig creates a new DiscoveryClient for the given config, and wraps
-// the created client in a CachedDiscoveryClient. The provided configuration is upddated with a
+// the created client in a CachedDiscoveryClient. The provided configuration is updated with a
 // custom transport that understands cache responses.
-func NewCachedDiscoveryClientForConfig(config *restclient.Config, cacheDirectory string, ttl time.Duration) (*CachedDiscoveryClient, error) {
-	if len(cacheDirectory) > 0 {
+// We receive two distinct cache directories for now, in order to preserve old behavior
+// which makes use of the --cache-dir flag value for storing cache data from the CacheRoundTripper,
+// and makes use of the hardcoded destination (~/.kube/cache/discovery/...) for storing
+// CachedDiscoveryClient cache data. If httpCacheDir is empty, the restconfig's transport will not
+// be updated with a roundtripper that understands cache responses.
+// If discoveryCacheDir is empty, cached server resource data will be looked up in the current directory.
+// TODO(juanvallejo): the value of "--cache-dir" should be honored. Consolidate discoveryCacheDir with httpCacheDir
+// so that server resources and http-cache data are stored in the same location, provided via config flags.
+func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCacheDir, httpCacheDir string, ttl time.Duration) (*CachedDiscoveryClient, error) {
+	if len(httpCacheDir) > 0 {
 		// update the given restconfig with a custom roundtripper that
 		// understands how to handle cache responses.
 		wt := config.WrapTransport
@@ -250,7 +258,7 @@ func NewCachedDiscoveryClientForConfig(config *restclient.Config, cacheDirectory
 			if wt != nil {
 				rt = wt(rt)
 			}
-			return newCacheRoundTripper(cacheDirectory, rt)
+			return newCacheRoundTripper(httpCacheDir, rt)
 		}
 	}
 
@@ -259,7 +267,7 @@ func NewCachedDiscoveryClientForConfig(config *restclient.Config, cacheDirectory
 		return nil, err
 	}
 
-	return newCachedDiscoveryClient(discoveryClient, cacheDirectory, ttl), nil
+	return newCachedDiscoveryClient(discoveryClient, discoveryCacheDir, ttl), nil
 }
 
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
