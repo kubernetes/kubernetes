@@ -50,6 +50,11 @@ func (u *Upgrade) CanUpgradeKubelets() bool {
 	return !sameVersionFound
 }
 
+// CanUpgradeEtcd returns whether an upgrade of etcd is possible
+func (u *Upgrade) CanUpgradeEtcd() bool {
+	return u.Before.EtcdVersion != u.After.EtcdVersion
+}
+
 // ActiveDNSAddon returns the version of CoreDNS or kube-dns
 func ActiveDNSAddon(featureGates map[string]bool) string {
 	if features.Enabled(featureGates, features.CoreDNS) {
@@ -83,13 +88,13 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	// Get the cluster version
 	clusterVersionStr, clusterVersion, err := versionGetterImpl.ClusterVersion()
 	if err != nil {
-		return nil, err
+		return upgrades, err
 	}
 
 	// Get current kubeadm CLI version
 	kubeadmVersionStr, kubeadmVersion, err := versionGetterImpl.KubeadmVersion()
 	if err != nil {
-		return nil, err
+		return upgrades, err
 	}
 
 	// Get and output the current latest stable version
@@ -103,13 +108,13 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	// Get the kubelet versions in the cluster
 	kubeletVersions, err := versionGetterImpl.KubeletVersions()
 	if err != nil {
-		return nil, err
+		return upgrades, err
 	}
 
 	// Get current etcd version
-	etcdStatus, err := etcdClient.GetStatus()
+	etcdVersion, err := etcdClient.GetVersion()
 	if err != nil {
-		return nil, err
+		return upgrades, err
 	}
 
 	// Construct a descriptor for the current state of the world
@@ -118,7 +123,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		DNSVersion:      dns.GetDNSVersion(clusterVersion, ActiveDNSAddon(featureGates)),
 		KubeadmVersion:  kubeadmVersionStr,
 		KubeletVersions: kubeletVersions,
-		EtcdVersion:     etcdStatus.Version,
+		EtcdVersion:     etcdVersion,
 	}
 
 	// Do a "dumb guess" that a new minor upgrade is available just because the latest stable version is higher than the cluster version
@@ -201,7 +206,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		// Get and output the current latest unstable version
 		latestVersionStr, latestVersion, err := versionGetterImpl.VersionFromCILabel("latest", "experimental version")
 		if err != nil {
-			return nil, err
+			return upgrades, err
 		}
 
 		minorUnstable := latestVersion.Components()[1]
@@ -209,7 +214,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		previousBranch := fmt.Sprintf("latest-1.%d", minorUnstable-1)
 		previousBranchLatestVersionStr, previousBranchLatestVersion, err := versionGetterImpl.VersionFromCILabel(previousBranch, "")
 		if err != nil {
-			return nil, err
+			return upgrades, err
 		}
 
 		// If that previous latest version is an RC, RCs are allowed and the cluster version is lower than the RC version, show the upgrade
