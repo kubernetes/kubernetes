@@ -129,23 +129,6 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.Po
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
 	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
 
-	sysctls, err := helper.SysctlsFromPodAnnotation(annotations[core.SysctlsPodAnnotationKey])
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(core.SysctlsPodAnnotationKey), annotations[core.SysctlsPodAnnotationKey], err.Error()))
-	} else {
-		allErrs = append(allErrs, validateSysctls(sysctls, fldPath.Key(core.SysctlsPodAnnotationKey))...)
-	}
-	unsafeSysctls, err := helper.SysctlsFromPodAnnotation(annotations[core.UnsafeSysctlsPodAnnotationKey])
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(core.UnsafeSysctlsPodAnnotationKey), annotations[core.UnsafeSysctlsPodAnnotationKey], err.Error()))
-	} else {
-		allErrs = append(allErrs, validateSysctls(unsafeSysctls, fldPath.Key(core.UnsafeSysctlsPodAnnotationKey))...)
-	}
-	inBoth := sysctlIntersection(sysctls, unsafeSysctls)
-	if len(inBoth) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(core.UnsafeSysctlsPodAnnotationKey), strings.Join(inBoth, ", "), "can not be safe and unsafe"))
-	}
-
 	return allErrs
 }
 
@@ -3332,6 +3315,10 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("shareProcessNamespace"), *securityContext.ShareProcessNamespace, "ShareProcessNamespace and HostPID cannot both be enabled"))
 			}
 		}
+
+		if securityContext.Sysctls != nil {
+			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
+		}
 	}
 
 	return allErrs
@@ -5116,20 +5103,6 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 		}
 	}
 	return allErrs
-}
-
-func sysctlIntersection(a []core.Sysctl, b []core.Sysctl) []string {
-	lookup := make(map[string]struct{}, len(a))
-	result := []string{}
-	for i := range a {
-		lookup[a[i].Name] = struct{}{}
-	}
-	for i := range b {
-		if _, found := lookup[b[i].Name]; found {
-			result = append(result, b[i].Name)
-		}
-	}
-	return result
 }
 
 // validateVolumeNodeAffinity tests that the PersistentVolume.NodeAffinity has valid data

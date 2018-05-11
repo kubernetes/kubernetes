@@ -22,13 +22,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-const (
-	// SysctlsPodSecurityPolicyAnnotationKey represents the key of a whitelist of
-	// allowed safe and unsafe sysctls in a pod spec. It's a comma-separated list of plain sysctl
-	// names or sysctl patterns (which end in *). The string "*" matches all sysctls.
-	SysctlsPodSecurityPolicyAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
-)
-
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 type PodDisruptionBudgetSpec struct {
 	// An eviction is allowed if at least "minAvailable" pods selected by
@@ -215,6 +208,12 @@ type PodSecurityPolicySpec struct {
 	// is allowed in the "Volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume
+	// AllowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none, * means all
+	// +optional
+	AllowedUnsafeSysctls []string
+	// ForbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none, * means all
+	// +optional
+	ForbiddenSysctls []string
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
