@@ -342,16 +342,6 @@ function do-single-node-upgrade() {
     sleep 1
   done
 
-  # Uncordon the node.
-  echo "== Uncordon ${instance}. == " >&2
-  local uncordon_rc
-  "${KUBE_ROOT}/cluster/kubectl.sh" uncordon "${instance}" \
-    && uncordon_rc=$? || uncordon_rc=$?
-  if [[ "${uncordon_rc}" != 0 ]]; then
-    echo "== FAILED to uncordon ${instance} =="
-    return ${uncordon_rc}
-  fi
-  
   # Wait for the node to have Ready=True.
   echo "== Waiting for ${instance} to become ready. ==" >&2
   while true; do
@@ -364,6 +354,16 @@ function do-single-node-upgrade() {
     fi
     sleep 1
   done
+
+  # Uncordon the node.
+  echo "== Uncordon ${instance}. == " >&2
+  local uncordon_rc
+  "${KUBE_ROOT}/cluster/kubectl.sh" uncordon "${instance}" \
+    && uncordon_rc=$? || uncordon_rc=$?
+  if [[ "${uncordon_rc}" != 0 ]]; then
+    echo "== FAILED to uncordon ${instance} =="
+    return ${uncordon_rc}
+  fi
 }
 
 # Prereqs:
