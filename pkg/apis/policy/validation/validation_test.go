@@ -323,8 +323,19 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + ",not-good",
 	}
 
-	invalidSysctlPattern := validPSP()
-	invalidSysctlPattern.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
+	invalidAllowedUnsafeSysctlPattern := validPSP()
+	invalidAllowedUnsafeSysctlPattern.Spec.AllowedUnsafeSysctls = []string{"a.*.b"}
+
+	invalidForbiddenSysctlPattern := validPSP()
+	invalidForbiddenSysctlPattern.Spec.ForbiddenSysctls = []string{"a.*.b"}
+
+	invalidOverlappingSysctls := validPSP()
+	invalidOverlappingSysctls.Spec.ForbiddenSysctls = []string{"kernel.*", "net.ipv4.ip_local_port_range"}
+	invalidOverlappingSysctls.Spec.AllowedUnsafeSysctls = []string{"kernel.shmmax", "net.ipv4.ip_local_port_range"}
+
+	invalidDuplicatedSysctls := validPSP()
+	invalidDuplicatedSysctls.Spec.ForbiddenSysctls = []string{"net.ipv4.ip_local_port_range"}
+	invalidDuplicatedSysctls.Spec.AllowedUnsafeSysctls = []string{"net.ipv4.ip_local_port_range"}
 
 	invalidSeccompDefault := validPSP()
 	invalidSeccompDefault.Annotations = map[string]string{
@@ -456,10 +467,25 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "invalid AppArmor profile name: \"not-good\"",
 		},
-		"invalid sysctl pattern": {
-			psp:         invalidSysctlPattern,
+		"invalid allowed unsafe sysctl pattern": {
+			psp:         invalidAllowedUnsafeSysctlPattern,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+		},
+		"invalid forbidden sysctl pattern": {
+			psp:         invalidForbiddenSysctlPattern,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+		},
+		"invalid overlapping sysctl pattern": {
+			psp:         invalidOverlappingSysctls,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("sysctl overlaps with %s", invalidOverlappingSysctls.Spec.ForbiddenSysctls[0]),
+		},
+		"invalid duplicated sysctls": {
+			psp:         invalidDuplicatedSysctls,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("sysctl overlaps with %s", invalidDuplicatedSysctls.Spec.AllowedUnsafeSysctls[0]),
 		},
 		"invalid seccomp default profile": {
 			psp:         invalidSeccompDefault,
@@ -561,8 +587,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
 	}
 
-	withSysctl := validPSP()
-	withSysctl.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "net.*"
+	withForbiddenSysctl := validPSP()
+	withForbiddenSysctl.Spec.ForbiddenSysctls = []string{"net.*"}
+
+	withAllowedUnsafeSysctl := validPSP()
+	withAllowedUnsafeSysctl.Spec.AllowedUnsafeSysctls = []string{"net.ipv4.tcp_max_syn_backlog"}
 
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
@@ -607,8 +636,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"valid AppArmor annotations": {
 			psp: validAppArmor,
 		},
-		"with network sysctls": {
-			psp: withSysctl,
+		"with network sysctls forbidden": {
+			psp: withForbiddenSysctl,
+		},
+		"with unsafe net.ipv4.tcp_max_syn_backlog sysctl allowed": {
+			psp: withAllowedUnsafeSysctl,
 		},
 		"valid seccomp annotations": {
 			psp: validSeccomp,

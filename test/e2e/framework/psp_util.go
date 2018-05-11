@@ -71,6 +71,7 @@ func PrivilegedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
 				Rule: extensionsv1beta1.FSGroupStrategyRunAsAny,
 			},
 			ReadOnlyRootFilesystem: false,
+			AllowedUnsafeSysctls:   []string{"*"},
 		},
 	}
 }

@@ -582,53 +582,6 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 	}
 }
 
-func TestSysctlsFromPodAnnotation(t *testing.T) {
-	type Test struct {
-		annotation  string
-		expectValue []v1.Sysctl
-		expectErr   bool
-	}
-	for i, test := range []Test{
-		{
-			annotation:  "",
-			expectValue: nil,
-		},
-		{
-			annotation: "foo.bar",
-			expectErr:  true,
-		},
-		{
-			annotation: "=123",
-			expectErr:  true,
-		},
-		{
-			annotation:  "foo.bar=",
-			expectValue: []v1.Sysctl{{Name: "foo.bar", Value: ""}},
-		},
-		{
-			annotation:  "foo.bar=42",
-			expectValue: []v1.Sysctl{{Name: "foo.bar", Value: "42"}},
-		},
-		{
-			annotation: "foo.bar=42,",
-			expectErr:  true,
-		},
-		{
-			annotation:  "foo.bar=42,abc.def=1",
-			expectValue: []v1.Sysctl{{Name: "foo.bar", Value: "42"}, {Name: "abc.def", Value: "1"}},
-		},
-	} {
-		sysctls, err := SysctlsFromPodAnnotation(test.annotation)
-		if test.expectErr && err == nil {
-			t.Errorf("[%v]expected error but got none", i)
-		} else if !test.expectErr && err != nil {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		} else if !reflect.DeepEqual(sysctls, test.expectValue) {
-			t.Errorf("[%v]expect value %v but got %v", i, test.expectValue, sysctls)
-		}
-	}
-}
-
 func TestMatchNodeSelectorTerms(t *testing.T) {
 	type args struct {
 		nodeSelectorTerms []v1.NodeSelectorTerm
