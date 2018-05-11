@@ -40,7 +40,8 @@ func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageNa
 	zero := int64(0)
 	return &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: rsName,
+			Name:   rsName,
+			Labels: rsPodLabels,
 		},
 		Spec: apps.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{
