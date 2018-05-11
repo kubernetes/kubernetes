@@ -145,6 +145,10 @@ func (h *Handle) LinkSetFlood(link Link, mode bool) error {
 	return ErrNotImplemented
 }
 
+func (h *Handle) LinkSetTxQLen(link Link, qlen int) error {
+	return ErrNotImplemented
+}
+
 func (h *Handle) setProtinfoAttr(link Link, mode bool, attr int) error {
 	return ErrNotImplemented
 }
