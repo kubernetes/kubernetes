@@ -501,6 +501,7 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 			vsphereInstanceMap: vsphereInstanceMap,
 			nodeInfoMap:        make(map[string]*NodeInfo),
 			registeredNodes:    make(map[string]*v1.Node),
+			attachedDisks:      make(map[string]map[string]bool),
 		},
 		isSecretInfoProvided: isSecretInfoProvided,
 		cfg:                  &cfg,
@@ -850,6 +851,9 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 			}
 		}
 	}
+	if err == nil {
+		vs.nodeManager.RegisterAttachedDisk(nodeName, vmDiskPath)
+	}
 	glog.V(4).Infof("AttachDisk executed for node %s and volume %s with diskUUID %s. Err: %s", convertToString(nodeName), vmDiskPath, diskUUID, err)
 	vclib.RecordvSphereMetric(vclib.OperationAttachVolume, requestTime, err)
 	return diskUUID, err
@@ -918,6 +922,9 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 				err = detachDiskInternal(volPath, nodeName)
 			}
 		}
+	}
+	if err == nil {
+		vs.nodeManager.UnRegisterAttachedDisk(nodeName, volPath)
 	}
 	vclib.RecordvSphereMetric(vclib.OperationDetachVolume, requestTime, err)
 	return err
@@ -1065,10 +1072,18 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 		}
 
 		// Convert VolPaths into canonical form so that it can be compared with the VM device path.
-		vmVolumes, err := vs.convertVolPathsToDevicePaths(ctx, nodeVolumes)
-		if err != nil {
-			glog.Errorf("Failed to convert volPaths to devicePaths: %+v. err: %+v", nodeVolumes, err)
-			return nil, err
+		// If there're VMs not registered in nodemanager, they are ignored
+		vmVolumes := make(map[k8stypes.NodeName][]string)
+		for nodeName, volPaths := range nodeVolumes {
+			devicePaths, err := vs.convertVolPathsToDevicePaths(ctx, nodeName, volPaths)
+			if err == vclib.ErrNoVMFound {
+				glog.Errorf("Node %q does not exist, disks are already detached from node: %+v", nodeName, volPaths)
+				continue
+			} else if err != nil {
+				glog.Errorf("Failed to convert volPaths to devicePaths: %+v. err: %+v", nodeVolumes, err)
+				return nil, err
+			}
+			vmVolumes[nodeName] = devicePaths
 		}
 		attached := make(map[string]map[string]bool)
 		nodesToRetry, err := disksAreAttach(ctx, vmVolumes, attached, false)
@@ -1103,6 +1118,11 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 
 			for nodeName, volPaths := range attached {
 				disksAttached[convertToK8sType(nodeName)] = volPaths
+			}
+		}
+		for nodeName, volPaths := range attached {
+			for volPath := range volPaths {
+				vs.nodeManager.RegisterAttachedDisk(convertToK8sType(nodeName), volPath)
 			}
 		}
 		glog.V(4).Infof("DisksAreAttach successfully executed. result: %+v", attached)
@@ -1285,6 +1305,14 @@ func (vs *VSphere) NodeDeleted(obj interface{}) {
 	}
 
 	glog.V(4).Infof("Node deleted: %+v", node)
+	disks, err := vs.nodeManager.GetAttachedDisks(convertToK8sType(node.ObjectMeta.Name))
+	if err == nil {
+		for _, disk := range disks {
+			if err := vs.DetachDisk(disk, convertToK8sType(node.ObjectMeta.Name)); err != nil {
+				glog.Errorf("Error %q while detaching disk %q from node %q", err, disk, convertToK8sType(node.ObjectMeta.Name))
+			}
+		}
+	}
 	vs.nodeManager.UnRegisterNode(node)
 }
 
