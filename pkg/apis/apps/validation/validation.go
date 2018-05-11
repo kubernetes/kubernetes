@@ -194,7 +194,7 @@ func ValidateStatefulSetStatusUpdate(statefulSet, oldStatefulSet *apps.StatefulS
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateStatefulSetStatus(&statefulSet.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))...)
-	// TODO: Validate status.
+
 	if apivalidation.IsDecremented(statefulSet.Status.CollisionCount, oldStatefulSet.Status.CollisionCount) {
 		value := int32(0)
 		if statefulSet.Status.CollisionCount != nil {
