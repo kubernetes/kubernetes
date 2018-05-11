@@ -38,7 +38,7 @@ func TestCreatePriorityClass(t *testing.T) {
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Group: "scheduling.k8s.io", Version: "v1alpha1"},
+		GroupVersion:         schema.GroupVersion{Group: "scheduling.k8s.io", Version: "v1beta1"},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
