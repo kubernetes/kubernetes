@@ -251,7 +251,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					{
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", namespace),
 						"create",
 						201,
 						auditTestUser,
@@ -263,7 +263,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments/audit-deployment", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
 						"get",
 						200,
 						auditTestUser,
@@ -275,7 +275,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", namespace),
 						"list",
 						200,
 						auditTestUser,
@@ -287,7 +287,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseStarted,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 						"watch",
 						200,
 						auditTestUser,
@@ -299,7 +299,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 						"watch",
 						200,
 						auditTestUser,
@@ -311,7 +311,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments/audit-deployment", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
 						"update",
 						200,
 						auditTestUser,
@@ -323,7 +323,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments/audit-deployment", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
 						"patch",
 						200,
 						auditTestUser,
@@ -335,7 +335,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments/audit-deployment", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
 						"delete",
 						200,
 						auditTestUser,
