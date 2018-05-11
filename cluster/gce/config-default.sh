@@ -235,8 +235,10 @@ ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
 #   new subnetwork will be created for the cluster.
 ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
 if [ ${ENABLE_IP_ALIASES} = true ]; then
-  # Size of ranges allocated to each node. Currently supports only /32 and /24.
-  IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
+  # Number of Pods that can run on this node.
+  MAX_PODS_PER_NODE=${MAX_PODS_PER_NODE:-110}
+  # Size of ranges allocated to each node.
+  IP_ALIAS_SIZE="/$(get-alias-range-size ${MAX_PODS_PER_NODE})"
   IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
   # If we're using custom network, use the subnet we already create for it as the one for ip-alias.
   # Note that this means SUBNETWORK would override KUBE_GCE_IP_ALIAS_SUBNETWORK in case of custom network.
@@ -247,6 +249,10 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   SERVICE_CLUSTER_IP_SUBNETWORK=${KUBE_GCE_SERVICE_CLUSTER_IP_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-services}
   # Add to the provider custom variables.
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
+elif [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
+  # Should not have MAX_PODS_PER_NODE set for route-based clusters.
+  echo -e "${color_red}Cannot set MAX_PODS_PER_NODE for route-based projects for ${PROJECT}." >&2
+  exit 1
 fi
 
 # Enable GCE Alpha features.
