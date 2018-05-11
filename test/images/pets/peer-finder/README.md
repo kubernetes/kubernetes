@@ -6,7 +6,7 @@ All it does is watch DNS for changes in the set of endpoints that are part of th
 of the PetSet.  It periodically looks up the SRV record of the DNS entry that corresponds to a Kubernetes
 Service which enumerates the set of peers for this  the specified service.
 
-Be sure to use the `service.alpha.kubernetes.io/tolerate-unready-endpoints` on the governing service
+Be sure to use the `publishNotReadyAddresses` field on the governing service
 of the StatefulSet so that all peers are listed in endpoints before any peers are started.
 
 There are several ways to bundle it with your main application.
