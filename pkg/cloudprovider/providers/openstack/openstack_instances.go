@@ -40,6 +40,7 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 
 	compute, err := os.NewComputeV2()
 	if err != nil {
+		glog.Errorf("unable to access compute v2 API : %v", err)
 		return nil, false
 	}
 
