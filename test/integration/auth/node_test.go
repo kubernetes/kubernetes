@@ -419,8 +419,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, createNode2MirrorPodEviction(node2Client))
 	expectAllowed(t, createNode2(node2Client))
 	expectAllowed(t, updateNode2Status(node2Client))
-	// cleanup node
-	expectAllowed(t, deleteNode2(superuserClient))
+	expectAllowed(t, deleteNode2(node2Client))
 
 	// create a pod as an admin to add object references
 	expectAllowed(t, createNode2NormalPod(superuserClient))
@@ -510,10 +509,8 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, unsetNode2ConfigSource(superuserClient))
 	// node2 can no longer get the configmap after it is unassigned as its config source
 	expectForbidden(t, getConfigMapConfigSource(node2Client))
-	// node should not be able to delete itself
-	expectForbidden(t, deleteNode2(node2Client))
 	// clean up node2
-	expectAllowed(t, deleteNode2(superuserClient))
+	expectAllowed(t, deleteNode2(node2Client))
 
 	//TODO(mikedanese): integration test node restriction of TokenRequest
 }
