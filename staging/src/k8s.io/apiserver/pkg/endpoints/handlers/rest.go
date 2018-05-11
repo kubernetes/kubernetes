@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/golang/glog"
@@ -317,4 +318,8 @@ func parseTimeout(str string) time.Duration {
 		glog.Errorf("Failed to parse %q: %v", str, err)
 	}
 	return 30 * time.Second
+}
+
+func isDryRun(url *url.URL) bool {
+	return len(url.Query()["dryRun"]) != 0
 }

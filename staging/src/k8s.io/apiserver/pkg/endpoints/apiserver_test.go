@@ -875,6 +875,71 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 	}
 }
 
+type OnlyGetRESTStorage struct {
+	UnimplementedRESTStorage
+}
+
+func (OnlyGetRESTStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+	return nil, nil
+}
+
+func (OnlyGetRESTStorage) NewList() runtime.Object {
+	return &genericapitesting.SimpleList{}
+}
+
+func (OnlyGetRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	return nil, nil
+}
+
+// TestSomeUnimplementedRESTStorage ensures that if a rest.Storage does
+// not implement a given method, that it is literally not registered
+// with the server. We need to have at least one verb supported inorder
+// to get a MethodNotAllowed rather than NotFound error.
+func TestSomeUnimplementedRESTStorage(t *testing.T) {
+	type T struct {
+		Method  string
+		Path    string
+		ErrCode int
+	}
+
+	cases := map[string]T{
+		"groupless POST list":         {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"groupless PUT object":        {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"groupless DELETE object":     {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"groupless DELETE collection": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"POST list":                   {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"PUT object":                  {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"DELETE object":               {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"DELETE collection":           {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+	}
+	handler := handle(map[string]rest.Storage{
+		"foo": OnlyGetRESTStorage{},
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+	for k, v := range cases {
+		request, err := http.NewRequest(v.Method, server.URL+v.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		defer response.Body.Close()
+		data, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if response.StatusCode != v.ErrCode {
+			t.Errorf("%s: expected %d for %s, Got %s", k, v.ErrCode, v.Method, string(data))
+			continue
+		}
+	}
+}
+
 func TestList(t *testing.T) {
 	testCases := []struct {
 		url       string
@@ -3767,6 +3832,92 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	}
 }
 
+// runRequest is used by TestDryRun since it runs the test twice in a
+// row with a slightly different URL (one has ?dryRun, one doesn't).
+func runRequest(t *testing.T, path, verb string, data []byte, contentType string) *http.Response {
+	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if contentType != "" {
+		request.Header.Set("Content-Type", contentType)
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	return response
+}
+
+// encodeOrFatal is used by TestDryRun to parse an object and stop right
+// away if it fails.
+func encodeOrFatal(t *testing.T, obj runtime.Object) []byte {
+	data, err := runtime.Encode(testCodec, obj)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	return data
+}
+
+type SimpleRESTStorageWithDeleteCollection struct {
+	SimpleRESTStorage
+}
+
+// Delete collection doesn't do much, but let us test this path.
+func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+	storage.checkContext(ctx)
+	return nil, nil
+}
+
+func TestDryRun(t *testing.T) {
+	tests := []struct {
+		path        string
+		verb        string
+		data        []byte
+		contentType string
+	}{
+		{path: "/namespaces/default/simples", verb: "POST", data: encodeOrFatal(t, &genericapitesting.Simple{Other: "bar"})},
+		{path: "/namespaces/default/simples/id", verb: "PUT", data: encodeOrFatal(t, &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "id"}, Other: "bar"})},
+		{path: "/namespaces/default/simples/id", verb: "PATCH", data: []byte(`{"labels":{"foo":"bar"}}`), contentType: "application/merge-patch+json; charset=UTF-8"},
+		{path: "/namespaces/default/simples/id", verb: "DELETE"},
+		{path: "/namespaces/default/simples", verb: "DELETE"},
+		{path: "/namespaces/default/simples/id/subsimple", verb: "DELETE"},
+	}
+
+	server := httptest.NewServer(handle(map[string]rest.Storage{
+		"simples": &SimpleRESTStorageWithDeleteCollection{
+			SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "id",
+						Namespace: "",
+						UID:       "uid",
+					},
+					Other: "bar",
+				},
+			},
+		},
+		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
+			item: genericapitesting.SimpleXGSubresource{
+				SubresourceInfo: "foo",
+			},
+			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}))
+	defer server.Close()
+	for _, test := range tests {
+		baseUrl := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		response := runRequest(t, baseUrl+test.path, test.verb, test.data, test.contentType)
+		if response.StatusCode == http.StatusBadRequest {
+			t.Fatalf("unexpected BadRequest: %#v", response)
+		}
+		response = runRequest(t, baseUrl+test.path+"?dryRun", test.verb, test.data, test.contentType)
+		if response.StatusCode != http.StatusBadRequest {
+			t.Fatalf("unexpected non BadRequest: %#v", response)
+		}
+	}
+}
+
 type SimpleXGSubresourceRESTStorage struct {
 	item    genericapitesting.SimpleXGSubresource
 	itemGVK schema.GroupVersionKind
@@ -3780,6 +3931,10 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	return storage.item.DeepCopyObject(), nil
+}
+
+func (storage *SimpleXGSubresourceRESTStorage) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	return nil, true, nil
 }
 
 func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
