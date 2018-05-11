@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // statusError is an object that can be converted into an metav1.Status
@@ -63,6 +64,93 @@ func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv runtime
 }
 
 var fakeCodec = runtime.NewCodec(runtime.NoopEncoder{}, runtime.NoopDecoder{})
+
+var simpleTestEndpointRestrictions = testEndpointRestrictions{}
+
+type testEndpointRestrictions struct{}
+
+func (testEndpointRestrictions) AllowsConversion(schema.GroupVersionKind) bool { return true }
+func (testEndpointRestrictions) AllowsServerVersion(string) bool               { return true }
+func (testEndpointRestrictions) AllowsStreamSchema(s string) bool              { return true }
+
+func TestNegotiateOutputMediaType(t *testing.T) {
+	testCases := []struct {
+		accept      string
+		req         *http.Request
+		ns          *fakeNegotiater
+		serializer  runtime.Serializer
+		contentType string
+		convert     schema.GroupVersionKind
+		params      map[string]string
+		errFn       func(error) bool
+	}{
+		{
+			req: &http.Request{
+				Header: http.Header{
+					"Accept": []string{"text/plain;as=Test;v=v12;g=meta.k8s.io, application/json"},
+				},
+			},
+			contentType: "text/plain",
+			convert:     schema.GroupVersionKind{Group: "meta.k8s.io", Kind: "Test", Version: "v12"},
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json", "text/plain"}},
+			serializer:  fakeCodec,
+		},
+		{
+			req: &http.Request{
+				Header: http.Header{
+					"Accept": []string{"application/json;as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io, application/json"},
+				},
+			},
+			contentType: "application/json",
+			convert:     schema.GroupVersionKind{Group: "meta.k8s.io", Kind: "PartialObjectMetadataList", Version: "v1alpha1"},
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json", "text/plain"}},
+			serializer:  fakeCodec,
+		},
+		{
+			req: &http.Request{
+				Header: http.Header{
+					"Accept": []string{"application/json;as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io"},
+				},
+			},
+			contentType: "application/json",
+			convert:     schema.GroupVersionKind{Group: "meta.k8s.io", Kind: "PartialObjectMetadataList", Version: "v1alpha1"},
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json;as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io", "application/json"}},
+			serializer:  fakeCodec,
+		},
+		{
+			req: &http.Request{
+				Header: http.Header{
+					"Accept": []string{"application/json"},
+				},
+			},
+			contentType: "application/json",
+			convert:     schema.GroupVersionKind{},
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json;as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io", "application/json"}},
+			serializer:  fakeCodec,
+		},
+	}
+
+	for i, test := range testCases {
+		req := test.req
+		if req == nil {
+			req = &http.Request{Header: http.Header{}}
+			req.Header.Set("Accept", test.accept)
+		}
+		m, s, err := NegotiateOutputMediaType(req, test.ns, simpleTestEndpointRestrictions)
+		if err != nil {
+			t.Errorf("%d: failed: %v", i, err)
+			continue
+		}
+
+		if test.contentType != s.MediaType {
+			t.Errorf("%d: expected %s got %s", i, test.contentType, s.MediaType)
+		}
+
+		if m.Convert != nil && test.convert != *m.Convert {
+			t.Errorf("%d: expected %v got %v", i, test.convert, *m.Convert)
+		}
+	}
+}
 
 func TestNegotiate(t *testing.T) {
 	testCases := []struct {
