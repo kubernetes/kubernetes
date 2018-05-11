@@ -582,23 +582,39 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 	receiveStdout := make(chan error)
 	if outputStream != nil || errorStream != nil {
 		go func() {
+			defer close(receiveStdout)
 			receiveStdout <- d.redirectResponseToOutputStream(tty, outputStream, errorStream, resp.Reader)
 		}()
 	}
 
-	stdinDone := make(chan struct{})
+	stdinDone := make(chan error)
 	go func() {
+		defer close(stdinDone)
 		if inputStream != nil {
-			io.Copy(resp.Conn, inputStream)
+			_, err := io.Copy(resp.Conn, inputStream)
+			if err != nil {
+				stdinDone <- err
+				return
+			}
 		}
-		resp.CloseWrite()
-		close(stdinDone)
+		err := resp.CloseWrite()
+		if err != nil {
+			stdinDone <- err
+		}
 	}()
 
 	select {
 	case err := <-receiveStdout:
-		return err
-	case <-stdinDone:
+		if err != nil {
+			return err
+		}
+		if inputStream != nil {
+			return <-stdinDone
+		}
+	case err := <-stdinDone:
+		if err != nil {
+			return err
+		}
 		if outputStream != nil || errorStream != nil {
 			return <-receiveStdout
 		}
