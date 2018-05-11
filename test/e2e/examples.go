@@ -84,7 +84,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Redis", func() {
 		It("should create and stop redis servers", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/redis", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/storage/redis", file)
 			}
 			bootstrapYaml := mkpath("redis-master.yaml")
 			sentinelServiceYaml := mkpath("redis-sentinel-service.yaml")
@@ -162,7 +162,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Spark", func() {
 		It("should start spark master, driver and workers", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/spark", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/spark", file)
 			}
 
 			// TODO: Add Zepplin and Web UI to this example.
@@ -226,10 +226,10 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Cassandra", func() {
 		It("should create and scale cassandra", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/statefulset/cassandra", file)
 			}
-			serviceYaml := mkpath("cassandra-service.yaml")
-			controllerYaml := mkpath("cassandra-controller.yaml")
+			serviceYaml := mkpath("service.yaml")
+			controllerYaml := mkpath("controller.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("Starting the cassandra service")
@@ -265,15 +265,15 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("CassandraStatefulSet", func() {
 		It("should create statefulset", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/statefulset/cassandra", file)
 			}
-			serviceYaml := mkpath("cassandra-service.yaml")
+			serviceYaml := filepath.Join(framework.TestContext.OutputDir, mkpath("service.yaml"))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			// have to change dns prefix because of the dynamic namespace
-			input := generated.ReadOrDie(mkpath("cassandra-statefulset.yaml"))
+			input := generated.ReadOrDie(mkpath("statefulset.yaml"))
 
-			output := strings.Replace(string(input), "cassandra-0.cassandra.default.svc.cluster.local", "cassandra-0.cassandra."+ns+".svc.cluster.local", -1)
+			output := strings.Replace(string(input), "$(POD_NAMESPACE)", ns, -1)
 
 			statefulsetYaml := "/tmp/cassandra-statefulset.yaml"
 
@@ -336,14 +336,14 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 	framework.KubeDescribe("Storm", func() {
 		It("should create and stop Zookeeper, Nimbus and Storm worker servers", func() {
-			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/storm", file)
+			mkpath := func(app, file string) string {
+				return filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests", app, file)
 			}
-			zookeeperServiceJson := mkpath("zookeeper-service.json")
-			zookeeperPodJson := mkpath("zookeeper.json")
-			nimbusServiceJson := mkpath("storm-nimbus-service.json")
-			nimbusPodJson := mkpath("storm-nimbus.json")
-			workerControllerJson := mkpath("storm-worker-controller.json")
+			zookeeperServiceJson := mkpath("zookeeper", "zookeeper-service.json")
+			zookeeperPodJson := mkpath("zookeeper", "zookeeper.json")
+			nimbusServiceJson := mkpath("storm", "storm-nimbus-service.json")
+			nimbusPodJson := mkpath("storm", "storm-nimbus.json")
+			workerControllerJson := mkpath("storm", "storm-worker-controller.json")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			zookeeperPod := "zookeeper"
 			nimbusPod := "nimbus"
@@ -496,7 +496,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("RethinkDB", func() {
 		It("should create and stop rethinkdb servers", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/rethinkdb", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/storage/rethinkdb", file)
 			}
 			driverServiceYaml := mkpath("driver-service.yaml")
 			rethinkDbControllerYaml := mkpath("rc.yaml")
@@ -541,7 +541,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Hazelcast", func() {
 		It("should create and scale hazelcast", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/hazelcast", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/storage/hazelcast", file)
 			}
 			serviceYaml := mkpath("hazelcast-service.yaml")
 			deploymentYaml := mkpath("hazelcast-deployment.yaml")
@@ -564,7 +564,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling hazelcast")
-			framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, "hazelcast", 2, true)
+			err = framework.ScaleDeployment(f.ClientSet, f.ScalesGetter, ns, "hazelcast", 2, true)
+			Expect(err).NotTo(HaveOccurred())
 			forEachPod("name", "hazelcast", func(pod v1.Pod) {
 				_, err := framework.LookForStringInLog(ns, pod.Name, "hazelcast", "Members [2]", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
