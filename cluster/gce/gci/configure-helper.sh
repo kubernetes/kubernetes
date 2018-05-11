@@ -892,8 +892,9 @@ function create-kubelet-kubeconfig() {
     echo "Must provide API server address to create Kubelet kubeconfig file!"
     exit 1
   fi
-  echo "Creating kubelet kubeconfig file"
-  cat <<EOF >/var/lib/kubelet/bootstrap-kubeconfig
+  if [[ "${CREATE_BOOTSTRAP_KUBECONFIG:-true}" == "true" ]]; then
+    echo "Creating kubelet bootstrap-kubeconfig file"
+    cat <<EOF >/var/lib/kubelet/bootstrap-kubeconfig
 apiVersion: v1
 kind: Config
 users:
@@ -913,6 +914,13 @@ contexts:
   name: service-account-context
 current-context: service-account-context
 EOF
+  elif [[ "${FETCH_BOOTSTRAP_KUBECONFIG:-false}" == "true" ]]; then
+    echo "Fetching kubelet bootstrap-kubeconfig file from metadata"
+    get-metadata-value "instance/attributes/bootstrap-kubeconfig" >/var/lib/kubelet/bootstrap-kubeconfig
+  else
+    echo "Fetching kubelet kubeconfig file from metadata"
+    get-metadata-value "instance/attributes/kubeconfig" >/var/lib/kubelet/kubeconfig
+  fi
 }
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
@@ -1584,6 +1592,9 @@ function start-kube-apiserver {
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
     params+=" --enable-logs-handler=false"
   fi
+  if [[ -n "${APISERVER_KUBELET_CA:-}" ]]; then
+    params+=" --kubelet-certificate-authority=${APISERVER_KUBELET_CA}"
+  fi
 
   local admission_controller_config_mount=""
   local admission_controller_config_volume=""
@@ -1612,7 +1623,7 @@ function start-kube-apiserver {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
-    local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
+    local -r vm_external_ip=$(get-metadata-value "instance/network-interfaces/0/access-configs/0/external-ip")
     if [[ -n "${PROXY_SSH_USER:-}" ]]; then
       params+=" --advertise-address=${vm_external_ip}"
       params+=" --ssh-user=${PROXY_SSH_USER}"
@@ -2008,6 +2019,20 @@ function download-extra-addons {
   "${curl_cmd[@]}"
 }
 
+# A function that fetches a GCE metadata value and echoes it out.
+#
+# $1: URL path after /computeMetadata/v1/ (without heading slash).
+function get-metadata-value {
+    curl \
+        --retry 5 \
+        --retry-delay 3 \
+        ${CURL_RETRY_CONNREFUSED} \
+        --fail \
+        --silent \
+        -H 'Metadata-Flavor: Google' \
+        "http://metadata/computeMetadata/v1/${1}"
+}
+
 # A helper function for copying manifests and setting dir/files
 # permissions.
 #
@@ -2161,12 +2186,6 @@ function setup-fluentd {
   sed -i -e "s@{{ fluentd_gcp_configmap_name }}@${fluentd_gcp_configmap_name}@g" "${fluentd_gcp_yaml}"
   fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.2-1.5.30-1-k8s}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
-  if [[ "${STACKDRIVER_METADATA_AGENT_URL:-}" != "" ]]; then
-    metadata_agent_url="${STACKDRIVER_METADATA_AGENT_URL}"
-  else
-    metadata_agent_url="http://${HOSTNAME}:8799"
-  fi
-  sed -i -e "s@{{ stackdriver_metadata_agent_url }}@${metadata_agent_url}@g" "${fluentd_gcp_yaml}"
   update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}
   update-container-runtime ${fluentd_gcp_configmap_yaml}

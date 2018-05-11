@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 
@@ -103,7 +103,7 @@ type ConvertOptions struct {
 
 func NewConvertOptions(ioStreams genericclioptions.IOStreams) *ConvertOptions {
 	return &ConvertOptions{
-		PrintFlags: printers.NewPrintFlags("converted").WithDefaultOutput("yaml"),
+		PrintFlags: printers.NewPrintFlags("converted", scheme.Scheme).WithDefaultOutput("yaml"),
 		local:      true,
 		IOStreams:  ioStreams,
 	}
@@ -199,7 +199,7 @@ func objectListToVersionedObject(objects []runtime.Object, specifiedOutputVersio
 	if !specifiedOutputVersion.Empty() {
 		targetVersions = append(targetVersions, specifiedOutputVersion)
 	}
-	targetVersions = append(targetVersions, scheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
+	targetVersions = append(targetVersions, schema.GroupVersion{Group: "", Version: "v1"})
 	converted, err := tryConvert(scheme.Scheme, objectList, targetVersions...)
 	if err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVe
 		if !specifiedOutputVersion.Empty() {
 			targetVersions = append(targetVersions, specifiedOutputVersion)
 		}
-		targetVersions = append(targetVersions, scheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
+		targetVersions = append(targetVersions, schema.GroupVersion{Group: "", Version: "v1"})
 
 		converted, err := tryConvert(scheme.Scheme, object, targetVersions...)
 		if err != nil {
@@ -275,7 +275,7 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 			gvks, _, err := scheme.Scheme.ObjectKinds(info.Object)
 			if err == nil {
 				for _, gvk := range gvks {
-					for _, version := range scheme.Registry.RegisteredVersionsForGroup(gvk.Group) {
+					for _, version := range scheme.Scheme.PrioritizedVersionsForGroup(gvk.Group) {
 						targetVersions = append(targetVersions, version)
 					}
 				}

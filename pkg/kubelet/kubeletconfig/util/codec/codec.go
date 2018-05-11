@@ -32,7 +32,7 @@ import (
 
 // EncodeKubeletConfig encodes an internal KubeletConfiguration to an external YAML representation
 func EncodeKubeletConfig(internal *kubeletconfig.KubeletConfiguration, targetVersion schema.GroupVersion) ([]byte, error) {
-	encoder, err := newKubeletConfigYAMLEncoder(targetVersion)
+	encoder, err := NewKubeletconfigYAMLEncoder(targetVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -44,8 +44,8 @@ func EncodeKubeletConfig(internal *kubeletconfig.KubeletConfiguration, targetVer
 	return data, nil
 }
 
-// newKubeletConfigYAMLEncoder returns an encoder that can write a KubeletConfig to YAML
-func newKubeletConfigYAMLEncoder(targetVersion schema.GroupVersion) (runtime.Encoder, error) {
+// NewKubeletconfigYAMLEncoder returns an encoder that can write objects in the kubeletconfig API group to YAML
+func NewKubeletconfigYAMLEncoder(targetVersion schema.GroupVersion) (runtime.Encoder, error) {
 	_, codecs, err := scheme.NewSchemeAndCodecs()
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func NewYAMLEncoder(groupName string) (runtime.Encoder, error) {
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
 
-	versions := legacyscheme.Registry.RegisteredVersionsForGroup(groupName)
+	versions := legacyscheme.Scheme.PrioritizedVersionsForGroup(groupName)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("no enabled versions for group %q", groupName)
 	}

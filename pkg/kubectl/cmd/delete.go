@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -31,7 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -109,11 +109,10 @@ type DeleteOptions struct {
 	Mapper meta.RESTMapper
 	Result *resource.Result
 
-	Out    io.Writer
-	ErrOut io.Writer
+	genericclioptions.IOStreams
 }
 
-func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
+func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
 	cmd := &cobra.Command{
@@ -123,16 +122,14 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    delete_long,
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			options := deleteFlags.ToOptions(out, errOut)
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-
-			if err := options.Complete(f, out, errOut, args, cmd); err != nil {
+			o := deleteFlags.ToOptions(streams)
+			if err := o.Complete(f, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
-			if err := options.Validate(cmd); err != nil {
+			if err := o.Validate(cmd); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
-			if err := options.RunDelete(); err != nil {
+			if err := o.RunDelete(); err != nil {
 				cmdutil.CheckErr(err)
 			}
 		},
@@ -145,10 +142,30 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string, cmd *cobra.Command) error {
+func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Command) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+
+	if o.DeleteAll || len(o.LabelSelector) > 0 || len(o.FieldSelector) > 0 {
+		if f := cmd.Flags().Lookup("ignore-not-found"); f != nil && !f.Changed {
+			// If the user didn't explicitly set the option, default to ignoring NotFound errors when used with --all, -l, or --field-selector
+			o.IgnoreNotFound = true
+		}
+	}
+	if o.DeleteNow {
+		if o.GracePeriod != -1 {
+			return fmt.Errorf("--now and --grace-period cannot be specified together")
+		}
+		o.GracePeriod = 1
+	}
+	if o.GracePeriod == 0 && !o.ForceDeletion {
+		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
+		// into --grace-period=1 and wait until the object is successfully deleted. Users may provide --force
+		// to bypass this wait.
+		o.WaitForDeletion = true
+		o.GracePeriod = 1
 	}
 
 	o.Reaper = f.Reaper
@@ -177,48 +194,25 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 		return err
 	}
 
-	// Set up writer
-	o.Out = out
-	o.ErrOut = errOut
-
 	return nil
 }
 
 func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
+	if o.Output != "" && o.Output != "name" {
+		return cmdutil.UsageErrorf(cmd, "Unexpected -o output mode: %v. We only support '-o name'.", o.Output)
+	}
+
 	if o.DeleteAll && len(o.LabelSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
 	if o.DeleteAll && len(o.FieldSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
 	}
-	if o.DeleteAll {
-		f := cmd.Flags().Lookup("ignore-not-found")
-		// The flag should never be missing
-		if f == nil {
-			return fmt.Errorf("missing --ignore-not-found flag")
-		}
-		// If the user didn't explicitly set the option, default to ignoring NotFound errors when used with --all
-		if !f.Changed {
-			o.IgnoreNotFound = true
-		}
-	}
-	if o.DeleteNow {
-		if o.GracePeriod != -1 {
-			return fmt.Errorf("--now and --grace-period cannot be specified together")
-		}
-		o.GracePeriod = 1
-	}
-	if o.GracePeriod == 0 {
-		if o.ForceDeletion {
-			fmt.Fprintf(o.ErrOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n")
-		} else {
-			// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
-			// into --grace-period=1 and wait until the object is successfully deleted. Users may provide --force
-			// to bypass this wait.
-			o.WaitForDeletion = true
-			o.GracePeriod = 1
-		}
-	} else if o.ForceDeletion {
+
+	switch {
+	case o.GracePeriod == 0 && o.ForceDeletion:
+		fmt.Fprintf(o.ErrOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n")
+	case o.ForceDeletion:
 		fmt.Fprintf(o.ErrOut, "warning: --force is ignored because --grace-period is not 0.\n")
 	}
 	return nil

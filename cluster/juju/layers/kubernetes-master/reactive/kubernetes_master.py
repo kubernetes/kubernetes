@@ -39,6 +39,7 @@ from charms.reactive import hook
 from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import is_state
+from charms.reactive import endpoint_from_flag
 from charms.reactive import when, when_any, when_not
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.kubernetes.common import get_version
@@ -1224,6 +1225,9 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
         api_opts['enable-aggregator-routing'] = 'true'
         api_opts['client-ca-file'] = ca_cert_path
 
+    if is_state('endpoint.aws.ready'):
+        api_opts['cloud-provider'] = 'aws'
+
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
     restart_apiserver()
 
@@ -1244,6 +1248,9 @@ def configure_controller_manager():
 
     controller_opts['service-account-private-key-file'] = \
         '/root/cdk/serviceaccount.key'
+
+    if is_state('endpoint.aws.ready'):
+        controller_opts['cloud-provider'] = 'aws'
 
     configure_kubernetes_service('kube-controller-manager', controller_opts,
                                  'controller-manager-extra-args')
@@ -1377,3 +1384,61 @@ def getStorageBackend():
     if storage_backend == 'auto':
         storage_backend = leader_get('auto_storage_backend')
     return storage_backend
+
+
+@when('leadership.is_leader')
+@when_not('leadership.set.cluster_tag')
+def create_cluster_tag():
+    cluster_tag = 'kubernetes-{}'.format(token_generator())
+    leader_set(cluster_tag=cluster_tag)
+
+
+@when('leadership.set.cluster_tag',
+      'kube-control.connected')
+@when_not('kubernetes-master.cluster-tag-sent')
+def send_cluster_tag():
+    cluster_tag = leader_get('cluster_tag')
+    kube_control = endpoint_from_flag('kube-control.connected')
+    kube_control.set_cluster_tag(cluster_tag)
+    set_state('kubernetes-master.cluster-tag-sent')
+
+
+@when_not('kube-control.connected')
+def clear_cluster_tag_sent():
+    remove_state('kubernetes-master.cluster-tag-sent')
+
+
+@when('endpoint.aws.joined',
+      'leadership.set.cluster_tag')
+@when_not('kubernetes-master.aws-request-sent')
+def request_integration():
+    hookenv.status_set('maintenance', 'requesting aws integration')
+    aws = endpoint_from_flag('endpoint.aws.joined')
+    cluster_tag = leader_get('cluster_tag')
+    aws.tag_instance({
+        'KubernetesCluster': cluster_tag,
+        'k8s.io/role/master': 'true',
+    })
+    aws.tag_instance_security_group({
+        'KubernetesCluster': cluster_tag,
+    })
+    aws.enable_instance_inspection()
+    aws.enable_network_management()
+    aws.enable_dns_management()
+    aws.enable_load_balancer_management()
+    aws.enable_block_storage_management()
+    aws.enable_object_storage_management(['kubernetes-*'])
+    set_state('kubernetes-master.aws-request-sent')
+    hookenv.status_set('waiting', 'waiting for aws integration')
+
+
+@when_not('endpoint.aws.joined')
+def clear_requested_integration():
+    remove_state('kubernetes-master.aws-request-sent')
+
+
+@when('endpoint.aws.ready')
+@when_not('kubernetes-master.restarted-for-aws')
+def restart_for_aws():
+    set_state('kubernetes-master.restarted-for-aws')
+    remove_state('kubernetes-master.components.started')  # force restart

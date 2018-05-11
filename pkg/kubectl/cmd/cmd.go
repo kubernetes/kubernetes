@@ -17,12 +17,13 @@ limitations under the License.
 package cmd
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apiserver/pkg/util/flag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
@@ -93,13 +94,15 @@ __kubectl_parse_config()
     fi
 }
 
+# $1 is the name of resource (required)
+# $2 is template string for kubectl get (optional)
 __kubectl_parse_get()
 {
     local template
-    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
+    template="${2:-"{{ range .items  }}{{ .metadata.name }} {{ end }}"}"
     local kubectl_out
     if kubectl_out=$(kubectl get $(__kubectl_override_flags) -o template --template="${template}" "$1" 2>/dev/null); then
-        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+        COMPREPLY+=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
 
@@ -170,6 +173,36 @@ __kubectl_require_pod_and_container()
     return 0
 }
 
+__kubectl_cp()
+{
+    if [[ $(type -t compopt) = "builtin" ]]; then
+        compopt -o nospace
+    fi
+
+    case "$cur" in
+        /*|[.~]*) # looks like a path
+            return
+            ;;
+        *:*) # TODO: complete remote files in the pod
+            return
+            ;;
+        */*) # complete <namespace>/<pod>
+            local template namespace kubectl_out
+            template="{{ range .items }}{{ .metadata.namespace }}/{{ .metadata.name }}: {{ end }}"
+            namespace="${cur%%/*}"
+            if kubectl_out=( $(kubectl get $(__kubectl_override_flags) --namespace "${namespace}" -o template --template="${template}" pods 2>/dev/null) ); then
+                COMPREPLY=( $(compgen -W "${kubectl_out[*]}" -- "${cur}") )
+            fi
+            return
+            ;;
+        *) # complete namespaces, pods, and filedirs
+            __kubectl_parse_get "namespace" "{{ range .items  }}{{ .metadata.name }}/ {{ end }}"
+            __kubectl_parse_get "pod" "{{ range .items  }}{{ .metadata.name }}: {{ end }}"
+            _filedir
+            ;;
+    esac
+}
+
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
@@ -202,6 +235,10 @@ __custom_func() {
             __kubectl_config_get_clusters
             return
             ;;
+        kubectl_cp)
+            __kubectl_cp
+            return
+            ;;
         *)
             ;;
     esac
@@ -219,11 +256,11 @@ var (
 )
 
 func NewDefaultKubectlCommand() *cobra.Command {
-	return NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+	return NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -237,8 +274,14 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		BashCompletionFunction: bashCompletionFunc,
 	}
 
-	f.BindFlags(cmds.PersistentFlags())
-	f.BindExternalFlags(cmds.PersistentFlags())
+	kubeConfigFlags := cmdutil.NewConfigFlags()
+	kubeConfigFlags.AddFlags(cmds.PersistentFlags())
+	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
+	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
+
+	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+
+	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
 	// Sending in 'nil' for the getLanguageFn() results in using
 	// the LANG environment variable.
@@ -248,7 +291,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	i18n.LoadTranslations("kubectl", nil)
 
 	// From this point and forward we get warnings on flags that contain "_" separators
-	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
+	cmds.SetGlobalNormalizationFunc(utilflag.WarnWordSepNormalizeFunc)
 
 	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
 
@@ -269,7 +312,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdExplain("kubectl", f, ioStreams),
 				get.NewCmdGet("kubectl", f, ioStreams),
 				NewCmdEdit(f, ioStreams),
-				NewCmdDelete(f, out, err),
+				NewCmdDelete(f, ioStreams),
 			},
 		},
 		{
@@ -286,7 +329,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdCertificate(f, ioStreams),
 				NewCmdClusterInfo(f, ioStreams),
-				NewCmdTop(f, out, err),
+				NewCmdTop(f, ioStreams),
 				NewCmdCordon(f, ioStreams),
 				NewCmdUncordon(f, ioStreams),
 				NewCmdDrain(f, ioStreams),
@@ -297,13 +340,13 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Message: "Troubleshooting and Debugging Commands:",
 			Commands: []*cobra.Command{
 				NewCmdDescribe("kubectl", f, ioStreams),
-				NewCmdLogs(f, out, err),
-				NewCmdAttach(f, in, out, err),
-				NewCmdExec(f, in, out, err),
-				NewCmdPortForward(f, out, err),
-				NewCmdProxy(f, out),
+				NewCmdLogs(f, ioStreams),
+				NewCmdAttach(f, ioStreams),
+				NewCmdExec(f, ioStreams),
+				NewCmdPortForward(f, ioStreams),
+				NewCmdProxy(f, ioStreams),
 				NewCmdCp(f, ioStreams),
-				auth.NewCmdAuth(f, out, err),
+				auth.NewCmdAuth(f, ioStreams),
 			},
 		},
 		{
@@ -311,7 +354,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdApply("kubectl", f, ioStreams),
 				NewCmdPatch(f, ioStreams),
-				NewCmdReplace(f, out, err),
+				NewCmdReplace(f, ioStreams),
 				NewCmdConvert(f, ioStreams),
 			},
 		},
@@ -320,7 +363,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdLabel(f, ioStreams),
 				NewCmdAnnotate("kubectl", f, ioStreams),
-				NewCmdCompletion(out, ""),
+				NewCmdCompletion(ioStreams.Out, ""),
 			},
 		},
 	}
@@ -329,7 +372,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	filters := []string{"options"}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
-	alpha := NewCmdAlpha(f, in, out, err)
+	alpha := NewCmdAlpha(f, ioStreams)
 	if !alpha.HasSubCommands() {
 		filters = append(filters, alpha.Name())
 	}
@@ -349,12 +392,12 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	}
 
 	cmds.AddCommand(alpha)
-	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), out, err))
-	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
+	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
+	cmds.AddCommand(NewCmdPlugin(f, ioStreams))
 	cmds.AddCommand(NewCmdVersion(f, ioStreams))
 	cmds.AddCommand(NewCmdApiVersions(f, ioStreams))
 	cmds.AddCommand(NewCmdApiResources(f, ioStreams))
-	cmds.AddCommand(NewCmdOptions(out))
+	cmds.AddCommand(NewCmdOptions(ioStreams.Out))
 
 	return cmds
 }

@@ -43,7 +43,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -59,6 +58,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/master" // TODO what else is needed
 
 	"github.com/coreos/etcd/clientv3"
+	"k8s.io/client-go/restmapper"
 )
 
 // Etcd data for all persisted objects.
@@ -437,7 +437,6 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	gvk("", "v1", "RangeAllocation"),     // stored in various places in etcd but cannot be directly created
 	gvk("", "v1", "ComponentStatus"),     // status info not stored in etcd
 	gvk("", "v1", "SerializedReference"), // used for serilization, not stored in etcd
-	gvk("", "v1", "NodeConfigSource"),    // subfield of node.spec, but shouldn't be directly created
 	gvk("", "v1", "PodStatusResult"),     // wrapper object not stored in etcd
 	// --
 
@@ -802,12 +801,10 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 	}
 
 	discoveryClient := cacheddiscovery.NewMemCacheClient(kubeClient.Discovery())
-	restMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	restMapper.Reset()
-	// allow conversion between typed and unstructured objects
-	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
 
-	return client, kvClient, mapper
+	return client, kvClient, restMapper
 }
 
 func dumpEtcdKVOnFailure(t *testing.T, kvClient clientv3.KV) {

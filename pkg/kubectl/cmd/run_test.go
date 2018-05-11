@@ -174,7 +174,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -198,7 +198,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			cmd.Flags().Set("image", "nginx")
 			cmd.Flags().Set("generator", "run/v1")
 
-			printFlags := printers.NewPrintFlags("created")
+			printFlags := printers.NewPrintFlags("created", legacyscheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -208,7 +208,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
+				DeleteOptions: deleteFlags.ToOptions(genericclioptions.NewTestIOStreamsDiscard()),
 
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
@@ -331,7 +331,7 @@ func TestGenerateService(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.ClientConfigVal = defaultClientConfig()
@@ -366,7 +366,7 @@ func TestGenerateService(t *testing.T) {
 				}),
 			}
 
-			printFlags := printers.NewPrintFlags("created")
+			printFlags := printers.NewPrintFlags("created", legacyscheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -377,7 +377,7 @@ func TestGenerateService(t *testing.T) {
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
+				DeleteOptions: deleteFlags.ToOptions(genericclioptions.NewTestIOStreamsDiscard()),
 
 				IOStreams: ioStreams,
 

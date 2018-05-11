@@ -1319,6 +1319,29 @@ func TestEnsureLoadBalancerHealthCheck(t *testing.T) {
 	})
 }
 
+func TestFindSecurityGroupForInstance(t *testing.T) {
+	groups := map[string]*ec2.SecurityGroup{"sg123": {GroupId: aws.String("sg123")}}
+	id, err := findSecurityGroupForInstance(&ec2.Instance{SecurityGroups: []*ec2.GroupIdentifier{{GroupId: aws.String("sg123"), GroupName: aws.String("my_group")}}}, groups)
+	if err != nil {
+		t.Error()
+	}
+	assert.Equal(t, *id.GroupId, "sg123")
+	assert.Equal(t, *id.GroupName, "my_group")
+}
+
+func TestFindSecurityGroupForInstanceMultipleTagged(t *testing.T) {
+	groups := map[string]*ec2.SecurityGroup{"sg123": {GroupId: aws.String("sg123")}}
+	_, err := findSecurityGroupForInstance(&ec2.Instance{
+		SecurityGroups: []*ec2.GroupIdentifier{
+			{GroupId: aws.String("sg123"), GroupName: aws.String("my_group")},
+			{GroupId: aws.String("sg123"), GroupName: aws.String("another_group")},
+		},
+	}, groups)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "sg123(my_group)")
+	assert.Contains(t, err.Error(), "sg123(another_group)")
+}
+
 func newMockedFakeAWSServices(id string) *FakeAWSServices {
 	s := NewFakeAWSServices(id)
 	s.ec2 = &MockedFakeEC2{FakeEC2Impl: s.ec2.(*FakeEC2Impl)}

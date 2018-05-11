@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -41,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -73,8 +74,8 @@ func TestImageLocal(t *testing.T) {
 
 	opts := SetImageOptions{
 		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags(""),
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+			NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
 
 			OutputFormat: &outputFormat,
 		},
@@ -100,8 +101,8 @@ func TestImageLocal(t *testing.T) {
 
 func TestSetImageValidation(t *testing.T) {
 	printFlags := &printers.PrintFlags{
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-		NamePrintFlags:     printers.NewNamePrintFlags(""),
+		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+		NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
 	}
 
 	testCases := []struct {
@@ -196,8 +197,8 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 
 	opts := SetImageOptions{
 		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags(""),
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+			NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
 
 			OutputFormat: &outputFormat,
 		},
@@ -590,8 +591,8 @@ func TestSetImageRemote(t *testing.T) {
 			cmd.Flags().Set("output", outputFormat)
 			opts := SetImageOptions{
 				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags(""),
+					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+					NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
 
 					OutputFormat: &outputFormat,
 				},

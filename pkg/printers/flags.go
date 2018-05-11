@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type NoCompatiblePrinterError struct {
@@ -53,6 +55,8 @@ type PrintFlags struct {
 	NamePrintFlags     *NamePrintFlags
 
 	OutputFormat *string
+
+	Scheme runtime.ObjectConvertor
 }
 
 func (f *PrintFlags) Complete(successTemplate string) error {
@@ -65,12 +69,16 @@ func (f *PrintFlags) ToPrinter() (ResourcePrinter, error) {
 		outputFormat = *f.OutputFormat
 	}
 
-	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
-		return p, err
+	if f.JSONYamlPrintFlags != nil {
+		if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+			return p, err
+		}
 	}
 
-	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
-		return p, err
+	if f.NamePrintFlags != nil {
+		if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+			return p, err
+		}
 	}
 
 	return nil, NoCompatiblePrinterError{Options: f, OutputFormat: f.OutputFormat}
@@ -87,25 +95,19 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 
 // WithDefaultOutput sets a default output format if one is not provided through a flag value
 func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
-	existingFormat := ""
-	if f.OutputFormat != nil {
-		existingFormat = *f.OutputFormat
-	}
-	if len(existingFormat) == 0 {
-		existingFormat = output
-	}
-	f.OutputFormat = &existingFormat
-
+	f.OutputFormat = &output
 	return f
 }
 
-func NewPrintFlags(operation string) *PrintFlags {
+func NewPrintFlags(operation string, scheme runtime.ObjectConvertor) *PrintFlags {
 	outputFormat := ""
 
 	return &PrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: NewJSONYamlPrintFlags(),
-		NamePrintFlags:     NewNamePrintFlags(operation),
+		Scheme: scheme,
+
+		JSONYamlPrintFlags: NewJSONYamlPrintFlags(scheme),
+		NamePrintFlags:     NewNamePrintFlags(operation, scheme),
 	}
 }

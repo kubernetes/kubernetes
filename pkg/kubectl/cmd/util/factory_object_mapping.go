@@ -38,9 +38,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -48,10 +48,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -76,37 +75,13 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
-// RESTMapper returns a mapper.
-func (f *ring1Factory) RESTMapper() (meta.RESTMapper, error) {
+func (f *ring1Factory) CategoryExpander() (restmapper.CategoryExpander, error) {
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
 
-	// allow conversion between typed and unstructured objects
-	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	// TODO: should this also indicate it recognizes typed objects?
-	expander := NewShortcutExpander(mapper, discoveryClient)
-	return expander, nil
-}
-
-func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {
-	legacyExpander := categories.LegacyCategoryExpander
-
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err == nil {
-		// fallback is the legacy expander wrapped with discovery based filtering
-		fallbackExpander, err := categories.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
-		CheckErr(err)
-
-		// by default use the expander that discovers based on "categories" field from the API
-		discoveryCategoryExpander, err := categories.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
-		CheckErr(err)
-
-		return discoveryCategoryExpander
-	}
-
-	return legacyExpander
+	return restmapper.NewDiscoveryCategoryExpander(discoveryClient), nil
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {

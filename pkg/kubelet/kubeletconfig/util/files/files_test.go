@@ -209,6 +209,189 @@ func TestHelpers(t *testing.T) {
 	}
 }
 
+func TestFileExists(t *testing.T) {
+	fn := func(fs utilfs.Filesystem, dir string, c *test) []error {
+		ok, err := FileExists(fs, filepath.Join(dir, "foo"))
+		if err != nil {
+			return []error{err}
+		}
+		if !ok {
+			return []error{fmt.Errorf("does not exist (test)")}
+		}
+		return nil
+	}
+	cases := []test{
+		{
+			fn:     fn,
+			desc:   "file exists",
+			writes: []file{{name: "foo"}},
+		},
+		{
+			fn:   fn,
+			desc: "file does not exist",
+			err:  "does not exist (test)",
+		},
+		{
+			fn:     fn,
+			desc:   "object has non-file mode",
+			writes: []file{{name: "foo", mode: os.ModeDir}},
+			err:    "expected regular file",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			c.run(t, utilfs.DefaultFs{})
+		})
+	}
+}
+
+func TestEnsureFile(t *testing.T) {
+	fn := func(fs utilfs.Filesystem, dir string, c *test) []error {
+		var errs []error
+		for _, f := range c.expects {
+			if err := EnsureFile(fs, filepath.Join(dir, f.name)); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		return errs
+	}
+	cases := []test{
+		{
+			fn:      fn,
+			desc:    "file exists",
+			writes:  []file{{name: "foo"}},
+			expects: []file{{name: "foo"}},
+		},
+		{
+			fn:      fn,
+			desc:    "file does not exist",
+			expects: []file{{name: "bar"}},
+		},
+		{
+			fn:      fn,
+			desc:    "neither parent nor file exists",
+			expects: []file{{name: "baz/quux"}},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			c.run(t, utilfs.DefaultFs{})
+		})
+	}
+}
+
+// Note: This transitively tests WriteTmpFile
+func TestReplaceFile(t *testing.T) {
+	fn := func(fs utilfs.Filesystem, dir string, c *test) []error {
+		var errs []error
+		for _, f := range c.expects {
+			if err := ReplaceFile(fs, filepath.Join(dir, f.name), []byte(f.data)); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		return errs
+	}
+	cases := []test{
+		{
+			fn:      fn,
+			desc:    "file exists",
+			writes:  []file{{name: "foo"}},
+			expects: []file{{name: "foo", data: "bar"}},
+		},
+		{
+			fn:      fn,
+			desc:    "file does not exist",
+			expects: []file{{name: "foo", data: "bar"}},
+		},
+		{
+			fn: func(fs utilfs.Filesystem, dir string, c *test) []error {
+				if err := ReplaceFile(fs, filepath.Join(dir, "foo/bar"), []byte("")); err != nil {
+					return []error{err}
+				}
+				return nil
+			},
+			desc: "neither parent nor file exists",
+			err:  "no such file or directory",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			c.run(t, utilfs.DefaultFs{})
+		})
+	}
+}
+
+func TestDirExists(t *testing.T) {
+	fn := func(fs utilfs.Filesystem, dir string, c *test) []error {
+		ok, err := DirExists(fs, filepath.Join(dir, "foo"))
+		if err != nil {
+			return []error{err}
+		}
+		if !ok {
+			return []error{fmt.Errorf("does not exist (test)")}
+		}
+		return nil
+	}
+	cases := []test{
+		{
+			fn:     fn,
+			desc:   "dir exists",
+			writes: []file{{name: "foo", mode: os.ModeDir}},
+		},
+		{
+			fn:   fn,
+			desc: "dir does not exist",
+			err:  "does not exist (test)",
+		},
+		{
+			fn:     fn,
+			desc:   "object has non-dir mode",
+			writes: []file{{name: "foo"}},
+			err:    "expected dir",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			c.run(t, utilfs.DefaultFs{})
+		})
+	}
+}
+
+func TestEnsureDir(t *testing.T) {
+	fn := func(fs utilfs.Filesystem, dir string, c *test) []error {
+		var errs []error
+		for _, f := range c.expects {
+			if err := EnsureDir(fs, filepath.Join(dir, f.name)); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		return errs
+	}
+	cases := []test{
+		{
+			fn:      fn,
+			desc:    "dir exists",
+			writes:  []file{{name: "foo", mode: os.ModeDir}},
+			expects: []file{{name: "foo", mode: os.ModeDir}},
+		},
+		{
+			fn:      fn,
+			desc:    "dir does not exist",
+			expects: []file{{name: "bar", mode: os.ModeDir}},
+		},
+		{
+			fn:      fn,
+			desc:    "neither parent nor dir exists",
+			expects: []file{{name: "baz/quux", mode: os.ModeDir}},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			c.run(t, utilfs.DefaultFs{})
+		})
+	}
+}
+
 func TestWriteTempDir(t *testing.T) {
 	// writing a tmp dir is covered by TestReplaceDir, but we additionally test filename validation here
 	c := test{

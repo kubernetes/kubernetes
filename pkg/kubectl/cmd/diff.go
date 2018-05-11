@@ -34,7 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/utils/exec"
 )
@@ -101,12 +102,11 @@ func parseDiffArguments(args []string) (string, string, error) {
 	return from, to, nil
 }
 
-func NewCmdDiff(f cmdutil.Factory, stdout, stderr io.Writer) *cobra.Command {
+func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	var options DiffOptions
 	diff := DiffProgram{
-		Exec:   exec.New(),
-		Stdout: stdout,
-		Stderr: stderr,
+		Exec:      exec.New(),
+		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
 		Use: "diff -f FILENAME",
@@ -132,9 +132,8 @@ func NewCmdDiff(f cmdutil.Factory, stdout, stderr io.Writer) *cobra.Command {
 // KUBERNETES_EXTERNAL_DIFF environment variable will be used a diff
 // program. By default, `diff(1)` will be used.
 type DiffProgram struct {
-	Exec   exec.Interface
-	Stdout io.Writer
-	Stderr io.Writer
+	Exec exec.Interface
+	genericclioptions.IOStreams
 }
 
 func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
@@ -147,8 +146,8 @@ func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
 	}
 
 	cmd := d.Exec.Command(diff, args...)
-	cmd.SetStdout(d.Stdout)
-	cmd.SetStderr(d.Stderr)
+	cmd.SetStdout(d.Out)
+	cmd.SetStderr(d.ErrOut)
 
 	return cmd
 }

@@ -268,7 +268,7 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				case 0:
 					r.Cells[i] = c.RandString()
 				case 1:
-					r.Cells[i] = c.Uint64()
+					r.Cells[i] = c.Int63()
 				case 2:
 					r.Cells[i] = c.RandBool()
 				case 3:
@@ -280,7 +280,7 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				case 4:
 					x := make([]interface{}, c.Intn(10))
 					for i := range x {
-						x[i] = c.Uint64()
+						x[i] = c.Int63()
 					}
 					r.Cells[i] = x
 				default:

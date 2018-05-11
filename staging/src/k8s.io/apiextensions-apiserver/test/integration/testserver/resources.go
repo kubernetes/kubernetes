@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
 )
 
@@ -245,6 +246,7 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 			"gamma":   "bar",
 			"delta":   "hello",
 			"epsilon": "foobar",
+			"spec":    map[string]interface{}{},
 		},
 	}
 	if _, err := resourceClient.Create(instance); err != nil {
@@ -271,6 +273,25 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("gave up waiting for watch event")
 	}
+}
+
+// UpdateCustomResourceDefinition updates a CRD, retrying up to 5 times on version conflict errors.
+func UpdateCustomResourceDefinition(client clientset.Interface, name string, update func(*apiextensionsv1beta1.CustomResourceDefinition)) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
+	for i := 0; i < 5; i++ {
+		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get CustomResourceDefinition %q: %v", name, err)
+		}
+		update(crd)
+		crd, err = client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+		if err == nil {
+			return crd, nil
+		}
+		if !errors.IsConflict(err) {
+			return nil, fmt.Errorf("failed to update CustomResourceDefinition %q: %v", name, err)
+		}
+	}
+	return nil, fmt.Errorf("too many retries after conflicts updating CustomResourceDefinition %q", name)
 }
 
 func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
@@ -310,7 +331,7 @@ func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, co
 		return nil, err
 	}
 
-	resources := []*discovery.APIGroupResources{
+	resources := []*restmapper.APIGroupResources{
 		{
 			Group: metav1.APIGroup{
 				Name: crd.Spec.Group,
@@ -325,7 +346,7 @@ func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, co
 		},
 	}
 
-	restMapper := discovery.NewRESTMapper(resources)
+	restMapper := restmapper.NewDiscoveryRESTMapper(resources)
 	resolver := scale.NewDiscoveryScaleKindResolver(discoveryClient)
 
 	return scale.NewForConfig(config, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)

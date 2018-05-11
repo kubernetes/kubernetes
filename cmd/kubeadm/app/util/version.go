@@ -122,8 +122,8 @@ func splitVersion(version string) (string, string, error) {
 
 	switch {
 	case strings.HasPrefix(subs[0][2], "ci"):
-		// Special case. CI images populated only by ci-cross area
-		urlSuffix = "ci-cross"
+		// Just use whichever the user specified
+		urlSuffix = subs[0][2]
 	default:
 		urlSuffix = "release"
 	}

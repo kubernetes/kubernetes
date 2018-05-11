@@ -33,18 +33,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	manualfake "k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/restmapper"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
 func TestPortsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -75,7 +75,7 @@ func TestPortsForObject(t *testing.T) {
 }
 
 func TestProtocolsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -113,7 +113,7 @@ func TestProtocolsForObject(t *testing.T) {
 }
 
 func TestLabelsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	tests := []struct {
 		name     string
@@ -164,7 +164,7 @@ func TestLabelsForObject(t *testing.T) {
 }
 
 func TestCanBeExposed(t *testing.T) {
-	factory := NewFactory(nil)
+	factory := NewFactory(NewTestConfigFlags())
 	tests := []struct {
 		kind      schema.GroupKind
 		expectErr bool
@@ -470,8 +470,8 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
-	b := resource.NewFakeBuilder(fakeClient(), mapper, categories.LegacyCategoryExpander)
+	mapper := restmapper.NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme), ds)
+	b := resource.NewFakeBuilder(fakeClient(), mapper, resource.FakeCategoryExpander)
 
 	for _, test := range tests {
 		replaced := b.ReplaceAliases(test.arg)

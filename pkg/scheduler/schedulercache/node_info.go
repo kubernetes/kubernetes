@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/golang/glog"
 
@@ -30,7 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var emptyResource = Resource{}
+var (
+	emptyResource = Resource{}
+	generation    int64
+)
 
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
@@ -54,6 +58,10 @@ type NodeInfo struct {
 	taints    []v1.Taint
 	taintsErr error
 
+	// This is a map from image name to image size, also for checking image existence on the node
+	// Cache it here to avoid rebuilding the map during scheduling, e.g., in image_locality.go
+	imageSizes map[string]int64
+
 	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
 	// scheduling cycle.
 	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
@@ -72,6 +80,14 @@ type NodeInfo struct {
 //initializeNodeTransientInfo initializes transient information pertaining to node.
 func initializeNodeTransientInfo() nodeTransientInfo {
 	return nodeTransientInfo{AllocatableVolumesCount: 0, RequestedVolumes: 0}
+}
+
+// nextGeneration: Let's make sure history never forgets the name...
+// Increments the generation number monotonically ensuring that generation numbers never collide.
+// Collision of the generation numbers would be particularly problematic if a node was deleted and
+// added back with the same name. See issue#63262.
+func nextGeneration() int64 {
+	return atomic.AddInt64(&generation, 1)
 }
 
 // nodeTransientInfo contains transient node information while scheduling.
@@ -203,6 +219,37 @@ func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
 	r.ScalarResources[name] = quantity
 }
 
+// SetMaxResource compares with ResourceList and takes max value for each Resource.
+func (r *Resource) SetMaxResource(rl v1.ResourceList) {
+	if r == nil {
+		return
+	}
+
+	for rName, rQuantity := range rl {
+		switch rName {
+		case v1.ResourceMemory:
+			if mem := rQuantity.Value(); mem > r.Memory {
+				r.Memory = mem
+			}
+		case v1.ResourceCPU:
+			if cpu := rQuantity.MilliValue(); cpu > r.MilliCPU {
+				r.MilliCPU = cpu
+			}
+		case v1.ResourceEphemeralStorage:
+			if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
+				r.EphemeralStorage = ephemeralStorage
+			}
+		default:
+			if v1helper.IsScalarResourceName(rName) {
+				value := rQuantity.Value()
+				if value > r.ScalarResources[rName] {
+					r.SetScalar(rName, value)
+				}
+			}
+		}
+	}
+}
+
 // NewNodeInfo returns a ready to use empty NodeInfo object.
 // If any pods are given in arguments, their information will be aggregated in
 // the returned object.
@@ -212,8 +259,9 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		nonzeroRequest:      &Resource{},
 		allocatableResource: &Resource{},
 		TransientInfo:       newTransientSchedulerInfo(),
-		generation:          0,
+		generation:          nextGeneration(),
 		usedPorts:           make(util.HostPortInfo),
+		imageSizes:          make(map[string]int64),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -243,6 +291,14 @@ func (n *NodeInfo) UsedPorts() util.HostPortInfo {
 		return nil
 	}
 	return n.usedPorts
+}
+
+// Images returns the image size information on this node.
+func (n *NodeInfo) Images() map[string]int64 {
+	if n == nil {
+		return nil
+	}
+	return n.imageSizes
 }
 
 // PodsWithAffinity return all pods with (anti)affinity constraints on this node.
@@ -320,6 +376,7 @@ func (n *NodeInfo) AllocatableResource() Resource {
 // SetAllocatableResource sets the allocatableResource information of given node.
 func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
 	n.allocatableResource = allocatableResource
+	n.generation = nextGeneration()
 }
 
 // Clone returns a copy of this node.
@@ -335,6 +392,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		diskPressureCondition:   n.diskPressureCondition,
 		pidPressureCondition:    n.pidPressureCondition,
 		usedPorts:               make(util.HostPortInfo),
+		imageSizes:              n.imageSizes,
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
@@ -391,7 +449,7 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	// Consume ports when pods added.
 	n.updateUsedPorts(pod, true)
 
-	n.generation++
+	n.generation = nextGeneration()
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
@@ -442,7 +500,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			// Release ports when remove Pods.
 			n.updateUsedPorts(pod, false)
 
-			n.generation++
+			n.generation = nextGeneration()
 
 			return nil
 		}
@@ -478,6 +536,17 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 	}
 }
 
+func (n *NodeInfo) updateImageSizes() {
+	node := n.Node()
+	imageSizes := make(map[string]int64)
+	for _, image := range node.Status.Images {
+		for _, name := range image.Names {
+			imageSizes[name] = image.SizeBytes
+		}
+	}
+	n.imageSizes = imageSizes
+}
+
 // SetNode sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) error {
 	n.node = node
@@ -499,7 +568,8 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 		}
 	}
 	n.TransientInfo = newTransientSchedulerInfo()
-	n.generation++
+	n.updateImageSizes()
+	n.generation = nextGeneration()
 	return nil
 }
 
@@ -515,7 +585,7 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	n.memoryPressureCondition = v1.ConditionUnknown
 	n.diskPressureCondition = v1.ConditionUnknown
 	n.pidPressureCondition = v1.ConditionUnknown
-	n.generation++
+	n.generation = nextGeneration()
 	return nil
 }
 

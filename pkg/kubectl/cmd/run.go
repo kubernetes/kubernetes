@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -126,7 +126,7 @@ type RunOptions struct {
 
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
-		PrintFlags:  printers.NewPrintFlags("created"),
+		PrintFlags:  printers.NewPrintFlags("created", legacyscheme.Scheme),
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
@@ -233,7 +233,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	deleteOpts := o.DeleteFlags.ToOptions(o.Out, o.ErrOut)
+	deleteOpts := o.DeleteFlags.ToOptions(o.IOStreams)
 	deleteOpts.IgnoreNotFound = true
 	deleteOpts.WaitForDeletion = false
 	deleteOpts.GracePeriod = -1
@@ -374,12 +374,10 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 		opts := &AttachOptions{
 			StreamOptions: StreamOptions{
-				In:    o.In,
-				Out:   o.Out,
-				Err:   o.ErrOut,
-				Stdin: o.Interactive,
-				TTY:   o.TTY,
-				Quiet: o.Quiet,
+				IOStreams: o.IOStreams,
+				Stdin:     o.Interactive,
+				TTY:       o.TTY,
+				Quiet:     o.Quiet,
 			},
 			GetPodTimeout: timeout,
 			CommandName:   cmd.Parent().CommandPath() + " attach",
@@ -528,7 +526,7 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 	opts.Namespace = ns
 
 	// TODO: opts.Run sets opts.Err to nil, we need to find a better way
-	stderr := opts.Err
+	stderr := opts.ErrOut
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(stderr, "Error attaching, falling back to logs: %v\n", err)
 		return logOpts(f, pod, opts)
@@ -665,7 +663,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	if len(overrides) > 0 {
-		codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Registry.RegisteredGroupVersions()...))
+		codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
 		obj, err = cmdutil.Merge(codec, obj, overrides)
 		if err != nil {
 			return nil, err

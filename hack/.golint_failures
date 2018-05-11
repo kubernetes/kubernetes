@@ -1,3 +1,4 @@
+
 cluster/images/etcd-version-monitor
 cmd/hyperkube
 cmd/kube-apiserver/app
@@ -134,7 +135,6 @@ pkg/kubeapiserver/authorizer/modes
 pkg/kubeapiserver/options
 pkg/kubeapiserver/server
 pkg/kubectl
-pkg/kubectl/categories
 pkg/kubectl/cmd
 pkg/kubectl/cmd/auth
 pkg/kubectl/cmd/config
@@ -148,8 +148,8 @@ pkg/kubectl/cmd/util
 pkg/kubectl/cmd/util/editor
 pkg/kubectl/cmd/util/jsonmerge
 pkg/kubectl/cmd/util/sanity
+pkg/kubectl/genericclioptions/resource
 pkg/kubectl/metricsutil
-pkg/kubectl/resource
 pkg/kubectl/util
 pkg/kubectl/util/crlf
 pkg/kubectl/util/slice
@@ -461,8 +461,6 @@ staging/src/k8s.io/apimachinery/pkg/api/testing/fuzzer
 staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip
 staging/src/k8s.io/apimachinery/pkg/api/validation
 staging/src/k8s.io/apimachinery/pkg/api/validation/path
-staging/src/k8s.io/apimachinery/pkg/apimachinery/announced
-staging/src/k8s.io/apimachinery/pkg/apimachinery/registered
 staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
@@ -698,6 +696,7 @@ test/e2e/ui
 test/e2e/upgrades
 test/e2e/upgrades/apps
 test/e2e/upgrades/storage
+test/e2e_kubeadm
 test/e2e_node
 test/e2e_node/builder
 test/e2e_node/environment

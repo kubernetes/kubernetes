@@ -99,14 +99,10 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
-	if class.Provisioner == "kubernetes.io/glusterfs" && framework.ProviderIs("gke", "gce") {
-		framework.Logf("Skipping glusterfs dynamic test for cloud provider %v", "GCE/GKE")
-	} else {
-		// Check sizes
-		expectedCapacity := resource.MustParse(t.expectedSize)
-		pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
-		Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()), "pvCapacity is not equal to expectedCapacity")
-	}
+	// Check sizes
+	expectedCapacity := resource.MustParse(t.expectedSize)
+	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()), "pvCapacity is not equal to expectedCapacity")
 
 	requestedCapacity := resource.MustParse(t.claimSize)
 	claimCapacity := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -802,6 +798,17 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				parameters:   map[string]string{"resturl": serverUrl},
 				attach:       false,
 			}
+
+			// GCE/GKE
+			if getDefaultPluginName() == "kubernetes.io/gce-pd" {
+				// Keeping an extra condition here based on below facts:
+				//*) gce-pd rounds up to the next gb.
+				//*) GlusterFS provisioner rounduptoGiB() and send it to backend,
+				//      which does 'size/number' from provisioner*1024*1024*1024
+				test.claimSize = "2Gi"
+				test.expectedSize = "3G"
+			}
+
 			suffix := fmt.Sprintf("glusterdptest")
 			class := newStorageClass(test, ns, suffix)
 

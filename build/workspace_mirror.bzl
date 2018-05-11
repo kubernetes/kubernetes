@@ -15,31 +15,35 @@
 prefix = "https://storage.googleapis.com/k8s-bazel-cache/"
 
 def mirror(url):
-  """Try downloading a URL from a GCS mirror first, then from the original.
+    """Try downloading a URL from a GCS mirror first, then from the original.
 
-  Update the GCS bucket using bazel run //hack:update-mirror"""
-  return [prefix + url, url]
+    Update the GCS bucket using bazel run //hack:update-mirror"""
+    return [prefix + url, url]
 
-# This function only gives proper results when executed from WORKSPACE,
-# but the data is needed in sh_binary, which can only be in a BUILD file.
-# Thus, it is be exported by a repository_rule (which executes in WORKSPACE)
-# to be used by the sh_binary.
 def mirror_urls():
-  urls = []
-  for k, v in native.existing_rules().items():
-    us = list(v.get('urls', []))
-    if 'url' in v:
-      us.append(v['url'])
-    for u in us:
-      if u and not u.startswith(prefix):
-        urls.append(u)
-  return sorted(urls)
+    # This function only gives proper results when executed from WORKSPACE,
+    # but the data is needed in sh_binary, which can only be in a BUILD file.
+    # Thus, it is be exported by a repository_rule (which executes in WORKSPACE)
+    # to be used by the sh_binary.
+    urls = []
+    for k, v in native.existing_rules().items():
+        us = list(v.get("urls", []))
+        if "url" in v:
+            us.append(v["url"])
+        for u in us:
+            if u and not u.startswith(prefix):
+                urls.append(u)
+    return sorted(urls)
 
 def export_urls_impl(repo_ctx):
-  repo_ctx.file(repo_ctx.path("BUILD.bazel"), """
+    repo_ctx.file(repo_ctx.path("BUILD.bazel"), """
 exports_files(glob(["**"]), visibility=["//visibility:public"])
 """)
-  repo_ctx.file(repo_ctx.path("urls.txt"), content="\n".join(repo_ctx.attr.urls))
+    repo_ctx.file(
+        repo_ctx.path("urls.txt"),
+        # Add a trailing newline, since the "while read" loop needs it
+        content = ("\n".join(repo_ctx.attr.urls) + "\n"),
+    )
 
 _export_urls = repository_rule(
     attrs = {
@@ -50,4 +54,4 @@ _export_urls = repository_rule(
 )
 
 def export_urls(name):
-  return _export_urls(name=name, urls=mirror_urls())
+    return _export_urls(name = name, urls = mirror_urls())

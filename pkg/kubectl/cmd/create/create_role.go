@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -119,7 +120,7 @@ type CreateRoleOptions struct {
 
 func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
 	return &CreateRoleOptions{
-		PrintFlags: NewPrintFlags("created"),
+		PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
 
 		IOStreams: ioStreams,
 	}

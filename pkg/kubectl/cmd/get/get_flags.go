@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/printers"
@@ -152,7 +153,7 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 
 // NewGetPrintFlags returns flags associated with humanreadable,
 // template, and "name" printing, with default values set.
-func NewGetPrintFlags() *PrintFlags {
+func NewGetPrintFlags(scheme runtime.ObjectConvertor) *PrintFlags {
 	outputFormat := ""
 	noHeaders := false
 
@@ -160,8 +161,8 @@ func NewGetPrintFlags() *PrintFlags {
 		OutputFormat: &outputFormat,
 		NoHeaders:    &noHeaders,
 
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-		NamePrintFlags:     printers.NewNamePrintFlags(""),
+		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme),
+		NamePrintFlags:     printers.NewNamePrintFlags("", scheme),
 		TemplateFlags:      printers.NewKubeTemplatePrintFlags(),
 		HumanReadableFlags: NewHumanPrintFlags(),
 		CustomColumnsFlags: printers.NewCustomColumnsPrintFlags(),

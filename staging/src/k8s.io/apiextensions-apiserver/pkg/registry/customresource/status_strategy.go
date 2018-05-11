@@ -33,28 +33,24 @@ func NewStatusStrategy(strategy customResourceStrategy) statusStrategy {
 }
 
 func (a statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	// update is only allowed to set status
 	newCustomResourceObject := obj.(*unstructured.Unstructured)
-	oldCustomResourceObject := old.(*unstructured.Unstructured)
-
 	newCustomResource := newCustomResourceObject.UnstructuredContent()
-	oldCustomResource := oldCustomResourceObject.UnstructuredContent()
+	status, ok := newCustomResource["status"]
 
-	// update is not allowed to set spec and metadata
-	_, ok1 := newCustomResource["spec"]
-	_, ok2 := oldCustomResource["spec"]
-	switch {
-	case ok2:
-		newCustomResource["spec"] = oldCustomResource["spec"]
-	case ok1:
-		delete(newCustomResource, "spec")
+	// copy old object into new object
+	oldCustomResourceObject := old.(*unstructured.Unstructured)
+	// overridding the resourceVersion in metadata is safe here, we have already checked that
+	// new object and old object have the same resourceVersion.
+	*newCustomResourceObject = *oldCustomResourceObject.DeepCopy()
+
+	// set status
+	newCustomResource = newCustomResourceObject.UnstructuredContent()
+	if ok {
+		newCustomResource["status"] = status
+	} else {
+		delete(newCustomResource, "status")
 	}
-
-	newCustomResourceObject.SetAnnotations(oldCustomResourceObject.GetAnnotations())
-	newCustomResourceObject.SetFinalizers(oldCustomResourceObject.GetFinalizers())
-	newCustomResourceObject.SetGeneration(oldCustomResourceObject.GetGeneration())
-	newCustomResourceObject.SetLabels(oldCustomResourceObject.GetLabels())
-	newCustomResourceObject.SetOwnerReferences(oldCustomResourceObject.GetOwnerReferences())
-	newCustomResourceObject.SetSelfLink(oldCustomResourceObject.GetSelfLink())
 }
 
 // ValidateUpdate is the default update validation for an end user updating status.

@@ -26,31 +26,17 @@ import (
 // UnstructuredObjectTyper provides a runtime.ObjectTyper implementation for
 // runtime.Unstructured object based on discovery information.
 type UnstructuredObjectTyper struct {
-	registered map[schema.GroupVersionKind]bool
-	typers     []runtime.ObjectTyper
+	typers []runtime.ObjectTyper
 }
 
 // NewUnstructuredObjectTyper returns a runtime.ObjectTyper for
 // unstructured objects based on discovery information. It accepts a list of fallback typers
 // for handling objects that are not runtime.Unstructured. It does not delegate the Recognizes
 // check, only ObjectKinds.
-func NewUnstructuredObjectTyper(groupResources []*APIGroupResources, typers ...runtime.ObjectTyper) *UnstructuredObjectTyper {
+// TODO this only works for the apiextensions server and doesn't recognize any types.  Move to point of use.
+func NewUnstructuredObjectTyper(typers ...runtime.ObjectTyper) *UnstructuredObjectTyper {
 	dot := &UnstructuredObjectTyper{
-		registered: make(map[schema.GroupVersionKind]bool),
-		typers:     typers,
-	}
-	for _, group := range groupResources {
-		for _, discoveryVersion := range group.Group.Versions {
-			resources, ok := group.VersionedResources[discoveryVersion.Version]
-			if !ok {
-				continue
-			}
-
-			gv := schema.GroupVersion{Group: group.Group.Name, Version: discoveryVersion.Version}
-			for _, resource := range resources {
-				dot.registered[gv.WithKind(resource.Kind)] = true
-			}
-		}
+		typers: typers,
 	}
 	return dot
 }
@@ -89,7 +75,7 @@ func (d *UnstructuredObjectTyper) ObjectKinds(obj runtime.Object) (gvks []schema
 // Recognizes returns true if the provided group,version,kind was in the
 // discovery information.
 func (d *UnstructuredObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
-	return d.registered[gvk]
+	return false
 }
 
 var _ runtime.ObjectTyper = &UnstructuredObjectTyper{}

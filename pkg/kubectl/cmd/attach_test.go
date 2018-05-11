@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,6 +37,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -143,7 +143,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -227,7 +227,7 @@ func TestAttach(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -249,9 +249,6 @@ func TestAttach(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
-			bufOut := bytes.NewBuffer([]byte{})
-			bufErr := bytes.NewBuffer([]byte{})
-			bufIn := bytes.NewBuffer([]byte{})
 			remoteAttach := &fakeRemoteAttach{}
 			if test.remoteAttachErr {
 				remoteAttach.err = fmt.Errorf("attach error")
@@ -259,9 +256,7 @@ func TestAttach(t *testing.T) {
 			params := &AttachOptions{
 				StreamOptions: StreamOptions{
 					ContainerName: test.container,
-					In:            bufIn,
-					Out:           bufOut,
-					Err:           bufErr,
+					IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
 				},
 				Attach:        remoteAttach,
 				GetPodTimeout: 1000,
@@ -320,7 +315,7 @@ func TestAttachWarnings(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -342,16 +337,12 @@ func TestAttachWarnings(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
-			bufOut := bytes.NewBuffer([]byte{})
-			bufErr := bytes.NewBuffer([]byte{})
-			bufIn := bytes.NewBuffer([]byte{})
+			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
 			ex := &fakeRemoteAttach{}
 			params := &AttachOptions{
 				StreamOptions: StreamOptions{
 					ContainerName: test.container,
-					In:            bufIn,
-					Out:           bufOut,
-					Err:           bufErr,
+					IOStreams:     streams,
 					Stdin:         test.stdin,
 					TTY:           test.tty,
 				},

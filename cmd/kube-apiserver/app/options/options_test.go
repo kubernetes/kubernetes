@@ -284,8 +284,8 @@ func TestAddFlags(t *testing.T) {
 			CloudProvider:   "azure",
 		},
 		StorageSerialization: &kubeoptions.StorageSerializationOptions{
-			StorageVersions:        legacyscheme.Registry.AllPreferredGroupVersions(),
-			DefaultStorageVersions: legacyscheme.Registry.AllPreferredGroupVersions(),
+			StorageVersions:        kubeoptions.ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
+			DefaultStorageVersions: kubeoptions.ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
 		},
 		APIEnablement: &apiserveroptions.APIEnablementOptions{
 			RuntimeConfig: utilflag.ConfigurationMap{},

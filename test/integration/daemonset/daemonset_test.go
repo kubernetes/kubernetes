@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,6 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+var zero = int64(0)
 
 func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
@@ -92,10 +95,52 @@ func newDaemonSet(name, namespace string) *apps.DaemonSet {
 					Labels: testLabels(),
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Name: "foo", Image: "bar"}},
+					Containers:                    []v1.Container{{Name: "foo", Image: "bar"}},
+					TerminationGracePeriodSeconds: &zero,
 				},
 			},
 		},
+	}
+}
+
+func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet) {
+	ds, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Failed to get DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
+		return
+	}
+
+	// We set the nodeSelector to a random label. This label is nearly guaranteed
+	// to not be set on any node so the DameonSetController will start deleting
+	// daemon pods. Once it's done deleting the daemon pods, it's safe to delete
+	// the DaemonSet.
+	ds.Spec.Template.Spec.NodeSelector = map[string]string{
+		string(uuid.NewUUID()): string(uuid.NewUUID()),
+	}
+	// force update to avoid version conflict
+	ds.ResourceVersion = ""
+
+	if ds, err = cs.AppsV1().DaemonSets(ds.Namespace).Update(ds); err != nil {
+		t.Errorf("Failed to update DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
+		return
+	}
+
+	// Wait for the daemon set controller to kill all the daemon pods.
+	if err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		updatedDS, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return updatedDS.Status.CurrentNumberScheduled+updatedDS.Status.NumberMisscheduled == 0, nil
+	}); err != nil {
+		t.Errorf("Failed to kill the pods of DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
+		return
+	}
+
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	if err := cs.AppsV1().DaemonSets(ds.Namespace).Delete(ds.Name, deleteOptions); err != nil {
+		t.Errorf("Failed to delete DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
 	}
 }
 
@@ -140,6 +185,7 @@ func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
 				},
 			},
 		},
+		TerminationGracePeriodSeconds: &zero,
 	}
 }
 
@@ -257,8 +303,15 @@ func validateFailedPlacementEvent(eventClient corev1typed.EventInterface, t *tes
 	}
 }
 
-func TestOneNodeDaemonLaunchesPod(t *testing.T) {
+func forEachStrategy(t *testing.T, tf func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy)) {
 	for _, strategy := range updateStrategies() {
+		t.Run(fmt.Sprintf("%s (%v)", t.Name(), strategy),
+			func(tt *testing.T) { tf(tt, strategy) })
+	}
+}
+
+func TestOneNodeDaemonLaunchesPod(t *testing.T) {
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateTestingNamespace("one-node-daemonset-test", server, t)
@@ -268,9 +321,11 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 		podClient := clientset.CoreV1().Pods(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
 		podInformer := informers.Core().V1().Pods().Informer()
+
 		stopCh := make(chan struct{})
 		informers.Start(stopCh)
 		go dc.Run(5, stopCh)
+		defer close(stopCh)
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.UpdateStrategy = *strategy
@@ -278,6 +333,8 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create DaemonSet: %v", err)
 		}
+		defer cleanupDaemonSets(t, clientset, ds)
+
 		_, err = nodeClient.Create(newNode("single-node", nil))
 		if err != nil {
 			t.Fatalf("Failed to create node: %v", err)
@@ -285,13 +342,11 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
 		validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 1, t)
-
-		close(stopCh)
-	}
+	})
 }
 
 func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
-	for _, strategy := range updateStrategies() {
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateTestingNamespace("simple-daemonset-test", server, t)
@@ -301,9 +356,11 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 		podClient := clientset.CoreV1().Pods(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
 		podInformer := informers.Core().V1().Pods().Informer()
+
 		stopCh := make(chan struct{})
 		informers.Start(stopCh)
 		go dc.Run(5, stopCh)
+		defer close(stopCh)
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.UpdateStrategy = *strategy
@@ -311,17 +368,17 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create DaemonSet: %v", err)
 		}
+		defer cleanupDaemonSets(t, clientset, ds)
+
 		addNodes(nodeClient, 0, 5, nil, t)
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 5, t)
 		validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 5, t)
-
-		close(stopCh)
-	}
+	})
 }
 
 func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
-	for _, strategy := range updateStrategies() {
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateTestingNamespace("simple-daemonset-test", server, t)
@@ -331,9 +388,11 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		podClient := clientset.CoreV1().Pods(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
 		podInformer := informers.Core().V1().Pods().Informer()
+
 		stopCh := make(chan struct{})
 		informers.Start(stopCh)
 		go dc.Run(5, stopCh)
+		defer close(stopCh)
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.UpdateStrategy = *strategy
@@ -341,6 +400,8 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create DaemonSet: %v", err)
 		}
+		defer cleanupDaemonSets(t, clientset, ds)
+
 		node := newNode("single-node", nil)
 		node.Status.Conditions = []v1.NodeCondition{
 			{Type: v1.NodeReady, Status: v1.ConditionFalse},
@@ -352,13 +413,11 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
 		validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 1, t)
-
-		close(stopCh)
-	}
+	})
 }
 
 func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	for _, strategy := range updateStrategies() {
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateTestingNamespace("insufficient-capacity", server, t)
@@ -367,9 +426,11 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
 		eventClient := clientset.CoreV1().Events(ns.Namespace)
+
 		stopCh := make(chan struct{})
 		informers.Start(stopCh)
 		go dc.Run(5, stopCh)
+		defer close(stopCh)
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.Template.Spec = resourcePodSpec("node-with-limited-memory", "120M", "75m")
@@ -378,6 +439,8 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create DaemonSet: %v", err)
 		}
+		defer cleanupDaemonSets(t, clientset, ds)
+
 		node := newNode("node-with-limited-memory", nil)
 		node.Status.Allocatable = allocatableResources("100M", "200m")
 		_, err = nodeClient.Create(node)
@@ -386,7 +449,5 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		}
 
 		validateFailedPlacementEvent(eventClient, t)
-
-		close(stopCh)
-	}
+	})
 }
