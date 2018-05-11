@@ -40,6 +40,11 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		trace := utiltrace.New("Update " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
+		if isDryRun(req.URL) {
+			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			return
+		}
+
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
