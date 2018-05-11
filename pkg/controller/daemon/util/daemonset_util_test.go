@@ -24,7 +24,9 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -337,6 +339,112 @@ func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
 		got := ReplaceDaemonSetPodHostnameNodeAffinity(test.affinity, test.hostname)
 		if !reflect.DeepEqual(test.expected, got) {
 			t.Errorf("Failed to append NodeAffinity, got: %v, expected: %v", got, test.expected)
+		}
+	}
+}
+
+func TestGetTargetNodeName(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
+	defer func() {
+		if !enabled {
+			utilfeature.DefaultFeatureGate.Set("ScheduleDaemonSetPods=false")
+		}
+	}()
+	utilfeature.DefaultFeatureGate.Set("ScheduleDaemonSetPods=true")
+
+	tests := []struct {
+		pod         *v1.Pod
+		nodeName    string
+		expectedErr bool
+	}{
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+				},
+			},
+			nodeName: "node-1",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod2",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      kubeletapis.LabelHostname,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node-1"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node-1",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod3",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      kubeletapis.LabelHostname,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node-1", "node-2"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: true,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod4",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{},
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		got, err := GetTargetNodeName(test.pod)
+		if test.expectedErr != (err != nil) {
+			t.Errorf("Unexpected error, expectedErr: %v, err: %v", test.expectedErr, err)
+		} else if !test.expectedErr {
+			if test.nodeName != got {
+				t.Errorf("Failed to get target node name, got: %v, expected: %v", got, test.nodeName)
+			}
 		}
 	}
 }
