@@ -53,6 +53,10 @@ func (d *DisallowFlunder) Admit(a admission.Attributes) error {
 		return nil
 	}
 
+	if !d.WaitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+	}
+
 	metaAccessor, err := meta.Accessor(a.GetObject())
 	if err != nil {
 		return err
@@ -82,6 +86,7 @@ func (d *DisallowFlunder) Admit(a admission.Attributes) error {
 // The lister knows how to lists Fischers.
 func (d *DisallowFlunder) SetInternalWardleInformerFactory(f informers.SharedInformerFactory) {
 	d.lister = f.Wardle().InternalVersion().Fischers().Lister()
+	d.SetReadyFunc(f.Wardle().InternalVersion().Fischers().Informer().HasSynced)
 }
 
 // ValidaValidateInitializationte checks whether the plugin was correctly initialized.
