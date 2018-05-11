@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -155,13 +154,15 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	versionDiscoveryHandler := &versionDiscoveryHandler{
-		discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{},
-		delegate:  delegateHandler,
+		delegate: delegateHandler,
 	}
+	versionDiscoveryHandler.discoveryStorage.Store(versionDiscoveryMap{})
+
 	groupDiscoveryHandler := &groupDiscoveryHandler{
-		discovery: map[string]*discovery.APIGroupHandler{},
-		delegate:  delegateHandler,
+		delegate: delegateHandler,
 	}
+	groupDiscoveryHandler.discoveryStorage.Store(groupDiscoveryMap{})
+
 	crdHandler := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,

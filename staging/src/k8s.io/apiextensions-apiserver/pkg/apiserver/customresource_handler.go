@@ -304,7 +304,7 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 
 	// Copy because we cannot write to storageMap without a race
 	// as it is used without locking elsewhere.
-	storageMap2 := storageMap.clone()
+	storageMap2 := clone(storageMap).(crdStorageMap)
 	if oldInfo, ok := storageMap2[types.UID(oldCRD.UID)]; ok {
 		// destroy only the main storage. Those for the subresources share cacher and etcd clients.
 		oldInfo.storage.CustomResource.DestroyFunc()
@@ -328,7 +328,7 @@ func (r *crdHandler) removeDeadStorage() {
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	// Copy because we cannot write to storageMap without a race
 	// as it is used without locking elsewhere
-	storageMap2 := storageMap.clone()
+	storageMap2 := clone(storageMap).(crdStorageMap)
 	for uid, s := range storageMap2 {
 		found := false
 		for _, crd := range allCustomResourceDefinitions {
@@ -509,7 +509,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 	// Copy because we cannot write to storageMap without a race
 	// as it is used without locking elsewhere.
-	storageMap2 := storageMap.clone()
+	storageMap2 := clone(storageMap).(crdStorageMap)
 
 	storageMap2[crd.UID] = ret
 	r.customStorage.Store(storageMap2)
@@ -626,17 +626,4 @@ func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (gen
 		ret.Decorator = genericregistry.StorageWithCacher(t.DefaultWatchCacheSize)
 	}
 	return ret, nil
-}
-
-// clone returns a clone of the provided crdStorageMap.
-// The clone is a shallow copy of the map.
-func (in crdStorageMap) clone() crdStorageMap {
-	if in == nil {
-		return nil
-	}
-	out := make(crdStorageMap, len(in))
-	for key, value := range in {
-		out[key] = value
-	}
-	return out
 }
