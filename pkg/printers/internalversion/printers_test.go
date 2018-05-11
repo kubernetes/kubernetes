@@ -390,10 +390,25 @@ func TestNamePrinter(t *testing.T) {
 				},
 				Items: []runtime.RawExtension{
 					{
-						Raw: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "foo"}}`),
+						Object: &v1.Pod{
+							TypeMeta: metav1.TypeMeta{
+								Kind: "Pod",
+							},
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "foo",
+							},
+						},
 					},
 					{
-						Raw: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "bar"}}`),
+						Object: &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"kind":       "Pod",
+								"apiVersion": "v1",
+								"metadata": map[string]interface{}{
+									"name": "bar",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -574,8 +589,7 @@ func TestPrinters(t *testing.T) {
 		"template2": templatePrinter2,
 		"jsonpath":  jsonpathPrinter,
 		"name": &printers.NamePrinter{
-			Typer:    legacyscheme.Scheme,
-			Decoders: []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme},
+			Typer: legacyscheme.Scheme,
 		},
 	}
 	objects := map[string]runtime.Object{
