@@ -230,7 +230,7 @@ func validatePayload(payload map[string]FileProjection) (map[string]FileProjecti
 			return nil, err
 		}
 
-		cleanPayload[path.Clean(k)] = content
+		cleanPayload[filepath.Clean(k)] = content
 	}
 
 	return cleanPayload, nil
