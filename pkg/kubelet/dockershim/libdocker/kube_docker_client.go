@@ -367,6 +367,9 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	resp, err := d.client.ImagePull(ctx, image, opts)
+	if ctxErr := contextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
 	if err != nil {
 		return err
 	}
@@ -543,9 +546,13 @@ func (d *kubeDockerClient) GetContainerStats(id string) (*dockertypes.StatsJSON,
 	defer cancel()
 
 	response, err := d.client.ContainerStats(ctx, id, false)
+	if ctxErr := contextError(ctx); ctxErr != nil {
+		return nil, ctxErr
+	}
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 
 	dec := json.NewDecoder(response.Body)
 	var stats dockertypes.StatsJSON
@@ -554,7 +561,6 @@ func (d *kubeDockerClient) GetContainerStats(id string) (*dockertypes.StatsJSON,
 		return nil, err
 	}
 
-	defer response.Body.Close()
 	return &stats, nil
 }
 
