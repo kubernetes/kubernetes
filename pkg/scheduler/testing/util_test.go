@@ -18,6 +18,7 @@ package testing
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -26,157 +27,113 @@ import (
 )
 
 func TestResourcePathWithPrefix(t *testing.T) {
+	testGroup := Test
+	testGroup.externalGroupVersion.Group = "TestGroup"
 	testCases := []struct {
+		test      TestGroup
 		prefix    string
 		resource  string
 		namespace string
 		name      string
 		expected  string
 	}{
-		{"prefix", "resource", "mynamespace", "myresource", "/api/" + Test.externalGroupVersion.Version + "/prefix/namespaces/mynamespace/resource/myresource"},
-		{"prefix", "resource", "", "myresource", "/api/" + Test.externalGroupVersion.Version + "/prefix/resource/myresource"},
-		{"prefix", "resource", "mynamespace", "", "/api/" + Test.externalGroupVersion.Version + "/prefix/namespaces/mynamespace/resource"},
-		{"prefix", "resource", "", "", "/api/" + Test.externalGroupVersion.Version + "/prefix/resource"},
-		{"", "resource", "mynamespace", "myresource", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
+		{Test, "prefix", "resource", "mynamespace", "myresource", "/api/" + Test.externalGroupVersion.Version + "/prefix/namespaces/mynamespace/resource/myresource"},
+		{Test, "prefix", "resource", "", "myresource", "/api/" + Test.externalGroupVersion.Version + "/prefix/resource/myresource"},
+		{Test, "prefix", "resource", "mynamespace", "", "/api/" + Test.externalGroupVersion.Version + "/prefix/namespaces/mynamespace/resource"},
+		{Test, "prefix", "resource", "", "", "/api/" + Test.externalGroupVersion.Version + "/prefix/resource"},
+		{Test, "", "resource", "mynamespace", "myresource", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
+		{testGroup, "prefix", "resource", "mynamespace", "myresource", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/prefix/namespaces/mynamespace/resource/myresource"},
+		{testGroup, "prefix", "resource", "", "myresource", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/prefix/resource/myresource"},
+		{testGroup, "prefix", "resource", "mynamespace", "", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/prefix/namespaces/mynamespace/resource"},
+		{testGroup, "prefix", "resource", "", "", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/prefix/resource"},
+		{testGroup, "", "resource", "mynamespace", "myresource", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
 	}
-	for _, item := range testCases {
-		if actual := Test.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
-		}
+	for i, item := range testCases {
+		name := fmt.Sprintf("%v/%v", i, item.test.externalGroupVersion.Group)
+		t.Run(name, func(t *testing.T) {
+			if actual := item.test.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
+				t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
+			}
+		})
 	}
-
-	TestGroup := Test
-	TestGroup.externalGroupVersion.Group = "TestGroup"
-
-	testGroupCases := []struct {
-		prefix    string
-		resource  string
-		namespace string
-		name      string
-		expected  string
-	}{
-		{"prefix", "resource", "mynamespace", "myresource", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/prefix/namespaces/mynamespace/resource/myresource"},
-		{"prefix", "resource", "", "myresource", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/prefix/resource/myresource"},
-		{"prefix", "resource", "mynamespace", "", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/prefix/namespaces/mynamespace/resource"},
-		{"prefix", "resource", "", "", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/prefix/resource"},
-		{"", "resource", "mynamespace", "myresource", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
-	}
-	for _, item := range testGroupCases {
-		if actual := TestGroup.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
-		}
-	}
-
 }
 
 func TestResourcePath(t *testing.T) {
+	testGroup := Test
+	testGroup.externalGroupVersion.Group = "TestGroup"
 	testCases := []struct {
+		test      TestGroup
 		resource  string
 		namespace string
 		name      string
 		expected  string
 	}{
-		{"resource", "mynamespace", "myresource", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
-		{"resource", "", "myresource", "/api/" + Test.externalGroupVersion.Version + "/resource/myresource"},
-		{"resource", "mynamespace", "", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource"},
-		{"resource", "", "", "/api/" + Test.externalGroupVersion.Version + "/resource"},
+		{Test, "resource", "mynamespace", "myresource", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
+		{Test, "resource", "", "myresource", "/api/" + Test.externalGroupVersion.Version + "/resource/myresource"},
+		{Test, "resource", "mynamespace", "", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource"},
+		{Test, "resource", "", "", "/api/" + Test.externalGroupVersion.Version + "/resource"},
+		{testGroup, "resource", "mynamespace", "myresource", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
+		{testGroup, "resource", "", "myresource", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/resource/myresource"},
+		{testGroup, "resource", "mynamespace", "", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource"},
+		{testGroup, "resource", "", "", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/resource"},
 	}
-	for _, item := range testCases {
-		if actual := Test.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
-		}
+	for i, item := range testCases {
+		name := fmt.Sprintf("%v/%v", i, item.test.externalGroupVersion.Group)
+		t.Run(name, func(t *testing.T) {
+			if actual := item.test.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
+				t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
+			}
+		})
 	}
-
-	TestGroup := Test
-	TestGroup.externalGroupVersion.Group = "TestGroup"
-
-	testGroupCases := []struct {
-		resource  string
-		namespace string
-		name      string
-		expected  string
-	}{
-		{"resource", "mynamespace", "myresource", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
-		{"resource", "", "myresource", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/resource/myresource"},
-		{"resource", "mynamespace", "", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource"},
-		{"resource", "", "", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/resource"},
-	}
-	for _, item := range testGroupCases {
-		if actual := TestGroup.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
-		}
-	}
-
 }
 
 func TestSubResourcePath(t *testing.T) {
+	testGroup := Test
+	testGroup.externalGroupVersion.Group = "TestGroup"
 	testCases := []struct {
+		test      TestGroup
 		resource  string
 		namespace string
 		name      string
 		sub       string
 		expected  string
 	}{
-		{"resource", "mynamespace", "myresource", "subresource", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource/subresource"},
-		{"resource", "mynamespace", "myresource", "", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
+		{Test, "resource", "mynamespace", "myresource", "subresource", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource/subresource"},
+		{Test, "resource", "mynamespace", "myresource", "", "/api/" + Test.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
+		{testGroup, "resource", "mynamespace", "myresource", "subresource", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource/subresource"},
+		{testGroup, "resource", "mynamespace", "myresource", "", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
 	}
-	for _, item := range testCases {
-		if actual := Test.SubResourcePath(item.resource, item.namespace, item.name, item.sub); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s, name: %s and sub: %s", item.expected, actual, item.resource, item.namespace, item.name, item.sub)
-		}
+	for i, item := range testCases {
+		name := fmt.Sprintf("%v/%v", i, item.test.externalGroupVersion.Group)
+		t.Run(name, func(t *testing.T) {
+			if actual := item.test.SubResourcePath(item.resource, item.namespace, item.name, item.sub); actual != item.expected {
+				t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s, name: %s and sub: %s", item.expected, actual, item.resource, item.namespace, item.name, item.sub)
+			}
+		})
 	}
-
-	TestGroup := Test
-	TestGroup.externalGroupVersion.Group = "TestGroup"
-
-	testGroupCases := []struct {
-		resource  string
-		namespace string
-		name      string
-		sub       string
-		expected  string
-	}{
-		{"resource", "mynamespace", "myresource", "subresource", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource/subresource"},
-		{"resource", "mynamespace", "myresource", "", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
-	}
-	for _, item := range testGroupCases {
-		if actual := TestGroup.SubResourcePath(item.resource, item.namespace, item.name, item.sub); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s, name: %s and sub: %s", item.expected, actual, item.resource, item.namespace, item.name, item.sub)
-		}
-	}
-
 }
 
 func TestSelfLink(t *testing.T) {
+	testGroup := Test
+	testGroup.externalGroupVersion.Group = "TestGroup"
 	testCases := []struct {
+		test     TestGroup
 		resource string
 		name     string
 		expected string
 	}{
-		{"resource", "name", "/api/" + Test.externalGroupVersion.Version + "/resource/name"},
-		{"resource", "", "/api/" + Test.externalGroupVersion.Version + "/resource"},
+		{Test, "resource", "name", "/api/" + Test.externalGroupVersion.Version + "/resource/name"},
+		{Test, "resource", "", "/api/" + Test.externalGroupVersion.Version + "/resource"},
+		{testGroup, "resource", "name", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/resource/name"},
+		{testGroup, "resource", "", "/apis/" + testGroup.externalGroupVersion.Group + "/" + testGroup.externalGroupVersion.Version + "/resource"},
 	}
-	for _, item := range testCases {
-		if actual := Test.SelfLink(item.resource, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
-		}
-	}
-
-	TestGroup := Test
-	TestGroup.externalGroupVersion.Group = "TestGroup"
-
-	testGroupCases := []struct {
-		resource string
-		name     string
-		expected string
-	}{
-		{"resource", "name", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/resource/name"},
-		{"resource", "", "/apis/" + TestGroup.externalGroupVersion.Group + "/" + TestGroup.externalGroupVersion.Version + "/resource"},
-	}
-	for _, item := range testGroupCases {
-		if actual := TestGroup.SelfLink(item.resource, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
-		}
+	for i, item := range testCases {
+		name := fmt.Sprintf("%v/%v", i, item.test.externalGroupVersion.Group)
+		t.Run(name, func(t *testing.T) {
+			if actual := item.test.SelfLink(item.resource, item.name); actual != item.expected {
+				t.Errorf("Expected: %s, got: %s for resource: %s and name: %s", item.expected, actual, item.resource, item.name)
+			}
+		})
 	}
 }
 

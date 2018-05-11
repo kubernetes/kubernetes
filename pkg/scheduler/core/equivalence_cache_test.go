@@ -18,6 +18,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -343,38 +344,64 @@ func TestUpdateResult(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ecache := NewEquivalenceCache()
-		if test.expectPredicateMap {
-			ecache.algorithmCache[test.nodeName] = newAlgorithmCache()
-			predicateItem := HostPredicate{
-				Fit: true,
-			}
-			ecache.algorithmCache[test.nodeName].predicatesCache.Add(test.predicateKey,
-				PredicateMap{
-					test.equivalenceHash: predicateItem,
-				})
-		}
-		ecache.mu.Lock()
-		ecache.updateResult(
-			test.pod,
-			test.nodeName,
-			test.predicateKey,
-			test.fit,
-			test.reasons,
-			test.equivalenceHash,
-		)
-		ecache.mu.Unlock()
+		t.Run(test.name, func(t *testing.T) {
+			testUpdateResult(
+				test.pod,
+				test.predicateKey,
+				test.nodeName,
+				test.fit,
+				test.reasons,
+				test.equivalenceHash,
+				test.expectPredicateMap,
+				test.expectCacheItem,
+				t,
+			)
+		})
+	}
+}
 
-		value, ok := ecache.algorithmCache[test.nodeName].predicatesCache.Get(test.predicateKey)
-		if !ok {
-			t.Errorf("Failed: %s, can't find expected cache item: %v",
-				test.name, test.expectCacheItem)
-		} else {
-			cachedMapItem := value.(PredicateMap)
-			if !reflect.DeepEqual(cachedMapItem[test.equivalenceHash], test.expectCacheItem) {
-				t.Errorf("Failed: %s, expected cached item: %v, but got: %v",
-					test.name, test.expectCacheItem, cachedMapItem[test.equivalenceHash])
-			}
+func testUpdateResult(
+	pod,
+	predicateKey,
+	nodeName string,
+	fit bool,
+	reasons []algorithm.PredicateFailureReason,
+	equivalenceHash uint64,
+	expectPredicateMap bool,
+	expectCacheItem HostPredicate,
+	t *testing.T,
+) {
+	ecache := NewEquivalenceCache()
+	if expectPredicateMap {
+		ecache.algorithmCache[nodeName] = newAlgorithmCache()
+		predicateItem := HostPredicate{
+			Fit: true,
+		}
+		ecache.algorithmCache[nodeName].predicatesCache.Add(predicateKey,
+			PredicateMap{
+				equivalenceHash: predicateItem,
+			})
+	}
+	ecache.mu.Lock()
+	ecache.updateResult(
+		pod,
+		nodeName,
+		predicateKey,
+		fit,
+		reasons,
+		equivalenceHash,
+	)
+	ecache.mu.Unlock()
+
+	value, ok := ecache.algorithmCache[nodeName].predicatesCache.Get(predicateKey)
+	if !ok {
+		t.Errorf("Failed: can't find expected cache item: %v",
+			expectCacheItem)
+	} else {
+		cachedMapItem := value.(PredicateMap)
+		if !reflect.DeepEqual(cachedMapItem[equivalenceHash], expectCacheItem) {
+			t.Errorf("Failed: expected cached item: %v, but got: %v",
+				expectCacheItem, cachedMapItem[equivalenceHash])
 		}
 	}
 }
@@ -463,52 +490,80 @@ func TestLookupResult(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ecache := NewEquivalenceCache()
-		// set cached item to equivalence cache
-		ecache.mu.Lock()
-		ecache.updateResult(
-			test.podName,
-			test.nodeName,
-			test.predicateKey,
-			test.cachedItem.fit,
-			test.cachedItem.reasons,
-			test.equivalenceHashForUpdatePredicate,
-		)
-		ecache.mu.Unlock()
-		// if we want to do invalid, invalid the cached item
-		if test.expectedInvalidPredicateKey {
-			predicateKeys := sets.NewString()
-			predicateKeys.Insert(test.predicateKey)
-			ecache.InvalidateCachedPredicateItem(test.nodeName, predicateKeys)
+		t.Run(test.name, func(t *testing.T) {
+			testLookupResult(
+				test.podName,
+				test.nodeName,
+				test.predicateKey,
+				test.equivalenceHashForUpdatePredicate,
+				test.equivalenceHashForCalPredicate,
+				test.expectedInvalidPredicateKey,
+				test.expectedInvalidEquivalenceHash,
+				test.cachedItem,
+				test.expectedPredicateItem,
+				t,
+			)
+		})
+	}
+}
+
+func testLookupResult(
+	podName,
+	nodeName,
+	predicateKey string,
+	equivalenceHashForUpdatePredicate,
+	equivalenceHashForCalPredicate uint64,
+	expectedInvalidPredicateKey,
+	expectedInvalidEquivalenceHash bool,
+	cachedItem,
+	expectedPredicateItem predicateItemType,
+	t *testing.T,
+) {
+	ecache := NewEquivalenceCache()
+	// set cached item to equivalence cache
+	ecache.mu.Lock()
+	ecache.updateResult(
+		podName,
+		nodeName,
+		predicateKey,
+		cachedItem.fit,
+		cachedItem.reasons,
+		equivalenceHashForUpdatePredicate,
+	)
+	ecache.mu.Unlock()
+	// if we want to do invalid, invalid the cached item
+	if expectedInvalidPredicateKey {
+		predicateKeys := sets.NewString()
+		predicateKeys.Insert(predicateKey)
+		ecache.InvalidateCachedPredicateItem(nodeName, predicateKeys)
+	}
+	// calculate predicate with equivalence cache
+	ecache.mu.Lock()
+	fit, reasons, invalid := ecache.lookupResult(podName,
+		nodeName,
+		predicateKey,
+		equivalenceHashForCalPredicate,
+	)
+	ecache.mu.Unlock()
+	// returned invalid should match expectedInvalidPredicateKey or expectedInvalidEquivalenceHash
+	if equivalenceHashForUpdatePredicate != equivalenceHashForCalPredicate {
+		if invalid != expectedInvalidEquivalenceHash {
+			t.Errorf("Failed: expected invalid: %v, but got: %v",
+				expectedInvalidEquivalenceHash, invalid)
 		}
-		// calculate predicate with equivalence cache
-		ecache.mu.Lock()
-		fit, reasons, invalid := ecache.lookupResult(test.podName,
-			test.nodeName,
-			test.predicateKey,
-			test.equivalenceHashForCalPredicate,
-		)
-		ecache.mu.Unlock()
-		// returned invalid should match expectedInvalidPredicateKey or expectedInvalidEquivalenceHash
-		if test.equivalenceHashForUpdatePredicate != test.equivalenceHashForCalPredicate {
-			if invalid != test.expectedInvalidEquivalenceHash {
-				t.Errorf("Failed: %s, expected invalid: %v, but got: %v",
-					test.name, test.expectedInvalidEquivalenceHash, invalid)
-			}
-		} else {
-			if invalid != test.expectedInvalidPredicateKey {
-				t.Errorf("Failed: %s, expected invalid: %v, but got: %v",
-					test.name, test.expectedInvalidPredicateKey, invalid)
-			}
+	} else {
+		if invalid != expectedInvalidPredicateKey {
+			t.Errorf("Failed: expected invalid: %v, but got: %v",
+				expectedInvalidPredicateKey, invalid)
 		}
-		// returned predicate result should match expected predicate item
-		if fit != test.expectedPredicateItem.fit {
-			t.Errorf("Failed: %s, expected fit: %v, but got: %v", test.name, test.cachedItem.fit, fit)
-		}
-		if !reflect.DeepEqual(reasons, test.expectedPredicateItem.reasons) {
-			t.Errorf("Failed: %s, expected reasons: %v, but got: %v",
-				test.name, test.cachedItem.reasons, reasons)
-		}
+	}
+	// returned predicate result should match expected predicate item
+	if fit != expectedPredicateItem.fit {
+		t.Errorf("Failed: expected fit: %v, but got: %v", cachedItem.fit, fit)
+	}
+	if !reflect.DeepEqual(reasons, expectedPredicateItem.reasons) {
+		t.Errorf("Failed: expected reasons: %v, but got: %v",
+			cachedItem.reasons, reasons)
 	}
 }
 
@@ -691,14 +746,16 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 	ecache.InvalidateCachedPredicateItemOfAllNodes(sets.NewString(testPredicate))
 
 	// there should be no cached predicate any more
-	for _, test := range tests {
-		if algorithmCache, exist := ecache.algorithmCache[test.nodeName]; exist {
-			if _, exist := algorithmCache.predicatesCache.Get(testPredicate); exist {
-				t.Errorf("Failed: cached item for predicate key: %v on node: %v should be invalidated",
-					testPredicate, test.nodeName)
-				break
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%v/%v", i, test.nodeName), func(t *testing.T) {
+			if algorithmCache, exist := ecache.algorithmCache[test.nodeName]; exist {
+				if _, exist := algorithmCache.predicatesCache.Get(testPredicate); exist {
+					t.Errorf("Failed: cached item for predicate key: %v on node: %v should be invalidated",
+						testPredicate, test.nodeName)
+					return
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -755,13 +812,15 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 		ecache.mu.Unlock()
 	}
 
-	for _, test := range tests {
-		// invalidate cached predicate for all nodes
-		ecache.InvalidateAllCachedPredicateItemOfNode(test.nodeName)
-		if _, exist := ecache.algorithmCache[test.nodeName]; exist {
-			t.Errorf("Failed: cached item for node: %v should be invalidated", test.nodeName)
-			break
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%v/%v", i, test.nodeName), func(t *testing.T) {
+			// invalidate cached predicate for all nodes
+			ecache.InvalidateAllCachedPredicateItemOfNode(test.nodeName)
+			if _, exist := ecache.algorithmCache[test.nodeName]; exist {
+				t.Errorf("Failed: cached item for node: %v should be invalidated", test.nodeName)
+				return
+			}
+		})
 	}
 }
 
