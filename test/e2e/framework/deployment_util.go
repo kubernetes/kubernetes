@@ -87,7 +87,8 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 	zero := int64(0)
 	return &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: deploymentName,
+			Name:   deploymentName,
+			Labels: podLabels,
 		},
 		Spec: apps.DeploymentSpec{
 			Replicas: &replicas,
