@@ -115,21 +115,21 @@ func defaultPredicates() sets.String {
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxEBSVolumeCountPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.PVInfo, args.PVCInfo)
+				return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many GCE PD volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxGCEPDVolumeCountPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.PVInfo, args.PVCInfo)
+				return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many Azure Disk volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxAzureDiskVolumeCountPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
+				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 			},
 		),
 		// Fit is determined by inter-pod affinity.

@@ -289,11 +289,13 @@ func NoDiskConflict(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *sch
 
 // MaxPDVolumeCountChecker contains information to check the max number of volumes for a predicate.
 type MaxPDVolumeCountChecker struct {
-	filter     VolumeFilter
-	maxVolumes int
-	pvInfo     PersistentVolumeInfo
-	pvcInfo    PersistentVolumeClaimInfo
-
+	filterName  string
+	provisioner string
+	filter      VolumeFilter
+	maxVolumes  int
+	pvInfo      PersistentVolumeInfo
+	pvcInfo     PersistentVolumeClaimInfo
+	classInfo   StorageClassInfo
 	// The string below is generated randomly during the struct's initialization.
 	// It is used to prefix volumeID generated inside the predicate() method to
 	// avoid conflicts with any real volume.
@@ -313,21 +315,25 @@ type VolumeFilter struct {
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
-func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
+func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, classInfo StorageClassInfo) algorithm.FitPredicate {
 
 	var filter VolumeFilter
 	var maxVolumes int
+	var provisioner string
 
 	switch filterName {
 
 	case EBSVolumeFilterType:
 		filter = EBSVolumeFilter
+		provisioner = "kubernetes.io/aws-ebs"
 		maxVolumes = getMaxVols(DefaultMaxEBSVolumes)
 	case GCEPDVolumeFilterType:
 		filter = GCEPDVolumeFilter
+		provisioner = "kubernetes.io/gce-pd"
 		maxVolumes = getMaxVols(DefaultMaxGCEPDVolumes)
 	case AzureDiskVolumeFilterType:
 		filter = AzureDiskVolumeFilter
+		provisioner = "kubernetes.io/azure-disk"
 		maxVolumes = getMaxVols(DefaultMaxAzureDiskVolumes)
 	default:
 		glog.Fatalf("Wrong filterName, Only Support %v %v %v ", EBSVolumeFilterType,
@@ -336,10 +342,13 @@ func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo
 
 	}
 	c := &MaxPDVolumeCountChecker{
+		filterName:           filterName,
 		filter:               filter,
+		provisioner:          provisioner,
 		maxVolumes:           maxVolumes,
 		pvInfo:               pvInfo,
 		pvcInfo:              pvcInfo,
+		classInfo:            classInfo,
 		randomVolumeIDPrefix: rand.String(32),
 	}
 
@@ -388,12 +397,21 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
-				// PVC is not bound. It was either deleted and created again or
-				// it was forcefully unbound by admin. The pod can still use the
-				// original PV where it was bound to -> log the error and count
-				// the PV towards the PV limit
-				glog.V(4).Infof("PVC %s/%s is not bound, assuming PVC matches predicate when counting limits", namespace, pvcName)
-				filteredVolumes[pvID] = true
+				className := v1helper.GetPersistentVolumeClaimClass(pvc)
+				if className == "" {
+					return fmt.Errorf("PersistentVolumeClaim doesn't have Storage class info:%v/%v", namespace, pvcName)
+				}
+				class, err := c.classInfo.GetStorageClassInfo(className)
+				if class != nil && err == nil {
+					if class.Provisioner == c.provisioner {
+						// PVC is not bound. It was either deleted and created again or
+						// it was forcefully unbound by admin. The pod can still use the
+						// original PV where it was bound to -> log the error and count
+						// the PV towards the PV limit
+						glog.V(4).Infof("PVC %s/%s is not bound, assuming PVC matches predicate when counting limits", namespace, pvcName)
+						filteredVolumes[pvID] = true
+					}
+				}
 				continue
 			}
 

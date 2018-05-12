@@ -2563,36 +2563,51 @@ func TestVolumeCountConflicts(t *testing.T) {
 		return FakePersistentVolumeClaimInfo{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "some" + filterName + "Vol"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "some" + filterName + "Vol", StorageClassName: &filterName},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNon" + filterName + "Vol"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNon" + filterName + "Vol", StorageClassName: &filterName},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV", StorageClassName: &filterName},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "anotherPVCWithDeletedPV"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV", StorageClassName: &filterName},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "unboundPVC"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "", StorageClassName: &filterName},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "anotherUnboundPVC"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "", StorageClassName: &filterName},
 			},
 		}
+	}
+
+	classInfo := FakeStorageClassInfo{
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: EBSVolumeFilterType},
+			Provisioner: "kubernetes.io/aws-ebs",
+		},
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: GCEPDVolumeFilterType},
+			Provisioner: "kubernetes.io/gce-pd",
+		},
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: AzureDiskVolumeFilterType},
+			Provisioner: "kubernetes.io/azure-disk",
+		},
 	}
 
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
 	for _, test := range tests {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
-		pred := NewMaxPDVolumeCountPredicate(test.filterName, pvInfo(test.filterName), pvcInfo(test.filterName))
+		pred := NewMaxPDVolumeCountPredicate(test.filterName, pvInfo(test.filterName), pvcInfo(test.filterName), classInfo)
 		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
