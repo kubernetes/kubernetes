@@ -28,12 +28,14 @@ import (
 
 func TestConfigMapGenerate(t *testing.T) {
 	tests := []struct {
+		name      string
 		setup     func(t *testing.T, params map[string]interface{}) func()
 		params    map[string]interface{}
 		expected  *v1.ConfigMap
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"name": "foo",
 			},
@@ -47,6 +49,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test2",
 			params: map[string]interface{}{
 				"name":        "foo",
 				"append-hash": true,
@@ -61,6 +64,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test3",
 			params: map[string]interface{}{
 				"name": "foo",
 				"type": "my-type",
@@ -75,6 +79,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test4",
 			params: map[string]interface{}{
 				"name":        "foo",
 				"type":        "my-type",
@@ -90,6 +95,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test5",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1=value1", "key2=value2"},
@@ -107,6 +113,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test6",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1=value1", "key2=value2"},
@@ -125,6 +132,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test7",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1value1"},
@@ -132,6 +140,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test8",
 			params: map[string]interface{}{
 				"name":      "foo",
 				"from-file": []string{"key1=/file=2"},
@@ -139,6 +148,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test9",
 			params: map[string]interface{}{
 				"name":      "foo",
 				"from-file": []string{"key1==value"},
@@ -146,6 +156,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name:  "test10",
 			setup: setupBinaryFile([]byte{0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64}),
 			params: map[string]interface{}{
 				"name":      "foo",
@@ -161,6 +172,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:  "test11",
 			setup: setupBinaryFile([]byte{0xff, 0xfd}),
 			params: map[string]interface{}{
 				"name":      "foo",
@@ -176,6 +188,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test12",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1==value1"},
@@ -192,6 +205,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test13",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1==value1"},
@@ -209,6 +223,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:  "test14",
 			setup: setupEnvFile("key1=value1", "#", "", "key2=value2"),
 			params: map[string]interface{}{
 				"name":          "valid_env",
@@ -227,6 +242,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:  "test15",
 			setup: setupEnvFile("key1=value1", "#", "", "key2=value2"),
 			params: map[string]interface{}{
 				"name":          "valid_env",
@@ -246,6 +262,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test16",
 			setup: func() func(t *testing.T, params map[string]interface{}) func() {
 				os.Setenv("g_key1", "1")
 				os.Setenv("g_key2", "2")
@@ -268,6 +285,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test17",
 			setup: func() func(t *testing.T, params map[string]interface{}) func() {
 				os.Setenv("g_key1", "1")
 				os.Setenv("g_key2", "2")
@@ -291,6 +309,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test18",
 			params: map[string]interface{}{
 				"name":          "too_many_args",
 				"from-literal":  []string{"key1=value1"},
@@ -298,7 +317,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			},
 			expectErr: true,
 		},
-		{
+		{name: "test19",
 			setup: setupEnvFile("key#1=value1"),
 			params: map[string]interface{}{
 				"name":          "invalid_key",
@@ -307,6 +326,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name:  "test20",
 			setup: setupEnvFile("  key1=  value1"),
 			params: map[string]interface{}{
 				"name":          "with_spaces",
@@ -324,6 +344,7 @@ func TestConfigMapGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:  "test21",
 			setup: setupEnvFile("  key1=  value1"),
 			params: map[string]interface{}{
 				"name":          "with_spaces",
@@ -343,22 +364,24 @@ func TestConfigMapGenerate(t *testing.T) {
 		},
 	}
 	generator := ConfigMapGeneratorV1{}
-	for i, test := range tests {
-		if test.setup != nil {
-			if teardown := test.setup(t, test.params); teardown != nil {
-				defer teardown()
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				if teardown := tt.setup(t, tt.params); teardown != nil {
+					defer teardown()
+				}
 			}
-		}
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("case %d, unexpected error: %v", i, err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*v1.ConfigMap), test.expected) {
-			t.Errorf("\ncase %d, expected:\n%#v\nsaw:\n%#v", i, test.expected, obj.(*v1.ConfigMap))
-		}
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("case %d, unexpected error: %v", i, err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*v1.ConfigMap), tt.expected) {
+				t.Errorf("\ncase %d, expected:\n%#v\nsaw:\n%#v", i, tt.expected, obj.(*v1.ConfigMap))
+			}
+		})
 	}
 }
 

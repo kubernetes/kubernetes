@@ -26,11 +26,13 @@ import (
 
 func TestNamespaceGenerate(t *testing.T) {
 	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *v1.Namespace
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"name": "foo",
 			},
@@ -42,34 +44,40 @@ func TestNamespaceGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:      "test2",
 			params:    map[string]interface{}{},
 			expectErr: true,
 		},
 		{
+			name: "test3",
 			params: map[string]interface{}{
 				"name": 1,
 			},
 			expectErr: true,
 		},
 		{
+			name: "test4",
 			params: map[string]interface{}{
 				"name": "",
 			},
 			expectErr: true,
 		},
 		{
+			name: "test5",
 			params: map[string]interface{}{
 				"name": nil,
 			},
 			expectErr: true,
 		},
 		{
+			name: "test6",
 			params: map[string]interface{}{
 				"name_wrong_key": "some_value",
 			},
 			expectErr: true,
 		},
 		{
+			name: "test7",
 			params: map[string]interface{}{
 				"NAME": "some_value",
 			},
@@ -77,22 +85,24 @@ func TestNamespaceGenerate(t *testing.T) {
 		},
 	}
 	generator := NamespaceGeneratorV1{}
-	for index, test := range tests {
-		obj, err := generator.Generate(test.params)
-		switch {
-		case test.expectErr && err != nil:
-			continue // loop, since there's no output to check
-		case test.expectErr && err == nil:
-			t.Errorf("%v: expected error and didn't get one", index)
-			continue // loop, no expected output object
-		case !test.expectErr && err != nil:
-			t.Errorf("%v: unexpected error %v", index, err)
-			continue // loop, no output object
-		case !test.expectErr && err == nil:
-			// do nothing and drop through
-		}
-		if !reflect.DeepEqual(obj.(*v1.Namespace), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.Namespace))
-		}
+	for index, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			switch {
+			case tt.expectErr && err != nil:
+				return // loop, since there's no output to check
+			case tt.expectErr && err == nil:
+				t.Errorf("%v: expected error and didn't get one", index)
+				return // loop, no expected output object
+			case !tt.expectErr && err != nil:
+				t.Errorf("%v: unexpected error %v", index, err)
+				return // loop, no output object
+			case !tt.expectErr && err == nil:
+				// do nothing and drop through
+			}
+			if !reflect.DeepEqual(obj.(*v1.Namespace), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*v1.Namespace))
+			}
+		})
 	}
 }

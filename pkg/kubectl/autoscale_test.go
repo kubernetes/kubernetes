@@ -101,28 +101,30 @@ func TestHPAGenerate(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		generator := HorizontalPodAutoscalerGeneratorV1{
-			Name:               test.HPAName,
-			ScaleRefKind:       test.scaleRefKind,
-			ScaleRefName:       test.scaleRefName,
-			ScaleRefApiVersion: test.scaleRefApiVersion,
-			MinReplicas:        test.minReplicas,
-			MaxReplicas:        test.maxReplicas,
-			CPUPercent:         test.CPUPercent,
-		}
-		obj, err := generator.StructuredGenerate()
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("[%s] unexpected error: %v", test.name, err)
-		}
-		if test.expectErr && err == nil {
-			t.Errorf("[%s] expect error, got nil", test.name)
-		}
-		if !reflect.DeepEqual(obj.(*autoscalingv1.HorizontalPodAutoscaler), test.expected) {
-			t.Errorf("[%s] want:\n%#v\ngot:\n%#v", test.name, test.expected, obj.(*autoscalingv1.HorizontalPodAutoscaler))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generator := HorizontalPodAutoscalerGeneratorV1{
+				Name:               tt.HPAName,
+				ScaleRefKind:       tt.scaleRefKind,
+				ScaleRefName:       tt.scaleRefName,
+				ScaleRefApiVersion: tt.scaleRefApiVersion,
+				MinReplicas:        tt.minReplicas,
+				MaxReplicas:        tt.maxReplicas,
+				CPUPercent:         tt.CPUPercent,
+			}
+			obj, err := generator.StructuredGenerate()
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !tt.expectErr && err != nil {
+				t.Errorf("[%s] unexpected error: %v", tt.name, err)
+			}
+			if tt.expectErr && err == nil {
+				t.Errorf("[%s] expect error, got nil", tt.name)
+			}
+			if !reflect.DeepEqual(obj.(*autoscalingv1.HorizontalPodAutoscaler), tt.expected) {
+				t.Errorf("[%s] want:\n%#v\ngot:\n%#v", tt.name, tt.expected, obj.(*autoscalingv1.HorizontalPodAutoscaler))
+			}
+		})
 	}
 }

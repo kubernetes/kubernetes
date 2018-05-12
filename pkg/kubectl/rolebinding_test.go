@@ -25,12 +25,14 @@ import (
 )
 
 func TestRoleBindingGenerate(t *testing.T) {
-	tests := map[string]struct {
+	tests := []struct {
+		name          string
 		params        map[string]interface{}
 		expectErrMsg  string
 		expectBinding *rbac.RoleBinding
 	}{
-		"test-missing-name": {
+		{
+			name: "test-missing-name",
 			params: map[string]interface{}{
 				"role":           "fake-role",
 				"groups":         []string{"fake-group"},
@@ -38,7 +40,8 @@ func TestRoleBindingGenerate(t *testing.T) {
 			},
 			expectErrMsg: "Parameter: name is required",
 		},
-		"test-missing-role-and-clusterrole": {
+		{
+			name: "test-missing-role-and-clusterrole",
 			params: map[string]interface{}{
 				"name":           "fake-binding",
 				"group":          []string{"fake-group"},
@@ -46,7 +49,8 @@ func TestRoleBindingGenerate(t *testing.T) {
 			},
 			expectErrMsg: "exactly one of clusterrole or role must be specified",
 		},
-		"test-both-role-and-clusterrole-provided": {
+		{
+			name: "test-both-role-and-clusterrole-provided",
 			params: map[string]interface{}{
 				"name":           "fake-binding",
 				"role":           "fake-role",
@@ -56,7 +60,8 @@ func TestRoleBindingGenerate(t *testing.T) {
 			},
 			expectErrMsg: "exactly one of clusterrole or role must be specified",
 		},
-		"test-invalid-parameter-type": {
+		{
+			name: "test-invalid-parameter-type",
 			params: map[string]interface{}{
 				"name":           "fake-binding",
 				"role":           []string{"fake-role"},
@@ -65,7 +70,8 @@ func TestRoleBindingGenerate(t *testing.T) {
 			},
 			expectErrMsg: "expected string, saw [fake-role] for 'role'",
 		},
-		"test-invalid-serviceaccount": {
+		{
+			name: "test-invalid-serviceaccount",
 			params: map[string]interface{}{
 				"name":           "fake-binding",
 				"role":           "fake-role",
@@ -74,7 +80,8 @@ func TestRoleBindingGenerate(t *testing.T) {
 			},
 			expectErrMsg: "serviceaccount must be <namespace>:<name>",
 		},
-		"test-valid-case": {
+		{
+			name: "test-valid-case",
 			params: map[string]interface{}{
 				"name":           "fake-binding",
 				"role":           "fake-role",
@@ -113,23 +120,25 @@ func TestRoleBindingGenerate(t *testing.T) {
 	}
 
 	generator := RoleBindingGeneratorV1{}
-	for name, test := range tests {
-		obj, err := generator.Generate(test.params)
-		switch {
-		case test.expectErrMsg != "" && err != nil:
-			if err.Error() != test.expectErrMsg {
-				t.Errorf("test '%s': expect error '%s', but saw '%s'", name, test.expectErrMsg, err.Error())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			switch {
+			case tt.expectErrMsg != "" && err != nil:
+				if err.Error() != tt.expectErrMsg {
+					t.Errorf("test '%s': expect error '%s', but saw '%s'", tt.name, tt.expectErrMsg, err.Error())
+				}
+				return
+			case tt.expectErrMsg != "" && err == nil:
+				t.Errorf("test '%s': expected error '%s' and didn't get one", tt.name, tt.expectErrMsg)
+				return
+			case tt.expectErrMsg == "" && err != nil:
+				t.Errorf("test '%s': unexpected error %s", tt.name, err.Error())
+				return
 			}
-			continue
-		case test.expectErrMsg != "" && err == nil:
-			t.Errorf("test '%s': expected error '%s' and didn't get one", name, test.expectErrMsg)
-			continue
-		case test.expectErrMsg == "" && err != nil:
-			t.Errorf("test '%s': unexpected error %s", name, err.Error())
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*rbac.RoleBinding), test.expectBinding) {
-			t.Errorf("test '%s': expected:\n%#v\nsaw:\n%#v", name, test.expectBinding, obj.(*rbac.RoleBinding))
-		}
+			if !reflect.DeepEqual(obj.(*rbac.RoleBinding), tt.expectBinding) {
+				t.Errorf("test '%s': expected:\n%#v\nsaw:\n%#v", tt.name, tt.expectBinding, obj.(*rbac.RoleBinding))
+			}
+		})
 	}
 }

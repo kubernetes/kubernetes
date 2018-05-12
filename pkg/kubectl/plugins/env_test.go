@@ -25,35 +25,43 @@ import (
 
 func TestEnv(t *testing.T) {
 	tests := []struct {
+		name     string
 		env      Env
 		expected string
 	}{
 		{
+			name:     "test1",
 			env:      Env{"FOO", "BAR"},
 			expected: "FOO=BAR",
 		},
 		{
+			name:     "test2",
 			env:      Env{"FOO", "BAR="},
 			expected: "FOO=BAR=",
 		},
 		{
+			name:     "test3",
 			env:      Env{"FOO", ""},
 			expected: "FOO=",
 		},
 	}
-	for _, test := range tests {
-		if s := test.env.String(); s != test.expected {
-			t.Errorf("%v: expected string %q, got %q", test.env, test.expected, s)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if s := tt.env.String(); s != tt.expected {
+				t.Errorf("%v: expected string %q, got %q", tt.env, tt.expected, s)
+			}
+		})
 	}
 }
 
 func TestEnvListToSlice(t *testing.T) {
 	tests := []struct {
+		name     string
 		env      EnvList
 		expected []string
 	}{
 		{
+			name: "test1",
 			env: EnvList{
 				{"FOO", "BAR"},
 				{"ZEE", "YO"},
@@ -64,20 +72,24 @@ func TestEnvListToSlice(t *testing.T) {
 			expected: []string{"FOO=BAR", "ZEE=YO", "ONE=1", "EQUALS===", "EMPTY="},
 		},
 	}
-	for _, test := range tests {
-		if s := test.env.Slice(); !reflect.DeepEqual(test.expected, s) {
-			t.Errorf("%v: expected %v, got %v", test.env, test.expected, s)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if s := tt.env.Slice(); !reflect.DeepEqual(tt.expected, s) {
+				t.Errorf("%v: expected %v, got %v", tt.env, tt.expected, s)
+			}
+		})
 	}
 }
 
 func TestAddToEnvList(t *testing.T) {
 	tests := []struct {
+		name     string
 		add      []string
 		expected EnvList
 	}{
 		{
-			add: []string{"FOO=BAR", "EMPTY=", "EQUALS===", "JUSTNAME"},
+			name: "test1",
+			add:  []string{"FOO=BAR", "EMPTY=", "EQUALS===", "JUSTNAME"},
 			expected: EnvList{
 				{"FOO", "BAR"},
 				{"EMPTY", ""},
@@ -86,11 +98,13 @@ func TestAddToEnvList(t *testing.T) {
 			},
 		},
 	}
-	for _, test := range tests {
-		env := EnvList{}.Merge(test.add...)
-		if !reflect.DeepEqual(test.expected, env) {
-			t.Errorf("%v: expected %v, got %v", test.add, test.expected, env)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := EnvList{}.Merge(tt.add...)
+			if !reflect.DeepEqual(tt.expected, env) {
+				t.Errorf("%v: expected %v, got %v", tt.add, tt.expected, env)
+			}
+		})
 	}
 }
 
@@ -102,37 +116,45 @@ func TestFlagToEnv(t *testing.T) {
 	flags.Parse([]string{"--from-file=nondefault"})
 
 	tests := []struct {
+		name     string
 		flag     *pflag.Flag
 		prefix   string
 		expected Env
 	}{
 		{
+			name:     "test1",
 			flag:     flags.Lookup("test"),
 			expected: Env{"TEST", "ok"},
 		},
 		{
+			name:     "test2",
 			flag:     flags.Lookup("kube-master"),
 			expected: Env{"KUBE_MASTER", "http://something"},
 		},
 		{
+			name:     "test3",
 			prefix:   "KUBECTL_",
 			flag:     flags.Lookup("from-file"),
 			expected: Env{"KUBECTL_FROM_FILE", "nondefault"},
 		},
 	}
-	for _, test := range tests {
-		if env := FlagToEnv(test.flag, test.prefix); !reflect.DeepEqual(test.expected, env) {
-			t.Errorf("%v: expected %v, got %v", test.flag.Name, test.expected, env)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if env := FlagToEnv(tt.flag, tt.prefix); !reflect.DeepEqual(tt.expected, env) {
+				t.Errorf("%v: expected %v, got %v", tt.flag.Name, tt.expected, env)
+			}
+		})
 	}
 }
 
 func TestPluginDescriptorEnvProvider(t *testing.T) {
 	tests := []struct {
+		name     string
 		plugin   *Plugin
 		expected EnvList
 	}{
 		{
+			name: "test1",
 			plugin: &Plugin{
 				Description: Description{
 					Name:      "test",
@@ -149,14 +171,16 @@ func TestPluginDescriptorEnvProvider(t *testing.T) {
 			},
 		},
 	}
-	for _, test := range tests {
-		provider := &PluginDescriptorEnvProvider{
-			Plugin: test.plugin,
-		}
-		env, _ := provider.Env()
-		if !reflect.DeepEqual(test.expected, env) {
-			t.Errorf("%v: expected %v, got %v", test.plugin.Name, test.expected, env)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &PluginDescriptorEnvProvider{
+				Plugin: tt.plugin,
+			}
+			env, _ := provider.Env()
+			if !reflect.DeepEqual(tt.expected, env) {
+				t.Errorf("%v: expected %v, got %v", tt.plugin.Name, tt.expected, env)
+			}
+		})
 	}
 
 }

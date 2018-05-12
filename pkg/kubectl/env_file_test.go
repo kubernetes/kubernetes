@@ -48,24 +48,26 @@ func Test_processEnvFileLine(t *testing.T) {
 		{"key is returned even with no value",
 			[]byte{' ', 'x', '='}, 0, "x", "", ""},
 	}
-	for _, c := range testCases {
-		key, value, err := proccessEnvFileLine(c.line, `filename`, c.currentLine)
-		t.Logf("Testing that %s.", c.name)
-		if c.expectedKey != key {
-			t.Errorf("\texpected key %q, received %q", c.expectedKey, key)
-		}
-		if c.expectedValue != value {
-			t.Errorf("\texpected value %q, received %q", c.expectedValue, value)
-		}
-		if len(c.expectedErr) == 0 {
-			if err != nil {
-				t.Errorf("\tunexpected err %v", err)
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			key, value, err := proccessEnvFileLine(tt.line, `filename`, tt.currentLine)
+			t.Logf("Testing that %s.", tt.name)
+			if tt.expectedKey != key {
+				t.Errorf("\texpected key %q, received %q", tt.expectedKey, key)
 			}
-		} else {
-			if !strings.Contains(err.Error(), c.expectedErr) {
-				t.Errorf("\terr %v doesn't match expected %q", err, c.expectedErr)
+			if tt.expectedValue != value {
+				t.Errorf("\texpected value %q, received %q", tt.expectedValue, value)
 			}
-		}
+			if len(tt.expectedErr) == 0 {
+				if err != nil {
+					t.Errorf("\tunexpected err %v", err)
+				}
+			} else {
+				if !strings.Contains(err.Error(), tt.expectedErr) {
+					t.Errorf("\terr %v doesn't match expected %q", err, tt.expectedErr)
+				}
+			}
+		})
 	}
 }
 

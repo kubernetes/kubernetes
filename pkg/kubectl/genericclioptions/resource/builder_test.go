@@ -378,33 +378,35 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 		{"hardlink", &v1.Pod{}, true, fmt.Sprintf("%s/inode/hardlink/busybox-link.json", tmpDir), []string{"busybox0"}},
 	}
 
-	for _, test := range tests {
-		b := newDefaultBuilder().
-			FilenameParam(false, &FilenameOptions{Recursive: test.recursive, Filenames: []string{test.directory}}).
-			NamespaceParam("test").DefaultNamespace()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newDefaultBuilder().
+				FilenameParam(false, &FilenameOptions{Recursive: tt.recursive, Filenames: []string{tt.directory}}).
+				NamespaceParam("test").DefaultNamespace()
 
-		testVisitor := &testVisitor{}
-		singleItemImplied := false
+			testVisitor := &testVisitor{}
+			singleItemImplied := false
 
-		err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(testVisitor.Handle)
-		if err != nil {
-			t.Fatalf("unexpected response: %v %t %#v %s", err, singleItemImplied, testVisitor.Infos, test.name)
-		}
+			err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(testVisitor.Handle)
+			if err != nil {
+				t.Fatalf("unexpected response: %v %t %#v %s", err, singleItemImplied, testVisitor.Infos, tt.name)
+			}
 
-		info := testVisitor.Infos
+			info := testVisitor.Infos
 
-		for i, v := range info {
-			switch test.object.(type) {
-			case *v1.Pod:
-				if _, ok := v.Object.(*v1.Pod); !ok || v.Name != test.expectedNames[i] || v.Namespace != "test" {
-					t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
-				}
-			case *v1.ReplicationController:
-				if _, ok := v.Object.(*v1.ReplicationController); !ok || v.Name != test.expectedNames[i] || v.Namespace != "test" {
-					t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
+			for i, v := range info {
+				switch tt.object.(type) {
+				case *v1.Pod:
+					if _, ok := v.Object.(*v1.Pod); !ok || v.Name != tt.expectedNames[i] || v.Namespace != "test" {
+						t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
+					}
+				case *v1.ReplicationController:
+					if _, ok := v.Object.(*v1.ReplicationController); !ok || v.Name != tt.expectedNames[i] || v.Namespace != "test" {
+						t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
+					}
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -437,18 +439,20 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 		{"loop", true, fmt.Sprintf("%s/inode/symlink/loop", tmpDir)},
 	}
 
-	for _, test := range tests {
-		b := newDefaultBuilder().
-			FilenameParam(false, &FilenameOptions{Recursive: test.recursive, Filenames: []string{test.directory}}).
-			NamespaceParam("test").DefaultNamespace()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newDefaultBuilder().
+				FilenameParam(false, &FilenameOptions{Recursive: tt.recursive, Filenames: []string{tt.directory}}).
+				NamespaceParam("test").DefaultNamespace()
 
-		testVisitor := &testVisitor{}
-		singleItemImplied := false
+			testVisitor := &testVisitor{}
+			singleItemImplied := false
 
-		err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(testVisitor.Handle)
-		if err == nil {
-			t.Fatalf("unexpected response: %v %t %#v %s", err, singleItemImplied, testVisitor.Infos, test.name)
-		}
+			err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(testVisitor.Handle)
+			if err == nil {
+				t.Fatalf("unexpected response: %v %t %#v %s", err, singleItemImplied, testVisitor.Infos, tt.name)
+			}
+		})
 	}
 }
 
@@ -928,43 +932,45 @@ func TestResourceTuple(t *testing.T) {
 			errFn: expectErr,
 		},
 	}
-	for k, testCase := range testCases {
-		for _, requireObject := range []bool{true, false} {
-			expectedRequests := map[string]string{}
-			if requireObject {
-				pods, _ := testData()
-				expectedRequests = map[string]string{
-					"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
-					"/namespaces/test/pods/bar": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
-					"/nodes/foo":                runtime.EncodeOrDie(corev1Codec, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}),
+	for k, tt := range testCases {
+		t.Run("using default namespace", func(t *testing.T) {
+			for _, requireObject := range []bool{true, false} {
+				expectedRequests := map[string]string{}
+				if requireObject {
+					pods, _ := testData()
+					expectedRequests = map[string]string{
+						"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
+						"/namespaces/test/pods/bar": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
+						"/nodes/foo":                runtime.EncodeOrDie(corev1Codec, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}),
+					}
+				}
+				b := newDefaultBuilderWith(fakeClientWith(k, t, expectedRequests)).
+					NamespaceParam("test").DefaultNamespace().
+					ResourceTypeOrNameArgs(true, tt.args...).RequireObject(requireObject)
+
+				r := b.Do()
+
+				if !tt.errFn(r.Err()) {
+					t.Errorf("%s: unexpected error: %v", k, r.Err())
+				}
+				if r.Err() != nil {
+					continue
+				}
+				switch {
+				case (r.singleItemImplied && len(tt.args) != 1),
+					(!r.singleItemImplied && len(tt.args) == 1):
+					t.Errorf("%s: result had unexpected singleItemImplied value", k)
+				}
+				info, err := r.Infos()
+				if err != nil {
+					// test error
+					continue
+				}
+				if len(info) != len(tt.args) {
+					t.Errorf("%s: unexpected number of infos returned: %#v", k, info)
 				}
 			}
-			b := newDefaultBuilderWith(fakeClientWith(k, t, expectedRequests)).
-				NamespaceParam("test").DefaultNamespace().
-				ResourceTypeOrNameArgs(true, testCase.args...).RequireObject(requireObject)
-
-			r := b.Do()
-
-			if !testCase.errFn(r.Err()) {
-				t.Errorf("%s: unexpected error: %v", k, r.Err())
-			}
-			if r.Err() != nil {
-				continue
-			}
-			switch {
-			case (r.singleItemImplied && len(testCase.args) != 1),
-				(!r.singleItemImplied && len(testCase.args) == 1):
-				t.Errorf("%s: result had unexpected singleItemImplied value", k)
-			}
-			info, err := r.Infos()
-			if err != nil {
-				// test error
-				continue
-			}
-			if len(info) != len(testCase.args) {
-				t.Errorf("%s: unexpected number of infos returned: %#v", k, info)
-			}
-		}
+		})
 	}
 }
 
@@ -1296,120 +1302,146 @@ func TestReceiveMultipleErrors(t *testing.T) {
 func TestHasNames(t *testing.T) {
 	basename := filepath.Base(os.Args[0])
 	tests := []struct {
+		name            string
 		args            []string
 		expectedHasName bool
 		expectedError   error
 	}{
 		{
+			name:            "test1",
 			args:            []string{""},
 			expectedHasName: false,
 			expectedError:   nil,
 		},
 		{
+			name:            "test2",
 			args:            []string{"rc"},
 			expectedHasName: false,
 			expectedError:   nil,
 		},
 		{
+			name:            "test3",
 			args:            []string{"rc,pod,svc"},
 			expectedHasName: false,
 			expectedError:   nil,
 		},
 		{
+			name:            "test4",
 			args:            []string{"rc/foo"},
 			expectedHasName: true,
 			expectedError:   nil,
 		},
 		{
+			name:            "test5",
 			args:            []string{"rc", "foo"},
 			expectedHasName: true,
 			expectedError:   nil,
 		},
 		{
+			name:            "test6",
 			args:            []string{"rc,pod,svc", "foo"},
 			expectedHasName: true,
 			expectedError:   nil,
 		},
 		{
+			name:            "test7",
 			args:            []string{"rc/foo", "rc/bar", "rc/zee"},
 			expectedHasName: true,
 			expectedError:   nil,
 		},
 		{
+			name:            "test8",
 			args:            []string{"rc/foo", "bar"},
 			expectedHasName: false,
 			expectedError:   fmt.Errorf("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. '" + basename + " get resource/<resource_name>' instead of '" + basename + " get resource resource/<resource_name>'"),
 		},
 	}
-	for _, test := range tests {
-		hasNames, err := HasNames(test.args)
-		if !reflect.DeepEqual(test.expectedError, err) {
-			t.Errorf("expected HasName to error:\n%s\tgot:\n%s", test.expectedError, err)
-		}
-		if hasNames != test.expectedHasName {
-			t.Errorf("expected HasName to return %v for %s", test.expectedHasName, test.args)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hasNames, err := HasNames(tt.args)
+			if !reflect.DeepEqual(tt.expectedError, err) {
+				t.Errorf("expected HasName to error:\n%s\tgot:\n%s", tt.expectedError, err)
+			}
+			if hasNames != tt.expectedHasName {
+				t.Errorf("expected HasName to return %v for %s", tt.expectedHasName, tt.args)
+			}
+		})
 	}
 }
 
 func TestMultipleTypesRequested(t *testing.T) {
 	tests := []struct {
+		name                  string
 		args                  []string
 		expectedMultipleTypes bool
 	}{
 		{
+			name: "test1",
 			args: []string{""},
 			expectedMultipleTypes: false,
 		},
 		{
+			name: "test2",
 			args: []string{"all"},
 			expectedMultipleTypes: true,
 		},
 		{
+			name: "test3",
 			args: []string{"rc"},
 			expectedMultipleTypes: false,
 		},
 		{
+			name: "test4",
 			args: []string{"pod,all"},
 			expectedMultipleTypes: true,
 		},
 		{
+			name: "test5",
 			args: []string{"all,rc,pod"},
 			expectedMultipleTypes: true,
 		},
 		{
+			name: "test6",
 			args: []string{"rc,pod,svc"},
 			expectedMultipleTypes: true,
 		},
 		{
+			name: "test7",
 			args: []string{"rc/foo"},
 			expectedMultipleTypes: false,
 		},
 		{
+			name: "test8",
 			args: []string{"rc/foo", "rc/bar"},
 			expectedMultipleTypes: false,
 		},
 		{
+			name: "test9",
 			args: []string{"rc", "foo"},
 			expectedMultipleTypes: false,
 		},
 		{
+			name: "test10",
 			args: []string{"rc,pod,svc", "foo"},
 			expectedMultipleTypes: true,
 		},
 		{
+			name: "test11",
 			args: []string{"rc,secrets"},
 			expectedMultipleTypes: true,
 		},
 		{
+			name: "test12",
 			args: []string{"rc/foo", "rc/bar", "svc/svc"},
 			expectedMultipleTypes: true,
 		},
 	}
-	for _, test := range tests {
-		hasMultipleTypes := MultipleTypesRequested(test.args)
-		if hasMultipleTypes != test.expectedMultipleTypes {
-			t.Errorf("expected MultipleTypesRequested to return %v for %s", test.expectedMultipleTypes, test.args)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hasMultipleTypes := MultipleTypesRequested(tt.args)
+			if hasMultipleTypes != tt.expectedMultipleTypes {
+				t.Errorf("expected MultipleTypesRequested to return %v for %s", tt.expectedMultipleTypes, tt.args)
+			}
+		})
 	}
 }
