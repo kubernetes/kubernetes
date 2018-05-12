@@ -112,11 +112,10 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
 			m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, glog.Info)
 			return imageRef, "", nil
-		} else {
-			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
-			m.logIt(ref, v1.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
-			return "", msg, ErrImageNeverPull
 		}
+		msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
+		m.logIt(ref, v1.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
+		return "", msg, ErrImageNeverPull
 	}
 
 	backOffKey := fmt.Sprintf("%s_%s", pod.UID, container.Image)
