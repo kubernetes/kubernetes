@@ -28,13 +28,13 @@ import (
 type PodBindingCache interface {
 	// UpdateBindings will update the cache with the given bindings for the
 	// pod and node.
-	UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo)
+	UpdateBindings(pod *v1.Pod, node string, bindings []bindingInfo)
 
 	// DeleteBindings will remove all cached bindings for the given pod.
 	DeleteBindings(pod *v1.Pod)
 
 	// GetBindings will return the cached bindings for the given pod and node.
-	GetBindings(pod *v1.Pod, node string) []*bindingInfo
+	GetBindings(pod *v1.Pod, node string) []bindingInfo
 }
 
 type podBindingCache struct {
@@ -47,7 +47,7 @@ type podBindingCache struct {
 
 // Key = nodeName
 // Value = array of bindingInfo
-type nodeBindings map[string][]*bindingInfo
+type nodeBindings map[string][]bindingInfo
 
 func NewPodBindingCache() PodBindingCache {
 	return &podBindingCache{bindings: map[string]nodeBindings{}}
@@ -61,7 +61,7 @@ func (c *podBindingCache) DeleteBindings(pod *v1.Pod) {
 	delete(c.bindings, podName)
 }
 
-func (c *podBindingCache) UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo) {
+func (c *podBindingCache) UpdateBindings(pod *v1.Pod, node string, bindings []bindingInfo) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -74,7 +74,7 @@ func (c *podBindingCache) UpdateBindings(pod *v1.Pod, node string, bindings []*b
 	nodeBinding[node] = bindings
 }
 
-func (c *podBindingCache) GetBindings(pod *v1.Pod, node string) []*bindingInfo {
+func (c *podBindingCache) GetBindings(pod *v1.Pod, node string) []bindingInfo {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 

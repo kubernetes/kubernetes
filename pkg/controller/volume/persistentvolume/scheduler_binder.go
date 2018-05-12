@@ -180,7 +180,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 
 	assumedPod.Spec.NodeName = nodeName
 	claimsToBind := b.podBindingCache.GetBindings(assumedPod, nodeName)
-	newBindings := []*bindingInfo{}
+	newBindings := []bindingInfo{}
 
 	for _, binding := range claimsToBind {
 		newPV, dirty, err := b.ctrl.getBindVolumeToClaim(binding.pv, binding.pvc)
@@ -201,7 +201,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 				return false, true, err
 			}
 
-			newBindings = append(newBindings, &bindingInfo{pv: newPV, pvc: binding.pvc})
+			newBindings = append(newBindings, bindingInfo{pv: newPV, pvc: binding.pvc})
 		}
 	}
 
@@ -287,10 +287,10 @@ func (b *volumeBinder) arePodVolumesBound(pod *v1.Pod) bool {
 
 // getPodVolumes returns a pod's PVCs separated into bound (including prebound), unbound with delayed binding,
 // and unbound with immediate binding
-func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentVolumeClaim, unboundClaims []*bindingInfo, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
+func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentVolumeClaim, unboundClaims []bindingInfo, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
 	boundClaims = []*v1.PersistentVolumeClaim{}
 	unboundClaimsImmediate = []*v1.PersistentVolumeClaim{}
-	unboundClaims = []*bindingInfo{}
+	unboundClaims = []bindingInfo{}
 
 	for _, vol := range pod.Spec.Volumes {
 		volumeBound, pvc, err := b.isVolumeBound(pod.Namespace, &vol, false)
@@ -309,7 +309,7 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 			}
 			if delayBinding {
 				// Scheduler path
-				unboundClaims = append(unboundClaims, &bindingInfo{pvc: pvc})
+				unboundClaims = append(unboundClaims, bindingInfo{pvc: pvc})
 			} else {
 				// Immediate binding should have already been bound
 				unboundClaimsImmediate = append(unboundClaimsImmediate, pvc)
@@ -339,13 +339,14 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 	return true, nil
 }
 
-func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*bindingInfo, node *v1.Node) (foundMatches bool, err error) {
+func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []bindingInfo, node *v1.Node) (foundMatches bool, err error) {
 	// Sort all the claims by increasing size request to get the smallest fits
 	sort.Sort(byPVCSize(claimsToBind))
 
 	chosenPVs := map[string]*v1.PersistentVolume{}
 
-	for _, bindingInfo := range claimsToBind {
+	for i := 0; i < len(claimsToBind); i++ {
+		bindingInfo := &claimsToBind[i]
 		// Get storage class name from each PVC
 		storageClassName := ""
 		storageClass := bindingInfo.pvc.Spec.StorageClassName
@@ -375,7 +376,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*bindingI
 	return true, nil
 }
 
-func (b *volumeBinder) revertAssumedPVs(bindings []*bindingInfo) {
+func (b *volumeBinder) revertAssumedPVs(bindings []bindingInfo) {
 	for _, bindingInfo := range bindings {
 		b.pvCache.Restore(bindingInfo.pv.Name)
 	}
@@ -402,7 +403,7 @@ func (b bindingInfo) String() string {
 	return fmt.Sprintf("[PVC %q, PV %q]", pvcName, pvName)
 }
 
-type byPVCSize []*bindingInfo
+type byPVCSize []bindingInfo
 
 func (a byPVCSize) Len() int {
 	return len(a)

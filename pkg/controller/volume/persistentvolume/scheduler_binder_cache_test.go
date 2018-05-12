@@ -26,11 +26,11 @@ import (
 
 func TestUpdateGetBindings(t *testing.T) {
 	scenarios := map[string]struct {
-		updateBindings []*bindingInfo
+		updateBindings []bindingInfo
 		updatePod      string
 		updateNode     string
 
-		getBindings []*bindingInfo
+		getBindings []bindingInfo
 		getPod      string
 		getNode     string
 	}{
@@ -41,17 +41,17 @@ func TestUpdateGetBindings(t *testing.T) {
 		"no-node": {
 			updatePod:      "pod1",
 			updateNode:     "node1",
-			updateBindings: []*bindingInfo{},
+			updateBindings: []bindingInfo{},
 			getPod:         "pod1",
 			getNode:        "node2",
 		},
 		"binding-exists": {
 			updatePod:      "pod1",
 			updateNode:     "node1",
-			updateBindings: []*bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}},
+			updateBindings: []bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}},
 			getPod:         "pod1",
 			getNode:        "node1",
-			getBindings:    []*bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}},
+			getBindings:    []bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}},
 		},
 	}
 
@@ -78,7 +78,7 @@ func TestUpdateGetBindings(t *testing.T) {
 }
 
 func TestDeleteBindings(t *testing.T) {
-	initialBindings := []*bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}}
+	initialBindings := []bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}}
 	cache := NewPodBindingCache()
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "ns"}}

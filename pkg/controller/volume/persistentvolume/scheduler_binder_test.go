@@ -165,7 +165,7 @@ func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.P
 
 }
 
-func (env *testEnv) assumeVolumes(t *testing.T, name, node string, pod *v1.Pod, bindings []*bindingInfo) {
+func (env *testEnv) assumeVolumes(t *testing.T, name, node string, pod *v1.Pod, bindings []bindingInfo) {
 	pvCache := env.internalBinder.pvCache
 	for _, binding := range bindings {
 		if err := pvCache.Assume(binding.pv); err != nil {
@@ -176,12 +176,12 @@ func (env *testEnv) assumeVolumes(t *testing.T, name, node string, pod *v1.Pod, 
 	env.internalBinder.podBindingCache.UpdateBindings(pod, node, bindings)
 }
 
-func (env *testEnv) initPodCache(pod *v1.Pod, node string, bindings []*bindingInfo) {
+func (env *testEnv) initPodCache(pod *v1.Pod, node string, bindings []bindingInfo) {
 	cache := env.internalBinder.podBindingCache
 	cache.UpdateBindings(pod, node, bindings)
 }
 
-func (env *testEnv) validatePodCache(t *testing.T, name, node string, pod *v1.Pod, expectedBindings []*bindingInfo) {
+func (env *testEnv) validatePodCache(t *testing.T, name, node string, pod *v1.Pod, expectedBindings []bindingInfo) {
 	cache := env.internalBinder.podBindingCache
 	bindings := cache.GetBindings(pod, node)
 
@@ -190,7 +190,7 @@ func (env *testEnv) validatePodCache(t *testing.T, name, node string, pod *v1.Po
 	}
 }
 
-func (env *testEnv) validateAssume(t *testing.T, name string, pod *v1.Pod, bindings []*bindingInfo) {
+func (env *testEnv) validateAssume(t *testing.T, name string, pod *v1.Pod, bindings []bindingInfo) {
 	// TODO: Check binding cache
 
 	// Check pv cache
@@ -214,7 +214,7 @@ func (env *testEnv) validateAssume(t *testing.T, name string, pod *v1.Pod, bindi
 	}
 }
 
-func (env *testEnv) validateFailedAssume(t *testing.T, name string, pod *v1.Pod, bindings []*bindingInfo) {
+func (env *testEnv) validateFailedAssume(t *testing.T, name string, pod *v1.Pod, bindings []bindingInfo) {
 	// All PVs have been unmodified in cache
 	pvCache := env.internalBinder.pvCache
 	for _, b := range bindings {
@@ -379,8 +379,8 @@ func makePodWithoutPVC() *v1.Pod {
 	return pod
 }
 
-func makeBinding(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) *bindingInfo {
-	return &bindingInfo{pvc: pvc, pv: pv}
+func makeBinding(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) bindingInfo {
+	return bindingInfo{pvc: pvc, pv: pv}
 }
 
 func TestFindPodVolumes(t *testing.T) {
@@ -394,7 +394,7 @@ func TestFindPodVolumes(t *testing.T) {
 		pod *v1.Pod
 
 		// Expected podBindingCache fields
-		expectedBindings []*bindingInfo
+		expectedBindings []bindingInfo
 
 		// Expected return values
 		expectedUnbound bool
@@ -439,7 +439,7 @@ func TestFindPodVolumes(t *testing.T) {
 		"unbound-pvc,pv-same-node": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC},
 			pvs:              []*v1.PersistentVolume{pvNode2, pvNode1a, pvNode1b},
-			expectedBindings: []*bindingInfo{binding1a},
+			expectedBindings: []bindingInfo{binding1a},
 			expectedUnbound:  true,
 			expectedBound:    true,
 		},
@@ -452,14 +452,14 @@ func TestFindPodVolumes(t *testing.T) {
 		"two-unbound-pvcs": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, unboundPVC2},
 			pvs:              []*v1.PersistentVolume{pvNode1a, pvNode1b},
-			expectedBindings: []*bindingInfo{binding1a, binding1b},
+			expectedBindings: []bindingInfo{binding1a, binding1b},
 			expectedUnbound:  true,
 			expectedBound:    true,
 		},
 		"two-unbound-pvcs,order-by-size": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC2, unboundPVC},
 			pvs:              []*v1.PersistentVolume{pvNode1a, pvNode1b},
-			expectedBindings: []*bindingInfo{binding1a, binding1b},
+			expectedBindings: []bindingInfo{binding1a, binding1b},
 			expectedUnbound:  true,
 			expectedBound:    true,
 		},
@@ -472,7 +472,7 @@ func TestFindPodVolumes(t *testing.T) {
 		"one-bound,one-unbound": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, boundPVC},
 			pvs:              []*v1.PersistentVolume{pvBound, pvNode1a},
-			expectedBindings: []*bindingInfo{binding1a},
+			expectedBindings: []bindingInfo{binding1a},
 			expectedUnbound:  true,
 			expectedBound:    true,
 		},
@@ -485,7 +485,7 @@ func TestFindPodVolumes(t *testing.T) {
 		"one-prebound,one-unbound": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, preboundPVC},
 			pvs:              []*v1.PersistentVolume{pvNode1a, pvNode1b},
-			expectedBindings: []*bindingInfo{binding1a},
+			expectedBindings: []bindingInfo{binding1a},
 			expectedUnbound:  true,
 			expectedBound:    true,
 		},
@@ -578,7 +578,7 @@ func TestAssumePodVolumes(t *testing.T) {
 		// Inputs
 		podPVCs  []*v1.PersistentVolumeClaim
 		pvs      []*v1.PersistentVolume
-		bindings []*bindingInfo
+		bindings []bindingInfo
 
 		// Expected return values
 		shouldFail              bool
@@ -586,7 +586,7 @@ func TestAssumePodVolumes(t *testing.T) {
 		expectedAllBound        bool
 
 		// if nil, use bindings
-		expectedBindings []*bindingInfo
+		expectedBindings []bindingInfo
 	}{
 		"all-bound": {
 			podPVCs:          []*v1.PersistentVolumeClaim{boundPVC},
@@ -599,33 +599,33 @@ func TestAssumePodVolumes(t *testing.T) {
 		},
 		"one-binding": {
 			podPVCs:  []*v1.PersistentVolumeClaim{unboundPVC},
-			bindings: []*bindingInfo{binding1a},
+			bindings: []bindingInfo{binding1a},
 			pvs:      []*v1.PersistentVolume{pvNode1a},
 			expectedBindingRequired: true,
 		},
 		"two-bindings": {
 			podPVCs:  []*v1.PersistentVolumeClaim{unboundPVC, unboundPVC2},
-			bindings: []*bindingInfo{binding1a, binding1b},
+			bindings: []bindingInfo{binding1a, binding1b},
 			pvs:      []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			expectedBindingRequired: true,
 		},
 		"pv-already-bound": {
 			podPVCs:  []*v1.PersistentVolumeClaim{unboundPVC},
-			bindings: []*bindingInfo{binding1aBound},
+			bindings: []bindingInfo{binding1aBound},
 			pvs:      []*v1.PersistentVolume{pvNode1aBound},
 			expectedBindingRequired: false,
-			expectedBindings:        []*bindingInfo{},
+			expectedBindings:        []bindingInfo{},
 		},
 		"claimref-failed": {
 			podPVCs:                 []*v1.PersistentVolumeClaim{unboundPVC},
-			bindings:                []*bindingInfo{binding1a, bindingBad},
+			bindings:                []bindingInfo{binding1a, bindingBad},
 			pvs:                     []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			shouldFail:              true,
 			expectedBindingRequired: true,
 		},
 		"tmpupdate-failed": {
 			podPVCs:                 []*v1.PersistentVolumeClaim{unboundPVC},
-			bindings:                []*bindingInfo{binding1a, binding1b},
+			bindings:                []bindingInfo{binding1a, binding1b},
 			pvs:                     []*v1.PersistentVolume{pvNode1a},
 			shouldFail:              true,
 			expectedBindingRequired: true,
@@ -672,7 +672,7 @@ func TestAssumePodVolumes(t *testing.T) {
 func TestBindPodVolumes(t *testing.T) {
 	scenarios := map[string]struct {
 		// Inputs
-		bindings  []*bindingInfo
+		bindings  []bindingInfo
 		cachedPVs []*v1.PersistentVolume
 		// if nil, use cachedPVs
 		apiPVs []*v1.PersistentVolume
@@ -685,20 +685,20 @@ func TestBindPodVolumes(t *testing.T) {
 	}{
 		"all-bound": {},
 		"not-fully-bound": {
-			bindings: []*bindingInfo{},
+			bindings: []bindingInfo{},
 		},
 		"one-binding": {
-			bindings:    []*bindingInfo{binding1aBound},
+			bindings:    []bindingInfo{binding1aBound},
 			cachedPVs:   []*v1.PersistentVolume{pvNode1a},
 			expectedPVs: []*v1.PersistentVolume{pvNode1aBound},
 		},
 		"two-bindings": {
-			bindings:    []*bindingInfo{binding1aBound, binding1bBound},
+			bindings:    []bindingInfo{binding1aBound, binding1bBound},
 			cachedPVs:   []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			expectedPVs: []*v1.PersistentVolume{pvNode1aBound, pvNode1bBound},
 		},
 		"api-update-failed": {
-			bindings:       []*bindingInfo{binding1aBound, binding1bBound},
+			bindings:       []bindingInfo{binding1aBound, binding1bBound},
 			cachedPVs:      []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			apiPVs:         []*v1.PersistentVolume{pvNode1a, pvNode1bBoundHigherVersion},
 			expectedPVs:    []*v1.PersistentVolume{pvNode1aBound, pvNode1b},
