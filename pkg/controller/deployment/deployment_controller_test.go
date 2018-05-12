@@ -45,6 +45,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
 var (
@@ -77,7 +78,7 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 
 func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *apps.Deployment {
 	d := apps.Deployment{
-		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1"},
+		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:         uuid.NewUUID(),
 			Name:        name,
@@ -120,6 +121,7 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 
 func newReplicaSet(d *apps.Deployment, name string, replicas int) *apps.ReplicaSet {
 	return &apps.ReplicaSet{
+		TypeMeta: metav1.TypeMeta{Kind: "ReplicaSet"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			UID:             uuid.NewUUID(),
@@ -132,15 +134,6 @@ func newReplicaSet(d *apps.Deployment, name string, replicas int) *apps.ReplicaS
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Template: d.Spec.Template,
 		},
-	}
-}
-
-func getKey(d *apps.Deployment, t *testing.T) string {
-	if key, err := controller.KeyFunc(d); err != nil {
-		t.Errorf("Unexpected error getting key for deployment %v: %v", d.Name, err)
-		return ""
-	} else {
-		return key
 	}
 }
 
@@ -285,7 +278,7 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	f.expectUpdateDeploymentStatusAction(d)
 	f.expectUpdateDeploymentStatusAction(d)
 
-	f.run(getKey(d, t))
+	f.run(testutil.GetKey(d, t))
 }
 
 func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
@@ -298,7 +291,7 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	f.objects = append(f.objects, d)
 
 	f.expectUpdateDeploymentStatusAction(d)
-	f.run(getKey(d, t))
+	f.run(testutil.GetKey(d, t))
 }
 
 func TestSyncDeploymentDeletionRace(t *testing.T) {
@@ -323,7 +316,7 @@ func TestSyncDeploymentDeletionRace(t *testing.T) {
 	f.expectGetDeploymentAction(d)
 	// Sync should fail and requeue to let cache catch up.
 	// Don't start informers, since we don't want cache to catch up for this test.
-	f.runExpectError(getKey(d, t), false)
+	f.runExpectError(testutil.GetKey(d, t), false)
 }
 
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
@@ -337,7 +330,7 @@ func TestDontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 
 	// Normally there should be a status update to sync observedGeneration but the fake
 	// deployment has no generation set so there is no action happpening here.
-	f.run(getKey(d, t))
+	f.run(testutil.GetKey(d, t))
 }
 
 func TestReentrantRollback(t *testing.T) {
@@ -364,7 +357,7 @@ func TestReentrantRollback(t *testing.T) {
 	// Rollback is done here
 	f.expectUpdateDeploymentAction(d)
 	// Expect no update on replica sets though
-	f.run(getKey(d, t))
+	f.run(testutil.GetKey(d, t))
 }
 
 // TestPodDeletionEnqueuesRecreateDeployment ensures that the deletion of a pod
