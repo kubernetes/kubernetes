@@ -24,6 +24,7 @@ go_library(
         "kubelet_etc_hosts.go",
         "networking.go",
         "pods.go",
+        "podtemplates.go",
         "privileged.go",
         "projected.go",
         "secrets.go",
