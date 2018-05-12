@@ -32,14 +32,16 @@ func TestIsValidAuthorizationMode(t *testing.T) {
 		{"AlwaysAllow", true},  // supported
 		{"AlwaysDeny", true},   // supported
 	}
-	for _, rt := range tests {
-		actual := IsValidAuthorizationMode(rt.authzMode)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed ValidAuthorizationMode:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				actual,
-			)
-		}
+	for _, tt := range tests {
+		t.Run("mode is "+tt.authzMode, func(t *testing.T) {
+			actual := IsValidAuthorizationMode(tt.authzMode)
+			if actual != tt.expected {
+				t.Errorf(
+					"failed ValidAuthorizationMode:\n\texpected: %t\n\t  actual: %t",
+					tt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }

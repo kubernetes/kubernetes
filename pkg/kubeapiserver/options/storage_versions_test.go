@@ -25,12 +25,14 @@ import (
 
 func TestGenerateStorageVersionMap(t *testing.T) {
 	testCases := []struct {
+		name            string
 		legacyVersion   string
 		storageVersions string
 		defaultVersions string
 		expectedMap     map[string]schema.GroupVersion
 	}{
 		{
+			name:            "test-storageVersions-v1,extensions/v1beta1",
 			legacyVersion:   "v1",
 			storageVersions: "v1,extensions/v1beta1",
 			expectedMap: map[string]schema.GroupVersion{
@@ -39,6 +41,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			},
 		},
 		{
+			name:            "test-storageVersions-extensions/v1beta1,v1",
 			legacyVersion:   "",
 			storageVersions: "extensions/v1beta1,v1",
 			expectedMap: map[string]schema.GroupVersion{
@@ -47,6 +50,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			},
 		},
 		{
+			name:            "test-storageVersions-autoscaling=extensions/v1beta1,v1",
 			legacyVersion:   "",
 			storageVersions: "autoscaling=extensions/v1beta1,v1",
 			defaultVersions: "extensions/v1beta1,v1,autoscaling/v1",
@@ -57,22 +61,25 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			},
 		},
 		{
+			name:            "test-storageVersions-no value",
 			legacyVersion:   "",
 			storageVersions: "",
 			expectedMap:     map[string]schema.GroupVersion{},
 		},
 	}
-	for i, test := range testCases {
-		s := &StorageSerializationOptions{
-			StorageVersions:        test.storageVersions,
-			DefaultStorageVersions: test.defaultVersions,
-		}
-		output, err := s.StorageGroupsToEncodingVersion()
-		if err != nil {
-			t.Errorf("%v: unexpected error: %v", i, err)
-		}
-		if !reflect.DeepEqual(test.expectedMap, output) {
-			t.Errorf("%v: unexpected error. expect: %v, got: %v", i, test.expectedMap, output)
-		}
+	for i, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &StorageSerializationOptions{
+				StorageVersions:        tt.storageVersions,
+				DefaultStorageVersions: tt.defaultVersions,
+			}
+			output, err := s.StorageGroupsToEncodingVersion()
+			if err != nil {
+				t.Errorf("%v: unexpected error: %v", i, err)
+			}
+			if !reflect.DeepEqual(tt.expectedMap, output) {
+				t.Errorf("%v: unexpected error. expect: %v, got: %v", i, tt.expectedMap, output)
+			}
+		})
 	}
 }

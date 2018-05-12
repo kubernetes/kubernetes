@@ -19,37 +19,64 @@ package options
 import (
 	"reflect"
 	"testing"
+
+	"k8s.io/apiserver/pkg/admission"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 )
 
 func TestValidate(t *testing.T) {
-	// 1. Both `--admission-control` and `--enable-admission-plugins` are specified
-	options := NewAdmissionOptions()
-	options.PluginNames = []string{"ServiceAccount"}
-	options.GenericAdmission.EnablePlugins = []string{"Initializers"}
-	if len(options.Validate()) == 0 {
-		t.Errorf("Expect error, but got none")
+	tests := []struct {
+		name             string
+		pluginNames      []string
+		genericAdmission *genericoptions.AdmissionOptions
+		wantError        bool
+	}{
+		{
+			name:        "Both `--admission-control` and `--enable-admission-plugins` are specified",
+			pluginNames: []string{"ServiceAccount"},
+			genericAdmission: &genericoptions.AdmissionOptions{
+				Plugins:       admission.NewPlugins(),
+				EnablePlugins: []string{"Initializers"},
+			},
+			wantError: true,
+		},
+		{
+			name:        "Both `--admission-control` and `--disable-admission-plugins` are specified",
+			pluginNames: []string{"ServiceAccount"},
+			genericAdmission: &genericoptions.AdmissionOptions{
+				Plugins:        admission.NewPlugins(),
+				DisablePlugins: []string{"Initializers"},
+			},
+			wantError: true,
+		},
+		{
+			name:        "PluginNames is not registered",
+			pluginNames: []string{"pluginA"},
+			wantError:   true,
+		},
+		{
+			name:        "PluginNames is not valid",
+			pluginNames: []string{"ServiceAccount"},
+		},
 	}
 
-	// 2. Both `--admission-control` and `--disable-admission-plugins` are specified
-	options = NewAdmissionOptions()
-	options.PluginNames = []string{"ServiceAccount"}
-	options.GenericAdmission.DisablePlugins = []string{"Initializers"}
-	if len(options.Validate()) == 0 {
-		t.Errorf("Expect error, but got none")
-	}
-
-	// 3. PluginNames is not registered
-	options = NewAdmissionOptions()
-	options.PluginNames = []string{"pluginA"}
-	if len(options.Validate()) == 0 {
-		t.Errorf("Expect error, but got none")
-	}
-
-	// 4. PluginNames is not valid
-	options = NewAdmissionOptions()
-	options.PluginNames = []string{"ServiceAccount"}
-	if errs := options.Validate(); len(errs) > 0 {
-		t.Errorf("Unexpected err: %v", errs)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			options := NewAdmissionOptions()
+			if tt.genericAdmission != nil {
+				options.GenericAdmission = tt.genericAdmission
+			}
+			options.PluginNames = tt.pluginNames
+			if tt.wantError {
+				if len(options.Validate()) == 0 {
+					t.Errorf("Expect error, but got none")
+				}
+			} else {
+				if errs := options.Validate(); len(errs) > 0 {
+					t.Errorf("Unexpected err: %v", errs)
+				}
+			}
+		})
 	}
 }
 
