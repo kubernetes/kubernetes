@@ -154,16 +154,16 @@
     "description": "get information of a group"
    },
    {
-    "path": "/apis/apps/v1beta1",
-    "description": "API at /apis/apps/v1beta1"
+    "path": "/apis/apps/v1",
+    "description": "API at /apis/apps/v1"
    },
    {
     "path": "/apis/apps/v1beta2",
     "description": "API at /apis/apps/v1beta2"
    },
    {
-    "path": "/apis/apps/v1",
-    "description": "API at /apis/apps/v1"
+    "path": "/apis/apps/v1beta1",
+    "description": "API at /apis/apps/v1beta1"
    },
    {
     "path": "/apis/apps",

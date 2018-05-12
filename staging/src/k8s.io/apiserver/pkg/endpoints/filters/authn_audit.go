@@ -28,17 +28,16 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // WithFailedAuthenticationAudit decorates a failed http.Handler used in WithAuthentication handler.
 // It is meant to log only failed authentication requests.
-func WithFailedAuthenticationAudit(failedHandler http.Handler, requestContextMapper request.RequestContextMapper, sink audit.Sink, policy policy.Checker) http.Handler {
+func WithFailedAuthenticationAudit(failedHandler http.Handler, sink audit.Sink, policy policy.Checker) http.Handler {
 	if sink == nil || policy == nil {
 		return failedHandler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		_, ev, omitStages, err := createAuditEventAndAttachToContext(requestContextMapper, req, policy)
+		req, ev, omitStages, err := createAuditEventAndAttachToContext(req, policy)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to create audit event: %v", err))
 			responsewriters.InternalError(w, req, errors.New("failed to create audit event"))

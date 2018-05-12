@@ -133,9 +133,6 @@ func (idr *InitDryRunGetter) handleGetNode(action core.GetAction) (bool, runtime
 				"kubernetes.io/hostname": idr.masterName,
 			},
 		},
-		Spec: v1.NodeSpec{
-			ExternalID: idr.masterName,
-		},
 	}, nil
 }
 

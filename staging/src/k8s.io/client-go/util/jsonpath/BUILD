@@ -13,7 +13,6 @@ go_test(
         "parser_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/util/jsonpath",
 )
 
 go_library(

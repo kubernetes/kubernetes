@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// GetControllerRef gets pod's owner controller reference from a pod object.
 func GetControllerRef(pod *v1.Pod) *metav1.OwnerReference {
 	if len(pod.OwnerReferences) == 0 {
 		return nil

@@ -248,7 +248,6 @@ func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod)
 // returns true if pod1 has a smaller request than pod2
 func smallerResourceRequest(pod1 *v1.Pod, pod2 *v1.Pod) bool {
 	priorityList := []v1.ResourceName{
-		v1.ResourceNvidiaGPU,
 		v1.ResourceMemory,
 		v1.ResourceCPU,
 	}

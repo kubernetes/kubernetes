@@ -22,7 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -269,8 +269,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// set the generation, and revisions in the returned status
 	status := apps.StatefulSetStatus{}
-	status.ObservedGeneration = new(int64)
-	*status.ObservedGeneration = set.Generation
+	status.ObservedGeneration = set.Generation
 	status.CurrentRevision = currentRevision.Name
 	status.UpdateRevision = updateRevision.Name
 	status.CollisionCount = new(int32)
@@ -470,7 +469,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				firstUnhealthyPod.Name)
 			return &status, nil
 		}
-		glog.V(4).Infof("StatefulSet %s/%s terminating Pod %s for scale dowm",
+		glog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for scale dowm",
 			set.Namespace,
 			set.Name,
 			condemned[target].Name)
@@ -503,7 +502,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-			glog.V(4).Infof("StatefulSet %s/%s terminating Pod %s for update",
+			glog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for update",
 				set.Namespace,
 				set.Name,
 				replicas[target].Name)

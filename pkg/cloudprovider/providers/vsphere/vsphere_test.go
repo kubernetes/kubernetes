@@ -17,13 +17,15 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
+	"crypto/tls"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 
-	"golang.org/x/net/context"
+	"github.com/vmware/govmomi/simulator"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -57,6 +59,50 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 		cfg.Global.User != "")
 
 	return
+}
+
+// configFromEnvOrSim returns config from configFromEnv if set,
+// otherwise starts a vcsim instance and returns config for use against the vcsim instance.
+func configFromEnvOrSim() (VSphereConfig, func()) {
+	cfg, ok := configFromEnv()
+	if ok {
+		return cfg, func() {}
+	}
+
+	model := simulator.VPX()
+
+	err := model.Create()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	model.Service.TLS = new(tls.Config)
+	s := model.Service.NewServer()
+
+	cfg.Global.InsecureFlag = true
+	cfg.Global.VCenterIP = s.URL.Hostname()
+	cfg.Global.VCenterPort = s.URL.Port()
+	cfg.Global.User = s.URL.User.Username()
+	cfg.Global.Password, _ = s.URL.User.Password()
+	cfg.Global.Datacenter = vclib.TestDefaultDatacenter
+	cfg.Network.PublicNetwork = vclib.TestDefaultNetwork
+	cfg.Global.DefaultDatastore = vclib.TestDefaultDatastore
+	cfg.Disk.SCSIControllerType = os.Getenv("VSPHERE_SCSICONTROLLER_TYPE")
+	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
+	cfg.Global.VMName = os.Getenv("VSPHERE_VM_NAME")
+
+	if cfg.Global.WorkingDir == "" {
+		cfg.Global.WorkingDir = "vm" // top-level Datacenter.VmFolder
+	}
+
+	uuid := simulator.Map.Any("VirtualMachine").(*simulator.VirtualMachine).Config.Uuid
+	getVMUUID = func() (string, error) { return uuid, nil }
+
+	return cfg, func() {
+		getVMUUID = GetVMUUID
+		s.Close()
+		model.Remove()
+	}
 }
 
 func TestReadConfig(t *testing.T) {
@@ -110,10 +156,8 @@ func TestNewVSphere(t *testing.T) {
 }
 
 func TestVSphereLogin(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
-		t.Skipf("No config found in environment")
-	}
+	cfg, cleanup := configFromEnvOrSim()
+	defer cleanup()
 
 	// Create vSphere configuration object
 	vs, err := newControllerNode(cfg)
@@ -126,8 +170,8 @@ func TestVSphereLogin(t *testing.T) {
 	defer cancel()
 
 	// Create vSphere client
-	var vcInstance *VSphereInstance
-	if vcInstance, ok = vs.vsphereInstanceMap[cfg.Global.VCenterIP]; !ok {
+	vcInstance, ok := vs.vsphereInstanceMap[cfg.Global.VCenterIP]
+	if !ok {
 		t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
 	}
 
@@ -135,7 +179,7 @@ func TestVSphereLogin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to connect to vSphere: %s", err)
 	}
-	defer vcInstance.conn.GoVmomiClient.Logout(ctx)
+	defer vcInstance.conn.Logout(ctx)
 }
 
 func TestZones(t *testing.T) {
@@ -169,34 +213,19 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances() returned false")
 	}
 
-	nodeName, err := vs.CurrentNodeName("")
+	nodeName, err := vs.CurrentNodeName(context.TODO(), "")
 	if err != nil {
 		t.Fatalf("CurrentNodeName() failed: %s", err)
 	}
 
-	externalID, err := i.ExternalID(nodeName)
-	if err != nil {
-		t.Fatalf("Instances.ExternalID(%s) failed: %s", nodeName, err)
-	}
-	t.Logf("Found ExternalID(%s) = %s\n", nodeName, externalID)
-
 	nonExistingVM := types.NodeName(rand.String(15))
-	externalID, err = i.ExternalID(nonExistingVM)
-	if err == cloudprovider.InstanceNotFound {
-		t.Logf("VM %s was not found as expected\n", nonExistingVM)
-	} else if err == nil {
-		t.Fatalf("Instances.ExternalID did not fail as expected, VM %s was found", nonExistingVM)
-	} else {
-		t.Fatalf("Instances.ExternalID did not fail as expected, err: %v", err)
-	}
-
-	instanceID, err := i.InstanceID(nodeName)
+	instanceID, err := i.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.InstanceID(%s) failed: %s", nodeName, err)
 	}
 	t.Logf("Found InstanceID(%s) = %s\n", nodeName, instanceID)
 
-	instanceID, err = i.InstanceID(nonExistingVM)
+	instanceID, err = i.InstanceID(context.TODO(), nonExistingVM)
 	if err == cloudprovider.InstanceNotFound {
 		t.Logf("VM %s was not found as expected\n", nonExistingVM)
 	} else if err == nil {
@@ -205,7 +234,7 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances.InstanceID did not fail as expected, err: %v", err)
 	}
 
-	addrs, err := i.NodeAddresses(nodeName)
+	addrs, err := i.NodeAddresses(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", nodeName, err)
 	}
@@ -223,7 +252,7 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
 
-	nodeName, err := vs.CurrentNodeName("")
+	nodeName, err := vs.CurrentNodeName(context.TODO(), "")
 	if err != nil {
 		t.Fatalf("CurrentNodeName() failed: %s", err)
 	}

@@ -10,9 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = ["cacher_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/storage/tests",
     deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",

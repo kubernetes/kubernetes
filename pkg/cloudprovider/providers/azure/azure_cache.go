@@ -17,40 +17,58 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	"k8s.io/client-go/tools/cache"
 )
 
-type timedcacheEntry struct {
+// getFunc defines a getter function for timedCache.
+type getFunc func(key string) (interface{}, error)
+
+// cacheEntry is the internal structure stores inside TTLStore.
+type cacheEntry struct {
 	key  string
 	data interface{}
+
+	// The lock to ensure not updating same entry simultaneously.
+	lock sync.Mutex
 }
 
-type timedcache struct {
-	store cache.Store
-	lock  sync.Mutex
-}
-
-// ttl time.Duration
-func newTimedcache(ttl time.Duration) timedcache {
-	return timedcache{
-		store: cache.NewTTLStore(cacheKeyFunc, ttl),
-	}
-}
-
+// cacheKeyFunc defines the key function required in TTLStore.
 func cacheKeyFunc(obj interface{}) (string, error) {
-	return obj.(*timedcacheEntry).key, nil
+	return obj.(*cacheEntry).key, nil
 }
 
-func (t *timedcache) GetOrCreate(key string, createFunc func() interface{}) (interface{}, error) {
+// timedCache is a cache with TTL.
+type timedCache struct {
+	store  cache.Store
+	lock   sync.Mutex
+	getter getFunc
+}
+
+// newTimedcache creates a new timedCache.
+func newTimedcache(ttl time.Duration, getter getFunc) (*timedCache, error) {
+	if getter == nil {
+		return nil, fmt.Errorf("getter is not provided")
+	}
+
+	return &timedCache{
+		getter: getter,
+		store:  cache.NewTTLStore(cacheKeyFunc, ttl),
+	}, nil
+}
+
+// getInternal returns cacheEntry by key. If the key is not cached yet,
+// it returns a cacheEntry with nil data.
+func (t *timedCache) getInternal(key string) (*cacheEntry, error) {
 	entry, exists, err := t.store.GetByKey(key)
 	if err != nil {
 		return nil, err
 	}
 	if exists {
-		return (entry.(*timedcacheEntry)).data, nil
+		return entry.(*cacheEntry), nil
 	}
 
 	t.lock.Lock()
@@ -60,22 +78,47 @@ func (t *timedcache) GetOrCreate(key string, createFunc func() interface{}) (int
 		return nil, err
 	}
 	if exists {
-		return (entry.(*timedcacheEntry)).data, nil
+		return entry.(*cacheEntry), nil
 	}
 
-	if createFunc == nil {
-		return nil, nil
-	}
-	created := createFunc()
-	t.store.Add(&timedcacheEntry{
+	// Still not found, add new entry with nil data.
+	// Note the data will be filled later by getter.
+	newEntry := &cacheEntry{
 		key:  key,
-		data: created,
-	})
-	return created, nil
+		data: nil,
+	}
+	t.store.Add(newEntry)
+	return newEntry, nil
 }
 
-func (t *timedcache) Delete(key string) {
-	_ = t.store.Delete(&timedcacheEntry{
+// Get returns the requested item by key.
+func (t *timedCache) Get(key string) (interface{}, error) {
+	entry, err := t.getInternal(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Data is still not cached yet, cache it by getter.
+	if entry.data == nil {
+		entry.lock.Lock()
+		defer entry.lock.Unlock()
+
+		if entry.data == nil {
+			data, err := t.getter(key)
+			if err != nil {
+				return nil, err
+			}
+
+			entry.data = data
+		}
+	}
+
+	return entry.data, nil
+}
+
+// Delete removes an item from the cache.
+func (t *timedCache) Delete(key string) error {
+	return t.store.Delete(&cacheEntry{
 		key: key,
 	})
 }

@@ -31,9 +31,34 @@ type OperationProps struct {
 	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitempty"`
 	ID           string                 `json:"operationId,omitempty"`
 	Deprecated   bool                   `json:"deprecated,omitempty"`
-	Security     []map[string][]string  `json:"security,omitempty"`
+	Security     []map[string][]string  `json:"security,omitempty"` //Special case, see MarshalJSON function
 	Parameters   []Parameter            `json:"parameters,omitempty"`
 	Responses    *Responses             `json:"responses,omitempty"`
+}
+
+// MarshalJSON takes care of serializing operation properties to JSON
+//
+// We use a custom marhaller here to handle a special cases related
+// the Security field. We need to preserve zero length slice
+// while omiting the field when the value is nil/unset.
+func (op OperationProps) MarshalJSON() ([]byte, error) {
+	type Alias OperationProps
+	if op.Security == nil {
+		return json.Marshal(&struct {
+			Security []map[string][]string `json:"security,omitempty"`
+			*Alias
+		}{
+			Security: op.Security,
+			Alias:    (*Alias)(&op),
+		})
+	}
+	return json.Marshal(&struct {
+		Security []map[string][]string `json:"security"`
+		*Alias
+	}{
+		Security: op.Security,
+		Alias:    (*Alias)(&op),
+	})
 }
 
 // Operation describes a single API operation on a path.

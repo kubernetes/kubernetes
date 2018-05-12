@@ -70,7 +70,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -232,7 +232,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -341,7 +341,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -717,7 +717,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -836,7 +836,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -939,7 +939,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -1518,7 +1518,7 @@
     "properties": {
      "prefix": {
       "type": "string",
-      "description": "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
+      "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
      },
      "configMapRef": {
       "$ref": "v1.ConfigMapEnvSource",
@@ -2568,7 +2568,7 @@
      },
      "mountPropagation": {
       "$ref": "v1.MountPropagationMode",
-      "description": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationHostToContainer is used. This field is alpha in 1.8 and can be reworked or removed in a future release."
+      "description": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationHostToContainer is used. This field is beta in 1.10."
      }
     }
    },

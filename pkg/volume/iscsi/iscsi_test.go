@@ -52,6 +52,21 @@ func TestCanSupport(t *testing.T) {
 	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
+	if plug.CanSupport(&volume.Spec{}) {
+		t.Errorf("Expected false")
+	}
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{ISCSI: &v1.ISCSIVolumeSource{}}}}) {
+		t.Errorf("Expected true")
+	}
+	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{}}}) {
+		t.Errorf("Expected false")
+	}
+	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{}}}}) {
+		t.Errorf("Expected false")
+	}
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{ISCSI: &v1.ISCSIPersistentVolumeSource{}}}}}) {
+		t.Errorf("Expected true")
+	}
 }
 
 func TestGetAccessModes(t *testing.T) {
@@ -162,13 +177,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
 	}
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
@@ -539,7 +547,7 @@ func TestGetVolumeSpec_no_lun(t *testing.T) {
 func TestGetVolumeSpec_no_iface(t *testing.T) {
 	path := "plugins/kubernetes.io/iscsi/volumeDevices/default/127.0.0.1:3260-iqn.2014-12.server:storage.target01-lun-0"
 	_, err := getVolumeSpecFromGlobalMapPath("test", path)
-	if !strings.Contains(err.Error(), "failed to retreive iface") {
-		t.Errorf("should get error: failed to retreive iface")
+	if !strings.Contains(err.Error(), "failed to retrieve iface") {
+		t.Errorf("should get error: failed to retrieve iface")
 	}
 }

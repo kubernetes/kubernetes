@@ -70,7 +70,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -232,7 +232,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -341,7 +341,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -717,7 +717,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -836,7 +836,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -939,7 +939,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -1370,7 +1370,7 @@
    },
    "v1beta1.EventSeries": {
     "id": "v1beta1.EventSeries",
-    "description": "EventSeries contain information on series of events, i.e. thing that was/is happening continously for some time.",
+    "description": "EventSeries contain information on series of events, i.e. thing that was/is happening continuously for some time.",
     "required": [
      "count",
      "lastObservedTime",

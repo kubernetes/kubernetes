@@ -31,7 +31,6 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

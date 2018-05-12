@@ -74,17 +74,6 @@ var validController = api.ReplicationController{
 	Spec:       validControllerSpec,
 }
 
-var validScale = autoscaling.Scale{
-	ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
-	Spec: autoscaling.ScaleSpec{
-		Replicas: validReplicas,
-	},
-	Status: autoscaling.ScaleStatus{
-		Replicas: 0,
-		Selector: "a=b",
-	},
-}
-
 func TestGet(t *testing.T) {
 	storage, _, si, destroyFunc := newStorage(t)
 	defer destroyFunc()

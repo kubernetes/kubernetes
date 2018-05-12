@@ -17,7 +17,6 @@ limitations under the License.
 package libdocker
 
 import (
-	"strings"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -36,10 +35,6 @@ const (
 	StatusRunningPrefix = "Up"
 	StatusCreatedPrefix = "Created"
 	StatusExitedPrefix  = "Exited"
-
-	// This is only used by GetKubeletDockerContainers(), and should be removed
-	// along with the function.
-	containerNamePrefix = "k8s"
 
 	// Fake docker endpoint
 	FakeDockerEndpoint = "fake://"
@@ -108,30 +103,4 @@ func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgre
 	}
 	glog.Infof("Start docker client with request timeout=%v", requestTimeout)
 	return newKubeDockerClient(client, requestTimeout, imagePullProgressDeadline)
-}
-
-// GetKubeletDockerContainers lists all container or just the running ones.
-// Returns a list of docker containers that we manage
-// TODO: This function should be deleted after migrating
-// test/e2e_node/garbage_collector_test.go off of it.
-func GetKubeletDockerContainers(client Interface, allContainers bool) ([]*dockertypes.Container, error) {
-	result := []*dockertypes.Container{}
-	containers, err := client.ListContainers(dockertypes.ContainerListOptions{All: allContainers})
-	if err != nil {
-		return nil, err
-	}
-	for i := range containers {
-		container := &containers[i]
-		if len(container.Names) == 0 {
-			continue
-		}
-		// Skip containers that we didn't create to allow users to manually
-		// spin up their own containers if they want.
-		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"_") {
-			glog.V(5).Infof("Docker Container: %s is not managed by kubelet.", container.Names[0])
-			continue
-		}
-		result = append(result, container)
-	}
-	return result, nil
 }

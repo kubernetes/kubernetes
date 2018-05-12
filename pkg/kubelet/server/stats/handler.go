@@ -78,6 +78,16 @@ type StatsProvider interface {
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
 	// GetPods returns the specs of all the pods running on this node.
 	GetPods() []*v1.Pod
+
+	// RlimitStats returns the rlimit stats of system.
+	RlimitStats() (*statsapi.RlimitStats, error)
+
+	// GetPodCgroupRoot returns the literal cgroupfs value for the cgroup containing all pods
+	GetPodCgroupRoot() string
+
+	// GetPodByCgroupfs provides the pod that maps to the specified cgroup literal, as well
+	// as whether the pod was found.
+	GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool)
 }
 
 type handler struct {

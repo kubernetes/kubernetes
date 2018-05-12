@@ -114,7 +114,9 @@ func NewFsInfo(context Context) (FsInfo, error) {
 
 	fsUUIDToDeviceName, err := getFsUUIDToDeviceNameMap()
 	if err != nil {
-		return nil, err
+		// UUID is not always avaiable across different OS distributions.
+		// Do not fail if there is an error.
+		glog.Warningf("Failed to get disk UUID mapping, getting disk info by uuid will not work: %v", err)
 	}
 
 	// Avoid devicemapper container mounts - these are tracked by the ThinPoolWatcher

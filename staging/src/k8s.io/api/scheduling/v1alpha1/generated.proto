@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ option go_package = "v1alpha1";
 // integer value. The value can be any valid integer.
 message PriorityClass {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -43,6 +43,9 @@ message PriorityClass {
 
   // globalDefault specifies whether this PriorityClass should be considered as
   // the default priority for pods that do not have any priority class.
+  // Only one PriorityClass can be marked as `globalDefault`. However, if more than
+  // one PriorityClasses exists with their `globalDefault` field set to true,
+  // the smallest value of such global default PriorityClasses will be used as the default priority.
   // +optional
   optional bool globalDefault = 3;
 
@@ -55,7 +58,7 @@ message PriorityClass {
 // PriorityClassList is a collection of priority classes.
 message PriorityClassList {
   // Standard list metadata
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

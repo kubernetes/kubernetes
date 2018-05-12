@@ -20,7 +20,6 @@ go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/util/retry",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

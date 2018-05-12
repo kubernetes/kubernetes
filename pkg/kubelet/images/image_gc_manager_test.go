@@ -33,6 +33,7 @@ import (
 )
 
 var zero time.Time
+var sandboxImage = "k8s.gcr.io/pause-amd64:latest"
 
 func newRealImageGCManager(policy ImageGCPolicy) (*realImageGCManager, *containertest.FakeRuntime, *statstest.StatsProvider) {
 	fakeRuntime := &containertest.FakeRuntime{}
@@ -43,6 +44,7 @@ func newRealImageGCManager(policy ImageGCPolicy) (*realImageGCManager, *containe
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
+		sandboxImage:  sandboxImage,
 	}, fakeRuntime, mockStatsProvider
 }
 
@@ -176,6 +178,21 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 	assert.Equal(zero, noContainer.lastUsed)
 }
 
+func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
+	fakeRuntime.ImageList = []container.Image{
+		{
+			ID:   sandboxImage,
+			Size: 1024,
+		},
+	}
+
+	err := manager.DeleteUnusedImages()
+	assert := assert.New(t)
+	assert.Len(fakeRuntime.ImageList, 1)
+	require.NoError(t, err)
+}
+
 func TestDetectImagesContainerStopped(t *testing.T) {
 	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
@@ -274,10 +291,9 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 		}},
 	}
 
-	spaceFreed, err := manager.DeleteUnusedImages()
+	err := manager.DeleteUnusedImages()
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.EqualValues(3072, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, 1)
 }
 
@@ -524,12 +540,22 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, ""); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
 		}
 	}
+}
+
+func TestImageCacheReturnCopiedList(t *testing.T) {
+	cache := &imageCache{}
+	testList := []container.Image{{ID: "1"}, {ID: "2"}}
+	cache.set(testList)
+	list := cache.get()
+	assert.Len(t, list, 2)
+	list[0].ID = "3"
+	assert.Equal(t, cache.get(), testList)
 }
 
 func uint64Ptr(i uint64) *uint64 {

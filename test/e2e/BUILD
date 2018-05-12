@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["e2e_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/e2e",
     tags = ["e2e"],
     deps = [
         "//test/e2e/apimachinery:go_default_library",
@@ -23,7 +22,6 @@ go_test(
         "//test/e2e/kubectl:go_default_library",
         "//test/e2e/lifecycle:go_default_library",
         "//test/e2e/lifecycle/bootstrap:go_default_library",
-        "//test/e2e/multicluster:go_default_library",
         "//test/e2e/network:go_default_library",
         "//test/e2e/node:go_default_library",
         "//test/e2e/scalability:go_default_library",
@@ -44,7 +42,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e",
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
@@ -72,6 +69,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/plugin/pkg/client/auth:go_default_library",
     ],
 )
 
@@ -109,7 +107,6 @@ filegroup(
         "//test/e2e/kubectl:all-srcs",
         "//test/e2e/lifecycle:all-srcs",
         "//test/e2e/manifest:all-srcs",
-        "//test/e2e/multicluster:all-srcs",
         "//test/e2e/network:all-srcs",
         "//test/e2e/node:all-srcs",
         "//test/e2e/perftype:all-srcs",

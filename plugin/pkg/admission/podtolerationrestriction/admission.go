@@ -40,9 +40,11 @@ import (
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
 
+const PluginName = "PodTolerationRestriction"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("PodTolerationRestriction", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		pluginConfig, err := loadConfiguration(config)
 		if err != nil {
 			return nil, err

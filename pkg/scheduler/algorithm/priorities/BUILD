@@ -28,6 +28,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
@@ -40,6 +41,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
     ],
 )
@@ -61,8 +63,8 @@ go_test(
         "taint_toleration_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities",
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
@@ -73,6 +75,7 @@ go_test(
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

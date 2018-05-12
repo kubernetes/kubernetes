@@ -29,7 +29,6 @@ go_test(
     name = "go_default_test",
     srcs = ["fake_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/ipset/testing",
     deps = [
         "//pkg/util/ipset:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

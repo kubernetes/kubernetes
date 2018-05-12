@@ -17,6 +17,8 @@ limitations under the License.
 package defaults
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -26,8 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -77,13 +77,6 @@ func init() {
 	// Fit is determined by node selector query.
 	factory.RegisterFitPredicate(predicates.MatchNodeSelectorPred, predicates.PodMatchNodeSelector)
 
-	// Use equivalence class to speed up heavy predicates phase.
-	factory.RegisterGetEquivalencePodFunction(
-		func(args factory.PluginFactoryArgs) algorithm.GetEquivalencePodFunc {
-			return predicates.NewEquivalencePodGenerator(args.PVCInfo)
-		},
-	)
-
 	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
 	// the number of pods (belonging to the same service) on the same node.
 	// Register the factory so that it's available, but do not include it as part of the default priorities
@@ -107,10 +100,6 @@ func init() {
 	factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	factory.RegisterPriorityFunction2("MostRequestedPriority", priorities.MostRequestedPriorityMap, nil, 1)
-	// Prioritizes nodes that satisfy pod's resource limits
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
-		factory.RegisterPriorityFunction2("ResourceLimitsPriority", priorities.ResourceLimitsPriorityMap, nil, 1)
-	}
 }
 
 func defaultPredicates() sets.String {
@@ -164,6 +153,9 @@ func defaultPredicates() sets.String {
 		// Fit is determined by node disk pressure condition.
 		factory.RegisterFitPredicate(predicates.CheckNodeDiskPressurePred, predicates.CheckNodeDiskPressurePredicate),
 
+		// Fit is determined by node pid pressure condition.
+		factory.RegisterFitPredicate(predicates.CheckNodePIDPressurePred, predicates.CheckNodePIDPressurePredicate),
+
 		// Fit is determined by node conditions: not ready, network unavailable or out of disk.
 		factory.RegisterMandatoryFitPredicate(predicates.CheckNodeConditionPred, predicates.CheckNodeConditionPredicate),
 
@@ -182,24 +174,37 @@ func defaultPredicates() sets.String {
 
 // ApplyFeatureGates applies algorithm by feature gates.
 func ApplyFeatureGates() {
-
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		// Remove "CheckNodeCondition" predicate
+		// Remove "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressurePred"
+		// and "CheckNodeDiskPressure" predicates
 		factory.RemoveFitPredicate(predicates.CheckNodeConditionPred)
-		// Remove Key "CheckNodeCondition" From All Algorithm Provider
+		factory.RemoveFitPredicate(predicates.CheckNodeMemoryPressurePred)
+		factory.RemoveFitPredicate(predicates.CheckNodeDiskPressurePred)
+		factory.RemoveFitPredicate(predicates.CheckNodePIDPressurePred)
+		// Remove key "CheckNodeCondition", "CheckNodeMemoryPressure" and "CheckNodeDiskPressure"
+		// from ALL algorithm provider
 		// The key will be removed from all providers which in algorithmProviderMap[]
 		// if you just want remove specific provider, call func RemovePredicateKeyFromAlgoProvider()
 		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeConditionPred)
+		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeMemoryPressurePred)
+		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeDiskPressurePred)
+		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodePIDPressurePred)
 
 		// Fit is determined based on whether a pod can tolerate all of the node's taints
 		factory.RegisterMandatoryFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
-		// Insert Key "PodToleratesNodeTaints" To All Algorithm Provider
+		// Insert Key "PodToleratesNodeTaints" and "CheckNodeUnschedulable" To All Algorithm Provider
 		// The key will insert to all providers which in algorithmProviderMap[]
 		// if you just want insert to specific provider, call func InsertPredicateKeyToAlgoProvider()
 		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.PodToleratesNodeTaintsPred)
 
 		glog.Warningf("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
 	}
+
+	// Prioritizes nodes that satisfy pod's resource limits
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
+		factory.RegisterPriorityFunction2("ResourceLimitsPriority", priorities.ResourceLimitsPriorityMap, nil, 1)
+	}
+
 }
 
 func registerAlgorithmProvider(predSet, priSet sets.String) {

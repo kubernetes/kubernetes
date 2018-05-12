@@ -15,7 +15,6 @@ go_library(
         "extensions_client.go",
         "generated_expansion.go",
         "ingress.go",
-        "podsecuritypolicy.go",
         "replicaset.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion",

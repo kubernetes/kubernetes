@@ -21,7 +21,6 @@ go_library(
         "//pkg/util/node:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -34,6 +33,7 @@ go_library(
         "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
+        "//vendor/k8s.io/client-go/util/retry:go_default_library",
     ],
 )
 
@@ -41,7 +41,6 @@ go_test(
     name = "go_default_test",
     srcs = ["route_controller_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/route",
     deps = [
         "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",

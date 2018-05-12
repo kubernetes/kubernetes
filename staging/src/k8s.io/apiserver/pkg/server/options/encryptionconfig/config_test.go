@@ -19,9 +19,6 @@ package encryptionconfig
 import (
 	"bytes"
 	"encoding/base64"
-	"fmt"
-	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -34,10 +31,6 @@ const (
 	sampleText = "abcdefghijklmnopqrstuvwxyz"
 
 	sampleContextText = "0123456789"
-
-	// Modify these in all configurations if changed
-	testEnvelopeServiceConfigPath   = "testproviderconfig"
-	testEnvelopeServiceProviderName = "testprovider"
 
 	correctConfigWithIdentityFirst = `
 kind: EncryptionConfig
@@ -56,7 +49,7 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - aescbc:
         keys:
@@ -89,7 +82,7 @@ resources:
           secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - aescbc:
         keys:
@@ -115,7 +108,7 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - identity: {}
     - secretbox:
@@ -149,7 +142,7 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - identity: {}
     - aesgcm:
@@ -169,7 +162,7 @@ resources:
     providers:
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - secretbox:
         keys:
@@ -218,40 +211,45 @@ resources:
         - name: key2
           secret: YSBzZWNyZXQgYSBzZWNyZXQ=
 `
+
+	incorrectConfigNoEndpointForKMS = `
+kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: testprovider
+        cachesize: 10
+`
 )
 
 // testEnvelopeService is a mock envelope service which can be used to simulate remote Envelope services
 // for testing of the envelope transformer with other transformers.
 type testEnvelopeService struct {
-	disabled bool
 }
 
 func (t *testEnvelopeService) Decrypt(data []byte) ([]byte, error) {
-	if t.disabled {
-		return nil, fmt.Errorf("Envelope service was disabled")
-	}
 	return base64.StdEncoding.DecodeString(string(data))
 }
 
 func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
-	if t.disabled {
-		return nil, fmt.Errorf("Envelope service was disabled")
-	}
 	return []byte(base64.StdEncoding.EncodeToString(data)), nil
 }
 
-func (t *testEnvelopeService) SetDisabledStatus(status bool) {
-	t.disabled = status
+// The factory method to create mock envelope service.
+func newMockEnvelopeService(endpoint string) (envelope.Service, error) {
+	return &testEnvelopeService{}, nil
 }
 
-var _ envelope.Service = &testEnvelopeService{}
-
 func TestEncryptionProviderConfigCorrect(t *testing.T) {
-	os.OpenFile(testEnvelopeServiceConfigPath, os.O_CREATE, 0666)
-	defer os.Remove(testEnvelopeServiceConfigPath)
-	KMSPluginRegistry.Register(testEnvelopeServiceProviderName, func(_ io.Reader) (envelope.Service, error) {
-		return &testEnvelopeService{}, nil
-	})
+	// Set factory for mock envelope service
+	factory := envelopeServiceFactory
+	envelopeServiceFactory = newMockEnvelopeService
+	defer func() {
+		envelopeServiceFactory = factory
+	}()
 
 	// Creates compound/prefix transformers with different ordering of available transformers.
 	// Transforms data using one of them, and tries to untransform using the others.
@@ -335,5 +333,12 @@ func TestEncryptionProviderConfigNoSecretForKey(t *testing.T) {
 func TestEncryptionProviderConfigInvalidKey(t *testing.T) {
 	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigInvalidKey)); err == nil {
 		t.Fatalf("invalid configuration file (bad AES key) got parsed:\n%s", incorrectConfigInvalidKey)
+	}
+}
+
+// Throw error if kms has no endpoint
+func TestEncryptionProviderConfigNoEndpointForKMS(t *testing.T) {
+	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigNoEndpointForKMS)); err == nil {
+		t.Fatalf("invalid configuration file (kms has no endpoint) got parsed:\n%s", incorrectConfigNoEndpointForKMS)
 	}
 }

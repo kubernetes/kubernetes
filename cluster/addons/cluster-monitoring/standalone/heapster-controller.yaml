@@ -1,14 +1,3 @@
-{% set base_metrics_memory = "140Mi" -%}
-{% set metrics_memory_per_node = 4 -%}
-{% set base_metrics_cpu = "80m" -%}
-{% set metrics_cpu_per_node = 0.5 -%}
-{% set num_nodes = pillar.get('num_nodes', -1) -%}
-{% set nanny_memory = "90Mi" -%}
-{% set nanny_memory_per_node = 200 -%}
-{% if num_nodes >= 0 -%}
-  {% set nanny_memory = (90 * 1024 + num_nodes * nanny_memory_per_node)|string + "Ki" -%}
-{% endif -%}
-
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -34,29 +23,30 @@ data:
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: heapster-v1.5.0
+  name: heapster-v1.5.3
   namespace: kube-system
   labels:
     k8s-app: heapster
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v1.5.0
+    version: v1.5.3
 spec:
   replicas: 1
   selector:
     matchLabels:
       k8s-app: heapster
-      version: v1.5.0
+      version: v1.5.3
   template:
     metadata:
       labels:
         k8s-app: heapster
-        version: v1.5.0
+        version: v1.5.3
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       containers:
-        - image: gcr.io/google_containers/heapster-amd64:v1.5.0
+        - image: k8s.gcr.io/heapster-amd64:v1.5.3
           name: heapster
           livenessProbe:
             httpGet:
@@ -68,7 +58,7 @@ spec:
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
-        - image: gcr.io/google_containers/addon-resizer:1.8.1
+        - image: k8s.gcr.io/addon-resizer:1.8.1
           name: heapster-nanny
           resources:
             limits:
@@ -97,7 +87,7 @@ spec:
             - --memory={{ base_metrics_memory }}
             - --extra-memory={{ metrics_memory_per_node }}Mi
             - --threshold=5
-            - --deployment=heapster-v1.5.0
+            - --deployment=heapster-v1.5.3
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential

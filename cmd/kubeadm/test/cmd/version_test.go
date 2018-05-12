@@ -117,12 +117,12 @@ func TestCmdVersionOutputJsonOrYaml(t *testing.T) {
 
 			m := obj.(map[string]interface{})
 			if m["clientVersion"] == nil {
-				t.Errorf("failed to get the infomation of clientVersion from 'kubeadm version %s'", rt.args)
+				t.Errorf("failed to get the information of clientVersion from 'kubeadm version %s'", rt.args)
 			}
 			info := m["clientVersion"].(map[string]interface{})
 			for _, key := range VersionInfo {
 				if len(info[key].(string)) == 0 {
-					t.Errorf("failed to get the infomation of %s from 'kubeadm version %s'", key, rt.args)
+					t.Errorf("failed to get the information of %s from 'kubeadm version %s'", key, rt.args)
 				}
 			}
 		}

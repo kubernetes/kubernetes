@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["meta_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/runtime/serializer/json",
 )
 
 go_library(
@@ -34,7 +33,6 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["json_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/runtime/serializer/json_test",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

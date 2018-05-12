@@ -1,6 +1,6 @@
 ### debian-iptables
 
-Serves as the base image for `gcr.io/google_containers/kube-proxy-${ARCH}` and multiarch (not `amd64`) `gcr.io/google_containers/flannel-${ARCH}` images.
+Serves as the base image for `k8s.gcr.io/kube-proxy-${ARCH}` and multiarch (not `amd64`) `k8s.gcr.io/flannel-${ARCH}` images.
 
 This image is compiled for multiple architectures.
 
@@ -11,19 +11,19 @@ If you're editing the Dockerfile or some other thing, please bump the `TAG` in t
 ```console
 # Build for linux/amd64 (default)
 $ make push ARCH=amd64
-# ---> gcr.io/google_containers/debian-iptables-amd64:TAG
+# ---> staging-k8s.gcr.io/debian-iptables-amd64:TAG
 
 $ make push ARCH=arm
-# ---> gcr.io/google_containers/debian-iptables-arm:TAG
+# ---> staging-k8s.gcr.io/debian-iptables-arm:TAG
 
 $ make push ARCH=arm64
-# ---> gcr.io/google_containers/debian-iptables-arm64:TAG
+# ---> staging-k8s.gcr.io/debian-iptables-arm64:TAG
 
 $ make push ARCH=ppc64le
-# ---> gcr.io/google_containers/debian-iptables-ppc64le:TAG
+# ---> staging-k8s.gcr.io/debian-iptables-ppc64le:TAG
 
 $ make push ARCH=s390x
-# ---> gcr.io/google_containers/debian-iptables-s390x:TAG
+# ---> staging-k8s.gcr.io/debian-iptables-s390x:TAG
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

@@ -37,7 +37,7 @@ func TestSpecSourceConverters(t *testing.T) {
 		t.Errorf("Unexpected nil EmptyDir: %#v", converted)
 	}
 	if v.Name != converted.Name() {
-		t.Errorf("Expected %v but got %v", v.Name, converted.Name())
+		t.Errorf("Expected %v but got %v", converted.Name(), v.Name)
 	}
 
 	pv := &v1.PersistentVolume{
@@ -52,7 +52,7 @@ func TestSpecSourceConverters(t *testing.T) {
 		t.Errorf("Unexpected nil AWSElasticBlockStore: %#v", converted)
 	}
 	if pv.Name != converted.Name() {
-		t.Errorf("Expected %v but got %v", pv.Name, converted.Name())
+		t.Errorf("Expected %v but got %v", converted.Name(), pv.Name)
 	}
 }
 

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 type azureDiskProvisioner struct {
@@ -65,7 +66,7 @@ func (d *azureDiskDeleter) Delete() error {
 }
 
 func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+	if !util.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
 	}
 	supportedModes := p.plugin.GetAccessModes()
@@ -93,10 +94,10 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 		err                        error
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
-	name := volume.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
+	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
-	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGB := int(util.RoundUpSize(requestBytes, 1024*1024*1024))
 
 	for k, v := range p.options.Parameters {
 		switch strings.ToLower(k) {
@@ -120,7 +121,6 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 
 	// normalize values
-	fsType = normalizeFsType(fsType)
 	skuName, err := normalizeStorageAccountType(storageAccountType)
 	if err != nil {
 		return nil, err

@@ -27,7 +27,6 @@ go_test(
         "decoder_test.go",
         "encoder_test.go",
     ],
-    importpath = "k8s.io/client-go/rest/watch_test",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

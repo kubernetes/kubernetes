@@ -17,22 +17,23 @@ limitations under the License.
 package networkpolicy
 
 import (
+	"context"
+
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/networking"
 )
 
 // Registry is an interface for things that know how to store NetworkPolicies.
 type Registry interface {
-	ListNetworkPolicies(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*networking.NetworkPolicyList, error)
-	CreateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc) error
-	UpdateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
-	GetNetworkPolicy(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*networking.NetworkPolicy, error)
-	DeleteNetworkPolicy(ctx genericapirequest.Context, name string) error
-	WatchNetworkPolicies(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	ListNetworkPolicies(ctx context.Context, options *metainternalversion.ListOptions) (*networking.NetworkPolicyList, error)
+	CreateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc) error
+	UpdateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	GetNetworkPolicy(ctx context.Context, name string, options *metav1.GetOptions) (*networking.NetworkPolicy, error)
+	DeleteNetworkPolicy(ctx context.Context, name string) error
+	WatchNetworkPolicies(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListNetworkPolicies(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*networking.NetworkPolicyList, error) {
+func (s *storage) ListNetworkPolicies(ctx context.Context, options *metainternalversion.ListOptions) (*networking.NetworkPolicyList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -55,21 +56,21 @@ func (s *storage) ListNetworkPolicies(ctx genericapirequest.Context, options *me
 	return obj.(*networking.NetworkPolicyList), nil
 }
 
-func (s *storage) CreateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc) error {
+func (s *storage) CreateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc) error {
 	_, err := s.Create(ctx, np, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+func (s *storage) UpdateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
 	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np), createValidation, updateValidation)
 	return err
 }
 
-func (s *storage) WatchNetworkPolicies(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchNetworkPolicies(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetNetworkPolicy(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*networking.NetworkPolicy, error) {
+func (s *storage) GetNetworkPolicy(ctx context.Context, name string, options *metav1.GetOptions) (*networking.NetworkPolicy, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -77,7 +78,7 @@ func (s *storage) GetNetworkPolicy(ctx genericapirequest.Context, name string, o
 	return obj.(*networking.NetworkPolicy), nil
 }
 
-func (s *storage) DeleteNetworkPolicy(ctx genericapirequest.Context, name string) error {
+func (s *storage) DeleteNetworkPolicy(ctx context.Context, name string) error {
 	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }

@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "genswaggertypedocs",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/genswaggertypedocs",
 )
 
 go_library(

@@ -19,7 +19,6 @@ package aws_ebs
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -34,7 +33,6 @@ import (
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -134,7 +132,7 @@ func (plugin *awsElasticBlockStorePlugin) newMounterInternal(spec *volume.Spec, 
 		},
 		fsType:      fsType,
 		readOnly:    readOnly,
-		diskMounter: volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -388,12 +386,12 @@ func makeGlobalPDPath(host volume.VolumeHost, volumeID aws.KubernetesVolumeID) s
 	// Clean up the URI to be more fs-friendly
 	name := string(volumeID)
 	name = strings.Replace(name, "://", "/", -1)
-	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath, name)
+	return filepath.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath, name)
 }
 
 // Reverses the mapping done in makeGlobalPDPath
 func getVolumeIDFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
-	basePath := path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath)
+	basePath := filepath.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath)
 	rel, err := filepath.Rel(basePath, globalPath)
 	if err != nil {
 		glog.Errorf("Failed to get volume id from global mount %s - %v", globalPath, err)
@@ -456,7 +454,7 @@ type awsElasticBlockStoreProvisioner struct {
 var _ volume.Provisioner = &awsElasticBlockStoreProvisioner{}
 
 func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
@@ -475,7 +473,7 @@ func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, err
 			Name:   c.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "aws-ebs-dynamic-provisioner",
+				util.VolumeDynamicallyCreatedByKey: "aws-ebs-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

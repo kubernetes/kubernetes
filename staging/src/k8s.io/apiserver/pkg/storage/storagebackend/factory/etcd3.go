@@ -17,11 +17,11 @@ limitations under the License.
 package factory
 
 import (
+	"context"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
-	"golang.org/x/net/context"
 
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -29,11 +29,13 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
-// The short keepalive timeout and interval have been chosen to aggressively
-// detect a failed etcd server without introducing much overhead.
 var (
+	// The short keepalive timeout and interval have been chosen to aggressively
+	// detect a failed etcd server without introducing much overhead.
 	keepaliveTime    = 30 * time.Second
 	keepaliveTimeout = 10 * time.Second
+	// dialTimeout is the timeout for failing to establish a connection.
+	dialTimeout = 10 * time.Second
 )
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
@@ -52,6 +54,7 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		tlsConfig = nil
 	}
 	cfg := clientv3.Config{
+		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
 		DialKeepAliveTimeout: keepaliveTimeout,
 		Endpoints:            c.ServerList,

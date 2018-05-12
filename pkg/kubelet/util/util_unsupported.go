@@ -31,3 +31,12 @@ func CreateListener(endpoint string) (net.Listener, error) {
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
 	return "", nil, fmt.Errorf("GetAddressAndDialer is unsupported in this build")
 }
+
+// LockAndCheckSubPath empty implementation
+func LockAndCheckSubPath(volumePath, subPath string) ([]uintptr, error) {
+	return []uintptr{}, nil
+}
+
+// UnlockPath empty implementation
+func UnlockPath(fileHandles []uintptr) {
+}

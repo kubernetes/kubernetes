@@ -17,6 +17,7 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -185,7 +186,7 @@ func (pvlc *PersistentVolumeLabelController) addLabelsToVolume(vol *v1.Persisten
 	// Only add labels if the next pending initializer.
 	if needsInitialization(vol.Initializers, initializerName) {
 		if labeler, ok := (pvlc.cloud).(cloudprovider.PVLabeler); ok {
-			labels, err := labeler.GetLabelsForVolume(vol)
+			labels, err := labeler.GetLabelsForVolume(context.TODO(), vol)
 			if err != nil {
 				return fmt.Errorf("error querying volume %v: %v", vol.Spec, err)
 			}

@@ -9,7 +9,6 @@ go_test(
     name = "go_default_test",
     size = "large",
     srcs = ["scale_test.go"],
-    importpath = "k8s.io/kubernetes/test/integration/scale",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",

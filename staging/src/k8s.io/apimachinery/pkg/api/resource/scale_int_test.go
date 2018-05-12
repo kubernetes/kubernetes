@@ -45,7 +45,7 @@ func TestScaledValueInternal(t *testing.T) {
 		{big.NewInt(1), 3, 0, 1},
 		// large scaled value does not lose precision
 		{big.NewInt(0).Sub(maxInt64, bigOne), 1, 0, (math.MaxInt64-1)/10 + 1},
-		// large intermidiate result.
+		// large intermediate result.
 		{big.NewInt(1).Exp(big.NewInt(10), big.NewInt(100), nil), 100, 0, 1},
 
 		// scale up

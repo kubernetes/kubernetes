@@ -32,13 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/util/integer"
 	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
@@ -404,6 +400,22 @@ func SetReplicasAnnotations(rs *extensions.ReplicaSet, desiredReplicas, maxRepli
 	return updated
 }
 
+// AnnotationsNeedUpdate return true if ReplicasAnnotations need to be updated
+func ReplicasAnnotationsNeedUpdate(rs *extensions.ReplicaSet, desiredReplicas, maxReplicas int32) bool {
+	if rs.Annotations == nil {
+		return true
+	}
+	desiredString := fmt.Sprintf("%d", desiredReplicas)
+	if hasString := rs.Annotations[DesiredReplicasAnnotation]; hasString != desiredString {
+		return true
+	}
+	maxString := fmt.Sprintf("%d", maxReplicas)
+	if hasString := rs.Annotations[MaxReplicasAnnotation]; hasString != maxString {
+		return true
+	}
+	return false
+}
+
 // MaxUnavailable returns the maximum unavailable pods a rolling deployment can take.
 func MaxUnavailable(deployment extensions.Deployment) int32 {
 	if !IsRollingUpdate(&deployment) || *(deployment.Spec.Replicas) == 0 {
@@ -620,25 +632,16 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 }
 
 // EqualIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
-// We ignore pod-template-hash because the hash result would be different upon podTemplateSpec API changes
-// (e.g. the addition of a new field will cause the hash code to change)
-// Note that we assume input podTemplateSpecs contain non-empty labels
+// We ignore pod-template-hash because:
+// 1. The hash result would be different upon podTemplateSpec API changes
+//    (e.g. the addition of a new field will cause the hash code to change)
+// 2. The deployment template won't have hash labels
 func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) bool {
 	t1Copy := template1.DeepCopy()
 	t2Copy := template2.DeepCopy()
-	// First, compare template.Labels (ignoring hash)
-	labels1, labels2 := t1Copy.Labels, t2Copy.Labels
-	if len(labels1) > len(labels2) {
-		labels1, labels2 = labels2, labels1
-	}
-	// We make sure len(labels2) >= len(labels1)
-	for k, v := range labels2 {
-		if labels1[k] != v && k != extensions.DefaultDeploymentUniqueLabelKey {
-			return false
-		}
-	}
-	// Then, compare the templates without comparing their labels
-	t1Copy.Labels, t2Copy.Labels = nil, nil
+	// Remove hash labels from template.Labels before comparing
+	delete(t1Copy.Labels, extensions.DefaultDeploymentUniqueLabelKey)
+	delete(t2Copy.Labels, extensions.DefaultDeploymentUniqueLabelKey)
 	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 }
 
@@ -675,56 +678,6 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 		}
 	}
 	return requiredRSs, allRSs
-}
-
-// WaitForReplicaSetUpdated polls the replica set until it is updated.
-func WaitForReplicaSetUpdated(c extensionslisters.ReplicaSetLister, desiredGeneration int64, namespace, name string) error {
-	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err := c.ReplicaSets(namespace).Get(name)
-		if err != nil {
-			return false, err
-		}
-		return rs.Status.ObservedGeneration >= desiredGeneration, nil
-	})
-}
-
-// WaitForPodsHashPopulated polls the replica set until updated and fully labeled.
-func WaitForPodsHashPopulated(c extensionslisters.ReplicaSetLister, desiredGeneration int64, namespace, name string) error {
-	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err := c.ReplicaSets(namespace).Get(name)
-		if err != nil {
-			return false, err
-		}
-		return rs.Status.ObservedGeneration >= desiredGeneration &&
-			rs.Status.FullyLabeledReplicas == *(rs.Spec.Replicas), nil
-	})
-}
-
-// LabelPodsWithHash labels all pods in the given podList with the new hash label.
-func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister corelisters.PodLister, namespace, name, hash string) error {
-	for _, pod := range podList.Items {
-		// Ignore inactive Pods.
-		if !controller.IsPodActive(&pod) {
-			continue
-		}
-		// Only label the pod that doesn't already have the new hash
-		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
-			_, err := UpdatePodWithRetries(c.CoreV1().Pods(namespace), podLister, pod.Namespace, pod.Name,
-				func(podToUpdate *v1.Pod) error {
-					// Precondition: the pod doesn't contain the new hash in its label.
-					if podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
-						return errors.ErrPreconditionViolated
-					}
-					podToUpdate.Labels = labelsutil.AddLabel(podToUpdate.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
-					return nil
-				})
-			if err != nil {
-				return fmt.Errorf("error in adding template hash label %s to pod %q: %v", hash, pod.Name, err)
-			}
-			glog.V(4).Infof("Labeled pod %s/%s of ReplicaSet %s/%s with hash %s.", pod.Namespace, pod.Name, namespace, name, hash)
-		}
-	}
-	return nil
 }
 
 // SetFromReplicaSetTemplate sets the desired PodTemplateSpec from a replica set template to the given deployment.

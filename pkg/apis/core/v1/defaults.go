@@ -296,11 +296,6 @@ func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
 		obj.Phase = v1.NamespaceActive
 	}
 }
-func SetDefaults_Node(obj *v1.Node) {
-	if obj.Spec.ExternalID == "" {
-		obj.Spec.ExternalID = obj.Name
-	}
-}
 func SetDefaults_NodeStatus(obj *v1.NodeStatus) {
 	if obj.Allocatable == nil && obj.Capacity != nil {
 		obj.Allocatable = make(v1.ResourceList, len(obj.Capacity))

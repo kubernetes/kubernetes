@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -176,7 +175,7 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, 
 		},
 		registry:     source.Registry,
 		readOnly:     readOnly,
-		mountOptions: volume.MountOptionFromSpec(spec),
+		mountOptions: util.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -256,7 +255,7 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	//if a trailing slash is missing we add it here
-	mountOptions := volume.JoinMountOptions(mounter.mountOptions, options)
+	mountOptions := util.JoinMountOptions(mounter.mountOptions, options)
 	if err := mounter.mounter.Mount(mounter.correctTraillingSlash(mounter.registry), dir, "quobyte", mountOptions); err != nil {
 		return fmt.Errorf("quobyte: mount failed: %v", err)
 	}
@@ -356,7 +355,7 @@ type quobyteVolumeProvisioner struct {
 }
 
 func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(provisioner.plugin.GetAccessModes(), provisioner.options.PVC.Spec.AccessModes) {
+	if !util.AccessModesContainedInAll(provisioner.plugin.GetAccessModes(), provisioner.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", provisioner.options.PVC.Spec.AccessModes, provisioner.plugin.GetAccessModes())
 	}
 
@@ -410,7 +409,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 		return nil, err
 	}
 	pv := new(v1.PersistentVolume)
-	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, volumehelper.VolumeDynamicallyCreatedByKey, "quobyte-dynamic-provisioner")
+	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, util.VolumeDynamicallyCreatedByKey, "quobyte-dynamic-provisioner")
 	pv.Spec.PersistentVolumeSource.Quobyte = vol
 	pv.Spec.PersistentVolumeReclaimPolicy = provisioner.options.PersistentVolumeReclaimPolicy
 	pv.Spec.AccessModes = provisioner.options.PVC.Spec.AccessModes

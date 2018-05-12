@@ -30,9 +30,7 @@ go_test(
         "defaults_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/api:go_default_library",
@@ -40,6 +38,7 @@ go_test(
         "//pkg/scheduler/factory:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",

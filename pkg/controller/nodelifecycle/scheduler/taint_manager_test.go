@@ -273,7 +273,7 @@ func TestCreateNode(t *testing.T) {
 		expectDelete bool
 	}{
 		{
-			description: "Creating Node maching already assigned Pod",
+			description: "Creating Node matching already assigned Pod",
 			pods: []v1.Pod{
 				*testutil.NewPod("pod1", "node1"),
 			},
@@ -281,7 +281,7 @@ func TestCreateNode(t *testing.T) {
 			expectDelete: false,
 		},
 		{
-			description: "Creating tainted Node maching already assigned Pod",
+			description: "Creating tainted Node matching already assigned Pod",
 			pods: []v1.Pod{
 				*testutil.NewPod("pod1", "node1"),
 			},
@@ -289,7 +289,7 @@ func TestCreateNode(t *testing.T) {
 			expectDelete: true,
 		},
 		{
-			description: "Creating tainted Node maching already assigned tolerating Pod",
+			description: "Creating tainted Node matching already assigned tolerating Pod",
 			pods: []v1.Pod{
 				*addToleration(testutil.NewPod("pod1", "node1"), 1, -1),
 			},
@@ -468,7 +468,7 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 			},
 		},
 		{
-			description: "Evict all pods not maching all taints instantly",
+			description: "Evict all pods not matching all taints instantly",
 			pods: []v1.Pod{
 				*testutil.NewPod("pod1", "node1"),
 				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),

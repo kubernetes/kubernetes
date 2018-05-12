@@ -1,18 +1,19 @@
 repo: https://github.com/kubernetes/kubernetes.git
 includes:
   - 'layer:basic'
+  - 'layer:status'
   - 'layer:debug'
   - 'layer:snap'
   - 'layer:docker'
   - 'layer:metrics'
   - 'layer:nagios'
   - 'layer:tls-client'
-  - 'layer:nvidia-cuda'
   - 'layer:cdk-service-kicker'
   - 'interface:http'
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
   - 'interface:kube-control'
+  - 'interface:aws'
 config:
   deletes:
     - install_from_upstream

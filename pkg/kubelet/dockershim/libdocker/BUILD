@@ -13,7 +13,6 @@ go_test(
         "kube_docker_client_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker",
     deps = [
         "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
@@ -41,7 +40,6 @@ go_library(
         "//vendor/github.com/docker/docker/pkg/stdcopy:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/opencontainers/go-digest:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],

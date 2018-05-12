@@ -18,19 +18,18 @@ package etcd3
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -413,6 +412,15 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "")
 }
 
+func (s *store) Count(key string) (int64, error) {
+	key = path.Join(s.pathPrefix, key)
+	getResp, err := s.client.KV.Get(context.Background(), key, clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)), clientv3.WithCountOnly())
+	if err != nil {
+		return 0, err
+	}
+	return getResp.Count, nil
+}
+
 // continueToken is a simple structured object for encoding the state of a continue token.
 // TODO: if we change the version of the encoded from, we can't start encoding the new version
 // until all other servers are upgraded (i.e. we need to support rolling schema)
@@ -524,14 +532,14 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	case s.pagingEnabled && pred.Limit > 0:
 		if len(resourceVersion) > 0 {
-			fromRV, err := strconv.ParseInt(resourceVersion, 10, 64)
+			fromRV, err := s.versioner.ParseListResourceVersion(resourceVersion)
 			if err != nil {
 				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 			}
 			if fromRV > 0 {
-				options = append(options, clientv3.WithRev(fromRV))
+				options = append(options, clientv3.WithRev(int64(fromRV)))
 			}
-			returnedRV = fromRV
+			returnedRV = int64(fromRV)
 		}
 
 		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
@@ -539,14 +547,14 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	default:
 		if len(resourceVersion) > 0 {
-			fromRV, err := strconv.ParseInt(resourceVersion, 10, 64)
+			fromRV, err := s.versioner.ParseListResourceVersion(resourceVersion)
 			if err != nil {
 				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 			}
 			if fromRV > 0 {
-				options = append(options, clientv3.WithRev(fromRV))
+				options = append(options, clientv3.WithRev(int64(fromRV)))
 			}
-			returnedRV = fromRV
+			returnedRV = int64(fromRV)
 		}
 
 		options = append(options, clientv3.WithPrefix())
@@ -666,7 +674,7 @@ func (s *store) WatchList(ctx context.Context, key string, resourceVersion strin
 }
 
 func (s *store) watch(ctx context.Context, key string, rv string, pred storage.SelectionPredicate, recursive bool) (watch.Interface, error) {
-	rev, err := storage.ParseWatchResourceVersion(rv)
+	rev, err := s.versioner.ParseWatchResourceVersion(rv)
 	if err != nil {
 		return nil, err
 	}

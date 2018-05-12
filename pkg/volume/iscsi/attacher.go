@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type iscsiAttacher struct {
@@ -113,7 +112,7 @@ func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string,
 	}
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(iscsiPluginName)}
-		mountOptions := volume.MountOptionFromSpec(spec, options...)
+		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, fsType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
@@ -184,7 +183,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, pod *v1.Pod)
 	exec := host.GetExec(iscsiPluginName)
 	// TODO: remove feature gate check after no longer needed
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode, err := volumehelper.GetVolumeMode(spec)
+		volumeMode, err := volumeutil.GetVolumeMode(spec)
 		if err != nil {
 			return nil, err
 		}

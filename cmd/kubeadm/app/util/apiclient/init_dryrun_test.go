@@ -46,7 +46,7 @@ func TestHandleGetAction(t *testing.T) {
 		{
 			action:             core.NewRootGetAction(schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, masterName),
 			expectedHandled:    true,
-			expectedObjectJSON: []byte(`{"metadata":{"name":"master-foo","creationTimestamp":null,"labels":{"kubernetes.io/hostname":"master-foo"}},"spec":{"externalID":"master-foo"},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}`),
+			expectedObjectJSON: []byte(`{"metadata":{"name":"master-foo","creationTimestamp":null,"labels":{"kubernetes.io/hostname":"master-foo"}},"spec":{},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}`),
 			expectedErr:        false,
 		},
 		{

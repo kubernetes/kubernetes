@@ -224,7 +224,11 @@ metadata:
   labels:
     k8s-app: kube-dns
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   selector:
     matchLabels:
       k8s-app: kube-dns
@@ -260,9 +264,6 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
-        - containerPort: 9153
-          name: metrics
-          protocol: TCP
         livenessProbe:
           httpGet:
             path: /health
@@ -293,15 +294,16 @@ data:
   Corefile: |
     .:53 {
         errors
-        log
         health
-        kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }} {
+        kubernetes {{ .DNSDomain }} in-addr.arpa ip6.arpa {
            pods insecure
-        }
-        prometheus
-        proxy . /etc/resolv.conf
+           upstream
+           fallthrough in-addr.arpa ip6.arpa
+        }{{ .Federation }}
+        prometheus :9153
+        proxy . {{ .UpstreamNameserver }}
         cache 30
-    }
+    }{{ .StubDomain }}
 `
 	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
 	CoreDNSClusterRole = `

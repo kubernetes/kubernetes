@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/pborman/uuid"
@@ -31,11 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 )
 
 func DefaultServerConfig() (*extensionsapiserver.Config, error) {
-	port, err := FindFreeLocalPort()
+	listener, port, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +48,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	options.RecommendedOptions.Authorization = nil  // disable
 	options.RecommendedOptions.Admission = nil      // disable
 	options.RecommendedOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+	options.RecommendedOptions.SecureServing.Listener = listener
 	etcdURL, ok := os.LookupEnv("KUBE_INTEGRATION_ETCD_URL")
 	if !ok {
 		etcdURL = "http://127.0.0.1:2379"
@@ -60,6 +62,9 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 	if err := options.RecommendedOptions.ApplyTo(genericConfig, nil); err != nil {
+		return nil, err
+	}
+	if err := options.APIEnablement.ApplyTo(&genericConfig.Config, extensionsapiserver.DefaultAPIResourceConfigSource(), extensionsapiserver.Scheme); err != nil {
 		return nil, err
 	}
 
@@ -83,11 +88,11 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	return config, nil
 }
 
-func StartServer(config *extensionsapiserver.Config) (chan struct{}, clientset.Interface, dynamic.ClientPool, error) {
+func StartServer(config *extensionsapiserver.Config) (chan struct{}, *rest.Config, error) {
 	stopCh := make(chan struct{})
-	server, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	server, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	go func() {
 		err := server.GenericAPIServer.PrepareRun().Run(stopCh)
@@ -119,48 +124,38 @@ func StartServer(config *extensionsapiserver.Config) (chan struct{}, clientset.I
 	})
 	if err != nil {
 		close(stopCh)
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	apiExtensionsClient, err := clientset.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
-	if err != nil {
-		close(stopCh)
-		return nil, nil, nil, err
-	}
-
-	bytes, _ := apiExtensionsClient.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io/v1beta1").DoRaw()
-	fmt.Print(string(bytes))
-
-	return stopCh, apiExtensionsClient, dynamic.NewDynamicClientPool(server.GenericAPIServer.LoopbackClientConfig), nil
+	return stopCh, config.GenericConfig.LoopbackClientConfig, nil
 }
 
-func StartDefaultServer() (chan struct{}, clientset.Interface, dynamic.ClientPool, error) {
+func StartDefaultServer() (chan struct{}, *rest.Config, error) {
 	config, err := DefaultServerConfig()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	return StartServer(config)
 }
 
-// FindFreeLocalPort returns the number of an available port number on
-// the loopback interface.  Useful for determining the port to launch
-// a server on.  Error handling required - there is a non-zero chance
-// that the returned port number will be bound by another process
-// after this function returns.
-func FindFreeLocalPort() (int, error) {
-	l, err := net.Listen("tcp", ":0")
+func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynamic.Interface, error) {
+	stopCh, config, err := StartDefaultServer()
 	if err != nil {
-		return 0, err
+		return nil, nil, nil, err
 	}
-	defer l.Close()
-	_, portStr, err := net.SplitHostPort(l.Addr().String())
+
+	apiExtensionsClient, err := clientset.NewForConfig(config)
 	if err != nil {
-		return 0, err
+		close(stopCh)
+		return nil, nil, nil, err
 	}
-	port, err := strconv.Atoi(portStr)
+
+	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		return 0, err
+		close(stopCh)
+		return nil, nil, nil, err
 	}
-	return port, nil
+
+	return stopCh, apiExtensionsClient, dynamicClient, nil
 }

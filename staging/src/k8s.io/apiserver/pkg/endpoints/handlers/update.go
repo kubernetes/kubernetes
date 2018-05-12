@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -33,7 +34,7 @@ import (
 )
 
 // UpdateResource returns a function that will handle a resource update
-func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
+func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Update " + req.URL.Path)
@@ -47,7 +48,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			scope.err(err, w, req)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		body, err := readBody(req)
@@ -67,7 +68,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		decoder := scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: defaultGVK.Group, Version: runtime.APIVersionInternal})
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
-			err = transformDecodeError(typer, err, original, gvk, body)
+			err = transformDecodeError(scope.Typer, err, original, gvk, body)
 			scope.err(err, w, req)
 			return
 		}
@@ -90,7 +91,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
 		var transformers []rest.TransformFunc
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Update) {
-			transformers = append(transformers, func(ctx request.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
+			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			})
 		}

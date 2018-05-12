@@ -68,11 +68,14 @@ func TestRunForEndpointsAndReturnFirst(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		returnKubeConfig := runForEndpointsAndReturnFirst(rt.endpoints, func(endpoint string) (*clientcmdapi.Config, error) {
+		returnKubeConfig, err := runForEndpointsAndReturnFirst(rt.endpoints, 5*time.Minute, func(endpoint string) (*clientcmdapi.Config, error) {
 			timeout, _ := strconv.Atoi(endpoint)
 			time.Sleep(time.Second * time.Duration(timeout))
 			return kubeconfigutil.CreateBasic(endpoint, "foo", "foo", []byte{}), nil
 		})
+		if err != nil {
+			t.Errorf("unexpected error: %v for endpoint %s", err, rt.expectedEndpoint)
+		}
 		endpoint := returnKubeConfig.Clusters[returnKubeConfig.Contexts[returnKubeConfig.CurrentContext].Cluster].Server
 		if endpoint != rt.expectedEndpoint {
 			t.Errorf(

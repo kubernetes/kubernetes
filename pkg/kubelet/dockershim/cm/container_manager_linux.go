@@ -95,7 +95,7 @@ func (m *containerManager) doWork() {
 	//   1. Ensure processes run in the cgroups if m.cgroupsManager is not nil.
 	//   2. Ensure processes have the OOM score applied.
 	if err := kubecm.EnsureDockerInContainer(version, dockerOOMScoreAdj, m.cgroupsManager); err != nil {
-		glog.Errorf("Unable to ensure the docker processes run in the desired containers")
+		glog.Errorf("Unable to ensure the docker processes run in the desired containers: %v", err)
 	}
 }
 

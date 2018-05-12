@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
@@ -103,10 +104,28 @@ func newContainerdContainerHandler(
 		return nil, err
 	}
 
-	taskPid, err := client.TaskPid(ctx, id)
-	if err != nil {
-		return nil, err
+	// Cgroup is created during task creation. When cadvisor sees the cgroup,
+	// task may not be fully created yet. Use a retry+backoff to tolerant the
+	// race condition.
+	// TODO(random-liu): Use cri-containerd client to talk with cri-containerd
+	// instead. cri-containerd has some internal synchronization to make sure
+	// `ContainerStatus` only returns result after `StartContainer` finishes.
+	var taskPid uint32
+	backoff := 100 * time.Millisecond
+	retry := 5
+	for {
+		taskPid, err = client.TaskPid(ctx, id)
+		if err == nil {
+			break
+		}
+		retry--
+		if !errdefs.IsNotFound(err) || retry == 0 {
+			return nil, err
+		}
+		time.Sleep(backoff)
+		backoff *= 2
 	}
+
 	rootfs := "/"
 	if !inHostNamespace {
 		rootfs = "/rootfs"

@@ -1,0 +1,7 @@
+This is go/types forked from go@236abdb46b (just after 1.10) and cherry-picked
+1006f703ffc, which fixes https://github.com/golang/go/issues/23712.
+
+It can be removed when all builders are >= go1.11.
+
+Do *not* update this to newer code if https://github.com/golang/go/issues/23914
+has not been fixed!

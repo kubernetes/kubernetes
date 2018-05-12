@@ -22,6 +22,7 @@ import (
 
 	"github.com/blang/semver"
 	systemdutil "github.com/coreos/go-systemd/util"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )
 
@@ -73,18 +74,52 @@ func isDockerLiveRestoreSupported() (bool, error) {
 	return version.GTE(semver.MustParse("1.26.0")), nil
 }
 
+// getDockerInfo returns the Info struct for the running Docker daemon.
+func getDockerInfo() (types.Info, error) {
+	var info types.Info
+	c, err := client.NewClient(defaultDockerEndpoint, "", nil, nil)
+	if err != nil {
+		return info, fmt.Errorf("failed to create docker client: %v", err)
+	}
+	info, err = c.Info(context.Background())
+	if err != nil {
+		return info, fmt.Errorf("failed to get docker info: %v", err)
+	}
+	return info, nil
+}
+
 // isDockerLiveRestoreEnabled returns true if live-restore is enabled in the
 // Docker.
 func isDockerLiveRestoreEnabled() (bool, error) {
-	c, err := client.NewClient(defaultDockerEndpoint, "", nil, nil)
+	info, err := getDockerInfo()
 	if err != nil {
-		return false, fmt.Errorf("failed to create docker client: %v", err)
-	}
-	info, err := c.Info(context.Background())
-	if err != nil {
-		return false, fmt.Errorf("failed to get docker info: %v", err)
+		return false, err
 	}
 	return info.LiveRestoreEnabled, nil
+}
+
+// getDockerLoggingDriver returns the name of the logging driver.
+func getDockerLoggingDriver() (string, error) {
+	info, err := getDockerInfo()
+	if err != nil {
+		return "", err
+	}
+	return info.LoggingDriver, nil
+}
+
+// isDockerSELinuxSupportEnabled checks whether the Docker daemon was started
+// with SELinux support enabled.
+func isDockerSELinuxSupportEnabled() (bool, error) {
+	info, err := getDockerInfo()
+	if err != nil {
+		return false, err
+	}
+	for _, s := range info.SecurityOptions {
+		if s == "selinux" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // startDockerDaemon starts the Docker daemon.

@@ -32,6 +32,7 @@ go_library(
         "//vendor/k8s.io/api/storage/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
@@ -50,7 +51,6 @@ go_test(
         "utils_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
@@ -62,6 +62,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )

@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -29,6 +30,44 @@ import (
 // 2. Call the syncVolume *once*.
 // 3. Compare resulting volumes with expected volumes.
 func TestRecycleSync(t *testing.T) {
+	runningPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "runningPod",
+			Namespace: testNamespace,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "runningClaim",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	pendingPod := runningPod.DeepCopy()
+	pendingPod.Name = "pendingPod"
+	pendingPod.Status.Phase = v1.PodPending
+	pendingPod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = "pendingClaim"
+
+	completedPod := runningPod.DeepCopy()
+	completedPod.Name = "completedPod"
+	completedPod.Status.Phase = v1.PodSucceeded
+	completedPod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName = "completedClaim"
+
+	pods := []*v1.Pod{
+		runningPod,
+		pendingPod,
+		completedPod,
+	}
+
 	tests := []controllerTest{
 		{
 			// recycle volume bound by controller
@@ -160,8 +199,38 @@ func TestRecycleSync(t *testing.T) {
 			noclaims,
 			[]string{"Warning VolumeUnknownReclaimPolicy"}, noerrors, testSyncVolume,
 		},
+		{
+			// volume is used by a running pod - failure expected
+			"6-11 - used by running pod",
+			newVolumeArray("volume6-11", "1Gi", "uid6-11", "runningClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, annBoundByController),
+			newVolumeArray("volume6-11", "1Gi", "uid6-11", "runningClaim", v1.VolumeReleased, v1.PersistentVolumeReclaimRecycle, classEmpty, annBoundByController),
+			noclaims,
+			noclaims,
+			[]string{"Normal VolumeFailedRecycle"}, noerrors, testSyncVolume,
+		},
+		{
+			// volume is used by a pending pod - failure expected
+			"6-12 - used by pending pod",
+			newVolumeArray("volume6-12", "1Gi", "uid6-12", "pendingClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, annBoundByController),
+			newVolumeArray("volume6-12", "1Gi", "uid6-12", "pendingClaim", v1.VolumeReleased, v1.PersistentVolumeReclaimRecycle, classEmpty, annBoundByController),
+			noclaims,
+			noclaims,
+			[]string{"Normal VolumeFailedRecycle"}, noerrors, testSyncVolume,
+		},
+		{
+			// volume is used by a completed pod - recycle succeeds
+			"6-13 - used by completed pod",
+			newVolumeArray("volume6-13", "1Gi", "uid6-13", "completedClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, annBoundByController),
+			newVolumeArray("volume6-13", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			noclaims,
+			noclaims,
+			noevents, noerrors,
+			// Inject recycler into the controller and call syncVolume. The
+			// recycler simulates one recycle() call that succeeds.
+			wrapTestWithReclaimCalls(operationRecycle, []error{nil}, testSyncVolume),
+		},
 	}
-	runSyncTests(t, tests, []*storage.StorageClass{})
+	runSyncTests(t, tests, []*storage.StorageClass{}, pods)
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all

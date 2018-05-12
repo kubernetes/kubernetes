@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
 )
 
@@ -103,7 +104,7 @@ func (plugin *flexVolumePlugin) getExecutable() string {
 	execName := parts[len(parts)-1]
 	execPath := path.Join(plugin.execPath, execName)
 	if runtime.GOOS == "windows" {
-		execPath = volume.GetWindowsPath(execPath)
+		execPath = util.GetWindowsPath(execPath)
 	}
 	return execPath
 }

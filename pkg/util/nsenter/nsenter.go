@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/utils/exec"
 
@@ -57,7 +58,8 @@ const (
 //     contents. TODO: remove this requirement.
 // 6.  The host image must have "mount", "findmnt", "umount", "stat", "touch",
 //     "mkdir", "ls", "sh" and "chmod" binaries in /bin, /usr/sbin, or /usr/bin
-// 7.  The host image should have systemd-run in /bin, /usr/sbin, or /usr/bin
+// 7.  The host image should have systemd-run in /bin, /usr/sbin, or /usr/bin if
+//     systemd is installed/enabled in the operating system.
 // For more information about mount propagation modes, see:
 //   https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
 type Nsenter struct {
@@ -66,7 +68,7 @@ type Nsenter struct {
 }
 
 // NewNsenter constructs a new instance of Nsenter
-func NewNsenter() *Nsenter {
+func NewNsenter() (*Nsenter, error) {
 	ne := &Nsenter{
 		paths: map[string]string{
 			"mount":       "",
@@ -83,9 +85,8 @@ func NewNsenter() *Nsenter {
 	}
 	// search for the required commands in other locations besides /usr/bin
 	for binary := range ne.paths {
-		// default to root
-		ne.paths[binary] = filepath.Join("/", binary)
-		for _, path := range []string{"/bin", "/usr/sbin", "/usr/bin"} {
+		// check for binary under the following directories
+		for _, path := range []string{"/", "/bin", "/usr/sbin", "/usr/bin"} {
 			binPath := filepath.Join(path, binary)
 			if _, err := os.Stat(filepath.Join(hostRootFsPath, binPath)); err != nil {
 				continue
@@ -93,10 +94,12 @@ func NewNsenter() *Nsenter {
 			ne.paths[binary] = binPath
 			break
 		}
-		// TODO: error, so that the kubelet can stop if the paths don't exist
-		// (don't forget that systemd-run is optional)
+		// systemd-run is optional, bailout if we don't find any of the other binaries
+		if ne.paths[binary] == "" && binary != "systemd-run" {
+			return nil, fmt.Errorf("unable to find %v", binary)
+		}
 	}
-	return ne
+	return ne, nil
 }
 
 // Exec executes nsenter commands in hostProcMountNsPath mount namespace
@@ -119,6 +122,28 @@ func (ne *Nsenter) AbsHostPath(command string) string {
 
 // SupportsSystemd checks whether command systemd-run exists
 func (ne *Nsenter) SupportsSystemd() (string, bool) {
-	systemdRunPath, hasSystemd := ne.paths["systemd-run"]
-	return systemdRunPath, hasSystemd
+	systemdRunPath, ok := ne.paths["systemd-run"]
+	return systemdRunPath, ok && systemdRunPath != ""
+}
+
+// EvalSymlinks returns the path name on the host after evaluating symlinks on the
+// host.
+func (ne *Nsenter) EvalSymlinks(pathname string) (string, error) {
+	args := []string{"-m", pathname}
+	outBytes, err := ne.Exec("realpath", args).CombinedOutput()
+	if err != nil {
+		glog.Infof("failed to resolve symbolic links on %s: %v", pathname, err)
+		return "", err
+	}
+	return strings.TrimSpace(string(outBytes)), nil
+}
+
+// KubeletPath returns the path name that can be accessed by containerized
+// kubelet, after evaluating symlinks on the host.
+func (ne *Nsenter) KubeletPath(pathname string) (string, error) {
+	hostpath, err := ne.EvalSymlinks(pathname)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(hostRootFsPath, hostpath), nil
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -39,12 +40,17 @@ type instanceInfo struct {
 }
 
 // GetZone returns the Zone containing the current failure zone and locality region that the program is running in
-func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
+func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
+	return az.getZoneFromURL(instanceInfoURL)
+}
+
+// This is injectable for testing.
+func (az *Cloud) getZoneFromURL(url string) (cloudprovider.Zone, error) {
 	faultMutex.Lock()
 	defer faultMutex.Unlock()
 	if faultDomain == nil {
 		var err error
-		faultDomain, err = fetchFaultDomain()
+		faultDomain, err = fetchFaultDomain(url)
 		if err != nil {
 			return cloudprovider.Zone{}, err
 		}
@@ -59,24 +65,24 @@ func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (az *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+func (az *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
 	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
 
-	return az.GetZoneByNodeName(nodeName)
+	return az.GetZoneByNodeName(ctx, nodeName)
 }
 
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (az *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+func (az *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
 	return az.vmSet.GetZoneByNodeName(string(nodeName))
 }
 
-func fetchFaultDomain() (*string, error) {
-	resp, err := http.Get(instanceInfoURL)
+func fetchFaultDomain(url string) (*string, error) {
+	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}

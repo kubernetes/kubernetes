@@ -193,6 +193,9 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
+	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
+		return err
+	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
 	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
@@ -303,7 +306,7 @@ func (c *secretVolumeUnmounter) TearDown() error {
 }
 
 func (c *secretVolumeUnmounter) TearDownAt(dir string) error {
-	return volume.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
+	return volumeutil.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.SecretVolumeSource, bool) {

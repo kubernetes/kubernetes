@@ -42,7 +42,7 @@ import (
 var pvcObjectCountName = generic.ObjectCountQuotaResourceNameFor(v1.SchemeGroupVersion.WithResource("persistentvolumeclaims").GroupResource())
 
 // pvcResources are the set of static resources managed by quota associated with pvcs.
-// for each resouce in this list, it may be refined dynamically based on storage class.
+// for each resource in this list, it may be refined dynamically based on storage class.
 var pvcResources = []api.ResourceName{
 	api.ResourcePersistentVolumeClaims,
 	api.ResourceRequestsStorage,

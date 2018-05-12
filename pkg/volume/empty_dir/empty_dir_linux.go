@@ -23,6 +23,8 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
+
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -37,22 +39,22 @@ type realMountDetector struct {
 	mounter mount.Interface
 }
 
-func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
+func (m *realMountDetector) GetMountMedium(path string) (v1.StorageMedium, bool, error) {
 	glog.V(5).Infof("Determining mount medium of %v", path)
 	notMnt, err := m.mounter.IsLikelyNotMountPoint(path)
 	if err != nil {
-		return 0, false, fmt.Errorf("IsLikelyNotMountPoint(%q): %v", path, err)
+		return v1.StorageMediumDefault, false, fmt.Errorf("IsLikelyNotMountPoint(%q): %v", path, err)
 	}
 	buf := unix.Statfs_t{}
 	if err := unix.Statfs(path, &buf); err != nil {
-		return 0, false, fmt.Errorf("statfs(%q): %v", path, err)
+		return v1.StorageMediumDefault, false, fmt.Errorf("statfs(%q): %v", path, err)
 	}
 
 	glog.V(5).Infof("Statfs_t of %v: %+v", path, buf)
 	if buf.Type == linuxTmpfsMagic {
-		return mediumMemory, !notMnt, nil
+		return v1.StorageMediumMemory, !notMnt, nil
 	} else if int64(buf.Type) == linuxHugetlbfsMagic {
-		return mediumHugepages, !notMnt, nil
+		return v1.StorageMediumHugePages, !notMnt, nil
 	}
-	return mediumUnknown, !notMnt, nil
+	return v1.StorageMediumDefault, !notMnt, nil
 }

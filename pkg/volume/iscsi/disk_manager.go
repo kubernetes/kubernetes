@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // Abstract interface to disk operations.
@@ -63,7 +64,7 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 		b.iscsiDisk.Iface = b.iscsiDisk.Portals[0] + ":" + b.iscsiDisk.VolName
 	}
 	globalPDPath := manager.MakeGlobalPDName(*b.iscsiDisk)
-	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+	mountOptions := util.JoinMountOptions(b.mountOptions, options)
 	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
 	if err != nil {
 		glog.Errorf("Failed to bind mount: source:%s, target:%s, err:%v", globalPDPath, volPath, err)

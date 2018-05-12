@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,164 +17,40 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
 	"k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	clientset "k8s.io/client-go/kubernetes"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
-	csiExternalAttacherImage    string = "docker.io/k8scsi/csi-attacher:0.1"
-	csiExternalProvisionerImage string = "docker.io/k8scsi/csi-provisioner:0.1"
-	csiDriverRegistrarImage     string = "docker.io/k8scsi/driver-registrar"
+	csiExternalProvisionerClusterRoleName string = "system:csi-external-provisioner"
+	csiExternalAttacherClusterRoleName    string = "system:csi-external-attacher"
+	csiDriverRegistrarClusterRoleName     string = "csi-driver-registrar"
 )
 
-func externalAttacherServiceAccount(
-	client clientset.Interface,
-	config framework.VolumeTestConfig,
-	teardown bool,
-) *v1.ServiceAccount {
-	serviceAccountName := config.Prefix + "-service-account"
-	serviceAccountClient := client.CoreV1().ServiceAccounts(config.Namespace)
-	sa := &v1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: serviceAccountName,
-		},
-	}
-
-	serviceAccountClient.Delete(sa.GetName(), &metav1.DeleteOptions{})
-	err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
-		_, err := serviceAccountClient.Get(sa.GetName(), metav1.GetOptions{})
-		return apierrs.IsNotFound(err), nil
-	})
-	framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
-
-	if teardown {
-		return nil
-	}
-
-	ret, err := serviceAccountClient.Create(sa)
-	if err != nil {
-		framework.ExpectNoError(err, "Failed to create %s service account: %v", sa.GetName(), err)
-	}
-
-	return ret
+type csiTestDriver interface {
+	createCSIDriver()
+	cleanupCSIDriver()
+	createStorageClassTest(node v1.Node) storageClassTest
 }
 
-func externalAttacherClusterRole(
-	client clientset.Interface,
-	config framework.VolumeTestConfig,
-	teardown bool,
-) *rbacv1.ClusterRole {
-	clusterRoleClient := client.RbacV1().ClusterRoles()
-	role := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Prefix + "-cluster-role",
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{""},
-				Resources: []string{"persistentvolumes"},
-				Verbs:     []string{"create", "delete", "get", "list", "watch", "update"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"persistentvolumesclaims"},
-				Verbs:     []string{"get", "list", "watch", "update"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"nodes"},
-				Verbs:     []string{"get", "list", "watch", "update"},
-			},
-			{
-				APIGroups: []string{"storage.k8s.io"},
-				Resources: []string{"volumeattachments"},
-				Verbs:     []string{"get", "list", "watch", "update"},
-			},
-			{
-				APIGroups: []string{"storage.k8s.io"},
-				Resources: []string{"storageclasses"},
-				Verbs:     []string{"get", "list", "watch"},
-			},
-		},
-	}
-
-	clusterRoleClient.Delete(role.GetName(), &metav1.DeleteOptions{})
-	err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
-		_, err := clusterRoleClient.Get(role.GetName(), metav1.GetOptions{})
-		return apierrs.IsNotFound(err), nil
-	})
-	framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
-
-	if teardown {
-		return nil
-	}
-
-	ret, err := clusterRoleClient.Create(role)
-	if err != nil {
-		framework.ExpectNoError(err, "Failed to create %s cluster role: %v", role.GetName(), err)
-	}
-
-	return ret
+var csiTestDrivers = map[string]func(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver{
+	"hostPath": initCSIHostpath,
+	// Feature tag to skip test in CI, pending fix of #62237
+	"[Feature: GCE PD CSI Plugin] gcePD": initCSIgcePD,
 }
 
-func externalAttacherClusterRoleBinding(
-	client clientset.Interface,
-	config framework.VolumeTestConfig,
-	teardown bool,
-	sa *v1.ServiceAccount,
-	clusterRole *rbacv1.ClusterRole,
-) *rbacv1.ClusterRoleBinding {
-	clusterRoleBindingClient := client.RbacV1().ClusterRoleBindings()
-	binding := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Prefix + "-role-binding",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      sa.GetName(),
-				Namespace: sa.GetNamespace(),
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Kind:     "ClusterRole",
-			Name:     clusterRole.GetName(),
-			APIGroup: "rbac.authorization.k8s.io",
-		},
-	}
-
-	clusterRoleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
-	err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
-		_, err := clusterRoleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
-		return apierrs.IsNotFound(err), nil
-	})
-	framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
-
-	if teardown {
-		return nil
-	}
-
-	ret, err := clusterRoleBindingClient.Create(binding)
-	if err != nil {
-		framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
-	}
-
-	return ret
-}
-
-var _ = utils.SIGDescribe("CSI Volumes [Feature:CSI]", func() {
+var _ = utils.SIGDescribe("CSI Volumes [Flaky]", func() {
 	f := framework.NewDefaultFramework("csi-mock-plugin")
 
 	var (
@@ -182,7 +58,6 @@ var _ = utils.SIGDescribe("CSI Volumes [Feature:CSI]", func() {
 		ns     *v1.Namespace
 		node   v1.Node
 		config framework.VolumeTestConfig
-		suffix string
 	)
 
 	BeforeEach(func() {
@@ -197,47 +72,154 @@ var _ = utils.SIGDescribe("CSI Volumes [Feature:CSI]", func() {
 			ServerNodeName:    node.Name,
 			WaitForCompletion: true,
 		}
-		suffix = ns.Name
+		csiDriverRegistrarClusterRole(config)
 	})
 
-	// Create one of these for each of the drivers to be tested
-	// CSI hostPath driver test
-	Describe("Sanity CSI plugin test using hostPath CSI driver", func() {
+	for driverName, initCSIDriver := range csiTestDrivers {
+		curDriverName := driverName
+		curInitCSIDriver := initCSIDriver
 
-		var (
-			clusterRole    *rbacv1.ClusterRole
-			serviceAccount *v1.ServiceAccount
-		)
+		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s", curDriverName), func() {
+			var (
+				driver csiTestDriver
+			)
 
-		BeforeEach(func() {
-			By("deploying csi hostpath driver")
-			clusterRole = externalAttacherClusterRole(cs, config, false)
-			serviceAccount = externalAttacherServiceAccount(cs, config, false)
-			externalAttacherClusterRoleBinding(cs, config, false, serviceAccount, clusterRole)
-			csiHostPathPod(cs, config, false, f, serviceAccount)
+			BeforeEach(func() {
+				driver = curInitCSIDriver(f, config)
+				driver.createCSIDriver()
+			})
+
+			AfterEach(func() {
+				driver.cleanupCSIDriver()
+			})
+
+			It("should provision storage", func() {
+				t := driver.createStorageClassTest(node)
+				claim := newClaim(t, ns.GetName(), "")
+				class := newStorageClass(t, ns.GetName(), "")
+				claim.Spec.StorageClassName = &class.ObjectMeta.Name
+				testDynamicProvisioning(t, cs, claim, class)
+			})
 		})
-
-		AfterEach(func() {
-			By("uninstalling csi hostpath driver")
-			csiHostPathPod(cs, config, true, f, serviceAccount)
-			externalAttacherClusterRoleBinding(cs, config, true, serviceAccount, clusterRole)
-			serviceAccount = externalAttacherServiceAccount(cs, config, true)
-			clusterRole = externalAttacherClusterRole(cs, config, true)
-		})
-
-		It("should provision storage with a hostPath CSI driver", func() {
-			t := storageClassTest{
-				name:         "csi-hostpath",
-				provisioner:  "csi-hostpath",
-				parameters:   map[string]string{},
-				claimSize:    "1Gi",
-				expectedSize: "1Gi",
-				nodeName:     node.Name,
-			}
-
-			claim := newClaim(t, ns.GetName(), "")
-			class := newStorageClass(t, ns.GetName(), "")
-			testDynamicProvisioning(t, cs, claim, class)
-		})
-	})
+	}
 })
+
+type hostpathCSIDriver struct {
+	combinedClusterRoleNames []string
+	serviceAccount           *v1.ServiceAccount
+
+	f      *framework.Framework
+	config framework.VolumeTestConfig
+}
+
+func initCSIHostpath(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
+	return &hostpathCSIDriver{
+		combinedClusterRoleNames: []string{
+			csiExternalAttacherClusterRoleName,
+			csiExternalProvisionerClusterRoleName,
+			csiDriverRegistrarClusterRoleName,
+		},
+		f:      f,
+		config: config,
+	}
+}
+
+func (h *hostpathCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
+	return storageClassTest{
+		name:         "csi-hostpath",
+		provisioner:  "csi-hostpath",
+		parameters:   map[string]string{},
+		claimSize:    "1Gi",
+		expectedSize: "1Gi",
+		nodeName:     node.Name,
+	}
+}
+
+func (h *hostpathCSIDriver) createCSIDriver() {
+	By("deploying csi hostpath driver")
+	f := h.f
+	cs := f.ClientSet
+	config := h.config
+	h.serviceAccount = csiServiceAccount(cs, config, "hostpath", false)
+	csiClusterRoleBindings(cs, config, false, h.serviceAccount, h.combinedClusterRoleNames)
+	csiHostPathPod(cs, config, false, f, h.serviceAccount)
+}
+
+func (h *hostpathCSIDriver) cleanupCSIDriver() {
+	By("uninstalling csi hostpath driver")
+	f := h.f
+	cs := f.ClientSet
+	config := h.config
+	csiHostPathPod(cs, config, true, f, h.serviceAccount)
+	csiClusterRoleBindings(cs, config, true, h.serviceAccount, h.combinedClusterRoleNames)
+	csiServiceAccount(cs, config, "hostpath", true)
+}
+
+type gcePDCSIDriver struct {
+	controllerClusterRoles   []string
+	nodeClusterRoles         []string
+	controllerServiceAccount *v1.ServiceAccount
+	nodeServiceAccount       *v1.ServiceAccount
+
+	f      *framework.Framework
+	config framework.VolumeTestConfig
+}
+
+func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
+	cs := f.ClientSet
+	framework.SkipUnlessProviderIs("gce", "gke")
+	// Currently you will need to manually add the required GCP Credentials as a secret "cloud-sa"
+	// kubectl create generic cloud-sa --from-file=PATH/TO/cloud-sa.json --namespace={{config.Namespace}}
+	// TODO(#62561): Inject the necessary credentials automatically to the driver containers in e2e test
+	framework.SkipUnlessSecretExistsAfterWait(cs, "cloud-sa", config.Namespace, 3*time.Minute)
+
+	return &gcePDCSIDriver{
+		nodeClusterRoles: []string{
+			csiDriverRegistrarClusterRoleName,
+		},
+		controllerClusterRoles: []string{
+			csiExternalAttacherClusterRoleName,
+			csiExternalProvisionerClusterRoleName,
+		},
+		f:      f,
+		config: config,
+	}
+}
+
+func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
+	nodeZone, ok := node.GetLabels()[kubeletapis.LabelZoneFailureDomain]
+	Expect(ok).To(BeTrue(), "Could not get label %v from node %v", kubeletapis.LabelZoneFailureDomain, node.GetName())
+
+	return storageClassTest{
+		name:         "csi-gce-pd",
+		provisioner:  "csi-gce-pd",
+		parameters:   map[string]string{"type": "pd-standard", "zone": nodeZone},
+		claimSize:    "5Gi",
+		expectedSize: "5Gi",
+		nodeName:     node.Name,
+	}
+}
+
+func (g *gcePDCSIDriver) createCSIDriver() {
+	By("deploying gce-pd driver")
+	f := g.f
+	cs := f.ClientSet
+	config := g.config
+	g.controllerServiceAccount = csiServiceAccount(cs, config, "gce-controller", false /* teardown */)
+	g.nodeServiceAccount = csiServiceAccount(cs, config, "gce-node", false /* teardown */)
+	csiClusterRoleBindings(cs, config, false /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
+	csiClusterRoleBindings(cs, config, false /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	deployGCEPDCSIDriver(cs, config, false /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
+}
+
+func (g *gcePDCSIDriver) cleanupCSIDriver() {
+	By("uninstalling gce-pd driver")
+	f := g.f
+	cs := f.ClientSet
+	config := g.config
+	deployGCEPDCSIDriver(cs, config, true /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
+	csiClusterRoleBindings(cs, config, true /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
+	csiClusterRoleBindings(cs, config, true /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
+	csiServiceAccount(cs, config, "gce-node", true /* teardown */)
+}

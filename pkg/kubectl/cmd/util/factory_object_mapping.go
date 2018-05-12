@@ -27,29 +27,30 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
-
+	appsv1 "k8s.io/api/apps/v1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -74,61 +75,13 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
-// objectLoader attempts to perform discovery against the server, and will fall back to
-// the built in mapper if necessary. It supports unstructured objects either way, since
-// the underlying Scheme supports Unstructured. The mapper will return converters that can
-// convert versioned types to unstructured and back.
-// It can return an error and the best effort unstructured mapper and typer.
-func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, error) {
+func (f *ring1Factory) CategoryExpander() (restmapper.CategoryExpander, error) {
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
-		unstructuredMapper := discovery.NewRESTMapper(nil, meta.InterfacesForUnstructured)
-		unstructuredTyper := discovery.NewUnstructuredObjectTyper(nil)
-		return unstructuredMapper, unstructuredTyper, err
+		return nil, err
 	}
 
-	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
-	if err != nil && !discoveryClient.Fresh() {
-		discoveryClient.Invalidate()
-		groupResources, err = discovery.GetAPIGroupResources(discoveryClient)
-	}
-	// even if we can't get all the results, we're better off continuing with what we can than not presenting
-	// anything.  This mirrors old behavior that used to fallback to a hardcoded list of API types compiled
-	// into kubernetes.
-	if err != nil {
-		glog.V(1).Infof("Unable to retrieve all API resources, continuing with partial results: %v", err)
-	}
-
-	// allow conversion between typed and unstructured objects
-	interfaces := meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor)
-	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.VersionInterfacesFunc(interfaces))
-	// TODO: should this also indicate it recognizes typed objects?
-	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
-	expander := NewShortcutExpander(mapper, discoveryClient)
-	return expander, typer, err
-}
-
-func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	return meta.NewLazyObjectLoader(f.objectLoader)
-}
-
-func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {
-	legacyExpander := categories.LegacyCategoryExpander
-
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err == nil {
-		// fallback is the legacy expander wrapped with discovery based filtering
-		fallbackExpander, err := categories.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
-		CheckErr(err)
-
-		// by default use the expander that discovers based on "categories" field from the API
-		discoveryCategoryExpander, err := categories.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
-		CheckErr(err)
-
-		return discoveryCategoryExpander
-	}
-
-	return legacyExpander
+	return restmapper.NewDiscoveryCategoryExpander(discoveryClient), nil
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
@@ -136,7 +89,7 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 	if err != nil {
 		return nil, err
 	}
-	if err := client.SetKubernetesDefaults(cfg); err != nil {
+	if err := setKubernetesDefaults(cfg); err != nil {
 		return nil, err
 	}
 	gvk := mapping.GroupVersionKind
@@ -164,26 +117,18 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 		cfg.APIPath = "/api"
 	}
 	gv := mapping.GroupVersionKind.GroupVersion()
-	cfg.ContentConfig = dynamic.ContentConfig()
+	cfg.ContentConfig = resource.UnstructuredPlusDefaultContentConfig()
 	cfg.GroupVersion = &gv
 	return restclient.RESTClientFor(cfg)
 }
 
 func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientConfig, err := f.clientAccessFactory.ClientConfig()
 	if err != nil {
-		// if we can't make a client for this group/version, go generic if possible
-		if genericDescriber, genericErr := genericDescriber(f.clientAccessFactory, mapping); genericErr == nil {
-			return genericDescriber, nil
-		}
-		// otherwise return the original error
 		return nil, err
 	}
-
 	// try to get a describer
-	if describer, ok := printersinternal.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
+	if describer, ok := printersinternal.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientConfig); ok {
 		return describer, nil
 	}
 	// if this is a kind we don't have a describer for yet, go generic if possible
@@ -201,13 +146,8 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 		return nil, err
 	}
 
-	clientConfigCopy := *clientConfig
-	clientConfigCopy.APIPath = dynamic.LegacyAPIPathResolverFunc(mapping.GroupVersionKind)
-	gv := mapping.GroupVersionKind.GroupVersion()
-	clientConfigCopy.GroupVersion = &gv
-
 	// used to fetch the resource
-	dynamicClient, err := dynamic.NewClient(&clientConfigCopy)
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +163,7 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 }
 
 func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		return nil, err
 	}
@@ -232,48 +172,17 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 		return nil, errors.New("provided options object is not a PodLogOptions")
 	}
 
-	var selector labels.Selector
-	var namespace string
 	switch t := object.(type) {
 	case *api.Pod:
 		return clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
-
-	case *api.ReplicationController:
-		namespace = t.Namespace
-		selector = labels.SelectorFromSet(t.Spec.Selector)
-
-	case *extensions.ReplicaSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *extensions.Deployment:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *batch.Job:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *apps.StatefulSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	default:
-		return nil, fmt.Errorf("cannot get the logs from %T", object)
+	case *corev1.Pod:
+		return clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
 	}
 
+	namespace, selector, err := selectorsForObject(object)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the logs from %T: %v", object, err)
+	}
 	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
 	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
 	if err != nil {
@@ -285,43 +194,152 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 	return clientset.Core().Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
 }
 
-func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
-	if err != nil {
-		return nil, err
+func selectorsForObject(object runtime.Object) (namespace string, selector labels.Selector, err error) {
+	switch t := object.(type) {
+	case *extensions.ReplicaSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *extensionsv1beta1.ReplicaSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1.ReplicaSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1beta2.ReplicaSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *api.ReplicationController:
+		namespace = t.Namespace
+		selector = labels.SelectorFromSet(t.Spec.Selector)
+	case *corev1.ReplicationController:
+		namespace = t.Namespace
+		selector = labels.SelectorFromSet(t.Spec.Selector)
+
+	case *apps.StatefulSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1.StatefulSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1beta1.StatefulSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1beta2.StatefulSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *extensions.DaemonSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *extensionsv1beta1.DaemonSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1.DaemonSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1beta2.DaemonSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *extensions.Deployment:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *extensionsv1beta1.Deployment:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1.Deployment:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1beta1.Deployment:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *appsv1beta2.Deployment:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *batch.Job:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+	case *batchv1.Job:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *api.Service:
+		namespace = t.Namespace
+		if t.Spec.Selector == nil || len(t.Spec.Selector) == 0 {
+			return "", nil, fmt.Errorf("invalid service '%s': Service is defined without a selector", t.Name)
+		}
+		selector = labels.SelectorFromSet(t.Spec.Selector)
+	case *corev1.Service:
+		namespace = t.Namespace
+		if t.Spec.Selector == nil || len(t.Spec.Selector) == 0 {
+			return "", nil, fmt.Errorf("invalid service '%s': Service is defined without a selector", t.Name)
+		}
+		selector = labels.SelectorFromSet(t.Spec.Selector)
+
+	default:
+		return "", nil, fmt.Errorf("selector for %T not implemented", object)
 	}
 
-	// create scales getter
-	// TODO(p0lyn0mial): put scalesGetter to a factory
-	discoClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err != nil {
-		return nil, err
-	}
-	restClient, err := f.clientAccessFactory.RESTClient()
-	if err != nil {
-		return nil, err
-	}
-	mapper, _ := f.Object()
-	resolver := scaleclient.NewDiscoveryScaleKindResolver(discoClient)
-	scalesGetter := scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver)
-	gvk := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)
-
-	return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), clientset, scalesGetter, gvk.GroupResource())
-}
-
-func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, clientsetErr := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
-	reaper, reaperErr := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
-
-	if kubectl.IsNoSuchReaperError(reaperErr) {
-		return nil, reaperErr
-	}
-	if clientsetErr != nil {
-		return nil, clientsetErr
-	}
-	return reaper, reaperErr
+	return namespace, selector, nil
 }
 
 func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
@@ -371,49 +389,25 @@ func (f *ring1Factory) ApproximatePodTemplateForObject(object runtime.Object) (*
 }
 
 func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		return nil, err
 	}
-	var selector labels.Selector
-	var namespace string
+
 	switch t := object.(type) {
-	case *extensions.ReplicaSet:
-		namespace = t.Namespace
-		selector = labels.SelectorFromSet(t.Spec.Selector.MatchLabels)
-
-	case *api.ReplicationController:
-		namespace = t.Namespace
-		selector = labels.SelectorFromSet(t.Spec.Selector)
-
-	case *apps.StatefulSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *extensions.Deployment:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *batch.Job:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
 	case *api.Pod:
 		return t, nil
+	case *corev1.Pod:
+		internalPod := &api.Pod{}
+		err := apiv1.Convert_v1_Pod_To_core_Pod(t, internalPod, nil)
+		return internalPod, err
 
-	default:
-		return nil, fmt.Errorf("cannot attach to %T: not implemented", object)
 	}
 
+	namespace, selector, err := selectorsForObject(object)
+	if err != nil {
+		return nil, fmt.Errorf("cannot attach to %T: %v", object, err)
+	}
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
 	return pod, err

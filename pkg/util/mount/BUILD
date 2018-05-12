@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -72,6 +66,7 @@ go_library(
         "//conditions:default": [],
     }),
     importpath = "k8s.io/kubernetes/pkg/util/mount",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
@@ -102,10 +97,18 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/mount",
     deps = [
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -119,4 +122,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

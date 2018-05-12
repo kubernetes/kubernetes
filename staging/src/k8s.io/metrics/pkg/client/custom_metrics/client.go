@@ -69,7 +69,7 @@ func NewForConfigOrDie(c *rest.Config) CustomMetricsClient {
 	return client
 }
 
-// NewForMapper constucts the client with a RESTMapper, which allows more
+// NewForMapper constructs the client with a RESTMapper, which allows more
 // accurate translation from GroupVersionKind to GroupVersionResource.
 func NewForMapper(client rest.Interface, mapper meta.RESTMapper) CustomMetricsClient {
 	return &customMetricsClient{
@@ -104,11 +104,8 @@ func (c *customMetricsClient) qualResourceForKind(groupKind schema.GroupKind) (s
 		return "", fmt.Errorf("unable to map kind %s to resource: %v", groupKind.String(), err)
 	}
 
-	groupResource := schema.GroupResource{
-		Group:    mapping.GroupVersionKind.Group,
-		Resource: mapping.Resource,
-	}
-	return groupResource.String(), nil
+	gr := mapping.Resource.GroupResource()
+	return gr.String(), nil
 }
 
 type rootScopedMetrics struct {

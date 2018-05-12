@@ -35,7 +35,7 @@ func TestGetNonzeroRequests(t *testing.T) {
 		{
 			"cpu_and_memory_not_found",
 			v1.ResourceList{},
-			DefaultMilliCpuRequest,
+			DefaultMilliCPURequest,
 			DefaultMemoryRequest,
 		},
 		{
@@ -51,7 +51,7 @@ func TestGetNonzeroRequests(t *testing.T) {
 			v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("400Mi"),
 			},
-			DefaultMilliCpuRequest,
+			DefaultMilliCPURequest,
 			400 * 1024 * 1024,
 		},
 		{

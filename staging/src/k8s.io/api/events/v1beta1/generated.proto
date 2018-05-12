@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ message EventList {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 message EventSeries {
   // Number of occurrences in this series up to the last heartbeat time
   optional int32 count = 1;

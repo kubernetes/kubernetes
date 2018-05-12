@@ -15,6 +15,7 @@
 package validate
 
 import (
+	"log"
 	"reflect"
 	"strings"
 
@@ -30,16 +31,6 @@ type typeValidator struct {
 	Format string
 	In     string
 	Path   string
-}
-
-var jsonTypeNames = map[string]struct{}{
-	"array":   struct{}{},
-	"boolean": struct{}{},
-	"integer": struct{}{},
-	"null":    struct{}{},
-	"number":  struct{}{},
-	"object":  struct{}{},
-	"string":  struct{}{},
 }
 
 func (t *typeValidator) schemaInfoForType(data interface{}) (string, string) {
@@ -121,7 +112,9 @@ func (t *typeValidator) SetPath(path string) {
 func (t *typeValidator) Applies(source interface{}, kind reflect.Kind) bool {
 	stpe := reflect.TypeOf(source)
 	r := (len(t.Type) > 0 || t.Format != "") && (stpe == specSchemaType || stpe == specParameterType || stpe == specHeaderType)
-	//fmt.Printf("type validator for %q applies %t for %T (kind: %v)\n", t.Path, r, source, kind)
+	if Debug {
+		log.Printf("type validator for %q applies %t for %T (kind: %v)\n", t.Path, r, source, kind)
+	}
 	return r
 }
 
@@ -140,7 +133,9 @@ func (t *typeValidator) Validate(data interface{}) *Result {
 	kind := val.Kind()
 
 	schType, format := t.schemaInfoForType(data)
-	//fmt.Println("path:", t.Path, "schType:", schType, "format:", format, "expType:", t.Type, "expFmt:", t.Format, "kind:", val.Kind().String())
+	if Debug {
+		log.Println("path:", t.Path, "schType:", schType, "format:", format, "expType:", t.Type, "expFmt:", t.Format, "kind:", val.Kind().String())
+	}
 	isLowerInt := t.Format == "int64" && format == "int32"
 	isLowerFloat := t.Format == "float64" && format == "float32"
 	isFloatInt := schType == "number" && swag.IsFloat64AJSONInteger(val.Float()) && t.Type.Contains("integer")

@@ -101,7 +101,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 
 	framework.ExpectNoError(err)
 
-	rc := common.NewDynamicResourceConsumer(rcName, f.Namespace.Name, common.KindDeployment, pods, allPodsCPU, memoryUsed, 0, perPodCPU, memoryLimit, f.ClientSet, f.InternalClientset)
+	rc := common.NewDynamicResourceConsumer(rcName, f.Namespace.Name, common.KindDeployment, pods, allPodsCPU, memoryUsed, 0, perPodCPU, memoryLimit, f.ClientSet, f.InternalClientset, f.ScalesGetter)
 	defer rc.CleanUp()
 
 	rc.WaitForReplicas(pods, 15*time.Minute)

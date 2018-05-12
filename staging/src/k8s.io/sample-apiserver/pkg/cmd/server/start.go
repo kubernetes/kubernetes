@@ -57,9 +57,9 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 }
 
 // NewCommandStartWardleServer provides a CLI handler for 'start master' command
-func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewWardleServerOptions(out, errOut)
-
+// with a default WardleServerOptions.
+func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan struct{}) *cobra.Command {
+	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a wardle API server",
 		Long:  "Launch a wardle API server",
@@ -137,6 +137,7 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 
 	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
 		config.GenericConfig.SharedInformerFactory.Start(context.StopCh)
+		o.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
 

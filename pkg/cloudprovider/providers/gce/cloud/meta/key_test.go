@@ -58,18 +58,19 @@ func TestKeyValid(t *testing.T) {
 	zone := "us-central1-b"
 
 	for _, tc := range []struct {
-		key      *Key
-		typeName string
-		want     bool
+		key  *Key
+		want bool
 	}{
-		// Note: these test cases need to be synchronized with the
-		// actual settings for each type.
-		{GlobalKey("abc"), "UrlMap", true},
-		{&Key{"abc", zone, region}, "UrlMap", false},
+		{GlobalKey("abc"), true},
+		{RegionalKey("abc", region), true},
+		{ZonalKey("abc", zone), true},
+		{RegionalKey("abc", "/invalid/"), false},
+		{ZonalKey("abc", "/invalid/"), false},
+		{&Key{"abc", zone, region}, false},
 	} {
-		valid := tc.key.Valid(tc.typeName)
-		if valid != tc.want {
-			t.Errorf("key %+v, type %v; key.Valid() = %v, want %v", tc.key, tc.typeName, valid, tc.want)
+		got := tc.key.Valid()
+		if got != tc.want {
+			t.Errorf("key %+v; key.Valid() = %v, want %v", tc.key, got, tc.want)
 		}
 	}
 }

@@ -19,6 +19,7 @@ package e2e_node
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -50,12 +52,13 @@ const (
 	pressureDelay  = 20 * time.Second
 	testContextFmt = "when we run containers that should cause %s"
 	noPressure     = v1.NodeConditionType("NoPressure")
-	lotsOfDisk     = 10240 // 10 Gb in Mb
+	lotsOfDisk     = 10240      // 10 Gb in Mb
+	lotsOfFiles    = 1000000000 // 1 billion
 )
 
 // InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
 // Node disk pressure is induced by consuming all inodes on the node.
-var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
+var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("inode-eviction-test")
 	expectedNodeCondition := v1.NodeDiskPressure
 	pressureTimeout := 15 * time.Minute
@@ -74,11 +77,11 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logInodeMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
-				pod:              inodeConsumingPod("container-inode-hog", nil),
+				pod:              inodeConsumingPod("container-inode-hog", lotsOfFiles, nil),
 			},
 			{
 				evictionPriority: 1,
-				pod:              inodeConsumingPod("volume-inode-hog", &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}),
+				pod:              inodeConsumingPod("volume-inode-hog", lotsOfFiles, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}),
 			},
 			{
 				evictionPriority: 0,
@@ -88,9 +91,38 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 	})
 })
 
+// ImageGCNoEviction tests that the node does not evict pods when inodes are consumed by images
+// Disk pressure is induced by pulling large images
+var _ = framework.KubeDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive]", func() {
+	f := framework.NewDefaultFramework("image-gc-eviction-test")
+	pressureTimeout := 10 * time.Minute
+	expectedNodeCondition := v1.NodeDiskPressure
+	inodesConsumed := uint64(100000)
+	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
+			summary := eventuallyGetSummary()
+			inodesFree := *summary.Node.Fs.InodesFree
+			if inodesFree <= inodesConsumed {
+				framework.Skipf("Too few inodes free on the host for the InodeEviction test to run")
+			}
+			initialConfig.EvictionHard = map[string]string{"nodefs.inodesFree": fmt.Sprintf("%d", inodesFree-inodesConsumed)}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
+		})
+		// Consume enough inodes to induce disk pressure,
+		// but expect that image garbage collection can reduce it enough to avoid an eviction
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
+			{
+				evictionPriority: 0,
+				pod:              inodeConsumingPod("container-inode", 110000, nil),
+			},
+		})
+	})
+})
+
 // MemoryAllocatableEviction tests that the node responds to node memory pressure by evicting only responsible pods.
 // Node memory pressure is only encountered because we reserve the majority of the node's capacity via kube-reserved.
-var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
+var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("memory-allocatable-eviction-test")
 	expectedNodeCondition := v1.NodeMemoryPressure
 	pressureTimeout := 10 * time.Minute
@@ -122,7 +154,7 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space.
-var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
+var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
@@ -150,7 +182,7 @@ var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
-var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
+var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
@@ -168,7 +200,8 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 			initialConfig.EvictionMaxPodGracePeriod = 30
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 			// Ensure that pods are not evicted because of the eviction-hard threshold
-			initialConfig.EvictionHard = map[string]string{}
+			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
+			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
 			{
@@ -184,13 +217,14 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 })
 
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
-var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disruptive] [Flaky] [Feature:LocalStorageCapacityIsolation]", func() {
+var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 	evictionTestTimeout := 10 * time.Minute
 	Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
-			initialConfig.EvictionHard = map[string]string{}
+			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
+			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}
 		})
 		sizeLimit := resource.MustParse("100Mi")
 		useOverLimit := 101 /* Mb */
@@ -236,7 +270,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 // PriorityMemoryEvictionOrdering tests that the node responds to node memory pressure by evicting pods.
 // This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
 // the higher priority pod.
-var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive] [Flaky]", func() {
+var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("priority-memory-eviction-ordering-test")
 	expectedNodeCondition := v1.NodeMemoryPressure
 	pressureTimeout := 10 * time.Minute
@@ -282,7 +316,7 @@ var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [
 // PriorityLocalStorageEvictionOrdering tests that the node responds to node disk pressure by evicting pods.
 // This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
 // the higher priority pod.
-var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disruptive] [Flaky]", func() {
+var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("priority-disk-eviction-ordering-test")
 	expectedNodeCondition := v1.NodeDiskPressure
 	pressureTimeout := 10 * time.Minute
@@ -346,6 +380,8 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 	// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
 	Context("", func() {
 		BeforeEach(func() {
+			// reduce memory usage in the allocatable cgroup to ensure we do not have MemoryPressure
+			reduceAllocatableMemoryUsage()
 			// Nodes do not immediately report local storage capacity
 			// Sleep so that pods requesting local storage do not fail to schedule
 			time.Sleep(30 * time.Second)
@@ -413,6 +449,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
 				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, 10*time.Minute)
 			}
+			reduceAllocatableMemoryUsage()
 			if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
 				// The disk eviction test may cause the prepulled images to be evicted,
 				// prepull those images again to ensure this test not affect following tests.
@@ -428,7 +465,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: framework.GetPauseImageNameForHostArch(),
+							Image: imageutils.GetPauseImageName(),
 							Name:  podName,
 						},
 					},
@@ -573,7 +610,12 @@ func logMemoryMetrics() {
 		return
 	}
 	if summary.Node.Memory != nil && summary.Node.Memory.WorkingSetBytes != nil && summary.Node.Memory.AvailableBytes != nil {
-		framework.Logf("Node.Memory.WorkingSetBytes: %d, summary.Node.Memory.AvailableBytes: %d", *summary.Node.Memory.WorkingSetBytes, *summary.Node.Memory.AvailableBytes)
+		framework.Logf("Node.Memory.WorkingSetBytes: %d, Node.Memory.AvailableBytes: %d", *summary.Node.Memory.WorkingSetBytes, *summary.Node.Memory.AvailableBytes)
+	}
+	for _, sysContainer := range summary.Node.SystemContainers {
+		if sysContainer.Name == stats.SystemContainerPods && sysContainer.Memory != nil && sysContainer.Memory.WorkingSetBytes != nil && sysContainer.Memory.AvailableBytes != nil {
+			framework.Logf("Allocatable.Memory.WorkingSetBytes: %d, Allocatable.Memory.AvailableBytes: %d", *sysContainer.Memory.WorkingSetBytes, *sysContainer.Memory.AvailableBytes)
+		}
 	}
 	for _, pod := range summary.Pods {
 		framework.Logf("Pod: %s", pod.PodRef.Name)
@@ -626,19 +668,19 @@ const (
 	volumeName      = "test-volume"
 )
 
-func inodeConsumingPod(name string, volumeSource *v1.VolumeSource) *v1.Pod {
+func inodeConsumingPod(name string, numFiles int, volumeSource *v1.VolumeSource) *v1.Pod {
 	// Each iteration creates an empty file
-	return podWithCommand(volumeSource, v1.ResourceRequirements{}, name, "i=0; while true; do touch %s${i}.txt; sleep 0.001; i=$((i+=1)); done;")
+	return podWithCommand(volumeSource, v1.ResourceRequirements{}, numFiles, name, "touch %s${i}.txt; sleep 0.001")
 }
 
 func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSource, resources v1.ResourceRequirements) *v1.Pod {
 	// Each iteration writes 1 Mb, so do diskConsumedMB iterations.
-	return podWithCommand(volumeSource, resources, name, fmt.Sprintf("i=0; while [ $i -lt %d ];", diskConsumedMB)+" do dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null ; i=$(($i+1)); done; while true; do sleep 5; done")
+	return podWithCommand(volumeSource, resources, diskConsumedMB, name, "dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null")
 }
 
 // podWithCommand returns a pod with the provided volumeSource and resourceRequirements.
 // If a volumeSource is provided, then the volumeMountPath to the volume is inserted into the provided command.
-func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirements, name, command string) *v1.Pod {
+func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirements, iterations int, name, command string) *v1.Pod {
 	path := ""
 	volumeMounts := []v1.VolumeMount{}
 	volumes := []v1.Volume{}
@@ -658,13 +700,60 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 					Command: []string{
 						"sh",
 						"-c",
-						fmt.Sprintf(command, filepath.Join(path, "file")),
+						fmt.Sprintf("i=0; while [ $i -lt %d ]; do %s; i=$(($i+1)); done; while true; do sleep 5; done", iterations, fmt.Sprintf(command, filepath.Join(path, "file"))),
 					},
 					Resources:    resources,
 					VolumeMounts: volumeMounts,
 				},
 			},
 			Volumes: volumes,
+		},
+	}
+}
+
+func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *v1.Pod {
+	env := []v1.EnvVar{
+		{
+			Name: "MEMORY_LIMIT",
+			ValueFrom: &v1.EnvVarSource{
+				ResourceFieldRef: &v1.ResourceFieldSelector{
+					Resource: "limits.memory",
+				},
+			},
+		},
+	}
+
+	// If there is a limit specified, pass 80% of it for -mem-total, otherwise use the downward API
+	// to pass limits.memory, which will be the total memory available.
+	// This helps prevent a guaranteed pod from triggering an OOM kill due to it's low memory limit,
+	// which will cause the test to fail inappropriately.
+	var memLimit string
+	if limit, ok := res.Limits[v1.ResourceMemory]; ok {
+		memLimit = strconv.Itoa(int(
+			float64(limit.Value()) * 0.8))
+	} else {
+		memLimit = "$(MEMORY_LIMIT)"
+	}
+
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Name:            ctnName,
+					Image:           "k8s.gcr.io/stress:v1",
+					ImagePullPolicy: "Always",
+					Env:             env,
+					// 60 min timeout * 60s / tick per 10s = 360 ticks before timeout => ~11.11Mi/tick
+					// to fill ~4Gi of memory, so initial ballpark 12Mi/tick.
+					// We might see flakes due to timeout if the total memory on the nodes increases.
+					Args:      []string{"-mem-alloc-size", "12Mi", "-mem-alloc-sleep", "10s", "-mem-total", memLimit},
+					Resources: res,
+				},
+			},
 		},
 	}
 }

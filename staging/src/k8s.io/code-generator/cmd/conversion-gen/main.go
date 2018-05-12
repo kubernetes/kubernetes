@@ -44,6 +44,7 @@ import (
 
 	generatorargs "k8s.io/code-generator/cmd/conversion-gen/args"
 	"k8s.io/code-generator/cmd/conversion-gen/generators"
+	"k8s.io/code-generator/pkg/util"
 )
 
 func main() {
@@ -51,7 +52,7 @@ func main() {
 
 	// Override defaults.
 	// TODO: move this out of conversion-gen
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
 
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)

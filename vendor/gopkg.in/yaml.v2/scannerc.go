@@ -9,7 +9,7 @@ import (
 // ************
 //
 // The following notes assume that you are familiar with the YAML specification
-// (http://yaml.org/spec/cvs/current.html).  We mostly follow it, although in
+// (http://yaml.org/spec/1.2/spec.html).  We mostly follow it, although in
 // some cases we are less restrictive that it requires.
 //
 // The process of transforming a YAML stream into a sequence of events is
@@ -611,7 +611,7 @@ func yaml_parser_set_scanner_tag_error(parser *yaml_parser_t, directive bool, co
 	if directive {
 		context = "while parsing a %TAG directive"
 	}
-	return yaml_parser_set_scanner_error(parser, context, context_mark, "did not find URI escaped octet")
+	return yaml_parser_set_scanner_error(parser, context, context_mark, problem)
 }
 
 func trace(args ...interface{}) func() {
@@ -1546,7 +1546,7 @@ func yaml_parser_scan_directive(parser *yaml_parser_t, token *yaml_token_t) bool
 		// Unknown directive.
 	} else {
 		yaml_parser_set_scanner_error(parser, "while scanning a directive",
-			start_mark, "found uknown directive name")
+			start_mark, "found unknown directive name")
 		return false
 	}
 
@@ -1959,11 +1959,12 @@ func yaml_parser_scan_tag_handle(parser *yaml_parser_t, directive bool, start_ma
 func yaml_parser_scan_tag_uri(parser *yaml_parser_t, directive bool, head []byte, start_mark yaml_mark_t, uri *[]byte) bool {
 	//size_t length = head ? strlen((char *)head) : 0
 	var s []byte
+	length := len(head)
 
 	// Copy the head if needed.
 	//
 	// Note that we don't copy the leading '!' character.
-	if len(head) > 1 {
+	if length > 0 {
 		s = append(s, head[1:]...)
 	}
 
@@ -1996,6 +1997,7 @@ func yaml_parser_scan_tag_uri(parser *yaml_parser_t, directive bool, head []byte
 			}
 		} else {
 			s = read(parser, s)
+			length++
 		}
 		if parser.unread < 1 && !yaml_parser_update_buffer(parser, 1) {
 			return false
@@ -2003,7 +2005,7 @@ func yaml_parser_scan_tag_uri(parser *yaml_parser_t, directive bool, head []byte
 	}
 
 	// Check if the tag is non-empty.
-	if len(s) == 0 {
+	if length == 0 {
 		yaml_parser_set_scanner_tag_error(parser, directive,
 			start_mark, "did not find expected tag URI")
 		return false

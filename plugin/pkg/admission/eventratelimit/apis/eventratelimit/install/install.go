@@ -19,25 +19,15 @@ limitations under the License.
 package install
 
 import (
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	internalapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
 	versionedapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1"
 )
 
 // Install registers the API group and adds types to a scheme
-func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	if err := announced.NewGroupMetaFactory(
-		&announced.GroupMetaFactoryArgs{
-			GroupName:                  internalapi.GroupName,
-			VersionPreferenceOrder:     []string{versionedapi.SchemeGroupVersion.Version},
-			AddInternalObjectsToScheme: internalapi.AddToScheme,
-		},
-		announced.VersionToSchemeFunc{
-			versionedapi.SchemeGroupVersion.Version: versionedapi.AddToScheme,
-		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
-		panic(err)
-	}
+func Install(scheme *runtime.Scheme) {
+	utilruntime.Must(internalapi.AddToScheme(scheme))
+	utilruntime.Must(versionedapi.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(versionedapi.SchemeGroupVersion))
 }

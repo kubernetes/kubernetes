@@ -27,6 +27,9 @@ func TestDropAlphaFields(t *testing.T) {
 	bindingMode := storage.VolumeBindingWaitForFirstConsumer
 
 	// Test that field gets dropped when feature gate is not set
+	if err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false"); err != nil {
+		t.Fatalf("Failed to set feature gate for VolumeScheduling: %v", err)
+	}
 	class := &storage.StorageClass{
 		VolumeBindingMode: &bindingMode,
 	}

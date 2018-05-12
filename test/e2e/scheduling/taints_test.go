@@ -147,14 +147,12 @@ const (
 // - lack of eviction of short-tolerating pod after taint removal.
 var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 	var cs clientset.Interface
-	var nodeList *v1.NodeList
 	var ns string
 	f := framework.NewDefaultFramework("taint-control")
 
 	BeforeEach(func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
-		nodeList = &v1.NodeList{}
 
 		framework.WaitForAllNodesHealthy(cs, time.Minute)
 
@@ -196,7 +194,7 @@ var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 
 	// 1. Run a pod with toleration
 	// 2. Taint the node running this pod with a no-execute taint
-	// 3. See if pod wont get evicted
+	// 3. See if pod won't get evicted
 	It("doesn't evict pod with tolerations from tainted nodes", func() {
 		podName := "taint-eviction-2"
 		pod := createPodForTaintsTest(true, 0, podName, ns)
@@ -228,7 +226,7 @@ var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 
 	// 1. Run a pod with a finite toleration
 	// 2. Taint the node running this pod with a no-execute taint
-	// 3. See if pod wont get evicted before toleration time runs out
+	// 3. See if pod won't get evicted before toleration time runs out
 	// 4. See if pod will get evicted after toleration time runs out
 	It("eventually evict pod with finite tolerations from tainted nodes", func() {
 		podName := "taint-eviction-3"

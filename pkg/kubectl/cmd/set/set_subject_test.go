@@ -24,11 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
 func TestValidate(t *testing.T) {
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.Namespace = "test"
 
 	tests := map[string]struct {
@@ -107,7 +109,6 @@ func TestValidate(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test.options.Mapper, _ = f.Object()
 		err := test.options.Validate()
 		if test.expectErr && err != nil {
 			continue

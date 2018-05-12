@@ -67,7 +67,7 @@ func NewMemCGThresholdNotifier(path, attribute, threshold, description string, h
 			unix.Close(eventfd)
 		}
 	}()
-	glog.V(2).Infof("eviction: setting notification threshold to %s", threshold)
+	glog.V(3).Infof("eviction: setting notification threshold to %s", threshold)
 	config := fmt.Sprintf("%d %d %s", eventfd, watchfd, threshold)
 	_, err = unix.Write(controlfd, []byte(config))
 	if err != nil {
@@ -82,7 +82,7 @@ func NewMemCGThresholdNotifier(path, attribute, threshold, description string, h
 	}, nil
 }
 
-func getThresholdEvents(eventfd int, eventCh chan<- struct{}, stopCh <-chan struct{}) {
+func getThresholdEvents(eventfd int, eventCh chan<- struct{}, stop ThresholdStopCh) {
 	for {
 		buf := make([]byte, 8)
 		_, err := unix.Read(eventfd, buf)
@@ -92,19 +92,19 @@ func getThresholdEvents(eventfd int, eventCh chan<- struct{}, stopCh <-chan stru
 
 		select {
 		case eventCh <- struct{}{}:
-		case <-stopCh:
+		case <-stop.Ch():
 			return
 		}
 	}
 }
 
-func (n *memcgThresholdNotifier) Start(stopCh <-chan struct{}) {
+func (n *memcgThresholdNotifier) Start(stop ThresholdStopCh) {
 	eventCh := make(chan struct{})
-	go getThresholdEvents(n.eventfd, eventCh, stopCh)
+	go getThresholdEvents(n.eventfd, eventCh, stop)
 	for {
 		select {
-		case <-stopCh:
-			glog.V(2).Infof("eviction: stopping threshold notifier")
+		case <-stop.Ch():
+			glog.V(3).Infof("eviction: stopping threshold notifier")
 			unix.Close(n.watchfd)
 			unix.Close(n.controlfd)
 			unix.Close(n.eventfd)

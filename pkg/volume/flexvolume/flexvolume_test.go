@@ -30,7 +30,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
-const execScriptTempl1 = `#!/bin/bash
+const execScriptTempl1 = `#!/usr/bin/env bash
 if [ "$1" == "init" -a $# -eq 1 ]; then
   echo -n '{
     "status": "Success"
@@ -73,7 +73,7 @@ exit 1
 echo -n $@ &> {{.OutputFile}}
 `
 
-const execScriptTempl2 = `#!/bin/bash
+const execScriptTempl2 = `#!/usr/bin/env bash
 if [ "$1" == "init" -a $# -eq 1 ]; then
   echo -n '{
     "status": "Success"

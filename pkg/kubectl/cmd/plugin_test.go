@@ -17,12 +17,12 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 )
 
@@ -80,34 +80,36 @@ func TestPluginCmd(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		inBuf := bytes.NewBuffer([]byte{})
-		outBuf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+		t.Run(test.name, func(t *testing.T) {
+			streams, _, outBuf, errBuf := genericclioptions.NewTestIOStreams()
 
-		cmdutil.BehaviorOnFatal(func(str string, code int) {
-			errBuf.Write([]byte(str))
-		})
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				errBuf.Write([]byte(str))
+			})
 
-		runner := &mockPluginRunner{
-			success: test.expectedSuccess,
-		}
-
-		f, _, _, _ := cmdtesting.NewAPIFactory()
-		cmd := NewCmdForPlugin(f, test.plugin, runner, inBuf, outBuf, errBuf)
-		if cmd == nil {
-			if !test.expectedNilCmd {
-				t.Fatalf("%s: command was unexpectedly not registered", test.name)
+			runner := &mockPluginRunner{
+				success: test.expectedSuccess,
 			}
-			continue
-		}
-		cmd.Run(cmd, []string{})
 
-		if test.expectedSuccess && outBuf.String() != fmt.Sprintf("ok: %s", test.plugin.Name) {
-			t.Errorf("%s: unexpected output: %q", test.name, outBuf.String())
-		}
+			f := cmdtesting.NewTestFactory()
+			defer f.Cleanup()
 
-		if !test.expectedSuccess && errBuf.String() != fmt.Sprintf("error: oops %s", test.plugin.Name) {
-			t.Errorf("%s: unexpected err output: %q", test.name, errBuf.String())
-		}
+			cmd := NewCmdForPlugin(f, test.plugin, runner, streams)
+			if cmd == nil {
+				if !test.expectedNilCmd {
+					t.Fatalf("%s: command was unexpectedly not registered", test.name)
+				}
+				return
+			}
+			cmd.Run(cmd, []string{})
+
+			if test.expectedSuccess && outBuf.String() != fmt.Sprintf("ok: %s", test.plugin.Name) {
+				t.Errorf("%s: unexpected output: %q", test.name, outBuf.String())
+			}
+
+			if !test.expectedSuccess && errBuf.String() != fmt.Sprintf("error: oops %s", test.plugin.Name) {
+				t.Errorf("%s: unexpected err output: %q", test.name, errBuf.String())
+			}
+		})
 	}
 }

@@ -17,6 +17,7 @@ go_library(
         "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/controller/util/node:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/util/node:go_default_library",
@@ -49,7 +50,6 @@ go_test(
         "pvlcontroller_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/cloud",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",

@@ -26,11 +26,14 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
+// ResourceAllocationPriority contains information to calculate resource allocation priority.
 type ResourceAllocationPriority struct {
 	Name   string
-	scorer func(requested, allocable *schedulercache.Resource) int64
+	scorer func(requested, allocable *schedulercache.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
 }
 
+// PriorityMap priorities nodes according to the resource allocations on the node.
+// It will use `scorer` function to calculate the score.
 func (r *ResourceAllocationPriority) PriorityMap(
 	pod *v1.Pod,
 	meta interface{},
@@ -45,14 +48,19 @@ func (r *ResourceAllocationPriority) PriorityMap(
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
 		requested = *priorityMeta.nonZeroRequest
 	} else {
-		// We couldn't parse metadatat - fallback to computing it.
+		// We couldn't parse metadata - fallback to computing it.
 		requested = *getNonZeroRequests(pod)
 	}
 
 	requested.MilliCPU += nodeInfo.NonZeroRequest().MilliCPU
 	requested.Memory += nodeInfo.NonZeroRequest().Memory
-
-	score := r.scorer(&requested, &allocatable)
+	var score int64
+	// Check if the pod has volumes and this could be added to scorer function for balanced resource allocation.
+	if len(pod.Spec.Volumes) >= 0 && nodeInfo.TransientInfo != nil {
+		score = r.scorer(&requested, &allocatable, true, nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes, nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount)
+	} else {
+		score = r.scorer(&requested, &allocatable, false, 0, 0)
+	}
 
 	if glog.V(10) {
 		glog.Infof(

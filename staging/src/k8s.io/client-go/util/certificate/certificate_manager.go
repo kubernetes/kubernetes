@@ -141,7 +141,6 @@ type manager struct {
 	certStore                Store
 	certAccessLock           sync.RWMutex
 	cert                     *tls.Certificate
-	rotationDeadline         time.Time
 	forceRotation            bool
 	certificateExpiration    Gauge
 	serverHealth             bool
@@ -208,8 +207,7 @@ func (m *manager) SetCertificateSigningRequestClient(certSigningRequestClient ce
 func (m *manager) Start() {
 	// Certificate rotation depends on access to the API server certificate
 	// signing API, so don't start the certificate manager if we don't have a
-	// client. This will happen on the cluster master, where the kubelet is
-	// responsible for bootstrapping the pods of the master components.
+	// client.
 	if m.certSigningRequestClient == nil {
 		glog.V(2).Infof("Certificate rotation is not enabled, no connection to the apiserver.")
 		return
@@ -217,27 +215,18 @@ func (m *manager) Start() {
 
 	glog.V(2).Infof("Certificate rotation is enabled.")
 
-	m.setRotationDeadline()
-
-	// Synchronously request a certificate before entering the background
-	// loop to allow bootstrap scenarios, where the certificate manager
-	// doesn't have a certificate at all yet.
-	if m.shouldRotate() {
-		glog.V(1).Infof("shouldRotate() is true, forcing immediate rotation")
-		if _, err := m.rotateCerts(); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Could not rotate certificates: %v", err))
-		}
-	}
-	backoff := wait.Backoff{
-		Duration: 2 * time.Second,
-		Factor:   2,
-		Jitter:   0.1,
-		Steps:    5,
-	}
 	go wait.Forever(func() {
-		sleepInterval := m.rotationDeadline.Sub(time.Now())
-		glog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
-		time.Sleep(sleepInterval)
+		deadline := m.nextRotationDeadline()
+		if sleepInterval := deadline.Sub(time.Now()); sleepInterval > 0 {
+			glog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
+			time.Sleep(sleepInterval)
+		}
+		backoff := wait.Backoff{
+			Duration: 2 * time.Second,
+			Factor:   2,
+			Jitter:   0.1,
+			Steps:    5,
+		}
 		if err := wait.ExponentialBackoff(backoff, m.rotateCerts); err != nil {
 			utilruntime.HandleError(fmt.Errorf("Reached backoff limit, still unable to rotate certs: %v", err))
 			wait.PollInfinite(32*time.Second, m.rotateCerts)
@@ -252,11 +241,14 @@ func getCurrentCertificateOrBootstrap(
 
 	currentCert, err := store.Current()
 	if err == nil {
-		return currentCert, false, nil
-	}
-
-	if _, ok := err.(*NoCertKeyError); !ok {
-		return nil, false, err
+		// if the current cert is expired, fall back to the bootstrap cert
+		if currentCert.Leaf != nil && time.Now().Before(currentCert.Leaf.NotAfter) {
+			return currentCert, false, nil
+		}
+	} else {
+		if _, ok := err.(*NoCertKeyError); !ok {
+			return nil, false, err
+		}
 	}
 
 	if bootstrapCertificatePEM == nil || bootstrapKeyPEM == nil {
@@ -276,21 +268,14 @@ func getCurrentCertificateOrBootstrap(
 		return nil, false, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
 	bootstrapCert.Leaf = certs[0]
-	return &bootstrapCert, true, nil
-}
 
-// shouldRotate looks at how close the current certificate is to expiring and
-// decides if it is time to rotate or not.
-func (m *manager) shouldRotate() bool {
-	m.certAccessLock.RLock()
-	defer m.certAccessLock.RUnlock()
-	if m.cert == nil {
-		return true
+	if _, err := store.Update(bootstrapCertificatePEM, bootstrapKeyPEM); err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to set the cert/key pair to the bootstrap certificate: %v", err))
+	} else {
+		glog.V(4).Infof("Updated the store to contain the initial bootstrap certificate")
 	}
-	if m.forceRotation {
-		return true
-	}
-	return time.Now().After(m.rotationDeadline)
+
+	return &bootstrapCert, true, nil
 }
 
 // rotateCerts attempts to request a client cert from the server, wait a reasonable
@@ -315,7 +300,7 @@ func (m *manager) rotateCerts() (bool, error) {
 		return false, m.updateServerError(err)
 	}
 
-	// Wait for the certificate to be signed. Instead of one long watch, we retry with slighly longer
+	// Wait for the certificate to be signed. Instead of one long watch, we retry with slightly longer
 	// intervals each time in order to tolerate failures from the server AND to preserve the liveliness
 	// of the cert manager loop. This creates slightly more traffic against the API server in return
 	// for bounding the amount of time we wait when a certificate expires.
@@ -349,30 +334,34 @@ func (m *manager) rotateCerts() (bool, error) {
 	}
 
 	m.updateCached(cert)
-	m.setRotationDeadline()
-	m.forceRotation = false
 	return true, nil
 }
 
-// setRotationDeadline sets a cached value for the threshold at which the
+// nextRotationDeadline returns a value for the threshold at which the
 // current certificate should be rotated, 80%+/-10% of the expiration of the
 // certificate.
-func (m *manager) setRotationDeadline() {
+func (m *manager) nextRotationDeadline() time.Time {
+	// forceRotation is not protected by locks
+	if m.forceRotation {
+		m.forceRotation = false
+		return time.Now()
+	}
+
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
 	if m.cert == nil {
-		m.rotationDeadline = time.Now()
-		return
+		return time.Now()
 	}
 
 	notAfter := m.cert.Leaf.NotAfter
 	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
+	deadline := m.cert.Leaf.NotBefore.Add(jitteryDuration(totalDuration))
 
-	m.rotationDeadline = m.cert.Leaf.NotBefore.Add(jitteryDuration(totalDuration))
-	glog.V(2).Infof("Certificate expiration is %v, rotation deadline is %v", notAfter, m.rotationDeadline)
+	glog.V(2).Infof("Certificate expiration is %v, rotation deadline is %v", notAfter, deadline)
 	if m.certificateExpiration != nil {
 		m.certificateExpiration.Set(float64(notAfter.Unix()))
 	}
+	return deadline
 }
 
 // jitteryDuration uses some jitter to set the rotation threshold so each node

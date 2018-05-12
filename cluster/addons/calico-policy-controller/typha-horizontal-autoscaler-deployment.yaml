@@ -16,8 +16,9 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       containers:
-        - image: gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.1.2
+        - image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.1.2-r2
           name: autoscaler
           command:
             - /cluster-proportional-autoscaler

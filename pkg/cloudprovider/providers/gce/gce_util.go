@@ -22,11 +22,13 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 
 	"cloud.google.com/go/compute/metadata"
 	compute "google.golang.org/api/compute/v1"
@@ -98,8 +100,13 @@ func firewallToGcloudArgs(fw *compute.Firewall, projectID string) string {
 			allPorts = append(allPorts, fmt.Sprintf("%v:%v", a.IPProtocol, p))
 		}
 	}
+
+	// Sort all slices to prevent the event from being duped
+	sort.Strings(allPorts)
 	allow := strings.Join(allPorts, ",")
+	sort.Strings(fw.SourceRanges)
 	srcRngs := strings.Join(fw.SourceRanges, ",")
+	sort.Strings(fw.TargetTags)
 	targets := strings.Join(fw.TargetTags, ",")
 	return fmt.Sprintf("--description %q --allow %v --source-ranges %v --target-tags %v --project %v", fw.Description, allow, srcRngs, targets, projectID)
 }
@@ -214,7 +221,7 @@ func handleAlphaNetworkTierGetError(err error) (string, error) {
 		// Network tier is still an Alpha feature in GCP, and not every project
 		// is whitelisted to access the API. If we cannot access the API, just
 		// assume the tier is premium.
-		return NetworkTierDefault.ToGCEValue(), nil
+		return cloud.NetworkTierDefault.ToGCEValue(), nil
 	}
 	// Can't get the network tier, just return an error.
 	return "", err

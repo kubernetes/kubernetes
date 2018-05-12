@@ -18,7 +18,6 @@ package vsphere
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -55,15 +54,11 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		scParameters = make(map[string]string)
-		datastore = os.Getenv("VSPHERE_DATASTORE")
-		Expect(datastore).NotTo(BeEmpty())
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if !(len(nodeList.Items) > 0) {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+		datastore = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 	})
 
 	It("verify dynamically provisioned pv using storageclass with an invalid disk size fails", func() {
@@ -87,7 +82,7 @@ func invokeInvalidDiskSizeTestNeg(client clientset.Interface, namespace string, 
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, diskSize, storageclass))
+	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, diskSize, storageclass))
 	Expect(err).NotTo(HaveOccurred())
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juju/ratelimit"
+	"golang.org/x/time/rate"
 )
 
 type RateLimiter interface {
@@ -40,19 +40,19 @@ func DefaultControllerRateLimiter() RateLimiter {
 	return NewMaxOfRateLimiter(
 		NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-		&BucketRateLimiter{Bucket: ratelimit.NewBucketWithRate(float64(10), int64(100))},
+		&BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 }
 
 // BucketRateLimiter adapts a standard bucket to the workqueue ratelimiter API
 type BucketRateLimiter struct {
-	*ratelimit.Bucket
+	*rate.Limiter
 }
 
 var _ RateLimiter = &BucketRateLimiter{}
 
 func (r *BucketRateLimiter) When(item interface{}) time.Duration {
-	return r.Bucket.Take(1)
+	return r.Limiter.Reserve().Delay()
 }
 
 func (r *BucketRateLimiter) NumRequeues(item interface{}) int {

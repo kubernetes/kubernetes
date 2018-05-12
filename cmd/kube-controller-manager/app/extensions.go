@@ -24,28 +24,8 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
-	"k8s.io/kubernetes/pkg/controller/replicaset"
 )
-
-func startDaemonSetController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "daemonsets"}] {
-		return false, nil
-	}
-	dsc, err := daemon.NewDaemonSetsController(
-		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
-		ctx.InformerFactory.Apps().V1beta1().ControllerRevisions(),
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
-	)
-	if err != nil {
-		return true, fmt.Errorf("error creating DaemonSets controller: %v", err)
-	}
-	go dsc.Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
-	return true, nil
-}
 
 func startDeploymentController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}] {
@@ -60,19 +40,6 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("error creating Deployment controller: %v", err)
 	}
-	go dc.Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)
-	return true, nil
-}
-
-func startReplicaSetController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicasets"}] {
-		return false, nil
-	}
-	go replicaset.NewReplicaSetController(
-		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
-		replicaset.BurstReplicas,
-	).Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
+	go dc.Run(int(ctx.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
 }

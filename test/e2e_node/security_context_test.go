@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -37,6 +39,78 @@ var _ = framework.KubeDescribe("Security Context", func() {
 	var podClient *framework.PodClient
 	BeforeEach(func() {
 		podClient = f.PodClient()
+	})
+
+	Context("when pod PID namespace is configurable [Feature:ShareProcessNamespace]", func() {
+		It("containers in pods using isolated PID namespaces should all receive PID 1", func() {
+			By("Create a pod with isolated PID namespaces.")
+			f.PodClient().CreateSync(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "isolated-pid-ns-test-pod"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    "test-container-1",
+							Image:   "busybox",
+							Command: []string{"/bin/top"},
+						},
+						{
+							Name:    "test-container-2",
+							Image:   "busybox",
+							Command: []string{"/bin/sleep"},
+							Args:    []string{"10000"},
+						},
+					},
+				},
+			})
+
+			By("Check if both containers receive PID 1.")
+			pid1 := f.ExecCommandInContainer("isolated-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
+			pid2 := f.ExecCommandInContainer("isolated-pid-ns-test-pod", "test-container-2", "/bin/pidof", "sleep")
+			if pid1 != "1" || pid2 != "1" {
+				framework.Failf("PIDs of different containers are not all 1: test-container-1=%v, test-container-2=%v", pid1, pid2)
+			}
+		})
+
+		It("processes in containers sharing a pod namespace should be able to see each other [Alpha]", func() {
+			By("Check whether shared PID namespace is supported.")
+			isEnabled, err := isSharedPIDNamespaceSupported()
+			framework.ExpectNoError(err)
+			if !isEnabled {
+				framework.Skipf("Skipped because shared PID namespace is not supported by this docker version.")
+			}
+			// It's not enough to set this flag in the kubelet because the apiserver needs it too
+			if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) {
+				framework.Skipf("run test with --feature-gates=PodShareProcessNamespace=true to test PID namespace sharing")
+			}
+
+			By("Create a pod with shared PID namespace.")
+			f.PodClient().CreateSync(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "shared-pid-ns-test-pod"},
+				Spec: v1.PodSpec{
+					ShareProcessNamespace: &[]bool{true}[0],
+					Containers: []v1.Container{
+						{
+							Name:    "test-container-1",
+							Image:   "busybox",
+							Command: []string{"/bin/top"},
+						},
+						{
+							Name:    "test-container-2",
+							Image:   "busybox",
+							Command: []string{"/bin/sleep"},
+							Args:    []string{"10000"},
+						},
+					},
+				},
+			})
+
+			By("Check if the process in one container is visible to the process in the other.")
+			pid1 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
+			pid2 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-2", "/bin/pidof", "top")
+			if pid1 != pid2 {
+				framework.Failf("PIDs are not the same in different containers: test-container-1=%v, test-container-2=%v", pid1, pid2)
+			}
+		})
 	})
 
 	Context("when creating a pod in the host PID namespace", func() {
@@ -140,7 +214,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 		createAndWaitHostIPCPod := func(podName string, hostNetwork bool) {
 			podClient.Create(makeHostIPCPod(podName,
-				busyboxImage,
+				imageutils.GetE2EImage(imageutils.IpcUtils),
 				[]string{"sh", "-c", "ipcs -m | awk '{print $2}'"},
 				hostNetwork,
 			))
@@ -150,7 +224,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 		hostSharedMemoryID := ""
 		BeforeEach(func() {
-			output, err := exec.Command("sh", "-c", "ipcmk -M 1M | awk '{print $NF}'").Output()
+			output, err := exec.Command("sh", "-c", "ipcmk -M 1048576 | awk '{print $NF}'").Output()
 			if err != nil {
 				framework.Failf("Failed to create the shared memory on the host: %v", err)
 			}
@@ -159,30 +233,30 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 
 		It("should show the shared memory ID in the host IPC containers", func() {
-			busyboxPodName := "busybox-hostipc-" + string(uuid.NewUUID())
-			createAndWaitHostIPCPod(busyboxPodName, true)
-			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			ipcutilsPodName := "ipcutils-hostipc-" + string(uuid.NewUUID())
+			createAndWaitHostIPCPod(ipcutilsPodName, true)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+				framework.Failf("GetPodLogs for pod %q failed: %v", ipcutilsPodName, err)
 			}
 
 			podSharedMemoryIDs := strings.TrimSpace(logs)
-			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, busyboxPodName)
+			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
 			if !strings.Contains(podSharedMemoryIDs, hostSharedMemoryID) {
 				framework.Failf("hostIPC container should show shared memory IDs on host")
 			}
 		})
 
 		It("should not show the shared memory ID in the non-hostIPC containers", func() {
-			busyboxPodName := "busybox-non-hostipc-" + string(uuid.NewUUID())
-			createAndWaitHostIPCPod(busyboxPodName, false)
-			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			ipcutilsPodName := "ipcutils-non-hostipc-" + string(uuid.NewUUID())
+			createAndWaitHostIPCPod(ipcutilsPodName, false)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+				framework.Failf("GetPodLogs for pod %q failed: %v", ipcutilsPodName, err)
 			}
 
 			podSharedMemoryIDs := strings.TrimSpace(logs)
-			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, busyboxPodName)
+			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
 			if strings.Contains(podSharedMemoryIDs, hostSharedMemoryID) {
 				framework.Failf("non-hostIPC container should not show shared memory IDs on host")
 			}
@@ -372,6 +446,18 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				framework.ExpectNoError(err)
 				if !isSupported {
 					framework.Skipf("Skipping because no_new_privs is not supported in this docker")
+				}
+				// It turns out SELinux policy in RHEL 7 does not play well with
+				// the "NoNewPrivileges" flag. So let's skip this test when running
+				// with SELinux support enabled.
+				//
+				// TODO(filbranden): Remove this after the fix for
+				// https://github.com/projectatomic/container-selinux/issues/45
+				// has been backported to RHEL 7 (expected on RHEL 7.5)
+				selinuxEnabled, err := isDockerSELinuxSupportEnabled()
+				framework.ExpectNoError(err)
+				if selinuxEnabled {
+					framework.Skipf("Skipping because Docker daemon is running with SELinux support enabled")
 				}
 			}
 		})

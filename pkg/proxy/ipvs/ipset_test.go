@@ -55,7 +55,7 @@ const testIPSetVersion = "v6.19"
 
 func TestSyncIPSetEntries(t *testing.T) {
 	testCases := []struct {
-		setName         string
+		set             *utilipset.IPSet
 		setType         utilipset.Type
 		ipv6            bool
 		activeEntries   []string
@@ -63,7 +63,9 @@ func TestSyncIPSetEntries(t *testing.T) {
 		expectedEntries []string
 	}{
 		{ // case 0
-			setName:         "foo",
+			set: &utilipset.IPSet{
+				Name: "foo",
+			},
 			setType:         utilipset.HashIPPort,
 			ipv6:            false,
 			activeEntries:   []string{"172.17.0.4,tcp:80"},
@@ -71,7 +73,9 @@ func TestSyncIPSetEntries(t *testing.T) {
 			expectedEntries: []string{"172.17.0.4,tcp:80"},
 		},
 		{ // case 1
-			setName:         "abz",
+			set: &utilipset.IPSet{
+				Name: "abz",
+			},
 			setType:         utilipset.HashIPPort,
 			ipv6:            true,
 			activeEntries:   []string{"FE80::0202:B3FF:FE1E:8329,tcp:80"},
@@ -79,7 +83,9 @@ func TestSyncIPSetEntries(t *testing.T) {
 			expectedEntries: []string{"FE80::0202:B3FF:FE1E:8329,tcp:80"},
 		},
 		{ // case 2
-			setName:         "bca",
+			set: &utilipset.IPSet{
+				Name: "bca",
+			},
 			setType:         utilipset.HashIPPort,
 			ipv6:            false,
 			activeEntries:   []string{"172.17.0.4,tcp:80", "172.17.0.5,tcp:80"},
@@ -87,7 +93,9 @@ func TestSyncIPSetEntries(t *testing.T) {
 			expectedEntries: []string{"172.17.0.4,tcp:80", "172.17.0.5,tcp:80"},
 		},
 		{ // case 3
-			setName:         "bar",
+			set: &utilipset.IPSet{
+				Name: "bar",
+			},
 			setType:         utilipset.HashIPPortIP,
 			ipv6:            false,
 			activeEntries:   []string{"172.17.0.4,tcp:80:172.17.0.4"},
@@ -95,7 +103,9 @@ func TestSyncIPSetEntries(t *testing.T) {
 			expectedEntries: []string{"172.17.0.4,tcp:80:172.17.0.4"},
 		},
 		{ // case 4
-			setName:         "baz",
+			set: &utilipset.IPSet{
+				Name: "baz",
+			},
 			setType:         utilipset.HashIPPortIP,
 			ipv6:            true,
 			activeEntries:   []string{"FE80:0000:0000:0000:0202:B3FF:FE1E:8329,tcp:8080:FE80:0000:0000:0000:0202:B3FF:FE1E:8329"},
@@ -103,7 +113,9 @@ func TestSyncIPSetEntries(t *testing.T) {
 			expectedEntries: []string{"FE80:0000:0000:0000:0202:B3FF:FE1E:8329,tcp:8080:FE80:0000:0000:0000:0202:B3FF:FE1E:8329"},
 		},
 		{ // case 5
-			setName:         "NOPE",
+			set: &utilipset.IPSet{
+				Name: "NOPE",
+			},
 			setType:         utilipset.HashIPPortIP,
 			ipv6:            false,
 			activeEntries:   []string{"172.17.0.4,tcp:80,172.17.0.9", "172.17.0.5,tcp:80,172.17.0.10"},
@@ -111,7 +123,9 @@ func TestSyncIPSetEntries(t *testing.T) {
 			expectedEntries: []string{"172.17.0.4,tcp:80,172.17.0.9", "172.17.0.5,tcp:80,172.17.0.10"},
 		},
 		{ // case 6
-			setName:         "ABC-DEF",
+			set: &utilipset.IPSet{
+				Name: "ABC-DEF",
+			},
 			setType:         utilipset.HashIPPortNet,
 			ipv6:            false,
 			activeEntries:   []string{"172.17.0.4,tcp:80,172.17.0.0/16", "172.17.0.5,tcp:80,172.17.0.0/16"},
@@ -119,7 +133,9 @@ func TestSyncIPSetEntries(t *testing.T) {
 			expectedEntries: []string{"172.17.0.4,tcp:80,172.17.0.0/16", "172.17.0.5,tcp:80,172.17.0.0/16"},
 		},
 		{ // case 7
-			setName:         "zar",
+			set: &utilipset.IPSet{
+				Name: "zar",
+			},
 			setType:         utilipset.HashIPPortNet,
 			ipv6:            true,
 			activeEntries:   []string{"FE80::8329,tcp:8800,2001:db8::/32"},
@@ -127,7 +143,9 @@ func TestSyncIPSetEntries(t *testing.T) {
 			expectedEntries: []string{"FE80::8329,tcp:8800,2001:db8::/32"},
 		},
 		{ // case 8
-			setName:         "bbb",
+			set: &utilipset.IPSet{
+				Name: "bbb",
+			},
 			setType:         utilipset.HashIPPortNet,
 			ipv6:            true,
 			activeEntries:   nil,
@@ -135,21 +153,27 @@ func TestSyncIPSetEntries(t *testing.T) {
 			expectedEntries: nil,
 		},
 		{ // case 9
-			setName:         "AAA",
+			set: &utilipset.IPSet{
+				Name: "AAA",
+			},
 			setType:         utilipset.BitmapPort,
 			activeEntries:   nil,
 			currentEntries:  []string{"80"},
 			expectedEntries: nil,
 		},
 		{ // case 10
-			setName:         "c-c-c",
+			set: &utilipset.IPSet{
+				Name: "c-c-c",
+			},
 			setType:         utilipset.BitmapPort,
 			activeEntries:   []string{"8080", "9090"},
 			currentEntries:  []string{"80"},
 			expectedEntries: []string{"8080", "9090"},
 		},
 		{ // case 11
-			setName:         "NODE-PORT",
+			set: &utilipset.IPSet{
+				Name: "NODE-PORT",
+			},
 			setType:         utilipset.BitmapPort,
 			activeEntries:   []string{"8080"},
 			currentEntries:  []string{"80", "9090", "8081", "8082"},
@@ -158,19 +182,19 @@ func TestSyncIPSetEntries(t *testing.T) {
 	}
 
 	for i := range testCases {
-		set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCases[i].setName, testCases[i].setType, testCases[i].ipv6)
+		set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCases[i].set.Name, testCases[i].setType, testCases[i].ipv6)
 
 		if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		for _, entry := range testCases[i].expectedEntries {
-			set.handle.AddEntry(entry, testCases[i].setName, true)
+			set.handle.AddEntry(entry, testCases[i].set, true)
 		}
 
 		set.activeEntries.Insert(testCases[i].activeEntries...)
 		set.syncIPSetEntries()
 		for _, entry := range testCases[i].expectedEntries {
-			found, err := set.handle.TestEntry(entry, testCases[i].setName)
+			found, err := set.handle.TestEntry(entry, testCases[i].set.Name)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}

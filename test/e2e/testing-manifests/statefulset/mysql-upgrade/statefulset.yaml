@@ -1,10 +1,13 @@
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mysql
 spec:
   serviceName: mysql
   replicas: 3
+  selector:
+    matchLabels:
+      app: mysql
   template:
     metadata:
       labels:

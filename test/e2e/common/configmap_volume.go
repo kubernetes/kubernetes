@@ -184,6 +184,97 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
 	})
 
+	It("binary data should be reflected in volume ", func() {
+		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
+
+		name := "configmap-test-upd-" + string(uuid.NewUUID())
+		volumeName := "configmap-volume"
+		volumeMountPath := "/etc/configmap-volume"
+		containerName1 := "configmap-volume-data-test"
+		containerName2 := "configmap-volume-binary-test"
+
+		configMap := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      name,
+			},
+			Data: map[string]string{
+				"data-1": "value-1",
+			},
+			BinaryData: map[string][]byte{
+				"dump.bin": {0xde, 0xca, 0xfe, 0xba, 0xd0, 0xfe, 0xff},
+			},
+		}
+
+		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+		var err error
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-configmaps-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: volumeName,
+						VolumeSource: v1.VolumeSource{
+							ConfigMap: &v1.ConfigMapVolumeSource{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: name,
+								},
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    containerName1,
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: volumeMountPath,
+								ReadOnly:  true,
+							},
+						},
+					},
+					{
+						Name:    containerName2,
+						Image:   "busybox",
+						Command: []string{"hexdump", "-C", "/etc/configmap-volume/dump.bin"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: volumeMountPath,
+								ReadOnly:  true,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+		By("Creating the pod")
+		f.PodClient().CreateSync(pod)
+
+		pollLogs1 := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName1)
+		}
+		pollLogs2 := func() (string, error) {
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName2)
+		}
+
+		By("Waiting for pod with text data")
+		Eventually(pollLogs1, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
+		By("Waiting for pod with binary data")
+		Eventually(pollLogs2, podLogTimeout, framework.Poll).Should(ContainSubstring("de ca fe ba d0 fe ff"))
+	})
+
 	/*
 		    Testname: configmap-CUD-test
 		    Description: Make sure Create, Update, Delete operations are all working

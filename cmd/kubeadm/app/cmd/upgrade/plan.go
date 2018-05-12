@@ -23,20 +23,32 @@ import (
 	"sort"
 	"text/tabwriter"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
+
+type planFlags struct {
+	newK8sVersionStr string
+	parent           *cmdUpgradeFlags
+}
 
 // NewCmdPlan returns the cobra command for `kubeadm upgrade plan`
 func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
+	flags := &planFlags{
+		parent: parentFlags,
+	}
+
 	cmd := &cobra.Command{
-		Use:   "plan",
-		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable.",
-		Run: func(_ *cobra.Command, _ []string) {
+		Use:   "plan [version] [flags]",
+		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter.",
+		Run: func(_ *cobra.Command, args []string) {
 			var err error
 			parentFlags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(parentFlags.ignorePreflightErrors, parentFlags.skipPreFlight)
 			kubeadmutil.CheckErr(err)
@@ -44,7 +56,22 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 			err = runPreflightChecks(parentFlags.ignorePreflightErrorsSet)
 			kubeadmutil.CheckErr(err)
 
-			err = RunPlan(parentFlags)
+			// If the version is specified in config file, pick up that value.
+			if parentFlags.cfgPath != "" {
+				glog.V(1).Infof("fetching configuration from file", parentFlags.cfgPath)
+				cfg, err := upgrade.FetchConfigurationFromFile(parentFlags.cfgPath)
+				kubeadmutil.CheckErr(err)
+
+				if cfg.KubernetesVersion != "" {
+					flags.newK8sVersionStr = cfg.KubernetesVersion
+				}
+			}
+			// If option was specified in both args and config file, args will overwrite the config file.
+			if len(args) == 1 {
+				flags.newK8sVersionStr = args[0]
+			}
+
+			err = RunPlan(flags)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -53,18 +80,28 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 }
 
 // RunPlan takes care of outputting available versions to upgrade to for the user
-func RunPlan(parentFlags *cmdUpgradeFlags) error {
+func RunPlan(flags *planFlags) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
-	upgradeVars, err := enforceRequirements(parentFlags, false, "")
+	glog.V(1).Infof("[upgrade/plan] verifying health of cluster")
+	glog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
+	upgradeVars, err := enforceRequirements(flags.parent, false, flags.newK8sVersionStr)
 	if err != nil {
 		return err
 	}
 
 	// Define Local Etcd cluster to be able to retrieve information
-	etcdCluster := kubeadmutil.LocalEtcdCluster{}
+	etcdClient, err := etcdutil.NewStaticPodClient(
+		[]string{"localhost:2379"},
+		constants.GetStaticPodDirectory(),
+		upgradeVars.cfg.CertificatesDir,
+	)
+	if err != nil {
+		return err
+	}
 
 	// Compute which upgrade possibilities there are
-	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, parentFlags.allowExperimentalUpgrades, parentFlags.allowRCUpgrades, etcdCluster, upgradeVars.cfg.FeatureGates)
+	glog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
+	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.parent.allowExperimentalUpgrades, flags.parent.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates)
 	if err != nil {
 		return fmt.Errorf("[upgrade/versions] FATAL: %v", err)
 	}
@@ -104,7 +141,7 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, featureGate
 					firstPrinted = true
 					continue
 				}
-				fmt.Fprintf(tabw, "\t\t%d x %s\t%s\n", nodeCount, oldVersion, upgrade.After.KubeVersion)
+				fmt.Fprintf(tabw, "\t%d x %s\t%s\n", nodeCount, oldVersion, upgrade.After.KubeVersion)
 			}
 			// We should flush the writer here at this stage; as the columns will now be of the right size, adjusted to the above content
 			tabw.Flush()

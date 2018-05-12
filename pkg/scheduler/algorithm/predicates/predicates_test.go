@@ -27,6 +27,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -36,18 +37,19 @@ import (
 )
 
 var (
-	extendedResourceA = v1.ResourceName("example.com/aaa")
-	extendedResourceB = v1.ResourceName("example.com/bbb")
-	hugePageResourceA = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
+	extendedResourceA     = v1.ResourceName("example.com/aaa")
+	extendedResourceB     = v1.ResourceName("example.com/bbb")
+	kubernetesIOResourceA = v1.ResourceName("kubernetes.io/something")
+	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
+	hugePageResourceA     = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
 )
 
-func makeResources(milliCPU, memory, nvidiaGPUs, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
+func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
 	return v1.NodeResources{
 		Capacity: v1.ResourceList{
 			v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 			v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
 			v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
-			v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
 			extendedResourceA:           *resource.NewQuantity(extendedA, resource.DecimalSI),
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
 			hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
@@ -55,12 +57,11 @@ func makeResources(milliCPU, memory, nvidiaGPUs, pods, extendedA, storage, hugeP
 	}
 }
 
-func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, extendedA, storage, hugePageA int64) v1.ResourceList {
+func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.ResourceList {
 	return v1.ResourceList{
 		v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 		v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
 		v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
-		v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
 		extendedResourceA:           *resource.NewQuantity(extendedA, resource.DecimalSI),
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
 		hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
@@ -93,11 +94,12 @@ func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) 
 
 func TestPodFitsResources(t *testing.T) {
 	enoughPodsTests := []struct {
-		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
-		fits     bool
-		test     string
-		reasons  []algorithm.PredicateFailureReason
+		pod                      *v1.Pod
+		nodeInfo                 *schedulercache.NodeInfo
+		fits                     bool
+		test                     string
+		reasons                  []algorithm.PredicateFailureReason
+		ignoredExtendedResources sets.String
 	}{
 		{
 			pod: &v1.Pod{},
@@ -297,6 +299,24 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceA: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits:    false,
+			test:    "kubernetes.io resource capacity enforced",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceA, 10, 0, 0)},
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceB: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits:    false,
+			test:    "kubernetes.io resource capacity enforced for init container",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceB, 10, 0, 0)},
+		},
+		{
+			pod: newResourcePod(
 				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
@@ -323,12 +343,23 @@ func TestPodFitsResources(t *testing.T) {
 			test:    "hugepages resource allocatable enforced for multiple containers",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 6, 2, 5)},
 		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits: true,
+			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
+			test: "skip checking ignored extended resource",
+		},
 	}
 
 	for _, test := range enoughPodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 		test.nodeInfo.SetNode(&node)
-		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		RegisterPredicateMetadataProducerWithExtendedResourceOptions(test.ignoredExtendedResources)
+		meta := PredicateMetadata(test.pod, nil)
+		fits, reasons, err := PodFitsResources(test.pod, meta, test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -381,7 +412,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range notEnoughPodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1, 0, 0, 0)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
@@ -439,7 +470,7 @@ func TestPodFitsResources(t *testing.T) {
 	}
 
 	for _, test := range storagePodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
@@ -880,10 +911,11 @@ func TestISCSIDiskConflicts(t *testing.T) {
 // TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
 func TestPodFitsSelector(t *testing.T) {
 	tests := []struct {
-		pod    *v1.Pod
-		labels map[string]string
-		fits   bool
-		test   string
+		pod      *v1.Pod
+		labels   map[string]string
+		nodeName string
+		fits     bool
+		test     string
 	}{
 		{
 			pod:  &v1.Pod{},
@@ -1328,11 +1360,234 @@ func TestPodFitsSelector(t *testing.T) {
 			test: "Pod with an Affinity matches node's labels but the PodSpec.NodeSelector(the old thing that we are deprecating) " +
 				"is not satisfied, won't schedule onto the node",
 		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpNotIn,
+												Values:   []string{"invalid value: ___@#$%^"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "Pod with an invalid value in Affinity term won't be scheduled onto the node",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_1",
+			fits:     true,
+			test:     "Pod with matchFields using In operator that matches the existing node",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			fits:     false,
+			test:     "Pod with matchFields using In operator that does not match the existing node",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+									},
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			labels:   map[string]string{"foo": "bar"},
+			fits:     true,
+			test:     "Pod with two terms: matchFields does not match, but matchExpressions matches",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			labels:   map[string]string{"foo": "bar"},
+			fits:     false,
+			test:     "Pod with one term: matchFields does not match, but matchExpressions matches",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_1",
+			labels:   map[string]string{"foo": "bar"},
+			fits:     true,
+			test:     "Pod with one term: both matchFields and matchExpressions match",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+									},
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"not-match-to-bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			labels:   map[string]string{"foo": "bar"},
+			fits:     false,
+			test:     "Pod with two terms: both matchFields and matchExpressions do not match",
+		},
 	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
 
 	for _, test := range tests {
-		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.labels}}
+		node := v1.Node{ObjectMeta: metav1.ObjectMeta{
+			Name:   test.nodeName,
+			Labels: test.labels,
+		}}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
@@ -1578,46 +1833,52 @@ func TestServiceAffinity(t *testing.T) {
 	}
 }
 
-func TestEBSVolumeCountConflicts(t *testing.T) {
+func onePVCPod(filterName string) *v1.Pod {
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "some" + filterName + "Vol",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func splitPVCPod(filterName string) *v1.Pod {
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "someNon" + filterName + "Vol",
+						},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "some" + filterName + "Vol",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestVolumeCountConflicts(t *testing.T) {
 	oneVolPod := &v1.Pod{
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{
 				{
 					VolumeSource: v1.VolumeSource{
 						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
-					},
-				},
-			},
-		},
-	}
-	ebsPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "someEBSVol",
-						},
-					},
-				},
-			},
-		},
-	}
-	splitPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "someNonEBSVol",
-						},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "someEBSVol",
-						},
 					},
 				},
 			},
@@ -1789,13 +2050,16 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 	tests := []struct {
 		newPod       *v1.Pod
 		existingPods []*v1.Pod
+		filterName   string
 		maxVols      int
 		fits         bool
 		test         string
 	}{
+		// filterName:EBSVolumeFilterType
 		{
 			newPod:       oneVolPod,
 			existingPods: []*v1.Pod{twoVolPod, oneVolPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      4,
 			fits:         true,
 			test:         "fits when node capacity >= new pod's EBS volumes",
@@ -1803,6 +2067,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       twoVolPod,
 			existingPods: []*v1.Pod{oneVolPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "doesn't fit when node capacity < new pod's EBS volumes",
@@ -1810,6 +2075,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       splitVolsPod,
 			existingPods: []*v1.Pod{twoVolPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "new pod's count ignores non-EBS volumes",
@@ -1817,76 +2083,87 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       twoVolPod,
 			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "existing pods' counts ignore non-EBS volumes",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "new pod's count considers PVCs backed by EBS volumes",
 		},
 		{
-			newPod:       splitPVCPod,
+			newPod:       splitPVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{splitVolsPod, oneVolPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "new pod's count ignores PVCs not backed by EBS volumes",
 		},
 		{
 			newPod:       twoVolPod,
-			existingPods: []*v1.Pod{oneVolPod, ebsPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, onePVCPod(EBSVolumeFilterType)},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         false,
 			test:         "existing pods' counts considers PVCs backed by EBS volumes",
 		},
 		{
 			newPod:       twoVolPod,
-			existingPods: []*v1.Pod{oneVolPod, twoVolPod, ebsPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, twoVolPod, onePVCPod(EBSVolumeFilterType)},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      4,
 			fits:         true,
 			test:         "already-mounted EBS volumes are always ok to allow",
 		},
 		{
 			newPod:       splitVolsPod,
-			existingPods: []*v1.Pod{oneVolPod, oneVolPod, ebsPVCPod},
+			existingPods: []*v1.Pod{oneVolPod, oneVolPod, onePVCPod(EBSVolumeFilterType)},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "the same EBS volumes are not counted multiple times",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "pod with missing PVC is counted towards the PV limit",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "pod with missing PVC is counted towards the PV limit",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         false,
 			test:         "pod with missing two PVCs is counted towards the PV limit twice",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "pod with missing PV is counted towards the PV limit",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "pod with missing PV is counted towards the PV limit",
@@ -1894,6 +2171,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       deletedPVPod2,
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         true,
 			test:         "two pods missing the same PV are counted towards the PV limit only once",
@@ -1901,20 +2179,23 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       anotherDeletedPVPod,
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "two pods missing different PVs are counted towards the PV limit twice",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "pod with unbound PVC is counted towards the PV limit",
 		},
 		{
-			newPod:       ebsPVCPod,
+			newPod:       onePVCPod(EBSVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      3,
 			fits:         true,
 			test:         "pod with unbound PVC is counted towards the PV limit",
@@ -1922,6 +2203,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       unboundPVCPod2,
 			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         true,
 			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
@@ -1929,70 +2211,397 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		{
 			newPod:       anotherUnboundPVCPod,
 			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   EBSVolumeFilterType,
 			maxVols:      2,
 			fits:         false,
 			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
 		},
+		// filterName:GCEPDVolumeFilterType
+		{
+			newPod:       oneVolPod,
+			existingPods: []*v1.Pod{twoVolPod, oneVolPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "fit when node capacity < new pod's GCE volumes",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{twoVolPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores non-GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts ignore non-GCE volumes",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count considers PVCs backed by GCE volumes",
+		},
+		{
+			newPod:       splitPVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{splitVolsPod, oneVolPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores PVCs not backed by GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, onePVCPod(GCEPDVolumeFilterType)},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts considers PVCs backed by GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, twoVolPod, onePVCPod(GCEPDVolumeFilterType)},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "already-mounted EBS volumes are always ok to allow",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{oneVolPod, oneVolPod, onePVCPod(GCEPDVolumeFilterType)},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "the same GCE volumes are not counted multiple times",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing two PVCs is counted towards the PV limit twice",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       deletedPVPod2,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two pods missing the same PV are counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherDeletedPVPod,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two pods missing different PVs are counted towards the PV limit twice",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(GCEPDVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       unboundPVCPod2,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherUnboundPVCPod,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   GCEPDVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
+		},
+		// filterName:AzureDiskVolumeFilterType
+		{
+			newPod:       oneVolPod,
+			existingPods: []*v1.Pod{twoVolPod, oneVolPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's AzureDisk volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "fit when node capacity < new pod's AzureDisk volumes",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{twoVolPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores non-AzureDisk volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts ignore non-AzureDisk volumes",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{splitVolsPod, nonApplicablePod, emptyPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count considers PVCs backed by AzureDisk volumes",
+		},
+		{
+			newPod:       splitPVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{splitVolsPod, oneVolPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "new pod's count ignores PVCs not backed by AzureDisk volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, onePVCPod(AzureDiskVolumeFilterType)},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "existing pods' counts considers PVCs backed by AzureDisk volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: []*v1.Pod{oneVolPod, twoVolPod, onePVCPod(AzureDiskVolumeFilterType)},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      4,
+			fits:         true,
+			test:         "already-mounted AzureDisk volumes are always ok to allow",
+		},
+		{
+			newPod:       splitVolsPod,
+			existingPods: []*v1.Pod{oneVolPod, oneVolPod, onePVCPod(AzureDiskVolumeFilterType)},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "the same AzureDisk volumes are not counted multiple times",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, twoDeletedPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing two PVCs is counted towards the PV limit twice",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with missing PV is counted towards the PV limit",
+		},
+		{
+			newPod:       deletedPVPod2,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two pods missing the same PV are counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherDeletedPVPod,
+			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two pods missing different PVs are counted towards the PV limit twice",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       onePVCPod(AzureDiskVolumeFilterType),
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      3,
+			fits:         true,
+			test:         "pod with unbound PVC is counted towards the PV limit",
+		},
+		{
+			newPod:       unboundPVCPod2,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
+		},
+		{
+			newPod:       anotherUnboundPVCPod,
+			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:   AzureDiskVolumeFilterType,
+			maxVols:      2,
+			fits:         true,
+			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
+		},
 	}
 
-	pvInfo := FakePersistentVolumeInfo{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "someEBSVol"},
-			Spec: v1.PersistentVolumeSpec{
-				PersistentVolumeSource: v1.PersistentVolumeSource{
-					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ebsVol"},
+	pvInfo := func(filterName string) FakePersistentVolumeInfo {
+		return FakePersistentVolumeInfo{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: strings.ToLower(filterName) + "Vol"},
+					},
 				},
 			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "someNonEBSVol"},
-			Spec: v1.PersistentVolumeSpec{
-				PersistentVolumeSource: v1.PersistentVolumeSource{},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{},
+				},
 			},
-		},
+		}
 	}
 
-	pvcInfo := FakePersistentVolumeClaimInfo{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "someEBSVol"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someEBSVol"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "someNonEBSVol"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "anotherPVCWithDeletedPV"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVC"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "anotherUnboundPVC"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
-		},
+	pvcInfo := func(filterName string) FakePersistentVolumeClaimInfo {
+		return FakePersistentVolumeClaimInfo{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "some" + filterName + "Vol"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNon" + filterName + "Vol"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "anotherPVCWithDeletedPV"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "unboundPVC"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "anotherUnboundPVC"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+			},
+		}
 	}
 
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
 	for _, test := range tests {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
-		pred := NewMaxPDVolumeCountPredicate(EBSVolumeFilterType, pvInfo, pvcInfo)
+		pred := NewMaxPDVolumeCountPredicate(test.filterName, pvInfo(test.filterName), pvcInfo(test.filterName))
 		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
+			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}
 		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+			t.Errorf("[%s]%s: unexpected failure reasons: %v, want: %v", test.filterName, test.test, reasons, expectedFailureReasons)
 		}
 		if fits != test.fits {
-			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
+			t.Errorf("[%s]%s: expected %v, got %v", test.filterName, test.test, test.fits, fits)
 		}
 	}
 }
@@ -2029,7 +2638,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits: true,
 			wErr: nil,
@@ -2041,7 +2650,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits: false,
 			wErr: nil,
@@ -2052,34 +2661,6 @@ func TestRunGeneralPredicates(t *testing.T) {
 			test: "not enough cpu and memory resource",
 		},
 		{
-			pod: &v1.Pod{},
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
-			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
-			fits: true,
-			wErr: nil,
-			test: "no resources/port/host requested always fits on GPU machine",
-		},
-		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 1})),
-			node:    &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
-			fits:    false,
-			wErr:    nil,
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceNvidiaGPU, 1, 1, 1)},
-			test:    "not enough GPU resource",
-		},
-		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 0})),
-			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
-			fits: true,
-			wErr: nil,
-			test: "enough GPU resource",
-		},
-		{
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					NodeName: "machine2",
@@ -2088,7 +2669,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
@@ -2100,7 +2681,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
@@ -2790,7 +3371,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelA}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: podLabelA}},
 			},
 			nodes: []v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
@@ -2862,7 +3443,8 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"foo": "bar",
+						"foo":     "bar",
+						"service": "securityscan",
 					},
 				},
 				Spec: v1.PodSpec{
@@ -2881,12 +3463,24 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 									},
 									TopologyKey: "zone",
 								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"securityscan"},
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
 							},
 						},
 					},
 				},
 			},
-			pods: []*v1.Pod{},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: map[string]string{"foo": "bar"}}}},
 			nodes: []v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zone": "az1", "hostname": "h1"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zone": "az2", "hostname": "h2"}}},
@@ -2954,6 +3548,55 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 									},
 									TopologyKey: "region",
 								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"securityscan"},
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc", "service": "securityscan"}}},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": true,
+			},
+			test: "This test ensures that anti-affinity matches a pod when all terms of the anti-affinity rule matches a pod.",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"abc"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
 							},
 						},
 					},
@@ -2973,7 +3616,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeB": false,
 				"nodeC": true,
 			},
-			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be schedulerd onto nodeC",
+			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be scheduled onto nodeC",
 		},
 		{
 			pod: &v1.Pod{
@@ -3121,7 +3764,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeB": false,
 				"nodeC": true,
 			},
-			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB, but can be schedulerd onto nodeC (NodeC has an existing pod that match the inter pod affinity rule but in different namespace)",
+			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB, but can be scheduled onto nodeC (NodeC has an existing pod that match the inter pod affinity rule but in different namespace)",
 		},
 	}
 
@@ -3129,7 +3772,8 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		nodeListInfo := FakeNodeListInfo(test.nodes)
-		for indexNode, node := range test.nodes {
+		nodeInfoMap := make(map[string]*schedulercache.NodeInfo)
+		for i, node := range test.nodes {
 			var podsOnNode []*v1.Pod
 			for _, pod := range test.pods {
 				if pod.Spec.NodeName == node.Name {
@@ -3137,21 +3781,23 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				}
 			}
 
+			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
+			nodeInfo.SetNode(&test.nodes[i])
+			nodeInfoMap[node.Name] = nodeInfo
+		}
+
+		for indexNode, node := range test.nodes {
 			testFit := PodAffinityChecker{
 				info:      nodeListInfo,
 				podLister: schedulertesting.FakePodLister(test.pods),
 			}
-			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
-			nodeInfo.SetNode(&node)
-			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
 
-			var meta algorithm.PredicateMetadata = nil
-
+			var meta algorithm.PredicateMetadata
 			if !test.nometa {
 				meta = PredicateMetadata(test.pod, nodeInfoMap)
 			}
 
-			fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, nodeInfo)
+			fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, nodeInfoMap[node.Name])
 			if !fits && !reflect.DeepEqual(reasons, test.nodesExpectAffinityFailureReasons[indexNode]) {
 				t.Errorf("index: %d test: %s unexpected failure reasons: %v expect: %v", indexTest, test.test, reasons, test.nodesExpectAffinityFailureReasons[indexNode])
 			}
@@ -3410,7 +4056,7 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 					ImagePullPolicy: "Always",
 					// at least one requirement -> burstable pod
 					Resources: v1.ResourceRequirements{
-						Requests: makeAllocatableResources(100, 100, 100, 100, 0, 0, 0),
+						Requests: makeAllocatableResources(100, 100, 100, 0, 0, 0),
 					},
 				},
 			},

@@ -28,7 +28,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"sort"
 	"text/template"
 	"time"
 
@@ -175,14 +174,14 @@ func (gce *GCE) {{.WrapType}}() {{.WrapType}} {
 {{- end}}
 
 // NewMockGCE returns a new mock for GCE.
-func NewMockGCE() *MockGCE {
+func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 	{{- range .Groups}}
 	mock{{.Service}}Objs := map[meta.Key]*Mock{{.Service}}Obj{}
 	{{- end}}
 
 	mock := &MockGCE{
 	{{- range .All}}
-		{{.MockField}}: New{{.MockWrapType}}(mock{{.Service}}Objs),
+		{{.MockField}}: New{{.MockWrapType}}(projectRouter, mock{{.Service}}Objs),
 	{{- end}}
 	}
 	return mock
@@ -276,7 +275,7 @@ type {{.WrapType}} interface {
 	{{.WrapTypeOps}}
 {{- end}}
 {{- if .GenerateGet}}
-	Get(ctx context.Context, key meta.Key) (*{{.FQObjectType}}, error)
+	Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error)
 {{- end -}}
 {{- if .GenerateList}}
 {{- if .KeyIsGlobal}}
@@ -290,10 +289,10 @@ type {{.WrapType}} interface {
 {{- end -}}
 {{- end -}}
 {{- if .GenerateInsert}}
-	Insert(ctx context.Context, key meta.Key, obj *{{.FQObjectType}}) error
+	Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error
 {{- end -}}
 {{- if .GenerateDelete}}
-	Delete(ctx context.Context, key meta.Key) error
+	Delete(ctx context.Context, key *meta.Key) error
 {{- end -}}
 {{- if .AggregatedList}}
 	AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*{{.FQObjectType}}, error)
@@ -306,8 +305,10 @@ type {{.WrapType}} interface {
 }
 
 // New{{.MockWrapType}} returns a new mock for {{.Service}}.
-func New{{.MockWrapType}}(objs map[meta.Key]*Mock{{.Service}}Obj) *{{.MockWrapType}} {
+func New{{.MockWrapType}}(pr ProjectRouter, objs map[meta.Key]*Mock{{.Service}}Obj) *{{.MockWrapType}} {
 	mock := &{{.MockWrapType}}{
+		ProjectRouter: pr,
+
 		Objects: objs,
 		{{- if .GenerateGet}}
 		GetError:    map[meta.Key]error{},
@@ -325,6 +326,8 @@ func New{{.MockWrapType}}(objs map[meta.Key]*Mock{{.Service}}Obj) *{{.MockWrapTy
 // {{.MockWrapType}} is the mock for {{.Service}}.
 type {{.MockWrapType}} struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*Mock{{.Service}}Obj
@@ -352,27 +355,27 @@ type {{.MockWrapType}} struct {
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
 	{{- if .GenerateGet}}
-	GetHook    func(m *{{.MockWrapType}}, ctx context.Context, key meta.Key) (bool, *{{.FQObjectType}}, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *{{.MockWrapType}}) (bool, *{{.FQObjectType}}, error)
 	{{- end -}}
 	{{- if .GenerateList}}
 	{{- if .KeyIsGlobal}}
-	ListHook   func(m *{{.MockWrapType}}, ctx context.Context, fl *filter.F) (bool, []*{{.FQObjectType}}, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *{{.MockWrapType}}) (bool, []*{{.FQObjectType}}, error)
 	{{- end -}}
 	{{- if .KeyIsRegional}}
-	ListHook   func(m *{{.MockWrapType}}, ctx context.Context, region string, fl *filter.F) (bool, []*{{.FQObjectType}}, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *{{.MockWrapType}}) (bool, []*{{.FQObjectType}}, error)
 	{{- end -}}
 	{{- if .KeyIsZonal}}
-	ListHook   func(m *{{.MockWrapType}}, ctx context.Context, zone string, fl *filter.F) (bool, []*{{.FQObjectType}}, error)
+	ListHook   func(ctx context.Context, zone string, fl *filter.F, m *{{.MockWrapType}}) (bool, []*{{.FQObjectType}}, error)
 	{{- end}}
 	{{- end -}}
 	{{- if .GenerateInsert}}
-	InsertHook func(m *{{.MockWrapType}}, ctx context.Context, key meta.Key, obj *{{.FQObjectType}}) (bool, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}, m *{{.MockWrapType}}) (bool, error)
 	{{- end -}}
 	{{- if .GenerateDelete}}
-	DeleteHook func(m *{{.MockWrapType}}, ctx context.Context, key meta.Key) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *{{.MockWrapType}}) (bool, error)
 	{{- end -}}
 	{{- if .AggregatedList}}
-	AggregatedListHook func(m *{{.MockWrapType}}, ctx context.Context, fl *filter.F) (bool, map[string][]*{{.FQObjectType}}, error)
+	AggregatedListHook func(ctx context.Context, fl *filter.F, m *{{.MockWrapType}}) (bool, map[string][]*{{.FQObjectType}}, error)
 	{{- end}}
 
 {{- with .Methods -}}
@@ -388,22 +391,25 @@ type {{.MockWrapType}} struct {
 
 {{- if .GenerateGet}}
 // Get returns the object from the mock.
-func (m *{{.MockWrapType}}) Get(ctx context.Context, key meta.Key) (*{{.FQObjectType}}, error) {
+func (m *{{.MockWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key);  intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.Get(%v, %s) = %+v, %v", ctx, key, obj ,err)
 			return obj, err
 		}
+	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
 
-	if err, ok := m.GetError[key]; ok {
+	if err, ok := m.GetError[*key]; ok {
 		glog.V(5).Infof("{{.MockWrapType}}.Get(%v, %s) = nil, %v", ctx, key, err)
 		return nil, err
 	}
-	if obj, ok := m.Objects[key]; ok {
+	if obj, ok := m.Objects[*key]; ok {
 		typedObj := obj.To{{.VersionTitle}}()
 		glog.V(5).Infof("{{.MockWrapType}}.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
 		return typedObj, nil
@@ -433,15 +439,15 @@ func (m *{{.MockWrapType}}) List(ctx context.Context, zone string, fl *filter.F)
 {{- end}}
 	if m.ListHook != nil {
 		{{if .KeyIsGlobal -}}
-		if intercept, objs, err := m.ListHook(m, ctx, fl);  intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 		{{- end -}}
 		{{- if .KeyIsRegional -}}
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl);  intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 		{{- end -}}
 		{{- if .KeyIsZonal -}}
-		if intercept, objs, err := m.ListHook(m, ctx, zone, fl);  intercept {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
 		{{- end}}
 			return objs, err
@@ -482,7 +488,7 @@ func (m *{{.MockWrapType}}) List(ctx context.Context, zone string, fl *filter.F)
 			continue
 		}
 {{- end}}
-		if ! fl.Match(obj.To{{.VersionTitle}}()) {
+		if !fl.Match(obj.To{{.VersionTitle}}()) {
 			continue
 		}
 		objs = append(objs, obj.To{{.VersionTitle}}())
@@ -503,22 +509,25 @@ func (m *{{.MockWrapType}}) List(ctx context.Context, zone string, fl *filter.F)
 
 {{- if .GenerateInsert}}
 // Insert is a mock for inserting/creating a new object.
-func (m *{{.MockWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQObjectType}}) error {
+func (m *{{.MockWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj);  intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
 
-	if err, ok := m.InsertError[key]; ok {
+	if err, ok := m.InsertError[*key]; ok {
 		glog.V(5).Infof("{{.MockWrapType}}.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 		return err
 	}
-	if _, ok := m.Objects[key]; ok {
+	if _, ok := m.Objects[*key]; ok {
 		err := &googleapi.Error{
 			Code: http.StatusConflict,
 			Message: fmt.Sprintf("{{.MockWrapType}} %v exists", key),
@@ -528,11 +537,10 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQ
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.Version{{.VersionTitle}}, "mock-project", "{{.Resource}}", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Resource}}")
+	obj.SelfLink = SelfLink(meta.Version{{.VersionTitle}}, projectID, "{{.Resource}}", key)
 
-	m.Objects[key] = &Mock{{.Service}}Obj{obj}
+	m.Objects[*key] = &Mock{{.Service}}Obj{obj}
 	glog.V(5).Infof("{{.MockWrapType}}.Insert(%v, %v, %+v) = nil", ctx, key, obj)
 	return nil
 }
@@ -540,22 +548,25 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQ
 
 {{- if .GenerateDelete}}
 // Delete is a mock for deleting the object.
-func (m *{{.MockWrapType}}) Delete(ctx context.Context, key meta.Key) error {
+func (m *{{.MockWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key);  intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m);  intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	m.Lock.Lock()
 	defer m.Lock.Unlock()
 
-	if err, ok := m.DeleteError[key]; ok {
+	if err, ok := m.DeleteError[*key]; ok {
 		glog.V(5).Infof("{{.MockWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	if _, ok := m.Objects[key]; !ok {
+	if _, ok := m.Objects[*key]; !ok {
 		err := &googleapi.Error{
 			Code: http.StatusNotFound,
 			Message: fmt.Sprintf("{{.MockWrapType}} %v not found", key),
@@ -564,7 +575,7 @@ func (m *{{.MockWrapType}}) Delete(ctx context.Context, key meta.Key) error {
 		return err
 	}
 
-	delete(m.Objects, key)
+	delete(m.Objects, *key)
 	glog.V(5).Infof("{{.MockWrapType}}.Delete(%v, %v) = nil", ctx, key)
 	return nil
 }
@@ -574,7 +585,7 @@ func (m *{{.MockWrapType}}) Delete(ctx context.Context, key meta.Key) error {
 // AggregatedList is a mock for AggregatedList.
 func (m *{{.MockWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*{{.FQObjectType}}, error) {
 	if m.AggregatedListHook != nil {
-		if intercept, objs, err := m.AggregatedListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.AggregatedListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("{{.MockWrapType}}.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -602,7 +613,7 @@ func (m *{{.MockWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (m
 			glog.V(5).Infof("{{.MockWrapType}}.AggregatedList(%v, %v) = nil, %v", ctx, fl, err)
 			return nil, err
 		}
-		if ! fl.Match(obj.To{{.VersionTitle}}()) {
+		if !fl.Match(obj.To{{.VersionTitle}}()) {
 			continue
 		}
 		objs[location] = append(objs[location], obj.To{{.VersionTitle}}())
@@ -621,16 +632,21 @@ func (m *{{.MockWrapType}}) Obj(o *{{.FQObjectType}}) *Mock{{.Service}}Obj {
 {{- range .}}
 // {{.Name}} is a mock for the corresponding method.
 func (m *{{.MockWrapType}}) {{.FcnArgs}} {
-{{- if eq .ReturnType "Operation"}}
+{{- if .IsOperation }}
 	if m.{{.MockHookName}} != nil {
-		return m.{{.MockHookName}}(m, ctx, key {{.CallArgs}})
+		return m.{{.MockHookName}}(ctx, key {{.CallArgs}}, m)
 	}
 	return nil
-{{- else}}
+{{- else if .IsGet}}
 	if m.{{.MockHookName}} != nil {
-		return m.{{.MockHookName}}(m, ctx, key {{.CallArgs}})
+		return m.{{.MockHookName}}(ctx, key {{.CallArgs}}, m)
 	}
 	return nil, fmt.Errorf("{{.MockHookName}} must be set")
+{{- else if .IsPaged}}
+	if m.{{.MockHookName}} != nil {
+		return m.{{.MockHookName}}(ctx, key {{.CallArgs}}, fl, m)
+	}
+	return nil, nil
 {{- end}}
 }
 {{end -}}
@@ -642,7 +658,13 @@ type {{.GCEWrapType}} struct {
 
 {{- if .GenerateGet}}
 // Get the {{.Object}} named by key.
-func (g *{{.GCEWrapType}}) Get(ctx context.Context, key meta.Key) (*{{.FQObjectType}}, error) {
+func (g *{{.GCEWrapType}}) Get(ctx context.Context, key *meta.Key) (*{{.FQObjectType}}, error) {
+	glog.V(5).Infof("{{.GCEWrapType}}.Get(%v, %v): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("{{.GCEWrapType}}.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -650,7 +672,9 @@ func (g *{{.GCEWrapType}}) Get(ctx context.Context, key meta.Key) (*{{.FQObjectT
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+	glog.V(5).Infof("{{.GCEWrapType}}.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
 {{- if .KeyIsGlobal}}
@@ -663,7 +687,9 @@ func (g *{{.GCEWrapType}}) Get(ctx context.Context, key meta.Key) (*{{.FQObjectT
 	call := g.s.{{.VersionTitle}}.{{.Service}}.Get(projectID, key.Zone, key.Name)
 {{- end}}
 	call.Context(ctx)
-	return call.Do()
+	v, err := call.Do()
+	glog.V(4).Infof("{{.GCEWrapType}}.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
 }
 {{- end}}
 
@@ -671,15 +697,18 @@ func (g *{{.GCEWrapType}}) Get(ctx context.Context, key meta.Key) (*{{.FQObjectT
 // List all {{.Object}} objects.
 {{- if .KeyIsGlobal}}
 func (g *{{.GCEWrapType}}) List(ctx context.Context, fl *filter.F) ([]*{{.FQObjectType}}, error) {
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v) called", ctx, fl)
 {{- end -}}
 {{- if .KeyIsRegional}}
 func (g *{{.GCEWrapType}}) List(ctx context.Context, region string, fl *filter.F) ([]*{{.FQObjectType}}, error) {
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v, %v) called", ctx, region, fl)
 {{- end -}}
 {{- if .KeyIsZonal}}
 func (g *{{.GCEWrapType}}) List(ctx context.Context, zone string, fl *filter.F) ([]*{{.FQObjectType}}, error) {
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v, %v) called", ctx, zone, fl)
 {{- end}}
-projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
-rk := &RateLimitKey{
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
+	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "List",
 		Version: meta.Version("{{.Version}}"),
@@ -689,12 +718,15 @@ rk := &RateLimitKey{
 		return nil, err
 	}
 {{- if .KeyIsGlobal}}
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	call := g.s.{{.VersionTitle}}.{{.Service}}.List(projectID)
 {{- end -}}
 {{- if .KeyIsRegional}}
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
 	call := g.s.{{.VersionTitle}}.{{.Service}}.List(projectID, region)
 {{- end -}}
 {{- if .KeyIsZonal}}
+	glog.V(5).Infof("{{.GCEWrapType}}.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
 	call := g.s.{{.VersionTitle}}.{{.Service}}.List(projectID, zone)
 {{- end}}
 	if fl != filter.None {
@@ -702,19 +734,37 @@ rk := &RateLimitKey{
 	}
 	var all []*{{.FQObjectType}}
 	f := func(l *{{.ObjectListType}}) error {
+		glog.V(5).Infof("{{.GCEWrapType}}.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("{{.GCEWrapType}}.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("{{.GCEWrapType}}.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
 	return all, nil
 }
 {{- end}}
 
 {{- if .GenerateInsert}}
 // Insert {{.Object}} with key of value obj.
-func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQObjectType}}) error {
+func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.FQObjectType}}) error {
+	glog.V(5).Infof("{{.GCEWrapType}}.Insert(%v, %v, %+v): called", ctx, key, obj)
+	if !key.Valid() {
+		glog.V(2).Infof("{{.GCEWrapType}}.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -722,7 +772,9 @@ func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQO
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+	glog.V(5).Infof("{{.GCEWrapType}}.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
@@ -739,15 +791,24 @@ func (g *{{.GCEWrapType}}) Insert(ctx context.Context, key meta.Key, obj *{{.FQO
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("{{.GCEWrapType}}.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
 }
 {{- end}}
 
 {{- if .GenerateDelete}}
 // Delete the {{.Object}} referenced by key.
-func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key meta.Key) error {
+func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("{{.GCEWrapType}}.Delete(%v, %v): called", ctx, key)
+	if !key.Valid() {
+		glog.V(2).Infof("{{.GCEWrapType}}.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -755,7 +816,9 @@ func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key meta.Key) error {
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+	glog.V(5).Infof("{{.GCEWrapType}}.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 {{- if .KeyIsGlobal}}
@@ -771,15 +834,21 @@ func (g *{{.GCEWrapType}}) Delete(ctx context.Context, key meta.Key) error {
 
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("{{.GCEWrapType}}.Delete(%v, %v) = %v", ctx, key, err)
+	return err
 }
 {{end -}}
 
 {{- if .AggregatedList}}
 // AggregatedList lists all resources of the given type across all locations.
 func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*{{.FQObjectType}}, error) {
+	glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v) called", ctx, fl)
+
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -787,7 +856,10 @@ func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (ma
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+
+	glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v): RateLimiter error: %v", ctx, fl, err)
 		return nil, err
 	}
 
@@ -800,12 +872,23 @@ func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (ma
 	all := map[string][]*{{.FQObjectType}}{}
 	f := func(l *{{.ObjectAggregatedListType}}) error {
 		for k, v := range l.Items {
+			glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v): page[%v]%+v", ctx, fl, k, v)
 			all[k] = append(all[k], v.{{.AggregatedListField}}...)
 		}
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
+	}
+	if glog.V(4) {
+		glog.V(4).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("{{.GCEWrapType}}.AggregatedList(%v, %v) = %v, %v", ctx, fl, asStr, nil)
 	}
 	return all, nil
 }
@@ -815,6 +898,18 @@ func (g *{{.GCEWrapType}}) AggregatedList(ctx context.Context, fl *filter.F) (ma
 {{- range .}}
 // {{.Name}} is a method on {{.GCEWrapType}}.
 func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
+	glog.V(5).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+{{- if .IsOperation}}
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+{{- else if .IsGet}}
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+{{- else if .IsPaged}}
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+{{- end}}
+	}
 	projectID := g.s.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Service}}")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
@@ -822,8 +917,11 @@ func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
 		Version: meta.Version("{{.Version}}"),
 		Service: "{{.Service}}",
 	}
+	glog.V(5).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-	{{- if eq .ReturnType "Operation"}}
+		glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+	{{- if .IsOperation}}
 		return err
 	{{- else}}
 		return nil, err
@@ -838,15 +936,42 @@ func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
 {{- if .KeyIsZonal}}
 	call := g.s.{{.VersionTitle}}.{{.Service}}.{{.Name}}(projectID, key.Zone, key.Name {{.CallArgs}})
 {{- end}}
+{{- if .IsOperation}}
 	call.Context(ctx)
-{{- if eq .ReturnType "Operation"}}
 	op, err := call.Do()
 	if err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
-	return g.s.WaitForCompletion(ctx, op)
-{{- else}}
-	return call.Do()
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+{{- else if .IsGet}}
+	call.Context(ctx)
+	v, err := call.Do()
+	glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %+v, %v", ctx, key, v, err)
+	return v, err
+{{- else if .IsPaged}}
+	var all []*{{.Version}}.{{.ItemType}}
+	f := func(l *{{.Version}}.{{.ReturnType}}) error {
+		glog.V(5).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...): page %+v", ctx, key, l)
+		all = append(all, l.Items...)
+		return nil
+	}
+	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %v, %v", ctx, key, nil, err)
+		return nil, err
+	}
+	if glog.V(4) {
+		glog.V(4).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = [%v items], %v", ctx, key, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("{{.GCEWrapType}}.{{.Name}}(%v, %v, ...) = %v, %v", ctx, key, asStr, nil)
+	}
+	return all, nil
 {{- end}}
 }
 {{end -}}
@@ -855,6 +980,38 @@ func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
 	tmpl := template.Must(template.New("interface").Parse(text))
 	for _, s := range meta.AllServices {
 		if err := tmpl.Execute(wr, s); err != nil {
+			panic(err)
+		}
+	}
+}
+
+// genTypes generates the type wrappers.
+func genResourceIDs(wr io.Writer) {
+	const text = `
+// New{{.Service}}ResourceID creates a ResourceID for the {{.Service}} resource.
+{{- if .KeyIsProject}}
+func New{{.Service}}ResourceID(project string) *ResourceID {
+	var key *meta.Key
+{{- else}}
+{{- if .KeyIsGlobal}}
+func New{{.Service}}ResourceID(project, name string) *ResourceID {
+	key := meta.GlobalKey(name)
+{{- end}}
+{{- if .KeyIsRegional}}
+func New{{.Service}}ResourceID(project, region, name string) *ResourceID {
+	key := meta.RegionalKey(name, region)
+{{- end}}
+{{- if .KeyIsZonal}}
+func New{{.Service}}ResourceID(project, zone, name string) *ResourceID {
+	key := meta.ZonalKey(name, zone)
+{{- end -}}
+{{end}}
+	return &ResourceID{project, "{{.Resource}}", key}
+}
+`
+	tmpl := template.Must(template.New("resourceIDs").Parse(text))
+	for _, sg := range meta.SortedServicesGroups {
+		if err := tmpl.Execute(wr, sg.ServiceInfo()); err != nil {
 			panic(err)
 		}
 	}
@@ -913,7 +1070,8 @@ func Test{{.Service}}Group(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 {{- if .HasAlpha}}
@@ -933,17 +1091,17 @@ func Test{{.Service}}Group(t *testing.T) {
 
 	// Get not found.
 {{- if .HasAlpha}}{{- if .Alpha.GenerateGet}}
-	if _, err := mock.Alpha{{.Service}}().Get(ctx, *key); err == nil {
+	if _, err := mock.Alpha{{.Service}}().Get(ctx, key); err == nil {
 		t.Errorf("Alpha{{.Service}}().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateGet}}
-	if _, err := mock.Beta{{.Service}}().Get(ctx, *key); err == nil {
+	if _, err := mock.Beta{{.Service}}().Get(ctx, key); err == nil {
 		t.Errorf("Beta{{.Service}}().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateGet}}
-	if _, err := mock.{{.Service}}().Get(ctx, *key); err == nil {
+	if _, err := mock.{{.Service}}().Get(ctx, key); err == nil {
 		t.Errorf("{{.Service}}().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 {{- end}}{{- end}}
@@ -952,41 +1110,41 @@ func Test{{.Service}}Group(t *testing.T) {
 {{- if .HasAlpha}}{{- if .Alpha.GenerateInsert}}
 	{
 		obj := &alpha.{{.Alpha.Object}}{}
-		if err := mock.Alpha{{.Service}}().Insert(ctx, *keyAlpha, obj); err != nil {
-			t.Errorf("Alpha{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.Alpha{{.Service}}().Insert(ctx, keyAlpha, obj); err != nil {
+			t.Errorf("Alpha{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
 		}
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateInsert}}
 	{
 		obj := &beta.{{.Beta.Object}}{}
-		if err := mock.Beta{{.Service}}().Insert(ctx, *keyBeta, obj); err != nil {
-			t.Errorf("Beta{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.Beta{{.Service}}().Insert(ctx, keyBeta, obj); err != nil {
+			t.Errorf("Beta{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, keyBeta, obj, err)
 		}
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateInsert}}
 	{
 		obj := &ga.{{.GA.Object}}{}
-		if err := mock.{{.Service}}().Insert(ctx, *keyGA, obj); err != nil {
-			t.Errorf("{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, key, obj, err)
+		if err := mock.{{.Service}}().Insert(ctx, keyGA, obj); err != nil {
+			t.Errorf("{{.Service}}().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
 		}
 	}
 {{- end}}{{- end}}
 
 	// Get across versions.
 {{- if .HasAlpha}}{{- if .Alpha.GenerateInsert}}
-	if obj, err := mock.Alpha{{.Service}}().Get(ctx, *key); err != nil {
+	if obj, err := mock.Alpha{{.Service}}().Get(ctx, key); err != nil {
 		t.Errorf("Alpha{{.Service}}().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateInsert}}
-	if obj, err := mock.Beta{{.Service}}().Get(ctx, *key); err != nil {
+	if obj, err := mock.Beta{{.Service}}().Get(ctx, key); err != nil {
 		t.Errorf("Beta{{.Service}}().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateInsert}}
-	if obj, err := mock.{{.Service}}().Get(ctx, *key); err != nil {
+	if obj, err := mock.{{.Service}}().Get(ctx, key); err != nil {
 		t.Errorf("{{.Service}}().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 {{- end}}{{- end}}
@@ -1077,51 +1235,117 @@ func Test{{.Service}}Group(t *testing.T) {
 
 	// Delete across versions.
 {{- if .HasAlpha}}{{- if .Alpha.GenerateDelete}}
-	if err := mock.Alpha{{.Service}}().Delete(ctx, *keyAlpha); err != nil {
-		t.Errorf("Alpha{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.Alpha{{.Service}}().Delete(ctx, keyAlpha); err != nil {
+		t.Errorf("Alpha{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateDelete}}
-	if err := mock.Beta{{.Service}}().Delete(ctx, *keyBeta); err != nil {
-		t.Errorf("Beta{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.Beta{{.Service}}().Delete(ctx, keyBeta); err != nil {
+		t.Errorf("Beta{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, keyBeta, err)
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateDelete}}
-	if err := mock.{{.Service}}().Delete(ctx, *keyGA); err != nil {
-		t.Errorf("{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, key, err)
+	if err := mock.{{.Service}}().Delete(ctx, keyGA); err != nil {
+		t.Errorf("{{.Service}}().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 {{- end}}{{- end}}
 
 	// Delete not found.
 {{- if .HasAlpha}}{{- if .Alpha.GenerateDelete}}
-	if err := mock.Alpha{{.Service}}().Delete(ctx, *keyAlpha); err == nil {
-		t.Errorf("Alpha{{.Service}}().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.Alpha{{.Service}}().Delete(ctx, keyAlpha); err == nil {
+		t.Errorf("Alpha{{.Service}}().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
 	}
 {{- end}}{{- end}}
 {{- if .HasBeta}}{{- if .Beta.GenerateDelete}}
-	if err := mock.Beta{{.Service}}().Delete(ctx, *keyBeta); err == nil {
-		t.Errorf("Beta{{.Service}}().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.Beta{{.Service}}().Delete(ctx, keyBeta); err == nil {
+		t.Errorf("Beta{{.Service}}().Delete(%v, %v) = nil; want error", ctx, keyBeta)
 	}
 {{- end}}{{- end}}
 {{- if .HasGA}}{{- if .GA.GenerateDelete}}
-	if err := mock.{{.Service}}().Delete(ctx, *keyGA); err == nil {
-		t.Errorf("{{.Service}}().Delete(%v, %v) = nil; want error", ctx, key)
+	if err := mock.{{.Service}}().Delete(ctx, keyGA); err == nil {
+		t.Errorf("{{.Service}}().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
 {{- end}}{{- end}}
 }
 `
 	tmpl := template.Must(template.New("unittest").Parse(text))
-	// Sort keys so the output will be stable.
-	var keys []string
-	for k := range meta.AllServicesByGroup {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		s := meta.AllServicesByGroup[k]
-		if err := tmpl.Execute(wr, s); err != nil {
+	for _, sg := range meta.SortedServicesGroups {
+		if err := tmpl.Execute(wr, sg); err != nil {
 			panic(err)
 		}
+	}
+}
+
+func genUnitTestResourceIDConversion(wr io.Writer) {
+	const text = `
+func TestResourceIDConversion(t *testing.T) {
+	t.Parallel()
+
+	for _, id := range []*ResourceID{
+		{{- range .Groups}}
+		{{- with .ServiceInfo}}
+		{{- if .KeyIsProject}}
+		New{{.Service}}ResourceID("my-{{.Resource}}-resource"),
+		{{- else}}
+		{{- if .KeyIsGlobal}}
+		New{{.Service}}ResourceID("some-project", "my-{{.Resource}}-resource"),
+		{{- end}}
+		{{- if .KeyIsRegional}}
+		New{{.Service}}ResourceID("some-project", "us-central1", "my-{{.Resource}}-resource"),
+		{{- end}}
+		{{- if .KeyIsZonal}}
+		New{{.Service}}ResourceID("some-project", "us-east1-b", "my-{{.Resource}}-resource"),
+		{{- end -}}
+		{{end -}}
+		{{end -}}
+		{{end}}
+	} {
+		t.Run(id.Resource, func(t *testing.T) {
+			// Test conversion to and from full URL.
+			fullURL := id.SelfLink(meta.VersionGA)
+			parsedID, err := ParseResourceURL(fullURL)
+			if err != nil {
+				t.Errorf("ParseResourceURL(%s) = _, %v, want nil", fullURL, err)
+			}
+			if !reflect.DeepEqual(id, parsedID) {
+				t.Errorf("SelfLink(%+v) -> ParseResourceURL(%s) = %+v, want original ID", id, fullURL, parsedID)
+			}
+
+			// Test conversion to and from relative resource name.
+			relativeName := id.RelativeResourceName()
+			parsedID, err = ParseResourceURL(relativeName)
+			if err != nil {
+				t.Errorf("ParseResourceURL(%s) = _, %v, want nil", relativeName, err)
+			}
+			if !reflect.DeepEqual(id, parsedID) {
+				t.Errorf("RelativeResourceName(%+v) -> ParseResourceURL(%s) = %+v, want original ID", id, relativeName, parsedID)
+			}
+
+			// Do not test ResourcePath for projects.
+			if id.Resource == "projects" {
+				return
+			}
+
+			// Test conversion to and from resource path.
+			resourcePath := id.ResourcePath()
+			parsedID, err = ParseResourceURL(resourcePath)
+			if err != nil {
+				t.Errorf("ParseResourceURL(%s) = _, %v, want nil", resourcePath, err)
+			}
+			id.ProjectID = ""
+			if !reflect.DeepEqual(id, parsedID) {
+				t.Errorf("ResourcePath(%+v) -> ParseResourceURL(%s) = %+v, want %+v", id, resourcePath, parsedID, id)
+			}
+		})
+	}
+}
+`
+	data := struct {
+		Groups []*meta.ServiceGroup
+	}{meta.SortedServicesGroups}
+	tmpl := template.Must(template.New("unittest-resourceIDs").Parse(text))
+	if err := tmpl.Execute(wr, data); err != nil {
+		panic(err)
 	}
 }
 
@@ -1135,9 +1359,11 @@ func main() {
 		genHeader(out)
 		genStubs(out)
 		genTypes(out)
+		genResourceIDs(out)
 	case "test":
 		genUnitTestHeader(out)
 		genUnitTestServices(out)
+		genUnitTestResourceIDConversion(out)
 	default:
 		log.Fatalf("Invalid -mode: %q", flags.mode)
 	}

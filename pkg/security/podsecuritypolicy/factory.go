@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/errors"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
@@ -39,7 +39,7 @@ func NewSimpleStrategyFactory() StrategyFactory {
 	return &simpleStrategyFactory{}
 }
 
-func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPolicy, namespace string) (*ProviderStrategies, error) {
+func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, namespace string) (*ProviderStrategies, error) {
 	errs := []error{}
 
 	userStrat, err := createUserStrategy(&psp.Spec.RunAsUser)
@@ -78,9 +78,9 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 	}
 
 	var unsafeSysctls []string
-	if ann, found := psp.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey]; found {
+	if ann, found := psp.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey]; found {
 		var err error
-		unsafeSysctls, err = extensions.SysctlsFromPodSecurityPolicyAnnotation(ann)
+		unsafeSysctls, err = policy.SysctlsFromPodSecurityPolicyAnnotation(ann)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -106,13 +106,13 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 }
 
 // createUserStrategy creates a new user strategy.
-func createUserStrategy(opts *extensions.RunAsUserStrategyOptions) (user.RunAsUserStrategy, error) {
+func createUserStrategy(opts *policy.RunAsUserStrategyOptions) (user.RunAsUserStrategy, error) {
 	switch opts.Rule {
-	case extensions.RunAsUserStrategyMustRunAs:
+	case policy.RunAsUserStrategyMustRunAs:
 		return user.NewMustRunAs(opts)
-	case extensions.RunAsUserStrategyMustRunAsNonRoot:
+	case policy.RunAsUserStrategyMustRunAsNonRoot:
 		return user.NewRunAsNonRoot(opts)
-	case extensions.RunAsUserStrategyRunAsAny:
+	case policy.RunAsUserStrategyRunAsAny:
 		return user.NewRunAsAny(opts)
 	default:
 		return nil, fmt.Errorf("Unrecognized RunAsUser strategy type %s", opts.Rule)
@@ -120,11 +120,11 @@ func createUserStrategy(opts *extensions.RunAsUserStrategyOptions) (user.RunAsUs
 }
 
 // createSELinuxStrategy creates a new selinux strategy.
-func createSELinuxStrategy(opts *extensions.SELinuxStrategyOptions) (selinux.SELinuxStrategy, error) {
+func createSELinuxStrategy(opts *policy.SELinuxStrategyOptions) (selinux.SELinuxStrategy, error) {
 	switch opts.Rule {
-	case extensions.SELinuxStrategyMustRunAs:
+	case policy.SELinuxStrategyMustRunAs:
 		return selinux.NewMustRunAs(opts)
-	case extensions.SELinuxStrategyRunAsAny:
+	case policy.SELinuxStrategyRunAsAny:
 		return selinux.NewRunAsAny(opts)
 	default:
 		return nil, fmt.Errorf("Unrecognized SELinuxContext strategy type %s", opts.Rule)
@@ -132,21 +132,21 @@ func createSELinuxStrategy(opts *extensions.SELinuxStrategyOptions) (selinux.SEL
 }
 
 // createAppArmorStrategy creates a new AppArmor strategy.
-func createAppArmorStrategy(psp *extensions.PodSecurityPolicy) (apparmor.Strategy, error) {
+func createAppArmorStrategy(psp *policy.PodSecurityPolicy) (apparmor.Strategy, error) {
 	return apparmor.NewStrategy(psp.Annotations), nil
 }
 
 // createSeccompStrategy creates a new seccomp strategy.
-func createSeccompStrategy(psp *extensions.PodSecurityPolicy) (seccomp.Strategy, error) {
+func createSeccompStrategy(psp *policy.PodSecurityPolicy) (seccomp.Strategy, error) {
 	return seccomp.NewStrategy(psp.Annotations), nil
 }
 
 // createFSGroupStrategy creates a new fsgroup strategy
-func createFSGroupStrategy(opts *extensions.FSGroupStrategyOptions) (group.GroupStrategy, error) {
+func createFSGroupStrategy(opts *policy.FSGroupStrategyOptions) (group.GroupStrategy, error) {
 	switch opts.Rule {
-	case extensions.FSGroupStrategyRunAsAny:
+	case policy.FSGroupStrategyRunAsAny:
 		return group.NewRunAsAny()
-	case extensions.FSGroupStrategyMustRunAs:
+	case policy.FSGroupStrategyMustRunAs:
 		return group.NewMustRunAs(opts.Ranges, fsGroupField)
 	default:
 		return nil, fmt.Errorf("Unrecognized FSGroup strategy type %s", opts.Rule)
@@ -154,11 +154,11 @@ func createFSGroupStrategy(opts *extensions.FSGroupStrategyOptions) (group.Group
 }
 
 // createSupplementalGroupStrategy creates a new supplemental group strategy
-func createSupplementalGroupStrategy(opts *extensions.SupplementalGroupsStrategyOptions) (group.GroupStrategy, error) {
+func createSupplementalGroupStrategy(opts *policy.SupplementalGroupsStrategyOptions) (group.GroupStrategy, error) {
 	switch opts.Rule {
-	case extensions.SupplementalGroupsStrategyRunAsAny:
+	case policy.SupplementalGroupsStrategyRunAsAny:
 		return group.NewRunAsAny()
-	case extensions.SupplementalGroupsStrategyMustRunAs:
+	case policy.SupplementalGroupsStrategyMustRunAs:
 		return group.NewMustRunAs(opts.Ranges, supplementalGroupsField)
 	default:
 		return nil, fmt.Errorf("Unrecognized SupplementalGroups strategy type %s", opts.Rule)

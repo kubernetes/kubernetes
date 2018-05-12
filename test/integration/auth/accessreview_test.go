@@ -31,7 +31,6 @@ import (
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -55,9 +54,8 @@ func alwaysAlice(req *http.Request) (user.Info, bool, error) {
 
 func TestSubjectAccessReview(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.GenericConfig.Authorizer = sarAuthorizer{}
-	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
@@ -147,11 +145,10 @@ func TestSubjectAccessReview(t *testing.T) {
 func TestSelfSubjectAccessReview(t *testing.T) {
 	username := "alice"
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authenticator = authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 		return &user.DefaultInfo{Name: username}, true, nil
 	})
-	masterConfig.GenericConfig.Authorizer = sarAuthorizer{}
-	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
@@ -229,9 +226,8 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 
 func TestLocalSubjectAccessReview(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.GenericConfig.Authorizer = sarAuthorizer{}
-	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 

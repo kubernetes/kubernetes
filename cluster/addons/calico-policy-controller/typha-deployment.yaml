@@ -16,13 +16,14 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
       hostNetwork: true
       serviceAccountName: calico
       containers:
-      - image: calico/typha:v0.5.1
+      - image: gcr.io/projectcalico-org/typha:v0.5.6
         name: calico-typha
         ports:
         - containerPort: 5473

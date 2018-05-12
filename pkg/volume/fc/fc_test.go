@@ -19,6 +19,7 @@ package fc
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -50,8 +51,23 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/fc" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
+	if plug.CanSupport(&volume.Spec{}) {
+		t.Errorf("Expected false")
+	}
 	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
 		t.Errorf("Expected false")
+	}
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{FC: &v1.FCVolumeSource{}}}}) {
+		t.Errorf("Expected true")
+	}
+	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{}}}) {
+		t.Errorf("Expected false")
+	}
+	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{}}}}) {
+		t.Errorf("Expected false")
+	}
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{FC: &v1.FCVolumeSource{}}}}}) {
+		t.Errorf("Expected true")
 	}
 }
 
@@ -165,13 +181,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
 	}
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
@@ -416,6 +425,9 @@ func Test_getWwnsLunWwidsError(t *testing.T) {
 }
 
 func Test_ConstructVolumeSpec(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skipf("Test_ConstructVolumeSpec is not supported on GOOS=%s", runtime.GOOS)
+	}
 	fm := &mount.FakeMounter{
 		MountPoints: []mount.MountPoint{
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1"},
@@ -429,7 +441,10 @@ func Test_ConstructVolumeSpec(t *testing.T) {
 		"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod2",
 	}
 	for _, path := range mountPaths {
-		refs, _ := mount.GetMountRefs(fm, path)
+		refs, err := mount.GetMountRefs(fm, path)
+		if err != nil {
+			t.Errorf("couldn't get mountrefs. err: %v", err)
+		}
 		var globalPDPath string
 		for _, ref := range refs {
 			if strings.Contains(ref, "kubernetes.io/fc") {

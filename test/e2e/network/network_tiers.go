@@ -26,9 +26,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -39,14 +39,12 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface
-	var internalClientset internalclientset.Interface
 	serviceLBNames := []string{}
 
 	BeforeEach(func() {
 		// This test suite requires the GCE environment.
 		framework.SkipUnlessProviderIs("gce")
 		cs = f.ClientSet
-		internalClientset = f.InternalClientset
 	})
 
 	AfterEach(func() {
@@ -55,7 +53,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Zone)
+			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -75,12 +73,12 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		By("creating a Service of type LoadBalancer using the standard network tier")
 		svc := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-			setNetworkTier(svc, gcecloud.NetworkTierAnnotationStandard)
+			setNetworkTier(svc, string(gcecloud.NetworkTierAnnotationStandard))
 		})
 		// Verify that service has been updated properly.
 		svcTier, err := gcecloud.GetServiceNetworkTier(svc)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(svcTier).To(Equal(gcecloud.NetworkTierStandard))
+		Expect(svcTier).To(Equal(cloud.NetworkTierStandard))
 		// Record the LB name for test cleanup.
 		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
 
@@ -95,7 +93,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		// Verify that service has been updated properly.
 		svcTier, err = gcecloud.GetServiceNetworkTier(svc)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(svcTier).To(Equal(gcecloud.NetworkTierDefault))
+		Expect(svcTier).To(Equal(cloud.NetworkTierDefault))
 
 		// Wait until the ingress IP changes. Each tier has its own pool of
 		// IPs, so changing tiers implies changing IPs.
@@ -104,12 +102,14 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		// Test 3: create a standard-tierd LB with a user-requested IP.
 		By("reserving a static IP for the load balancer")
 		requestedAddrName := fmt.Sprintf("e2e-ext-lb-net-tier-%s", framework.RunId)
-		requestedIP, err := reserveAlphaRegionalAddress(requestedAddrName, gcecloud.NetworkTierStandard)
+		gceCloud, err := framework.GetGCECloud()
+		Expect(err).NotTo(HaveOccurred())
+		requestedIP, err := reserveAlphaRegionalAddress(gceCloud, requestedAddrName, cloud.NetworkTierStandard)
 		Expect(err).NotTo(HaveOccurred(), "failed to reserve a STANDARD tiered address")
 		defer func() {
 			if requestedAddrName != "" {
 				// Release GCE static address - this is not kube-managed and will not be automatically released.
-				if err := framework.DeleteGCEStaticIP(requestedAddrName); err != nil {
+				if err := gceCloud.DeleteRegionAddress(requestedAddrName, gceCloud.Region()); err != nil {
 					framework.Logf("failed to release static IP address %q: %v", requestedAddrName, err)
 				}
 			}
@@ -120,13 +120,13 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		By("updating the Service to use the standard tier with a requested IP")
 		svc = jig.UpdateServiceOrFail(ns, svc.Name, func(svc *v1.Service) {
 			svc.Spec.LoadBalancerIP = requestedIP
-			setNetworkTier(svc, gcecloud.NetworkTierAnnotationStandard)
+			setNetworkTier(svc, string(gcecloud.NetworkTierAnnotationStandard))
 		})
 		// Verify that service has been updated properly.
 		Expect(svc.Spec.LoadBalancerIP).To(Equal(requestedIP))
 		svcTier, err = gcecloud.GetServiceNetworkTier(svc)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(svcTier).To(Equal(gcecloud.NetworkTierStandard))
+		Expect(svcTier).To(Equal(cloud.NetworkTierStandard))
 
 		// Wait until the ingress IP changes and verifies the LB.
 		ingressIP = waitAndVerifyLBWithTier(jig, ns, svcName, ingressIP, createTimeout, lagTimeout)
@@ -169,7 +169,7 @@ func waitAndVerifyLBWithTier(jig *framework.ServiceTestJig, ns, svcName, existin
 	return ingressIP
 }
 
-func getLBNetworkTierByIP(ip string) (gcecloud.NetworkTier, error) {
+func getLBNetworkTierByIP(ip string) (cloud.NetworkTier, error) {
 	var rule *computealpha.ForwardingRule
 	// Retry a few times to tolerate flakes.
 	err := wait.PollImmediate(5*time.Second, 15*time.Second, func() (bool, error) {
@@ -183,7 +183,7 @@ func getLBNetworkTierByIP(ip string) (gcecloud.NetworkTier, error) {
 	if err != nil {
 		return "", err
 	}
-	return gcecloud.NetworkTierGCEValueToType(rule.NetworkTier), nil
+	return cloud.NetworkTierGCEValueToType(rule.NetworkTier), nil
 }
 
 func getGCEForwardingRuleByIP(ip string) (*computealpha.ForwardingRule, error) {
@@ -195,7 +195,7 @@ func getGCEForwardingRuleByIP(ip string) (*computealpha.ForwardingRule, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, rule := range ruleList.Items {
+	for _, rule := range ruleList {
 		if rule.IPAddress == ip {
 			return rule, nil
 		}
@@ -221,8 +221,7 @@ func clearNetworkTier(svc *v1.Service) {
 
 // TODO: add retries if this turns out to be flaky.
 // TODO(#51665): remove this helper function once Network Tiers becomes beta.
-func reserveAlphaRegionalAddress(name string, netTier gcecloud.NetworkTier) (string, error) {
-	cloud, err := framework.GetGCECloud()
+func reserveAlphaRegionalAddress(cloud *gcecloud.GCECloud, name string, netTier cloud.NetworkTier) (string, error) {
 	alphaAddr := &computealpha.Address{
 		Name:        name,
 		NetworkTier: netTier.ToGCEValue(),

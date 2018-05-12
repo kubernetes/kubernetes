@@ -17,13 +17,13 @@ limitations under the License.
 package apiservice
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -45,7 +45,7 @@ func (apiServerStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (apiServerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (apiServerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	apiservice := obj.(*apiregistration.APIService)
 	apiservice.Status = apiregistration.APIServiceStatus{}
 
@@ -55,13 +55,13 @@ func (apiServerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj run
 	}
 }
 
-func (apiServerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (apiServerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newAPIService := obj.(*apiregistration.APIService)
 	oldAPIService := old.(*apiregistration.APIService)
 	newAPIService.Status = oldAPIService.Status
 }
 
-func (apiServerStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (apiServerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return validation.ValidateAPIService(obj.(*apiregistration.APIService))
 }
 
@@ -76,7 +76,7 @@ func (apiServerStrategy) AllowUnconditionalUpdate() bool {
 func (apiServerStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (apiServerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (apiServerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateAPIServiceUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 
@@ -93,7 +93,7 @@ func (apiServerStatusStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (apiServerStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (apiServerStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newAPIService := obj.(*apiregistration.APIService)
 	oldAPIService := old.(*apiregistration.APIService)
 	newAPIService.Spec = oldAPIService.Spec
@@ -114,7 +114,7 @@ func (apiServerStatusStrategy) AllowUnconditionalUpdate() bool {
 func (apiServerStatusStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (apiServerStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (apiServerStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateAPIServiceStatusUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 

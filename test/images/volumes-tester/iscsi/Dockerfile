@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM fedora
-RUN yum install -y iscsi-initiator-utils targetcli net-tools strace && yum clean all
+FROM fedora:26
+
+RUN yum install -y iscsi-initiator-utils targetcli net-tools strace procps-ng psmisc && yum clean all
 ADD run_iscsid.sh /usr/local/bin/
 ADD initiatorname.iscsi /etc/iscsi/
 ADD block.tar.gz /

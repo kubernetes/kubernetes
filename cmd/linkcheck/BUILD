@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "linkcheck",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/linkcheck",
 )
 
 go_library(

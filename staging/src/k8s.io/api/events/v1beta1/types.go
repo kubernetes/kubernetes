@@ -89,7 +89,7 @@ type Event struct {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 type EventSeries struct {
 	// Number of occurrences in this series up to the last heartbeat time
 	Count int32 `json:"count" protobuf:"varint,1,opt,name=count"`

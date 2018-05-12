@@ -12,8 +12,6 @@ go_library(
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
     ],
 )
 

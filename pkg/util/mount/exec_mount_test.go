@@ -19,7 +19,9 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -65,7 +67,7 @@ func TestBindMount(t *testing.T) {
 			expectedArgs = []string{"-t", fsType, "-o", "bind", sourcePath, destinationPath}
 		case 2:
 			// mount -t fstype -o "remount,opts" source target
-			expectedArgs = []string{"-t", fsType, "-o", "remount," + strings.Join(mountOptions, ","), sourcePath, destinationPath}
+			expectedArgs = []string{"-t", fsType, "-o", "bind,remount," + strings.Join(mountOptions, ","), sourcePath, destinationPath}
 		}
 		if !reflect.DeepEqual(expectedArgs, args) {
 			t.Errorf("expected arguments %q, got %q", strings.Join(expectedArgs, " "), strings.Join(args, " "))
@@ -150,4 +152,23 @@ func (fm *fakeMounter) ExistsPath(pathname string) bool {
 }
 func (fm *fakeMounter) GetFileType(pathname string) (FileType, error) {
 	return FileTypeFile, nil
+}
+func (fm *fakeMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return subPath.Path, nil, nil
+}
+
+func (fm *fakeMounter) CleanSubPaths(podDir string, volumeName string) error {
+	return nil
+}
+
+func (fm *fakeMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return nil
+}
+
+func (fm *fakeMounter) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (fm *fakeMounter) GetFSGroup(pathname string) (int64, error) {
+	return -1, errors.New("not implemented")
 }

@@ -33,6 +33,5 @@ go_test(
     name = "go_default_test",
     srcs = ["features_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/features",
     deps = ["//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library"],
 )

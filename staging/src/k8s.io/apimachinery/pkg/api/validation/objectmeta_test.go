@@ -219,21 +219,21 @@ func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 		&metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
 		&metav1.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: metav1.NewTime(time.Unix(10, 0))},
 		field.NewPath("field"),
-	); len(errs) != 0 {
+	); len(errs) != 1 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
 	if errs := ValidateObjectMetaUpdate(
 		&metav1.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: metav1.NewTime(time.Unix(10, 0))},
 		&metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
 		field.NewPath("field"),
-	); len(errs) != 0 {
+	); len(errs) != 1 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
 	if errs := ValidateObjectMetaUpdate(
 		&metav1.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: metav1.NewTime(time.Unix(10, 0))},
 		&metav1.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: metav1.NewTime(time.Unix(11, 0))},
 		field.NewPath("field"),
-	); len(errs) != 0 {
+	); len(errs) != 1 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
 }
@@ -328,38 +328,38 @@ func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
 			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
-			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: 1970-01-01 00:16:40 +0000 UTC: field is immutable; may only be changed via deletion"},
+			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: 1970-01-01 00:16:40 +0000 UTC: field is immutable"},
 		},
 		"invalid clear deletionTimestamp": {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
-			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
-			ExpectedErrs: []string{}, // no errors, validation copies the old value
+			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: \"null\": field is immutable"},
 		},
 		"invalid change deletionTimestamp": {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &later},
-			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
-			ExpectedErrs: []string{}, // no errors, validation copies the old value
+			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &later},
+			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: 1970-01-01 00:33:20 +0000 UTC: field is immutable"},
 		},
 
 		"invalid set deletionGracePeriodSeconds": {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
 			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
-			ExpectedErrs: []string{"field.deletionGracePeriodSeconds: Invalid value: 30: field is immutable; may only be changed via deletion"},
+			ExpectedErrs: []string{"field.deletionGracePeriodSeconds: Invalid value: 30: field is immutable"},
 		},
 		"invalid clear deletionGracePeriodSeconds": {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
-			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
-			ExpectedErrs: []string{}, // no errors, validation copies the old value
+			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
+			ExpectedErrs: []string{"field.deletionGracePeriodSeconds: Invalid value: \"null\": field is immutable"},
 		},
 		"invalid change deletionGracePeriodSeconds": {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodLong},
 			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodLong},
-			ExpectedErrs: []string{"field.deletionGracePeriodSeconds: Invalid value: 40: field is immutable; may only be changed via deletion"},
+			ExpectedErrs: []string{"field.deletionGracePeriodSeconds: Invalid value: 40: field is immutable"},
 		},
 	}
 

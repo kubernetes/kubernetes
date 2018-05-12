@@ -14,7 +14,6 @@ go_library(
         "generated.pb.go",
         "register.go",
         "types.go",
-        "types_swagger_doc_generated.go",
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",

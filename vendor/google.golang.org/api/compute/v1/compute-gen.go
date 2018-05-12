@@ -695,7 +695,8 @@ type AcceleratorConfig struct {
 	AcceleratorCount int64 `json:"acceleratorCount,omitempty"`
 
 	// AcceleratorType: Full or partial URL of the accelerator type resource
-	// to expose to this instance.
+	// to attach to this instance. If you are creating an instance template,
+	// specify only the accelerator name.
 	AcceleratorType string `json:"acceleratorType,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "AcceleratorCount") to
@@ -757,7 +758,9 @@ type AcceleratorType struct {
 	SelfLink string `json:"selfLink,omitempty"`
 
 	// Zone: [Output Only] The name of the zone where the accelerator type
-	// resides, such as us-central1-a.
+	// resides, such as us-central1-a. You must specify this field as part
+	// of the HTTP request URL. It is not settable as a field in the request
+	// body.
 	Zone string `json:"zone,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -1254,6 +1257,15 @@ type AccessConfig struct {
 	// live in the same region as the zone of the instance.
 	NatIP string `json:"natIP,omitempty"`
 
+	// PublicPtrDomainName: The DNS domain name for the public PTR record.
+	// This field can only be set when the set_public_ptr field is enabled.
+	PublicPtrDomainName string `json:"publicPtrDomainName,omitempty"`
+
+	// SetPublicPtr: Specifies whether a public DNS ?PTR? record should be
+	// created to map the external IP address of the instance to a DNS
+	// domain name.
+	SetPublicPtr bool `json:"setPublicPtr,omitempty"`
+
 	// Type: The type of configuration. The default and only option is
 	// ONE_TO_ONE_NAT.
 	//
@@ -1329,14 +1341,16 @@ type Address struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
 	Name string `json:"name,omitempty"`
 
 	// Region: [Output Only] URL of the region where the regional address
-	// resides. This field is not applicable to global addresses.
+	// resides. This field is not applicable to global addresses. You must
+	// specify this field as part of the HTTP request URL. You cannot set
+	// this field in the request body.
 	Region string `json:"region,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
@@ -1918,6 +1932,11 @@ type AttachedDisk struct {
 	// group.
 	DiskEncryptionKey *CustomerEncryptionKey `json:"diskEncryptionKey,omitempty"`
 
+	// GuestOsFeatures: A list of features to enable on the guest operating
+	// system. Applicable only for bootable images. Read  Enabling guest
+	// operating system features to see a list of available options.
+	GuestOsFeatures []*GuestOsFeature `json:"guestOsFeatures,omitempty"`
+
 	// Index: [Output Only] A zero-based index to this disk, where 0 is
 	// reserved for the boot disk. If you have many disks attached to an
 	// instance, each disk would have a unique index number.
@@ -2023,9 +2042,9 @@ type AttachedDiskInitializeParams struct {
 	// not specified, the default is pd-standard, specified using the full
 	// URL. For
 	// example:
+	// https://www.googleapis.com/compute/v1/projects/project/zones/
+	// zone/diskTypes/pd-standard
 	//
-	// https://www.googleapis.com/compute/v1/projects/project/zones
-	// /zone/diskTypes/pd-standard
 	//
 	// Other values include pd-ssd and local-ssd. If you define this field,
 	// you can provide either the full or partial URL. For example, the
@@ -2037,6 +2056,11 @@ type AttachedDiskInitializeParams struct {
 	// is the name of the disk type, not URL.
 	DiskType string `json:"diskType,omitempty"`
 
+	// Labels: Labels to apply to this disk. These can be later modified by
+	// the disks.setLabels method. This field is only applicable for
+	// persistent disks.
+	Labels map[string]string `json:"labels,omitempty"`
+
 	// SourceImage: The source image to create this disk. When creating a
 	// new instance, one of initializeParams.sourceImage or disks.source is
 	// required except for local SSD.
@@ -2045,25 +2069,28 @@ type AttachedDiskInitializeParams struct {
 	// specify the image by its family name. For example, specify
 	// family/debian-8 to use the latest Debian 8
 	// image:
-	//
 	// projects/debian-cloud/global/images/family/debian-8
 	//
-	// Alternatively, use a specific version of a public operating system
-	// image:
 	//
+	// Alternati
+	// vely, use a specific version of a public operating system
+	// image:
 	// projects/debian-cloud/global/images/debian-8-jessie-vYYYYMMDD
 	//
-	// To create a disk with a custom image that you created, specify the
-	// image name in the following format:
 	//
+	//
+	// To create a disk with a custom image that you created, specify the
+	// image name in the following
+	// format:
 	// global/images/my-custom-image
+	//
 	//
 	// You can also specify a custom image by its image family, which
 	// returns the latest version of the image in that family. Replace the
 	// image name with
 	// family/family-name:
-	//
 	// global/images/family/my-image-family
+	//
 	//
 	// If the source image is deleted later, this field will not be set.
 	SourceImage string `json:"sourceImage,omitempty"`
@@ -2136,7 +2163,7 @@ type Autoscaler struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -3076,7 +3103,7 @@ type BackendBucket struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -3342,7 +3369,7 @@ type BackendService struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -3380,7 +3407,8 @@ type BackendService struct {
 
 	// Region: [Output Only] URL of the region where the regional backend
 	// service resides. This field is not applicable to global backend
-	// services.
+	// services. You must specify this field as part of the HTTP request
+	// URL. It is not settable as a field in the request body.
 	Region string `json:"region,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
@@ -4101,7 +4129,7 @@ type Commitment struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -4805,6 +4833,11 @@ type Disk struct {
 	// you do not need to provide a key to use the disk later.
 	DiskEncryptionKey *CustomerEncryptionKey `json:"diskEncryptionKey,omitempty"`
 
+	// GuestOsFeatures: A list of features to enable on the guest operating
+	// system. Applicable only for bootable images. Read  Enabling guest
+	// operating system features to see a list of available options.
+	GuestOsFeatures []*GuestOsFeature `json:"guestOsFeatures,omitempty"`
+
 	// Id: [Output Only] The unique identifier for the resource. This
 	// identifier is defined by the server.
 	Id uint64 `json:"id,omitempty,string"`
@@ -4842,7 +4875,7 @@ type Disk struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -4873,24 +4906,26 @@ type Disk struct {
 	// specify the image by its family name. For example, specify
 	// family/debian-8 to use the latest Debian 8
 	// image:
-	//
 	// projects/debian-cloud/global/images/family/debian-8
 	//
-	// Alternatively, use a specific version of a public operating system
-	// image:
 	//
+	// Alternati
+	// vely, use a specific version of a public operating system
+	// image:
 	// projects/debian-cloud/global/images/debian-8-jessie-vYYYYMMDD
 	//
-	// To create a disk with a custom image that you created, specify the
-	// image name in the following format:
 	//
+	//
+	// To create a disk with a custom image that you created, specify the
+	// image name in the following
+	// format:
 	// global/images/my-custom-image
+	//
 	//
 	// You can also specify a custom image by its image family, which
 	// returns the latest version of the image in that family. Replace the
 	// image name with
 	// family/family-name:
-	//
 	// global/images/family/my-image-family
 	SourceImage string `json:"sourceImage,omitempty"`
 
@@ -4939,14 +4974,17 @@ type Disk struct {
 	Status string `json:"status,omitempty"`
 
 	// Type: URL of the disk type resource describing which disk type to use
-	// to create the disk. Provide this when creating the disk.
+	// to create the disk. Provide this when creating the disk. For example:
+	// project/zones/zone/diskTypes/pd-standard or pd-ssd
 	Type string `json:"type,omitempty"`
 
 	// Users: [Output Only] Links to the users of the disk (attached
 	// instances) in form: project/zones/zone/instances/instance
 	Users []string `json:"users,omitempty"`
 
-	// Zone: [Output Only] URL of the zone where the disk resides.
+	// Zone: [Output Only] URL of the zone where the disk resides. You must
+	// specify this field as part of the HTTP request URL. It is not
+	// settable as a field in the request body.
 	Zone string `json:"zone,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -5366,7 +5404,9 @@ type DiskType struct {
 	// valid disk size, such as "10GB-10TB".
 	ValidDiskSize string `json:"validDiskSize,omitempty"`
 
-	// Zone: [Output Only] URL of the zone where the disk type resides.
+	// Zone: [Output Only] URL of the zone where the disk type resides. You
+	// must specify this field as part of the HTTP request URL. It is not
+	// settable as a field in the request body.
 	Zone string `json:"zone,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -6013,7 +6053,7 @@ type Firewall struct {
 	CreationTimestamp string `json:"creationTimestamp,omitempty"`
 
 	// Denied: The list of DENY rules specified by this firewall. Each rule
-	// specifies a protocol and port-range tuple that describes a permitted
+	// specifies a protocol and port-range tuple that describes a denied
 	// connection.
 	Denied []*FirewallDenied `json:"denied,omitempty"`
 
@@ -6048,7 +6088,7 @@ type Firewall struct {
 	// Name: Name of the resource; provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -6495,7 +6535,7 @@ type ForwardingRule struct {
 	// Name: Name of the resource; provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -6522,11 +6562,10 @@ type ForwardingRule struct {
 	// - TargetHttpProxy: 80, 8080
 	// - TargetHttpsProxy: 443
 	// - TargetTcpProxy: 25, 43, 110, 143, 195, 443, 465, 587, 700, 993,
-	// 995, 1883, 5222
+	// 995, 1688, 1883, 5222
 	// - TargetSslProxy: 25, 43, 110, 143, 195, 443, 465, 587, 700, 993,
-	// 995, 1883, 5222
+	// 995, 1688, 1883, 5222
 	// - TargetVpnGateway: 500, 4500
-	// -
 	PortRange string `json:"portRange,omitempty"`
 
 	// Ports: This field is used along with the backend_service field for
@@ -6542,7 +6581,8 @@ type ForwardingRule struct {
 
 	// Region: [Output Only] URL of the region where the regional forwarding
 	// rule resides. This field is not applicable to global forwarding
-	// rules.
+	// rules. You must specify this field as part of the HTTP request URL.
+	// It is not settable as a field in the request body.
 	Region string `json:"region,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
@@ -6564,8 +6604,6 @@ type ForwardingRule struct {
 	// same region as the forwarding rule. For global forwarding rules, this
 	// target must be a global load balancing resource. The forwarded
 	// traffic must be of a type appropriate to the target object.
-	//
-	// This field is not used for internal load balancing.
 	Target string `json:"target,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -7051,8 +7089,8 @@ type GlobalSetLabelsRequest struct {
 	// Labels: A list of labels to apply for this resource. Each label key &
 	// value must comply with RFC1035. Specifically, the name must be 1-63
 	// characters long and match the regular expression
-	// [a-z]([-a-z0-9]*[a-z0-9])? which means the first character must be a
-	// lowercase letter, and all following characters must be a dash,
+	// `[a-z]([-a-z0-9]*[a-z0-9])?` which means the first character must be
+	// a lowercase letter, and all following characters must be a dash,
 	// lowercase letter, or digit, except the last character, which cannot
 	// be a dash. For example, "webserver-frontend": "images". A label value
 	// can also be empty (e.g. "my-label": "").
@@ -7089,6 +7127,9 @@ type GuestOsFeature struct {
 	//
 	// Possible values:
 	//   "FEATURE_TYPE_UNSPECIFIED"
+	//   "MULTI_IP_SUBNET"
+	//   "SECURE_BOOT"
+	//   "UEFI_COMPATIBLE"
 	//   "VIRTIO_SCSI_MULTIQUEUE"
 	//   "WINDOWS"
 	Type string `json:"type,omitempty"`
@@ -7250,7 +7291,7 @@ type HealthCheck struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -7616,7 +7657,7 @@ type HttpHealthCheck struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -7861,7 +7902,7 @@ type HttpsHealthCheck struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -8149,7 +8190,7 @@ type Image struct {
 	// Name: Name of the resource; provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -8198,6 +8239,26 @@ type Image struct {
 	// this image. This value may be used to determine whether the image was
 	// taken from the current or a previous instance of a given image name.
 	SourceImageId string `json:"sourceImageId,omitempty"`
+
+	// SourceSnapshot: URL of the source snapshot used to create this image.
+	// This can be a full or valid partial URL. You must provide exactly one
+	// of:
+	// - this property, or
+	// - the sourceImage property, or
+	// - the rawDisk.source property, or
+	// - the sourceDisk property   in order to create an image.
+	SourceSnapshot string `json:"sourceSnapshot,omitempty"`
+
+	// SourceSnapshotEncryptionKey: The customer-supplied encryption key of
+	// the source snapshot. Required if the source snapshot is protected by
+	// a customer-supplied encryption key.
+	SourceSnapshotEncryptionKey *CustomerEncryptionKey `json:"sourceSnapshotEncryptionKey,omitempty"`
+
+	// SourceSnapshotId: [Output Only] The ID value of the snapshot used to
+	// create this image. This value may be used to determine whether the
+	// snapshot was taken from the current or a previous instance of a given
+	// snapshot name.
+	SourceSnapshotId string `json:"sourceSnapshotId,omitempty"`
 
 	// SourceType: The type of the image used to create this disk. The
 	// default and only value is RAW
@@ -8502,8 +8563,8 @@ type Instance struct {
 	// when the instance is created. For example, the following is a valid
 	// partial url to a predefined machine
 	// type:
-	//
 	// zones/us-central1-f/machineTypes/n1-standard-1
+	//
 	//
 	// To create a custom machine type, provide a URL to a machine type in
 	// the following format, where CPUS is 1 or an even number up to 32 (2,
@@ -8511,8 +8572,8 @@ type Instance struct {
 	// Memory must be a multiple of 256 MB and must be supplied in MB (e.g.
 	// 5 GB of memory is 5120
 	// MB):
-	//
 	// zones/zone/machineTypes/custom-CPUS-MEMORY
+	//
 	//
 	// For example: zones/us-central1-f/machineTypes/custom-4-5120
 	//
@@ -8534,8 +8595,8 @@ type Instance struct {
 	// creating the resource. The resource name must be 1-63 characters
 	// long, and comply with RFC1035. Specifically, the name must be 1-63
 	// characters long and match the regular expression
-	// [a-z]([-a-z0-9]*[a-z0-9])? which means the first character must be a
-	// lowercase letter, and all following characters must be a dash,
+	// `[a-z]([-a-z0-9]*[a-z0-9])?` which means the first character must be
+	// a lowercase letter, and all following characters must be a dash,
 	// lowercase letter, or digit, except the last character, which cannot
 	// be a dash.
 	Name string `json:"name,omitempty"`
@@ -8591,7 +8652,9 @@ type Instance struct {
 	// comply with RFC1035.
 	Tags *Tags `json:"tags,omitempty"`
 
-	// Zone: [Output Only] URL of the zone where the instance resides.
+	// Zone: [Output Only] URL of the zone where the instance resides. You
+	// must specify this field as part of the HTTP request URL. It is not
+	// settable as a field in the request body.
 	Zone string `json:"zone,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -10570,6 +10633,162 @@ func (s *InstanceListWarningData) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// InstanceListReferrers: Contains a list of instance referrers.
+type InstanceListReferrers struct {
+	// Id: [Output Only] Unique identifier for the resource; defined by the
+	// server.
+	Id string `json:"id,omitempty"`
+
+	// Items: A list of Reference resources.
+	Items []*Reference `json:"items,omitempty"`
+
+	// Kind: [Output Only] Type of resource. Always
+	// compute#instanceListReferrers for lists of Instance referrers.
+	Kind string `json:"kind,omitempty"`
+
+	// NextPageToken: [Output Only] This token allows you to get the next
+	// page of results for list requests. If the number of results is larger
+	// than maxResults, use the nextPageToken as a value for the query
+	// parameter pageToken in the next list request. Subsequent list
+	// requests will have their own nextPageToken to continue paging through
+	// the results.
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// SelfLink: [Output Only] Server-defined URL for this resource.
+	SelfLink string `json:"selfLink,omitempty"`
+
+	// Warning: [Output Only] Informational warning message.
+	Warning *InstanceListReferrersWarning `json:"warning,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Id") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Id") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *InstanceListReferrers) MarshalJSON() ([]byte, error) {
+	type NoMethod InstanceListReferrers
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// InstanceListReferrersWarning: [Output Only] Informational warning
+// message.
+type InstanceListReferrersWarning struct {
+	// Code: [Output Only] A warning code, if applicable. For example,
+	// Compute Engine returns NO_RESULTS_ON_PAGE if there are no results in
+	// the response.
+	//
+	// Possible values:
+	//   "CLEANUP_FAILED"
+	//   "DEPRECATED_RESOURCE_USED"
+	//   "DEPRECATED_TYPE_USED"
+	//   "DISK_SIZE_LARGER_THAN_IMAGE_SIZE"
+	//   "EXPERIMENTAL_TYPE_USED"
+	//   "EXTERNAL_API_WARNING"
+	//   "FIELD_VALUE_OVERRIDEN"
+	//   "INJECTED_KERNELS_DEPRECATED"
+	//   "MISSING_TYPE_DEPENDENCY"
+	//   "NEXT_HOP_ADDRESS_NOT_ASSIGNED"
+	//   "NEXT_HOP_CANNOT_IP_FORWARD"
+	//   "NEXT_HOP_INSTANCE_NOT_FOUND"
+	//   "NEXT_HOP_INSTANCE_NOT_ON_NETWORK"
+	//   "NEXT_HOP_NOT_RUNNING"
+	//   "NOT_CRITICAL_ERROR"
+	//   "NO_RESULTS_ON_PAGE"
+	//   "REQUIRED_TOS_AGREEMENT"
+	//   "RESOURCE_IN_USE_BY_OTHER_RESOURCE_WARNING"
+	//   "RESOURCE_NOT_DELETED"
+	//   "SCHEMA_VALIDATION_IGNORED"
+	//   "SINGLE_INSTANCE_PROPERTY_TEMPLATE"
+	//   "UNDECLARED_PROPERTIES"
+	//   "UNREACHABLE"
+	Code string `json:"code,omitempty"`
+
+	// Data: [Output Only] Metadata about this warning in key: value format.
+	// For example:
+	// "data": [ { "key": "scope", "value": "zones/us-east1-d" }
+	Data []*InstanceListReferrersWarningData `json:"data,omitempty"`
+
+	// Message: [Output Only] A human-readable description of the warning
+	// code.
+	Message string `json:"message,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Code") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Code") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *InstanceListReferrersWarning) MarshalJSON() ([]byte, error) {
+	type NoMethod InstanceListReferrersWarning
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+type InstanceListReferrersWarningData struct {
+	// Key: [Output Only] A key that provides more detail on the warning
+	// being returned. For example, for warnings where there are no results
+	// in a list request for a particular zone, this key might be scope and
+	// the key value might be the zone name. Other examples might be a key
+	// indicating a deprecated resource and a suggested replacement, or a
+	// warning about invalid network settings (for example, if an instance
+	// attempts to perform IP forwarding but is not enabled for IP
+	// forwarding).
+	Key string `json:"key,omitempty"`
+
+	// Value: [Output Only] A warning data value corresponding to the key.
+	Value string `json:"value,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Key") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Key") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *InstanceListReferrersWarningData) MarshalJSON() ([]byte, error) {
+	type NoMethod InstanceListReferrersWarningData
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 type InstanceMoveRequest struct {
 	// DestinationZone: The URL of the destination zone to move the
 	// instance. This can be a full or partial URL. For example, the
@@ -10749,7 +10968,7 @@ type InstanceTemplate struct {
 	// Name: Name of the resource; provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -11384,7 +11603,7 @@ type Interconnect struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -11491,7 +11710,7 @@ type InterconnectAttachment struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -11511,7 +11730,9 @@ type InterconnectAttachment struct {
 	PrivateInterconnectInfo *InterconnectAttachmentPrivateInfo `json:"privateInterconnectInfo,omitempty"`
 
 	// Region: [Output Only] URL of the region where the regional
-	// interconnect attachment resides.
+	// interconnect attachment resides. You must specify this field as part
+	// of the HTTP request URL. It is not settable as a field in the request
+	// body.
 	Region string `json:"region,omitempty"`
 
 	// Router: URL of the cloud router to be used for dynamic routing. This
@@ -13207,6 +13428,7 @@ func (s *MachineTypesScopedListWarningData) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// ManagedInstance: Next available tag: 12
 type ManagedInstance struct {
 	// CurrentAction: [Output Only] The current action that the managed
 	// instance group has scheduled for the instance. Possible values:
@@ -13232,6 +13454,8 @@ type ManagedInstance struct {
 	// changes to the instance without stopping it. For example, the group
 	// can update the target pool list for an instance without stopping that
 	// instance.
+	// - VERIFYING The managed instance group has created the instance and
+	// it is in the process of being verified.
 	//
 	// Possible values:
 	//   "ABANDONING"
@@ -13537,7 +13761,7 @@ type Network struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -13598,6 +13822,12 @@ type NetworkInterface struct {
 	// interface. Can only be specified for network interfaces on
 	// subnet-mode networks.
 	AliasIpRanges []*AliasIpRange `json:"aliasIpRanges,omitempty"`
+
+	// Fingerprint: Fingerprint hash of contents stored in this network
+	// interface. This field will be ignored when inserting an Instance or
+	// adding a NetworkInterface. An up-to-date fingerprint must be provided
+	// in order to update the NetworkInterface.
+	Fingerprint string `json:"fingerprint,omitempty"`
 
 	// Kind: [Output Only] Type of the resource. Always
 	// compute#networkInterface for network interfaces.
@@ -13835,8 +14065,8 @@ type NetworkPeering struct {
 	// Name: Name of this peering. Provided by the client when the peering
 	// is created. The name must comply with RFC1035. Specifically, the name
 	// must be 1-63 characters long and match regular expression
-	// [a-z]([-a-z0-9]*[a-z0-9])? which means the first character must be a
-	// lowercase letter, and all the following characters must be a dash,
+	// `[a-z]([-a-z0-9]*[a-z0-9])?` which means the first character must be
+	// a lowercase letter, and all the following characters must be a dash,
 	// lowercase letter, or digit, except the last character, which cannot
 	// be a dash.
 	Name string `json:"name,omitempty"`
@@ -14046,7 +14276,9 @@ type Operation struct {
 	Progress int64 `json:"progress,omitempty"`
 
 	// Region: [Output Only] The URL of the region where the operation
-	// resides. Only available when performing regional operations.
+	// resides. Only available when performing regional operations. You must
+	// specify this field as part of the HTTP request URL. It is not
+	// settable as a field in the request body.
 	Region string `json:"region,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
@@ -14087,7 +14319,9 @@ type Operation struct {
 	Warnings []*OperationWarnings `json:"warnings,omitempty"`
 
 	// Zone: [Output Only] The URL of the zone where the operation resides.
-	// Only available when performing per-zone operations.
+	// Only available when performing per-zone operations. You must specify
+	// this field as part of the HTTP request URL. It is not settable as a
+	// field in the request body.
 	Zone string `json:"zone,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -14810,9 +15044,8 @@ func (s *PathRule) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// Project: A Project resource. Projects can only be created in the
-// Google Cloud Platform Console. Unless marked otherwise, values can
-// only be modified in the console. (== resource_for v1.projects ==) (==
+// Project: A Project resource. For an overview of projects, see  Cloud
+// Platform Resource Hierarchy. (== resource_for v1.projects ==) (==
 // resource_for beta.projects ==)
 type Project struct {
 	// CommonInstanceMetadata: Metadata key/value pairs available to all
@@ -15118,6 +15351,46 @@ func (s *Quota) UnmarshalJSON(data []byte) error {
 	s.Limit = float64(s1.Limit)
 	s.Usage = float64(s1.Usage)
 	return nil
+}
+
+// Reference: Represents a reference to a resource.
+type Reference struct {
+	// Kind: [Output Only] Type of the resource. Always compute#reference
+	// for references.
+	Kind string `json:"kind,omitempty"`
+
+	// ReferenceType: A description of the reference type with no implied
+	// semantics. Possible values include:
+	// - MEMBER_OF
+	ReferenceType string `json:"referenceType,omitempty"`
+
+	// Referrer: URL of the resource which refers to the target.
+	Referrer string `json:"referrer,omitempty"`
+
+	// Target: URL of the resource to which this reference points.
+	Target string `json:"target,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Kind") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Kind") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Reference) MarshalJSON() ([]byte, error) {
+	type NoMethod Reference
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // Region: Region resource. (== resource_for beta.regions ==) (==
@@ -16334,7 +16607,7 @@ type Route struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -16707,7 +16980,7 @@ type Router struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -16716,7 +16989,9 @@ type Router struct {
 	// Network: URI of the network to which this router belongs.
 	Network string `json:"network,omitempty"`
 
-	// Region: [Output Only] URI of the region where the router resides.
+	// Region: [Output Only] URI of the region where the router resides. You
+	// must specify this field as part of the HTTP request URL. It is not
+	// settable as a field in the request body.
 	Region string `json:"region,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
@@ -16745,6 +17020,39 @@ type Router struct {
 
 func (s *Router) MarshalJSON() ([]byte, error) {
 	type NoMethod Router
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// RouterAdvertisedIpRange: Description-tagged IP ranges for the router
+// to advertise.
+type RouterAdvertisedIpRange struct {
+	// Description: User-specified description for the IP range.
+	Description string `json:"description,omitempty"`
+
+	// Range: The IP range to advertise. The value must be a CIDR-formatted
+	// string.
+	Range string `json:"range,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Description") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Description") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *RouterAdvertisedIpRange) MarshalJSON() ([]byte, error) {
+	type NoMethod RouterAdvertisedIpRange
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -16905,13 +17213,39 @@ func (s *RouterAggregatedListWarningData) MarshalJSON() ([]byte, error) {
 }
 
 type RouterBgp struct {
+	// AdvertiseMode: User-specified flag to indicate which mode to use for
+	// advertisement.
+	//
+	// Possible values:
+	//   "CUSTOM"
+	//   "DEFAULT"
+	AdvertiseMode string `json:"advertiseMode,omitempty"`
+
+	// AdvertisedGroups: User-specified list of prefix groups to advertise
+	// in custom mode. This field can only be populated if advertise_mode is
+	// CUSTOM and is advertised to all peers of the router. These groups
+	// will be advertised in addition to any specified prefixes. Leave this
+	// field blank to advertise no custom groups.
+	//
+	// Possible values:
+	//   "ALL_SUBNETS"
+	AdvertisedGroups []string `json:"advertisedGroups,omitempty"`
+
+	// AdvertisedIpRanges: User-specified list of individual IP ranges to
+	// advertise in custom mode. This field can only be populated if
+	// advertise_mode is CUSTOM and is advertised to all peers of the
+	// router. These IP ranges will be advertised in addition to any
+	// specified groups. Leave this field blank to advertise no custom IP
+	// ranges.
+	AdvertisedIpRanges []*RouterAdvertisedIpRange `json:"advertisedIpRanges,omitempty"`
+
 	// Asn: Local BGP Autonomous System Number (ASN). Must be an RFC6996
 	// private ASN, either 16-bit or 32-bit. The value will be fixed for
 	// this router resource. All VPN tunnels that link to this router will
 	// have the same local ASN.
 	Asn int64 `json:"asn,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "Asn") to
+	// ForceSendFields is a list of field names (e.g. "AdvertiseMode") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -16919,10 +17253,10 @@ type RouterBgp struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "Asn") to include in API
-	// requests with the JSON null value. By default, fields with empty
-	// values are omitted from API requests. However, any field with an
-	// empty value appearing in NullFields will be sent to the server as
+	// NullFields is a list of field names (e.g. "AdvertiseMode") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
 	// null. It is an error if a field in this list has a non-empty value.
 	// This may be used to include null fields in Patch requests.
 	NullFields []string `json:"-"`
@@ -16935,6 +17269,33 @@ func (s *RouterBgp) MarshalJSON() ([]byte, error) {
 }
 
 type RouterBgpPeer struct {
+	// AdvertiseMode: User-specified flag to indicate which mode to use for
+	// advertisement.
+	//
+	// Possible values:
+	//   "CUSTOM"
+	//   "DEFAULT"
+	AdvertiseMode string `json:"advertiseMode,omitempty"`
+
+	// AdvertisedGroups: User-specified list of prefix groups to advertise
+	// in custom mode. This field can only be populated if advertise_mode is
+	// CUSTOM and overrides the list defined for the router (in Bgp
+	// message). These groups will be advertised in addition to any
+	// specified prefixes. Leave this field blank to advertise no custom
+	// groups.
+	//
+	// Possible values:
+	//   "ALL_SUBNETS"
+	AdvertisedGroups []string `json:"advertisedGroups,omitempty"`
+
+	// AdvertisedIpRanges: User-specified list of individual IP ranges to
+	// advertise in custom mode. This field can only be populated if
+	// advertise_mode is CUSTOM and overrides the list defined for the
+	// router (in Bgp message). These IP ranges will be advertised in
+	// addition to any specified groups. Leave this field blank to advertise
+	// no custom IP ranges.
+	AdvertisedIpRanges []*RouterAdvertisedIpRange `json:"advertisedIpRanges,omitempty"`
+
 	// AdvertisedRoutePriority: The priority of routes advertised to this
 	// BGP peer. In the case where there is more than one matching route of
 	// maximum length, the routes with lowest priority value win.
@@ -16959,22 +17320,20 @@ type RouterBgpPeer struct {
 	// Only IPv4 is supported.
 	PeerIpAddress string `json:"peerIpAddress,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g.
-	// "AdvertisedRoutePriority") to unconditionally include in API
-	// requests. By default, fields with empty values are omitted from API
-	// requests. However, any non-pointer, non-interface field appearing in
-	// ForceSendFields will be sent to the server regardless of whether the
-	// field is empty or not. This may be used to include empty fields in
-	// Patch requests.
+	// ForceSendFields is a list of field names (e.g. "AdvertiseMode") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "AdvertisedRoutePriority")
-	// to include in API requests with the JSON null value. By default,
-	// fields with empty values are omitted from API requests. However, any
-	// field with an empty value appearing in NullFields will be sent to the
-	// server as null. It is an error if a field in this list has a
-	// non-empty value. This may be used to include null fields in Patch
-	// requests.
+	// NullFields is a list of field names (e.g. "AdvertiseMode") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
 	NullFields []string `json:"-"`
 }
 
@@ -17711,7 +18070,7 @@ type Snapshot struct {
 	// Name: Name of the resource; provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -17989,7 +18348,7 @@ type SslCertificate struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -18196,9 +18555,14 @@ type Subnetwork struct {
 	// resource creation time.
 	Description string `json:"description,omitempty"`
 
+	// Fingerprint: Fingerprint of this resource. A hash of the contents
+	// stored in this object. This field is used in optimistic locking. This
+	// field will be ignored when inserting a Subnetwork. An up-to-date
+	// fingerprint must be provided in order to update the Subnetwork.
+	Fingerprint string `json:"fingerprint,omitempty"`
+
 	// GatewayAddress: [Output Only] The gateway address for default routes
-	// to reach destination addresses outside this subnetwork. This field
-	// can be set only at resource creation time.
+	// to reach destination addresses outside this subnetwork.
 	GatewayAddress string `json:"gatewayAddress,omitempty"`
 
 	// Id: [Output Only] The unique identifier for the resource. This
@@ -18219,7 +18583,7 @@ type Subnetwork struct {
 	// Name: The name of the resource, provided by the client when initially
 	// creating the resource. The name must be 1-63 characters long, and
 	// comply with RFC1035. Specifically, the name must be 1-63 characters
-	// long and match the regular expression [a-z]([-a-z0-9]*[a-z0-9])?
+	// long and match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?`
 	// which means the first character must be a lowercase letter, and all
 	// following characters must be a dash, lowercase letter, or digit,
 	// except the last character, which cannot be a dash.
@@ -18933,7 +19297,7 @@ type TargetHttpProxy struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -19183,7 +19547,7 @@ type TargetHttpsProxy struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -19424,7 +19788,7 @@ type TargetInstance struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -19441,7 +19805,8 @@ type TargetInstance struct {
 	SelfLink string `json:"selfLink,omitempty"`
 
 	// Zone: [Output Only] URL of the zone where the target instance
-	// resides.
+	// resides. You must specify this field as part of the HTTP request URL.
+	// It is not settable as a field in the request body.
 	Zone string `json:"zone,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -19986,7 +20351,7 @@ type TargetPool struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -20796,7 +21161,7 @@ type TargetSslProxy struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -21088,7 +21453,7 @@ type TargetTcpProxy struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -21320,7 +21685,7 @@ type TargetVpnGateway struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -21331,7 +21696,8 @@ type TargetVpnGateway struct {
 	Network string `json:"network,omitempty"`
 
 	// Region: [Output Only] URL of the region where the target VPN gateway
-	// resides.
+	// resides. You must specify this field as part of the HTTP request URL.
+	// It is not settable as a field in the request body.
 	Region string `json:"region,omitempty"`
 
 	// SelfLink: [Output Only] Server-defined URL for the resource.
@@ -21893,7 +22259,7 @@ type UrlMap struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -21905,8 +22271,9 @@ type UrlMap struct {
 	// SelfLink: [Output Only] Server-defined URL for the resource.
 	SelfLink string `json:"selfLink,omitempty"`
 
-	// Tests: The list of expected URL mappings. Request to update this
-	// UrlMap will succeed only if all of the test cases pass.
+	// Tests: The list of expected URL mapping tests. Request to update this
+	// UrlMap will succeed only if all of the test cases pass. You can
+	// specify a maximum of 100 tests per UrlMap.
 	Tests []*UrlMapTest `json:"tests,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -22331,7 +22698,7 @@ type VpnTunnel struct {
 	// Name: Name of the resource. Provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035. Specifically, the name must be 1-63 characters long and
-	// match the regular expression [a-z]([-a-z0-9]*[a-z0-9])? which means
+	// match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means
 	// the first character must be a lowercase letter, and all following
 	// characters must be a dash, lowercase letter, or digit, except the
 	// last character, which cannot be a dash.
@@ -22341,6 +22708,8 @@ type VpnTunnel struct {
 	PeerIp string `json:"peerIp,omitempty"`
 
 	// Region: [Output Only] URL of the region where the VPN tunnel resides.
+	// You must specify this field as part of the HTTP request URL. It is
+	// not settable as a field in the request body.
 	Region string `json:"region,omitempty"`
 
 	// RemoteTrafficSelector: Remote traffic selectors to use when
@@ -22379,8 +22748,9 @@ type VpnTunnel struct {
 	//   "WAITING_FOR_FULL_CONFIG"
 	Status string `json:"status,omitempty"`
 
-	// TargetVpnGateway: URL of the VPN gateway with which this VPN tunnel
-	// is associated. Provided by the client when the VPN tunnel is created.
+	// TargetVpnGateway: URL of the Target VPN gateway with which this VPN
+	// tunnel is associated. Provided by the client when the VPN tunnel is
+	// created.
 	TargetVpnGateway string `json:"targetVpnGateway,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -32132,7 +32502,7 @@ type FirewallsUpdateCall struct {
 }
 
 // Update: Updates the specified firewall rule with the data included in
-// the request. Using PUT method, can only update following fields of
+// the request. The PUT method can only update the following fields of
 // firewall rule: allowed, description, sourceRanges, sourceTags,
 // targetTags.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/firewalls/update
@@ -32250,7 +32620,7 @@ func (c *FirewallsUpdateCall) Do(opts ...googleapi.CallOption) (*Operation, erro
 	}
 	return ret, nil
 	// {
-	//   "description": "Updates the specified firewall rule with the data included in the request. Using PUT method, can only update following fields of firewall rule: allowed, description, sourceRanges, sourceTags, targetTags.",
+	//   "description": "Updates the specified firewall rule with the data included in the request. The PUT method can only update the following fields of firewall rule: allowed, description, sourceRanges, sourceTags, targetTags.",
 	//   "httpMethod": "PUT",
 	//   "id": "compute.firewalls.update",
 	//   "parameterOrder": [
@@ -44519,11 +44889,9 @@ type InstanceTemplatesDeleteCall struct {
 	header_          http.Header
 }
 
-// Delete: Deletes the specified instance template. If you delete an
-// instance template that is being referenced from another instance
-// group, the instance group will not be able to create or recreate
-// virtual machine instances. Deleting an instance template is permanent
-// and cannot be undone.
+// Delete: Deletes the specified instance template. Deleting an instance
+// template is permanent and cannot be undone. It's not possible to
+// delete templates which are in use by an instance group.
 // For details, see https://cloud.google.com/compute/docs/reference/latest/instanceTemplates/delete
 func (r *InstanceTemplatesService) Delete(project string, instanceTemplate string) *InstanceTemplatesDeleteCall {
 	c := &InstanceTemplatesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -44633,7 +45001,7 @@ func (c *InstanceTemplatesDeleteCall) Do(opts ...googleapi.CallOption) (*Operati
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes the specified instance template. If you delete an instance template that is being referenced from another instance group, the instance group will not be able to create or recreate virtual machine instances. Deleting an instance template is permanent and cannot be undone.",
+	//   "description": "Deletes the specified instance template. Deleting an instance template is permanent and cannot be undone. It's not possible to delete templates which are in use by an instance group.",
 	//   "httpMethod": "DELETE",
 	//   "id": "compute.instanceTemplates.delete",
 	//   "parameterOrder": [
@@ -47210,6 +47578,280 @@ func (c *InstancesListCall) Pages(ctx context.Context, f func(*InstanceList) err
 	}
 }
 
+// method id "compute.instances.listReferrers":
+
+type InstancesListReferrersCall struct {
+	s            *Service
+	project      string
+	zone         string
+	instance     string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// ListReferrers: Retrieves the list of referrers to instances contained
+// within the specified zone.
+func (r *InstancesService) ListReferrers(project string, zone string, instance string) *InstancesListReferrersCall {
+	c := &InstancesListReferrersCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.zone = zone
+	c.instance = instance
+	return c
+}
+
+// Filter sets the optional parameter "filter": Sets a filter
+// {expression} for filtering listed resources. Your {expression} must
+// be in the format: field_name comparison_string literal_string.
+//
+// The field_name is the name of the field you want to compare. Only
+// atomic field types are supported (string, number, boolean). The
+// comparison_string must be either eq (equals) or ne (not equals). The
+// literal_string is the string value to filter to. The literal value
+// must be valid for the type of field you are filtering by (string,
+// number, boolean). For string fields, the literal value is interpreted
+// as a regular expression using RE2 syntax. The literal value must
+// match the entire field.
+//
+// For example, to filter for instances that do not have a name of
+// example-instance, you would use name ne example-instance.
+//
+// You can filter on nested fields. For example, you could filter on
+// instances that have set the scheduling.automaticRestart field to
+// true. Use filtering on nested fields to take advantage of labels to
+// organize and search for results based on label values.
+//
+// To filter on multiple expressions, provide each separate expression
+// within parentheses. For example, (scheduling.automaticRestart eq
+// true) (zone eq us-central1-f). Multiple expressions are treated as
+// AND expressions, meaning that resources must match all expressions to
+// pass the filters.
+func (c *InstancesListReferrersCall) Filter(filter string) *InstancesListReferrersCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
+// MaxResults sets the optional parameter "maxResults": The maximum
+// number of results per page that should be returned. If the number of
+// available results is larger than maxResults, Compute Engine returns a
+// nextPageToken that can be used to get the next page of results in
+// subsequent list requests. Acceptable values are 0 to 500, inclusive.
+// (Default: 500)
+func (c *InstancesListReferrersCall) MaxResults(maxResults int64) *InstancesListReferrersCall {
+	c.urlParams_.Set("maxResults", fmt.Sprint(maxResults))
+	return c
+}
+
+// OrderBy sets the optional parameter "orderBy": Sorts list results by
+// a certain order. By default, results are returned in alphanumerical
+// order based on the resource name.
+//
+// You can also sort results in descending order based on the creation
+// timestamp using orderBy="creationTimestamp desc". This sorts results
+// based on the creationTimestamp field in reverse chronological order
+// (newest result first). Use this to sort resources like operations so
+// that the newest operation is returned first.
+//
+// Currently, only sorting by name or creationTimestamp desc is
+// supported.
+func (c *InstancesListReferrersCall) OrderBy(orderBy string) *InstancesListReferrersCall {
+	c.urlParams_.Set("orderBy", orderBy)
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": Specifies a page
+// token to use. Set pageToken to the nextPageToken returned by a
+// previous list request to get the next page of results.
+func (c *InstancesListReferrersCall) PageToken(pageToken string) *InstancesListReferrersCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *InstancesListReferrersCall) Fields(s ...googleapi.Field) *InstancesListReferrersCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *InstancesListReferrersCall) IfNoneMatch(entityTag string) *InstancesListReferrersCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *InstancesListReferrersCall) Context(ctx context.Context) *InstancesListReferrersCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *InstancesListReferrersCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *InstancesListReferrersCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/zones/{zone}/instances/{instance}/referrers")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"project":  c.project,
+		"zone":     c.zone,
+		"instance": c.instance,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "compute.instances.listReferrers" call.
+// Exactly one of *InstanceListReferrers or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *InstanceListReferrers.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *InstancesListReferrersCall) Do(opts ...googleapi.CallOption) (*InstanceListReferrers, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &InstanceListReferrers{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Retrieves the list of referrers to instances contained within the specified zone.",
+	//   "httpMethod": "GET",
+	//   "id": "compute.instances.listReferrers",
+	//   "parameterOrder": [
+	//     "project",
+	//     "zone",
+	//     "instance"
+	//   ],
+	//   "parameters": {
+	//     "filter": {
+	//       "description": "Sets a filter {expression} for filtering listed resources. Your {expression} must be in the format: field_name comparison_string literal_string.\n\nThe field_name is the name of the field you want to compare. Only atomic field types are supported (string, number, boolean). The comparison_string must be either eq (equals) or ne (not equals). The literal_string is the string value to filter to. The literal value must be valid for the type of field you are filtering by (string, number, boolean). For string fields, the literal value is interpreted as a regular expression using RE2 syntax. The literal value must match the entire field.\n\nFor example, to filter for instances that do not have a name of example-instance, you would use name ne example-instance.\n\nYou can filter on nested fields. For example, you could filter on instances that have set the scheduling.automaticRestart field to true. Use filtering on nested fields to take advantage of labels to organize and search for results based on label values.\n\nTo filter on multiple expressions, provide each separate expression within parentheses. For example, (scheduling.automaticRestart eq true) (zone eq us-central1-f). Multiple expressions are treated as AND expressions, meaning that resources must match all expressions to pass the filters.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "instance": {
+	//       "description": "Name of the target instance scoping this request, or '-' if the request should span over all instances in the container.",
+	//       "location": "path",
+	//       "pattern": "-|[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "maxResults": {
+	//       "default": "500",
+	//       "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests. Acceptable values are 0 to 500, inclusive. (Default: 500)",
+	//       "format": "uint32",
+	//       "location": "query",
+	//       "minimum": "0",
+	//       "type": "integer"
+	//     },
+	//     "orderBy": {
+	//       "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name.\n\nYou can also sort results in descending order based on the creation timestamp using orderBy=\"creationTimestamp desc\". This sorts results based on the creationTimestamp field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first.\n\nCurrently, only sorting by name or creationTimestamp desc is supported.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "pageToken": {
+	//       "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "zone": {
+	//       "description": "The name of the zone for this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/zones/{zone}/instances/{instance}/referrers",
+	//   "response": {
+	//     "$ref": "InstanceListReferrers"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute",
+	//     "https://www.googleapis.com/auth/compute.readonly"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *InstancesListReferrersCall) Pages(ctx context.Context, f func(*InstanceListReferrers) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
 // method id "compute.instances.reset":
 
 type InstancesResetCall struct {
@@ -49741,6 +50383,388 @@ func (c *InstancesStopCall) Do(opts ...googleapi.CallOption) (*Operation, error)
 	//     }
 	//   },
 	//   "path": "{project}/zones/{zone}/instances/{instance}/stop",
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
+// method id "compute.instances.updateAccessConfig":
+
+type InstancesUpdateAccessConfigCall struct {
+	s            *Service
+	project      string
+	zone         string
+	instance     string
+	accessconfig *AccessConfig
+	urlParams_   gensupport.URLParams
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// UpdateAccessConfig: Updates the specified access config from an
+// instance's network interface with the data included in the request.
+// This method supports PATCH semantics and uses the JSON merge patch
+// format and processing rules.
+func (r *InstancesService) UpdateAccessConfig(project string, zone string, instance string, networkInterface string, accessconfig *AccessConfig) *InstancesUpdateAccessConfigCall {
+	c := &InstancesUpdateAccessConfigCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.zone = zone
+	c.instance = instance
+	c.urlParams_.Set("networkInterface", networkInterface)
+	c.accessconfig = accessconfig
+	return c
+}
+
+// RequestId sets the optional parameter "requestId": An optional
+// request ID to identify requests. Specify a unique request ID so that
+// if you must retry your request, the server will know to ignore the
+// request if it has already been completed.
+//
+// For example, consider a situation where you make an initial request
+// and the request times out. If you make the request again with the
+// same request ID, the server can check if original operation with the
+// same request ID was received, and if so, will ignore the second
+// request. This prevents clients from accidentally creating duplicate
+// commitments.
+//
+// The request ID must be a valid UUID with the exception that zero UUID
+// is not supported (00000000-0000-0000-0000-000000000000).
+func (c *InstancesUpdateAccessConfigCall) RequestId(requestId string) *InstancesUpdateAccessConfigCall {
+	c.urlParams_.Set("requestId", requestId)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *InstancesUpdateAccessConfigCall) Fields(s ...googleapi.Field) *InstancesUpdateAccessConfigCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *InstancesUpdateAccessConfigCall) Context(ctx context.Context) *InstancesUpdateAccessConfigCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *InstancesUpdateAccessConfigCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *InstancesUpdateAccessConfigCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.accessconfig)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/zones/{zone}/instances/{instance}/updateAccessConfig")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"project":  c.project,
+		"zone":     c.zone,
+		"instance": c.instance,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "compute.instances.updateAccessConfig" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *InstancesUpdateAccessConfigCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Updates the specified access config from an instance's network interface with the data included in the request. This method supports PATCH semantics and uses the JSON merge patch format and processing rules.",
+	//   "httpMethod": "POST",
+	//   "id": "compute.instances.updateAccessConfig",
+	//   "parameterOrder": [
+	//     "project",
+	//     "zone",
+	//     "instance",
+	//     "networkInterface"
+	//   ],
+	//   "parameters": {
+	//     "instance": {
+	//       "description": "The instance name for this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "networkInterface": {
+	//       "description": "The name of the network interface where the access config is attached.",
+	//       "location": "query",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "requestId": {
+	//       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "zone": {
+	//       "description": "The name of the zone for this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/zones/{zone}/instances/{instance}/updateAccessConfig",
+	//   "request": {
+	//     "$ref": "AccessConfig"
+	//   },
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
+// method id "compute.instances.updateNetworkInterface":
+
+type InstancesUpdateNetworkInterfaceCall struct {
+	s                *Service
+	project          string
+	zone             string
+	instance         string
+	networkinterface *NetworkInterface
+	urlParams_       gensupport.URLParams
+	ctx_             context.Context
+	header_          http.Header
+}
+
+// UpdateNetworkInterface: Updates an instance's network interface. This
+// method follows PATCH semantics.
+func (r *InstancesService) UpdateNetworkInterface(project string, zone string, instance string, networkInterface string, networkinterface *NetworkInterface) *InstancesUpdateNetworkInterfaceCall {
+	c := &InstancesUpdateNetworkInterfaceCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.zone = zone
+	c.instance = instance
+	c.urlParams_.Set("networkInterface", networkInterface)
+	c.networkinterface = networkinterface
+	return c
+}
+
+// RequestId sets the optional parameter "requestId": An optional
+// request ID to identify requests. Specify a unique request ID so that
+// if you must retry your request, the server will know to ignore the
+// request if it has already been completed.
+//
+// For example, consider a situation where you make an initial request
+// and the request times out. If you make the request again with the
+// same request ID, the server can check if original operation with the
+// same request ID was received, and if so, will ignore the second
+// request. This prevents clients from accidentally creating duplicate
+// commitments.
+//
+// The request ID must be a valid UUID with the exception that zero UUID
+// is not supported (00000000-0000-0000-0000-000000000000).
+func (c *InstancesUpdateNetworkInterfaceCall) RequestId(requestId string) *InstancesUpdateNetworkInterfaceCall {
+	c.urlParams_.Set("requestId", requestId)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *InstancesUpdateNetworkInterfaceCall) Fields(s ...googleapi.Field) *InstancesUpdateNetworkInterfaceCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *InstancesUpdateNetworkInterfaceCall) Context(ctx context.Context) *InstancesUpdateNetworkInterfaceCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *InstancesUpdateNetworkInterfaceCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *InstancesUpdateNetworkInterfaceCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.networkinterface)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/zones/{zone}/instances/{instance}/updateNetworkInterface")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PATCH", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"project":  c.project,
+		"zone":     c.zone,
+		"instance": c.instance,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "compute.instances.updateNetworkInterface" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *InstancesUpdateNetworkInterfaceCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Updates an instance's network interface. This method follows PATCH semantics.",
+	//   "httpMethod": "PATCH",
+	//   "id": "compute.instances.updateNetworkInterface",
+	//   "parameterOrder": [
+	//     "project",
+	//     "zone",
+	//     "instance",
+	//     "networkInterface"
+	//   ],
+	//   "parameters": {
+	//     "instance": {
+	//       "description": "The instance name for this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "networkInterface": {
+	//       "description": "The name of the network interface to update.",
+	//       "location": "query",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "requestId": {
+	//       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "zone": {
+	//       "description": "The name of the zone for this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/zones/{zone}/instances/{instance}/updateNetworkInterface",
+	//   "request": {
+	//     "$ref": "NetworkInterface"
+	//   },
 	//   "response": {
 	//     "$ref": "Operation"
 	//   },
@@ -57847,7 +58871,7 @@ func (c *RegionBackendServicesGetHealthCall) Do(opts ...googleapi.CallOption) (*
 	//   ],
 	//   "parameters": {
 	//     "backendService": {
-	//       "description": "Name of the BackendService resource to which the queried instance belongs.",
+	//       "description": "Name of the BackendService resource for which to get health.",
 	//       "location": "path",
 	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
 	//       "required": true,
@@ -68540,6 +69564,191 @@ func (c *SubnetworksListCall) Pages(ctx context.Context, f func(*SubnetworkList)
 		}
 		c.PageToken(x.NextPageToken)
 	}
+}
+
+// method id "compute.subnetworks.patch":
+
+type SubnetworksPatchCall struct {
+	s           *Service
+	project     string
+	region      string
+	subnetwork  string
+	subnetwork2 *Subnetwork
+	urlParams_  gensupport.URLParams
+	ctx_        context.Context
+	header_     http.Header
+}
+
+// Patch: Patches the specified subnetwork with the data included in the
+// request. Only the following fields within the subnetwork resource can
+// be specified in the request: secondary_ip_range and
+// allow_subnet_cidr_routes_overlap. It is also mandatory to specify the
+// current fingeprint of the subnetwork resource being patched.
+func (r *SubnetworksService) Patch(project string, region string, subnetwork string, subnetwork2 *Subnetwork) *SubnetworksPatchCall {
+	c := &SubnetworksPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.region = region
+	c.subnetwork = subnetwork
+	c.subnetwork2 = subnetwork2
+	return c
+}
+
+// RequestId sets the optional parameter "requestId": An optional
+// request ID to identify requests. Specify a unique request ID so that
+// if you must retry your request, the server will know to ignore the
+// request if it has already been completed.
+//
+// For example, consider a situation where you make an initial request
+// and the request times out. If you make the request again with the
+// same request ID, the server can check if original operation with the
+// same request ID was received, and if so, will ignore the second
+// request. This prevents clients from accidentally creating duplicate
+// commitments.
+//
+// The request ID must be a valid UUID with the exception that zero UUID
+// is not supported (00000000-0000-0000-0000-000000000000).
+func (c *SubnetworksPatchCall) RequestId(requestId string) *SubnetworksPatchCall {
+	c.urlParams_.Set("requestId", requestId)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *SubnetworksPatchCall) Fields(s ...googleapi.Field) *SubnetworksPatchCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *SubnetworksPatchCall) Context(ctx context.Context) *SubnetworksPatchCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *SubnetworksPatchCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *SubnetworksPatchCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.subnetwork2)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/regions/{region}/subnetworks/{subnetwork}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PATCH", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"project":    c.project,
+		"region":     c.region,
+		"subnetwork": c.subnetwork,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "compute.subnetworks.patch" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *SubnetworksPatchCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Patches the specified subnetwork with the data included in the request. Only the following fields within the subnetwork resource can be specified in the request: secondary_ip_range and allow_subnet_cidr_routes_overlap. It is also mandatory to specify the current fingeprint of the subnetwork resource being patched.",
+	//   "httpMethod": "PATCH",
+	//   "id": "compute.subnetworks.patch",
+	//   "parameterOrder": [
+	//     "project",
+	//     "region",
+	//     "subnetwork"
+	//   ],
+	//   "parameters": {
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "region": {
+	//       "description": "Name of the region scoping this request.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "requestId": {
+	//       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "subnetwork": {
+	//       "description": "Name of the Subnetwork resource to patch.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/regions/{region}/subnetworks/{subnetwork}",
+	//   "request": {
+	//     "$ref": "Subnetwork"
+	//   },
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
 }
 
 // method id "compute.subnetworks.setPrivateIpGoogleAccess":

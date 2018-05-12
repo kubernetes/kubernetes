@@ -15,15 +15,15 @@
 # Build the hyperkube base image. This image is used to build the hyperkube image.
 #
 # Usage:
-#   [ARCH=amd64] [REGISTRY="gcr.io/google-containers"] make (build|push)
+#   [ARCH=amd64] [REGISTRY="staging-k8s.gcr.io"] make (build|push)
 
-REGISTRY?=gcr.io/google-containers
+REGISTRY?=staging-k8s.gcr.io
 IMAGE?=debian-hyperkube-base
-TAG=0.8
+TAG=0.10
 ARCH?=amd64
 CACHEBUST?=1
 
-BASEIMAGE=gcr.io/google-containers/debian-base-$(ARCH):0.3
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.3
 CNI_VERSION=v0.6.0
 
 TEMP_DIR:=$(shell mktemp -d)
@@ -57,4 +57,4 @@ endif
 	rm -rf $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
+	docker push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)

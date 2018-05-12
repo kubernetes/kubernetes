@@ -116,4 +116,7 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.ClientConnection.Burst == 0 {
 		obj.ClientConnection.Burst = 10
 	}
+	if obj.FeatureGates == nil {
+		obj.FeatureGates = make(map[string]bool)
+	}
 }

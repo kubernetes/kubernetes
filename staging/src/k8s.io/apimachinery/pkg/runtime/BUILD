@@ -8,9 +8,15 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["swagger_doc_generator_test.go"],
+    srcs = [
+        "local_scheme_test.go",
+        "swagger_doc_generator_test.go",
+    ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/runtime",
+    deps = [
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+    ],
 )
 
 go_library(
@@ -45,6 +51,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
@@ -57,7 +64,6 @@ go_test(
         "extension_test.go",
         "scheme_test.go",
     ],
-    importpath = "k8s.io/apimachinery/pkg/runtime_test",
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

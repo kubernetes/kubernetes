@@ -17,20 +17,39 @@ limitations under the License.
 package node
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core/internalversion"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 type graphPopulator struct {
 	graph *Graph
 }
 
-func AddGraphEventHandlers(graph *Graph, pods coreinformers.PodInformer, pvs coreinformers.PersistentVolumeInformer) {
+func AddGraphEventHandlers(
+	graph *Graph,
+	nodes coreinformers.NodeInformer,
+	pods coreinformers.PodInformer,
+	pvs coreinformers.PersistentVolumeInformer,
+	attachments storageinformers.VolumeAttachmentInformer,
+) {
 	g := &graphPopulator{
 		graph: graph,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		nodes.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    g.addNode,
+			UpdateFunc: g.updateNode,
+			DeleteFunc: g.deleteNode,
+		})
 	}
 
 	pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -44,6 +63,70 @@ func AddGraphEventHandlers(graph *Graph, pods coreinformers.PodInformer, pvs cor
 		UpdateFunc: g.updatePV,
 		DeleteFunc: g.deletePV,
 	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+		attachments.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    g.addVolumeAttachment,
+			UpdateFunc: g.updateVolumeAttachment,
+			DeleteFunc: g.deleteVolumeAttachment,
+		})
+	}
+}
+
+func (g *graphPopulator) addNode(obj interface{}) {
+	g.updateNode(nil, obj)
+}
+
+func (g *graphPopulator) updateNode(oldObj, obj interface{}) {
+	node := obj.(*api.Node)
+	var oldNode *api.Node
+	if oldObj != nil {
+		oldNode = oldObj.(*api.Node)
+	}
+
+	// we only set up rules for ConfigMap today, because that is the only reference type
+
+	var name, namespace string
+	if source := node.Spec.ConfigSource; source != nil && source.ConfigMap != nil {
+		name = source.ConfigMap.Name
+		namespace = source.ConfigMap.Namespace
+	}
+
+	var oldName, oldNamespace string
+	if oldNode != nil {
+		if oldSource := oldNode.Spec.ConfigSource; oldSource != nil && oldSource.ConfigMap != nil {
+			oldName = oldSource.ConfigMap.Name
+			oldNamespace = oldSource.ConfigMap.Namespace
+		}
+	}
+
+	// if Node.Spec.ConfigSource wasn't updated, nothing for us to do
+	if name == oldName && namespace == oldNamespace {
+		return
+	}
+
+	path := "nil"
+	if node.Spec.ConfigSource != nil {
+		path = fmt.Sprintf("%s/%s", namespace, name)
+	}
+	glog.V(4).Infof("updateNode configSource reference to %s for node %s", path, node.Name)
+	g.graph.SetNodeConfigMap(node.Name, name, namespace)
+}
+
+func (g *graphPopulator) deleteNode(obj interface{}) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	node, ok := obj.(*api.Node)
+	if !ok {
+		glog.Infof("unexpected type %T", obj)
+		return
+	}
+
+	// NOTE: We don't remove the node, because if the node is re-created not all pod -> node
+	// links are re-established (we don't get relevant events because the no mutations need
+	// to happen in the API; the state is already there).
+	g.graph.SetNodeConfigMap(node.Name, "", "")
 }
 
 func (g *graphPopulator) addPod(obj interface{}) {
@@ -105,4 +188,32 @@ func (g *graphPopulator) deletePV(obj interface{}) {
 		return
 	}
 	g.graph.DeletePV(pv.Name)
+}
+
+func (g *graphPopulator) addVolumeAttachment(obj interface{}) {
+	g.updateVolumeAttachment(nil, obj)
+}
+
+func (g *graphPopulator) updateVolumeAttachment(oldObj, obj interface{}) {
+	attachment := obj.(*storagev1beta1.VolumeAttachment)
+	if oldObj != nil {
+		// skip add if node name is identical
+		oldAttachment := oldObj.(*storagev1beta1.VolumeAttachment)
+		if oldAttachment.Spec.NodeName == attachment.Spec.NodeName {
+			return
+		}
+	}
+	g.graph.AddVolumeAttachment(attachment.Name, attachment.Spec.NodeName)
+}
+
+func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	attachment, ok := obj.(*api.PersistentVolume)
+	if !ok {
+		glog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.graph.DeleteVolumeAttachment(attachment.Name)
 }

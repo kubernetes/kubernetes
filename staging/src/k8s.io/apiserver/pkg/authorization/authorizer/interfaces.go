@@ -152,7 +152,7 @@ const (
 	DecisionDeny Decision = iota
 	// DecisionAllow means that an authorizer decided to allow the action.
 	DecisionAllow
-	// DecisionNoOpionion means that an authorizer has no opinion on wether
+	// DecisionNoOpionion means that an authorizer has no opinion on whether
 	// to allow or deny an action.
 	DecisionNoOpinion
 )

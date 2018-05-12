@@ -54,16 +54,6 @@ func validNewEndpoints() *api.Endpoints {
 	}
 }
 
-func validChangedEndpoints() *api.Endpoints {
-	endpoints := validNewEndpoints()
-	endpoints.ResourceVersion = "1"
-	endpoints.Subsets = []api.EndpointSubset{{
-		Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
-		Ports:     []api.EndpointPort{{Port: 80, Protocol: "TCP"}},
-	}}
-	return endpoints
-}
-
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)

@@ -21,23 +21,17 @@ import (
 	"net"
 
 	"github.com/golang/glog"
-
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
 // DefaultServiceIPRange takes a the serviceIPRange flag and returns the defaulted service ip range (if  needed),
 // api server service IP, and an error
-// TODO move this out of the genericapiserver package
 func DefaultServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, net.IP, error) {
 	serviceClusterIPRange := passedServiceClusterIPRange
 	if passedServiceClusterIPRange.IP == nil {
-		defaultNet := "10.0.0.0/24"
-		glog.Infof("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
-		_, defaultServiceClusterIPRange, err := net.ParseCIDR(defaultNet)
-		if err != nil {
-			return net.IPNet{}, net.IP{}, err
-		}
-		serviceClusterIPRange = *defaultServiceClusterIPRange
+		glog.Infof("Network range for service cluster IPs is unspecified. Defaulting to %v.", kubeoptions.DefaultServiceIPCIDR)
+		serviceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
 	}
 	if size := ipallocator.RangeSize(&serviceClusterIPRange); size < 8 {
 		return net.IPNet{}, net.IP{}, fmt.Errorf("The service cluster IP range must be at least %d IP addresses", 8)

@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"os"
-	"runtime"
 
 	"github.com/golang/glog"
 
@@ -32,12 +31,9 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	if len(os.Getenv("GOMAXPROCS")) == 0 {
-		runtime.GOMAXPROCS(runtime.NumCPU())
-	}
-
 	stopCh := genericapiserver.SetupSignalHandler()
-	cmd := server.NewCommandStartWardleServer(os.Stdout, os.Stderr, stopCh)
+	options := server.NewWardleServerOptions(os.Stdout, os.Stderr)
+	cmd := server.NewCommandStartWardleServer(options, stopCh)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		glog.Fatal(err)

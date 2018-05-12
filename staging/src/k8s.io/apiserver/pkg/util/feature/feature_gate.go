@@ -67,6 +67,9 @@ const (
 	Alpha = prerelease("ALPHA")
 	Beta  = prerelease("BETA")
 	GA    = prerelease("")
+
+	// Deprecated
+	Deprecated = prerelease("DEPRECATED")
 )
 
 // FeatureGate parses and stores flag gates for known features from
@@ -157,7 +160,7 @@ func (f *featureGate) Set(value string) error {
 		}
 		arr := strings.SplitN(s, "=", 2)
 		k := Feature(strings.TrimSpace(arr[0]))
-		_, ok := known[k]
+		featureSpec, ok := known[k]
 		if !ok {
 			return fmt.Errorf("unrecognized key: %s", k)
 		}
@@ -170,6 +173,9 @@ func (f *featureGate) Set(value string) error {
 			return fmt.Errorf("invalid value of %s: %s, err: %v", k, v, err)
 		}
 		enabled[k] = boolValue
+		if boolValue && featureSpec.PreRelease == Deprecated {
+			glog.Warningf("enabling deprecated feature gate %s", k)
+		}
 
 		// Handle "special" features like "all alpha gates"
 		if fn, found := f.special[k]; found {

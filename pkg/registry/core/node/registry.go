@@ -17,22 +17,23 @@ limitations under the License.
 package node
 
 import (
+	"context"
+
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface for things that know how to store node.
 type Registry interface {
-	ListNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.NodeList, error)
-	CreateNode(ctx genericapirequest.Context, node *api.Node, createValidation rest.ValidateObjectFunc) error
-	UpdateNode(ctx genericapirequest.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
-	GetNode(ctx genericapirequest.Context, nodeID string, options *metav1.GetOptions) (*api.Node, error)
-	DeleteNode(ctx genericapirequest.Context, nodeID string) error
-	WatchNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	ListNodes(ctx context.Context, options *metainternalversion.ListOptions) (*api.NodeList, error)
+	CreateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc) error
+	UpdateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	GetNode(ctx context.Context, nodeID string, options *metav1.GetOptions) (*api.Node, error)
+	DeleteNode(ctx context.Context, nodeID string) error
+	WatchNodes(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.NodeList, error) {
+func (s *storage) ListNodes(ctx context.Context, options *metainternalversion.ListOptions) (*api.NodeList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -55,21 +56,21 @@ func (s *storage) ListNodes(ctx genericapirequest.Context, options *metainternal
 	return obj.(*api.NodeList), nil
 }
 
-func (s *storage) CreateNode(ctx genericapirequest.Context, node *api.Node, createValidation rest.ValidateObjectFunc) error {
+func (s *storage) CreateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc) error {
 	_, err := s.Create(ctx, node, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateNode(ctx genericapirequest.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+func (s *storage) UpdateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
 	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node), createValidation, updateValidation)
 	return err
 }
 
-func (s *storage) WatchNodes(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchNodes(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetNode(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Node, error) {
+func (s *storage) GetNode(ctx context.Context, name string, options *metav1.GetOptions) (*api.Node, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -77,7 +78,7 @@ func (s *storage) GetNode(ctx genericapirequest.Context, name string, options *m
 	return obj.(*api.Node), nil
 }
 
-func (s *storage) DeleteNode(ctx genericapirequest.Context, name string) error {
+func (s *storage) DeleteNode(ctx context.Context, name string) error {
 	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }

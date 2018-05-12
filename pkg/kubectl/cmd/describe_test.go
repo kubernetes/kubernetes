@@ -17,29 +17,34 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	f, tf, codec, _ := cmdtesting.NewTestFactory()
-	tf.Describer = d
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	_, _, codec := cmdtesting.NewExternalScheme()
+	tf.DescriberVal = d
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
 	tf.Namespace = "non-default"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(f, buf, buferr)
+	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"type", "foo"})
 
 	if d.Name != "foo" || d.Namespace != "" {
@@ -54,16 +59,20 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	f, tf, codec, _ := cmdtesting.NewTestFactory()
-	tf.Describer = d
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	_, _, codec := cmdtesting.NewExternalScheme()
+
+	tf.DescriberVal = d
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
 	}
 	tf.Namespace = "non-default"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(f, buf, buferr)
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"namespacedtype", "foo"})
 
 	if d.Name != "foo" || d.Namespace != "non-default" {
@@ -77,9 +86,12 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	_, _, rc := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
 	d := &testDescriber{Output: "test output"}
-	tf.Describer = d
+	tf.DescriberVal = d
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -93,10 +105,11 @@ func TestDescribeObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(f, buf, buferr)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdDescribe("kubectl", tf, streams)
+	cmd.Flags().Set("filename", "../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	if d.Name != "redis-master" || d.Namespace != "test" {
@@ -110,18 +123,21 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
 	d := &testDescriber{Output: "test output"}
-	tf.Describer = d
+	tf.DescriberVal = d
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(f, buf, buferr)
+	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"pods"})
 	if buf.String() != fmt.Sprintf("%s\n\n%s", d.Output, d.Output) {
 		t.Errorf("unexpected output: %s", buf.String())
@@ -130,18 +146,19 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
 	d := &testDescriber{Output: "test output"}
-	tf.Describer = d
+	tf.DescriberVal = d
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(f, buf, buferr)
+	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("show-events", "true")
 	cmd.Run(cmd, []string{"pods"})
 	if d.Settings.ShowEvents != true {
@@ -151,18 +168,19 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
 	d := &testDescriber{Output: "test output"}
-	tf.Describer = d
+	tf.DescriberVal = d
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(f, buf, buferr)
+	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("show-events", "false")
 	cmd.Run(cmd, []string{"pods"})
 	if d.Settings.ShowEvents != false {
@@ -171,11 +189,12 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 }
 
 func TestDescribeHelpMessage(t *testing.T) {
-	f, _, _, _ := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(f, buf, buferr)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.SetArgs([]string{"-h"})
 	cmd.SetOutput(buf)
 	_, err := cmd.ExecuteC()

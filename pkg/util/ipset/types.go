@@ -58,13 +58,3 @@ var ValidIPSetTypes = []Type{
 	BitmapPort,
 	HashIPPortNet,
 }
-
-// IsValidIPSetType checks if the given ipset type is valid.
-func IsValidIPSetType(set Type) bool {
-	for _, valid := range ValidIPSetTypes {
-		if set == valid {
-			return true
-		}
-	}
-	return false
-}

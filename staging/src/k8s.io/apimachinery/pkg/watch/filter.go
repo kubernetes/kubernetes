@@ -62,11 +62,7 @@ func (fw *filteredWatch) Stop() {
 // loop waits for new values, filters them, and resends them.
 func (fw *filteredWatch) loop() {
 	defer close(fw.result)
-	for {
-		event, ok := <-fw.incoming.ResultChan()
-		if !ok {
-			break
-		}
+	for event := range fw.incoming.ResultChan() {
 		filtered, keep := fw.f(event)
 		if keep {
 			fw.result <- filtered

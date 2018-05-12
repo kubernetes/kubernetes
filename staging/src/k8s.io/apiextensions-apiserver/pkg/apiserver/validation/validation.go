@@ -18,14 +18,31 @@ package validation
 
 import (
 	"github.com/go-openapi/spec"
+	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 )
 
+// NewSchemaValidator creates an openapi schema validator for the given CRD validation.
+func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceValidation) (*validate.SchemaValidator, *spec.Schema, error) {
+	// Convert CRD schema to openapi schema
+	openapiSchema := &spec.Schema{}
+	if customResourceValidation != nil {
+		if err := ConvertJSONSchemaProps(customResourceValidation.OpenAPIV3Schema, openapiSchema); err != nil {
+			return nil, nil, err
+		}
+	}
+	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default), openapiSchema, nil
+}
+
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.
 // CustomResource is a JSON data structure.
 func ValidateCustomResource(customResource interface{}, validator *validate.SchemaValidator) error {
+	if validator == nil {
+		return nil
+	}
+
 	result := validator.Validate(customResource)
 	if result.AsError() != nil {
 		return result.AsError()
@@ -33,17 +50,8 @@ func ValidateCustomResource(customResource interface{}, validator *validate.Sche
 	return nil
 }
 
-// ConvertToOpenAPITypes is used to convert internal types to go-openapi types.
-func ConvertToOpenAPITypes(in *apiextensions.CustomResourceDefinition, out *spec.Schema) error {
-	if in.Spec.Validation != nil {
-		if err := convertJSONSchemaProps(in.Spec.Validation.OpenAPIV3Schema, out); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func convertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema) error {
+// ConvertJSONSchemaProps converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema
+func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema) error {
 	if in == nil {
 		return nil
 	}
@@ -96,7 +104,7 @@ func convertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 	if in.Not != nil {
 		in, out := &in.Not, &out.Not
 		*out = new(spec.Schema)
-		if err := convertJSONSchemaProps(*in, *out); err != nil {
+		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
 			return err
 		}
 	}
@@ -173,7 +181,7 @@ func convertSliceOfJSONSchemaProps(in *[]apiextensions.JSONSchemaProps, out *[]s
 	if in != nil {
 		for _, jsonSchemaProps := range *in {
 			schema := spec.Schema{}
-			if err := convertJSONSchemaProps(&jsonSchemaProps, &schema); err != nil {
+			if err := ConvertJSONSchemaProps(&jsonSchemaProps, &schema); err != nil {
 				return err
 			}
 			*out = append(*out, schema)
@@ -187,7 +195,7 @@ func convertMapOfJSONSchemaProps(in map[string]apiextensions.JSONSchemaProps) (m
 	if len(in) != 0 {
 		for k, jsonSchemaProps := range in {
 			schema := spec.Schema{}
-			if err := convertJSONSchemaProps(&jsonSchemaProps, &schema); err != nil {
+			if err := ConvertJSONSchemaProps(&jsonSchemaProps, &schema); err != nil {
 				return nil, err
 			}
 			out[k] = schema
@@ -200,7 +208,7 @@ func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(spec.Schema)
-		if err := convertJSONSchemaProps(*in, *out); err != nil {
+		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
 			return err
 		}
 	}
@@ -208,7 +216,7 @@ func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out
 		in, out := &in.JSONSchemas, &out.Schemas
 		*out = make([]spec.Schema, len(*in))
 		for i := range *in {
-			if err := convertJSONSchemaProps(&(*in)[i], &(*out)[i]); err != nil {
+			if err := ConvertJSONSchemaProps(&(*in)[i], &(*out)[i]); err != nil {
 				return err
 			}
 		}
@@ -221,7 +229,7 @@ func convertJSONSchemaPropsorBool(in *apiextensions.JSONSchemaPropsOrBool, out *
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(spec.Schema)
-		if err := convertJSONSchemaProps(*in, *out); err != nil {
+		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
 			return err
 		}
 	}
@@ -233,7 +241,7 @@ func convertJSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStri
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(spec.Schema)
-		if err := convertJSONSchemaProps(*in, *out); err != nil {
+		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
 			return err
 		}
 	}

@@ -30,26 +30,23 @@ import (
 type RESTStorageProvider struct{}
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(networking.GroupName, legacyscheme.Registry, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(networking.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(networkingapiv1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(networkingapiv1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = networkingapiv1.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	version := networkingapiv1.SchemeGroupVersion
-
 	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
-		networkPolicyStorage := networkpolicystore.NewREST(restOptionsGetter)
-		storage["networkpolicies"] = networkPolicyStorage
-	}
+	// networkpolicies
+	networkPolicyStorage := networkpolicystore.NewREST(restOptionsGetter)
+	storage["networkpolicies"] = networkPolicyStorage
+
 	return storage
 }
 

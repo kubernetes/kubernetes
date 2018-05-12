@@ -36,7 +36,7 @@ const (
 // PodSpecMutatorFunc is a function capable of mutating a PodSpec
 type PodSpecMutatorFunc func(*v1.PodSpec)
 
-// GetDefaultMutators gets the mutator functions that alwasy should be used
+// GetDefaultMutators gets the mutator functions that always should be used
 func GetDefaultMutators() map[string][]PodSpecMutatorFunc {
 	return map[string][]PodSpecMutatorFunc{
 		kubeadmconstants.KubeAPIServer: {

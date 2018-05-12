@@ -17,6 +17,7 @@ limitations under the License.
 package selfsubjectaccessreview
 
 import (
+	"context"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,11 +38,15 @@ func NewREST(authorizer authorizer.Authorizer) *REST {
 	return &REST{authorizer}
 }
 
+func (r *REST) NamespaceScoped() bool {
+	return false
+}
+
 func (r *REST) New() runtime.Object {
 	return &authorizationapi.SelfSubjectAccessReview{}
 }
 
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	selfSAR, ok := obj.(*authorizationapi.SelfSubjectAccessReview)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a SelfSubjectAccessReview: %#v", obj))

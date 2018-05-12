@@ -69,11 +69,6 @@ func (fc *FakeConfigurator) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQu
 	return nil
 }
 
-// ResponsibleForPod is not implemented yet.
-func (fc *FakeConfigurator) ResponsibleForPod(pod *v1.Pod) bool {
-	panic("not implemented")
-}
-
 // GetNodeLister is not implemented yet.
 func (fc *FakeConfigurator) GetNodeLister() corelisters.NodeLister {
 	return nil
@@ -87,11 +82,6 @@ func (fc *FakeConfigurator) GetClient() clientset.Interface {
 // GetScheduledPodLister is not implemented yet.
 func (fc *FakeConfigurator) GetScheduledPodLister() corelisters.PodLister {
 	return nil
-}
-
-// Run is not implemented yet.
-func (fc *FakeConfigurator) Run() {
-	panic("not implemented")
 }
 
 // Create returns FakeConfigurator.Config

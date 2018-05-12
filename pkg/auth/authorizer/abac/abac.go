@@ -53,7 +53,7 @@ type policyList []*abac.Policy
 
 // TODO: Have policies be created via an API call and stored in REST storage.
 func NewFromFile(path string) (policyList, error) {
-	// File format is one map per line.  This allows easy concatentation of files,
+	// File format is one map per line.  This allows easy concatenation of files,
 	// comments in files, and identification of errors by line number.
 	file, err := os.Open(path)
 	if err != nil {

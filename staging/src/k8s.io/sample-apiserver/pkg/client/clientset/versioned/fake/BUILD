@@ -19,9 +19,12 @@ go_library(
         "//vendor/k8s.io/client-go/discovery/fake:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/versioned:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1alpha1:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1alpha1/fake:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1beta1:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1beta1/fake:go_default_library",
     ],
 )
 

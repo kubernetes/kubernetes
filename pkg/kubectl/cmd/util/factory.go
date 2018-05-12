@@ -18,7 +18,6 @@ package util
 
 import (
 	"fmt"
-	"io"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,28 +33,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/restmapper"
+	scaleclient "k8s.io/client-go/scale"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
-)
-
-const (
-	FlagMatchBinaryVersion = "match-server-version"
-)
-
-var (
-	FlagHTTPCacheDir = "cache-dir"
 )
 
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
@@ -92,8 +84,14 @@ type ClientAccessFactory interface {
 	// ClientSet gives you back an internal, generated clientset
 	ClientSet() (internalclientset.Interface, error)
 
+	// DynamicClient returns a dynamic client ready for use
+	DynamicClient() (dynamic.Interface, error)
+
 	// KubernetesClientSet gives you back an external clientset
 	KubernetesClientSet() (*kubernetes.Clientset, error)
+
+	// Returns interfaces for dealing with arbitrary runtime.Objects.
+	RESTMapper() (meta.RESTMapper, error)
 
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
 	RESTClient() (*restclient.RESTClient, error)
@@ -103,17 +101,9 @@ type ClientAccessFactory interface {
 	// just directions to the server. People use this to build RESTMappers on top of
 	BareClientConfig() (*restclient.Config, error)
 
-	// TODO remove.  This should be rolled into `ClientSet`
-	ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error)
-	// TODO remove.  This should be rolled into `ClientConfig`
-	ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error)
-
-	// Returns interfaces for decoding objects - if toInternal is set, decoded objects will be converted
-	// into their internal form (if possible). Eventually the internal form will be removed as an option,
-	// and only versioned objects will be returned.
-	Decoder(toInternal bool) runtime.Decoder
-	// Returns an encoder capable of encoding a provided object into JSON in the default desired version.
-	JSONEncoder() runtime.Encoder
+	// NewBuilder returns an object that assists in loading objects from both disk and the server
+	// and which implements the common patterns for CLI interactions with generic resources.
+	NewBuilder() *resource.Builder
 
 	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
 	// return false if no pod spec is supported, or return an error.
@@ -130,30 +120,19 @@ type ClientAccessFactory interface {
 	// LabelsForObject returns the labels associated with the provided object
 	LabelsForObject(object runtime.Object) (map[string]string, error)
 
-	// Returns internal flagset
-	FlagSet() *pflag.FlagSet
 	// Command will stringify and return all environment arguments ie. a command run by a client
 	// using the factory.
 	Command(cmd *cobra.Command, showSecrets bool) string
-	// BindFlags adds any flags that are common to all kubectl sub commands.
-	BindFlags(flags *pflag.FlagSet)
-	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
-	BindExternalFlags(flags *pflag.FlagSet)
-
-	// DefaultResourceFilterFunc returns a collection of FilterFuncs suitable for filtering specific resource types.
-	DefaultResourceFilterFunc() kubectl.Filters
 
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
 
-	// Returns a Printer for formatting objects of the given type or an error.
-	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
-	// Returns the patched object in bytes and any error that occured during the encoding or
+	// Returns the patched object in bytes and any error that occurred during the encoding or
 	// in case the object is already paused.
 	Pauser(info *resource.Info) ([]byte, error)
 	// Resumer resumes a paused object inside the info. Currently supported only for Deployments.
-	// Returns the patched object in bytes and any error that occured during the encoding or
+	// Returns the patched object in bytes and any error that occurred during the encoding or
 	// in case the object is already resumed.
 	Resumer(info *resource.Info) ([]byte, error)
 
@@ -177,18 +156,13 @@ type ClientAccessFactory interface {
 	// can range over in order to determine if the user has specified an editor
 	// of their choice.
 	EditorEnvs() []string
-
-	// PrintObjectSpecificMessage prints object-specific messages on the provided writer
-	PrintObjectSpecificMessage(obj runtime.Object, out io.Writer)
 }
 
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
 // Generally they provide object typing and functions that build requests based on the negotiated clients.
 type ObjectMappingFactory interface {
-	// Returns interfaces for dealing with arbitrary runtime.Objects.
-	Object() (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns interface for expanding categories like `all`.
-	CategoryExpander() categories.CategoryExpander
+	CategoryExpander() (restmapper.CategoryExpander, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -199,10 +173,6 @@ type ObjectMappingFactory interface {
 
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
-	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
-	Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
-	// Returns a Reaper for gracefully shutting down resources.
-	Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 	// Returns a HistoryViewer for viewing change history
 	HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
 	// Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
@@ -220,48 +190,23 @@ type ObjectMappingFactory interface {
 
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool) (validation.Schema, error)
-	// OpenAPISchema returns the schema openapi schema definiton
+	// OpenAPISchema returns the schema openapi schema definition
 	OpenAPISchema() (openapi.Resources, error)
 }
 
 // BuilderFactory holds the third level of factory methods. These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
-	// PrinterForCommand returns the default printer for the command. It requires that certain options
-	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
-	// could not be found.
-	PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error)
-	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
-	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	// Returns a printer, true if the printer is generic (is not internal), or
-	// an error if a printer could not be found.
-	PrinterForMapping(options *printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
-	// PrintObject prints an api object given command line flags to modify the output format
-	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
-	// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and
-	// attempts to print an info object based on the specified output format. If the
-	// object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.
-	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error
-	// PrintSuccess prints message after finishing mutating operations
-	PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	// NewBuilder returns an object that assists in loading objects from both disk and the server
-	// and which implements the common patterns for CLI interactions with generic resources.
-	NewBuilder() *resource.Builder
 	// PluginLoader provides the implementation to be used to load cli plugins.
 	PluginLoader() plugins.PluginLoader
 	// PluginRunner provides the implementation to be used to run cli plugins.
 	PluginRunner() plugins.PluginRunner
-}
-
-func getGroupVersionKinds(gvks []schema.GroupVersionKind, group string) []schema.GroupVersionKind {
-	result := []schema.GroupVersionKind{}
-	for ix := range gvks {
-		if gvks[ix].Group == group {
-			result = append(result, gvks[ix])
-		}
-	}
-	return result
+	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
+	Scaler() (kubectl.Scaler, error)
+	// ScaleClient gives you back scale getter
+	ScaleClient() (scaleclient.ScalesGetter, error)
+	// Returns a Reaper for gracefully shutting down resources.
+	Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 }
 
 type factory struct {
@@ -271,10 +216,9 @@ type factory struct {
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
-// if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
-// if optionalClientConfig is not nil, then this factory will make use of it.
-func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
-	clientAccessFactory := NewClientAccessFactory(optionalClientConfig)
+// Receives a clientGetter capable of providing a discovery client and a REST client configuration.
+func NewFactory(clientGetter RESTClientGetter) Factory {
+	clientAccessFactory := NewClientAccessFactory(clientGetter)
 	objectMappingFactory := NewObjectMappingFactory(clientAccessFactory)
 	builderFactory := NewBuilderFactory(clientAccessFactory, objectMappingFactory)
 

@@ -110,7 +110,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && (sudo ifdown eth0 || sudo ip link set eth0 down) && sleep 120 && (sudo ifup eth0 || sudo ip link set eth0 up)' >/dev/null 2>&1 &", nil)
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo ip link set eth0 down && sleep 120 && sudo ip link set eth0 up && (sudo dhclient || true)' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
@@ -219,7 +219,11 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := metav1.NamespaceSystem
-	ps := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	ps, err := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	if err != nil {
+		framework.Logf("Couldn't initialize pod store: %v", err)
+		return false
+	}
 	defer ps.Stop()
 
 	// Get the node initially.

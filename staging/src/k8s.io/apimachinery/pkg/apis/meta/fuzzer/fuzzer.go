@@ -29,7 +29,7 @@ import (
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
@@ -221,7 +221,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			if j.MatchExpressions != nil {
 				// NB: the label selector parser code sorts match expressions by key, and sorts the values,
-				// so we need to make sure ours are sorted as well here to preserve round-trip comparision.
+				// so we need to make sure ours are sorted as well here to preserve round-trip comparison.
 				// In practice, not sorting doesn't hurt anything...
 
 				for i := range j.MatchExpressions {
@@ -252,7 +252,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(r *metav1alpha1.TableRow, c fuzz.Continue) {
+		func(r *metav1beta1.TableRow, c fuzz.Continue) {
 			c.Fuzz(&r.Object)
 			c.Fuzz(&r.Conditions)
 			if len(r.Conditions) == 0 {
@@ -268,7 +268,7 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				case 0:
 					r.Cells[i] = c.RandString()
 				case 1:
-					r.Cells[i] = c.Uint64()
+					r.Cells[i] = c.Int63()
 				case 2:
 					r.Cells[i] = c.RandBool()
 				case 3:
@@ -280,7 +280,7 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				case 4:
 					x := make([]interface{}, c.Intn(10))
 					for i := range x {
-						x[i] = c.Uint64()
+						x[i] = c.Int63()
 					}
 					r.Cells[i] = x
 				default:

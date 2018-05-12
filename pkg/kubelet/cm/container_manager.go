@@ -91,6 +91,9 @@ type ContainerManager interface {
 	UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error
 
 	InternalContainerLifecycle() InternalContainerLifecycle
+
+	// GetPodCgroupRoot returns the cgroup which contains all pods.
+	GetPodCgroupRoot() string
 }
 
 type NodeConfig struct {
@@ -104,9 +107,11 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	ExperimentalQOSReserved               map[v1.ResourceName]int64
+	QOSReserved                           map[v1.ResourceName]int64
 	ExperimentalCPUManagerPolicy          string
 	ExperimentalCPUManagerReconcilePeriod time.Duration
+	ExperimentalPodPidsLimit              int64
+	EnforceCPULimits                      bool
 }
 
 type NodeAllocatableConfig struct {

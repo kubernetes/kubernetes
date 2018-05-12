@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/apimachinery",
-	"GoVersion": "go1.9",
-	"GodepVersion": "v79",
+	"GoVersion": "go1.10",
+	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
 	],
@@ -24,7 +24,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "944e07253867aacae43c04b2e6a239005443f33a"
+			"Rev": "ed7cfbae1fffc071f71e068df27bf4f0521402d8"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
@@ -92,7 +92,15 @@
 		},
 		{
 			"ImportPath": "github.com/json-iterator/go",
-			"Rev": "13f86432b882000a51c6e610c620974462691a97"
+			"Rev": "2ddf6d758266fcb080a4f9e054b9f292c85e6798"
+		},
+		{
+			"ImportPath": "github.com/modern-go/concurrent",
+			"Rev": "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94"
+		},
+		{
+			"ImportPath": "github.com/modern-go/reflect2",
+			"Rev": "05fbef0ca5da472bbf96c9322b84a53edc03c9fd"
 		},
 		{
 			"ImportPath": "github.com/mxk/go-flowrate/flowrate",
@@ -108,15 +116,15 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "4c012f6dcd9546820e378d0bdda4d8fc772cdfea"
+			"Rev": "583c0c0531f06d5278b7d917446061adc344b5cd"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Rev": "f6abca593680b2315d2075e0f5e2a9751e3f431a"
+			"Rev": "c679ae2cc0cb27ec3293fea7e254e47386f05d69"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Rev": "f6abca593680b2315d2075e0f5e2a9751e3f431a"
+			"Rev": "c679ae2cc0cb27ec3293fea7e254e47386f05d69"
 		},
 		{
 			"ImportPath": "golang.org/x/net/html",
@@ -168,11 +176,11 @@
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
-			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
+			"Rev": "670d4cfef0544295bc27a114dbac37980d83185a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "a07b7bbb58e7fdc5144f8d7046331d29fc9ad3b3"
+			"Rev": "61db125d227fc9d4e373819a059516f32f7f23c7"
 		}
 	]
 }

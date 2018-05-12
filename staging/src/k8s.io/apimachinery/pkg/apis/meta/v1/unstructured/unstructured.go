@@ -58,6 +58,26 @@ func (obj *Unstructured) IsList() bool {
 	_, ok = field.([]interface{})
 	return ok
 }
+func (obj *Unstructured) ToList() (*UnstructuredList, error) {
+	if !obj.IsList() {
+		// return an empty list back
+		return &UnstructuredList{Object: obj.Object}, nil
+	}
+
+	ret := &UnstructuredList{}
+	ret.Object = obj.Object
+
+	err := obj.EachListItem(func(item runtime.Object) error {
+		castItem := item.(*Unstructured)
+		ret.Items = append(ret.Items, *castItem)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
 
 func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
 	field, ok := obj.Object["items"]
@@ -82,7 +102,7 @@ func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
 
 func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
 	if obj.Object == nil {
-		obj.Object = make(map[string]interface{})
+		return make(map[string]interface{})
 	}
 	return obj.Object
 }
@@ -138,7 +158,7 @@ func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
 }
 
 func (u *Unstructured) GetOwnerReferences() []metav1.OwnerReference {
-	field, found, err := nestedFieldNoCopy(u.Object, "metadata", "ownerReferences")
+	field, found, err := NestedFieldNoCopy(u.Object, "metadata", "ownerReferences")
 	if !found || err != nil {
 		return nil
 	}

@@ -30,9 +30,12 @@ type FloatingIP struct {
 	// associated with the floating IP.
 	FixedIP string `json:"fixed_ip_address"`
 
-	// TenantID is the Owner of the floating IP. Only admin users can specify a
-	// tenant identifier other than its own.
+	// TenantID is the project owner of the floating IP. Only admin users can
+	// specify a project identifier other than its own.
 	TenantID string `json:"tenant_id"`
+
+	// ProjectID is the project owner of the floating IP.
+	ProjectID string `json:"project_id"`
 
 	// Status is the condition of the API resource.
 	Status string `json:"status"`

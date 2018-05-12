@@ -13,7 +13,6 @@ go_test(
         "toleration_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/api/core/v1",
 )
 
 go_library(
@@ -22,7 +21,6 @@ go_library(
         "annotation_key_constants.go",
         "doc.go",
         "generated.pb.go",
-        "meta.go",
         "objectreference.go",
         "register.go",
         "resource.go",

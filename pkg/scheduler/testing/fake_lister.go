@@ -25,11 +25,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	. "k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
-var _ NodeLister = &FakeNodeLister{}
+var _ algorithm.NodeLister = &FakeNodeLister{}
 
 // FakeNodeLister implements NodeLister on a []string for test purposes.
 type FakeNodeLister []*v1.Node
@@ -39,7 +39,7 @@ func (f FakeNodeLister) List() ([]*v1.Node, error) {
 	return f, nil
 }
 
-var _ PodLister = &FakePodLister{}
+var _ algorithm.PodLister = &FakePodLister{}
 
 // FakePodLister implements PodLister on an []v1.Pods for test purposes.
 type FakePodLister []*v1.Pod
@@ -54,6 +54,7 @@ func (f FakePodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
 	return selected, nil
 }
 
+// FilteredList returns pods matching a pod filter and a label selector.
 func (f FakePodLister) FilteredList(podFilter schedulercache.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range f {
 		if podFilter(pod) && s.Matches(labels.Set(pod.Labels)) {
@@ -63,7 +64,7 @@ func (f FakePodLister) FilteredList(podFilter schedulercache.PodFilter, s labels
 	return selected, nil
 }
 
-var _ ServiceLister = &FakeServiceLister{}
+var _ algorithm.ServiceLister = &FakeServiceLister{}
 
 // FakeServiceLister implements ServiceLister on []v1.Service for test purposes.
 type FakeServiceLister []*v1.Service
@@ -91,7 +92,7 @@ func (f FakeServiceLister) GetPodServices(pod *v1.Pod) (services []*v1.Service, 
 	return
 }
 
-var _ ControllerLister = &FakeControllerLister{}
+var _ algorithm.ControllerLister = &FakeControllerLister{}
 
 // FakeControllerLister implements ControllerLister on []v1.ReplicationController for test purposes.
 type FakeControllerLister []*v1.ReplicationController
@@ -122,7 +123,7 @@ func (f FakeControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.
 	return
 }
 
-var _ ReplicaSetLister = &FakeReplicaSetLister{}
+var _ algorithm.ReplicaSetLister = &FakeReplicaSetLister{}
 
 // FakeReplicaSetLister implements ControllerLister on []extensions.ReplicaSet for test purposes.
 type FakeReplicaSetLister []*extensions.ReplicaSet
@@ -151,7 +152,7 @@ func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.
 	return
 }
 
-var _ StatefulSetLister = &FakeStatefulSetLister{}
+var _ algorithm.StatefulSetLister = &FakeStatefulSetLister{}
 
 // FakeStatefulSetLister implements ControllerLister on []apps.StatefulSet for testing purposes.
 type FakeStatefulSetLister []*apps.StatefulSet
@@ -183,10 +184,12 @@ type FakePersistentVolumeClaimLister []*v1.PersistentVolumeClaim
 
 var _ corelisters.PersistentVolumeClaimLister = FakePersistentVolumeClaimLister{}
 
+// List returns not implemented error.
 func (f FakePersistentVolumeClaimLister) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
+// PersistentVolumeClaims returns a FakePersistentVolumeClaimLister object.
 func (f FakePersistentVolumeClaimLister) PersistentVolumeClaims(namespace string) corelisters.PersistentVolumeClaimNamespaceLister {
 	return &fakePersistentVolumeClaimNamespaceLister{
 		pvcs:      f,

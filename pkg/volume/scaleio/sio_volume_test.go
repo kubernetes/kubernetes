@@ -384,7 +384,7 @@ func TestVolumeProvisioner(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 	if err := deleter.Delete(); err != nil {
-		t.Fatalf("failed while deleteing vol: %v", err)
+		t.Fatalf("failed while deleting vol: %v", err)
 	}
 	path := deleter.GetPath()
 	if _, err := os.Stat(path); err == nil {

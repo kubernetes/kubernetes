@@ -38,8 +38,8 @@ const (
 	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
 	// SignalAllocatableMemoryAvailable is amount of memory available for pod allocation (i.e. allocatable - workingSet (of pods), in bytes.
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
-	// SignalAllocatableNodeFsAvailable is amount of local storage available for pod allocation
-	SignalAllocatableNodeFsAvailable Signal = "allocatableNodeFs.available"
+	// SignalPIDAvailable is amount of PID available for pod allocation
+	SignalPIDAvailable Signal = "pid.available"
 )
 
 // ThresholdOperator is the operator used to express a Threshold.
@@ -58,13 +58,11 @@ const (
 // from either above or below, never both). There is thus no reason to expose the
 // operator in the Kubelet's public API. Instead, we internally map signal types to operators.
 var OpForSignal = map[Signal]ThresholdOperator{
-	SignalMemoryAvailable:            OpLessThan,
-	SignalNodeFsAvailable:            OpLessThan,
-	SignalNodeFsInodesFree:           OpLessThan,
-	SignalImageFsAvailable:           OpLessThan,
-	SignalImageFsInodesFree:          OpLessThan,
-	SignalAllocatableMemoryAvailable: OpLessThan,
-	SignalAllocatableNodeFsAvailable: OpLessThan,
+	SignalMemoryAvailable:   OpLessThan,
+	SignalNodeFsAvailable:   OpLessThan,
+	SignalNodeFsInodesFree:  OpLessThan,
+	SignalImageFsAvailable:  OpLessThan,
+	SignalImageFsInodesFree: OpLessThan,
 }
 
 // ThresholdValue is a value holder that abstracts literal versus percentage based quantity

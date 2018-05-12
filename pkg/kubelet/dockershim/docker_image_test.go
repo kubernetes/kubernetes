@@ -23,8 +23,9 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -32,7 +33,7 @@ func TestRemoveImage(t *testing.T) {
 	ds, fakeDocker, _ := newTestDockerService()
 	id := "1111"
 	fakeDocker.InjectImageInspects([]dockertypes.ImageInspect{{ID: id, RepoTags: []string{"foo"}}})
-	ds.RemoveImage(&runtimeapi.ImageSpec{Image: id})
+	ds.RemoveImage(getTestCTX(), &runtimeapi.RemoveImageRequest{Image: &runtimeapi.ImageSpec{Image: id}})
 	fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
 		libdocker.NewCalledDetail("remove_image", []interface{}{id, dockertypes.ImageRemoveOptions{PruneChildren: true}}))
 }
@@ -41,7 +42,7 @@ func TestRemoveImageWithMultipleTags(t *testing.T) {
 	ds, fakeDocker, _ := newTestDockerService()
 	id := "1111"
 	fakeDocker.InjectImageInspects([]dockertypes.ImageInspect{{ID: id, RepoTags: []string{"foo", "bar"}}})
-	ds.RemoveImage(&runtimeapi.ImageSpec{Image: id})
+	ds.RemoveImage(getTestCTX(), &runtimeapi.RemoveImageRequest{Image: &runtimeapi.ImageSpec{Image: id}})
 	fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
 		libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 		libdocker.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}))
@@ -67,8 +68,8 @@ func TestPullWithJSONError(t *testing.T) {
 	}
 	for key, test := range tests {
 		fakeDocker.InjectError("pull", test.err)
-		_, err := ds.PullImage(test.image, &runtimeapi.AuthConfig{})
-		assert.Error(t, err, fmt.Sprintf("TestCase [%s]", key))
+		_, err := ds.PullImage(getTestCTX(), &runtimeapi.PullImageRequest{Image: test.image, Auth: &runtimeapi.AuthConfig{}})
+		require.Error(t, err, fmt.Sprintf("TestCase [%s]", key))
 		assert.Contains(t, err.Error(), test.expectedError)
 	}
 }

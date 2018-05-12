@@ -108,7 +108,11 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
-	ignoreMetrics := cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}
+	ignoreMetrics := cadvisormetrics.MetricSet{
+		cadvisormetrics.NetworkTcpUsageMetrics: struct{}{},
+		cadvisormetrics.NetworkUdpUsageMetrics: struct{}{},
+		cadvisormetrics.PerCpuUsageMetrics:     struct{}{},
+	}
 	if !usingLegacyStats {
 		ignoreMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
 	}
@@ -241,17 +245,4 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 
 func (cc *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return cc.WatchForEvents(request)
-}
-
-// HasDedicatedImageFs returns true if the imagefs has a dedicated device.
-func (cc *cadvisorClient) HasDedicatedImageFs() (bool, error) {
-	imageFsInfo, err := cc.ImagesFsInfo()
-	if err != nil {
-		return false, err
-	}
-	rootFsInfo, err := cc.RootFsInfo()
-	if err != nil {
-		return false, err
-	}
-	return imageFsInfo.Device != rootFsInfo.Device, nil
 }

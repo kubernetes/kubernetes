@@ -17,21 +17,22 @@ limitations under the License.
 package endpoint
 
 import (
+	"context"
+
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Registry is an interface for things that know how to store endpoints.
 type Registry interface {
-	ListEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error)
-	GetEndpoints(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error)
-	WatchEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
-	UpdateEndpoints(ctx genericapirequest.Context, e *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
-	DeleteEndpoints(ctx genericapirequest.Context, name string) error
+	ListEndpoints(ctx context.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error)
+	GetEndpoints(ctx context.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error)
+	WatchEndpoints(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	UpdateEndpoints(ctx context.Context, e *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	DeleteEndpoints(ctx context.Context, name string) error
 }
 
 // storage puts strong typing around storage calls
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error) {
+func (s *storage) ListEndpoints(ctx context.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -53,11 +54,11 @@ func (s *storage) ListEndpoints(ctx genericapirequest.Context, options *metainte
 	return obj.(*api.EndpointsList), nil
 }
 
-func (s *storage) WatchEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchEndpoints(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetEndpoints(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error) {
+func (s *storage) GetEndpoints(ctx context.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -65,12 +66,12 @@ func (s *storage) GetEndpoints(ctx genericapirequest.Context, name string, optio
 	return obj.(*api.Endpoints), nil
 }
 
-func (s *storage) UpdateEndpoints(ctx genericapirequest.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+func (s *storage) UpdateEndpoints(ctx context.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
 	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints), createValidation, updateValidation)
 	return err
 }
 
-func (s *storage) DeleteEndpoints(ctx genericapirequest.Context, name string) error {
+func (s *storage) DeleteEndpoints(ctx context.Context, name string) error {
 	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }

@@ -11,13 +11,13 @@ go_library(
     srcs = [
         "admission_failure_handler_stub.go",
         "doc.go",
-        "fake_handler_runner.go",
         "handlers.go",
         "interfaces.go",
         "predicate.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/lifecycle",
     deps = [
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
@@ -34,13 +34,17 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["handlers_test.go"],
+    srcs = [
+        "handlers_test.go",
+        "predicate_test.go",
+    ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/lifecycle",
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
+        "//pkg/scheduler/schedulercache:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )

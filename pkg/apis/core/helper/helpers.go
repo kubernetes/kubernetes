@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -146,28 +147,36 @@ func IsStandardContainerResourceName(str string) bool {
 	return standardContainerResources.Has(str) || IsHugePageResourceName(core.ResourceName(str))
 }
 
-// IsExtendedResourceName returns true if the resource name is not in the
-// default namespace.
+// IsExtendedResourceName returns true if:
+// 1. the resource name is not in the default namespace;
+// 2. resource name does not have "requests." prefix,
+// to avoid confusion with the convention in quota
+// 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name core.ResourceName) bool {
-	return !IsDefaultNamespaceResource(name)
+	if IsNativeResource(name) || strings.HasPrefix(string(name), core.DefaultResourceRequestsPrefix) {
+		return false
+	}
+	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
+	nameForQuota := fmt.Sprintf("%s%s", core.DefaultResourceRequestsPrefix, string(name))
+	if errs := validation.IsQualifiedName(string(nameForQuota)); len(errs) != 0 {
+		return false
+	}
+	return true
 }
 
-// IsDefaultNamespaceResource returns true if the resource name is in the
+// IsNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
 // implicitly in the kubernetes.io/ namespace.
-func IsDefaultNamespaceResource(name core.ResourceName) bool {
+func IsNativeResource(name core.ResourceName) bool {
 	return !strings.Contains(string(name), "/") ||
 		strings.Contains(string(name), core.ResourceDefaultNamespacePrefix)
 }
 
-var overcommitBlacklist = sets.NewString(string(core.ResourceNvidiaGPU))
-
 // IsOvercommitAllowed returns true if the resource is in the default
-// namespace and not blacklisted.
+// namespace and is not hugepages.
 func IsOvercommitAllowed(name core.ResourceName) bool {
-	return IsDefaultNamespaceResource(name) &&
-		!IsHugePageResourceName(name) &&
-		!overcommitBlacklist.Has(string(name))
+	return IsNativeResource(name) &&
+		!IsHugePageResourceName(name)
 }
 
 var standardLimitRangeTypes = sets.NewString(
@@ -314,16 +323,6 @@ func ingressEqual(lhs, rhs *core.LoadBalancerIngress) bool {
 	return true
 }
 
-// TODO: make method on LoadBalancerStatus?
-func LoadBalancerStatusDeepCopy(lb *core.LoadBalancerStatus) *core.LoadBalancerStatus {
-	c := &core.LoadBalancerStatus{}
-	c.Ingress = make([]core.LoadBalancerIngress, len(lb.Ingress))
-	for i := range lb.Ingress {
-		c.Ingress[i] = lb.Ingress[i]
-	}
-	return c
-}
-
 // GetAccessModesAsString returns a string representation of an array of access modes.
 // modes, when present, are always in the same order: RWO,ROX,RWX.
 func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
@@ -411,6 +410,38 @@ func NodeSelectorRequirementsAsSelector(nsm []core.NodeSelectorRequirement) (lab
 		selector = selector.Add(*r)
 	}
 	return selector, nil
+}
+
+// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
+// fields.Selector.
+func NodeSelectorRequirementsAsFieldSelector(nsm []core.NodeSelectorRequirement) (fields.Selector, error) {
+	if len(nsm) == 0 {
+		return fields.Nothing(), nil
+	}
+
+	selectors := []fields.Selector{}
+	for _, expr := range nsm {
+		switch expr.Operator {
+		case core.NodeSelectorOpIn:
+			if len(expr.Values) != 1 {
+				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+					len(expr.Values), expr.Operator)
+			}
+			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
+
+		case core.NodeSelectorOpNotIn:
+			if len(expr.Values) != 1 {
+				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+					len(expr.Values), expr.Operator)
+			}
+			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
+
+		default:
+			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
+		}
+	}
+
+	return fields.AndSelectors(selectors...), nil
 }
 
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
@@ -552,34 +583,4 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 	}
 
 	return false
-}
-
-// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
-// and converts it to the NodeAffinity type in core.
-// TODO: update when storage node affinity graduates to beta
-func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*core.NodeAffinity, error) {
-	if len(annotations) > 0 && annotations[core.AlphaStorageNodeAffinityAnnotation] != "" {
-		var affinity core.NodeAffinity
-		err := json.Unmarshal([]byte(annotations[core.AlphaStorageNodeAffinityAnnotation]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
-// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
-// TODO: update when storage node affinity graduates to beta
-func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *core.NodeAffinity) error {
-	if affinity == nil {
-		return nil
-	}
-
-	json, err := json.Marshal(*affinity)
-	if err != nil {
-		return err
-	}
-	annotations[core.AlphaStorageNodeAffinityAnnotation] = string(json)
-	return nil
 }

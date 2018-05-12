@@ -17,9 +17,10 @@ limitations under the License.
 package vclib
 
 import (
+	"context"
+
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
-	"golang.org/x/net/context"
 )
 
 // Folder extends the govmomi Folder object

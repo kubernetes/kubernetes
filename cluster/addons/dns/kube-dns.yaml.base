@@ -84,6 +84,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
@@ -94,7 +95,7 @@ spec:
           optional: true
       containers:
       - name: kubedns
-        image: gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.8
+        image: k8s.gcr.io/k8s-dns-kube-dns-amd64:1.14.10
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -145,7 +146,7 @@ spec:
         - name: kube-dns-config
           mountPath: /kube-dns-config
       - name: dnsmasq
-        image: gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.8
+        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny-amd64:1.14.10
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -184,7 +185,7 @@ spec:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
       - name: sidecar
-        image: gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.8
+        image: k8s.gcr.io/k8s-dns-sidecar-amd64:1.14.10
         livenessProbe:
           httpGet:
             path: /metrics

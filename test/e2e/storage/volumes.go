@@ -261,7 +261,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
 				Prefix:      "cephfs",
-				ServerImage: imageutils.GetE2EImage(imageutils.VolumeCephServer),
+				ServerImage: imageutils.GetE2EImage(imageutils.VolumeRBDServer),
 				ServerPorts: []int{6789},
 			}
 
@@ -279,10 +279,9 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: config.Prefix + "-secret",
 				},
-				// Must use the ceph keyring at contrib/for-tests/volumes-ceph/ceph/init.sh
-				// and encode in base64
+				// from test/images/volumes-tester/rbd/keyring
 				Data: map[string][]byte{
-					"key": []byte("AQAMgXhVwBCeDhAA9nlPaFyfUSatGD4drFWDvQ=="),
+					"key": []byte("AQDRrKNVbEevChAAEmRC+pW/KBVHxa0w/POILA=="),
 				},
 				Type: "kubernetes.io/cephfs",
 			}
@@ -503,24 +502,18 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	Describe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
+			vspheretest.Bootstrap(f)
+			nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
 			var volumePath string
 			config := framework.VolumeTestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "vsphere",
 			}
-			By("creating a test vsphere volume")
-			c, err := framework.LoadClientset()
-			if err != nil {
-				return
-			}
-			vsp, err := vspheretest.GetVSphere(c)
-			Expect(err).NotTo(HaveOccurred())
-
-			volumePath, err = vspheretest.CreateVSphereVolume(vsp, nil)
+			volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
 			Expect(err).NotTo(HaveOccurred())
 
 			defer func() {
-				vsp.DeleteVolume(volumePath)
+				nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
 			}()
 
 			defer func() {

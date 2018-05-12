@@ -54,11 +54,9 @@ type Rule struct {
 type FailurePolicyType string
 
 const (
-	// Ignore means the initializer is removed from the initializers list of an
-	// object if the initializer is timed out.
+	// Ignore means that an error calling the webhook is ignored.
 	Ignore FailurePolicyType = "Ignore"
-	// For 1.7, only "Ignore" is allowed. "Fail" will be allowed when the
-	// extensible admission feature is beta.
+	// Fail means that an error calling the webhook causes the admission to fail.
 	Fail FailurePolicyType = "Fail"
 )
 
@@ -137,6 +135,10 @@ type Webhook struct {
 
 	// Rules describes what operations on what resources/subresources the webhook cares about.
 	// The webhook cares about an operation if it matches _any_ Rule.
+	// However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks
+	// from putting the cluster in a state which cannot be recovered from without completely
+	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
+	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 
 	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -147,8 +149,8 @@ type Webhook struct {
 	// NamespaceSelector decides whether to run the webhook on an object based
 	// on whether the namespace for that object matches the selector. If the
 	// object itself is a namespace, the matching is performed on
-	// object.metadata.labels. If the object is other cluster scoped resource,
-	// it is not subjected to the webhook.
+	// object.metadata.labels. If the object is another cluster scoped resource,
+	// it never skips the webhook.
 	//
 	// For example, to run the webhook on any objects whose namespace is not
 	// associated with "runlevel" of "0" or "1";  you will set the selector as
@@ -252,9 +254,7 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// If there is only one port open for the service, that port will be
-	// used. If there are multiple ports open, port 443 will be used if it
-	// is open, otherwise it is an error.
+	// Port 443 will be used if it is open, otherwise it is an error.
 	//
 	// +optional
 	Service *ServiceReference `json:"service" protobuf:"bytes,1,opt,name=service"`

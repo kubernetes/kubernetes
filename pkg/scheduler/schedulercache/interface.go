@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+// PodFilter is a function to filter a pod. If pod passed return true else return false.
 type PodFilter func(*v1.Pod) bool
 
 // Cache collects pods' information and provides node-level aggregated information.
@@ -118,4 +119,17 @@ type Cache interface {
 
 	// FilteredList returns all cached pods that pass the filter.
 	FilteredList(filter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
+
+	// Snapshot takes a snapshot on current cache
+	Snapshot() *Snapshot
+
+	// IsUpToDate returns true if the given NodeInfo matches the current data in the cache.
+	IsUpToDate(n *NodeInfo) bool
+}
+
+// Snapshot is a snapshot of cache state
+type Snapshot struct {
+	AssumedPods map[string]bool
+	Nodes       map[string]*NodeInfo
+	Pdbs        map[string]*policy.PodDisruptionBudget
 }

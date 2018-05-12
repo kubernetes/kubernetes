@@ -1,3 +1,17 @@
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 package azure
 
 import (
@@ -30,7 +44,7 @@ func DoRetryWithRegistration(client autorest.Client) autorest.SendDecorator {
 					return resp, err
 				}
 
-				if resp.StatusCode != http.StatusConflict {
+				if resp.StatusCode != http.StatusConflict || client.SkipResourceProviderRegistration {
 					return resp, err
 				}
 				var re RequestError
@@ -41,25 +55,23 @@ func DoRetryWithRegistration(client autorest.Client) autorest.SendDecorator {
 				if err != nil {
 					return resp, err
 				}
+				err = re
 
 				if re.ServiceError != nil && re.ServiceError.Code == "MissingSubscriptionRegistration" {
-					err = register(client, r, re)
-					if err != nil {
-						return resp, fmt.Errorf("failed auto registering Resource Provider: %s", err)
+					regErr := register(client, r, re)
+					if regErr != nil {
+						return resp, fmt.Errorf("failed auto registering Resource Provider: %s. Original error: %s", regErr, err)
 					}
 				}
 			}
-			return resp, errors.New("failed request and resource provider registration")
+			return resp, fmt.Errorf("failed request: %s", err)
 		})
 	}
 }
 
 func getProvider(re RequestError) (string, error) {
-	if re.ServiceError != nil {
-		if re.ServiceError.Details != nil && len(*re.ServiceError.Details) > 0 {
-			detail := (*re.ServiceError.Details)[0].(map[string]interface{})
-			return detail["target"].(string), nil
-		}
+	if re.ServiceError != nil && len(re.ServiceError.Details) > 0 {
+		return re.ServiceError.Details[0]["target"].(string), nil
 	}
 	return "", errors.New("provider was not found in the response")
 }
@@ -103,7 +115,7 @@ func register(client autorest.Client, originalReq *http.Request, re RequestError
 	if err != nil {
 		return err
 	}
-	req.Cancel = originalReq.Cancel
+	req = req.WithContext(originalReq.Context())
 
 	resp, err := autorest.SendWithSender(client, req,
 		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...),
@@ -142,9 +154,9 @@ func register(client autorest.Client, originalReq *http.Request, re RequestError
 		if err != nil {
 			return err
 		}
-		req.Cancel = originalReq.Cancel
+		req = req.WithContext(originalReq.Context())
 
-		resp, err := autorest.SendWithSender(client.Sender, req,
+		resp, err := autorest.SendWithSender(client, req,
 			autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...),
 		)
 		if err != nil {
@@ -166,9 +178,9 @@ func register(client autorest.Client, originalReq *http.Request, re RequestError
 			break
 		}
 
-		delayed := autorest.DelayWithRetryAfter(resp, originalReq.Cancel)
-		if !delayed {
-			autorest.DelayForBackoff(client.PollingDelay, 0, originalReq.Cancel)
+		delayed := autorest.DelayWithRetryAfter(resp, originalReq.Context().Done())
+		if !delayed && !autorest.DelayForBackoff(client.PollingDelay, 0, originalReq.Context().Done()) {
+			return originalReq.Context().Err()
 		}
 	}
 	if !(time.Since(now) < client.PollingDuration) {

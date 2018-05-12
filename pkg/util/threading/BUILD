@@ -17,7 +17,6 @@ go_test(
     name = "go_default_test",
     srcs = ["deadlock-detector_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/threading",
 )
 
 filegroup(

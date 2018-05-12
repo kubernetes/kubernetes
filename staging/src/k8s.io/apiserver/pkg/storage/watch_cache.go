@@ -61,12 +61,16 @@ type watchCacheEvent struct {
 }
 
 // Computing a key of an object is generally non-trivial (it performs
-// e.g. validation underneath). To avoid computing it multiple times
-// (to serve the event in different List/Watch requests), in the
-// underlying store we are keeping pair (key, object).
+// e.g. validation underneath). Similarly computing object fields and
+// labels. To avoid computing them multiple times (to serve the event
+// in different List/Watch requests), in the underlying store we are
+// keeping structs (key, object, labels, fields, uninitialized).
 type storeElement struct {
-	Key    string
-	Object runtime.Object
+	Key           string
+	Object        runtime.Object
+	Labels        labels.Set
+	Fields        fields.Set
+	Uninitialized bool
 }
 
 func storeElementKey(obj interface{}) (string, error) {
@@ -220,6 +224,20 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		return fmt.Errorf("couldn't compute key: %v", err)
 	}
 	elem := &storeElement{Key: key, Object: event.Object}
+	elem.Labels, elem.Fields, elem.Uninitialized, err = w.getAttrsFunc(event.Object)
+	if err != nil {
+		return err
+	}
+
+	watchCacheEvent := &watchCacheEvent{
+		Type:             event.Type,
+		Object:           elem.Object,
+		ObjLabels:        elem.Labels,
+		ObjFields:        elem.Fields,
+		ObjUninitialized: elem.Uninitialized,
+		Key:              key,
+		ResourceVersion:  resourceVersion,
+	}
 
 	// TODO: We should consider moving this lock below after the watchCacheEvent
 	// is created. In such situation, the only problematic scenario is Replace(
@@ -231,34 +249,14 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if err != nil {
 		return err
 	}
-	objLabels, objFields, objUninitialized, err := w.getAttrsFunc(event.Object)
-	if err != nil {
-		return err
-	}
-	var prevObject runtime.Object
-	var prevObjLabels labels.Set
-	var prevObjFields fields.Set
-	var prevObjUninitialized bool
 	if exists {
-		prevObject = previous.(*storeElement).Object
-		prevObjLabels, prevObjFields, prevObjUninitialized, err = w.getAttrsFunc(prevObject)
-		if err != nil {
-			return err
-		}
+		previousElem := previous.(*storeElement)
+		watchCacheEvent.PrevObject = previousElem.Object
+		watchCacheEvent.PrevObjLabels = previousElem.Labels
+		watchCacheEvent.PrevObjFields = previousElem.Fields
+		watchCacheEvent.PrevObjUninitialized = previousElem.Uninitialized
 	}
-	watchCacheEvent := &watchCacheEvent{
-		Type:                 event.Type,
-		Object:               event.Object,
-		ObjLabels:            objLabels,
-		ObjFields:            objFields,
-		ObjUninitialized:     objUninitialized,
-		PrevObject:           prevObject,
-		PrevObjLabels:        prevObjLabels,
-		PrevObjFields:        prevObjFields,
-		PrevObjUninitialized: prevObjUninitialized,
-		Key:                  key,
-		ResourceVersion:      resourceVersion,
-	}
+
 	if w.onEvent != nil {
 		w.onEvent(watchCacheEvent)
 	}
@@ -362,7 +360,7 @@ func (w *watchCache) GetByKey(key string) (interface{}, bool, error) {
 	return w.store.GetByKey(key)
 }
 
-// Replace takes slice of runtime.Object as a paramater.
+// Replace takes slice of runtime.Object as a parameter.
 func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	version, err := parseResourceVersion(resourceVersion)
 	if err != nil {
@@ -379,7 +377,17 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		if err != nil {
 			return fmt.Errorf("couldn't compute key: %v", err)
 		}
-		toReplace = append(toReplace, &storeElement{Key: key, Object: object})
+		objLabels, objFields, objUninitialized, err := w.getAttrsFunc(object)
+		if err != nil {
+			return err
+		}
+		toReplace = append(toReplace, &storeElement{
+			Key:           key,
+			Object:        object,
+			Labels:        objLabels,
+			Fields:        objFields,
+			Uninitialized: objUninitialized,
+		})
 	}
 
 	w.Lock()

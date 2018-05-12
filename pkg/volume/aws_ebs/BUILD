@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "attacher.go",
         "aws_ebs.go",
+        "aws_ebs_block.go",
         "aws_util.go",
         "doc.go",
     ],
@@ -22,7 +23,7 @@ go_library(
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
+        "//pkg/volume/util/volumepathhandler:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -35,10 +36,10 @@ go_test(
     name = "go_default_test",
     srcs = [
         "attacher_test.go",
+        "aws_ebs_block_test.go",
         "aws_ebs_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/aws_ebs",
     deps = [
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/util/mount:go_default_library",

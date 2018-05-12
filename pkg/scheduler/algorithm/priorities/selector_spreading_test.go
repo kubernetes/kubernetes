@@ -807,7 +807,7 @@ func TestGetNodeClassificationByLabels(t *testing.T) {
 		t.Errorf("Expected only labeled node with label zoneA and no noNonLabeledNodes")
 	}
 	if len(noLabeledNodes) != 0 && newnonLabeledNodes[0] != machine02 {
-		t.Errorf("Expected only non labled nodes")
+		t.Errorf("Expected only non labelled nodes")
 	}
 }
 

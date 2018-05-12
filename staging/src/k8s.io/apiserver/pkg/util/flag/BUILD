@@ -17,7 +17,6 @@ go_test(
         "namedcertkey_flag_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/util/flag",
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
@@ -32,6 +31,7 @@ go_library(
         "map_string_bool.go",
         "map_string_string.go",
         "namedcertkey_flag.go",
+        "noop.go",
         "omitempty.go",
         "string_flag.go",
         "tristate.go",

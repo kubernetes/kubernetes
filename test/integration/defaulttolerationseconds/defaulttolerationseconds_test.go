@@ -21,9 +21,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
@@ -33,12 +33,11 @@ import (
 func TestAdmission(t *testing.T) {
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableProfiling = true
-	masterConfig.GenericConfig.EnableMetrics = true
 	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
 	ns := framework.CreateTestingNamespace("default-toleration-seconds", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)

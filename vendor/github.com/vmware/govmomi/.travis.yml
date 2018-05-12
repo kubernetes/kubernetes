@@ -3,10 +3,11 @@ sudo: false
 language: go
 
 go:
-   - 1.7
+   - 1.8
 
 before_install:
   - make vendor
 
 script:
   - make check test
+  - GOOS=windows make install

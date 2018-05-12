@@ -27,6 +27,7 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Policy describes a struct for a policy resource used in api.
 type Policy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Holds the information to configure the fit predicate functions
@@ -47,6 +48,7 @@ type Policy struct {
 	AlwaysCheckAllPredicates bool `json:"alwaysCheckAllPredicates"`
 }
 
+// PredicatePolicy describes a struct of a predicate policy.
 type PredicatePolicy struct {
 	// Identifier of the predicate policy
 	// For a custom predicate, the name can be user-defined
@@ -56,6 +58,7 @@ type PredicatePolicy struct {
 	Argument *PredicateArgument `json:"argument"`
 }
 
+// PriorityPolicy describes a struct of a priority policy.
 type PriorityPolicy struct {
 	// Identifier of the priority policy
 	// For a custom priority, the name can be user-defined
@@ -122,6 +125,16 @@ type LabelPreference struct {
 	Presence bool `json:"presence"`
 }
 
+// ExtenderManagedResource describes the arguments of extended resources
+// managed by an extender.
+type ExtenderManagedResource struct {
+	// Name is the extended resource name.
+	Name apiv1.ResourceName `json:"name,casttype=ResourceName"`
+	// IgnoredByScheduler indicates whether kube-scheduler should ignore this
+	// resource when applying predicates.
+	IgnoredByScheduler bool `json:"ignoredByScheduler,omitempty"`
+}
+
 // ExtenderConfig holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type ExtenderConfig struct {
@@ -129,6 +142,8 @@ type ExtenderConfig struct {
 	URLPrefix string `json:"urlPrefix"`
 	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
 	FilterVerb string `json:"filterVerb,omitempty"`
+	// Verb for the preempt call, empty if not supported. This verb is appended to the URLPrefix when issuing the preempt call to extender.
+	PreemptVerb string `json:"preemptVerb,omitempty"`
 	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
 	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
 	// The numeric multiplier for the node scores that the prioritize call generates.
@@ -138,8 +153,8 @@ type ExtenderConfig struct {
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
 	BindVerb string
-	// EnableHttps specifies whether https should be used to communicate with the extender
-	EnableHttps bool `json:"enableHttps,omitempty"`
+	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	EnableHTTPS bool `json:"enableHttps,omitempty"`
 	// TLSConfig specifies the transport layer security config
 	TLSConfig *restclient.TLSClientConfig `json:"tlsConfig,omitempty"`
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
@@ -149,19 +164,69 @@ type ExtenderConfig struct {
 	// so the scheduler should only send minimal information about the eligible nodes
 	// assuming that the extender already cached full details of all nodes in the cluster
 	NodeCacheCapable bool `json:"nodeCacheCapable,omitempty"`
+	// ManagedResources is a list of extended resources that are managed by
+	// this extender.
+	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
+	//   (if the extender is the binder) phases iff the pod requests at least
+	//   one of the extended resources in this list. If empty or unspecified,
+	//   all pods will be sent to this extender.
+	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
+	//   will skip checking the resource in predicates.
+	// +optional
+	ManagedResources []ExtenderManagedResource `json:"managedResources,omitempty"`
+	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
+	// fail when the extender returns an error or is not reachable.
+	Ignorable bool `json:"ignorable,omitempty"`
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize
 // nodes for a pod.
 type ExtenderArgs struct {
 	// Pod being scheduled
-	Pod apiv1.Pod `json:"pod"`
+	Pod *apiv1.Pod `json:"pod"`
 	// List of candidate nodes where the pod can be scheduled; to be populated
 	// only if ExtenderConfig.NodeCacheCapable == false
 	Nodes *apiv1.NodeList `json:"nodes,omitempty"`
 	// List of candidate node names where the pod can be scheduled; to be
 	// populated only if ExtenderConfig.NodeCacheCapable == true
 	NodeNames *[]string `json:"nodenames,omitempty"`
+}
+
+// ExtenderPreemptionResult represents the result returned by preemption phase of extender.
+type ExtenderPreemptionResult struct {
+	NodeNameToMetaVictims map[string]*MetaVictims `json:"nodeNameToMetaVictims,omitempty"`
+}
+
+// ExtenderPreemptionArgs represents the arguments needed by the extender to preempt pods on nodes.
+type ExtenderPreemptionArgs struct {
+	// Pod being scheduled
+	Pod *apiv1.Pod `json:"pod"`
+	// Victims map generated by scheduler preemption phase
+	// Only set NodeNameToMetaVictims if ExtenderConfig.NodeCacheCapable == true. Otherwise, only set NodeNameToVictims.
+	NodeNameToVictims     map[string]*Victims     `json:"nodeToVictims,omitempty"`
+	NodeNameToMetaVictims map[string]*MetaVictims `json:"nodeNameToMetaVictims,omitempty"`
+}
+
+// Victims represents:
+//   pods:  a group of pods expected to be preempted.
+//   numPDBViolations: the count of violations of PodDisruptionBudget
+type Victims struct {
+	Pods             []*apiv1.Pod `json:"pods"`
+	NumPDBViolations int          `json:"numPDBViolations"`
+}
+
+// MetaPod represent identifier for a v1.Pod
+type MetaPod struct {
+	UID string `json:"uid"`
+}
+
+// MetaVictims represents:
+//   pods:  a group of pods expected to be preempted.
+//     Only Pod identifiers will be sent and user are expect to get v1.Pod in their own way.
+//   numPDBViolations: the count of violations of PodDisruptionBudget
+type MetaVictims struct {
+	Pods             []*MetaPod `json:"pods"`
+	NumPDBViolations int        `json:"numPDBViolations"`
 }
 
 // FailedNodesMap represents the filtered out nodes, with node names and failure messages
@@ -207,6 +272,7 @@ type HostPriority struct {
 	Score int `json:"score"`
 }
 
+// HostPriorityList declares a []HostPriority type.
 type HostPriorityList []HostPriority
 
 func (h HostPriorityList) Len() int {

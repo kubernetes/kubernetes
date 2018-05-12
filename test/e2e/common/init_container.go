@@ -29,6 +29,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -42,8 +43,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 	})
 
 	It("should invoke init containers on a RestartNever pod", func() {
-		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -101,8 +100,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 	})
 
 	It("should invoke init containers on a RestartAlways pod", func() {
-		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -130,7 +127,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "run1",
-						Image: framework.GetPauseImageName(f.ClientSet),
+						Image: imageutils.GetPauseImageName(),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
@@ -164,8 +161,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 	})
 
 	It("should not start app containers if init containers fail on a RestartAlways pod", func() {
-		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -194,7 +189,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "run1",
-						Image: framework.GetPauseImageName(f.ClientSet),
+						Image: imageutils.GetPauseImageName(),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
@@ -274,8 +269,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 	})
 
 	It("should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
-		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
