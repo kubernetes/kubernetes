@@ -596,6 +596,7 @@ function kube::build::run_build_command_ex() {
 
   docker_run_opts+=(
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
+    --env "KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
     --env "GOFLAGS=${GOFLAGS:-}"
