@@ -123,34 +123,21 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		return false
 	}
 
-	if existingNode.Spec.ExternalID == node.Spec.ExternalID {
-		glog.Infof("Node %s was previously registered", kl.nodeName)
+	glog.Infof("Node %s was previously registered", kl.nodeName)
 
-		// Edge case: the node was previously registered; reconcile
-		// the value of the controller-managed attach-detach
-		// annotation.
-		requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
-		requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
-		if requiresUpdate {
-			if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
-				glog.Errorf("Unable to reconcile node %q with API server: error updating node: %v", kl.nodeName, err)
-				return false
-			}
+	// Edge case: the node was previously registered; reconcile
+	// the value of the controller-managed attach-detach
+	// annotation.
+	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
+	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
+	if requiresUpdate {
+		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
+			glog.Errorf("Unable to reconcile node %q with API server: error updating node: %v", kl.nodeName, err)
+			return false
 		}
-
-		return true
 	}
 
-	glog.Errorf("Previously node %q had externalID %q; now it is %q; will delete and recreate.",
-		kl.nodeName, node.Spec.ExternalID, existingNode.Spec.ExternalID,
-	)
-	if err := kl.kubeClient.CoreV1().Nodes().Delete(node.Name, nil); err != nil {
-		glog.Errorf("Unable to register node %q with API server: error deleting old node: %v", kl.nodeName, err)
-	} else {
-		glog.Infof("Deleted old node object %q", kl.nodeName)
-	}
-
-	return false
+	return true
 }
 
 // updateDefaultLabels will set the default labels on the node
@@ -300,18 +287,10 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			return nil, fmt.Errorf("failed to get instances from cloud provider")
 		}
 
-		// TODO(roberthbailey): Can we do this without having credentials to talk
-		// to the cloud provider?
-		// TODO: ExternalID is deprecated, we'll have to drop this code
-		externalID, err := instances.ExternalID(context.TODO(), kl.nodeName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get external ID from cloud provider: %v", err)
-		}
-		node.Spec.ExternalID = externalID
-
 		// TODO: We can't assume that the node has credentials to talk to the
 		// cloudprovider from arbitrary nodes. At most, we should talk to a
 		// local metadata server here.
+		var err error
 		if node.Spec.ProviderID == "" {
 			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(context.TODO(), kl.cloud, kl.nodeName)
 			if err != nil {
@@ -343,9 +322,8 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 				node.ObjectMeta.Labels[kubeletapis.LabelZoneRegion] = zone.Region
 			}
 		}
-	} else {
-		node.Spec.ExternalID = kl.hostname
 	}
+
 	kl.setNodeStatus(node)
 
 	return node, nil
@@ -369,6 +347,7 @@ func (kl *Kubelet) syncNodeStatus() {
 
 // updateNodeStatus updates node status to master with retries.
 func (kl *Kubelet) updateNodeStatus() error {
+	glog.V(5).Infof("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := kl.tryUpdateNodeStatus(i); err != nil {
 			glog.Errorf("Error updating node status, will retry: %v", err)
@@ -428,7 +407,7 @@ func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 // Set IP and hostname addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 	if kl.nodeIP != nil {
-		if err := validateNodeIP(kl.nodeIP); err != nil {
+		if err := kl.nodeIPValidator(kl.nodeIP); err != nil {
 			return fmt.Errorf("failed to validate nodeIP: %v", err)
 		}
 		glog.V(2).Infof("Using node IP: %q", kl.nodeIP.String())
@@ -453,18 +432,57 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		// to the cloud provider?
 		// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and returned an interface
 		// TODO: If IP addresses couldn't be fetched from the cloud provider, should kubelet fallback on the other methods for getting the IP below?
-		nodeAddresses, err := instances.NodeAddresses(context.TODO(), kl.nodeName)
+		var nodeAddresses []v1.NodeAddress
+		var err error
+
+		// Make sure the instances.NodeAddresses returns even if the cloud provider API hangs for a long time
+		func() {
+			kl.cloudproviderRequestMux.Lock()
+			if len(kl.cloudproviderRequestParallelism) > 0 {
+				kl.cloudproviderRequestMux.Unlock()
+				return
+			}
+			kl.cloudproviderRequestParallelism <- 0
+			kl.cloudproviderRequestMux.Unlock()
+
+			go func() {
+				nodeAddresses, err = instances.NodeAddresses(context.TODO(), kl.nodeName)
+
+				kl.cloudproviderRequestMux.Lock()
+				<-kl.cloudproviderRequestParallelism
+				kl.cloudproviderRequestMux.Unlock()
+
+				kl.cloudproviderRequestSync <- 0
+			}()
+		}()
+
+		select {
+		case <-kl.cloudproviderRequestSync:
+		case <-time.After(kl.cloudproviderRequestTimeout):
+			err = fmt.Errorf("Timeout after %v", kl.cloudproviderRequestTimeout)
+		}
+
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
 		if kl.nodeIP != nil {
 			enforcedNodeAddresses := []v1.NodeAddress{}
+
+			var nodeIPType v1.NodeAddressType
 			for _, nodeAddress := range nodeAddresses {
 				if nodeAddress.Address == kl.nodeIP.String() {
 					enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
+					nodeIPType = nodeAddress.Type
+					break
 				}
 			}
 			if len(enforcedNodeAddresses) > 0 {
+				for _, nodeAddress := range nodeAddresses {
+					if nodeAddress.Type != nodeIPType && nodeAddress.Type != v1.NodeHostName {
+						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
+					}
+				}
+
 				enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: kl.GetHostname()})
 				node.Status.Addresses = enforcedNodeAddresses
 				return nil
@@ -505,7 +523,7 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 			var addrs []net.IP
 			addrs, _ = net.LookupIP(node.Name)
 			for _, addr := range addrs {
-				if err = validateNodeIP(addr); err == nil {
+				if err = kl.nodeIPValidator(addr); err == nil {
 					if addr.To4() != nil {
 						ipAddr = addr
 						break
@@ -538,14 +556,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	//       resources are being advertised.
 	if node.Status.Capacity == nil {
 		node.Status.Capacity = v1.ResourceList{}
-	}
-
-	// populate GPU capacity.
-	gpuCapacity := kl.gpuManager.Capacity()
-	if gpuCapacity != nil {
-		for k, v := range gpuCapacity {
-			node.Status.Capacity[k] = v
-		}
 	}
 
 	var devicePluginAllocatable v1.ResourceList
@@ -599,7 +609,9 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = kl.containerManager.GetDevicePluginResourceCapacity()
 		if devicePluginCapacity != nil {
 			for k, v := range devicePluginCapacity {
-				glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
+				if old, ok := node.Status.Capacity[k]; !ok || old.Value() != v.Value() {
+					glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
+				}
 				node.Status.Capacity[k] = v
 			}
 		}
@@ -642,9 +654,12 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		}
 		node.Status.Allocatable[k] = value
 	}
+
 	if devicePluginAllocatable != nil {
 		for k, v := range devicePluginAllocatable {
-			glog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
+			if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {
+				glog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
+			}
 			node.Status.Allocatable[k] = v
 		}
 	}
@@ -1049,7 +1064,8 @@ func (kl *Kubelet) setNodeVolumesInUseStatus(node *v1.Node) {
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
 // refactor the node status condition code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *v1.Node) {
-	for _, f := range kl.setNodeStatusFuncs {
+	for i, f := range kl.setNodeStatusFuncs {
+		glog.V(5).Infof("Setting node status at position %v", i)
 		if err := f(node); err != nil {
 			glog.Warningf("Failed to set some node status fields: %s", err)
 		}

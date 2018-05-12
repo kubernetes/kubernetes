@@ -137,6 +137,9 @@ type Config struct {
 
 	// VolumeBinder handles PVC/PV binding for the pod.
 	VolumeBinder *volumebinder.VolumeBinder
+
+	// Disable pod preemption or not.
+	DisablePreemption bool
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
@@ -207,8 +210,9 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 // If it succeeds, it adds the name of the node where preemption has happened to the pod annotations.
 // It returns the node name and an error if any.
 func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
-	if !util.PodPriorityEnabled() {
-		glog.V(3).Infof("Pod priority feature is not enabled. No preemption is performed.")
+	if !util.PodPriorityEnabled() || sched.config.DisablePreemption {
+		glog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
+			" No preemption is performed.")
 		return "", nil
 	}
 	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)
@@ -328,7 +332,7 @@ func (sched *Scheduler) bindVolumesWorker() {
 		// The Pod is always sent back to the scheduler afterwards.
 		err := sched.config.VolumeBinder.Binder.BindPodVolumes(assumed)
 		if err != nil {
-			glog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name, err)
+			glog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", assumed.Namespace, assumed.Name, err)
 			reason = "VolumeBindingFailed"
 			eventType = v1.EventTypeWarning
 		} else {
@@ -423,7 +427,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	}
 
 	metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
-	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", assumed.Name, b.Target.Name)
+	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, b.Target.Name)
 	return nil
 }
 

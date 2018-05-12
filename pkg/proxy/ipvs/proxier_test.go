@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -119,36 +120,42 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 	return &Proxier{
-		exec:               fexec,
-		serviceMap:         make(proxy.ServiceMap),
-		serviceChanges:     proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
-		endpointsMap:       make(proxy.EndpointsMap),
-		endpointsChanges:   proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil),
-		iptables:           ipt,
-		ipvs:               ipvs,
-		ipset:              ipset,
-		clusterCIDR:        "10.0.0.0/24",
-		hostname:           testHostname,
-		portsMap:           make(map[utilproxy.LocalPort]utilproxy.Closeable),
-		portMapper:         &fakePortOpener{[]*utilproxy.LocalPort{}},
-		healthChecker:      newFakeHealthChecker(),
-		ipvsScheduler:      DefaultScheduler,
-		ipGetter:           &fakeIPGetter{nodeIPs: nodeIPs},
-		iptablesData:       bytes.NewBuffer(nil),
-		natChains:          bytes.NewBuffer(nil),
-		natRules:           bytes.NewBuffer(nil),
-		netlinkHandle:      netlinktest.NewFakeNetlinkHandle(),
-		loopbackSet:        NewIPSet(ipset, KubeLoopBackIPSet, utilipset.HashIPPortIP, false),
-		clusterIPSet:       NewIPSet(ipset, KubeClusterIPSet, utilipset.HashIPPort, false),
-		externalIPSet:      NewIPSet(ipset, KubeExternalIPSet, utilipset.HashIPPort, false),
-		lbIngressSet:       NewIPSet(ipset, KubeLoadBalancerSet, utilipset.HashIPPort, false),
-		lbMasqSet:          NewIPSet(ipset, KubeLoadBalancerMasqSet, utilipset.HashIPPort, false),
-		lbWhiteListIPSet:   NewIPSet(ipset, KubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, false),
-		lbWhiteListCIDRSet: NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, false),
-		nodePortSetTCP:     NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
-		nodePortSetUDP:     NewIPSet(ipset, KubeNodePortSetUDP, utilipset.BitmapPort, false),
-		nodePortAddresses:  make([]string, 0),
-		networkInterfacer:  proxyutiltest.NewFakeNetwork(),
+		exec:                fexec,
+		serviceMap:          make(proxy.ServiceMap),
+		serviceChanges:      proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
+		endpointsMap:        make(proxy.EndpointsMap),
+		endpointsChanges:    proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil),
+		excludeCIDRs:        make([]string, 0),
+		iptables:            ipt,
+		ipvs:                ipvs,
+		ipset:               ipset,
+		clusterCIDR:         "10.0.0.0/24",
+		hostname:            testHostname,
+		portsMap:            make(map[utilproxy.LocalPort]utilproxy.Closeable),
+		portMapper:          &fakePortOpener{[]*utilproxy.LocalPort{}},
+		healthChecker:       newFakeHealthChecker(),
+		ipvsScheduler:       DefaultScheduler,
+		ipGetter:            &fakeIPGetter{nodeIPs: nodeIPs},
+		iptablesData:        bytes.NewBuffer(nil),
+		natChains:           bytes.NewBuffer(nil),
+		natRules:            bytes.NewBuffer(nil),
+		filterChains:        bytes.NewBuffer(nil),
+		filterRules:         bytes.NewBuffer(nil),
+		netlinkHandle:       netlinktest.NewFakeNetlinkHandle(),
+		loopbackSet:         NewIPSet(ipset, KubeLoopBackIPSet, utilipset.HashIPPortIP, false),
+		clusterIPSet:        NewIPSet(ipset, KubeClusterIPSet, utilipset.HashIPPort, false),
+		externalIPSet:       NewIPSet(ipset, KubeExternalIPSet, utilipset.HashIPPort, false),
+		lbSet:               NewIPSet(ipset, KubeLoadBalancerSet, utilipset.HashIPPort, false),
+		lbFWSet:             NewIPSet(ipset, KubeLoadbalancerFWSet, utilipset.HashIPPort, false),
+		lbLocalSet:          NewIPSet(ipset, KubeLoadBalancerLocalSet, utilipset.HashIPPort, false),
+		lbWhiteListIPSet:    NewIPSet(ipset, KubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, false),
+		lbWhiteListCIDRSet:  NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, false),
+		nodePortSetTCP:      NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
+		nodePortLocalSetTCP: NewIPSet(ipset, KubeNodePortLocalSetTCP, utilipset.BitmapPort, false),
+		nodePortLocalSetUDP: NewIPSet(ipset, KubeNodePortLocalSetUDP, utilipset.BitmapPort, false),
+		nodePortSetUDP:      NewIPSet(ipset, KubeNodePortSetUDP, utilipset.BitmapPort, false),
+		nodePortAddresses:   make([]string, 0),
+		networkInterfacer:   proxyutiltest.NewFakeNetwork(),
 	}
 }
 
@@ -802,16 +809,10 @@ func TestLoadBalancer(t *testing.T) {
 	fp.syncProxyRules()
 }
 
-func strPtr(s string) *string {
-	return &s
-}
-
 func TestOnlyLocalNodePorts(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
+	ipt, fp := buildFakeProxier([]net.IP{nodeIP})
+
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -834,17 +835,13 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 		}),
 	)
 
-	epIP1 := "10.180.0.1"
-	epIP2 := "10.180.2.1"
+	epIP := "10.180.0.1"
 	makeEndpointsMap(fp,
 		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *api.Endpoints) {
 			ept.Subsets = []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{
-					IP:       epIP1,
+					IP:       epIP,
 					NodeName: nil,
-				}, {
-					IP:       epIP2,
-					NodeName: strPtr(testHostname),
 				}},
 				Ports: []api.EndpointPort{{
 					Name: svcPortName.Port,
@@ -865,41 +862,205 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	fp.syncProxyRules()
 
 	// Expect 3 services and 1 destination
-	services, err := ipvs.GetVirtualServers()
-	if err != nil {
-		t.Errorf("Failed to get ipvs services, err: %v", err)
+	epVS := &netlinktest.ExpectedVirtualServer{
+		VSNum: 3, IP: nodeIP.String(), Port: uint16(svcNodePort), Protocol: string(api.ProtocolTCP),
+		RS: []netlinktest.ExpectedRealServer{{
+			IP: epIP, Port: uint16(svcPort),
+		}}}
+	checkIPVS(t, fp, epVS)
+
+	// check ipSet rules
+	epEntry := &utilipset.Entry{
+		Port:     svcNodePort,
+		Protocol: strings.ToLower(string(api.ProtocolTCP)),
+		SetType:  utilipset.BitmapPort,
 	}
-	if len(services) != 3 {
-		t.Errorf("Expect 3 ipvs services, got %d", len(services))
+	epIPSet := netlinktest.ExpectedIPSet{
+		KubeNodePortSetTCP:      {epEntry},
+		KubeNodePortLocalSetTCP: {epEntry},
 	}
-	found := false
-	for _, svc := range services {
-		if svc.Address.Equal(nodeIP) && svc.Port == uint16(svcNodePort) && svc.Protocol == string(api.ProtocolTCP) {
-			found = true
-			destinations, err := ipvs.GetRealServers(svc)
-			if err != nil {
-				t.Errorf("Failed to get ipvs destinations, err: %v", err)
+	checkIPSet(t, fp, epIPSet)
+
+	// Check iptables chain and rules
+	epIpt := netlinktest.ExpectedIptablesChain{
+		string(kubeServicesChain): {{
+			JumpChain: string(KubeNodePortChain), MatchSet: KubeNodePortSetTCP,
+		}},
+		string(KubeNodePortChain): {{
+			JumpChain: "ACCEPT", MatchSet: KubeNodePortLocalSetTCP,
+		}, {
+			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+		}},
+	}
+	checkIptables(t, ipt, epIpt)
+}
+func TestLoadBalanceSourceRanges(t *testing.T) {
+	nodeIP := net.ParseIP("100.101.102.103")
+	ipt, fp := buildFakeProxier([]net.IP{nodeIP})
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcLBIP := "1.2.3.4"
+	svcLBSource := "10.0.0.0/8"
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+	epIP := "10.180.0.1"
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []api.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: api.ProtocolTCP,
+			}}
+			svc.Status.LoadBalancer.Ingress = []api.LoadBalancerIngress{{
+				IP: svcLBIP,
+			}}
+			svc.Spec.LoadBalancerSourceRanges = []string{
+				svcLBSource,
 			}
-			if len(destinations) != 1 {
-				t.Errorf("Expect 1 ipvs destination, got %d", len(destinations))
-			} else {
-				if destinations[0].Address.String() != epIP2 || destinations[0].Port != uint16(svcPort) {
-					t.Errorf("service Endpoint mismatch ipvs service destination")
+		}),
+	)
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP:       epIP,
+					NodeName: nil,
+				}},
+				Ports: []api.EndpointPort{{
+					Name: svcPortName.Port,
+					Port: int32(svcPort),
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	// Check ipvs service and destinations
+	epVS := &netlinktest.ExpectedVirtualServer{
+		VSNum: 2, IP: svcLBIP, Port: uint16(svcPort), Protocol: string(api.ProtocolTCP),
+		RS: []netlinktest.ExpectedRealServer{{
+			IP: epIP, Port: uint16(svcPort),
+		}}}
+	checkIPVS(t, fp, epVS)
+
+	// Check ipset entry
+	epIPSet := netlinktest.ExpectedIPSet{
+		KubeLoadBalancerSet: {{
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			SetType:  utilipset.HashIPPort,
+		}},
+		KubeLoadbalancerFWSet: {{
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			SetType:  utilipset.HashIPPort,
+		}},
+		KubeLoadBalancerSourceCIDRSet: {{
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			Net:      svcLBSource,
+			SetType:  utilipset.HashIPPortNet,
+		}},
+	}
+	checkIPSet(t, fp, epIPSet)
+
+	// Check iptables chain and rules
+	epIpt := netlinktest.ExpectedIptablesChain{
+		string(kubeServicesChain): {{
+			JumpChain: string(KubeLoadBalancerChain), MatchSet: KubeLoadBalancerSet,
+		}},
+		string(KubeLoadBalancerChain): {{
+			JumpChain: string(KubeFireWallChain), MatchSet: KubeLoadbalancerFWSet,
+		}, {
+			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+		}},
+		string(KubeFireWallChain): {{
+			JumpChain: "RETURN", MatchSet: KubeLoadBalancerSourceCIDRSet,
+		}, {
+			JumpChain: string(KubeMarkDropChain), MatchSet: "",
+		}},
+	}
+	checkIptables(t, ipt, epIpt)
+}
+
+func TestAcceptIPVSTraffic(t *testing.T) {
+	ipt, fp := buildFakeProxier(nil)
+
+	ingressIP := "1.2.3.4"
+	externalIP := []string{"5.6.7.8"}
+	svcInfos := []struct {
+		svcType api.ServiceType
+		svcIP   string
+		svcName string
+		epIP    string
+	}{
+		{api.ServiceTypeClusterIP, "10.20.30.40", "svc1", "10.180.0.1"},
+		{api.ServiceTypeLoadBalancer, "10.20.30.41", "svc2", "10.180.0.2"},
+		{api.ServiceTypeNodePort, "10.20.30.42", "svc3", "10.180.0.3"},
+	}
+
+	for _, svcInfo := range svcInfos {
+		makeServiceMap(fp,
+			makeTestService("ns1", svcInfo.svcName, func(svc *api.Service) {
+				svc.Spec.Type = svcInfo.svcType
+				svc.Spec.ClusterIP = svcInfo.svcIP
+				svc.Spec.Ports = []api.ServicePort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: api.ProtocolTCP,
+					NodePort: 80,
+				}}
+				if svcInfo.svcType == api.ServiceTypeLoadBalancer {
+					svc.Status.LoadBalancer.Ingress = []api.LoadBalancerIngress{{
+						IP: ingressIP,
+					}}
 				}
-			}
-			break
-		}
+				if svcInfo.svcType == api.ServiceTypeClusterIP {
+					svc.Spec.ExternalIPs = externalIP
+				}
+			}),
+		)
+
+		makeEndpointsMap(fp,
+			makeTestEndpoints("ns1", "p80", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{
+						IP: svcInfo.epIP,
+					}},
+					Ports: []api.EndpointPort{{
+						Name: "p80",
+						Port: 80,
+					}},
+				}}
+			}),
+		)
 	}
-	if !found {
-		t.Errorf("Expect node port type service, got none")
+	fp.syncProxyRules()
+
+	// Check iptables chain and rules
+	epIpt := netlinktest.ExpectedIptablesChain{
+		string(kubeServicesChain): {
+			{JumpChain: "ACCEPT", MatchSet: KubeClusterIPSet},
+			{JumpChain: "ACCEPT", MatchSet: KubeLoadBalancerSet},
+			{JumpChain: "ACCEPT", MatchSet: KubeExternalIPSet},
+		},
 	}
+	checkIptables(t, ipt, epIpt)
 }
 
 func TestOnlyLocalLoadBalancing(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	ipt, fp := buildFakeProxier(nil)
+
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -926,17 +1087,13 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		}),
 	)
 
-	epIP1 := "10.180.0.1"
-	epIP2 := "10.180.2.1"
+	epIP := "10.180.0.1"
 	makeEndpointsMap(fp,
 		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *api.Endpoints) {
 			ept.Subsets = []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{
-					IP:       epIP1,
+					IP:       epIP,
 					NodeName: nil,
-				}, {
-					IP:       epIP2,
-					NodeName: strPtr(testHostname),
 				}},
 				Ports: []api.EndpointPort{{
 					Name: svcPortName.Port,
@@ -947,6 +1104,44 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	)
 
 	fp.syncProxyRules()
+
+	// Expect 2 services and 1 destination
+	epVS := &netlinktest.ExpectedVirtualServer{
+		VSNum: 2, IP: svcLBIP, Port: uint16(svcPort), Protocol: string(api.ProtocolTCP),
+		RS: []netlinktest.ExpectedRealServer{{
+			IP: epIP, Port: uint16(svcPort),
+		}}}
+	checkIPVS(t, fp, epVS)
+
+	// check ipSet rules
+	epIPSet := netlinktest.ExpectedIPSet{
+		KubeLoadBalancerSet: {{
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			SetType:  utilipset.HashIPPort,
+		}},
+		KubeLoadBalancerLocalSet: {{
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			SetType:  utilipset.HashIPPort,
+		}},
+	}
+	checkIPSet(t, fp, epIPSet)
+
+	// Check iptables chain and rules
+	epIpt := netlinktest.ExpectedIptablesChain{
+		string(kubeServicesChain): {{
+			JumpChain: string(KubeLoadBalancerChain), MatchSet: KubeLoadBalancerSet,
+		}},
+		string(KubeLoadBalancerChain): {{
+			JumpChain: "RETURN", MatchSet: KubeLoadBalancerLocalSet,
+		}, {
+			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+		}},
+	}
+	checkIptables(t, ipt, epIpt)
 }
 
 func addTestPort(array []api.ServicePort, name string, protocol api.Protocol, port, nodeport int32, targetPort int) []api.ServicePort {
@@ -2274,6 +2469,160 @@ func Test_syncService(t *testing.T) {
 		}
 		if !list[0].Equal(testCases[i].newVirtualServer) {
 			t.Errorf("Case [%d], unexpected mismatch, expect: %#v, got: %#v", i, testCases[i].newVirtualServer, list[0])
+		}
+	}
+}
+
+func Test_cleanLegacyService(t *testing.T) {
+	// All ipvs services that were processed in the latest sync loop.
+	activeServices := map[string]bool{"ipvs0": true, "ipvs1": true}
+	// All ipvs services in the system.
+	currentServices := map[string]*utilipvs.VirtualServer{
+		// Created by kube-proxy.
+		"ipvs0": {
+			Address:   net.ParseIP("1.1.1.1"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      53,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by kube-proxy.
+		"ipvs1": {
+			Address:   net.ParseIP("2.2.2.2"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      54,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by an external party.
+		"ipvs2": {
+			Address:   net.ParseIP("3.3.3.3"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      55,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by an external party.
+		"ipvs3": {
+			Address:   net.ParseIP("4.4.4.4"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      56,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by an external party.
+		"ipvs4": {
+			Address:   net.ParseIP("5.5.5.5"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      57,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by kube-proxy, but now stale.
+		"ipvs5": {
+			Address:   net.ParseIP("6.6.6.6"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      58,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+	}
+
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	proxier := NewFakeProxier(ipt, ipvs, ipset, nil)
+	// These CIDRs cover only ipvs2 and ipvs3.
+	proxier.excludeCIDRs = []string{"3.3.3.0/24", "4.4.4.0/24"}
+	for v := range currentServices {
+		proxier.ipvs.AddVirtualServer(currentServices[v])
+	}
+	proxier.cleanLegacyService(activeServices, currentServices)
+	// ipvs4 and ipvs5 should have been cleaned.
+	remainingVirtualServers, _ := proxier.ipvs.GetVirtualServers()
+	if len(remainingVirtualServers) != 4 {
+		t.Errorf("Expected number of remaining IPVS services after cleanup to be %v. Got %v", 4, len(remainingVirtualServers))
+	}
+	for _, vs := range remainingVirtualServers {
+		// Checking that ipvs4 and ipvs5 were removed.
+		if vs.Port == 57 {
+			t.Errorf("Expected ipvs4 to be removed after cleanup. It still remains")
+		}
+		if vs.Port == 58 {
+			t.Errorf("Expected ipvs5 to be removed after cleanup. It still remains")
+		}
+	}
+}
+
+func buildFakeProxier(nodeIP []net.IP) (*iptablestest.FakeIPTables, *Proxier) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	return ipt, NewFakeProxier(ipt, ipvs, ipset, nil)
+}
+
+func hasJump(rules []iptablestest.Rule, destChain, ipSet string) bool {
+	for _, r := range rules {
+		if r[iptablestest.Jump] == destChain {
+			if ipSet == "" {
+				return true
+			}
+			if strings.Contains(r[iptablestest.MatchSet], ipSet) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkIptabless to check expected iptables chain and rules
+func checkIptables(t *testing.T, ipt *iptablestest.FakeIPTables, epIpt netlinktest.ExpectedIptablesChain) {
+	for epChain, epRules := range epIpt {
+		rules := ipt.GetRules(epChain)
+		for _, epRule := range epRules {
+			if !hasJump(rules, epRule.JumpChain, epRule.MatchSet) {
+				t.Errorf("Didn't find jump from chain %v match set %v to %v", epChain, epRule.MatchSet, epRule.JumpChain)
+			}
+		}
+	}
+}
+
+// checkIPSet to check expected ipset and entries
+func checkIPSet(t *testing.T, fp *Proxier, ipSet netlinktest.ExpectedIPSet) {
+	for set, entries := range ipSet {
+		ents, err := fp.ipset.ListEntries(set)
+		if err != nil || len(ents) != len(entries) {
+			t.Errorf("Check ipset entries failed for ipset: %q, expect %d, got %d", set, len(entries), len(ents))
+			continue
+		}
+		if len(entries) == 1 {
+			if ents[0] != entries[0].String() {
+				t.Errorf("Check ipset entries failed for ipset: %q", set)
+			}
+		}
+	}
+}
+
+// checkIPVS to check expected ipvs service and destination
+func checkIPVS(t *testing.T, fp *Proxier, vs *netlinktest.ExpectedVirtualServer) {
+	services, err := fp.ipvs.GetVirtualServers()
+	if err != nil {
+		t.Errorf("Failed to get ipvs services, err: %v", err)
+	}
+	if len(services) != vs.VSNum {
+		t.Errorf("Expect %d ipvs services, got %d", vs.VSNum, len(services))
+	}
+	for _, svc := range services {
+		if svc.Address.String() == vs.IP && svc.Port == vs.Port && svc.Protocol == vs.Protocol {
+			destinations, _ := fp.ipvs.GetRealServers(svc)
+			if len(destinations) != len(vs.RS) {
+				t.Errorf("Expected %d destinations, got %d destinations", len(vs.RS), len(destinations))
+			}
+			if len(vs.RS) == 1 {
+				if destinations[0].Address.String() != vs.RS[0].IP || destinations[0].Port != vs.RS[0].Port {
+					t.Errorf("Unexpected mismatch destinations")
+				}
+			}
 		}
 	}
 }

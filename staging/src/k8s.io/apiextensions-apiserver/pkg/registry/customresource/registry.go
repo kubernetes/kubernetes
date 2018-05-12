@@ -17,6 +17,7 @@ limitations under the License.
 package customresource
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -26,18 +27,17 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 // Registry is an interface for things that know how to store CustomResources.
 type Registry interface {
-	ListCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*unstructured.UnstructuredList, error)
-	WatchCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
-	GetCustomResource(ctx genericapirequest.Context, customResourceID string, options *metav1.GetOptions) (*unstructured.Unstructured, error)
-	CreateCustomResource(ctx genericapirequest.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc) (*unstructured.Unstructured, error)
-	UpdateCustomResource(ctx genericapirequest.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*unstructured.Unstructured, error)
-	DeleteCustomResource(ctx genericapirequest.Context, customResourceID string) error
+	ListCustomResources(ctx context.Context, options *metainternalversion.ListOptions) (*unstructured.UnstructuredList, error)
+	WatchCustomResources(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	GetCustomResource(ctx context.Context, customResourceID string, options *metav1.GetOptions) (*unstructured.Unstructured, error)
+	CreateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc) (*unstructured.Unstructured, error)
+	UpdateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*unstructured.Unstructured, error)
+	DeleteCustomResource(ctx context.Context, customResourceID string) error
 }
 
 // storage puts strong typing around storage calls
@@ -51,7 +51,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*unstructured.UnstructuredList, error) {
+func (s *storage) ListCustomResources(ctx context.Context, options *metainternalversion.ListOptions) (*unstructured.UnstructuredList, error) {
 	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -62,11 +62,11 @@ func (s *storage) ListCustomResources(ctx genericapirequest.Context, options *me
 	return obj.(*unstructured.UnstructuredList), err
 }
 
-func (s *storage) WatchCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchCustomResources(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetCustomResource(ctx genericapirequest.Context, customResourceID string, options *metav1.GetOptions) (*unstructured.Unstructured, error) {
+func (s *storage) GetCustomResource(ctx context.Context, customResourceID string, options *metav1.GetOptions) (*unstructured.Unstructured, error) {
 	obj, err := s.Get(ctx, customResourceID, options)
 	customResource, ok := obj.(*unstructured.Unstructured)
 	if !ok {
@@ -82,7 +82,7 @@ func (s *storage) GetCustomResource(ctx genericapirequest.Context, customResourc
 	return customResource, nil
 }
 
-func (s *storage) CreateCustomResource(ctx genericapirequest.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc) (*unstructured.Unstructured, error) {
+func (s *storage) CreateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc) (*unstructured.Unstructured, error) {
 	obj, err := s.Create(ctx, customResource, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (s *storage) CreateCustomResource(ctx genericapirequest.Context, customReso
 	return obj.(*unstructured.Unstructured), nil
 }
 
-func (s *storage) UpdateCustomResource(ctx genericapirequest.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*unstructured.Unstructured, error) {
+func (s *storage) UpdateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*unstructured.Unstructured, error) {
 	obj, _, err := s.Update(ctx, customResource.GetName(), rest.DefaultUpdatedObjectInfo(customResource), createValidation, updateValidation)
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (s *storage) UpdateCustomResource(ctx genericapirequest.Context, customReso
 	return obj.(*unstructured.Unstructured), nil
 }
 
-func (s *storage) DeleteCustomResource(ctx genericapirequest.Context, customResourceID string) error {
+func (s *storage) DeleteCustomResource(ctx context.Context, customResourceID string) error {
 	_, _, err := s.Delete(ctx, customResourceID, nil)
 	return err
 }

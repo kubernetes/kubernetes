@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
@@ -31,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -53,7 +53,7 @@ func TestLog(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -67,7 +67,6 @@ func TestLog(t *testing.T) {
 						body := ioutil.NopCloser(bytes.NewBufferString(logContent))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 					default:
-						// Ensures no GET is performed when deleting by name
 						t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
 						return nil, nil
 					}
@@ -75,9 +74,9 @@ func TestLog(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
-			buf := bytes.NewBuffer([]byte{})
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-			cmd := NewCmdLogs(tf, buf, buf)
+			cmd := NewCmdLogs(tf, streams)
 			cmd.Flags().Set("namespace", "test")
 			cmd.Run(cmd, []string{"foo"})
 
@@ -110,44 +109,55 @@ func TestValidateLogFlags(t *testing.T) {
 	tests := []struct {
 		name     string
 		flags    map[string]string
+		args     []string
 		expected string
 	}{
 		{
 			name:     "since & since-time",
 			flags:    map[string]string{"since": "1h", "since-time": "2006-01-02T15:04:05Z"},
+			args:     []string{"foo"},
 			expected: "at most one of `sinceTime` or `sinceSeconds` may be specified",
 		},
 		{
 			name:     "negative since-time",
 			flags:    map[string]string{"since": "-1s"},
+			args:     []string{"foo"},
 			expected: "must be greater than 0",
 		},
 		{
 			name:     "negative limit-bytes",
 			flags:    map[string]string{"limit-bytes": "-100"},
+			args:     []string{"foo"},
 			expected: "must be greater than 0",
 		},
 		{
 			name:     "negative tail",
 			flags:    map[string]string{"tail": "-100"},
+			args:     []string{"foo"},
 			expected: "must be greater than or equal to 0",
+		},
+		{
+			name:     "container name combined with --all-containers",
+			flags:    map[string]string{"all-containers": "true"},
+			args:     []string{"my-pod", "my-container"},
+			expected: "--all-containers=true should not be specifiled with container",
 		},
 	}
 	for _, test := range tests {
-		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdLogs(f, buf, buf)
+		streams := genericclioptions.NewTestIOStreamsDiscard()
+		cmd := NewCmdLogs(f, streams)
 		out := ""
 		for flag, value := range test.flags {
 			cmd.Flags().Set(flag, value)
 		}
 		// checkErr breaks tests in case of errors, plus we just
 		// need to check errors returned by the command validation
-		o := &LogsOptions{}
+		o := NewLogsOptions(streams)
 		cmd.Run = func(cmd *cobra.Command, args []string) {
-			o.Complete(f, os.Stdout, cmd, args)
+			o.Complete(f, cmd, args)
 			out = o.Validate().Error()
 		}
-		cmd.Run(cmd, []string{"foo"})
+		cmd.Run(cmd, test.args)
 
 		if !strings.Contains(out, test.expected) {
 			t.Errorf("%s: expected to find:\n\t%s\nfound:\n\t%s\n", test.name, test.expected, out)
@@ -195,8 +205,7 @@ func TestLogComplete(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdLogs(f, buf, buf)
+		cmd := NewCmdLogs(f, genericclioptions.NewTestIOStreamsDiscard())
 		var err error
 		out := ""
 		for flag, value := range test.flags {
@@ -204,8 +213,8 @@ func TestLogComplete(t *testing.T) {
 		}
 		// checkErr breaks tests in case of errors, plus we just
 		// need to check errors returned by the command validation
-		o := &LogsOptions{}
-		err = o.Complete(f, os.Stdout, cmd, test.args)
+		o := NewLogsOptions(genericclioptions.NewTestIOStreamsDiscard())
+		err = o.Complete(f, cmd, test.args)
 		out = err.Error()
 		if !strings.Contains(out, test.expected) {
 			t.Errorf("%s: expected to find:\n\t%s\nfound:\n\t%s\n", test.name, test.expected, out)

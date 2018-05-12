@@ -15,16 +15,17 @@
 # CEPH all in one
 # Based on image by Ricardo Rocha, ricardo@catalyst.net.nz
 
-FROM fedora
+FROM fedora:26
 
 # Base Packages
-RUN yum install -y wget ceph ceph-fuse strace && yum clean all
+RUN yum install -y wget strace psmisc procps-ng ceph ceph-fuse && yum clean all
 
 # Get ports exposed
 EXPOSE 6789
 
 ADD ./bootstrap.sh /bootstrap.sh
 ADD ./mon.sh /mon.sh
+ADD ./mds.sh /mds.sh
 ADD ./osd.sh /osd.sh
 ADD ./ceph.conf.sh /ceph.conf.sh
 ADD ./keyring /var/lib/ceph/mon/keyring

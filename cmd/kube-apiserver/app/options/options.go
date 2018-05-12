@@ -26,7 +26,6 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -94,7 +93,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableLogsHandler:      true,
 		EventTTL:               1 * time.Hour,
 		MasterCount:            1,
-		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
+		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:         ports.KubeletPort,
 			ReadOnlyPort: ports.KubeletReadOnlyPort,
@@ -167,7 +166,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"Currently only applies to long-running requests.")
 
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
-		"The number of apiservers running in the cluster, must be a positive number.")
+		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
 
 	fs.StringVar(&s.EndpointReconcilerType, "endpoint-reconciler-type", string(s.EndpointReconcilerType),
 		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+")")
@@ -213,11 +212,10 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.KubeletConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.CAFile,
 		"Path to a cert file for the certificate authority.")
 
-	// TODO: delete this flag as soon as we identify and fix all clients that send malformed updates, like #14126.
-	fs.BoolVar(&validation.RepairMalformedUpdates, "repair-malformed-updates", validation.RepairMalformedUpdates, ""+
-		"If true, server will do its best to fix the update request to pass the validation, "+
-		"e.g., setting empty UID in update request to its existing value. This flag can be turned off "+
-		"after we fix all the clients that send malformed updates.")
+	// TODO: delete this flag in 1.13
+	repair := false
+	fs.BoolVar(&repair, "repair-malformed-updates", false, "deprecated")
+	fs.MarkDeprecated("repair-malformed-updates", "This flag will be removed in a future version")
 
 	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-cert-file", s.ProxyClientCertFile, ""+
 		"Client certificate used to prove the identity of the aggregator or kube-apiserver "+
@@ -236,6 +234,5 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
-		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Ignored unless alpha TokenRequest is enabled")
-
+		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Requires the 'TokenRequest' feature gate.)")
 }

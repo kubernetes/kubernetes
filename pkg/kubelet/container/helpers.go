@@ -19,7 +19,6 @@ package container
 import (
 	"bytes"
 	"fmt"
-	"hash/adler32"
 	"hash/fnv"
 	"strings"
 	"time"
@@ -46,7 +45,7 @@ type HandlerRunner interface {
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings, Host IP.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (contOpts *RunContainerOptions, err error)
+	GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (contOpts *RunContainerOptions, cleanupAction func(), err error)
 	GetPodDNS(pod *v1.Pod) (dnsConfig *runtimeapi.DNSConfig, err error)
 	// GetPodCgroupParent returns the CgroupName identifier, and its literal cgroupfs form on the host
 	// of a pod.
@@ -96,17 +95,6 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 // the running container with its desired spec.
 func HashContainer(container *v1.Container) uint64 {
 	hash := fnv.New32a()
-	hashutil.DeepHashObject(hash, *container)
-	return uint64(hash.Sum32())
-}
-
-// HashContainerLegacy returns the hash of the container. It is used to compare
-// the running container with its desired spec.
-// This is used by rktnetes and dockershim (for handling <=1.5 containers).
-// TODO: Remove this function when kubernetes version is >=1.8 AND rktnetes
-// update its hash function.
-func HashContainerLegacy(container *v1.Container) uint64 {
-	hash := adler32.New()
 	hashutil.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
 }
@@ -271,10 +259,6 @@ type containerCommandRunnerWrapper struct {
 
 var _ ContainerCommandRunner = &containerCommandRunnerWrapper{}
 
-func DirectStreamingRunner(runtime DirectStreamingRuntime) ContainerCommandRunner {
-	return &containerCommandRunnerWrapper{runtime}
-}
-
 func (r *containerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	var buffer bytes.Buffer
 	output := ioutils.WriteCloserWrapper(&buffer)
@@ -310,21 +294,6 @@ func HasPrivilegedContainer(pod *v1.Pod) bool {
 		}
 	}
 	return false
-}
-
-// MakeCapabilities creates string slices from Capability slices
-func MakeCapabilities(capAdd []v1.Capability, capDrop []v1.Capability) ([]string, []string) {
-	var (
-		addCaps  []string
-		dropCaps []string
-	)
-	for _, cap := range capAdd {
-		addCaps = append(addCaps, string(cap))
-	}
-	for _, cap := range capDrop {
-		dropCaps = append(dropCaps, string(cap))
-	}
-	return addCaps, dropCaps
 }
 
 // MakePortMappings creates internal port mapping from api port mapping.

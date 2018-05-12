@@ -104,11 +104,8 @@ func (c *customMetricsClient) qualResourceForKind(groupKind schema.GroupKind) (s
 		return "", fmt.Errorf("unable to map kind %s to resource: %v", groupKind.String(), err)
 	}
 
-	groupResource := schema.GroupResource{
-		Group:    mapping.GroupVersionKind.Group,
-		Resource: mapping.Resource,
-	}
-	return groupResource.String(), nil
+	gr := mapping.Resource.GroupResource()
+	return gr.String(), nil
 }
 
 type rootScopedMetrics struct {

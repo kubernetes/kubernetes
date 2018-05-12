@@ -19,19 +19,20 @@ package local
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	stringsutil "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/validation"
@@ -59,10 +60,7 @@ const (
 func (plugin *localVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	plugin.volumeLocks = keymutex.NewKeyMutex()
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "localvolume"})
-	plugin.recorder = recorder
+	plugin.recorder = host.GetEventRecorder()
 	return nil
 }
 
@@ -222,7 +220,7 @@ type localVolume struct {
 }
 
 func (l *localVolume) GetPath() string {
-	return l.plugin.host.GetPodVolumeDir(l.podUID, strings.EscapeQualifiedNameForDisk(localVolumePluginName), l.volName)
+	return l.plugin.host.GetPodVolumeDir(l.podUID, stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName), l.volName)
 }
 
 type localVolumeMounter struct {
@@ -276,31 +274,35 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if !notMnt {
 		return nil
 	}
-	refs, err := mount.GetMountRefsByDev(m.mounter, m.globalPath)
+	refs, err := m.mounter.GetMountRefs(m.globalPath)
 	if fsGroup != nil {
 		if err != nil {
 			glog.Errorf("cannot collect mounting information: %s %v", m.globalPath, err)
 			return err
 		}
 
+		// Only count mounts from other pods
+		refs = m.filterPodMounts(refs)
 		if len(refs) > 0 {
 			fsGroupNew := int64(*fsGroup)
-			fsGroupSame, fsGroupOld, err := volume.IsSameFSGroup(m.globalPath, fsGroupNew)
+			fsGroupOld, err := m.mounter.GetFSGroup(m.globalPath)
 			if err != nil {
 				return fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
 			}
-			if !fsGroupSame {
+			if fsGroupNew != fsGroupOld {
 				m.plugin.recorder.Eventf(m.pod, v1.EventTypeWarning, events.WarnAlreadyMountedVolume, "The requested fsGroup is %d, but the volume %s has GID %d. The volume may not be shareable.", fsGroupNew, m.volName, fsGroupOld)
 			}
 		}
 
 	}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
-		return err
+	if runtime.GOOS != "windows" {
+		// skip below MkdirAll for windows since the "bind mount" logic is implemented differently in mount_wiondows.go
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+			return err
+		}
 	}
-
 	// Perform a bind mount to the full path to allow duplicate mounts of the same volume.
 	options := []string{"bind"}
 	if m.readOnly {
@@ -308,7 +310,8 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	glog.V(4).Infof("attempting to mount %s", dir)
-	err = m.mounter.Mount(m.globalPath, dir, "", options)
+	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
+	err = m.mounter.Mount(globalPath, dir, "", options)
 	if err != nil {
 		glog.Errorf("Mount of volume %s failed: %v", dir, err)
 		notMnt, mntErr := m.mounter.IsNotMountPoint(dir)
@@ -344,6 +347,17 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
+// filterPodMounts only returns mount paths inside the kubelet pod directory
+func (m *localVolumeMounter) filterPodMounts(refs []string) []string {
+	filtered := []string{}
+	for _, r := range refs {
+		if strings.HasPrefix(r, m.plugin.host.GetPodsDir()+string(os.PathSeparator)) {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
+}
+
 type localVolumeUnmounter struct {
 	*localVolume
 }
@@ -371,8 +385,9 @@ var _ volume.BlockVolumeMapper = &localVolumeMapper{}
 
 // SetUpDevice provides physical device path for the local PV.
 func (m *localVolumeMapper) SetUpDevice() (string, error) {
-	glog.V(4).Infof("SetupDevice returning path %s", m.globalPath)
-	return m.globalPath, nil
+	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
+	glog.V(4).Infof("SetupDevice returning path %s", globalPath)
+	return globalPath, nil
 }
 
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.
@@ -391,7 +406,7 @@ func (u *localVolumeUnmapper) TearDownDevice(mapPath, devicePath string) error {
 // GetGlobalMapPath returns global map path and error.
 // path: plugins/kubernetes.io/kubernetes.io/local-volume/volumeDevices/{volumeName}
 func (lv *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	return path.Join(lv.plugin.host.GetVolumeDevicePluginDir(strings.EscapeQualifiedNameForDisk(localVolumePluginName)),
+	return filepath.Join(lv.plugin.host.GetVolumeDevicePluginDir(stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName)),
 		lv.volName), nil
 }
 
@@ -400,5 +415,5 @@ func (lv *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // volName: local-pv-ff0d6d4
 func (lv *localVolume) GetPodDeviceMapPath() (string, string) {
 	return lv.plugin.host.GetPodVolumeDeviceDir(lv.podUID,
-		strings.EscapeQualifiedNameForDisk(localVolumePluginName)), lv.volName
+		stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName)), lv.volName
 }

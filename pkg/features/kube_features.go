@@ -53,16 +53,6 @@ const (
 	// Note: This feature is not supported for `BestEffort` pods.
 	ExperimentalCriticalPodAnnotation utilfeature.Feature = "ExperimentalCriticalPodAnnotation"
 
-	// owner: @vishh
-	// alpha: v1.6
-	//
-	// This is deprecated and will be removed in v1.11. Use DevicePlugins instead.
-	//
-	// Enables support for GPUs as a schedulable resource.
-	// Only Nvidia GPUs are supported as of v1.6.
-	// Works only with Docker Container Runtime.
-	Accelerators utilfeature.Feature = "Accelerators"
-
 	// owner: @jiayingz
 	// beta: v1.10
 	//
@@ -76,7 +66,7 @@ const (
 	// to take advantage of NoExecute Taints and Tolerations.
 	TaintBasedEvictions utilfeature.Feature = "TaintBasedEvictions"
 
-	// owner: @jcbsmpsn
+	// owner: @mikedanese
 	// alpha: v1.7
 	//
 	// Gets a server certificate for the kubelet from the Certificate Signing
@@ -84,8 +74,8 @@ const (
 	// certificate as expiration approaches.
 	RotateKubeletServerCertificate utilfeature.Feature = "RotateKubeletServerCertificate"
 
-	// owner: @jcbsmpsn
-	// alpha: v1.7
+	// owner: @mikedanese
+	// beta: v1.8
 	//
 	// Automatically renews the client certificate used for communicating with
 	// the API server as the certificate approaches expiration.
@@ -145,6 +135,13 @@ const (
 	// Enable mount propagation of volumes.
 	MountPropagation utilfeature.Feature = "MountPropagation"
 
+	// owner: @sjenning
+	// alpha: v1.11
+	//
+	// Allows resource reservations at the QoS level preventing pods at lower QoS levels from
+	// bursting into resources requested at higher QoS levels (memory only for now)
+	QOSReserved utilfeature.Feature = "QOSReserved"
+
 	// owner: @ConnorDoyle
 	// alpha: v1.8
 	//
@@ -202,7 +199,7 @@ const (
 	BlockVolume utilfeature.Feature = "BlockVolume"
 
 	// owner: @pospispa
-	// beta: v1.10
+	// GA: v1.11
 	//
 	// Postpone deletion of a PV or a PVC when they are being used
 	StorageObjectInUseProtection utilfeature.Feature = "StorageObjectInUseProtection"
@@ -242,7 +239,7 @@ const (
 	// alpha: v1.10
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
-	NoDaemonSetScheduler utilfeature.Feature = "NoDaemonSetScheduler"
+	ScheduleDaemonSetPods utilfeature.Feature = "ScheduleDaemonSetPods"
 
 	// owner: @mikedanese
 	// alpha: v1.10
@@ -267,6 +264,21 @@ const (
 	//
 	// Enables control over the primary group ID of containers' init processes.
 	RunAsGroup utilfeature.Feature = "RunAsGroup"
+
+	// owner: @saad-ali
+	// ga
+	//
+	// Allow mounting a subpath of a volume in a container
+	// Do not remove this feature gate even though it's GA
+	VolumeSubpath utilfeature.Feature = "VolumeSubpath"
+
+	// owner: @ravig
+	// alpha: v1.11
+	//
+	// Include volume count on node to be considered for balanced resource allocation while scheduling.
+	// A node which has closer cpu,memory utilization and volume count is favoured by scheduler
+	// while making decisions.
+	BalanceAttachedNodeVolumes utilfeature.Feature = "BalanceAttachedNodeVolumes"
 )
 
 func init() {
@@ -281,7 +293,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
-	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
 	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
@@ -295,6 +306,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},
+	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
 	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
@@ -303,16 +315,18 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
-	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.Beta},
+	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.Beta},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
-	NoDaemonSetScheduler:                        {Default: false, PreRelease: utilfeature.Alpha},
+	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
 	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: false, PreRelease: utilfeature.Alpha},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
+	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

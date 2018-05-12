@@ -49,7 +49,12 @@ type TestContextType struct {
 	RepoRoot                string
 	DockershimCheckpointDir string
 
-	Provider       string
+	// Provider identifies the infrastructure provider (gce, gke, aws)
+	Provider string
+
+	// Tooling is the tooling in use (e.g. kops, gke).  Provider is the cloud provider and might not uniquely identify the tooling.
+	Tooling string
+
 	CloudConfig    CloudConfig
 	KubectlPath    string
 	OutputDir      string
@@ -112,6 +117,8 @@ type TestContextType struct {
 	NodeTestContextType
 	// Monitoring solution that is used in current cluster.
 	ClusterMonitoringMode string
+	// Separate Prometheus monitoring deployed in cluster
+	EnablePrometheusMonitoring bool
 
 	// Indicates what path the kubernetes-anywhere is installed on
 	KubernetesAnywherePath string
@@ -161,6 +168,7 @@ type CloudConfig struct {
 	Zone              string // for multizone tests, arbitrarily chosen zone
 	Region            string
 	MultiZone         bool
+	MultiMaster       bool
 	Cluster           string
 	MasterName        string
 	NodeInstanceGroup string // comma-delimited list of groups' names
@@ -208,7 +216,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.Var(utilflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
-	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/rkt/remote).")
+	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/remote).")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/dockershim.sock", "The container runtime endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flag.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
@@ -230,12 +238,14 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	flag.StringVar(&TestContext.RepoRoot, "repo-root", "../../", "Root directory of kubernetes repository, for finding test files.")
 	flag.StringVar(&TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, etc.)")
+	flag.StringVar(&TestContext.Tooling, "tooling", "", "The tooling in use (kops, gke, etc.)")
 	flag.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 	flag.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
 	flag.StringVar(&TestContext.Prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
 	flag.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, trusty, or coreos).")
 	flag.StringVar(&TestContext.NodeOSDistro, "node-os-distro", "debian", "The OS distribution of cluster VM instances (debian, trusty, or coreos).")
 	flag.StringVar(&TestContext.ClusterMonitoringMode, "cluster-monitoring-mode", "influxdb", "The monitoring solution that is used in the cluster.")
+	flag.BoolVar(&TestContext.EnablePrometheusMonitoring, "prometheus-monitoring", false, "Separate Prometheus monitoring deployed in cluster.")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
@@ -245,6 +255,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flag.StringVar(&cloudConfig.Region, "gce-region", "", "GCE region being used, if applicable")
 	flag.BoolVar(&cloudConfig.MultiZone, "gce-multizone", false, "If true, start GCE cloud provider with multizone support.")
+	flag.BoolVar(&cloudConfig.MultiMaster, "gce-multimaster", false, "If true, the underlying GCE/GKE cluster is assumed to be multi-master.")
 	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flag.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
@@ -275,7 +286,7 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
 	// TODO(random-liu): Move kubelet start logic out of the test.
 	// TODO(random-liu): Move log fetch logic out of the test.
-	// There are different ways to start kubelet (systemd, initd, docker, rkt, manually started etc.)
+	// There are different ways to start kubelet (systemd, initd, docker, manually started etc.)
 	// and manage logs (journald, upstart etc.).
 	// For different situation we need to mount different things into the container, run different commands.
 	// It is hard and unnecessary to deal with the complexity inside the test suite.

@@ -1,4 +1,4 @@
-// +build linux darwin
+// +build linux darwin windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"syscall"
+	"path/filepath"
+	"reflect"
+	"runtime"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -199,11 +201,15 @@ func TestMountUnmount(t *testing.T) {
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
+
+	if runtime.GOOS != "windows" {
+		// skip this check in windows since the "bind mount" logic is implemented differently in mount_wiondows.go
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("SetUp() failed, volume path not created: %s", path)
+			} else {
+				t.Errorf("SetUp() failed: %v", err)
+			}
 		}
 	}
 
@@ -260,6 +266,7 @@ func TestMapUnmap(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to SetUpDevice, err: %v", err)
 	}
+
 	if _, err := os.Stat(devPath); err != nil {
 		if os.IsNotExist(err) {
 			t.Errorf("SetUpDevice() failed, volume path not created: %s", devPath)
@@ -300,45 +307,6 @@ func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGr
 		return err
 	}
 	return nil
-}
-
-func TestFSGroupMount(t *testing.T) {
-	tmpDir, plug := getPlugin(t)
-	defer os.RemoveAll(tmpDir)
-	info, err := os.Stat(tmpDir)
-	if err != nil {
-		t.Errorf("Error getting stats for %s (%v)", tmpDir, err)
-	}
-	s := info.Sys().(*syscall.Stat_t)
-	if s == nil {
-		t.Errorf("Error getting stats for %s (%v)", tmpDir, err)
-	}
-	fsGroup1 := int64(s.Gid)
-	fsGroup2 := fsGroup1 + 1
-	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	pod1.Spec.SecurityContext = &v1.PodSecurityContext{
-		FSGroup: &fsGroup1,
-	}
-	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	pod2.Spec.SecurityContext = &v1.PodSecurityContext{
-		FSGroup: &fsGroup2,
-	}
-	err = testFSGroupMount(plug, pod1, tmpDir, fsGroup1)
-	if err != nil {
-		t.Errorf("Failed to make a new Mounter: %v", err)
-	}
-	err = testFSGroupMount(plug, pod2, tmpDir, fsGroup2)
-	if err != nil {
-		t.Errorf("Failed to make a new Mounter: %v", err)
-	}
-	//Checking if GID of tmpDir has not been changed by mounting it by second pod
-	s = info.Sys().(*syscall.Stat_t)
-	if s == nil {
-		t.Errorf("Error getting stats for %s (%v)", tmpDir, err)
-	}
-	if fsGroup1 != int64(s.Gid) {
-		t.Errorf("Old Gid %d for volume %s got overwritten by new Gid %d", fsGroup1, tmpDir, int64(s.Gid))
-	}
 }
 
 func TestConstructVolumeSpec(t *testing.T) {
@@ -479,5 +447,59 @@ func TestUnsupportedPlugins(t *testing.T) {
 	provisionPlug, err := plugMgr.FindProvisionablePluginByName(localVolumePluginName)
 	if err == nil && provisionPlug != nil {
 		t.Errorf("Provisionable plugin found, expected none")
+	}
+}
+
+func TestFilterPodMounts(t *testing.T) {
+	tmpDir, plug := getPlugin(t)
+	defer os.RemoveAll(tmpDir)
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
+	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir, false), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lvMounter, ok := mounter.(*localVolumeMounter)
+	if !ok {
+		t.Fatal("mounter is not localVolumeMounter")
+	}
+
+	host := volumetest.NewFakeVolumeHost(tmpDir, nil, nil)
+	podsDir := host.GetPodsDir()
+
+	cases := map[string]struct {
+		input    []string
+		expected []string
+	}{
+		"empty": {
+			[]string{},
+			[]string{},
+		},
+		"not-pod-mount": {
+			[]string{"/mnt/outside"},
+			[]string{},
+		},
+		"pod-mount": {
+			[]string{filepath.Join(podsDir, "pod-mount")},
+			[]string{filepath.Join(podsDir, "pod-mount")},
+		},
+		"not-directory-prefix": {
+			[]string{podsDir + "pod-mount"},
+			[]string{},
+		},
+		"mix": {
+			[]string{"/mnt/outside",
+				filepath.Join(podsDir, "pod-mount"),
+				"/another/outside",
+				filepath.Join(podsDir, "pod-mount2")},
+			[]string{filepath.Join(podsDir, "pod-mount"),
+				filepath.Join(podsDir, "pod-mount2")},
+		},
+	}
+	for name, test := range cases {
+		output := lvMounter.filterPodMounts(test.input)
+		if !reflect.DeepEqual(output, test.expected) {
+			t.Errorf("%v failed: output %+v doesn't equal expected %+v", name, output, test.expected)
+		}
 	}
 }

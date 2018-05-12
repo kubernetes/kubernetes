@@ -19,6 +19,7 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -93,6 +94,26 @@ func (mi *fakeMountInterface) MakeFile(pathname string) error {
 
 func (mi *fakeMountInterface) ExistsPath(pathname string) bool {
 	return true
+}
+
+func (mi *fakeMountInterface) PrepareSafeSubpath(subPath mount.Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return "", nil, nil
+}
+
+func (mi *fakeMountInterface) CleanSubPaths(_, _ string) error {
+	return nil
+}
+
+func (mi *fakeMountInterface) SafeMakeDir(_, _ string, _ os.FileMode) error {
+	return nil
+}
+
+func (mi *fakeMountInterface) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (mi *fakeMountInterface) GetFSGroup(pathname string) (int64, error) {
+	return -1, errors.New("not implemented")
 }
 
 func fakeContainerMgrMountInt() mount.Interface {

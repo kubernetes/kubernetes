@@ -26,10 +26,175 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/master/ports"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
+}
+
+func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerConfiguration) {
+	zero := metav1.Duration{}
+	if len(obj.Controllers) == 0 {
+		obj.Controllers = []string{"*"}
+	}
+	// Port
+	if obj.KubeCloudShared.Address == "" {
+		obj.KubeCloudShared.Address = "0.0.0.0"
+	}
+	if obj.EndPointController.ConcurrentEndpointSyncs == 0 {
+		obj.EndPointController.ConcurrentEndpointSyncs = 5
+	}
+	if obj.ServiceController.ConcurrentServiceSyncs == 0 {
+		obj.ServiceController.ConcurrentServiceSyncs = 1
+	}
+	if obj.ReplicationController.ConcurrentRCSyncs == 0 {
+		obj.ReplicationController.ConcurrentRCSyncs = 5
+	}
+	if obj.ReplicaSetController.ConcurrentRSSyncs == 0 {
+		obj.ReplicaSetController.ConcurrentRSSyncs = 5
+	}
+	if obj.DaemonSetController.ConcurrentDaemonSetSyncs == 0 {
+		obj.DaemonSetController.ConcurrentDaemonSetSyncs = 2
+	}
+	if obj.JobController.ConcurrentJobSyncs == 0 {
+		obj.JobController.ConcurrentJobSyncs = 5
+	}
+	if obj.ResourceQuotaController.ConcurrentResourceQuotaSyncs == 0 {
+		obj.ResourceQuotaController.ConcurrentResourceQuotaSyncs = 5
+	}
+	if obj.DeploymentController.ConcurrentDeploymentSyncs == 0 {
+		obj.DeploymentController.ConcurrentDeploymentSyncs = 5
+	}
+	if obj.NamespaceController.ConcurrentNamespaceSyncs == 0 {
+		obj.NamespaceController.ConcurrentNamespaceSyncs = 10
+	}
+	if obj.SAController.ConcurrentSATokenSyncs == 0 {
+		obj.SAController.ConcurrentSATokenSyncs = 5
+	}
+	if obj.KubeCloudShared.RouteReconciliationPeriod == zero {
+		obj.KubeCloudShared.RouteReconciliationPeriod = metav1.Duration{Duration: 10 * time.Second}
+	}
+	if obj.ResourceQuotaController.ResourceQuotaSyncPeriod == zero {
+		obj.ResourceQuotaController.ResourceQuotaSyncPeriod = metav1.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.NamespaceController.NamespaceSyncPeriod == zero {
+		obj.NamespaceController.NamespaceSyncPeriod = metav1.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod == zero {
+		obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
+	}
+	if obj.HPAController.HorizontalPodAutoscalerSyncPeriod == zero {
+		obj.HPAController.HorizontalPodAutoscalerSyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+	}
+	if obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow == zero {
+		obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow = metav1.Duration{Duration: 3 * time.Minute}
+	}
+	if obj.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow == zero {
+		obj.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow = metav1.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.HPAController.HorizontalPodAutoscalerTolerance == 0 {
+		obj.HPAController.HorizontalPodAutoscalerTolerance = 0.1
+	}
+	if obj.DeploymentController.DeploymentControllerSyncPeriod == zero {
+		obj.DeploymentController.DeploymentControllerSyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+	}
+	if obj.GenericComponent.MinResyncPeriod == zero {
+		obj.GenericComponent.MinResyncPeriod = metav1.Duration{Duration: 12 * time.Hour}
+	}
+	if obj.DeprecatedController.RegisterRetryCount == 0 {
+		obj.DeprecatedController.RegisterRetryCount = 10
+	}
+	if obj.NodeLifecycleController.PodEvictionTimeout == zero {
+		obj.NodeLifecycleController.PodEvictionTimeout = metav1.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.NodeLifecycleController.NodeMonitorGracePeriod == zero {
+		obj.NodeLifecycleController.NodeMonitorGracePeriod = metav1.Duration{Duration: 40 * time.Second}
+	}
+	if obj.NodeLifecycleController.NodeStartupGracePeriod == zero {
+		obj.NodeLifecycleController.NodeStartupGracePeriod = metav1.Duration{Duration: 60 * time.Second}
+	}
+	if obj.KubeCloudShared.NodeMonitorPeriod == zero {
+		obj.KubeCloudShared.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}
+	}
+	if obj.KubeCloudShared.ClusterName == "" {
+		obj.KubeCloudShared.ClusterName = "kubernetes"
+	}
+	if obj.NodeIpamController.NodeCIDRMaskSize == 0 {
+		obj.NodeIpamController.NodeCIDRMaskSize = 24
+	}
+	if obj.KubeCloudShared.ConfigureCloudRoutes == nil {
+		obj.KubeCloudShared.ConfigureCloudRoutes = utilpointer.BoolPtr(true)
+	}
+	if obj.PodGCController.TerminatedPodGCThreshold == 0 {
+		obj.PodGCController.TerminatedPodGCThreshold = 12500
+	}
+	if obj.GenericComponent.ContentType == "" {
+		obj.GenericComponent.ContentType = "application/vnd.kubernetes.protobuf"
+	}
+	if obj.GenericComponent.KubeAPIQPS == 0 {
+		obj.GenericComponent.KubeAPIQPS = 20.0
+	}
+	if obj.GenericComponent.KubeAPIBurst == 0 {
+		obj.GenericComponent.KubeAPIBurst = 30
+	}
+	if obj.GenericComponent.ControllerStartInterval == zero {
+		obj.GenericComponent.ControllerStartInterval = metav1.Duration{Duration: 0 * time.Second}
+	}
+	if obj.GarbageCollectorController.EnableGarbageCollector == nil {
+		obj.GarbageCollectorController.EnableGarbageCollector = utilpointer.BoolPtr(true)
+	}
+	if obj.GarbageCollectorController.ConcurrentGCSyncs == 0 {
+		obj.GarbageCollectorController.ConcurrentGCSyncs = 20
+	}
+	if obj.CSRSigningController.ClusterSigningCertFile == "" {
+		obj.CSRSigningController.ClusterSigningCertFile = "/etc/kubernetes/ca/ca.pem"
+	}
+	if obj.CSRSigningController.ClusterSigningKeyFile == "" {
+		obj.CSRSigningController.ClusterSigningKeyFile = "/etc/kubernetes/ca/ca.key"
+	}
+	if obj.CSRSigningController.ClusterSigningDuration == zero {
+		obj.CSRSigningController.ClusterSigningDuration = metav1.Duration{Duration: 365 * 24 * time.Hour}
+	}
+	if obj.AttachDetachController.ReconcilerSyncLoopPeriod == zero {
+		obj.AttachDetachController.ReconcilerSyncLoopPeriod = metav1.Duration{Duration: 60 * time.Second}
+	}
+	if obj.NodeLifecycleController.EnableTaintManager == nil {
+		obj.NodeLifecycleController.EnableTaintManager = utilpointer.BoolPtr(true)
+	}
+	if obj.HPAController.HorizontalPodAutoscalerUseRESTClients == nil {
+		obj.HPAController.HorizontalPodAutoscalerUseRESTClients = utilpointer.BoolPtr(true)
+	}
+}
+
+func SetDefaults_PersistentVolumeRecyclerConfiguration(obj *PersistentVolumeRecyclerConfiguration) {
+	if obj.MaximumRetry == 0 {
+		obj.MaximumRetry = 3
+	}
+	if obj.MinimumTimeoutNFS == 0 {
+		obj.MinimumTimeoutNFS = 300
+	}
+	if obj.IncrementTimeoutNFS == 0 {
+		obj.IncrementTimeoutNFS = 30
+	}
+	if obj.MinimumTimeoutHostPath == 0 {
+		obj.MinimumTimeoutHostPath = 60
+	}
+	if obj.IncrementTimeoutHostPath == 0 {
+		obj.IncrementTimeoutHostPath = 30
+	}
+}
+
+func SetDefaults_VolumeConfiguration(obj *VolumeConfiguration) {
+	if obj.EnableHostPathProvisioning == nil {
+		obj.EnableHostPathProvisioning = utilpointer.BoolPtr(false)
+	}
+	if obj.EnableDynamicProvisioning == nil {
+		obj.EnableDynamicProvisioning = utilpointer.BoolPtr(true)
+	}
+	if obj.FlexVolumePluginDir == "" {
+		obj.FlexVolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+	}
 }
 
 func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
@@ -107,5 +272,8 @@ func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
 	if obj.ResourceLock == "" {
 		// obj.ResourceLock = rl.EndpointsResourceLock
 		obj.ResourceLock = "endpoints"
+	}
+	if obj.LeaderElect == nil {
+		obj.LeaderElect = utilpointer.BoolPtr(true)
 	}
 }

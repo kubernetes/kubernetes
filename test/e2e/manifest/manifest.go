@@ -125,3 +125,20 @@ func StatefulSetFromManifest(fileName, ns string) (*apps.StatefulSet, error) {
 	}
 	return &ss, nil
 }
+
+// DaemonSetFromManifest returns a DaemonSet from a manifest stored in fileName in the Namespace indicated by ns.
+func DaemonSetFromManifest(fileName, ns string) (*apps.DaemonSet, error) {
+	var ds apps.DaemonSet
+	data := generated.ReadOrDie(fileName)
+
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	err = runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &ds)
+	if err != nil {
+		return nil, err
+	}
+	ds.Namespace = ns
+	return &ds, nil
+}

@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -45,8 +45,7 @@ func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*v1
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
 		Spec: v1.NodeSpec{
-			ExternalID: "node-name",
-			Taints:     oldTaints,
+			Taints: oldTaints,
 		},
 		Status: v1.NodeStatus{},
 	}
@@ -243,7 +242,7 @@ func TestTaint(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -303,8 +302,7 @@ func TestTaint(t *testing.T) {
 			}
 			tf.ClientConfigVal = defaultClientConfig()
 
-			buf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdTaint(tf, buf)
+			cmd := NewCmdTaint(tf, genericclioptions.NewTestIOStreamsDiscard())
 
 			saw_fatal := false
 			func() {

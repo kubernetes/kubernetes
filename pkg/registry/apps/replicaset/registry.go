@@ -19,24 +19,24 @@ limitations under the License.
 package replicaset
 
 import (
+	"context"
 	"fmt"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Registry is an interface for things that know how to store ReplicaSets.
 type Registry interface {
-	ListReplicaSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.ReplicaSetList, error)
-	WatchReplicaSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
-	GetReplicaSet(ctx genericapirequest.Context, replicaSetID string, options *metav1.GetOptions) (*extensions.ReplicaSet, error)
-	CreateReplicaSet(ctx genericapirequest.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc) (*extensions.ReplicaSet, error)
-	UpdateReplicaSet(ctx genericapirequest.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.ReplicaSet, error)
-	DeleteReplicaSet(ctx genericapirequest.Context, replicaSetID string) error
+	ListReplicaSets(ctx context.Context, options *metainternalversion.ListOptions) (*extensions.ReplicaSetList, error)
+	WatchReplicaSets(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	GetReplicaSet(ctx context.Context, replicaSetID string, options *metav1.GetOptions) (*extensions.ReplicaSet, error)
+	CreateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc) (*extensions.ReplicaSet, error)
+	UpdateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.ReplicaSet, error)
+	DeleteReplicaSet(ctx context.Context, replicaSetID string) error
 }
 
 // storage puts strong typing around storage calls
@@ -50,7 +50,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListReplicaSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.ReplicaSetList, error) {
+func (s *storage) ListReplicaSets(ctx context.Context, options *metainternalversion.ListOptions) (*extensions.ReplicaSetList, error) {
 	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -61,11 +61,11 @@ func (s *storage) ListReplicaSets(ctx genericapirequest.Context, options *metain
 	return obj.(*extensions.ReplicaSetList), err
 }
 
-func (s *storage) WatchReplicaSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchReplicaSets(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetReplicaSet(ctx genericapirequest.Context, replicaSetID string, options *metav1.GetOptions) (*extensions.ReplicaSet, error) {
+func (s *storage) GetReplicaSet(ctx context.Context, replicaSetID string, options *metav1.GetOptions) (*extensions.ReplicaSet, error) {
 	obj, err := s.Get(ctx, replicaSetID, options)
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (s *storage) GetReplicaSet(ctx genericapirequest.Context, replicaSetID stri
 	return obj.(*extensions.ReplicaSet), nil
 }
 
-func (s *storage) CreateReplicaSet(ctx genericapirequest.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc) (*extensions.ReplicaSet, error) {
+func (s *storage) CreateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc) (*extensions.ReplicaSet, error) {
 	obj, err := s.Create(ctx, replicaSet, createValidation, false)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (s *storage) CreateReplicaSet(ctx genericapirequest.Context, replicaSet *ex
 	return obj.(*extensions.ReplicaSet), nil
 }
 
-func (s *storage) UpdateReplicaSet(ctx genericapirequest.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.ReplicaSet, error) {
+func (s *storage) UpdateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.ReplicaSet, error) {
 	obj, _, err := s.Update(ctx, replicaSet.Name, rest.DefaultUpdatedObjectInfo(replicaSet), createValidation, updateValidation)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (s *storage) UpdateReplicaSet(ctx genericapirequest.Context, replicaSet *ex
 	return obj.(*extensions.ReplicaSet), nil
 }
 
-func (s *storage) DeleteReplicaSet(ctx genericapirequest.Context, replicaSetID string) error {
+func (s *storage) DeleteReplicaSet(ctx context.Context, replicaSetID string) error {
 	_, _, err := s.Delete(ctx, replicaSetID, nil)
 	return err
 }

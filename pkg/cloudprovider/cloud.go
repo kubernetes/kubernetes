@@ -130,9 +130,6 @@ type Instances interface {
 	// from the node whose nodeaddresses are being queried. i.e. local metadata
 	// services cannot be used in this method to obtain nodeaddresses
 	NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error)
-	// ExternalID returns the cloud provider ID of the node with the specified NodeName.
-	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-	ExternalID(ctx context.Context, nodeName types.NodeName) (string, error)
 	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
 	InstanceID(ctx context.Context, nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
@@ -148,6 +145,8 @@ type Instances interface {
 	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
+	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
 }
 
 // Route is a representation of an advanced routing rule.

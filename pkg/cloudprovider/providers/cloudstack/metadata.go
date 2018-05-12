@@ -69,11 +69,6 @@ func (m *metadata) NodeAddressesByProviderID(ctx context.Context, providerID str
 	return nil, errors.New("NodeAddressesByProviderID not implemented")
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (m *metadata) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	return m.InstanceID(ctx, name)
-}
-
 // InstanceID returns the cloud provider ID of the specified instance.
 func (m *metadata) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	instanceID, err := m.get(metadataTypeInstanceID)
@@ -106,7 +101,7 @@ func (m *metadata) InstanceTypeByProviderID(ctx context.Context, providerID stri
 
 // AddSSHKeyToAllInstances is currently not implemented.
 func (m *metadata) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return errors.New("AddSSHKeyToAllInstances not implemented")
+	return cloudprovider.NotImplemented
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.
@@ -117,6 +112,11 @@ func (m *metadata) CurrentNodeName(ctx context.Context, hostname string) (types.
 // InstanceExistsByProviderID returns if the instance still exists.
 func (m *metadata) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, errors.New("InstanceExistsByProviderID not implemented")
+}
+
+// InstanceShutdownByProviderID returns if the instance is shutdown.
+func (m *metadata) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
 }
 
 // GetZone returns the Zone containing the region that the program is running in.

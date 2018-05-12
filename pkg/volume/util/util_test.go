@@ -19,6 +19,7 @@ package util
 import (
 	"io/ioutil"
 	"os"
+	"runtime"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -29,7 +30,6 @@ import (
 	"hash/fnv"
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
 
 	"reflect"
@@ -45,105 +45,6 @@ import (
 var nodeLabels map[string]string = map[string]string{
 	"test-key1": "test-value1",
 	"test-key2": "test-value2",
-}
-
-func TestCheckAlphaNodeAffinity(t *testing.T) {
-	type affinityTest struct {
-		name          string
-		expectSuccess bool
-		pv            *v1.PersistentVolume
-	}
-
-	cases := []affinityTest{
-		{
-			name:          "valid-no-constraints",
-			expectSuccess: true,
-			pv:            testVolumeWithAlphaNodeAffinity(t, &v1.NodeAffinity{}),
-		},
-		{
-			name:          "valid-constraints",
-			expectSuccess: true,
-			pv: testVolumeWithAlphaNodeAffinity(t, &v1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      "test-key1",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"test-value1", "test-value3"},
-								},
-								{
-									Key:      "test-key2",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"test-value0", "test-value2"},
-								},
-							},
-						},
-					},
-				},
-			}),
-		},
-		{
-			name:          "invalid-key",
-			expectSuccess: false,
-			pv: testVolumeWithAlphaNodeAffinity(t, &v1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      "test-key1",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"test-value1", "test-value3"},
-								},
-								{
-									Key:      "test-key3",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"test-value0", "test-value2"},
-								},
-							},
-						},
-					},
-				},
-			}),
-		},
-		{
-			name:          "invalid-values",
-			expectSuccess: false,
-			pv: testVolumeWithAlphaNodeAffinity(t, &v1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      "test-key1",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"test-value3", "test-value4"},
-								},
-								{
-									Key:      "test-key2",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"test-value0", "test-value2"},
-								},
-							},
-						},
-					},
-				},
-			}),
-		},
-	}
-
-	for _, c := range cases {
-		err := CheckNodeAffinity(c.pv, nodeLabels)
-
-		if err != nil && c.expectSuccess {
-			t.Errorf("CheckTopology %v returned error: %v", c.name, err)
-		}
-		if err == nil && !c.expectSuccess {
-			t.Errorf("CheckTopology %v returned success, expected error", c.name)
-		}
-	}
 }
 
 func TestCheckVolumeNodeAffinity(t *testing.T) {
@@ -165,7 +66,53 @@ func TestCheckVolumeNodeAffinity(t *testing.T) {
 			pv:            testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{}),
 		},
 		{
-			name:          "valid-constraints",
+			name:          "select-nothing",
+			expectSuccess: false,
+			pv:            testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{Required: &v1.NodeSelector{}}),
+		},
+		{
+			name:          "select-nothing-empty-terms",
+			expectSuccess: false,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:          "valid-multiple-terms",
+			expectSuccess: true,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key3",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value1", "test-value3"},
+								},
+							},
+						},
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key2",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value0", "test-value2"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:          "valid-multiple-match-expressions",
 			expectSuccess: true,
 			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
@@ -189,7 +136,7 @@ func TestCheckVolumeNodeAffinity(t *testing.T) {
 			}),
 		},
 		{
-			name:          "invalid-key",
+			name:          "invalid-multiple-match-expressions-key",
 			expectSuccess: false,
 			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
@@ -213,7 +160,7 @@ func TestCheckVolumeNodeAffinity(t *testing.T) {
 			}),
 		},
 		{
-			name:          "invalid-values",
+			name:          "invalid-multiple-match-expressions-values",
 			expectSuccess: false,
 			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
@@ -236,6 +183,34 @@ func TestCheckVolumeNodeAffinity(t *testing.T) {
 				},
 			}),
 		},
+		{
+			name:          "invalid-multiple-terms",
+			expectSuccess: false,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key3",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value1", "test-value3"},
+								},
+							},
+						},
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key2",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value0", "test-value1"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
 	}
 
 	for _, c := range cases {
@@ -247,19 +222,6 @@ func TestCheckVolumeNodeAffinity(t *testing.T) {
 		if err == nil && !c.expectSuccess {
 			t.Errorf("CheckTopology %v returned success, expected error", c.name)
 		}
-	}
-}
-
-func testVolumeWithAlphaNodeAffinity(t *testing.T, affinity *v1.NodeAffinity) *v1.PersistentVolume {
-	objMeta := metav1.ObjectMeta{Name: "test-constraints"}
-	objMeta.Annotations = map[string]string{}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(objMeta.Annotations, affinity)
-	if err != nil {
-		t.Fatalf("Failed to get node affinity annotation: %v", err)
-	}
-
-	return &v1.PersistentVolume{
-		ObjectMeta: objMeta,
 	}
 }
 
@@ -1086,6 +1048,60 @@ func TestGetWindowsPath(t *testing.T) {
 		result := GetWindowsPath(test.path)
 		if result != test.expectedPath {
 			t.Errorf("GetWindowsPath(%v) returned (%v), want (%v)", test.path, result, test.expectedPath)
+		}
+	}
+}
+
+func TestMakeAbsolutePath(t *testing.T) {
+	tests := []struct {
+		goos         string
+		path         string
+		expectedPath string
+		name         string
+	}{
+		{
+			goos:         "linux",
+			path:         "non-absolute/path",
+			expectedPath: "/non-absolute/path",
+			name:         "linux non-absolute path",
+		},
+		{
+			goos:         "linux",
+			path:         "/absolute/path",
+			expectedPath: "/absolute/path",
+			name:         "linux absolute path",
+		},
+		{
+			goos:         "windows",
+			path:         "some\\path",
+			expectedPath: "c:\\some\\path",
+			name:         "basic windows",
+		},
+		{
+			goos:         "windows",
+			path:         "/some/path",
+			expectedPath: "c:/some/path",
+			name:         "linux path on windows",
+		},
+		{
+			goos:         "windows",
+			path:         "\\some\\path",
+			expectedPath: "c:\\some\\path",
+			name:         "windows path no drive",
+		},
+		{
+			goos:         "windows",
+			path:         "\\:\\some\\path",
+			expectedPath: "\\:\\some\\path",
+			name:         "windows path with colon",
+		},
+	}
+	for _, test := range tests {
+		if runtime.GOOS == test.goos {
+			path := MakeAbsolutePath(test.goos, test.path)
+			if path != test.expectedPath {
+				t.Errorf("[%s] Expected %s saw %s", test.name, test.expectedPath, path)
+			}
 		}
 	}
 }

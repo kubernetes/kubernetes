@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	autoscaling "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
@@ -93,21 +91,20 @@ func TestStatusSubresource(t *testing.T) {
 	// enable alpha feature CustomResourceSubresources
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
 
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
 
 	noxuDefinition := NewNoxuSubresourcesCRD(apiextensionsv1beta1.NamespaceScoped)
-	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, noxuVersionClient, noxuDefinition)
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -137,7 +134,7 @@ func TestStatusSubresource(t *testing.T) {
 
 	// UpdateStatus should not update spec.
 	// Check that .spec.num = 10 and .status.num = 20
-	updatedStatusInstance, err := noxuStatusResourceClient.Update(gottenNoxuInstance)
+	updatedStatusInstance, err := noxuResourceClient.UpdateStatus(gottenNoxuInstance)
 	if err != nil {
 		t.Fatalf("unable to update status: %v", err)
 	}
@@ -218,26 +215,28 @@ func TestScaleSubresource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientPool := dynamic.NewDynamicClientPool(config)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	noxuDefinition := NewNoxuSubresourcesCRD(apiextensionsv1beta1.NamespaceScoped)
 
 	// set invalid json path for specReplicasPath
 	noxuDefinition.Spec.Subresources.Scale.SpecReplicasPath = "foo,bar"
-	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err == nil {
 		t.Fatalf("unexpected non-error: specReplicasPath should be a valid json path under .spec")
 	}
 
 	noxuDefinition.Spec.Subresources.Scale.SpecReplicasPath = ".spec.replicas"
-	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, noxuVersionClient, noxuDefinition)
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -257,7 +256,7 @@ func TestScaleSubresource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	_, err = noxuStatusResourceClient.Update(gottenNoxuInstance)
+	_, err = noxuResourceClient.UpdateStatus(gottenNoxuInstance)
 	if err != nil {
 		t.Fatalf("unable to update status: %v", err)
 	}
@@ -345,13 +344,19 @@ func TestValidationSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientPool := dynamic.NewDynamicClientPool(config)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// fields other than properties in root schema are not allowed
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
-	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	noxuDefinition.Spec.Subresources = &apiextensionsv1beta1.CustomResourceSubresources{
+		Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+	}
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err == nil {
-		t.Fatalf("unexpected non-error: if subresources for custom resources are enabled, only properties can be used at the root of the schema")
+		t.Fatalf(`unexpected non-error, expected: must only have "properties" or "required" at the root if the status subresource is enabled`)
 	}
 
 	// make sure we are not restricting fields to properties even in subschemas
@@ -366,8 +371,9 @@ func TestValidationSchema(t *testing.T) {
 				},
 			},
 		},
+		Required: []string{"spec"},
 	}
-	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("unable to created crd %v: %v", noxuDefinition.Name, err)
 	}
@@ -377,7 +383,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 	// enable alpha feature CustomResourceSubresources
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
 
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,9 +392,8 @@ func TestValidateOnlyStatus(t *testing.T) {
 	// UpdateStatus should validate only status
 	// 1. create a crd with max value of .spec.num = 10 and .status.num = 10
 	// 2. create a cr with .spec.num = 10 and .status.num = 10 (valid)
-	// 3. update the crd so that max value of .spec.num = 5 and .status.num = 10
-	// 4. update the status of the cr with .status.num = 5 (spec is invalid)
-	// validation passes becauses spec is not validated
+	// 3. update the spec of the cr with .spec.num = 15 (spec is invalid), expect no error
+	// 4. update the spec of the cr with .spec.num = 15 (spec is invalid), expect error
 
 	// max value of spec.num = 10 and status.num = 10
 	schema := &apiextensionsv1beta1.JSONSchemaProps{
@@ -417,13 +422,12 @@ func TestValidateOnlyStatus(t *testing.T) {
 		OpenAPIV3Schema: schema,
 	}
 
-	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, noxuVersionClient, noxuDefinition)
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	// set .spec.num = 10 and .status.num = 10
 	noxuInstance := NewNoxuSubresourceInstance(ns, "foo")
@@ -437,58 +441,31 @@ func TestValidateOnlyStatus(t *testing.T) {
 		t.Fatalf("unable to create noxu instance: %v", err)
 	}
 
-	gottenCRD, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get("noxus.mygroup.example.com", metav1.GetOptions{})
+	// update the spec with .spec.num = 15, expecting no error
+	err = unstructured.SetNestedField(createdNoxuInstance.Object, int64(15), "spec", "num")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unexpected error setting .spec.num: %v", err)
 	}
-
-	// update the crd so that max value of spec.num = 5 and status.num = 10
-	gottenCRD.Spec.Validation.OpenAPIV3Schema = &apiextensionsv1beta1.JSONSchemaProps{
-		Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-			"spec": {
-				Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-					"num": {
-						Type:    "integer",
-						Maximum: float64Ptr(5),
-					},
-				},
-			},
-			"status": {
-				Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-					"num": {
-						Type:    "integer",
-						Maximum: float64Ptr(10),
-					},
-				},
-			},
-		},
-	}
-
-	if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(gottenCRD); err != nil {
-		t.Fatal(err)
-	}
-
-	// update the status with .status.num = 5
-	err = unstructured.SetNestedField(createdNoxuInstance.Object, int64(5), "status", "num")
+	createdNoxuInstance, err = noxuResourceClient.UpdateStatus(createdNoxuInstance)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Errorf("unexpected error: %v", err)
 	}
 
-	// cr is updated even though spec is invalid
-	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := noxuStatusResourceClient.Update(createdNoxuInstance)
-		if statusError, isStatus := err.(*apierrors.StatusError); isStatus {
-			if strings.Contains(statusError.Error(), "is invalid") {
-				return false, nil
-			}
-		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	})
+	// update with .status.num = 15, expecting an error
+	err = unstructured.SetNestedField(createdNoxuInstance.Object, int64(15), "status", "num")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unexpected error setting .status.num: %v", err)
+	}
+	createdNoxuInstance, err = noxuResourceClient.UpdateStatus(createdNoxuInstance)
+	if err == nil {
+		t.Fatal("expected error, but got none")
+	}
+	statusError, isStatus := err.(*apierrors.StatusError)
+	if !isStatus || statusError == nil {
+		t.Fatalf("expected status error, got %T: %v", err, err)
+	}
+	if !strings.Contains(statusError.Error(), "Invalid value") {
+		t.Fatalf("expected 'Invalid value' in error, got: %v", err)
 	}
 }
 
@@ -506,10 +483,13 @@ func TestSubresourcesDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientPool := dynamic.NewDynamicClientPool(config)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	noxuDefinition := NewNoxuSubresourcesCRD(apiextensionsv1beta1.NamespaceScoped)
-	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -580,21 +560,20 @@ func TestGeneration(t *testing.T) {
 	// enable alpha feature CustomResourceSubresources
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
 
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
 
 	noxuDefinition := NewNoxuSubresourcesCRD(apiextensionsv1beta1.NamespaceScoped)
-	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, noxuVersionClient, noxuDefinition)
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -616,7 +595,7 @@ func TestGeneration(t *testing.T) {
 	}
 
 	// UpdateStatus does not increment generation
-	updatedStatusInstance, err := noxuStatusResourceClient.Update(gottenNoxuInstance)
+	updatedStatusInstance, err := noxuResourceClient.UpdateStatus(gottenNoxuInstance)
 	if err != nil {
 		t.Fatalf("unable to update status: %v", err)
 	}
@@ -664,18 +643,19 @@ func TestSubresourcePatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientPool := dynamic.NewDynamicClientPool(config)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	noxuDefinition := NewNoxuSubresourcesCRD(apiextensionsv1beta1.NamespaceScoped)
-	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
-	noxuStatusResourceClient := NewNamespacedCustomResourceStatusClient(ns, noxuVersionClient, noxuDefinition)
-	noxuScaleResourceClient := NewNamespacedCustomResourceScaleClient(ns, noxuVersionClient, noxuDefinition)
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -687,7 +667,7 @@ func TestSubresourcePatch(t *testing.T) {
 	}
 
 	patch := []byte(`{"spec": {"num":999}, "status": {"num":999}}`)
-	patchedNoxuInstance, err := noxuStatusResourceClient.Patch("foo", types.MergePatchType, patch)
+	patchedNoxuInstance, err := noxuResourceClient.Patch("foo", types.MergePatchType, patch, "status")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -722,19 +702,19 @@ func TestSubresourcePatch(t *testing.T) {
 	}
 
 	// no-op patch
-	_, err = noxuStatusResourceClient.Patch("foo", types.MergePatchType, patch)
+	_, err = noxuResourceClient.Patch("foo", types.MergePatchType, patch, "status")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// empty patch
-	_, err = noxuStatusResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`))
+	_, err = noxuResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), "status")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	patch = []byte(`{"spec": {"replicas":7}, "status": {"replicas":7}}`)
-	patchedNoxuInstance, err = noxuScaleResourceClient.Patch("foo", types.MergePatchType, patch)
+	patchedNoxuInstance, err = noxuResourceClient.Patch("foo", types.MergePatchType, patch, "scale")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -763,24 +743,24 @@ func TestSubresourcePatch(t *testing.T) {
 	}
 
 	// no-op patch
-	_, err = noxuScaleResourceClient.Patch("foo", types.MergePatchType, patch)
+	_, err = noxuResourceClient.Patch("foo", types.MergePatchType, patch, "scale")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// empty patch
-	_, err = noxuScaleResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`))
+	_, err = noxuResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), "scale")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// make sure strategic merge patch is not supported for both status and scale
-	_, err = noxuStatusResourceClient.Patch("foo", types.StrategicMergePatchType, patch)
+	_, err = noxuResourceClient.Patch("foo", types.StrategicMergePatchType, patch, "status")
 	if err == nil {
 		t.Fatalf("unexpected non-error: strategic merge patch is not supported for custom resources")
 	}
 
-	_, err = noxuScaleResourceClient.Patch("foo", types.StrategicMergePatchType, patch)
+	_, err = noxuResourceClient.Patch("foo", types.StrategicMergePatchType, patch, "scale")
 	if err == nil {
 		t.Fatalf("unexpected non-error: strategic merge patch is not supported for custom resources")
 	}

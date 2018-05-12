@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -76,7 +76,7 @@ kube::test::object_assert() {
   local args=${5:-}
 
   for j in $(seq 1 ${tries}); do
-    res=$(eval kubectl get -a "${kube_flags[@]}" ${args} $object -o go-template=\"$request\")
+    res=$(eval kubectl get "${kube_flags[@]}" ${args} $object -o go-template=\"$request\")
     if [[ "$res" =~ ^$expected$ ]]; then
         echo -n ${green}
         echo "$(kube::test::get_caller 3): Successful get $object $request: $res"
@@ -103,7 +103,7 @@ kube::test::get_object_jsonpath_assert() {
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get -a "${kube_flags[@]}" $object -o jsonpath=\"$request\")
+  res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath=\"$request\")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}

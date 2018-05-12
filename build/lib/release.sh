@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -67,9 +67,9 @@ function kube::release::parse_and_validate_ci_version() {
 # Build final release artifacts
 function kube::release::clean_cruft() {
   # Clean out cruft
-  find ${RELEASE_STAGE} -name '*~' -exec rm {} \;
-  find ${RELEASE_STAGE} -name '#*#' -exec rm {} \;
-  find ${RELEASE_STAGE} -name '.DS*' -exec rm {} \;
+  find "${RELEASE_STAGE}" -name '*~' -exec rm {} \;
+  find "${RELEASE_STAGE}" -name '#*#' -exec rm {} \;
+  find "${RELEASE_STAGE}" -name '.DS*' -exec rm {} \;
 }
 
 function kube::release::package_tarballs() {
@@ -154,7 +154,7 @@ function kube::release::package_node_tarballs() {
   local platform
   for platform in "${KUBE_NODE_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    local arch=$(basename ${platform})
+    local arch=$(basename "${platform}")
     kube::log::status "Building tarball: node $platform_tag"
 
     local release_stage="${RELEASE_STAGE}/node/${platform_tag}/kubernetes"
@@ -198,7 +198,7 @@ function kube::release::package_server_tarballs() {
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    local arch=$(basename ${platform})
+    local arch=$(basename "${platform}")
     kube::log::status "Building tarball: server $platform_tag"
 
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
@@ -280,12 +280,12 @@ function kube::release::create_docker_images_for_server() {
     local binary_dir="$1"
     local arch="$2"
     local binary_name
-    local binaries=($(kube::build::get_docker_wrapped_binaries ${arch}))
+    local binaries=($(kube::build::get_docker_wrapped_binaries "${arch}"))
     local images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
     local -r docker_registry="k8s.gcr.io"
-    # TODO(thockin): Remove all traces of this after 1.10 release.
+    # TODO(thockin): Remove all traces of this after 1.11 release.
     # The following is the old non-indirected registry name.  To ease the
     # transition to the new name (above), we are double-tagging saved images.
     local -r deprecated_registry="gcr.io/google_containers"
@@ -325,16 +325,16 @@ function kube::release::create_docker_images_for_server() {
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
-        rm -rf ${docker_build_path}
-        mkdir -p ${docker_build_path}
-        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
-        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
+        rm -rf "${docker_build_path}"
+        mkdir -p "${docker_build_path}"
+        ln "${binary_dir}/${binary_name}" "${docker_build_path}/${binary_name}"
+        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > "${docker_file_path}"
 
-        "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
-        "${DOCKER[@]}" tag "${docker_image_tag}" ${deprecated_image_tag} >/dev/null
-        "${DOCKER[@]}" save "${docker_image_tag}" ${deprecated_image_tag} > "${binary_dir}/${binary_name}.tar"
-        echo "${docker_tag}" > ${binary_dir}/${binary_name}.docker_tag
-        rm -rf ${docker_build_path}
+        "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+        "${DOCKER[@]}" tag "${docker_image_tag}" "${deprecated_image_tag}" >/dev/null
+        "${DOCKER[@]}" save "${docker_image_tag}" "${deprecated_image_tag}" > "${binary_dir}/${binary_name}.tar"
+        echo "${docker_tag}" > "${binary_dir}/${binary_name}.docker_tag"
+        rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
 
         # If we are building an official/alpha/beta release we want to keep
@@ -350,8 +350,8 @@ function kube::release::create_docker_images_for_server() {
         else
           # not a release
           kube::log::status "Deleting docker image ${docker_image_tag}"
-          "${DOCKER[@]}" rmi ${docker_image_tag} &>/dev/null || true
-          "${DOCKER[@]}" rmi ${deprecated_image_tag} &>/dev/null || true
+          "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
+          "${DOCKER[@]}" rmi "${deprecated_image_tag}" &>/dev/null || true
         fi
       ) &
     done
@@ -389,6 +389,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
   cp "${src_dir}/rescheduler.manifest" "${dst_dir}/"
   cp "${src_dir}/e2e-image-puller.manifest" "${dst_dir}/"
+  cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
   local objects
@@ -434,7 +435,7 @@ function kube::release::package_test_tarball() {
   # Add the test image files
   mkdir -p "${release_stage}/test/images"
   cp -fR "${KUBE_ROOT}/test/images" "${release_stage}/test/"
-  tar c ${KUBE_TEST_PORTABLE[@]} | tar x -C ${release_stage}
+  tar c "${KUBE_TEST_PORTABLE[@]}" | tar x -C "${release_stage}"
 
   kube::release::clean_cruft
 
@@ -477,14 +478,10 @@ Server binary tarballs are no longer included in the Kubernetes final tarball.
 Run cluster/get-kube-binaries.sh to download client and server binaries.
 EOF
 
-  mkdir -p "${release_stage}/third_party"
-  cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
-
   # Include hack/lib as a dependency for the cluster/ scripts
   mkdir -p "${release_stage}/hack"
   cp -R "${KUBE_ROOT}/hack/lib" "${release_stage}/hack/"
 
-  cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"

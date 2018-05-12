@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -25,7 +25,7 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-if [[ "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" || "${NODE_OS_DISTRIBUTION}" == "custom" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
 else
   echo "Cannot operate on cluster using node os distro: ${NODE_OS_DISTRIBUTION}" >&2
@@ -502,6 +502,7 @@ function write-master-env {
 
   construct-kubelet-flags true
   build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
+  build-kubelet-config true "${KUBE_TEMP}/master-kubelet-config.yaml"
   build-kube-master-certs "${KUBE_TEMP}/kube-master-certs.yaml"
 }
 
@@ -512,6 +513,101 @@ function write-node-env {
 
   construct-kubelet-flags false
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
+  build-kubelet-config false "${KUBE_TEMP}/node-kubelet-config.yaml"
+}
+
+function build-node-labels {
+  local master=$1
+  local node_labels=""
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
+    # Add kube-proxy daemonset label to node to avoid situation during cluster
+    # upgrade/downgrade when there are two instances of kube-proxy running on a node.
+    node_labels="beta.kubernetes.io/kube-proxy-ds-ready=true"
+  fi
+  if [[ -n "${NODE_LABELS:-}" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
+  fi
+  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
+  fi
+  echo $node_labels
+}
+
+# yaml-map-string-stringarray converts the encoded structure to yaml format, and echoes the result
+# under the provided name. If the encoded structure is empty, echoes nothing.
+# 1: name to be output in yaml
+# 2: encoded map-string-string (which may contain duplicate keys - resulting in map-string-stringarray)
+# 3: key-value separator (defaults to ':')
+# 4: item separator (defaults to ',')
+function yaml-map-string-stringarray {
+  declare -r name="${1}"
+  declare -r encoded="${2}"
+  declare -r kv_sep="${3:-:}"
+  declare -r item_sep="${4:-,}"
+
+  declare -a pairs # indexed array
+  declare -A map # associative array
+  IFS="${item_sep}" read -ra pairs <<<"${encoded}" # split on item_sep
+  for pair in "${pairs[@]}"; do
+    declare key
+    declare value
+    IFS="${kv_sep}" read -r key value <<<"${pair}" # split on kv_sep
+    map[$key]="${map[$key]+${map[$key]}${item_sep}}${value}" # append values from duplicate keys
+  done
+  # only output if there is a non-empty map
+  if [[ ${#map[@]} -gt 0 ]]; then
+    echo "${name}:"
+    for k in "${!map[@]}"; do
+      echo "  ${k}:"
+      declare -a values
+      IFS="${item_sep}" read -ra values <<<"${map[$k]}"
+      for val in "${values[@]}"; do
+        # declare across two lines so errexit can catch failures
+        declare v
+        v=$(yaml-quote "${val}")
+        echo "    - ${v}"
+      done
+    done
+  fi
+}
+
+# yaml-map-string-string converts the encoded structure to yaml format, and echoes the result
+# under the provided name. If the encoded structure is empty, echoes nothing.
+# 1: name to be output in yaml
+# 2: encoded map-string-string (no duplicate keys)
+# 3: bool, whether to yaml-quote the value string in the output (defaults to true)
+# 4: key-value separator (defaults to ':')
+# 5: item separator (defaults to ',')
+function yaml-map-string-string {
+  declare -r name="${1}"
+  declare -r encoded="${2}"
+  declare -r quote_val_string="${3:-true}"
+  declare -r kv_sep="${4:-:}"
+  declare -r item_sep="${5:-,}"
+
+  declare -a pairs # indexed array
+  declare -A map # associative array
+  IFS="${item_sep}" read -ra pairs <<<"${encoded}" # split on item_sep # TODO(mtaufen): try quoting this too
+  for pair in "${pairs[@]}"; do
+    declare key
+    declare value
+    IFS="${kv_sep}" read -r key value <<<"${pair}" # split on kv_sep
+    map[$key]="${value}" # add to associative array
+  done
+  # only output if there is a non-empty map
+  if [[ ${#map[@]} -gt 0 ]]; then
+    echo "${name}:"
+    for k in "${!map[@]}"; do
+      if [[ "${quote_val_string}" == "true" ]]; then
+        # declare across two lines so errexit can catch failures
+        declare v
+        v=$(yaml-quote "${map[$k]}")
+        echo "  ${k}: ${v}"
+      else
+        echo "  ${k}: ${map[$k]}"
+      fi
+    done
+  fi
 }
 
 # $1: if 'true', we're rendering flags for a master, else a node
@@ -519,11 +615,7 @@ function construct-kubelet-flags {
   local master=$1
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
   flags+=" --allow-privileged=true"
-  flags+=" --cgroup-root=/"
   flags+=" --cloud-provider=gce"
-  flags+=" --cluster-dns=${DNS_SERVER_IP}"
-  flags+=" --cluster-domain=${DNS_DOMAIN}"
-  flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
   # Keep in sync with CONTAINERIZED_MOUNTER_HOME in configure-helper.sh
   flags+=" --experimental-mounter-path=/home/kubernetes/containerized_mounter/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
@@ -532,30 +624,17 @@ function construct-kubelet-flags {
 
   if [[ "${master}" == "true" ]]; then
     flags+=" ${MASTER_KUBELET_TEST_ARGS:-}"
-    flags+=" --enable-debugging-handlers=false"
-    flags+=" --hairpin-mode=none"
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
       #TODO(mikedanese): allow static pods to start before creating a client
       #flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       #flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
       flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       flags+=" --register-schedulable=false"
-    else
-      # Note: Standalone mode is used by GKE
-      flags+=" --pod-cidr=${MASTER_IP_RANGE}"
     fi
   else # For nodes
     flags+=" ${NODE_KUBELET_TEST_ARGS:-}"
-    flags+=" --enable-debugging-handlers=true"
     flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
     flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
-    if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
-       [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
-       [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
-      flags+=" --hairpin-mode=${HAIRPIN_MODE}"
-    fi
-    # Keep client-ca-file in sync with CA_CERT_BUNDLE_PATH in configure-helper.sh
-    flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=/etc/srv/kubernetes/pki/ca-certificates.crt"
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
@@ -577,37 +656,15 @@ function construct-kubelet-flags {
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
   flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
-  # Note: ENABLE_MANIFEST_URL is used by GKE
-  if [[ "${ENABLE_MANIFEST_URL:-}" == "true" ]]; then
-    flags+=" --manifest-url=${MANIFEST_URL}"
-    flags+=" --manifest-url-header=${MANIFEST_URL_HEADER}"
-  fi
   if [[ -n "${ENABLE_CUSTOM_METRICS:-}" ]]; then
     flags+=" --enable-custom-metrics=${ENABLE_CUSTOM_METRICS}"
   fi
-  local node_labels=""
-  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
-    # Add kube-proxy daemonset label to node to avoid situation during cluster
-    # upgrade/downgrade when there are two instances of kube-proxy running on a node.
-    node_labels="beta.kubernetes.io/kube-proxy-ds-ready=true"
-  fi
-  if [[ -n "${NODE_LABELS:-}" ]]; then
-    node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
-  fi
-  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
-    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
-  fi
+  local node_labels=$(build-node-labels ${master})
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
   fi
   if [[ -n "${NODE_TAINTS:-}" ]]; then
     flags+=" --register-with-taints=${NODE_TAINTS}"
-  fi
-  if [[ -n "${EVICTION_HARD:-}" ]]; then
-    flags+=" --eviction-hard=${EVICTION_HARD}"
-  fi
-  if [[ -n "${FEATURE_GATES:-}" ]]; then
-    flags+=" --feature-gates=${FEATURE_GATES}"
   fi
   # TODO(mtaufen): ROTATE_CERTIFICATES seems unused; delete it?
   if [[ -n "${ROTATE_CERTIFICATES:-}" ]]; then
@@ -620,8 +677,96 @@ function construct-kubelet-flags {
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
     flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
   fi
+  if [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
+    flags+=" --max-pods=${MAX_PODS_PER_NODE}"
+  fi
 
   KUBELET_ARGS="${flags}"
+}
+
+# $1: if 'true', we're rendering config for a master, else a node
+function build-kubelet-config {
+  local master=$1
+  local file=$2
+
+  rm -f "${file}"
+  {
+    declare quoted_dns_server_ip
+    declare quoted_dns_domain
+    quoted_dns_server_ip=$(yaml-quote "${DNS_SERVER_IP}")
+    quoted_dns_domain=$(yaml-quote "${DNS_DOMAIN}")
+    cat <<EOF
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+cgroupRoot: /
+clusterDNS:
+  - ${quoted_dns_server_ip}
+clusterDomain: ${quoted_dns_domain}
+staticPodPath: /etc/kubernetes/manifests
+readOnlyPort: 10255
+EOF
+
+    # --- begin master-specific config ---
+    if [[ "${master}" == "true" ]]; then
+        cat <<EOF
+enableDebuggingHandlers: false
+hairpinMode: none
+authentication:
+  webhook:
+    enabled: false
+  anonymous:
+    enabled: true
+authorization:
+  mode: AlwaysAllow
+EOF
+      if [[ "${REGISTER_MASTER_KUBELET:-false}" == "false" ]]; then
+        # Note: Standalone mode is used by GKE
+        declare quoted_master_ip_range
+        quoted_master_ip_range=$(yaml-quote "${MASTER_IP_RANGE}")
+        cat <<EOF
+podCidr: ${quoted_master_ip_range}
+EOF
+      fi
+      # --- end master-specific config ---
+    else
+      # --- begin node-specific config ---
+      # Keep authentication.x509.clientCAFile in sync with CA_CERT_BUNDLE_PATH in configure-helper.sh
+      cat <<EOF
+enableDebuggingHandlers: true
+authentication:
+  x509:
+    clientCAFile: /etc/srv/kubernetes/pki/ca-certificates.crt
+EOF
+      if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
+         [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
+         [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
+         declare quoted_hairpin_mode
+         quoted_hairpin_mode=$(yaml-quote "${HAIRPIN_MODE}")
+         cat <<EOF
+hairpinMode: ${quoted_hairpin_mode}
+EOF
+      fi
+      # --- end node-specific config ---
+    fi
+
+    # Note: ENABLE_MANIFEST_URL is used by GKE
+    if [[ "${ENABLE_MANIFEST_URL:-}" == "true" ]]; then
+      declare quoted_manifest_url
+      quoted_manifest_url=$(yaml-quote "${MANIFEST_URL}")
+      cat <<EOF
+staticPodURL: ${quoted_manifest_url}
+EOF
+      yaml-map-string-stringarray 'staticPodURLHeader' "${MANIFEST_URL_HEADER}"
+    fi
+
+    if [[ -n "${EVICTION_HARD:-}" ]]; then
+      yaml-map-string-string 'evictionHard' "${EVICTION_HARD}" true '<'
+    fi
+
+    if [[ -n "${FEATURE_GATES:-}" ]]; then
+      yaml-map-string-string 'featureGates' "${FEATURE_GATES}" false '='
+    fi
+  } > "${file}"
 }
 
 function build-kube-master-certs {
@@ -646,7 +791,7 @@ function build-kube-env {
   local server_binary_tar_url=$SERVER_BINARY_TAR_URL
   local kube_manifests_tar_url="${KUBE_MANIFESTS_TAR_URL:-}"
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] ; then
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "ubuntu" || "${NODE_OS_DISTRIBUTION}" == "custom") ]]; then
     # TODO: Support fallback .tar.gz settings on Container Linux
     server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
     kube_manifests_tar_url=$(split_csv "${KUBE_MANIFESTS_TAR_URL}")
@@ -670,9 +815,13 @@ SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${KUBERNETES_MASTER_NAME})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
 ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
+ENABLE_PROMETHEUS_MONITORING: $(yaml-quote ${ENABLE_PROMETHEUS_MONITORING:-false})
 ENABLE_METRICS_SERVER: $(yaml-quote ${ENABLE_METRICS_SERVER:-false})
 ENABLE_METADATA_AGENT: $(yaml-quote ${ENABLE_METADATA_AGENT:-none})
-METADATA_AGENT_VERSION: $(yaml-quote ${METADATA_AGENT_VERSION:-})
+METADATA_AGENT_CPU_REQUEST: $(yaml-quote ${METADATA_AGENT_CPU_REQUEST:-})
+METADATA_AGENT_MEMORY_REQUEST: $(yaml-quote ${METADATA_AGENT_MEMORY_REQUEST:-})
+METADATA_AGENT_CLUSTER_LEVEL_CPU_REQUEST: $(yaml-quote ${METADATA_AGENT_CLUSTER_LEVEL_CPU_REQUEST:-})
+METADATA_AGENT_CLUSTER_LEVEL_MEMORY_REQUEST: $(yaml-quote ${METADATA_AGENT_CLUSTER_LEVEL_MEMORY_REQUEST:-})
 DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote ${DOCKER_REGISTRY_MIRROR_URL:-})
 ENABLE_L7_LOADBALANCING: $(yaml-quote ${ENABLE_L7_LOADBALANCING:-none})
 ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
@@ -732,6 +881,7 @@ ADVANCED_AUDIT_WEBHOOK_THROTTLE_BURST: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_THR
 ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-})
 GCE_API_ENDPOINT: $(yaml-quote ${GCE_API_ENDPOINT:-})
 GCE_GLBC_IMAGE: $(yaml-quote ${GCE_GLBC_IMAGE:-})
+ENABLE_NODE_JOURNAL: $(yaml-quote ${ENABLE_NODE_JOURNAL:-false})
 PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote ${PROMETHEUS_TO_SD_PREFIX:-})
 ENABLE_PROMETHEUS_TO_SD: $(yaml-quote ${ENABLE_PROMETHEUS_TO_SD:-false})
@@ -742,9 +892,19 @@ CONTAINER_RUNTIME_NAME: $(yaml-quote ${CONTAINER_RUNTIME_NAME:-})
 NODE_LOCAL_SSDS_EXT: $(yaml-quote ${NODE_LOCAL_SSDS_EXT:-})
 LOAD_IMAGE_COMMAND: $(yaml-quote ${LOAD_IMAGE_COMMAND:-})
 ZONE: $(yaml-quote ${ZONE})
+REGION: $(yaml-quote ${REGION})
 VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR})
 KUBELET_ARGS: $(yaml-quote ${KUBELET_ARGS})
+REQUIRE_METADATA_KUBELET_CONFIG_FILE: $(yaml-quote true)
 EOF
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \
+     [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "cos" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
+    cat >>$file <<EOF
+REMOUNT_VOLUME_PLUGIN_DIR: $(yaml-quote ${REMOUNT_VOLUME_PLUGIN_DIR:-true})
+EOF
+  fi
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
     cat >>$file <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
@@ -755,8 +915,8 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
-     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "ubuntu") ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" = "ubuntu" || "${NODE_OS_DISTRIBUTION}" = "custom") ]] ; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
@@ -826,6 +986,7 @@ ETCD_CA_KEY: $(yaml-quote ${ETCD_CA_KEY_BASE64:-})
 ETCD_CA_CERT: $(yaml-quote ${ETCD_CA_CERT_BASE64:-})
 ETCD_PEER_KEY: $(yaml-quote ${ETCD_PEER_KEY_BASE64:-})
 ETCD_PEER_CERT: $(yaml-quote ${ETCD_PEER_CERT_BASE64:-})
+ENCRYPTION_PROVIDER_CONFIG: $(yaml-quote ${ENCRYPTION_PROVIDER_CONFIG:-})
 EOF
     if [[ "${ENABLE_TOKENREQUEST:-}" == "true" ]]; then
       cat >>$file <<EOF
@@ -964,10 +1125,26 @@ ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
 AUTOSCALER_EXPANDER_CONFIG: $(yaml-quote ${AUTOSCALER_EXPANDER_CONFIG})
 EOF
+      if [[ "${master}" == "false" ]]; then
+          # TODO(kubernetes/autoscaler#718): AUTOSCALER_ENV_VARS is a hotfix for cluster autoscaler,
+          # which reads the kube-env to determine the shape of a node and was broken by #60020.
+          # This should be removed as soon as a more reliable source of information is available!
+          local node_labels=$(build-node-labels false)
+          local node_taints="${NODE_TAINTS:-}"
+          local autoscaler_env_vars="node_labels=${node_labels};node_taints=${node_taints}"
+          cat >>$file <<EOF
+AUTOSCALER_ENV_VARS: $(yaml-quote ${autoscaler_env_vars})
+EOF
+      fi
   fi
   if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
     cat >>$file <<EOF
 SCHEDULING_ALGORITHM_PROVIDER: $(yaml-quote ${SCHEDULING_ALGORITHM_PROVIDER})
+EOF
+  fi
+  if [ -n "${MAX_PODS_PER_NODE:-}" ]; then
+    cat >>$file <<EOF
+MAX_PODS_PER_NODE: $(yaml-quote ${MAX_PODS_PER_NODE})
 EOF
   fi
 }
@@ -1267,6 +1444,9 @@ minVersion = version.LooseVersion("1.3.0")
 required = [ "alpha", "beta", "core" ]
 data = json.loads(sys.argv[1])
 rel = data.get("Google Cloud SDK")
+if "CL @" in rel:
+  print("Using dev version of gcloud: %s" %rel)
+  exit(0)
 if rel != "HEAD" and version.LooseVersion(rel) < minVersion:
   print("gcloud version out of date ( < %s )" % minVersion)
   exit(1)
@@ -1400,7 +1580,7 @@ function get-template-name-from-version() {
   echo "${NODE_INSTANCE_PREFIX}-template-${1}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
 }
 
-# validates the NODE_LOCAL_SSDS_EXT variable 
+# validates the NODE_LOCAL_SSDS_EXT variable
 function validate-node-local-ssds-ext(){
   ssdopts="${1}"
 
@@ -1476,7 +1656,7 @@ function create-node-template() {
       done
     done
   fi
-  
+
   if [[ ! -z ${NODE_LOCAL_SSDS+x} ]]; then
     # The NODE_LOCAL_SSDS check below fixes issue #49171
     # Some versions of seq will count down from 1 if "seq 0" is specified
@@ -1486,7 +1666,7 @@ function create-node-template() {
       done
     fi
   fi
-  
+
 
   local network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" \
@@ -1610,14 +1790,8 @@ function check-existing() {
   fi
 }
 
-# TODO(#54017): Remove below logics for handling deprecated network mode field.
-# `x_gcloud_mode` was replaced by `x_gcloud_subnet_mode` in gcloud 175.0.0 and
-# the content changed as well. Keeping such logic to make the transition eaiser.
 function check-network-mode() {
   local mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_subnet_mode)' || true)"
-  if [[ -z "${mode}" ]]; then
-    mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_mode)' || true)"
-  fi
   # The deprecated field uses lower case. Convert to upper case for consistency.
   echo "$(echo $mode | tr [a-z] [A-Z])"
 }
@@ -1631,7 +1805,7 @@ function create-network() {
       network_mode="custom"
     fi
     echo "Creating new ${network_mode} network: ${NETWORK}"
-    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --mode="${network_mode}"
+    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --subnet-mode="${network_mode}"
   else
     PREEXISTING_NETWORK=true
     PREEXISTING_NETWORK_MODE="$(check-network-mode)"
@@ -1666,8 +1840,8 @@ function create-network() {
 }
 
 function expand-default-subnetwork() {
-  gcloud compute networks switch-mode "${NETWORK}" \
-    --mode custom \
+  gcloud compute networks update "${NETWORK}" \
+    --switch-to-custom-subnet-mode \
     --project "${NETWORK_PROJECT}" \
     --quiet || true
   gcloud compute networks subnets expand-ip-range "${NETWORK}" \
@@ -1703,12 +1877,6 @@ function create-subnetworks() {
     --region ${REGION} \
     ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
   if [[ -z ${subnet} ]]; then
-    # Only allow auto-creation for default subnets
-    if [[ ${IP_ALIAS_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-default ]]; then
-      echo "${color_red}Subnetwork ${NETWORK}:${IP_ALIAS_SUBNETWORK} does not exist${color_norm}"
-      exit 1
-    fi
-
     echo "Creating subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
     gcloud beta compute networks subnets create \
       ${IP_ALIAS_SUBNETWORK} \
@@ -1721,7 +1889,7 @@ function create-subnetworks() {
       --secondary-range "services-default=${SERVICE_CLUSTER_IP_RANGE}"
     echo "Created subnetwork ${IP_ALIAS_SUBNETWORK}"
   else
-    if ! echo ${subnet} | grep --quiet secondaryIpRanges ${subnet}; then
+    if ! echo ${subnet} | grep --quiet secondaryIpRanges; then
       echo "${color_red}Subnet ${IP_ALIAS_SUBNETWORK} does not have a secondary range${color_norm}"
       exit 1
     fi
@@ -1795,35 +1963,38 @@ function delete-network() {
 }
 
 function delete-subnetworks() {
-  if [[ ${ENABLE_IP_ALIASES:-} != "true" ]]; then
-    # If running in custom mode network we need to delete subnets
-    mode="$(check-network-mode)"
-    if [[ "${mode}" == "CUSTOM" ]]; then
-      if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
-        echo "Deleting default subnets..."
-        # This value should be kept in sync with number of regions.
-        local parallelism=9
-        gcloud compute networks subnets list --network="${NETWORK}" --project "${NETWORK_PROJECT}" --format='value(region.basename())' | \
-          xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
-      elif [[ "${CREATE_CUSTOM_NETWORK:-}" == "true" ]]; then
-        echo "Deleting custom subnet..."
-        gcloud --quiet compute networks subnets delete "${SUBNETWORK}" --project "${NETWORK_PROJECT}" --region="${REGION}" || true
-      fi
+  # If running in custom mode network we need to delete subnets manually.
+  mode="$(check-network-mode)"
+  if [[ "${mode}" == "CUSTOM" ]]; then
+    if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
+      echo "Deleting default subnets..."
+      # This value should be kept in sync with number of regions.
+      local parallelism=9
+      gcloud compute networks subnets list --network="${NETWORK}" --project "${NETWORK_PROJECT}" --format='value(region.basename())' | \
+        xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
+    elif [[ "${CREATE_CUSTOM_NETWORK:-}" == "true" ]]; then
+      echo "Deleting custom subnet..."
+      gcloud --quiet compute networks subnets delete "${SUBNETWORK}" --project "${NETWORK_PROJECT}" --region="${REGION}" || true
     fi
     return
   fi
 
-  # Only delete automatically created subnets.
-  if [[ ${IP_ALIAS_SUBNETWORK} == ${INSTANCE_PREFIX}-subnet-default ]]; then
-    echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-    if [[ -n $(gcloud beta compute networks subnets describe \
+  # If we reached here, it means we're not using custom network.
+  # So the only thing we need to check is if IP-aliases was turned
+  # on and we created a subnet for it. If so, we should delete it.
+  if [[ ${ENABLE_IP_ALIASES:-} == "true" ]]; then
+    # Only delete the subnet if we created it (i.e it's not pre-existing).
+    if [[ -z "${KUBE_GCE_IP_ALIAS_SUBNETWORK:-}" ]]; then
+      echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
+      if [[ -n $(gcloud beta compute networks subnets describe \
+            --project "${NETWORK_PROJECT}" \
+            --region ${REGION} \
+            ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
+        gcloud beta --quiet compute networks subnets delete \
           --project "${NETWORK_PROJECT}" \
           --region ${REGION} \
-          ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
-      gcloud beta --quiet compute networks subnets delete \
-        --project "${NETWORK_PROJECT}" \
-        --region ${REGION} \
-        ${IP_ALIAS_SUBNETWORK}
+          ${IP_ALIAS_SUBNETWORK}
+      fi
     fi
   fi
 }

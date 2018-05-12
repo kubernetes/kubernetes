@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -29,13 +29,13 @@ DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
 readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox --virtualbox-cpu-count -1"}
 
 # This will canonicalize the path
-KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd -P)
+KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")"/.. && pwd -P)
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat ${KUBE_ROOT}/build/build-image/cross/VERSION)"
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"
 
 # This version number is used to cause everyone to rebuild their data containers
 # and build image.  This is especially useful for automated build systems like
@@ -43,7 +43,7 @@ readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat ${KUBE_ROOT}/build/build-image/cross/
 #
 # Increment/change this number if you change the build image (anything under
 # build/build-image) or change the set of volumes in the data container.
-readonly KUBE_BUILD_IMAGE_VERSION_BASE="$(cat ${KUBE_ROOT}/build/build-image/VERSION)"
+readonly KUBE_BUILD_IMAGE_VERSION_BASE="$(cat "${KUBE_ROOT}/build/build-image/VERSION")"
 readonly KUBE_BUILD_IMAGE_VERSION="${KUBE_BUILD_IMAGE_VERSION_BASE}-${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
 # Here we map the output directories across both the local and remote _output
@@ -232,7 +232,7 @@ function kube::build::prepare_docker_machine() {
 
   docker-machine inspect "${DOCKER_MACHINE_NAME}" &> /dev/null || {
     kube::log::status "Creating a machine to build Kubernetes"
-    docker-machine create --driver ${DOCKER_MACHINE_DRIVER} \
+    docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" \
       --virtualbox-memory "${virtualbox_memory_mb}" \
       --engine-env HTTP_PROXY="${KUBERNETES_HTTP_PROXY:-}" \
       --engine-env HTTPS_PROXY="${KUBERNETES_HTTPS_PROXY:-}" \
@@ -249,13 +249,13 @@ function kube::build::prepare_docker_machine() {
   local docker_machine_out
   while ! docker_machine_out=$(docker-machine env "${DOCKER_MACHINE_NAME}" 2>&1); do
     if [[ ${docker_machine_out} =~ "Error checking TLS connection" ]]; then
-      echo ${docker_machine_out}
+      echo "${docker_machine_out}"
       docker-machine regenerate-certs ${DOCKER_MACHINE_NAME}
     else
       sleep 1
     fi
   done
-  eval $(docker-machine env "${DOCKER_MACHINE_NAME}")
+  eval "$(docker-machine env "${DOCKER_MACHINE_NAME}")"
   kube::log::status "A Docker host using docker-machine named '${DOCKER_MACHINE_NAME}' is ready to go!"
   return 0
 }
@@ -354,7 +354,7 @@ function kube::build::docker_image_exists() {
 function kube::build::docker_delete_old_images() {
   # In Docker 1.12, we can replace this with
   #    docker images "$1" --format "{{.Tag}}"
-  for tag in $("${DOCKER[@]}" images ${1} | tail -n +2 | awk '{print $2}') ; do
+  for tag in $("${DOCKER[@]}" images "${1}" | tail -n +2 | awk '{print $2}') ; do
     if [[ "${tag}" != "${2}"* ]] ; then
       V=3 kube::log::status "Keeping image ${1}:${tag}"
       continue
@@ -434,7 +434,7 @@ function kube::build::clean() {
     kube::build::docker_delete_old_images "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG_BASE}"
 
     V=2 kube::log::status "Cleaning all untagged docker images"
-    "${DOCKER[@]}" rmi $("${DOCKER[@]}" images -q --filter 'dangling=true') 2> /dev/null || true
+    "${DOCKER[@]}" rmi "$("${DOCKER[@]}" images -q --filter 'dangling=true')" 2> /dev/null || true
   fi
 
   if [[ -d "${LOCAL_OUTPUT_ROOT}" ]]; then
@@ -451,8 +451,8 @@ function kube::build::build_image() {
 
   cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
-  cp ${KUBE_ROOT}/build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  cp ${KUBE_ROOT}/build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+  cp "${KUBE_ROOT}/build/build-image/Dockerfile" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  cp "${KUBE_ROOT}/build/build-image/rsyncd.sh" "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
   dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
   chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 

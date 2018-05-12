@@ -20,12 +20,13 @@ package mount
 
 import (
 	"errors"
+	"os"
 )
 
 type NsenterMounter struct{}
 
-func NewNsenterMounter() *NsenterMounter {
-	return &NsenterMounter{}
+func NewNsenterMounter() (*NsenterMounter, error) {
+	return &NsenterMounter{}, nil
 }
 
 var _ = Interface(&NsenterMounter{})
@@ -84,4 +85,24 @@ func (*NsenterMounter) MakeFile(pathname string) error {
 
 func (*NsenterMounter) ExistsPath(pathname string) bool {
 	return true
+}
+
+func (*NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return nil
+}
+
+func (*NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return subPath.Path, nil, nil
+}
+
+func (*NsenterMounter) CleanSubPaths(podDir string, volumeName string) error {
+	return nil
+}
+
+func (*NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (*NsenterMounter) GetFSGroup(pathname string) (int64, error) {
+	return -1, errors.New("not implemented")
 }

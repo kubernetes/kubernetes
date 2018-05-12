@@ -179,25 +179,27 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		}
 	}
 
-	// currentNum keeps track of how many ingresses have been created.
-	currentNum := new(int)
+	// numIngsCreated keeps track of how many ingresses have been created.
+	numIngsCreated := 0
 
-	prepareIngsFunc := func(goalNum int) {
+	prepareIngsFunc := func(numIngsNeeded int) {
 		var ingWg sync.WaitGroup
-		numToCreate := goalNum - *currentNum
-		ingWg.Add(numToCreate)
-		errQueue := make(chan error, numToCreate)
-		latencyQueue := make(chan time.Duration, numToCreate)
+		numIngsToCreate := numIngsNeeded - numIngsCreated
+		ingWg.Add(numIngsToCreate)
+		svcQueue := make(chan *v1.Service, numIngsToCreate)
+		ingQueue := make(chan *extensions.Ingress, numIngsToCreate)
+		errQueue := make(chan error, numIngsToCreate)
+		latencyQueue := make(chan time.Duration, numIngsToCreate)
 		start := time.Now()
-		for ; *currentNum < goalNum; *currentNum++ {
-			suffix := fmt.Sprintf("%d", *currentNum)
+		for ; numIngsCreated < numIngsNeeded; numIngsCreated++ {
+			suffix := fmt.Sprintf("%d", numIngsCreated)
 			go func() {
 				defer ingWg.Done()
 
 				start := time.Now()
 				svcCreated, ingCreated, err := f.createScaleTestServiceIngress(suffix, f.EnableTLS)
-				f.ScaleTestSvcs = append(f.ScaleTestSvcs, svcCreated)
-				f.ScaleTestIngs = append(f.ScaleTestIngs, ingCreated)
+				svcQueue <- svcCreated
+				ingQueue <- ingCreated
 				if err != nil {
 					errQueue <- err
 					return
@@ -214,11 +216,19 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		}
 
 		// Wait until all ingress creations are complete.
-		f.Logger.Infof("Waiting for %d ingresses to come up...", numToCreate)
+		f.Logger.Infof("Waiting for %d ingresses to come up...", numIngsToCreate)
 		ingWg.Wait()
+		close(svcQueue)
+		close(ingQueue)
 		close(errQueue)
 		close(latencyQueue)
 		elapsed := time.Since(start)
+		for svc := range svcQueue {
+			f.ScaleTestSvcs = append(f.ScaleTestSvcs, svc)
+		}
+		for ing := range ingQueue {
+			f.ScaleTestIngs = append(f.ScaleTestIngs, ing)
+		}
 		var createLatencies []time.Duration
 		for latency := range latencyQueue {
 			createLatencies = append(createLatencies, latency)
@@ -231,15 +241,15 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 			}
 			return
 		}
-		f.Logger.Infof("Spent %s for %d ingresses to come up", elapsed, numToCreate)
+		f.Logger.Infof("Spent %s for %d ingresses to come up", elapsed, numIngsToCreate)
 		f.BatchDurations = append(f.BatchDurations, elapsed)
 	}
 
 	measureCreateUpdateFunc := func() {
 		f.Logger.Infof("Create one more ingress and wait for it to come up")
 		start := time.Now()
-		svcCreated, ingCreated, err := f.createScaleTestServiceIngress(fmt.Sprintf("%d", *currentNum), f.EnableTLS)
-		*currentNum = *currentNum + 1
+		svcCreated, ingCreated, err := f.createScaleTestServiceIngress(fmt.Sprintf("%d", numIngsCreated), f.EnableTLS)
+		numIngsCreated = numIngsCreated + 1
 		f.ScaleTestSvcs = append(f.ScaleTestSvcs, svcCreated)
 		f.ScaleTestIngs = append(f.ScaleTestIngs, ingCreated)
 		if err != nil {
@@ -440,7 +450,7 @@ func generateScaleTestBackendDeploymentSpec(numReplicas int32) *extensions.Deplo
 					Containers: []v1.Container{
 						{
 							Name:  scaleTestBackendName,
-							Image: "gcr.io/google_containers/echoserver:1.6",
+							Image: "k8s.gcr.io/echoserver:1.10",
 							Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 							ReadinessProbe: &v1.Probe{
 								Handler: v1.Handler{

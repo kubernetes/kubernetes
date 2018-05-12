@@ -16,6 +16,7 @@ go_library(
         "//build/visible_to:pkg_kubectl_cmd_auth_CONSUMERS",
     ],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion:go_default_library",
@@ -23,7 +24,9 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/kubectl/resource:go_default_library",
+        "//pkg/kubectl/genericclioptions:go_default_library",
+        "//pkg/kubectl/genericclioptions/resource:go_default_library",
+        "//pkg/printers:go_default_library",
         "//pkg/registry/rbac/reconciliation:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

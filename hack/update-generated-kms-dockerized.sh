@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2018 The Kubernetes Authors.
 #
@@ -54,8 +54,7 @@ PATH="${gogopath}:${PATH}" \
   --gogo_out=plugins=grpc:${KUBE_KMS_GRPC_ROOT} ${KUBE_KMS_GRPC_ROOT}/service.proto
 
 # Update boilerplate for the generated file.
-echo "$(cat hack/boilerplate/boilerplate.go.txt ${KUBE_KMS_GRPC_ROOT}/service.pb.go)" > ${KUBE_KMS_GRPC_ROOT}/service.pb.go
-sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${KUBE_KMS_GRPC_ROOT}/service.pb.go
+echo "$(cat hack/boilerplate/boilerplate.generatego.txt ${KUBE_KMS_GRPC_ROOT}/service.pb.go)" > ${KUBE_KMS_GRPC_ROOT}/service.pb.go
 
 # Run gofmt to clean up the generated code.
 kube::golang::verify_go_version

@@ -48,12 +48,11 @@ func TestLegacyConstructResponseWriter(t *testing.T) {
 func TestLegacyAudit(t *testing.T) {
 	var buf bytes.Buffer
 
-	handler := WithLegacyAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{
-		user: &user.DefaultInfo{Name: "admin"},
-	}, &buf)
+	handler := WithLegacyAudit(&fakeHTTPHandler{}, &buf)
 
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
+	req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 	line := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	if len(line) != 2 {
@@ -78,10 +77,11 @@ func TestLegacyAudit(t *testing.T) {
 func TestLegacyAuditNoPanicOnNilUser(t *testing.T) {
 	var buf bytes.Buffer
 
-	handler := WithLegacyAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{}, &buf)
+	handler := WithLegacyAudit(&fakeHTTPHandler{}, &buf)
 
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
+	req = withTestContext(req, nil, nil)
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 	line := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	if len(line) != 2 {

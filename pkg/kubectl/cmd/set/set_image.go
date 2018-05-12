@@ -18,41 +18,48 @@ package set
 
 import (
 	"fmt"
-	"io"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
-type ImageOptions struct {
+type SetImageOptions struct {
 	resource.FilenameOptions
+
+	PrintFlags  *printers.PrintFlags
+	RecordFlags *genericclioptions.RecordFlags
 
 	Infos        []*resource.Info
 	Selector     string
-	Out          io.Writer
-	Err          io.Writer
 	DryRun       bool
-	ShortOutput  bool
 	All          bool
-	Record       bool
 	Output       string
-	ChangeCause  string
 	Local        bool
-	Cmd          *cobra.Command
 	ResolveImage func(in string) (string, error)
+
+	PrintObj printers.ResourcePrinterFunc
+	Recorder genericclioptions.Recorder
 
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
 	ContainerImages        map[string]string
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -79,11 +86,19 @@ var (
 		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
-func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
-	options := &ImageOptions{
-		Out: out,
-		Err: err,
+func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
+	return &SetImageOptions{
+		PrintFlags:  printers.NewPrintFlags("image updated", legacyscheme.Scheme),
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		Recorder: genericclioptions.NoopRecorder{},
+
+		IOStreams: streams,
 	}
+}
+
+func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewImageOptions(streams)
 
 	cmd := &cobra.Command{
 		Use: "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
@@ -92,33 +107,48 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 		Long:    image_long,
 		Example: image_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
+
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set image will NOT contact api-server but run locally.")
-	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 
-func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
-	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-	o.Record = cmdutil.GetRecordFlag(cmd)
-	o.ChangeCause = f.Command(cmd, false)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ResolveImage = f.ResolveImage
-	o.Cmd = cmd
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	o.PrintObj = printer.PrintObj
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -132,7 +162,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		Internal().
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -161,7 +191,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	return nil
 }
 
-func (o *ImageOptions) Validate() error {
+func (o *SetImageOptions) Validate() error {
 	errors := []error{}
 	if o.All && len(o.Selector) > 0 {
 		errors = append(errors, fmt.Errorf("cannot set --all and --selector at the same time"))
@@ -177,12 +207,11 @@ func (o *ImageOptions) Validate() error {
 	return utilerrors.NewAggregate(errors)
 }
 
-func (o *ImageOptions) Run() error {
+func (o *SetImageOptions) Run() error {
 	allErrs := []error{}
 
-	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		transformed := false
-		info.Object = info.AsVersioned()
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			for name, image := range o.ContainerImages {
 				var (
@@ -219,10 +248,18 @@ func (o *ImageOptions) Run() error {
 			}
 			return nil
 		})
-		if transformed && err == nil {
-			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+		if err != nil {
+			return nil, err
 		}
-		return nil, err
+		if !transformed {
+			return nil, nil
+		}
+		// record this change (for rollout history)
+		if err := o.Recorder.Record(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
+		}
+
+		return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 	})
 
 	for _, patch := range patches {
@@ -238,7 +275,7 @@ func (o *ImageOptions) Run() error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := cmdutil.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObj(patch.Info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
@@ -252,24 +289,9 @@ func (o *ImageOptions) Run() error {
 		}
 		info.Refresh(obj, true)
 
-		// record this change (for rollout history)
-		if o.Record || cmdutil.ContainsChangeCause(info) {
-			if patch, patchType, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause); err == nil {
-				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch); err != nil {
-					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
-				}
-			}
+		if err := o.PrintObj(info.Object, o.Out); err != nil {
+			return err
 		}
-
-		info.Refresh(obj, true)
-
-		if len(o.Output) > 0 {
-			if err := cmdutil.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
-				return err
-			}
-			continue
-		}
-		cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "image updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -27,7 +28,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	grpctx "golang.org/x/net/context"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"k8s.io/api/core/v1"
@@ -284,7 +284,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 	csi := c.csiClient
 
-	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
@@ -318,6 +318,15 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 	publishVolumeInfo := attachment.Status.AttachmentMetadata
 
+	nodeStageSecrets := map[string]string{}
+	if csiSource.NodeStageSecretRef != nil {
+		nodeStageSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodeStageSecretRef)
+		if err != nil {
+			return fmt.Errorf("fetching NodeStageSecretRef %s/%s failed: %v",
+				csiSource.NodeStageSecretRef.Namespace, csiSource.NodeStageSecretRef.Name, err)
+		}
+	}
+
 	// create target_dir before call to NodeStageVolume
 	if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
 		glog.Error(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
@@ -336,11 +345,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		fsType = defaultFSType
 	}
 
-	nodeStageSecrets := map[string]string{}
-	if csiSource.NodeStageSecretRef != nil {
-		nodeStageSecrets = getCredentialsFromSecret(c.k8s, csiSource.NodeStageSecretRef)
-	}
-
 	err = csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
 		publishVolumeInfo,
@@ -352,9 +356,8 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	if err != nil {
 		glog.Errorf(log("attacher.MountDevice failed: %v", err))
-		if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
-			glog.Error(log("attacher.MountDevice failed to remove mount dir after a NodeStageVolume() error [%s]: %v", deviceMountPath, err))
-			return err
+		if removeMountDirErr := removeMountDir(c.plugin, deviceMountPath); removeMountDirErr != nil {
+			glog.Error(log("attacher.MountDevice failed to remove mount dir after a NodeStageVolume() error [%s]: %v", deviceMountPath, removeMountDirErr))
 		}
 		return err
 	}
@@ -475,7 +478,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 	csi := c.csiClient
 
-	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
@@ -502,7 +505,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func hasStageUnstageCapability(ctx grpctx.Context, csi csiClient) (bool, error) {
+func hasStageUnstageCapability(ctx context.Context, csi csiClient) (bool, error) {
 	capabilities, err := csi.NodeGetCapabilities(ctx)
 	if err != nil {
 		return false, err

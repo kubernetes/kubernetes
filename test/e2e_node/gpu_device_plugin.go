@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"os/exec"
 	"strconv"
 	"time"
 
@@ -79,7 +80,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			p1 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
 
 			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
-			count1, devId1 := parseLogFromNRuns(f, p1.Name, p1.Name, 1, deviceIDRE)
+			devId1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			p1, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
@@ -87,15 +88,20 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			restartKubelet()
 
 			By("Confirming that after a kubelet and pod restart, GPU assignement is kept")
-			count1, devIdRestart1 := parseLogFromNRuns(f, p1.Name, p1.Name, count1+1, deviceIDRE)
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIdRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
 
 			By("Restarting Kubelet and creating another pod")
 			restartKubelet()
+			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+			Eventually(func() bool {
+				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
+			}, 10*time.Second, framework.Poll).Should(BeTrue())
 			p2 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
 
 			By("Checking that pods got a different GPU")
-			count2, devId2 := parseLogFromNRuns(f, p2.Name, p2.Name, 1, deviceIDRE)
+			devId2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
 
 			Expect(devId1).To(Not(Equal(devId2)))
 
@@ -108,16 +114,21 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 				return framework.NumberOfNVIDIAGPUs(node) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())
 			By("Checking that scheduled pods can continue to run even after we delete device plugin.")
-			count1, devIdRestart1 = parseLogFromNRuns(f, p1.Name, p1.Name, count1+1, deviceIDRE)
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
-			count2, devIdRestart2 := parseLogFromNRuns(f, p2.Name, p2.Name, count2+1, deviceIDRE)
+
+			ensurePodContainerRestart(f, p2.Name, p2.Name)
+			devIdRestart2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
 			Expect(devIdRestart2).To(Equal(devId2))
 			By("Restarting Kubelet.")
 			restartKubelet()
 			By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
-			count1, devIdRestart1 = parseLogFromNRuns(f, p1.Name, p1.Name, count1+2, deviceIDRE)
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
-			count2, devIdRestart2 = parseLogFromNRuns(f, p2.Name, p2.Name, count2+2, deviceIDRE)
+			ensurePodContainerRestart(f, p2.Name, p2.Name)
+			devIdRestart2 = parseLog(f, p2.Name, p2.Name, deviceIDRE)
 			Expect(devIdRestart2).To(Equal(devId2))
 			logDevicePluginMetrics()
 
@@ -127,6 +138,16 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 		})
 	})
 })
+
+func checkIfNvidiaGPUsExistOnNode() bool {
+	// Cannot use `lspci` because it is not installed on all distros by default.
+	err := exec.Command("/bin/sh", "-c", "find /sys/devices/pci* -type f | grep vendor | xargs cat | grep 0x10de").Run()
+	if err != nil {
+		framework.Logf("check for nvidia GPUs failed. Got Error: %v", err)
+		return false
+	}
+	return true
+}
 
 func logDevicePluginMetrics() {
 	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")

@@ -21,7 +21,6 @@ package config
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -46,8 +45,8 @@ import (
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := newSourceFile("/some/fake/file", "localhost", ch)
-	err := c.watch()
+	lw := newSourceFile("/some/fake/file", "localhost", time.Millisecond, ch)
+	err := lw.doWatch()
 	if err == nil {
 		t.Errorf("Expected error")
 	}
@@ -75,7 +74,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 
 	for _, testCase := range testCases {
 		func() {
-			dirName, err := utiltesting.MkTmpdir("file-test")
+			dirName, err := mkTempDir("file-test")
 			if err != nil {
 				t.Fatalf("unable to create temp dir: %v", err)
 			}
@@ -107,69 +106,35 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 	}
 }
 
-func TestReadPodsFromFileExistLater(t *testing.T) {
-	watchFileAdded(false, t)
+var (
+	testCases = []struct {
+		watchDir bool
+		symlink  bool
+	}{
+		{true, true},
+		{true, false},
+		{false, true},
+		{false, false},
+	}
+)
+
+func TestWatchFileAdded(t *testing.T) {
+	for _, testCase := range testCases {
+		watchFileAdded(testCase.watchDir, testCase.symlink, t)
+	}
 }
 
-func TestReadPodsFromFileChanged(t *testing.T) {
-	watchFileChanged(false, t)
-}
-
-func TestReadPodsFromFileInDirAdded(t *testing.T) {
-	watchFileAdded(true, t)
-}
-
-func TestReadPodsFromFileInDirChanged(t *testing.T) {
-	watchFileChanged(true, t)
-}
-
-func TestExtractFromBadDataFile(t *testing.T) {
-	dirName, err := utiltesting.MkTmpdir("file-test")
-	if err != nil {
-		t.Fatalf("unable to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(dirName)
-
-	fileName := filepath.Join(dirName, "test_pod_manifest")
-	err = ioutil.WriteFile(fileName, []byte{1, 2, 3}, 0555)
-	if err != nil {
-		t.Fatalf("unable to write test file %#v", err)
-	}
-
-	ch := make(chan interface{}, 1)
-	c := newSourceFile(fileName, "localhost", ch)
-	err = c.resetStoreFromPath()
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	expectEmptyChannel(t, ch)
-}
-
-func TestExtractFromEmptyDir(t *testing.T) {
-	dirName, err := utiltesting.MkTmpdir("file-test")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer os.RemoveAll(dirName)
-
-	ch := make(chan interface{}, 1)
-	c := newSourceFile(dirName, "localhost", ch)
-	err = c.resetStoreFromPath()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	update := (<-ch).(kubetypes.PodUpdate)
-	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
-	if !apiequality.Semantic.DeepEqual(expected, update) {
-		t.Fatalf("expected %#v, Got %#v", expected, update)
+func TestWatchFileChanged(t *testing.T) {
+	for _, testCase := range testCases {
+		watchFileChanged(testCase.watchDir, testCase.symlink, t)
 	}
 }
 
 type testCase struct {
-	desc     string
-	pod      runtime.Object
-	expected kubetypes.PodUpdate
+	desc       string
+	linkedFile string
+	pod        runtime.Object
+	expected   kubetypes.PodUpdate
 }
 
 func getTestCases(hostname types.NodeName) []*testCase {
@@ -234,7 +199,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 
 func (tc *testCase) writeToFile(dir, name string, t *testing.T) string {
 	var versionedPod runtime.Object
-	err := testapi.Default.Converter().Convert(&tc.pod, &versionedPod, nil)
+	err := legacyscheme.Scheme.Convert(&tc.pod, &versionedPod, nil)
 	if err != nil {
 		t.Fatalf("%s: error in versioning the pod: %v", tc.desc, err)
 	}
@@ -250,19 +215,40 @@ func (tc *testCase) writeToFile(dir, name string, t *testing.T) string {
 	return fileName
 }
 
-func watchFileAdded(watchDir bool, t *testing.T) {
+func createSymbolicLink(link, target, name string, t *testing.T) string {
+	linkName := filepath.Join(link, name)
+	linkedFile := filepath.Join(target, name)
+
+	err := os.Symlink(linkedFile, linkName)
+	if err != nil {
+		t.Fatalf("unexpected error when create symbolic link: %v", err)
+	}
+	return linkName
+}
+
+func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
 	fileNamePre := "test_pod_manifest"
 	for index, testCase := range testCases {
 		func() {
-			dirName, err := utiltesting.MkTmpdir("dir-test")
+			dirName, err := mkTempDir("dir-test")
 			if err != nil {
 				t.Fatalf("unable to create temp dir: %v", err)
 			}
-			defer os.RemoveAll(dirName)
+			defer removeAll(dirName, t)
+
 			fileName := fmt.Sprintf("%s_%d", fileNamePre, index)
+			var linkedDirName string
+			if symlink {
+				linkedDirName, err = mkTempDir("linked-dir-test")
+				if err != nil {
+					t.Fatalf("unable to create temp dir for linked files: %v", err)
+				}
+				defer removeAll(linkedDirName, t)
+				createSymbolicLink(dirName, linkedDirName, fileName, t)
+			}
 
 			ch := make(chan interface{})
 			if watchDir {
@@ -274,12 +260,17 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 
 			addFile := func() {
 				// Add a file
+				if symlink {
+					testCase.writeToFile(linkedDirName, fileName, t)
+					return
+				}
+
 				testCase.writeToFile(dirName, fileName, t)
 			}
 
 			go addFile()
 
-			// For !watchDir: expect an update by SourceFile.resetStoreFromPath().
+			// For !watchDir: expect an update by SourceFile.reloadConfig().
 			// For watchDir: expect at least one update from CREATE & MODIFY inotify event.
 			// Shouldn't expect two updates from CREATE & MODIFY because CREATE doesn't guarantee file written.
 			// In that case no update will be sent from CREATE event.
@@ -288,19 +279,29 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 	}
 }
 
-func watchFileChanged(watchDir bool, t *testing.T) {
+func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
 	fileNamePre := "test_pod_manifest"
 	for index, testCase := range testCases {
 		func() {
-			dirName, err := utiltesting.MkTmpdir("dir-test")
+			dirName, err := mkTempDir("dir-test")
 			fileName := fmt.Sprintf("%s_%d", fileNamePre, index)
 			if err != nil {
 				t.Fatalf("unable to create temp dir: %v", err)
 			}
-			defer os.RemoveAll(dirName)
+			defer removeAll(dirName, t)
+
+			var linkedDirName string
+			if symlink {
+				linkedDirName, err = mkTempDir("linked-dir-test")
+				if err != nil {
+					t.Fatalf("unable to create temp dir for linked files: %v", err)
+				}
+				defer removeAll(linkedDirName, t)
+				createSymbolicLink(dirName, linkedDirName, fileName, t)
+			}
 
 			var file string
 			lock := &sync.Mutex{}
@@ -308,6 +309,12 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
+
+				if symlink {
+					file = testCase.writeToFile(linkedDirName, fileName, t)
+					return
+				}
+
 				file = testCase.writeToFile(dirName, fileName, t)
 			}()
 
@@ -332,7 +339,12 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 				pod.Spec.Containers[0].Name = "image2"
 
 				testCase.expected.Pods[0].Spec.Containers[0].Name = "image2"
-				testCase.writeToFile(dirName, fileName, t)
+				if symlink {
+					file = testCase.writeToFile(linkedDirName, fileName, t)
+					return
+				}
+
+				file = testCase.writeToFile(dirName, fileName, t)
 			}
 
 			go changeFile()
@@ -370,6 +382,10 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 		select {
 		case got := <-ch:
 			update := got.(kubetypes.PodUpdate)
+			if len(update.Pods) == 0 {
+				// filter out the empty updates from reading a non-existing path
+				continue
+			}
 			for _, pod := range update.Pods {
 				// TODO: remove the conversion when validation is performed on versioned objects.
 				internalPod := &api.Pod{}

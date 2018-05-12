@@ -37,7 +37,7 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
 		return false, nil
 	}
-	if ctx.ComponentConfig.ClusterSigningCertFile == "" || ctx.ComponentConfig.ClusterSigningKeyFile == "" {
+	if ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == "" {
 		return false, nil
 	}
 
@@ -52,15 +52,15 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 	// bail out of startController without logging.
 	var keyFileExists, keyUsesDefault, certFileExists, certUsesDefault bool
 
-	_, err := os.Stat(ctx.ComponentConfig.ClusterSigningCertFile)
+	_, err := os.Stat(ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile)
 	certFileExists = !os.IsNotExist(err)
 
-	certUsesDefault = (ctx.ComponentConfig.ClusterSigningCertFile == cmoptions.DefaultClusterSigningCertFile)
+	certUsesDefault = (ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile == cmoptions.DefaultClusterSigningCertFile)
 
-	_, err = os.Stat(ctx.ComponentConfig.ClusterSigningKeyFile)
+	_, err = os.Stat(ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile)
 	keyFileExists = !os.IsNotExist(err)
 
-	keyUsesDefault = (ctx.ComponentConfig.ClusterSigningKeyFile == cmoptions.DefaultClusterSigningKeyFile)
+	keyUsesDefault = (ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == cmoptions.DefaultClusterSigningKeyFile)
 
 	switch {
 	case (keyFileExists && keyUsesDefault) || (certFileExists && certUsesDefault):
@@ -84,9 +84,9 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 	signer, err := signer.NewCSRSigningController(
 		c,
 		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
-		ctx.ComponentConfig.ClusterSigningCertFile,
-		ctx.ComponentConfig.ClusterSigningKeyFile,
-		ctx.ComponentConfig.ClusterSigningDuration.Duration,
+		ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile,
+		ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile,
+		ctx.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration,
 	)
 	if err != nil {
 		return false, fmt.Errorf("failed to start certificate controller: %v", err)

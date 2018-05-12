@@ -35,6 +35,7 @@ import (
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -315,17 +316,17 @@ func restrictedPod(f *framework.Framework, name string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SeccompPodAnnotationKey:                      "docker/default",
+				v1.SeccompPodAnnotationKey:                      v1.SeccompProfileRuntimeDefault,
 				apparmor.ContainerAnnotationKeyPrefix + "pause": apparmor.ProfileRuntimeDefault,
 			},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:  "pause",
-				Image: framework.GetPauseImageName(f.ClientSet),
+				Image: imageutils.GetPauseImageName(),
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: boolPtr(false),
-					RunAsUser:                intPtr(65534),
+					RunAsUser:                utilpointer.Int64Ptr(65534),
 				},
 			}},
 		},
@@ -373,8 +374,8 @@ func restrictedPSPInPolicy(name string) *policy.PodSecurityPolicy {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  "docker/default",
-				seccomp.DefaultProfileAnnotationKey:   "docker/default",
+				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
 				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
 				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
 			},
@@ -428,8 +429,8 @@ func restrictedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  "docker/default",
-				seccomp.DefaultProfileAnnotationKey:   "docker/default",
+				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
 				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
 				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
 			},
@@ -479,8 +480,4 @@ func restrictedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
 
 func boolPtr(b bool) *bool {
 	return &b
-}
-
-func intPtr(i int64) *int64 {
-	return &i
 }

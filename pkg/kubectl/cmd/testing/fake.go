@@ -28,27 +28,29 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/restmapper"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -178,7 +180,7 @@ func versionErrIfFalse(b bool) error {
 	return versionErr
 }
 
-var ValidVersion = legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
+var ValidVersion = "v1"
 var InternalGV = schema.GroupVersion{Group: "apitest", Version: runtime.APIVersionInternal}
 var UnlikelyGV = schema.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
 var ValidVersionGV = schema.GroupVersion{Group: "apitest", Version: ValidVersion}
@@ -202,12 +204,7 @@ func AddToScheme(scheme *runtime.Scheme) (meta.RESTMapper, runtime.Codec) {
 
 	codecs := serializer.NewCodecFactory(scheme)
 	codec := codecs.LegacyCodec(UnlikelyGV)
-	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{UnlikelyGV, ValidVersionGV}, func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: meta.NewAccessor(),
-		}, versionErrIfFalse(version == ValidVersionGV || version == UnlikelyGV)
-	})
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{UnlikelyGV, ValidVersionGV})
 	for _, gv := range []schema.GroupVersion{UnlikelyGV, ValidVersionGV} {
 		for kind := range scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
@@ -239,25 +236,45 @@ type TestFactory struct {
 	cmdutil.Factory
 
 	Client             kubectl.RESTClient
+	ScaleGetter        scaleclient.ScalesGetter
 	UnstructuredClient kubectl.RESTClient
 	DescriberVal       printers.Describer
 	Namespace          string
 	ClientConfigVal    *restclient.Config
 	CommandVal         string
+	FakeDynamicClient  *fakedynamic.FakeDynamicClient
 
 	tempConfigFile *os.File
 
-	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	UnstructuredClientForMappingFunc resource.FakeClientFunc
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
 }
 
 func NewTestFactory() *TestFactory {
 	// specify an optionalClientConfig to explicitly use in testing
 	// to avoid polluting an existing user config.
-	config, configFile := defaultFakeClientConfig()
+	tmpFile, err := ioutil.TempFile("", "cmdtests_temp")
+	if err != nil {
+		panic(fmt.Sprintf("unable to create a fake client config: %v", err))
+	}
+
+	loadingRules := &clientcmd.ClientConfigLoadingRules{
+		Precedence:     []string{tmpFile.Name()},
+		MigrationRules: map[string]string{},
+	}
+
+	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"}}
+	fallbackReader := bytes.NewBuffer([]byte{})
+	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
+
+	configFlags := cmdutil.NewTestConfigFlags().
+		WithClientConfig(clientConfig).
+		WithRESTMapper(testRESTMapper())
+
 	return &TestFactory{
-		Factory:        cmdutil.NewFactory(config),
-		tempConfigFile: configFile,
+		Factory:           cmdutil.NewFactory(configFlags),
+		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(legacyscheme.Scheme),
+		tempConfigFile:    tmpFile,
 	}
 }
 
@@ -269,33 +286,8 @@ func (f *TestFactory) Cleanup() {
 	os.Remove(f.tempConfigFile.Name())
 }
 
-func defaultFakeClientConfig() (clientcmd.ClientConfig, *os.File) {
-	loadingRules, tmpFile, err := newDefaultFakeClientConfigLoadingRules()
-	if err != nil {
-		panic(fmt.Sprintf("unable to create a fake client config: %v", err))
-	}
-
-	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"}}
-	fallbackReader := bytes.NewBuffer([]byte{})
-
-	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
-	return clientConfig, tmpFile
-}
-
-func newDefaultFakeClientConfigLoadingRules() (*clientcmd.ClientConfigLoadingRules, *os.File, error) {
-	tmpFile, err := ioutil.TempFile("", "cmdtests_temp")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return &clientcmd.ClientConfigLoadingRules{
-		Precedence:     []string{tmpFile.Name()},
-		MigrationRules: map[string]string{},
-	}, tmpFile, nil
-}
-
-func (f *TestFactory) CategoryExpander() categories.CategoryExpander {
-	return categories.LegacyCategoryExpander
+func (f *TestFactory) CategoryExpander() (restmapper.CategoryExpander, error) {
+	return resource.FakeCategoryExpander, nil
 }
 
 func (f *TestFactory) ClientConfig() (*restclient.Config, error) {
@@ -312,7 +304,7 @@ func (f *TestFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.REST
 
 func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	if f.UnstructuredClientForMappingFunc != nil {
-		return f.UnstructuredClientForMappingFunc(mapping)
+		return f.UnstructuredClientForMappingFunc(mapping.GroupVersionKind.GroupVersion())
 	}
 	return f.UnstructuredClient, nil
 }
@@ -341,23 +333,22 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper, typer := f.Object()
+	mapper, err := f.RESTMapper()
+	categoryExpander, err2 := f.CategoryExpander()
 
-	return resource.NewBuilder(
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  typer,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
+	return resource.NewFakeBuilder(
+		func(version schema.GroupVersion) (resource.RESTClient, error) {
+			if f.UnstructuredClientForMappingFunc != nil {
+				return f.UnstructuredClientForMappingFunc(version)
+			}
+			if f.UnstructuredClient != nil {
+				return f.UnstructuredClient, nil
+			}
+			return f.Client, nil
 		},
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  typer,
-			ClientMapper: resource.ClientMapperFunc(f.UnstructuredClientForMapping),
-			Decoder:      unstructured.UnstructuredJSONScheme,
-		},
-		f.CategoryExpander(),
-	)
+		mapper,
+		categoryExpander,
+	).AddError(err).AddError(err2)
 }
 
 func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
@@ -407,6 +398,13 @@ func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
 	return clientset, nil
 }
 
+func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
+	if f.FakeDynamicClient != nil {
+		return f.FakeDynamicClient, nil
+	}
+	return f.Factory.DynamicClient()
+}
+
 func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
 	// Swap out the HTTP client out of the client with the fake's version.
 	fakeClient := f.Client.(*fake.RESTClient)
@@ -431,38 +429,21 @@ func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) 
 	return f.ClientSet()
 }
 
-func (f *TestFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+func testRESTMapper() meta.RESTMapper {
 	groupResources := testDynamicResources()
-	mapper := discovery.NewRESTMapper(
-		groupResources,
-		meta.InterfacesForUnstructuredConversion(func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-			switch version {
-			// provide typed objects for these two versions
-			case ValidVersionGV, UnlikelyGV:
-				return &meta.VersionInterfaces{
-					ObjectConvertor:  scheme.Scheme,
-					MetadataAccessor: meta.NewAccessor(),
-				}, nil
-				// otherwise fall back to the legacy scheme
-			default:
-				return legacyscheme.Registry.InterfacesFor(version)
-			}
-		}),
-	)
+	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
 	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
 	// TODO: make this opt-in?
 	mapper = meta.FirstHitRESTMapper{
 		MultiRESTMapper: meta.MultiRESTMapper{
 			mapper,
-			legacyscheme.Registry.RESTMapper(),
+			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		},
 	}
 
-	// TODO: should probably be the external scheme
-	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
 	fakeDs := &fakeCachedDiscoveryClient{}
-	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
-	return expander, typer
+	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
+	return expander
 }
 
 func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
@@ -483,8 +464,12 @@ func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time
 	}
 }
 
-func testDynamicResources() []*discovery.APIGroupResources {
-	return []*discovery.APIGroupResources{
+func (f *TestFactory) ScaleClient() (scaleclient.ScalesGetter, error) {
+	return f.ScaleGetter, nil
+}
+
+func testDynamicResources() []*restmapper.APIGroupResources {
+	return []*restmapper.APIGroupResources{
 		{
 			Group: metav1.APIGroup{
 				Versions: []metav1.GroupVersionForDiscovery{

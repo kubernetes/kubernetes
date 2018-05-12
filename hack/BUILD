@@ -19,7 +19,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//hack/boilerplate:all-srcs",
-        "//hack/cmd/teststale:all-srcs",
         "//hack/e2e-internal:all-srcs",
         "//hack/lib:all-srcs",
         "//hack/make-rules:all-srcs",
@@ -71,4 +70,11 @@ go_library(
     name = "go_default_library",
     srcs = ["e2e.go"],
     importpath = "k8s.io/kubernetes/hack",
+)
+
+sh_binary(
+    name = "update-mirror",
+    srcs = ["update-workspace-mirror.sh"],
+    args = ["$(location @workspace_urls//:urls.txt)"],
+    data = ["@workspace_urls//:urls.txt"],
 )

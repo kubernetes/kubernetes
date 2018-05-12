@@ -59,7 +59,6 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 )
 
 // Config is a struct of configuration directives for NewMasterComponents.
@@ -125,8 +124,6 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
-		masterConfig.GenericConfig.EnableProfiling = true
-		masterConfig.GenericConfig.EnableMetrics = true
 		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, legacyscheme.Scheme)
 		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 			InfoProps: spec.InfoProps{
@@ -180,7 +177,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 
 	sharedInformers := informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
-	m, err = masterConfig.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
+	m, err = masterConfig.Complete(sharedInformers).New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		closeFn()
 		glog.Fatalf("error in bringing up the master: %v", err)
@@ -219,6 +216,14 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	return m, s, closeFn
 }
 
+// Returns the master config appropriate for most integration tests.
+func NewIntegrationTestMasterConfig() *master.Config {
+	masterConfig := NewMasterConfig()
+	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+	return masterConfig
+}
+
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
 	// This causes the integration tests to exercise the etcd
@@ -230,7 +235,7 @@ func NewMasterConfig() *master.Config {
 	info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(legacyscheme.Scheme, info)
 
-	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Registry)
+	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
 	// FIXME (soltysh): this GroupVersionResource override should be configurable
 	// we need to set both for the whole group and for cronjobs, separately
 	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
@@ -281,8 +286,6 @@ func NewMasterConfig() *master.Config {
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	genericConfig.EnableMetrics = true
 
 	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
 	if err != nil {
@@ -294,21 +297,11 @@ func NewMasterConfig() *master.Config {
 		ExtraConfig: master.ExtraConfig{
 			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 			StorageFactory:          storageFactory,
-			EnableCoreControllers:   true,
 			KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
 			APIServerServicePort:    443,
 			MasterCount:             1,
 		},
 	}
-}
-
-// Returns the master config appropriate for most integration tests.
-func NewIntegrationTestMasterConfig() *master.Config {
-	masterConfig := NewMasterConfig()
-	masterConfig.ExtraConfig.EnableCoreControllers = true
-	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
-	return masterConfig
 }
 
 // CloseFunc can be called to cleanup the master
@@ -318,7 +311,6 @@ func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
-		masterConfig.GenericConfig.EnableMetrics = true
 	}
 	return startMasterOrDie(masterConfig, nil, nil)
 }

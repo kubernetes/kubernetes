@@ -81,7 +81,7 @@ func NewInsecureServingOptions() *InsecureServingOptions {
 	}
 }
 
-func (s InsecureServingOptions) Validate(portArg string) []error {
+func (s InsecureServingOptions) Validate() []error {
 	errors := []error{}
 
 	if s.BindPort < 0 || s.BindPort > 65535 {
@@ -99,6 +99,7 @@ func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
 	fs.MarkDeprecated("insecure-bind-address", "This flag will be removed in a future version.")
+	fs.Lookup("insecure-bind-address").Hidden = false
 
 	fs.IntVar(&s.BindPort, "insecure-port", s.BindPort, ""+
 		"The port on which to serve unsecured, unauthenticated access. It is assumed "+
@@ -106,6 +107,7 @@ func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"the cluster and that port 443 on the cluster's public address is proxied to this "+
 		"port. This is performed by nginx in the default setup. Set to zero to disable.")
 	fs.MarkDeprecated("insecure-port", "This flag will be removed in a future version.")
+	fs.Lookup("insecure-port").Hidden = false
 }
 
 // TODO: remove it until kops stop using `--address`

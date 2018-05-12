@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -36,8 +36,9 @@ cleanup()
 
 trap cleanup TERM EXIT
 
-# Create 1MB device with ext2
-dd if=/dev/zero of=block count=1 bs=1M
+# Create 120MB device with ext2
+# (volume_io tests need at least 100MB)
+dd if=/dev/zero of=block seek=120 count=1 bs=1M
 mkfs.ext2 block
 
 # Add index.html to it

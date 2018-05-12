@@ -6,6 +6,7 @@ go_library(
         "async.go",
         "azure.go",
         "environments.go",
+        "metadata_environment.go",
         "rp.go",
     ],
     importpath = "github.com/Azure/go-autorest/autorest/azure",

@@ -21,9 +21,11 @@ package util
 import (
 	"os"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/dynamic"
+	scaleclient "k8s.io/client-go/scale"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 type ring2Factory struct {
@@ -38,32 +40,6 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	}
 
 	return f
-}
-
-// NewBuilder returns a new resource builder for structured api objects.
-func (f *ring2Factory) NewBuilder() *resource.Builder {
-	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping)
-	mapper, typer := f.objectMappingFactory.Object()
-
-	unstructuredClientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
-
-	categoryExpander := f.objectMappingFactory.CategoryExpander()
-
-	return resource.NewBuilder(
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  typer,
-			ClientMapper: clientMapperFunc,
-			Decoder:      InternalVersionDecoder(),
-		},
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  typer,
-			ClientMapper: unstructuredClientMapperFunc,
-			Decoder:      unstructured.UnstructuredJSONScheme,
-		},
-		categoryExpander,
-	)
 }
 
 // PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.
@@ -83,4 +59,48 @@ func (f *ring2Factory) PluginLoader() plugins.PluginLoader {
 
 func (f *ring2Factory) PluginRunner() plugins.PluginRunner {
 	return &plugins.ExecPluginRunner{}
+}
+
+func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
+	discoClient, err := f.clientAccessFactory.DiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	restClient, err := f.clientAccessFactory.RESTClient()
+	if err != nil {
+		return nil, err
+	}
+	resolver := scaleclient.NewDiscoveryScaleKindResolver(discoClient)
+	mapper, err := f.clientAccessFactory.RESTMapper()
+	if err != nil {
+		return nil, err
+	}
+
+	return scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
+}
+
+func (f *ring2Factory) Scaler() (kubectl.Scaler, error) {
+	scalesGetter, err := f.ScaleClient()
+	if err != nil {
+		return nil, err
+	}
+
+	return kubectl.NewScaler(scalesGetter), nil
+}
+
+func (f *ring2Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
+	clientset, clientsetErr := f.clientAccessFactory.ClientSet()
+	if clientsetErr != nil {
+		return nil, clientsetErr
+	}
+	scaler, err := f.ScaleClient()
+	if err != nil {
+		return nil, err
+	}
+
+	reaper, reaperErr := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset, scaler)
+	if kubectl.IsNoSuchReaperError(reaperErr) {
+		return nil, reaperErr
+	}
+	return reaper, reaperErr
 }

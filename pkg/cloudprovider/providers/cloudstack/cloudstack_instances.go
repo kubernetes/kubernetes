@@ -80,11 +80,6 @@ func (cs *CSCloud) nodeAddresses(instance *cloudstack.VirtualMachine) ([]v1.Node
 	return addresses, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (cs *CSCloud) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	return cs.InstanceID(ctx, name)
-}
-
 // InstanceID returns the cloud provider ID of the specified instance.
 func (cs *CSCloud) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByName(
@@ -135,7 +130,7 @@ func (cs *CSCloud) InstanceTypeByProviderID(ctx context.Context, providerID stri
 
 // AddSSHKeyToAllInstances is currently not implemented.
 func (cs *CSCloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return errors.New("AddSSHKeyToAllInstances not implemented")
+	return cloudprovider.NotImplemented
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.
@@ -157,4 +152,9 @@ func (cs *CSCloud) InstanceExistsByProviderID(ctx context.Context, providerID st
 	}
 
 	return true, nil
+}
+
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (cs *CSCloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
 }

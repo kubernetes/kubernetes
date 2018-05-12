@@ -18,7 +18,6 @@ package azure
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 
@@ -96,11 +95,6 @@ func (az *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID strin
 	return az.NodeAddresses(ctx, name)
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (az *Cloud) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	return az.InstanceID(ctx, name)
-}
-
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
@@ -118,6 +112,11 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 	}
 
 	return true, nil
+}
+
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
 }
 
 func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
@@ -167,6 +166,10 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 		}
 		ssName, instanceID, err := extractVmssVMName(metadataName)
 		if err != nil {
+			if err == ErrorNotVmssInstance {
+				// Compose machineID for standard Node.
+				return az.getStandardMachineID(nodeName), nil
+			}
 			return "", err
 		}
 		// Compose instanceID based on ssName and instanceID for vmss instance.
@@ -212,7 +215,7 @@ func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string,
 // AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 // expected format for the key is standard ssh-keygen format: <protocol> <blob>
 func (az *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return fmt.Errorf("not supported")
+	return cloudprovider.NotImplemented
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.

@@ -45,6 +45,10 @@ docs/admin/kubeadm_alpha_phase_kubeconfig_controller-manager.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_kubelet.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_scheduler.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_user.md
+docs/admin/kubeadm_alpha_phase_kubelet.md
+docs/admin/kubeadm_alpha_phase_kubelet_enable.md
+docs/admin/kubeadm_alpha_phase_kubelet_init.md
+docs/admin/kubeadm_alpha_phase_kubelet_upload.md
 docs/admin/kubeadm_alpha_phase_mark-master.md
 docs/admin/kubeadm_alpha_phase_preflight.md
 docs/admin/kubeadm_alpha_phase_preflight_master.md
@@ -54,6 +58,7 @@ docs/admin/kubeadm_alpha_phase_selfhosting_convert-from-staticpods.md
 docs/admin/kubeadm_alpha_phase_upload-config.md
 docs/admin/kubeadm_completion.md
 docs/admin/kubeadm_config.md
+docs/admin/kubeadm_config_list-images.md
 docs/admin/kubeadm_config_upload.md
 docs/admin/kubeadm_config_upload_from-file.md
 docs/admin/kubeadm_config_upload_from-flags.md
@@ -114,6 +119,10 @@ docs/man/man1/kubeadm-alpha-phase-kubeconfig-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-user.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-enable.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-init.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-upload.1
+docs/man/man1/kubeadm-alpha-phase-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-mark-master.1
 docs/man/man1/kubeadm-alpha-phase-preflight-master.1
 docs/man/man1/kubeadm-alpha-phase-preflight-node.1
@@ -124,6 +133,7 @@ docs/man/man1/kubeadm-alpha-phase-upload-config.1
 docs/man/man1/kubeadm-alpha-phase.1
 docs/man/man1/kubeadm-alpha.1
 docs/man/man1/kubeadm-completion.1
+docs/man/man1/kubeadm-config-list-images.1
 docs/man/man1/kubeadm-config-upload-from-file.1
 docs/man/man1/kubeadm-config-upload-from-flags.1
 docs/man/man1/kubeadm-config-upload.1
@@ -145,6 +155,7 @@ docs/man/man1/kubeadm.1
 docs/man/man1/kubectl-alpha-diff.1
 docs/man/man1/kubectl-alpha.1
 docs/man/man1/kubectl-annotate.1
+docs/man/man1/kubectl-api-resources.1
 docs/man/man1/kubectl-api-versions.1
 docs/man/man1/kubectl-apply-edit-last-applied.1
 docs/man/man1/kubectl-apply-set-last-applied.1
@@ -245,6 +256,7 @@ docs/user-guide/kubectl/kubectl.md
 docs/user-guide/kubectl/kubectl_alpha.md
 docs/user-guide/kubectl/kubectl_alpha_diff.md
 docs/user-guide/kubectl/kubectl_annotate.md
+docs/user-guide/kubectl/kubectl_api-resources.md
 docs/user-guide/kubectl/kubectl_api-versions.md
 docs/user-guide/kubectl/kubectl_apply.md
 docs/user-guide/kubectl/kubectl_apply_edit-last-applied.md
@@ -316,7 +328,6 @@ docs/user-guide/kubectl/kubectl_plugin.md
 docs/user-guide/kubectl/kubectl_port-forward.md
 docs/user-guide/kubectl/kubectl_proxy.md
 docs/user-guide/kubectl/kubectl_replace.md
-docs/user-guide/kubectl/kubectl_rolling-update.md
 docs/user-guide/kubectl/kubectl_rollout.md
 docs/user-guide/kubectl/kubectl_rollout_history.md
 docs/user-guide/kubectl/kubectl_rollout_pause.md
@@ -341,6 +352,7 @@ docs/user-guide/kubectl/kubectl_version.md
 docs/yaml/kubectl/kubectl.yaml
 docs/yaml/kubectl/kubectl_alpha.yaml
 docs/yaml/kubectl/kubectl_annotate.yaml
+docs/yaml/kubectl/kubectl_api-resources.yaml
 docs/yaml/kubectl/kubectl_api-versions.yaml
 docs/yaml/kubectl/kubectl_apply.yaml
 docs/yaml/kubectl/kubectl_attach.yaml

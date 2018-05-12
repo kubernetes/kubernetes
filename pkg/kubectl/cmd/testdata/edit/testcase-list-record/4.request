@@ -1,8 +1,5 @@
 {
 	"metadata": {
-		"annotations": {
-			"kubernetes.io/change-cause": "edit test cmd invocation"
-		},
 		"labels": {
 			"new-label2": "foo2"
 		}

@@ -67,27 +67,6 @@ func ParseSELinuxOptions(context string) (*v1.SELinuxOptions, error) {
 	}, nil
 }
 
-// HasNonRootUID returns true if the runAsUser is set and is greater than 0.
-func HasRootUID(container *v1.Container) bool {
-	if container.SecurityContext == nil {
-		return false
-	}
-	if container.SecurityContext.RunAsUser == nil {
-		return false
-	}
-	return *container.SecurityContext.RunAsUser == 0
-}
-
-// HasRunAsUser determines if the sc's runAsUser field is set.
-func HasRunAsUser(container *v1.Container) bool {
-	return container.SecurityContext != nil && container.SecurityContext.RunAsUser != nil
-}
-
-// HasRootRunAsUser returns true if the run as user is set and it is set to 0.
-func HasRootRunAsUser(container *v1.Container) bool {
-	return HasRunAsUser(container) && HasRootUID(container)
-}
-
 func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(pod)
 	containerSc := container.SecurityContext

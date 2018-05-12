@@ -17,19 +17,24 @@ limitations under the License.
 package schedulercache
 
 import (
+	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
 
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	clientcache "k8s.io/client-go/tools/cache"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var emptyResource = Resource{}
+var (
+	emptyResource = Resource{}
+	generation    int64
+)
 
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
@@ -49,24 +54,83 @@ type NodeInfo struct {
 	// as int64, to avoid conversions and accessing map.
 	allocatableResource *Resource
 
-	// Cached tains of the node for faster lookup.
+	// Cached taints of the node for faster lookup.
 	taints    []v1.Taint
 	taintsErr error
+
+	// This is a map from image name to image size, also for checking image existence on the node
+	// Cache it here to avoid rebuilding the map during scheduling, e.g., in image_locality.go
+	imageSizes map[string]int64
+
+	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
+	// scheduling cycle.
+	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
+	TransientInfo *transientSchedulerInfo
 
 	// Cached conditions of node for faster lookup.
 	memoryPressureCondition v1.ConditionStatus
 	diskPressureCondition   v1.ConditionStatus
+	pidPressureCondition    v1.ConditionStatus
 
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	generation int64
 }
 
+//initializeNodeTransientInfo initializes transient information pertaining to node.
+func initializeNodeTransientInfo() nodeTransientInfo {
+	return nodeTransientInfo{AllocatableVolumesCount: 0, RequestedVolumes: 0}
+}
+
+// nextGeneration: Let's make sure history never forgets the name...
+// Increments the generation number monotonically ensuring that generation numbers never collide.
+// Collision of the generation numbers would be particularly problematic if a node was deleted and
+// added back with the same name. See issue#63262.
+func nextGeneration() int64 {
+	return atomic.AddInt64(&generation, 1)
+}
+
+// nodeTransientInfo contains transient node information while scheduling.
+type nodeTransientInfo struct {
+	// AllocatableVolumesCount contains number of volumes that could be attached to node.
+	AllocatableVolumesCount int
+	// Requested number of volumes on a particular node.
+	RequestedVolumes int
+}
+
+// transientSchedulerInfo is a transient structure which is destructed at the end of each scheduling cycle.
+// It consists of items that are valid for a scheduling cycle and is used for message passing across predicates and
+// priorities. Some examples which could be used as fields are number of volumes being used on node, current utilization
+// on node etc.
+// IMPORTANT NOTE: Make sure that each field in this structure is documented along with usage. Expand this structure
+// only when absolutely needed as this data structure will be created and destroyed during every scheduling cycle.
+type transientSchedulerInfo struct {
+	TransientLock sync.Mutex
+	// NodeTransInfo holds the information related to nodeTransientInformation. NodeName is the key here.
+	TransNodeInfo nodeTransientInfo
+}
+
+// newTransientSchedulerInfo returns a new scheduler transient structure with initialized values.
+func newTransientSchedulerInfo() *transientSchedulerInfo {
+	tsi := &transientSchedulerInfo{
+		TransNodeInfo: initializeNodeTransientInfo(),
+	}
+	return tsi
+}
+
+// resetTransientSchedulerInfo resets the transientSchedulerInfo.
+func (transientSchedInfo *transientSchedulerInfo) resetTransientSchedulerInfo() {
+	transientSchedInfo.TransientLock.Lock()
+	defer transientSchedInfo.TransientLock.Unlock()
+	// Reset TransientNodeInfo.
+	transientSchedInfo.TransNodeInfo.AllocatableVolumesCount = 0
+	transientSchedInfo.TransNodeInfo.RequestedVolumes = 0
+}
+
 // Resource is a collection of compute resource.
 type Resource struct {
 	MilliCPU         int64
 	Memory           int64
-	NvidiaGPU        int64
 	EphemeralStorage int64
 	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
@@ -94,8 +158,6 @@ func (r *Resource) Add(rl v1.ResourceList) {
 			r.MilliCPU += rQuant.MilliValue()
 		case v1.ResourceMemory:
 			r.Memory += rQuant.Value()
-		case v1.ResourceNvidiaGPU:
-			r.NvidiaGPU += rQuant.Value()
 		case v1.ResourcePods:
 			r.AllowedPodNumber += int(rQuant.Value())
 		case v1.ResourceEphemeralStorage:
@@ -113,7 +175,6 @@ func (r *Resource) ResourceList() v1.ResourceList {
 	result := v1.ResourceList{
 		v1.ResourceCPU:              *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
 		v1.ResourceMemory:           *resource.NewQuantity(r.Memory, resource.BinarySI),
-		v1.ResourceNvidiaGPU:        *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
 		v1.ResourcePods:             *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(r.EphemeralStorage, resource.BinarySI),
 	}
@@ -132,7 +193,6 @@ func (r *Resource) Clone() *Resource {
 	res := &Resource{
 		MilliCPU:         r.MilliCPU,
 		Memory:           r.Memory,
-		NvidiaGPU:        r.NvidiaGPU,
 		AllowedPodNumber: r.AllowedPodNumber,
 		EphemeralStorage: r.EphemeralStorage,
 	}
@@ -159,6 +219,37 @@ func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
 	r.ScalarResources[name] = quantity
 }
 
+// SetMaxResource compares with ResourceList and takes max value for each Resource.
+func (r *Resource) SetMaxResource(rl v1.ResourceList) {
+	if r == nil {
+		return
+	}
+
+	for rName, rQuantity := range rl {
+		switch rName {
+		case v1.ResourceMemory:
+			if mem := rQuantity.Value(); mem > r.Memory {
+				r.Memory = mem
+			}
+		case v1.ResourceCPU:
+			if cpu := rQuantity.MilliValue(); cpu > r.MilliCPU {
+				r.MilliCPU = cpu
+			}
+		case v1.ResourceEphemeralStorage:
+			if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
+				r.EphemeralStorage = ephemeralStorage
+			}
+		default:
+			if v1helper.IsScalarResourceName(rName) {
+				value := rQuantity.Value()
+				if value > r.ScalarResources[rName] {
+					r.SetScalar(rName, value)
+				}
+			}
+		}
+	}
+}
+
 // NewNodeInfo returns a ready to use empty NodeInfo object.
 // If any pods are given in arguments, their information will be aggregated in
 // the returned object.
@@ -167,8 +258,10 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		requestedResource:   &Resource{},
 		nonzeroRequest:      &Resource{},
 		allocatableResource: &Resource{},
-		generation:          0,
+		TransientInfo:       newTransientSchedulerInfo(),
+		generation:          nextGeneration(),
 		usedPorts:           make(util.HostPortInfo),
+		imageSizes:          make(map[string]int64),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -198,6 +291,14 @@ func (n *NodeInfo) UsedPorts() util.HostPortInfo {
 		return nil
 	}
 	return n.usedPorts
+}
+
+// Images returns the image size information on this node.
+func (n *NodeInfo) Images() map[string]int64 {
+	if n == nil {
+		return nil
+	}
+	return n.imageSizes
 }
 
 // PodsWithAffinity return all pods with (anti)affinity constraints on this node.
@@ -240,6 +341,14 @@ func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
 	return n.diskPressureCondition
 }
 
+// PIDPressureCondition returns the pid pressure condition status on this node.
+func (n *NodeInfo) PIDPressureCondition() v1.ConditionStatus {
+	if n == nil {
+		return v1.ConditionUnknown
+	}
+	return n.pidPressureCondition
+}
+
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {
@@ -267,6 +376,7 @@ func (n *NodeInfo) AllocatableResource() Resource {
 // SetAllocatableResource sets the allocatableResource information of given node.
 func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
 	n.allocatableResource = allocatableResource
+	n.generation = nextGeneration()
 }
 
 // Clone returns a copy of this node.
@@ -277,9 +387,12 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		nonzeroRequest:          n.nonzeroRequest.Clone(),
 		allocatableResource:     n.allocatableResource.Clone(),
 		taintsErr:               n.taintsErr,
+		TransientInfo:           n.TransientInfo,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
+		pidPressureCondition:    n.pidPressureCondition,
 		usedPorts:               make(util.HostPortInfo),
+		imageSizes:              n.imageSizes,
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
@@ -319,7 +432,6 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	res, non0CPU, non0Mem := calculateResource(pod)
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
-	n.requestedResource.NvidiaGPU += res.NvidiaGPU
 	n.requestedResource.EphemeralStorage += res.EphemeralStorage
 	if n.requestedResource.ScalarResources == nil && len(res.ScalarResources) > 0 {
 		n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
@@ -337,7 +449,7 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	// Consume ports when pods added.
 	n.updateUsedPorts(pod, true)
 
-	n.generation++
+	n.generation = nextGeneration()
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
@@ -375,7 +487,6 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 
 			n.requestedResource.MilliCPU -= res.MilliCPU
 			n.requestedResource.Memory -= res.Memory
-			n.requestedResource.NvidiaGPU -= res.NvidiaGPU
 			n.requestedResource.EphemeralStorage -= res.EphemeralStorage
 			if len(res.ScalarResources) > 0 && n.requestedResource.ScalarResources == nil {
 				n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
@@ -389,7 +500,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			// Release ports when remove Pods.
 			n.updateUsedPorts(pod, false)
 
-			n.generation++
+			n.generation = nextGeneration()
 
 			return nil
 		}
@@ -425,6 +536,17 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 	}
 }
 
+func (n *NodeInfo) updateImageSizes() {
+	node := n.Node()
+	imageSizes := make(map[string]int64)
+	for _, image := range node.Status.Images {
+		for _, name := range image.Names {
+			imageSizes[name] = image.SizeBytes
+		}
+	}
+	n.imageSizes = imageSizes
+}
+
 // SetNode sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) error {
 	n.node = node
@@ -439,11 +561,15 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			n.memoryPressureCondition = cond.Status
 		case v1.NodeDiskPressure:
 			n.diskPressureCondition = cond.Status
+		case v1.NodePIDPressure:
+			n.pidPressureCondition = cond.Status
 		default:
 			// We ignore other conditions.
 		}
 	}
-	n.generation++
+	n.TransientInfo = newTransientSchedulerInfo()
+	n.updateImageSizes()
+	n.generation = nextGeneration()
 	return nil
 }
 
@@ -458,7 +584,8 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	n.taints, n.taintsErr = nil, nil
 	n.memoryPressureCondition = v1.ConditionUnknown
 	n.diskPressureCondition = v1.ConditionUnknown
-	n.generation++
+	n.pidPressureCondition = v1.ConditionUnknown
+	n.generation = nextGeneration()
 	return nil
 }
 
@@ -495,7 +622,11 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 
 // getPodKey returns the string key of a pod.
 func getPodKey(pod *v1.Pod) (string, error) {
-	return clientcache.MetaNamespaceKeyFunc(pod)
+	uid := string(pod.UID)
+	if len(uid) == 0 {
+		return "", errors.New("Cannot get cache key for pod with empty UID")
+	}
+	return uid, nil
 }
 
 // Filter implements PodFilter interface. It returns false only if the pod node name

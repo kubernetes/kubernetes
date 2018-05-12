@@ -17,6 +17,8 @@ limitations under the License.
 package role
 
 import (
+	"context"
+
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -27,12 +29,12 @@ import (
 
 // Registry is an interface for things that know how to store Roles.
 type Registry interface {
-	ListRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleList, error)
-	CreateRole(ctx genericapirequest.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc) error
-	UpdateRole(ctx genericapirequest.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
-	GetRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.Role, error)
-	DeleteRole(ctx genericapirequest.Context, name string) error
-	WatchRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	ListRoles(ctx context.Context, options *metainternalversion.ListOptions) (*rbac.RoleList, error)
+	CreateRole(ctx context.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc) error
+	UpdateRole(ctx context.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	GetRole(ctx context.Context, name string, options *metav1.GetOptions) (*rbac.Role, error)
+	DeleteRole(ctx context.Context, name string) error
+	WatchRoles(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +48,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleList, error) {
+func (s *storage) ListRoles(ctx context.Context, options *metainternalversion.ListOptions) (*rbac.RoleList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -55,22 +57,22 @@ func (s *storage) ListRoles(ctx genericapirequest.Context, options *metainternal
 	return obj.(*rbac.RoleList), nil
 }
 
-func (s *storage) CreateRole(ctx genericapirequest.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc) error {
+func (s *storage) CreateRole(ctx context.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc) error {
 	_, err := s.Create(ctx, role, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateRole(ctx genericapirequest.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+func (s *storage) UpdateRole(ctx context.Context, role *rbac.Role, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
 	// TODO: any admission?
 	_, _, err := s.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role), createValidation, updateValidation)
 	return err
 }
 
-func (s *storage) WatchRoles(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchRoles(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.Role, error) {
+func (s *storage) GetRole(ctx context.Context, name string, options *metav1.GetOptions) (*rbac.Role, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -78,7 +80,7 @@ func (s *storage) GetRole(ctx genericapirequest.Context, name string, options *m
 	return obj.(*rbac.Role), nil
 }
 
-func (s *storage) DeleteRole(ctx genericapirequest.Context, name string) error {
+func (s *storage) DeleteRole(ctx context.Context, name string) error {
 	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }

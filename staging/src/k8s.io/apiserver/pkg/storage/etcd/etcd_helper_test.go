@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -26,7 +27,6 @@ import (
 	"time"
 
 	etcd "github.com/coreos/etcd/client"
-	"golang.org/x/net/context"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -97,14 +97,6 @@ func testScheme(t *testing.T) (*runtime.Scheme, serializer.CodecFactory) {
 
 func newEtcdHelper(client etcd.Client, codec runtime.Codec, prefix string) etcdHelper {
 	return *NewEtcdStorage(client, codec, prefix, false, etcdtest.DeserializationCacheSize, prefixTransformer{prefix: "test!"}).(*etcdHelper)
-}
-
-// Returns an encoded version of example.Pod with the given name.
-func getEncodedPod(name string, codec runtime.Codec) string {
-	pod, _ := runtime.Encode(codec, &examplev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-	})
-	return string(pod)
 }
 
 func createObj(t *testing.T, helper etcdHelper, name string, obj, out runtime.Object, ttl uint64) error {

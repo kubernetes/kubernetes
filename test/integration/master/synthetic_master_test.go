@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -31,7 +32,9 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
+	clientsetv1 "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -222,6 +226,116 @@ func TestStatus(t *testing.T) {
 		if got, expected := decodedData["message"], tc.message; got != expected {
 			t.Errorf("unexpected message %v, expected %v", got, expected)
 		}
+	}
+}
+
+func constructBody(val string, size int, field string, t *testing.T) *appsv1.Deployment {
+	var replicas int32 = 1
+	deploymentObject := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "test",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "foo",
+							Image: "foo",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	switch field {
+	case "labels":
+		labelsMap := map[string]string{}
+		for i := 0; i < size; i++ {
+			key := val + strconv.Itoa(i)
+			labelsMap[key] = val
+		}
+		deploymentObject.ObjectMeta.Labels = labelsMap
+	case "annotations":
+		annotationsMap := map[string]string{}
+		for i := 0; i < size; i++ {
+			key := val + strconv.Itoa(i)
+			annotationsMap[key] = val
+		}
+		deploymentObject.ObjectMeta.Annotations = annotationsMap
+	case "finalizers":
+		finalizerString := []string{}
+		for i := 0; i < size; i++ {
+			finalizerString = append(finalizerString, val)
+		}
+		deploymentObject.ObjectMeta.Finalizers = finalizerString
+	default:
+		t.Fatalf("Unexpected field: %s used for making large deployment object value", field)
+	}
+
+	return deploymentObject
+}
+
+func TestObjectSizeResponses(t *testing.T) {
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
+
+	client := clientsetv1.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+
+	const DeploymentMegabyteSize = 100000
+	const DeploymentTwoMegabyteSize = 1000000
+
+	expectedMsgFor1MB := `etcdserver: request is too large`
+	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = grpc: trying to send message larger than max`
+	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 characters`
+
+	deployment1 := constructBody("a", DeploymentMegabyteSize, "labels", t)    // >1 MB file
+	deployment2 := constructBody("a", DeploymentTwoMegabyteSize, "labels", t) // >2 MB file
+
+	deployment3 := constructBody("a", DeploymentMegabyteSize, "annotations", t)
+
+	deployment4 := constructBody("sample/sample", DeploymentMegabyteSize, "finalizers", t)    // >1 MB file
+	deployment5 := constructBody("sample/sample", DeploymentTwoMegabyteSize, "finalizers", t) // >2 MB file
+
+	requests := []struct {
+		size             string
+		deploymentObject *appsv1.Deployment
+		expectedMessage  string
+	}{
+		{"1 MB", deployment1, expectedMsgFor1MB},
+		{"2 MB", deployment2, expectedMsgFor2MB},
+		{"1 MB", deployment3, expectedMsgForLargeAnnotation},
+		{"1 MB", deployment4, expectedMsgFor1MB},
+		{"2 MB", deployment5, expectedMsgFor2MB},
+	}
+
+	for _, r := range requests {
+		t.Run(r.size, func(t *testing.T) {
+			_, err := client.AppsV1().Deployments(metav1.NamespaceDefault).Create(r.deploymentObject)
+			if err != nil {
+				if !strings.Contains(err.Error(), r.expectedMessage) {
+					t.Errorf("got: %s;want: %s", err.Error(), r.expectedMessage)
+				}
+			}
+		})
 	}
 }
 
@@ -666,7 +780,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 		go func(lister int) {
 			w, err := c.Nodes().Watch(metav1.ListOptions{})
 			if err != nil {
-				fmt.Printf("[watch:%d] error: %v", k, err)
+				fmt.Printf("[watch:%d] error: %v", lister, err)
 				return
 			}
 			i := 0

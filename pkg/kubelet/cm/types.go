@@ -38,7 +38,9 @@ type ResourceConfig struct {
 }
 
 // CgroupName is the abstract name of a cgroup prior to any driver specific conversion.
-type CgroupName string
+// It is specified as a list of strings from its individual components, such as:
+// {"kubepods", "burstable", "pod1234-abcd-5678-efgh"}
+type CgroupName []string
 
 // CgroupConfig holds the cgroup configuration information.
 // This is common object which is used to specify
@@ -78,7 +80,7 @@ type CgroupManager interface {
 	Exists(name CgroupName) bool
 	// Name returns the literal cgroupfs name on the host after any driver specific conversions.
 	// We would expect systemd implementation to make appropriate name conversion.
-	// For example, if we pass /foo/bar
+	// For example, if we pass {"foo", "bar"}
 	// then systemd should convert the name to something like
 	// foo.slice/foo-bar.slice
 	Name(name CgroupName) string
@@ -94,9 +96,9 @@ type CgroupManager interface {
 
 // QOSContainersInfo stores the names of containers per qos
 type QOSContainersInfo struct {
-	Guaranteed string
-	BestEffort string
-	Burstable  string
+	Guaranteed CgroupName
+	BestEffort CgroupName
+	Burstable  CgroupName
 }
 
 // PodContainerManager stores and manages pod level containers
@@ -122,4 +124,7 @@ type PodContainerManager interface {
 
 	// GetAllPodsFromCgroups enumerates the set of pod uids to their associated cgroup based on state of cgroupfs system.
 	GetAllPodsFromCgroups() (map[types.UID]CgroupName, error)
+
+	// IsPodCgroup returns true if the literal cgroupfs name corresponds to a pod
+	IsPodCgroup(cgroupfs string) (bool, types.UID)
 }

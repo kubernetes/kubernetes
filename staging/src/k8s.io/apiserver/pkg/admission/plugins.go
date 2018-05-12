@@ -127,6 +127,8 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 // the given plugins.
 func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer, decorator Decorator) (Interface, error) {
 	handlers := []Interface{}
+	mutationPlugins := []string{}
+	validationPlugins := []string{}
 	for _, pluginName := range pluginNames {
 		pluginConfig, err := configProvider.ConfigFor(pluginName)
 		if err != nil {
@@ -143,10 +145,20 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 			} else {
 				handlers = append(handlers, plugin)
 			}
+
+			if _, ok := plugin.(MutationInterface); ok {
+				mutationPlugins = append(mutationPlugins, pluginName)
+			}
+			if _, ok := plugin.(ValidationInterface); ok {
+				validationPlugins = append(validationPlugins, pluginName)
+			}
 		}
 	}
-	if len(pluginNames) != 0 {
-		glog.Infof("Loaded %d admission controller(s) successfully in the following order: %s.", len(pluginNames), strings.Join(pluginNames, ","))
+	if len(mutationPlugins) != 0 {
+		glog.Infof("Loaded %d mutating admission controller(s) successfully in the following order: %s.", len(mutationPlugins), strings.Join(mutationPlugins, ","))
+	}
+	if len(validationPlugins) != 0 {
+		glog.Infof("Loaded %d validating admission controller(s) successfully in the following order: %s.", len(validationPlugins), strings.Join(validationPlugins, ","))
 	}
 	return chainAdmissionHandler(handlers), nil
 }
@@ -160,16 +172,16 @@ func (ps *Plugins) InitPlugin(name string, config io.Reader, pluginInitializer P
 
 	plugin, found, err := ps.getPlugin(name, config)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't init admission plugin %q: %v", name, err)
+		return nil, fmt.Errorf("couldn't init admission plugin %q: %v", name, err)
 	}
 	if !found {
-		return nil, fmt.Errorf("Unknown admission plugin: %s", name)
+		return nil, fmt.Errorf("unknown admission plugin: %s", name)
 	}
 
 	pluginInitializer.Initialize(plugin)
 	// ensure that plugins have been properly initialized
 	if err := ValidateInitialization(plugin); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize admission plugin %q: %v", name, err)
 	}
 
 	return plugin, nil

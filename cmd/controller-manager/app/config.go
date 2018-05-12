@@ -26,7 +26,6 @@ import (
 
 // Config is the main context object for the controller manager.
 type Config struct {
-	// TODO: split up the component config. This is not generic.
 	ComponentConfig componentconfig.KubeControllerManagerConfiguration
 
 	SecureServing *apiserver.SecureServingInfo

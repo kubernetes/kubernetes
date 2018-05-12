@@ -43,6 +43,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
+
+	// ensure auth plugins are loaded
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 var (
@@ -72,12 +75,9 @@ func setupProviderConfig() error {
 			managedZones = []string{zone}
 		}
 
-		gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{
+		gceAlphaFeatureGate := gcecloud.NewAlphaFeatureGate([]string{
 			gcecloud.AlphaFeatureNetworkEndpointGroup,
 		})
-		if err != nil {
-			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
-		}
 
 		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
 			ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,

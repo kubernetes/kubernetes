@@ -111,6 +111,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 	podGet.Status.Phase = v1.PodFailed
 
+	fakePodManager.DeletePod(pod)
 	//pod is added to fakePodManager but fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
 	dswp.findAndRemoveDeletedPods()
 
@@ -220,7 +221,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-
+	fakePodManager.DeletePod(pod)
 	//pod is added to fakePodManager but fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
 	dswp.findAndRemoveDeletedPods()
 
@@ -522,7 +523,7 @@ func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.Persist
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
 	fakePodManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
+		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager, podtest.NewMockCheckpointManager())
 
 	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
 	fakeASW := cache.NewActualStateOfWorld("fake", fakeVolumePluginMgr)

@@ -16,7 +16,6 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/validation:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
@@ -47,6 +46,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/audit/buffered:go_default_library",
+        "//vendor/k8s.io/apiserver/plugin/pkg/audit/truncate:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )

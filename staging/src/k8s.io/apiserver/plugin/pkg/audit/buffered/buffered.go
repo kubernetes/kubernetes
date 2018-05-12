@@ -28,8 +28,8 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 )
 
-// The plugin name reported in error metrics.
-const pluginName = "buffered"
+// PluginName is the name reported in error metrics.
+const PluginName = "buffered"
 
 const (
 	// Default configuration values for ModeBatch.
@@ -54,7 +54,7 @@ type BatchConfig struct {
 	ThrottleEnable bool
 	// ThrottleQPS defines the allowed rate of batches per second sent to the delegate backend.
 	ThrottleQPS float32
-	// ThrottleBurst defines the maximum rate of batches per second sent to the delegate backend in case
+	// ThrottleBurst defines the maximum number of requests sent to the delegate backend at the same moment in case
 	// the capacity defined by ThrottleQPS was not utilized.
 	ThrottleBurst int
 }
@@ -259,7 +259,7 @@ func (b *bufferedBackend) ProcessEvents(ev ...*auditinternal.Event) {
 			sendErr = fmt.Errorf("audit backend shut down")
 		}
 		if sendErr != nil {
-			audit.HandlePluginError(pluginName, sendErr, ev[evIndex:]...)
+			audit.HandlePluginError(PluginName, sendErr, ev[evIndex:]...)
 		}
 	}()
 
@@ -276,4 +276,8 @@ func (b *bufferedBackend) ProcessEvents(ev ...*auditinternal.Event) {
 			return
 		}
 	}
+}
+
+func (b *bufferedBackend) String() string {
+	return fmt.Sprintf("%s<%s>", PluginName, b.delegateBackend)
 }

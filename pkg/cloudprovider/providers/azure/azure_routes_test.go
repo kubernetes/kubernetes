@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
-	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
@@ -94,10 +94,8 @@ func TestCreateRoute(t *testing.T) {
 	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
 
 	nodeIP := "2.4.6.8"
-	fakeVM.NodeToIP = map[string]map[string]string{
-		"": {
-			"node": nodeIP,
-		},
+	fakeVM.NodeToIP = map[string]string{
+		"node": nodeIP,
 	}
 
 	err := cloud.CreateRoute(context.TODO(), "cluster", "unused", &route)

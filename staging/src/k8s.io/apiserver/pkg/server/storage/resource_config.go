@@ -36,6 +36,18 @@ func NewResourceConfig() *ResourceConfig {
 	return &ResourceConfig{GroupVersionConfigs: map[schema.GroupVersion]bool{}}
 }
 
+func (o *ResourceConfig) DisableAll() {
+	for k := range o.GroupVersionConfigs {
+		o.GroupVersionConfigs[k] = false
+	}
+}
+
+func (o *ResourceConfig) EnableAll() {
+	for k := range o.GroupVersionConfigs {
+		o.GroupVersionConfigs[k] = true
+	}
+}
+
 // DisableVersions disables the versions entirely.
 func (o *ResourceConfig) DisableVersions(versions ...schema.GroupVersion) {
 	for _, version := range versions {

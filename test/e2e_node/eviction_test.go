@@ -131,8 +131,8 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 			// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
 			kubeReserved := getNodeCPUAndMemoryCapacity(f)[v1.ResourceMemory]
 			// The default hard eviction threshold is 250Mb, so Allocatable = Capacity - Reserved - 250Mb
-			// We want Allocatable = 150Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 400Mb
-			kubeReserved.Sub(resource.MustParse("400Mi"))
+			// We want Allocatable = 50Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 300Mb
+			kubeReserved.Sub(resource.MustParse("300Mi"))
 			initialConfig.KubeReserved = map[string]string{
 				string(v1.ResourceMemory): kubeReserved.String(),
 			}
@@ -380,6 +380,8 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 	// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
 	Context("", func() {
 		BeforeEach(func() {
+			// reduce memory usage in the allocatable cgroup to ensure we do not have MemoryPressure
+			reduceAllocatableMemoryUsage()
 			// Nodes do not immediately report local storage capacity
 			// Sleep so that pods requesting local storage do not fail to schedule
 			time.Sleep(30 * time.Second)
@@ -447,6 +449,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
 				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, 10*time.Minute)
 			}
+			reduceAllocatableMemoryUsage()
 			if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
 				// The disk eviction test may cause the prepulled images to be evicted,
 				// prepull those images again to ensure this test not affect following tests.
@@ -462,7 +465,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: imageutils.GetPauseImageNameForHostArch(),
+							Image: imageutils.GetPauseImageName(),
 							Name:  podName,
 						},
 					},
@@ -607,7 +610,12 @@ func logMemoryMetrics() {
 		return
 	}
 	if summary.Node.Memory != nil && summary.Node.Memory.WorkingSetBytes != nil && summary.Node.Memory.AvailableBytes != nil {
-		framework.Logf("Node.Memory.WorkingSetBytes: %d, summary.Node.Memory.AvailableBytes: %d", *summary.Node.Memory.WorkingSetBytes, *summary.Node.Memory.AvailableBytes)
+		framework.Logf("Node.Memory.WorkingSetBytes: %d, Node.Memory.AvailableBytes: %d", *summary.Node.Memory.WorkingSetBytes, *summary.Node.Memory.AvailableBytes)
+	}
+	for _, sysContainer := range summary.Node.SystemContainers {
+		if sysContainer.Name == stats.SystemContainerPods && sysContainer.Memory != nil && sysContainer.Memory.WorkingSetBytes != nil && sysContainer.Memory.AvailableBytes != nil {
+			framework.Logf("Allocatable.Memory.WorkingSetBytes: %d, Allocatable.Memory.AvailableBytes: %d", *sysContainer.Memory.WorkingSetBytes, *sysContainer.Memory.AvailableBytes)
+		}
 	}
 	for _, pod := range summary.Pods {
 		framework.Logf("Pod: %s", pod.PodRef.Name)

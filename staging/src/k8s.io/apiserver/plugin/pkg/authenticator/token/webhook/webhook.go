@@ -18,13 +18,15 @@ limitations under the License.
 package webhook
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/golang/glog"
+
 	authentication "k8s.io/api/authentication/v1beta1"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/cache"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -84,6 +86,8 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 			return err
 		})
 		if err != nil {
+			// An error here indicates bad configuration or an outage. Log for debugging.
+			glog.Errorf("Failed to make webhook authenticator request: %v", err)
 			return nil, false, err
 		}
 		r.Status = result.Status
@@ -109,24 +113,15 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 	}, true, nil
 }
 
-// NOTE: client-go doesn't provide a registry. client-go does registers the
-// authentication/v1beta1. We construct a registry that acknowledges
-// authentication/v1beta1 as an enabled version to pass a check enforced in
-// NewGenericWebhook.
-var registry = registered.NewOrDie("")
-
-func init() {
-	registry.RegisterVersions(groupVersions)
-	if err := registry.EnableVersions(groupVersions...); err != nil {
-		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
-	}
-}
-
 // tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a TokenReviewInterface that uses that client. Note that the client submits TokenReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string) (authenticationclient.TokenReviewInterface, error) {
-	gw, err := webhook.NewGenericWebhook(registry, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+	localScheme := runtime.NewScheme()
+	scheme.AddToScheme(localScheme)
+	utilruntime.Must(localScheme.SetVersionPriority(groupVersions...))
+
+	gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {
 		return nil, err
 	}

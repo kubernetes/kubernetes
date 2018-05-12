@@ -32,15 +32,15 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -56,6 +56,11 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = "busybox"
+
+const (
+	// Kubelet internal cgroup name for node allocatable cgroup.
+	defaultNodeAllocatableCgroup = "kubepods"
+)
 
 func getNodeSummary() (*stats.Summary, error) {
 	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)
@@ -164,10 +169,11 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 
 	// create the reference and set Node.Spec.ConfigSource
 	src := &apiv1.NodeConfigSource{
-		ConfigMapRef: &apiv1.ObjectReference{
-			Namespace: "kube-system",
-			Name:      cm.Name,
-			UID:       cm.UID,
+		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+			Namespace:        "kube-system",
+			Name:             cm.Name,
+			UID:              cm.UID,
+			KubeletConfigKey: "kubelet",
 		},
 	}
 
@@ -295,17 +301,7 @@ func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletCo
 
 // constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Always uses GenerateName to generate a suffix.
 func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfiguration) *apiv1.ConfigMap {
-	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
-	framework.ExpectNoError(err)
-
-	versioned := &kubeletconfigv1beta1.KubeletConfiguration{}
-	err = scheme.Convert(internalKC, versioned, nil)
-	framework.ExpectNoError(err)
-
-	encoder, err := newKubeletConfigJSONEncoder()
-	framework.ExpectNoError(err)
-
-	data, err := runtime.Encode(encoder, versioned)
+	data, err := kubeletconfigcodec.EncodeKubeletConfig(internalKC, kubeletconfigv1beta1.SchemeGroupVersion)
 	framework.ExpectNoError(err)
 
 	cmap := &apiv1.ConfigMap{
@@ -349,20 +345,6 @@ func logKubeletMetrics(metricKeys ...string) {
 	}
 }
 
-func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		return nil, err
-	}
-
-	mediaType := "application/json"
-	info, ok := runtime.SerializerInfoForMediaType(kubeletCodecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return nil, fmt.Errorf("unsupported media type %q", mediaType)
-	}
-	return kubeletCodecs.EncoderForVersion(info.Serializer, kubeletconfigv1beta1.SchemeGroupVersion), nil
-}
-
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
 // error if the command failed.
 func runCommand(cmd ...string) (string, error) {
@@ -399,11 +381,28 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 func restartKubelet() {
 	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
 	framework.ExpectNoError(err)
-	regex := regexp.MustCompile("(kubelet-[0-9]+)")
+	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
 	Expect(len(matches)).NotTo(BeZero())
 	kube := matches[0]
 	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+}
+
+func toCgroupFsName(cgroupName cm.CgroupName) string {
+	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+		return cgroupName.ToSystemd()
+	} else {
+		return cgroupName.ToCgroupfs()
+	}
+}
+
+// reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)
+// to make the kernel reclaim memory in the allocatable cgroup
+// the time to reduce pressure may be unbounded, but usually finishes within a second
+func reduceAllocatableMemoryUsage() {
+	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
+	_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
+	framework.ExpectNoError(err)
 }

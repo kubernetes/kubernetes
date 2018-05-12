@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ import (
 	clientset "k8s.io/sample-apiserver/pkg/client/clientset/versioned"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1alpha1"
 	fakewardlev1alpha1 "k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1alpha1/fake"
+	wardlev1beta1 "k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1beta1"
+	fakewardlev1beta1 "k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1beta1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -41,9 +43,10 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	fakePtr := testing.Fake{}
-	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
-	fakePtr.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
+	cs := &Clientset{}
+	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs.AddReactor("*", "*", testing.ObjectReaction(o))
+	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
 		watch, err := o.Watch(gvr, ns)
@@ -53,7 +56,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		return true, watch, nil
 	})
 
-	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
+	return cs
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
@@ -75,7 +78,12 @@ func (c *Clientset) WardleV1alpha1() wardlev1alpha1.WardleV1alpha1Interface {
 	return &fakewardlev1alpha1.FakeWardleV1alpha1{Fake: &c.Fake}
 }
 
-// Wardle retrieves the WardleV1alpha1Client
-func (c *Clientset) Wardle() wardlev1alpha1.WardleV1alpha1Interface {
-	return &fakewardlev1alpha1.FakeWardleV1alpha1{Fake: &c.Fake}
+// WardleV1beta1 retrieves the WardleV1beta1Client
+func (c *Clientset) WardleV1beta1() wardlev1beta1.WardleV1beta1Interface {
+	return &fakewardlev1beta1.FakeWardleV1beta1{Fake: &c.Fake}
+}
+
+// Wardle retrieves the WardleV1beta1Client
+func (c *Clientset) Wardle() wardlev1beta1.WardleV1beta1Interface {
+	return &fakewardlev1beta1.FakeWardleV1beta1{Fake: &c.Fake}
 }

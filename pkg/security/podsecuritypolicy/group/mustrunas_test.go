@@ -17,20 +17,22 @@ limitations under the License.
 package group
 
 import (
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"strings"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 func TestMustRunAsOptions(t *testing.T) {
 	tests := map[string]struct {
-		ranges []extensions.GroupIDRange
+		ranges []policy.IDRange
 		pass   bool
 	}{
 		"empty": {
-			ranges: []extensions.GroupIDRange{},
+			ranges: []policy.IDRange{},
 		},
 		"ranges": {
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 1},
 			},
 			pass: true,
@@ -50,23 +52,23 @@ func TestMustRunAsOptions(t *testing.T) {
 
 func TestGenerate(t *testing.T) {
 	tests := map[string]struct {
-		ranges   []extensions.GroupIDRange
+		ranges   []policy.IDRange
 		expected []int64
 	}{
 		"multi value": {
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 2},
 			},
 			expected: []int64{1},
 		},
 		"single value": {
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 1},
 			},
 			expected: []int64{1},
 		},
 		"multi range": {
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 1},
 				{Min: 2, Max: 500},
 			},
@@ -108,54 +110,53 @@ func TestGenerate(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	tests := map[string]struct {
-		ranges []extensions.GroupIDRange
-		groups []int64
-		pass   bool
+		ranges        []policy.IDRange
+		groups        []int64
+		expectedError string
 	}{
 		"nil security context": {
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 3},
 			},
+			expectedError: "unable to validate empty groups against required ranges",
 		},
 		"empty groups": {
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 3},
 			},
+			expectedError: "unable to validate empty groups against required ranges",
 		},
 		"not in range": {
 			groups: []int64{5},
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 3},
 				{Min: 4, Max: 4},
 			},
+			expectedError: "group 5 must be in the ranges: [{1 3} {4 4}]",
 		},
 		"in range 1": {
 			groups: []int64{2},
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 3},
 			},
-			pass: true,
 		},
 		"in range boundary min": {
 			groups: []int64{1},
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 3},
 			},
-			pass: true,
 		},
 		"in range boundary max": {
 			groups: []int64{3},
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 1, Max: 3},
 			},
-			pass: true,
 		},
 		"singular range": {
 			groups: []int64{4},
-			ranges: []extensions.GroupIDRange{
+			ranges: []policy.IDRange{
 				{Min: 4, Max: 4},
 			},
-			pass: true,
 		},
 	}
 
@@ -165,11 +166,14 @@ func TestValidate(t *testing.T) {
 			t.Errorf("error creating strategy for %s: %v", k, err)
 		}
 		errs := s.Validate(nil, v.groups)
-		if v.pass && len(errs) > 0 {
+		if v.expectedError == "" && len(errs) > 0 {
 			t.Errorf("unexpected errors for %s: %v", k, errs)
 		}
-		if !v.pass && len(errs) == 0 {
-			t.Errorf("expected no errors for %s but got: %v", k, errs)
+		if v.expectedError != "" && len(errs) == 0 {
+			t.Errorf("expected errors for %s but got: %v", k, errs)
+		}
+		if v.expectedError != "" && len(errs) > 0 && !strings.Contains(errs[0].Error(), v.expectedError) {
+			t.Errorf("expected error for %s: %v, but got: %v", k, v.expectedError, errs[0])
 		}
 	}
 }

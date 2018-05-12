@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -155,7 +156,7 @@ func runPodCheckpointTest(f *framework.Framework, podName string, twist func()) 
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Image: framework.GetPauseImageName(f.ClientSet),
+					Image: imageutils.GetPauseImageName(),
 					Name:  "pause-container",
 				},
 			},

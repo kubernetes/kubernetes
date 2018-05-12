@@ -107,15 +107,21 @@ func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
 	if err := j.Parse(tmpl); err != nil {
 		return nil, err
 	}
-	return &JSONPathPrinter{tmpl, j}, nil
-}
-
-func (j *JSONPathPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
+	return &JSONPathPrinter{
+		rawTemplate: tmpl,
+		JSONPath:    j,
+	}, nil
 }
 
 // PrintObj formats the obj with the JSONPath Template.
 func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	// we use reflect.Indirect here in order to obtain the actual value from a pointer.
+	// we need an actual value in order to retrieve the package path for an object.
+	// using reflect.Indirect indiscriminately is valid here, as all runtime.Objects are supposed to be pointers.
+	if internalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
+		return fmt.Errorf(internalObjectPrinterErr)
+	}
+
 	var queryObj interface{} = obj
 	if meta.IsListType(obj) {
 		data, err := json.Marshal(obj)
@@ -149,13 +155,4 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return fmt.Errorf("error executing jsonpath %q: %v\n", j.rawTemplate, err)
 	}
 	return nil
-}
-
-// TODO: implement HandledResources()
-func (p *JSONPathPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (p *JSONPathPrinter) IsGeneric() bool {
-	return true
 }

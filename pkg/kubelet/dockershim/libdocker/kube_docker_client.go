@@ -18,6 +18,7 @@ package libdocker
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -35,7 +36,6 @@ import (
 	dockerapi "github.com/docker/docker/client"
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
-	"golang.org/x/net/context"
 )
 
 // kubeDockerClient is a wrapped layer of docker client for kubelet internal use. This layer is added to:
@@ -337,7 +337,7 @@ func (p *progressReporter) start() {
 			case <-ticker.C:
 				progress, timestamp := p.progress.get()
 				// If there is no progress for p.imagePullProgressDeadline, cancel the operation.
-				if time.Now().Sub(timestamp) > p.imagePullProgressDeadline {
+				if time.Since(timestamp) > p.imagePullProgressDeadline {
 					glog.Errorf("Cancel pulling image %q because of no progress for %v, latest progress: %q", p.image, p.imagePullProgressDeadline, progress)
 					p.cancel()
 					return

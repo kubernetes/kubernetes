@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ type ExtensionsInterface interface {
 	DaemonSetsGetter
 	DeploymentsGetter
 	IngressesGetter
-	PodSecurityPoliciesGetter
 	ReplicaSetsGetter
 }
 
@@ -47,10 +46,6 @@ func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
 
 func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
 	return newIngresses(c, namespace)
-}
-
-func (c *ExtensionsClient) PodSecurityPolicies() PodSecurityPolicyInterface {
-	return newPodSecurityPolicies(c)
 }
 
 func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
@@ -86,17 +81,12 @@ func New(c rest.Interface) *ExtensionsClient {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	g, err := scheme.Registry.Group("extensions")
-	if err != nil {
-		return err
-	}
-
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		gv := g.GroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != scheme.Scheme.PrioritizedVersionsForGroup("extensions")[0].Group {
+		gv := scheme.Scheme.PrioritizedVersionsForGroup("extensions")[0]
 		config.GroupVersion = &gv
 	}
 	config.NegotiatedSerializer = scheme.Codecs

@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path"
@@ -25,7 +26,6 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -99,10 +99,6 @@ type etcdHelper struct {
 	// Number of entries stored in the cache is controlled by maxEtcdCacheEntries constant.
 	// TODO: Measure how much this cache helps after the conversion code is optimized.
 	cache utilcache.Cache
-}
-
-func init() {
-	metrics.Register()
 }
 
 // Implements storage.Interface.

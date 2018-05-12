@@ -17,17 +17,118 @@ limitations under the License.
 package priorities
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
+// getExistingVolumeCountForNode gets the current number of volumes on node.
+func getExistingVolumeCountForNode(pods []*v1.Pod, maxVolumes int) int {
+	volumeCount := 0
+	for _, pod := range pods {
+		volumeCount += len(pod.Spec.Volumes)
+	}
+	if maxVolumes-volumeCount > 0 {
+		return maxVolumes - volumeCount
+	}
+	return 0
+}
+
 func TestBalancedResourceAllocation(t *testing.T) {
+	// Enable volumesOnNodeForBalancing to do balanced resource allocation
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.BalanceAttachedNodeVolumes))
+	podwithVol1 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1000m"),
+						v1.ResourceMemory: resource.MustParse("2000"),
+					},
+				},
+			},
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2000m"),
+						v1.ResourceMemory: resource.MustParse("3000"),
+					},
+				},
+			},
+		},
+		Volumes: []v1.Volume{
+			{
+				VolumeSource: v1.VolumeSource{
+					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
+				},
+			},
+		},
+		NodeName: "machine4",
+	}
+	podwithVol2 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("0m"),
+						v1.ResourceMemory: resource.MustParse("0"),
+					},
+				},
+			},
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("0m"),
+						v1.ResourceMemory: resource.MustParse("0"),
+					},
+				},
+			},
+		},
+		Volumes: []v1.Volume{
+			{
+				VolumeSource: v1.VolumeSource{
+					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp1"},
+				},
+			},
+		},
+		NodeName: "machine4",
+	}
+	podwithVol3 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("0m"),
+						v1.ResourceMemory: resource.MustParse("0"),
+					},
+				},
+			},
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("0m"),
+						v1.ResourceMemory: resource.MustParse("0"),
+					},
+				},
+			},
+		},
+		Volumes: []v1.Volume{
+			{
+				VolumeSource: v1.VolumeSource{
+					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp1"},
+				},
+			},
+		},
+		NodeName: "machine4",
+	}
 	labels1 := map[string]string{
 		"foo": "bar",
 		"baz": "blah",
@@ -70,6 +171,27 @@ func TestBalancedResourceAllocation(t *testing.T) {
 	cpuOnly2.NodeName = "machine2"
 	cpuAndMemory := v1.PodSpec{
 		NodeName: "machine2",
+		Containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1000m"),
+						v1.ResourceMemory: resource.MustParse("2000"),
+					},
+				},
+			},
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2000m"),
+						v1.ResourceMemory: resource.MustParse("3000"),
+					},
+				},
+			},
+		},
+	}
+	cpuAndMemory3 := v1.PodSpec{
+		NodeName: "machine3",
 		Containers: []v1.Container{
 			{
 				Resources: v1.ResourceRequirements{
@@ -249,10 +371,43 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				{Spec: cpuAndMemory},
 			},
 		},
+		{
+			/*
+				Machine4 will be chosen here because it already has a existing volume making the variance
+				of volume count, CPU usage, memory usage closer.
+			*/
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							VolumeSource: v1.VolumeSource{
+								AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp2"},
+							},
+						},
+					},
+				},
+			},
+			nodes:        []*v1.Node{makeNode("machine3", 3500, 40000), makeNode("machine4", 4000, 10000)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine3", Score: 8}, {Host: "machine4", Score: 9}},
+			test:         "Include volume count on a node for balanced resource allocation",
+			pods: []*v1.Pod{
+				{Spec: cpuAndMemory3},
+				{Spec: podwithVol1},
+				{Spec: podwithVol2},
+				{Spec: podwithVol3},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
+		if len(test.pod.Spec.Volumes) > 0 {
+			maxVolumes := 5
+			for _, info := range nodeNameToInfo {
+				info.TransientInfo.TransNodeInfo.AllocatableVolumesCount = getExistingVolumeCountForNode(info.Pods(), maxVolumes)
+				info.TransientInfo.TransNodeInfo.RequestedVolumes = len(test.pod.Spec.Volumes)
+			}
+		}
 		list, err := priorityFunction(BalancedResourceAllocationMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

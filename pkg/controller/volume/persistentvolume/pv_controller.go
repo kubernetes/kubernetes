@@ -571,6 +571,17 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			}
 			return nil
 		} else if claim.Spec.VolumeName == "" {
+			if isMisMatch, err := checkVolumeModeMisMatches(&claim.Spec, &volume.Spec); err != nil || isMisMatch {
+				// Binding for the volume won't be called in syncUnboundClaim,
+				// because findBestMatchForClaim won't return the volume due to volumeMode mismatch.
+				volumeMsg := fmt.Sprintf("Cannot bind PersistentVolume to requested PersistentVolumeClaim %q due to incompatible volumeMode.", claim.Name)
+				ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, events.VolumeMismatch, volumeMsg)
+				claimMsg := fmt.Sprintf("Cannot bind PersistentVolume %q to requested PersistentVolumeClaim due to incompatible volumeMode.", volume.Name)
+				ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.VolumeMismatch, claimMsg)
+				// Skipping syncClaim
+				return nil
+			}
+
 			if metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
 				// The binding is not completed; let PVC sync handle it
 				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume not bound yet, waiting for syncClaim to fix it", volume.Name)
@@ -1045,12 +1056,7 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 
 // doRerecycleVolumeOperationcycleVolume recycles a volume. This method is
 // running in standalone goroutine and already has all necessary locks.
-func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) {
-	volume, ok := arg.(*v1.PersistentVolume)
-	if !ok {
-		glog.Errorf("Cannot convert recycleVolumeOperation argument to volume, got %#v", arg)
-		return
-	}
+func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.PersistentVolume) {
 	glog.V(4).Infof("recycleVolumeOperation [%s] started", volume.Name)
 
 	// This method may have been waiting for a volume lock for some time.
@@ -1134,13 +1140,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 
 // deleteVolumeOperation deletes a volume. This method is running in standalone
 // goroutine and already has all necessary locks.
-func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) error {
-	volume, ok := arg.(*v1.PersistentVolume)
-	if !ok {
-		glog.Errorf("Cannot convert deleteVolumeOperation argument to volume, got %#v", arg)
-		return nil
-	}
-
+func (ctrl *PersistentVolumeController) deleteVolumeOperation(volume *v1.PersistentVolume) error {
 	glog.V(4).Infof("deleteVolumeOperation [%s] started", volume.Name)
 
 	// This method may have been waiting for a volume lock for some time.
@@ -1331,13 +1331,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 
 // provisionClaimOperation provisions a volume. This method is running in
 // standalone goroutine and already has all necessary locks.
-func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interface{}) {
-	claim, ok := claimObj.(*v1.PersistentVolumeClaim)
-	if !ok {
-		glog.Errorf("Cannot convert provisionClaimOperation argument to claim, got %#v", claimObj)
-		return
-	}
-
+func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) {
 	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 

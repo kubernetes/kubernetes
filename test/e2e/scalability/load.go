@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -54,6 +53,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
@@ -289,6 +289,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					framework.ExpectNoError(framework.DeleteResourceAndPods(
 						f.ClientSet,
 						f.InternalClientset,
+						f.ScalesGetter,
 						extensions.Kind("DaemonSet"),
 						config.Namespace,
 						config.Name,
@@ -409,7 +410,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 			return nil, nil, nil, err
 		}
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
-		restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoClient, meta.InterfacesForUnstructured)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 		restMapper.Reset()
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		scalesClients[i] = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
@@ -648,7 +649,6 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 	newSize := uint(rand.Intn(config.GetReplicas()) + config.GetReplicas()/2)
 	framework.ExpectNoError(framework.ScaleResource(
 		config.GetClient(),
-		config.GetInternalClient(),
 		config.GetScalesGetter(),
 		config.GetNamespace(),
 		config.GetName(),
@@ -700,7 +700,7 @@ func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deleti
 			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 	} else {
 		framework.ExpectNoError(framework.DeleteResourceAndPods(
-			config.GetClient(), config.GetInternalClient(), config.GetKind(), config.GetNamespace(), config.GetName()),
+			config.GetClient(), config.GetInternalClient(), config.GetScalesGetter(), config.GetKind(), config.GetNamespace(), config.GetName()),
 			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 	}
 }

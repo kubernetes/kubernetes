@@ -1,3 +1,7 @@
+#v80 (2018/01/26)
+
+* Address lin/vet feedback.
+
 #v79 (2017/02/01)
 
 * Fixes #531: fullPackageInDir didn't capture the error from fillPackage()

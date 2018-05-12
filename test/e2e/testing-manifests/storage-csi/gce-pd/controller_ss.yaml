@@ -1,0 +1,70 @@
+kind: StatefulSet
+apiVersion: apps/v1beta1
+metadata:
+  name: csi-gce-controller
+spec:
+  serviceName: "csi-gce-pd"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-gce-pd-driver
+  template:
+    metadata:
+      labels:
+        app: csi-gce-pd-driver
+    spec:
+      serviceAccount: csi-gce-pd
+      containers:
+        - name: csi-external-provisioner
+          imagePullPolicy: Always
+          image: quay.io/k8scsi/csi-provisioner:v0.2.0
+          args:
+            - "--v=5"
+            - "--provisioner=csi-gce-pd"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-attacher
+          imagePullPolicy: Always
+          image: quay.io/k8scsi/csi-attacher:v0.2.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: gce-driver
+          imagePullPolicy: Always
+          image: gcr.io/google-containers/volume-csi/compute-persistent-disk-csi-driver:v0.2.0.alpha
+          args:
+            - "--v=5"
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--nodeid=$(KUBE_NODE_NAME)"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/etc/service-account/cloud-sa.json"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: cloud-sa-volume
+              readOnly: true
+              mountPath: "/etc/service-account"
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
+        - name: cloud-sa-volume
+          secret:
+            secretName: cloud-sa

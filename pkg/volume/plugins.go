@@ -30,11 +30,19 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
+
+type ProbeOperation uint32
+type ProbeEvent struct {
+	Plugin     VolumePlugin // VolumePlugin that was added/updated/removed. if ProbeEvent.Op is 'ProbeRemove', Plugin should be nil
+	PluginName string
+	Op         ProbeOperation // The operation to the plugin
+}
 
 const (
 	// Common parameter which can be specified in StorageClass to specify the desired FSType
@@ -42,6 +50,9 @@ const (
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Default value depends on the provisioner
 	VolumeParameterFSType = "fstype"
+
+	ProbeAddOrUpdate ProbeOperation = 1 << iota
+	ProbeRemove
 )
 
 // VolumeOptions contains option information about a volume.
@@ -75,12 +86,8 @@ type VolumeOptions struct {
 type DynamicPluginProber interface {
 	Init() error
 
-	// If an update has occurred since the last probe, updated = true
-	// and the list of probed plugins is returned.
-	// Otherwise, update = false and probedPlugins = nil.
-	//
-	// If an error occurs, updated and probedPlugins are undefined.
-	Probe() (updated bool, probedPlugins []VolumePlugin, err error)
+	// If an error occurs, events are undefined.
+	Probe() (events []ProbeEvent, err error)
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
@@ -242,6 +249,10 @@ type VolumeHost interface {
 	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/
 	GetVolumeDevicePluginDir(pluginName string) string
 
+	// GetPodsDir returns the absolute path to a directory where all the pods
+	// information is stored
+	GetPodsDir() string
+
 	// GetPodVolumeDir returns the absolute path a directory which
 	// represents the named volume under the named plugin for the given
 	// pod.  If the specified pod does not exist, the result of this call
@@ -307,6 +318,9 @@ type VolumeHost interface {
 
 	// Returns the name of the node
 	GetNodeName() types.NodeName
+
+	// Returns the event recorder of kubelet.
+	GetEventRecorder() record.EventRecorder
 }
 
 // VolumePluginMgr tracks registered plugins.
@@ -314,7 +328,7 @@ type VolumePluginMgr struct {
 	mutex         sync.Mutex
 	plugins       map[string]VolumePlugin
 	prober        DynamicPluginProber
-	probedPlugins []VolumePlugin
+	probedPlugins map[string]VolumePlugin
 	Host          VolumeHost
 }
 
@@ -431,6 +445,9 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	if pm.plugins == nil {
 		pm.plugins = map[string]VolumePlugin{}
 	}
+	if pm.probedPlugins == nil {
+		pm.probedPlugins = map[string]VolumePlugin{}
+	}
 
 	allErrs := []error{}
 	for _, plugin := range plugins {
@@ -544,21 +561,25 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 // Check if probedPlugin cache update is required.
 // If it is, initialize all probed plugins and replace the cache with them.
 func (pm *VolumePluginMgr) refreshProbedPlugins() {
-	updated, plugins, err := pm.prober.Probe()
+	events, err := pm.prober.Probe()
 	if err != nil {
 		glog.Errorf("Error dynamically probing plugins: %s", err)
 		return // Use cached plugins upon failure.
 	}
 
-	if updated {
-		pm.probedPlugins = []VolumePlugin{}
-		for _, plugin := range plugins {
-			if err := pm.initProbedPlugin(plugin); err != nil {
+	for _, event := range events {
+		if event.Op == ProbeAddOrUpdate {
+			if err := pm.initProbedPlugin(event.Plugin); err != nil {
 				glog.Errorf("Error initializing dynamically probed plugin %s; error: %s",
-					plugin.GetPluginName(), err)
+					event.Plugin.GetPluginName(), err)
 				continue
 			}
-			pm.probedPlugins = append(pm.probedPlugins, plugin)
+			pm.probedPlugins[event.Plugin.GetPluginName()] = event.Plugin
+		} else if event.Op == ProbeRemove {
+			delete(pm.probedPlugins, event.Plugin.GetPluginName())
+		} else {
+			glog.Errorf("Unknown Operation on PluginName: %s.",
+				event.Plugin.GetPluginName())
 		}
 	}
 }
@@ -803,5 +824,5 @@ func ValidateRecyclerPodTemplate(pod *v1.Pod) error {
 
 type dummyPluginProber struct{}
 
-func (*dummyPluginProber) Init() error                          { return nil }
-func (*dummyPluginProber) Probe() (bool, []VolumePlugin, error) { return false, nil, nil }
+func (*dummyPluginProber) Init() error                  { return nil }
+func (*dummyPluginProber) Probe() ([]ProbeEvent, error) { return nil, nil }

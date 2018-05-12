@@ -165,7 +165,7 @@ func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 		t.Fatalf("error creating Deployment controller: %v", err)
 	}
 	rm := replicaset.NewReplicaSetController(
-		informers.Extensions().V1beta1().ReplicaSets(),
+		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
 		replicaset.BurstReplicas,
@@ -364,12 +364,12 @@ func (d *deploymentTester) expectNewReplicaSet() (*v1beta1.ReplicaSet, error) {
 	return rs, nil
 }
 
-func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
-	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
+func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateExtensionsReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
+	return testutil.UpdateExtensionsReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
 }
 
-func (d *deploymentTester) updateReplicaSetStatus(name string, applyStatusUpdate testutil.UpdateReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
-	return testutil.UpdateReplicaSetStatusWithRetries(d.c, d.deployment.Namespace, name, applyStatusUpdate, d.t.Logf, pollInterval, pollTimeout)
+func (d *deploymentTester) updateReplicaSetStatus(name string, applyStatusUpdate testutil.UpdateExtensionsReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
+	return testutil.UpdateExtensionsReplicaSetStatusWithRetries(d.c, d.deployment.Namespace, name, applyStatusUpdate, d.t.Logf, pollInterval, pollTimeout)
 }
 
 // waitForDeploymentRollbackCleared waits for deployment either started rolling back or doesn't need to rollback.
@@ -418,7 +418,7 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 }
 
 func (d *deploymentTester) waitRSStable(replicaset *v1beta1.ReplicaSet) error {
-	return testutil.WaitRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
+	return testutil.WaitExtensionsRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) scaleDeployment(newReplicas int32) error {

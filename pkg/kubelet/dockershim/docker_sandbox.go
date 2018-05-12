@@ -17,6 +17,7 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -26,10 +27,11 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -37,7 +39,7 @@ import (
 )
 
 const (
-	defaultSandboxImage = "k8s.gcr.io/pause-amd64:3.1"
+	defaultSandboxImage = "k8s.gcr.io/pause:3.1"
 
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2
@@ -118,7 +120,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	}(&err)
 
 	// Step 3: Create Sandbox Checkpoint.
-	if err = ds.checkpointHandler.CreateCheckpoint(createResp.ID, constructPodSandboxCheckpoint(config)); err != nil {
+	if err = ds.checkpointManager.CreateCheckpoint(createResp.ID, constructPodSandboxCheckpoint(config)); err != nil {
 		return nil, err
 	}
 
@@ -162,12 +164,24 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
 	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations)
 	if err != nil {
-		// TODO(random-liu): Do we need to teardown network here?
-		if err := ds.client.StopContainer(createResp.ID, defaultSandboxGracePeriod); err != nil {
-			glog.Warningf("Failed to stop sandbox container %q for pod %q: %v", createResp.ID, config.Metadata.Name, err)
+		errList := []error{fmt.Errorf("failed to set up sandbox container %q network for pod %q: %v", createResp.ID, config.Metadata.Name, err)}
+
+		// Ensure network resources are cleaned up even if the plugin
+		// succeeded but an error happened between that success and here.
+		err = ds.network.TearDownPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID)
+		if err != nil {
+			errList = append(errList, fmt.Errorf("failed to clean up sandbox container %q network for pod %q: %v", createResp.ID, config.Metadata.Name, err))
 		}
+
+		err = ds.client.StopContainer(createResp.ID, defaultSandboxGracePeriod)
+		if err != nil {
+			errList = append(errList, fmt.Errorf("failed to stop sandbox container %q for pod %q: %v", createResp.ID, config.Metadata.Name, err))
+		}
+
+		return resp, utilerrors.NewAggregate(errList)
 	}
-	return resp, err
+
+	return resp, nil
 }
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
@@ -189,12 +203,19 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 		name = metadata.Name
 		hostNetwork = (networkNamespaceMode(inspectResult) == runtimeapi.NamespaceMode_NODE)
 	} else {
-		checkpoint, checkpointErr := ds.checkpointHandler.GetCheckpoint(podSandboxID)
+		checkpoint := NewPodSandboxCheckpoint("", "", &CheckpointData{})
+		checkpointErr := ds.checkpointManager.GetCheckpoint(podSandboxID, checkpoint)
 
 		// Proceed if both sandbox container and checkpoint could not be found. This means that following
 		// actions will only have sandbox ID and not have pod namespace and name information.
 		// Return error if encounter any unexpected error.
 		if checkpointErr != nil {
+			if checkpointErr != errors.ErrCheckpointNotFound {
+				err := ds.checkpointManager.RemoveCheckpoint(podSandboxID)
+				if err != nil {
+					glog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", podSandboxID, err)
+				}
+			}
 			if libdocker.IsContainerNotFoundError(statusErr) {
 				glog.Warningf("Both sandbox container and checkpoint for id %q could not be found. "+
 					"Proceed without further sandbox information.", podSandboxID)
@@ -204,9 +225,7 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 					fmt.Errorf("failed to get sandbox status: %v", statusErr)})
 			}
 		} else {
-			namespace = checkpoint.Namespace
-			name = checkpoint.Name
-			hostNetwork = checkpoint.Data != nil && checkpoint.Data.HostNetwork
+			_, name, namespace, _, hostNetwork = checkpoint.GetData()
 		}
 	}
 
@@ -237,7 +256,7 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 			errList = append(errList, err)
 		} else {
 			// remove the checkpoint for any sandbox that is not found in the runtime
-			ds.checkpointHandler.RemoveCheckpoint(podSandboxID)
+			ds.checkpointManager.RemoveCheckpoint(podSandboxID)
 		}
 	}
 
@@ -284,7 +303,7 @@ func (ds *dockerService) RemovePodSandbox(ctx context.Context, r *runtimeapi.Rem
 	}
 
 	// Remove the checkpoint of the sandbox.
-	if err := ds.checkpointHandler.RemoveCheckpoint(podSandboxID); err != nil {
+	if err := ds.checkpointManager.RemoveCheckpoint(podSandboxID); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) == 0 {
@@ -465,7 +484,7 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 	var err error
 	checkpoints := []string{}
 	if filter == nil {
-		checkpoints, err = ds.checkpointHandler.ListCheckpoints()
+		checkpoints, err = ds.checkpointManager.ListCheckpoints()
 		if err != nil {
 			glog.Errorf("Failed to list checkpoints: %v", err)
 		}
@@ -501,9 +520,16 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 		if _, ok := sandboxIDs[id]; ok {
 			continue
 		}
-		checkpoint, err := ds.checkpointHandler.GetCheckpoint(id)
+		checkpoint := NewPodSandboxCheckpoint("", "", &CheckpointData{})
+		err := ds.checkpointManager.GetCheckpoint(id, checkpoint)
 		if err != nil {
 			glog.Errorf("Failed to retrieve checkpoint for sandbox %q: %v", id, err)
+			if err == errors.ErrCorruptCheckpoint {
+				err = ds.checkpointManager.RemoveCheckpoint(id)
+				if err != nil {
+					glog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", id, err)
+				}
+			}
 			continue
 		}
 		result = append(result, checkpointToRuntimeAPISandbox(id, checkpoint))
@@ -624,20 +650,20 @@ func ipcNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.Namespace
 	return runtimeapi.NamespaceMode_POD
 }
 
-func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) *PodSandboxCheckpoint {
-	checkpoint := NewPodSandboxCheckpoint(config.Metadata.Namespace, config.Metadata.Name)
+func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) checkpointmanager.Checkpoint {
+	data := CheckpointData{}
 	for _, pm := range config.GetPortMappings() {
 		proto := toCheckpointProtocol(pm.Protocol)
-		checkpoint.Data.PortMappings = append(checkpoint.Data.PortMappings, &PortMapping{
+		data.PortMappings = append(data.PortMappings, &PortMapping{
 			HostPort:      &pm.HostPort,
 			ContainerPort: &pm.ContainerPort,
 			Protocol:      &proto,
 		})
 	}
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {
-		checkpoint.Data.HostNetwork = true
+		data.HostNetwork = true
 	}
-	return checkpoint
+	return NewPodSandboxCheckpoint(config.Metadata.Namespace, config.Metadata.Name, &data)
 }
 
 func toCheckpointProtocol(protocol runtimeapi.Protocol) Protocol {

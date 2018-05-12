@@ -28,13 +28,13 @@ gcs_upload(
     data = [
         ":_binary-artifacts-and-hashes",
         "//build/release-tars:release-tars-and-hashes",
-        "//cluster/gce:gcs-release-artifacts-and-hashes",
+        "//cluster/gce/gci:gcs-release-artifacts-and-hashes",
     ],
     tags = ["manual"],
     upload_paths = {
         "//:_binary-artifacts-and-hashes": "bin/linux/amd64",
         "//build/release-tars:release-tars-and-hashes": "",
-        "//cluster/gce:gcs-release-artifacts-and-hashes": "extra/gce",
+        "//cluster/gce/gci:gcs-release-artifacts-and-hashes": "extra/gce",
     },
 )
 
@@ -58,18 +58,19 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//api:all-srcs",
+        "//api/openapi-spec:all-srcs",
+        "//api/swagger-spec:all-srcs",
         "//build:all-srcs",
         "//cluster:all-srcs",
         "//cmd:all-srcs",
         "//docs:all-srcs",
-        "//examples:all-srcs",
         "//hack:all-srcs",
         "//pkg:all-srcs",
         "//plugin:all-srcs",
         "//staging:all-srcs",
         "//test:all-srcs",
         "//third_party:all-srcs",
+        "//translations:all-srcs",
         "//vendor:all-srcs",
     ],
     tags = ["automanaged"],

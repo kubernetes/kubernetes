@@ -23,11 +23,13 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
@@ -132,4 +134,94 @@ func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*
 		}
 	}
 	return availablePods, unavailablePods
+}
+
+// ReplaceDaemonSetPodHostnameNodeAffinity replaces the 'kubernetes.io/hostname' NodeAffinity term with
+// the given "nodeName" in the "affinity" terms.
+func ReplaceDaemonSetPodHostnameNodeAffinity(affinity *v1.Affinity, nodename string) *v1.Affinity {
+	nodeSelector := &v1.NodeSelector{
+		NodeSelectorTerms: []v1.NodeSelectorTerm{
+			{
+				MatchExpressions: []v1.NodeSelectorRequirement{
+					{
+						Key:      kubeletapis.LabelHostname,
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{nodename},
+					},
+				},
+			},
+		},
+	}
+
+	if affinity == nil {
+		return &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: nodeSelector,
+			},
+		}
+	}
+
+	if affinity.NodeAffinity == nil {
+		affinity.NodeAffinity = &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: nodeSelector,
+		}
+		return affinity
+	}
+
+	nodeAffinity := affinity.NodeAffinity
+
+	if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeSelector
+		return affinity
+	}
+
+	nodeSelectorTerms := []v1.NodeSelectorTerm{}
+
+	// Removes hostname node selector, as only the target hostname will take effect.
+	for _, term := range nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+		exps := []v1.NodeSelectorRequirement{}
+		for _, exp := range term.MatchExpressions {
+			if exp.Key != kubeletapis.LabelHostname {
+				exps = append(exps, exp)
+			}
+		}
+
+		if len(exps) > 0 {
+			term.MatchExpressions = exps
+			nodeSelectorTerms = append(nodeSelectorTerms, term)
+		}
+	}
+
+	// Adds target hostname NodeAffinity term.
+	nodeSelectorTerms = append(nodeSelectorTerms, nodeSelector.NodeSelectorTerms[0])
+
+	// Replace node selector with the new one.
+	nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = nodeSelectorTerms
+
+	return affinity
+}
+
+// AppendNoScheduleTolerationIfNotExist appends unschedulable toleration to `.spec` if not exist; otherwise,
+// no changes to `.spec.tolerations`.
+func AppendNoScheduleTolerationIfNotExist(tolerations []v1.Toleration) []v1.Toleration {
+	unschedulableToleration := v1.Toleration{
+		Key:      algorithm.TaintNodeUnschedulable,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	}
+
+	unschedulableTaintExist := false
+
+	for _, t := range tolerations {
+		if apiequality.Semantic.DeepEqual(t, unschedulableToleration) {
+			unschedulableTaintExist = true
+			break
+		}
+	}
+
+	if !unschedulableTaintExist {
+		tolerations = append(tolerations, unschedulableToleration)
+	}
+
+	return tolerations
 }

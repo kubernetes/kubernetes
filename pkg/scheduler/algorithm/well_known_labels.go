@@ -16,6 +16,10 @@ limitations under the License.
 
 package algorithm
 
+import (
+	api "k8s.io/kubernetes/pkg/apis/core"
+)
+
 const (
 	// TaintNodeNotReady will be added when node is not ready
 	// and feature-gate for TaintBasedEvictions flag is enabled,
@@ -35,6 +39,11 @@ const (
 	// DeprecatedTaintNodeUnreachable is the deprecated version of TaintNodeUnreachable.
 	// It is deprecated since 1.9
 	DeprecatedTaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
+
+	// TaintNodeUnschedulable will be added when node becomes unschedulable
+	// and feature-gate for TaintNodesByCondition flag is enabled,
+	// and removed when node becomes scheduable.
+	TaintNodeUnschedulable = "node.kubernetes.io/unschedulable"
 
 	// TaintNodeOutOfDisk will be added when node becomes out of disk
 	// and feature-gate for TaintNodesByCondition flag is enabled,
@@ -66,4 +75,11 @@ const (
 	// from the cloud-controller-manager intitializes this node, and then removes
 	// the taint
 	TaintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
+
+	// TaintNodeShutdown when node is shutdown in external cloud provider
+	TaintNodeShutdown = "node.cloudprovider.kubernetes.io/shutdown"
+
+	// NodeFieldSelectorKeyNodeName ('metadata.name') uses this as node field selector key
+	// when selecting node by node's name.
+	NodeFieldSelectorKeyNodeName = api.ObjectNameField
 )

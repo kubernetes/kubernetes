@@ -14,7 +14,6 @@ go_library(
     ],
     importpath = "k8s.io/client-go/kubernetes",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1:go_default_library",

@@ -24,6 +24,7 @@ import (
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -221,7 +222,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 			return true, &metrics, nil
 		}
 		name := getForAction.GetName()
-		mapper := legacyscheme.Registry.RESTMapper()
+		mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
 		metrics := &cmapi.MetricValueList{}
 		assert.NotNil(t, tc.metric.singleObject, "should have only requested a single-object metric when calling GetObjectMetricReplicas")
 		gk := schema.FromAPIVersionAndKind(tc.metric.singleObject.APIVersion, tc.metric.singleObject.Kind).GroupKind()
@@ -229,7 +230,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 		if err != nil {
 			return true, nil, fmt.Errorf("unable to get mapping for %s: %v", gk.String(), err)
 		}
-		groupResource := schema.GroupResource{Group: mapping.GroupVersionKind.Group, Resource: mapping.Resource}
+		groupResource := mapping.Resource.GroupResource()
 
 		assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
 		assert.Equal(t, tc.metric.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
@@ -323,10 +324,10 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		var outTimestamp time.Time
 		var err error
 		if tc.metric.singleObject != nil {
-			outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject)
+			outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject, selector)
 		} else if tc.metric.selector != nil {
 			if tc.metric.targetUtilization > 0 {
-				outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.selector)
+				outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.selector, selector)
 			} else if tc.metric.perPodTargetUtilization > 0 {
 				outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUtilization, tc.metric.name, testNamespace, tc.metric.selector)
 			}
@@ -497,10 +498,46 @@ func TestReplicaCalcScaleUpCMObject(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcScaleUpCMObjectIgnoresUnreadyPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 5, // If we did not ignore unready pods, we'd expect 15 replicas.
+		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
+		metric: &metricInfo{
+			name:                "qps",
+			levels:              []int64{50000},
+			targetUtilization:   10000,
+			expectedUtilization: 50000,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "extensions/v1beta1",
+				Name:       "some-deployment",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcScaleUpCMExternal(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  1,
 		expectedReplicas: 2,
+		metric: &metricInfo{
+			name:                "qps",
+			levels:              []int64{8600},
+			targetUtilization:   4400,
+			expectedUtilization: 8600,
+			selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpCMExternalIgnoresUnreadyPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 2, // Would expect 6 if we didn't ignore unready pods
+		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []int64{8600},

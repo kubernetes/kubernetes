@@ -149,7 +149,7 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 		}
 		if !sessionAffinityReset {
 			sessionAffinity, exists := state.affinity.affinityMap[ipaddr]
-			if exists && int(time.Now().Sub(sessionAffinity.lastUsed).Seconds()) < state.affinity.ttlSeconds {
+			if exists && int(time.Since(sessionAffinity.lastUsed).Seconds()) < state.affinity.ttlSeconds {
 				// Affinity wins.
 				endpoint := sessionAffinity.endpoint
 				sessionAffinity.lastUsed = time.Now()
@@ -366,7 +366,7 @@ func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort proxy.ServicePortNa
 		return
 	}
 	for ip, affinity := range state.affinity.affinityMap {
-		if int(time.Now().Sub(affinity.lastUsed).Seconds()) >= state.affinity.ttlSeconds {
+		if int(time.Since(affinity.lastUsed).Seconds()) >= state.affinity.ttlSeconds {
 			glog.V(4).Infof("Removing client %s from affinityMap for service %q", affinity.clientIP, svcPort)
 			delete(state.affinity.affinityMap, ip)
 		}

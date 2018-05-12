@@ -91,7 +91,6 @@ func NewHorizontalController(
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(glog.Infof)
-	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
@@ -223,7 +222,7 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 
 		switch metricSpec.Type {
 		case autoscalingv2.ObjectMetricSourceType:
-			replicaCountProposal, utilizationProposal, timestampProposal, err = a.replicaCalc.GetObjectMetricReplicas(currentReplicas, metricSpec.Object.TargetValue.MilliValue(), metricSpec.Object.MetricName, hpa.Namespace, &metricSpec.Object.Target)
+			replicaCountProposal, utilizationProposal, timestampProposal, err = a.replicaCalc.GetObjectMetricReplicas(currentReplicas, metricSpec.Object.TargetValue.MilliValue(), metricSpec.Object.MetricName, hpa.Namespace, &metricSpec.Object.Target, selector)
 			if err != nil {
 				a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetObjectMetric", err.Error())
 				setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetObjectMetric", "the HPA was unable to compute the replica count: %v", err)
@@ -317,7 +316,7 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 					},
 				}
 			} else if metricSpec.External.TargetValue != nil {
-				replicaCountProposal, utilizationProposal, timestampProposal, err = a.replicaCalc.GetExternalMetricReplicas(currentReplicas, metricSpec.External.TargetValue.MilliValue(), metricSpec.External.MetricName, hpa.Namespace, metricSpec.External.MetricSelector)
+				replicaCountProposal, utilizationProposal, timestampProposal, err = a.replicaCalc.GetExternalMetricReplicas(currentReplicas, metricSpec.External.TargetValue.MilliValue(), metricSpec.External.MetricName, hpa.Namespace, metricSpec.External.MetricSelector, selector)
 				if err != nil {
 					a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetExternalMetric", err.Error())
 					setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetExternalMetric", "the HPA was unable to compute the replica count: %v", err)
@@ -621,7 +620,7 @@ func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutos
 func (a *HorizontalController) scaleForResourceMappings(namespace, name string, mappings []*apimeta.RESTMapping) (*autoscalingv1.Scale, schema.GroupResource, error) {
 	var firstErr error
 	for i, mapping := range mappings {
-		targetGR := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource).GroupResource()
+		targetGR := mapping.Resource.GroupResource()
 		scale, err := a.scaleNamespacer.Scales(namespace).Get(targetGR, name)
 		if err == nil {
 			return scale, targetGR, nil

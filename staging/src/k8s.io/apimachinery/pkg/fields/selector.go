@@ -55,6 +55,21 @@ type Selector interface {
 	DeepCopySelector() Selector
 }
 
+type nothingSelector struct{}
+
+func (n nothingSelector) Matches(_ Fields) bool                                      { return false }
+func (n nothingSelector) Empty() bool                                                { return false }
+func (n nothingSelector) String() string                                             { return "" }
+func (n nothingSelector) Requirements() Requirements                                 { return nil }
+func (n nothingSelector) DeepCopySelector() Selector                                 { return n }
+func (n nothingSelector) RequiresExactMatch(field string) (value string, found bool) { return "", false }
+func (n nothingSelector) Transform(fn TransformFunc) (Selector, error)               { return n, nil }
+
+// Nothing returns a selector that matches no fields
+func Nothing() Selector {
+	return nothingSelector{}
+}
+
 // Everything returns a selector that matches all fields.
 func Everything() Selector {
 	return andTerm{}
@@ -447,6 +462,12 @@ func parseSelector(selector string, fn TransformFunc) (Selector, error) {
 // Cannot return an error.
 func OneTermEqualSelector(k, v string) Selector {
 	return &hasTerm{field: k, value: v}
+}
+
+// OneTermNotEqualSelector returns an object that matches objects where one field/field does not equal one value.
+// Cannot return an error.
+func OneTermNotEqualSelector(k, v string) Selector {
+	return &notHasTerm{field: k, value: v}
 }
 
 // AndSelectors creates a selector that is the logical AND of all the given selectors

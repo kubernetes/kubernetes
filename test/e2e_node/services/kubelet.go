@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,16 +30,16 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/e2e_node/remote"
 )
 
 // TODO(random-liu): Replace this with standard kubelet launcher.
@@ -55,12 +54,6 @@ func (a *args) String() string {
 
 // Set function of flag.Value
 func (a *args) Set(value string) error {
-	// Someone else is calling flag.Parse after the flags are parsed in the
-	// test framework. Use this to avoid the flag being parsed twice.
-	// TODO(random-liu): Figure out who is parsing the flags.
-	if flag.Parsed() {
-		return nil
-	}
 	// Note that we assume all white space in flag string is separating fields
 	na := strings.Fields(value)
 	*a = append(*a, na...)
@@ -198,7 +191,12 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// Since kubelet will typically be run as a service it also makes more
 		// sense to test it that way
 		isSystemd = true
-		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
+		// We can ignore errors, to have GetTimestampFromWorkspaceDir() fallback
+		// to the current time.
+		cwd, _ := os.Getwd()
+		// Use the timestamp from the current directory to name the systemd unit.
+		unitTimestamp := remote.GetTimestampFromWorkspaceDir(cwd)
+		unitName := fmt.Sprintf("kubelet-%s.service", unitTimestamp)
 		if kubeletContainerized {
 			cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit",
 				"/usr/bin/docker", "run", "--name=kubelet",
@@ -259,7 +257,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--kubeconfig", kubeconfigPath,
 		"--root-dir", KubeletRootDirectory,
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
-		"--allow-privileged", "true",
+		"--allow-privileged=true",
 	)
 
 	// Apply test framework feature gates by default. This could also be overridden
@@ -349,27 +347,13 @@ func addKubeletConfigFlags(cmdArgs *[]string, kc *kubeletconfig.KubeletConfigura
 	fs := pflag.NewFlagSet("kubelet", pflag.ExitOnError)
 	options.AddKubeletConfigFlags(fs, kc)
 	for _, name := range flags {
-		*cmdArgs = append(*cmdArgs, "--"+name, fs.Lookup(name).Value.String())
+		*cmdArgs = append(*cmdArgs, fmt.Sprintf("--%s=%s", name, fs.Lookup(name).Value.String()))
 	}
 }
 
 // writeKubeletConfigFile writes the kubelet config file based on the args and returns the filename
 func writeKubeletConfigFile(internal *kubeletconfig.KubeletConfiguration, path string) error {
-	// extract the KubeletConfiguration and convert to versioned
-	versioned := &v1beta1.KubeletConfiguration{}
-	scheme, _, err := scheme.NewSchemeAndCodecs()
-	if err != nil {
-		return err
-	}
-	if err := scheme.Convert(internal, versioned, nil); err != nil {
-		return err
-	}
-	// encode
-	encoder, err := newKubeletConfigJSONEncoder()
-	if err != nil {
-		return err
-	}
-	data, err := runtime.Encode(encoder, versioned)
+	data, err := kubeletconfigcodec.EncodeKubeletConfig(internal, kubeletconfigv1beta1.SchemeGroupVersion)
 	if err != nil {
 		return err
 	}
@@ -383,20 +367,6 @@ func writeKubeletConfigFile(internal *kubeletconfig.KubeletConfiguration, path s
 		return err
 	}
 	return nil
-}
-
-func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
-	_, kubeletCodecs, err := scheme.NewSchemeAndCodecs()
-	if err != nil {
-		return nil, err
-	}
-
-	mediaType := "application/json"
-	info, ok := runtime.SerializerInfoForMediaType(kubeletCodecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return nil, fmt.Errorf("unsupported media type %q", mediaType)
-	}
-	return kubeletCodecs.EncoderForVersion(info.Serializer, v1beta1.SchemeGroupVersion), nil
 }
 
 // createPodDirectory creates pod directory.

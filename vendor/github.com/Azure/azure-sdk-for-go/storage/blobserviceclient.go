@@ -108,8 +108,8 @@ func (b BlobStorageClient) ListContainers(params ListContainersParameters) (*Con
 	if err != nil {
 		return nil, err
 	}
-	defer resp.body.Close()
-	err = xmlUnmarshal(resp.body, &outAlias)
+	defer resp.Body.Close()
+	err = xmlUnmarshal(resp.Body, &outAlias)
 	if err != nil {
 		return nil, err
 	}

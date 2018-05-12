@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -22,6 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
+DOCKER_ROOT=${DOCKER_ROOT:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}
 PSP_ADMISSION=${PSP_ADMISSION:-""}
@@ -31,6 +32,7 @@ KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
 POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
 KUBELET_FLAGS=${KUBELET_FLAGS:-""}
+KUBELET_IMAGE=${KUBELET_IMAGE:-""}
 # many dev environments run with swap on, so we don't fail in this env
 FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
 # Name of the network plugin, eg: "kubenet"
@@ -61,8 +63,9 @@ KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-""}
 ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
-KUBECTL=${KUBECTL:-cluster/kubectl.sh}
+KUBECTL=${KUBECTL:-"${KUBE_ROOT}/cluster/kubectl.sh"}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}
+MAX_TIME_FOR_URL_API_SERVER=${MAX_TIME_FOR_URL_API_SERVER:-1}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
 HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 EXTERNAL_CLOUD_PROVIDER=${EXTERNAL_CLOUD_PROVIDER:-false}
@@ -71,6 +74,8 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
+# preserve etcd data. you also need to set ETCD_DIR.
+PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 # enable swagger ui
 ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
 # enable Pod priority and preemption
@@ -90,8 +95,9 @@ AUTH_ARGS=${AUTH_ARGS:-""}
 # Install a default storage class (enabled by default)
 DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
 
-# start the cache mutation detector by default so that cache mutators will be found
-KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
+# Do not run the mutation detector by default on a local cluster.
+# It is intended for a specific type of testing and inherently leaks memory.
+KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-false}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
 # panic the server on watch decode errors since they are considered coder mistakes
@@ -139,7 +145,7 @@ fi
 
 # warn if users are running with swap allowed
 if [ "${FAIL_SWAP_ON}" == "false" ]; then
-    echo "WARNING : The kubelet is configured to not fail if swap is enabled; production deployments should disable swap."
+    echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
 fi
 
 if [ "$(id -u)" != "0" ]; then
@@ -203,23 +209,6 @@ else
     echo "skipped the build."
 fi
 
-function test_rkt {
-    if [[ -n "${RKT_PATH}" ]]; then
-      ${RKT_PATH} list 2> /dev/null 1> /dev/null
-      if [ "$?" != "0" ]; then
-        echo "Failed to successfully run 'rkt list', please verify that ${RKT_PATH} is the path of rkt binary."
-        exit 1
-      fi
-    else
-      rkt list 2> /dev/null 1> /dev/null
-      if [ "$?" != "0" ]; then
-        echo "Failed to successfully run 'rkt list', please verify that rkt is in \$PATH."
-        exit 1
-      fi
-    fi
-}
-
-
 # Shut down anyway if there's an error.
 set +e
 
@@ -244,8 +233,6 @@ LOG_DIR=${LOG_DIR:-"/tmp"}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
-RKT_PATH=${RKT_PATH:-""}
-RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
@@ -355,6 +342,13 @@ cleanup_dockerized_kubelet()
   if [[ -e $KUBELET_CIDFILE ]]; then
     docker kill $(<$KUBELET_CIDFILE) > /dev/null
     rm -f $KUBELET_CIDFILE
+
+    # Save the docker logs
+    if [[ -f /var/log/docker.log ]]; then
+      sudo cp /var/log/docker.log ${LOG_DIR}/docker.log
+    elif command -v journalctl &>/dev/null; then
+      journalctl -u docker --no-pager > ${LOG_DIR}/docker.log
+    fi
   fi
 }
 
@@ -371,33 +365,71 @@ cleanup()
 
   # Check if the API server is still running
   [[ -n "${APISERVER_PID-}" ]] && APISERVER_PIDS=$(pgrep -P ${APISERVER_PID} ; ps -o pid= -p ${APISERVER_PID})
-  [[ -n "${APISERVER_PIDS-}" ]] && sudo kill ${APISERVER_PIDS}
+  [[ -n "${APISERVER_PIDS-}" ]] && sudo kill ${APISERVER_PIDS} 2>/dev/null
 
   # Check if the controller-manager is still running
   [[ -n "${CTLRMGR_PID-}" ]] && CTLRMGR_PIDS=$(pgrep -P ${CTLRMGR_PID} ; ps -o pid= -p ${CTLRMGR_PID})
-  [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill ${CTLRMGR_PIDS}
+  [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill ${CTLRMGR_PIDS} 2>/dev/null
 
   if [[ -n "$DOCKERIZE_KUBELET" ]]; then
     cleanup_dockerized_kubelet
   else
     # Check if the kubelet is still running
     [[ -n "${KUBELET_PID-}" ]] && KUBELET_PIDS=$(pgrep -P ${KUBELET_PID} ; ps -o pid= -p ${KUBELET_PID})
-    [[ -n "${KUBELET_PIDS-}" ]] && sudo kill ${KUBELET_PIDS}
+    [[ -n "${KUBELET_PIDS-}" ]] && sudo kill ${KUBELET_PIDS} 2>/dev/null
   fi
 
   # Check if the proxy is still running
   [[ -n "${PROXY_PID-}" ]] && PROXY_PIDS=$(pgrep -P ${PROXY_PID} ; ps -o pid= -p ${PROXY_PID})
-  [[ -n "${PROXY_PIDS-}" ]] && sudo kill ${PROXY_PIDS}
+  [[ -n "${PROXY_PIDS-}" ]] && sudo kill ${PROXY_PIDS} 2>/dev/null
 
   # Check if the scheduler is still running
   [[ -n "${SCHEDULER_PID-}" ]] && SCHEDULER_PIDS=$(pgrep -P ${SCHEDULER_PID} ; ps -o pid= -p ${SCHEDULER_PID})
-  [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill ${SCHEDULER_PIDS}
+  [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill ${SCHEDULER_PIDS} 2>/dev/null
 
   # Check if the etcd is still running
   [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
-  [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
-
+  if [[ "${PRESERVE_ETCD}" == "false" ]]; then
+    [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+  fi
   exit 0
+}
+
+# Check if all processes are still running. Prints a warning once each time
+# a process dies unexpectedly.
+function healthcheck {
+  if [[ -n "${APISERVER_PID-}" ]] && ! sudo kill -0 ${APISERVER_PID} 2>/dev/null; then
+    warning "API server terminated unexpectedly, see ${APISERVER_LOG}"
+    APISERVER_PID=
+  fi
+
+  if [[ -n "${CTLRMGR_PID-}" ]] && ! sudo kill -0 ${CTLRMGR_PID} 2>/dev/null; then
+    warning "kube-controller-manager terminated unexpectedly, see ${CTLRMGR_LOG}"
+    CTLRMGR_PID=
+  fi
+
+  if [[ -n "$DOCKERIZE_KUBELET" ]]; then
+    # TODO (https://github.com/kubernetes/kubernetes/issues/62474): check health also in this case
+    :
+  elif [[ -n "${KUBELET_PID-}" ]] && ! sudo kill -0 ${KUBELET_PID} 2>/dev/null; then
+    warning "kubelet terminated unexpectedly, see ${KUBELET_LOG}"
+    KUBELET_PID=
+  fi
+
+  if [[ -n "${PROXY_PID-}" ]] && ! sudo kill -0 ${PROXY_PID} 2>/dev/null; then
+    warning "kube-proxy terminated unexpectedly, see ${PROXY_LOG}"
+    PROXY_PID=
+  fi
+
+  if [[ -n "${SCHEDULER_PID-}" ]] && ! sudo kill -0 ${SCHEDULER_PID} 2>/dev/null; then
+    warning "scheduler terminated unexpectedly, see ${SCHEDULER_LOG}"
+    SCHEDULER_PID=
+  fi
+
+  if [[ -n "${ETCD_PID-}" ]] && ! sudo kill -0 ${ETCD_PID} 2>/dev/null; then
+    warning "etcd terminated unexpectedly"
+    ETCD_PID=
+  fi
 }
 
 function warning {
@@ -446,7 +478,7 @@ function start_apiserver {
     # Admission Controllers to invoke prior to persisting objects in cluster
     #
     # The order defined here dose not matter.
-    ENABLE_ADMISSION_PLUGINS=Initializers,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,PodPreset,StorageObjectInUseProtection
+    ENABLE_ADMISSION_PLUGINS=Initializers,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,StorageObjectInUseProtection
 
     audit_arg=""
     APISERVER_BASIC_AUDIT_LOG=""
@@ -485,13 +517,6 @@ function start_apiserver {
           RUNTIME_CONFIG+=","
         fi
         RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
-    fi
-
-    if [[ ${ENABLE_ADMISSION_PLUGINS} == *"PodPreset"* ]]; then
-        if [[ -n "${RUNTIME_CONFIG}" ]]; then
-            RUNTIME_CONFIG+=","
-        fi
-        RUNTIME_CONFIG+="settings.k8s.io/v1alpha1"
     fi
 
     runtime_config=""
@@ -581,10 +606,7 @@ function start_apiserver {
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    # this uses the API port because if you don't have any authenticator, you can't seem to use the secure port at all.
-    # this matches what happened with the combination in 1.4.
-    # TODO change this conditionally based on whether API_PORT is on or off
-    kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
+    kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} ${MAX_TIME_FOR_URL_API_SERVER} \
         || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
 
     # Create kubeconfigs for all components, using client certs
@@ -684,92 +706,94 @@ function start_kubelet {
     fi
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
-    if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
-      # Enable dns
-      if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-         dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
-      else
-         # To start a private DNS server set ENABLE_CLUSTER_DNS and
-         # DNS_SERVER_IP/DOMAIN. This will at least provide a working
-         # DNS server for real world hostnames.
-         dns_args="--cluster-dns=8.8.8.8"
-      fi
-
-      net_plugin_args=""
-      if [[ -n "${NET_PLUGIN}" ]]; then
-        net_plugin_args="--network-plugin=${NET_PLUGIN}"
-      fi
-
-      auth_args=""
-      if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK:-}" ]]; then
-        auth_args="${auth_args} --authorization-mode=Webhook"
-      fi
-      if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK:-}" ]]; then
-        auth_args="${auth_args} --authentication-token-webhook"
-      fi
-      if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
-        auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
-      fi
-
-      cni_conf_dir_args=""
-      if [[ -n "${CNI_CONF_DIR}" ]]; then
-        cni_conf_dir_args="--cni-conf-dir=${CNI_CONF_DIR}"
-      fi
-
-      cni_bin_dir_args=""
-      if [[ -n "${CNI_BIN_DIR}" ]]; then
-        cni_bin_dir_args="--cni-bin-dir=${CNI_BIN_DIR}"
-      fi
-
-      container_runtime_endpoint_args=""
-      if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
-        container_runtime_endpoint_args="--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
-      fi
-
-      image_service_endpoint_args=""
-      if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
-        image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
-      fi
-
-      sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
-        --v=${LOG_LEVEL} \
-        --vmodule="${LOG_SPEC}" \
-        --chaos-chance="${CHAOS_CHANCE}" \
-        --container-runtime="${CONTAINER_RUNTIME}" \
-        --rkt-path="${RKT_PATH}" \
-        --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
-        --hostname-override="${HOSTNAME_OVERRIDE}" \
-        ${cloud_config_arg} \
-        --address="${KUBELET_HOST}" \
-        --kubeconfig "$CERT_DIR"/kubelet.kubeconfig \
-        --feature-gates="${FEATURE_GATES}" \
-        --cpu-cfs-quota=${CPU_CFS_QUOTA} \
-        --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
-        --cgroups-per-qos=${CGROUPS_PER_QOS} \
-        --cgroup-driver=${CGROUP_DRIVER} \
-        --keep-terminated-pod-volumes=${KEEP_TERMINATED_POD_VOLUMES} \
-        --eviction-hard=${EVICTION_HARD} \
-        --eviction-soft=${EVICTION_SOFT} \
-        --eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD} \
-        --pod-manifest-path="${POD_MANIFEST_PATH}" \
-        --fail-swap-on="${FAIL_SWAP_ON}" \
-        ${auth_args} \
-        ${dns_args} \
-        ${cni_conf_dir_args} \
-        ${cni_bin_dir_args} \
-        ${net_plugin_args} \
-        ${container_runtime_endpoint_args} \
-        ${image_service_endpoint_args} \
-        --port="$KUBELET_PORT" \
-	${KUBELET_FLAGS} >"${KUBELET_LOG}" 2>&1 &
-      KUBELET_PID=$!
-      # Quick check that kubelet is running.
-      if ps -p $KUBELET_PID > /dev/null ; then
-	echo "kubelet ( $KUBELET_PID ) is running."
-      else
-	cat ${KUBELET_LOG} ; exit 1
-      fi
+    # Enable dns
+    if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+      dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
     else
+      # To start a private DNS server set ENABLE_CLUSTER_DNS and
+      # DNS_SERVER_IP/DOMAIN. This will at least provide a working
+      # DNS server for real world hostnames.
+      dns_args="--cluster-dns=8.8.8.8"
+    fi
+    net_plugin_args=""
+    if [[ -n "${NET_PLUGIN}" ]]; then
+      net_plugin_args="--network-plugin=${NET_PLUGIN}"
+    fi
+
+    auth_args=""
+    if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK:-}" ]]; then
+      auth_args="${auth_args} --authorization-mode=Webhook"
+    fi
+    if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK:-}" ]]; then
+      auth_args="${auth_args} --authentication-token-webhook"
+    fi
+    if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
+      auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
+    fi
+
+    cni_conf_dir_args=""
+    if [[ -n "${CNI_CONF_DIR}" ]]; then
+      cni_conf_dir_args="--cni-conf-dir=${CNI_CONF_DIR}"
+    fi
+
+    cni_bin_dir_args=""
+    if [[ -n "${CNI_BIN_DIR}" ]]; then
+      cni_bin_dir_args="--cni-bin-dir=${CNI_BIN_DIR}"
+    fi
+
+    container_runtime_endpoint_args=""
+    if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
+      container_runtime_endpoint_args="--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+    fi
+
+    image_service_endpoint_args=""
+    if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
+      image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
+    fi
+
+    all_kubelet_flags=(
+      ${priv_arg}
+      --v="${LOG_LEVEL}"
+      --vmodule="${LOG_SPEC}"
+      --chaos-chance="${CHAOS_CHANCE}"
+      --container-runtime="${CONTAINER_RUNTIME}"
+      --hostname-override="${HOSTNAME_OVERRIDE}"
+      ${cloud_config_arg}
+      --address="${KUBELET_HOST}"
+      --kubeconfig "$CERT_DIR"/kubelet.kubeconfig
+      --feature-gates="${FEATURE_GATES}"
+      --cpu-cfs-quota="${CPU_CFS_QUOTA}"
+      --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}"
+      --cgroups-per-qos="${CGROUPS_PER_QOS}"
+      --cgroup-driver="${CGROUP_DRIVER}"
+      --keep-terminated-pod-volumes="${KEEP_TERMINATED_POD_VOLUMES}"
+      --eviction-hard="${EVICTION_HARD}"
+      --eviction-soft="${EVICTION_SOFT}"
+      --eviction-pressure-transition-period="${EVICTION_PRESSURE_TRANSITION_PERIOD}"
+      --pod-manifest-path="${POD_MANIFEST_PATH}"
+      --fail-swap-on="${FAIL_SWAP_ON}"
+      ${auth_args}
+      ${dns_args}
+      ${cni_conf_dir_args}
+      ${cni_bin_dir_args}
+      ${net_plugin_args}
+      ${container_runtime_endpoint_args}
+      ${image_service_endpoint_args}
+      --port="$KUBELET_PORT"
+      ${KUBELET_FLAGS}
+    )
+
+    if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
+      sudo -E "${GO_OUT}/hyperkube" kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
+      KUBELET_PID=$!
+    else
+
+      # Build the hyperkube container image if necessary
+      if [[ -z "$KUBELET_IMAGE" && -n "$DOCKERIZE_KUBELET" ]]; then
+        HYPERKUBE_BIN="${GO_OUT}/hyperkube" REGISTRY="k8s.gcr.io" VERSION="latest" make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
+        KUBELET_IMAGE="k8s.gcr.io/hyperkube-amd64:latest"
+      fi
+
       # Docker won't run a container with a cidfile (container id file)
       # unless that file does not already exist; clean up an existing
       # dockerized kubelet that might be running.
@@ -789,22 +813,51 @@ function start_kubelet {
       if  [[ -n "${cloud_cred}" ]]; then
           cred_bind="--volume=${cloud_cred}:${cloud_cred}:ro"
       fi
+      all_kubelet_flags+=(--containerized)
 
-      docker run \
-        --volume=/:/rootfs:ro \
+      all_kubelet_volumes=(
+        --volume=/:/rootfs:ro,rslave \
         --volume=/var/run:/var/run:rw \
         --volume=/sys:/sys:ro \
-        --volume=/var/lib/docker/:/var/lib/docker:ro \
-        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+        --volume=/var/lib/docker/:/var/lib/docker:rslave \
+        --volume=/var/lib/kubelet/:/var/lib/kubelet:rslave \
         --volume=/dev:/dev \
         --volume=/run/xtables.lock:/run/xtables.lock:rw \
+      )
+
+      if [[ -n "${DOCKER_ROOT}" ]]; then
+        all_kubelet_flags+=(--root-dir="${DOCKER_ROOT}")
+        all_kubelet_volumes+=(--volume="${DOCKER_ROOT}:${DOCKER_ROOT}:rslave")
+      fi
+
+      docker run --rm --name kubelet \
+        "${all_kubelet_volumes[@]}" \
         ${cred_bind} \
         --net=host \
+        --pid=host \
         --privileged=true \
         -i \
         --cidfile=$KUBELET_CIDFILE \
-        k8s.gcr.io/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" ${cloud_config_arg} \ --address="127.0.0.1" --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
+        "${KUBELET_IMAGE}" \
+        /kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
+      # Get PID of kubelet container.
+      for i in {1..3}; do
+        echo -n "Trying to get PID of kubelet container..."
+        KUBELET_PID=$(docker inspect kubelet -f '{{.State.Pid}}' 2>/dev/null || true)
+        if [[ -n ${KUBELET_PID} && ${KUBELET_PID} -gt 0 ]]; then
+            echo " ok, $KUBELET_PID."
+            break
+        else
+            echo " failed, retry in 1 second."
+            sleep 1
+        fi
+      done
+    fi
+    # Quick check that kubelet is running.
+    if [ -n "$KUBELET_PID" ] && ps -p $KUBELET_PID > /dev/null; then
+      echo "kubelet ( $KUBELET_PID ) is running."
+    else
+      cat ${KUBELET_LOG} ; exit 1
     fi
 }
 
@@ -819,10 +872,18 @@ clientConnection:
 hostnameOverride: ${HOSTNAME_OVERRIDE}
 mode: ${KUBE_PROXY_MODE}
 EOF
+    if [[ -n ${FEATURE_GATES} ]]; then
+      echo "featureGates:"
+      # Convert from foo=true,bar=false to
+      #   foo: true
+      #   bar: false
+      for gate in $(echo ${FEATURE_GATES} | tr ',' ' '); do
+        echo $gate | sed -e 's/\(.*\)=\(.*\)/  \1: \2/'
+      done
+    fi >>/tmp/kube-proxy.yaml
 
     sudo "${GO_OUT}/hyperkube" proxy \
       --v=${LOG_LEVEL} \
-      --feature-gates="${FEATURE_GATES}" \
       --config=/tmp/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
@@ -953,7 +1014,15 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   ${KUBE_ROOT}/hack/install-etcd.sh
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
   KUBE_FASTBUILD=true make ginkgo cross
+
   apt install -y sudo
+  apt-get remove -y systemd
+
+  # configure shared mounts to prevent failure in DIND scenarios
+  mount --make-rshared /
+
+  # kubekins has a special directory for docker root
+  DOCKER_ROOT="/docker-graph"
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
@@ -963,10 +1032,6 @@ fi
 
 if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
   exit 1
-fi
-
-if [[ "${CONTAINER_RUNTIME}" == "rkt" ]]; then
-  test_rkt
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
@@ -1029,7 +1094,7 @@ fi
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-  while true; do sleep 1; done
+  while true; do sleep 1; healthcheck; done
 fi
 
 if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then

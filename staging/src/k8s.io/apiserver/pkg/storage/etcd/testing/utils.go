@@ -32,6 +32,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 
+	"context"
+
 	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver"
@@ -42,7 +44,6 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing

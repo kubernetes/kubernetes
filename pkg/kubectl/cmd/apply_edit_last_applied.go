@@ -17,15 +17,12 @@ limitations under the License.
 package cmd
 
 import (
-	"io"
-	"runtime"
-
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 var (
@@ -58,11 +55,8 @@ var (
 		kubectl apply edit-last-applied -f deploy.yaml -o json`)
 )
 
-func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &editor.EditOptions{
-		EditMode: editor.ApplyEditMode,
-	}
-	validArgs := cmdutil.ValidArgList(f)
+func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 
 	cmd := &cobra.Command{
 		Use: "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
@@ -71,24 +65,23 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra
 		Long:    applyEditLastAppliedLong,
 		Example: applyEditLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			options.ChangeCause = f.Command(cmd, false)
-			if err := options.Complete(f, out, errOut, args, cmd); err != nil {
+			if err := o.Complete(f, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
-			if err := options.Run(); err != nil {
+			if err := o.Run(); err != nil {
 				cmdutil.CheckErr(err)
 			}
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
+	// bind flag structs
+	o.RecordFlags.AddFlags(cmd)
+
 	usage := "to use to edit the resource"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&options.Output, "output", "o", "yaml", "Output format. One of: yaml|json.")
-	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", runtime.GOOS == "windows",
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "Output format. One of: yaml|json.")
+	cmd.Flags().BoolVar(&o.WindowsLineEndings, "windows-line-endings", o.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
-	cmdutil.AddRecordVarFlag(cmd, &options.Record)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd

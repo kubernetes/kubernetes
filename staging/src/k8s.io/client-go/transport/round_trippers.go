@@ -335,7 +335,7 @@ func (r *requestInfo) toCurl() string {
 		}
 	}
 
-	return fmt.Sprintf("curl -k -v -X%s %s %s", r.RequestVerb, headers, r.RequestURL)
+	return fmt.Sprintf("curl -k -v -X%s %s '%s'", r.RequestVerb, headers, r.RequestURL)
 }
 
 // debuggingRoundTripper will display information about the requests passing

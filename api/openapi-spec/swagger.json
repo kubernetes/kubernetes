@@ -20060,6 +20060,41 @@
     ]
    },
    "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}/status": {
+    "get": {
+     "description": "read status of the specified CustomResourceDefinition",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiextensions_v1beta1"
+     ],
+     "operationId": "readApiextensionsV1beta1CustomResourceDefinitionStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinition",
+      "version": "v1beta1"
+     }
+    },
     "put": {
      "description": "replace status of the specified CustomResourceDefinition",
      "consumes": [
@@ -20105,6 +20140,53 @@
       }
      },
      "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinition",
+      "version": "v1beta1"
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified CustomResourceDefinition",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiextensions_v1beta1"
+     ],
+     "operationId": "patchApiextensionsV1beta1CustomResourceDefinitionStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
       "group": "apiextensions.k8s.io",
       "kind": "CustomResourceDefinition",
@@ -70574,7 +70656,7 @@
       "format": "byte"
      },
      "service": {
-      "description": "`service` is a reference to the service for this webhook. Either `service` or `url` must be specified.\n\nIf the webhook is running within the cluster, then you should use `service`.\n\nIf there is only one port open for the service, that port will be used. If there are multiple ports open, port 443 will be used if it is open, otherwise it is an error.",
+      "description": "`service` is a reference to the service for this webhook. Either `service` or `url` must be specified.\n\nIf the webhook is running within the cluster, then you should use `service`.\n\nPort 443 will be used if it is open, otherwise it is an error.",
       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1beta1.ServiceReference"
      },
      "url": {
@@ -71239,11 +71321,11 @@
     "description": "Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxSurge": {
-      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is at most 130% of desired pods.",
+      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new ReplicaSet can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new ReplicaSet can be scaled up further, ensuring that total number of pods running at any time during the update is at most 130% of desired pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      },
      "maxUnavailable": {
-      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
+      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old ReplicaSet can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old ReplicaSet can be scaled down further, followed by scaling up the new ReplicaSet, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      }
     }
@@ -71797,11 +71879,11 @@
     "description": "Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxSurge": {
-      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
+      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new ReplicaSet can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new ReplicaSet can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      },
      "maxUnavailable": {
-      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
+      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old ReplicaSet can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old ReplicaSet can be scaled down further, followed by scaling up the new ReplicaSet, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      }
     }
@@ -72744,11 +72826,11 @@
     "description": "Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxSurge": {
-      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
+      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new ReplicaSet can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new ReplicaSet can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      },
      "maxUnavailable": {
-      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
+      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old ReplicaSet can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old ReplicaSet can be scaled down further, followed by scaling up the new ReplicaSet, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      }
     }
@@ -75671,6 +75753,36 @@
      }
     ]
    },
+   "io.k8s.api.core.v1.ConfigMapNodeConfigSource": {
+    "description": "ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.",
+    "required": [
+     "namespace",
+     "name",
+     "kubeletConfigKey"
+    ],
+    "properties": {
+     "kubeletConfigKey": {
+      "description": "KubeletConfigKey declares which key of the referenced ConfigMap corresponds to the KubeletConfiguration structure This field is required in all cases.",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name is the metadata.name of the referenced ConfigMap. This field is required in all cases.",
+      "type": "string"
+     },
+     "namespace": {
+      "description": "Namespace is the metadata.namespace of the referenced ConfigMap. This field is required in all cases.",
+      "type": "string"
+     },
+     "resourceVersion": {
+      "description": "ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap. This field is forbidden in Node.Spec.",
+      "type": "string"
+     },
+     "uid": {
+      "description": "UID is the metadata.UID of the referenced ConfigMap. This field is currently reqired in Node.Spec.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.ConfigMapProjection": {
     "description": "Adapts a ConfigMap into a projected volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a projected volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. Note that this is identical to a configmap volume source without the default mode.",
     "properties": {
@@ -77022,13 +77134,13 @@
     }
    },
    "io.k8s.api.core.v1.LocalVolumeSource": {
-    "description": "Local represents directly-attached storage with node affinity",
+    "description": "Local represents directly-attached storage with node affinity (Beta feature)",
     "required": [
      "path"
     ],
     "properties": {
      "path": {
-      "description": "The full path to the volume on the node For alpha, this path must be a directory Once block as a source is supported, then this path can point to a block device",
+      "description": "The full path to the volume on the node. It can be either a directory or block device (disk, partition, ...). Directories can be represented only by PersistentVolume with VolumeMode=Filesystem. Block devices can be represented only by VolumeMode=Block, which also requires the BlockVolume alpha feature gate to be enabled.",
       "type": "string"
      }
     }
@@ -77242,25 +77354,11 @@
    "io.k8s.api.core.v1.NodeConfigSource": {
     "description": "NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.",
     "properties": {
-     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
-      "type": "string"
-     },
-     "configMapRef": {
-      "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
-     },
-     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-      "type": "string"
+     "configMap": {
+      "description": "ConfigMap is a reference to a Node's ConfigMap",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMapNodeConfigSource"
      }
-    },
-    "x-kubernetes-group-version-kind": [
-     {
-      "group": "",
-      "kind": "NodeConfigSource",
-      "version": "v1"
-     }
-    ]
+    }
    },
    "io.k8s.api.core.v1.NodeDaemonEndpoints": {
     "description": "NodeDaemonEndpoints lists ports opened by daemons running on the Node.",
@@ -77345,13 +77443,17 @@
     }
    },
    "io.k8s.api.core.v1.NodeSelectorTerm": {
-    "description": "A null or empty node selector term matches no objects.",
-    "required": [
-     "matchExpressions"
-    ],
+    "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed.",
     "properties": {
      "matchExpressions": {
-      "description": "Required. A list of node selector requirements. The requirements are ANDed.",
+      "description": "A list of node selector requirements by node's labels.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelectorRequirement"
+      }
+     },
+     "matchFields": {
+      "description": "A list of node selector requirements by node's fields.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelectorRequirement"
@@ -77367,7 +77469,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.NodeConfigSource"
      },
      "externalID": {
-      "description": "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
+      "description": "Deprecated. Not all kubelets will set this field. Remove field after 1.13. see: https://issues.k8s.io/61966",
       "type": "string"
      },
      "podCIDR": {
@@ -80103,22 +80205,22 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.AllowedFlexVolume": {
-    "description": "AllowedFlexVolume represents a single Flexvolume that is allowed to be used.",
+    "description": "AllowedFlexVolume represents a single Flexvolume that is allowed to be used. Deprecated: use AllowedFlexVolume from policy API Group instead.",
     "required": [
      "driver"
     ],
     "properties": {
      "driver": {
-      "description": "Driver is the name of the Flexvolume driver.",
+      "description": "driver is the name of the Flexvolume driver.",
       "type": "string"
      }
     }
    },
    "io.k8s.api.extensions.v1beta1.AllowedHostPath": {
-    "description": "defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+    "description": "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined. Deprecated: use AllowedHostPath from policy API Group instead.",
     "properties": {
      "pathPrefix": {
-      "description": "is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`",
+      "description": "pathPrefix is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`",
       "type": "string"
      }
     }
@@ -80580,17 +80682,17 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.FSGroupStrategyOptions": {
-    "description": "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+    "description": "FSGroupStrategyOptions defines the strategy type and options used to create the strategy. Deprecated: use FSGroupStrategyOptions from policy API Group instead.",
     "properties": {
      "ranges": {
-      "description": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end.",
+      "description": "ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end. Required for MustRunAs.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.IDRange"
       }
      },
      "rule": {
-      "description": "Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.",
+      "description": "rule is the strategy that will dictate what FSGroup is used in the SecurityContext.",
       "type": "string"
      }
     }
@@ -80627,7 +80729,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.HostPortRange": {
-    "description": "Host Port Range defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
+    "description": "HostPortRange defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined. Deprecated: use HostPortRange from policy API Group instead.",
     "required": [
      "min",
      "max"
@@ -80646,19 +80748,19 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.IDRange": {
-    "description": "ID Range provides a min/max of an allowed range of IDs.",
+    "description": "IDRange provides a min/max of an allowed range of IDs. Deprecated: use IDRange from policy API Group instead.",
     "required": [
      "min",
      "max"
     ],
     "properties": {
      "max": {
-      "description": "Max is the end of the range, inclusive.",
+      "description": "max is the end of the range, inclusive.",
       "type": "integer",
       "format": "int64"
      },
      "min": {
-      "description": "Min is the start of the range, inclusive.",
+      "description": "min is the start of the range, inclusive.",
       "type": "integer",
       "format": "int64"
      }
@@ -80930,15 +81032,15 @@
     "description": "DEPRECATED 1.9 - This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer.",
     "properties": {
      "ipBlock": {
-      "description": "IPBlock defines policy on a particular IPBlock",
+      "description": "IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.",
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.IPBlock"
      },
      "namespaceSelector": {
-      "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.",
+      "description": "Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces.\n\nIf PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "podSelector": {
-      "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If present but empty, this selector selects all pods in this namespace.",
+      "description": "This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods.\n\nIf NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      }
     }
@@ -80990,7 +81092,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.PodSecurityPolicy": {
-    "description": "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+    "description": "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container. Deprecated: use PodSecurityPolicy from policy API Group instead.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -81018,7 +81120,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.PodSecurityPolicyList": {
-    "description": "Pod Security Policy List is a list of PodSecurityPolicy objects.",
+    "description": "PodSecurityPolicyList is a list of PodSecurityPolicy objects. Deprecated: use PodSecurityPolicyList from policy API Group instead.",
     "required": [
      "items"
     ],
@@ -81028,7 +81130,7 @@
       "type": "string"
      },
      "items": {
-      "description": "Items is a list of schema objects.",
+      "description": "items is a list of schema objects.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.PodSecurityPolicy"
@@ -81052,7 +81154,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.PodSecurityPolicySpec": {
-    "description": "Pod Security Policy Spec defines the policy enforced.",
+    "description": "PodSecurityPolicySpec defines the policy enforced. Deprecated: use PodSecurityPolicySpec from policy API Group instead.",
     "required": [
      "seLinux",
      "runAsUser",
@@ -81061,43 +81163,43 @@
     ],
     "properties": {
      "allowPrivilegeEscalation": {
-      "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
+      "description": "allowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
       "type": "boolean"
      },
      "allowedCapabilities": {
-      "description": "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
+      "description": "allowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both allowedCapabilities and requiredDropCapabilities.",
       "type": "array",
       "items": {
        "type": "string"
       }
      },
      "allowedFlexVolumes": {
-      "description": "AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"Volumes\" field.",
+      "description": "allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"volumes\" field.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.AllowedFlexVolume"
       }
      },
      "allowedHostPaths": {
-      "description": "is a white list of allowed host paths. Empty indicates that all host paths may be used.",
+      "description": "allowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.AllowedHostPath"
       }
      },
      "defaultAddCapabilities": {
-      "description": "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capability in both DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly allowed, and need not be included in the AllowedCapabilities list.",
+      "description": "defaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capability in both defaultAddCapabilities and requiredDropCapabilities. Capabilities added here are implicitly allowed, and need not be included in the allowedCapabilities list.",
       "type": "array",
       "items": {
        "type": "string"
       }
      },
      "defaultAllowPrivilegeEscalation": {
-      "description": "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.",
+      "description": "defaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.",
       "type": "boolean"
      },
      "fsGroup": {
-      "description": "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
+      "description": "fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.FSGroupStrategyOptions"
      },
      "hostIPC": {
@@ -81124,11 +81226,11 @@
       "type": "boolean"
      },
      "readOnlyRootFilesystem": {
-      "description": "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
+      "description": "readOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
       "type": "boolean"
      },
      "requiredDropCapabilities": {
-      "description": "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
+      "description": "requiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
       "type": "array",
       "items": {
        "type": "string"
@@ -81143,11 +81245,11 @@
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.SELinuxStrategyOptions"
      },
      "supplementalGroups": {
-      "description": "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
+      "description": "supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.SupplementalGroupsStrategyOptions"
      },
      "volumes": {
-      "description": "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
+      "description": "volumes is a white list of allowed volume plugins. Empty indicates that no volumes may be used. To allow all volumes you may use '*'.",
       "type": "array",
       "items": {
        "type": "string"
@@ -81348,32 +81450,32 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.RunAsUserStrategyOptions": {
-    "description": "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use RunAsUserStrategyOptions from policy API Group instead.",
     "required": [
      "rule"
     ],
     "properties": {
      "ranges": {
-      "description": "Ranges are the allowed ranges of uids that may be used.",
+      "description": "ranges are the allowed ranges of uids that may be used. If you would like to force a single uid then supply a single range with the same start and end. Required for MustRunAs.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.IDRange"
       }
      },
      "rule": {
-      "description": "Rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
+      "description": "rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
       "type": "string"
      }
     }
    },
    "io.k8s.api.extensions.v1beta1.SELinuxStrategyOptions": {
-    "description": "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "SELinuxStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use SELinuxStrategyOptions from policy API Group instead.",
     "required": [
      "rule"
     ],
     "properties": {
      "rule": {
-      "description": "type is the strategy that will dictate the allowable labels that may be set.",
+      "description": "rule is the strategy that will dictate the allowable labels that may be set.",
       "type": "string"
      },
      "seLinuxOptions": {
@@ -81449,17 +81551,17 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.SupplementalGroupsStrategyOptions": {
-    "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+    "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy. Deprecated: use SupplementalGroupsStrategyOptions from policy API Group instead.",
     "properties": {
      "ranges": {
-      "description": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end.",
+      "description": "ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end. Required for MustRunAs.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.IDRange"
       }
      },
      "rule": {
-      "description": "Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
+      "description": "rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
       "type": "string"
      }
     }
@@ -81584,18 +81686,18 @@
     ]
    },
    "io.k8s.api.networking.v1.NetworkPolicyPeer": {
-    "description": "NetworkPolicyPeer describes a peer to allow traffic from. Exactly one of its fields must be specified.",
+    "description": "NetworkPolicyPeer describes a peer to allow traffic from. Only certain combinations of fields are allowed",
     "properties": {
      "ipBlock": {
-      "description": "IPBlock defines policy on a particular IPBlock",
+      "description": "IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.",
       "$ref": "#/definitions/io.k8s.api.networking.v1.IPBlock"
      },
      "namespaceSelector": {
-      "description": "Selects Namespaces using cluster scoped-labels. This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.",
+      "description": "Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces.\n\nIf PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "podSelector": {
-      "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If present but empty, this selector selects all pods in this namespace.",
+      "description": "This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods.\n\nIf NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      }
     }
@@ -81653,16 +81755,16 @@
     ],
     "properties": {
      "driver": {
-      "description": "Driver is the name of the Flexvolume driver.",
+      "description": "driver is the name of the Flexvolume driver.",
       "type": "string"
      }
     }
    },
    "io.k8s.api.policy.v1beta1.AllowedHostPath": {
-    "description": "defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+    "description": "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
     "properties": {
      "pathPrefix": {
-      "description": "is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`",
+      "description": "pathPrefix is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`",
       "type": "string"
      }
     }
@@ -81699,20 +81801,20 @@
     "description": "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
     "properties": {
      "ranges": {
-      "description": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end.",
+      "description": "ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end. Required for MustRunAs.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.IDRange"
       }
      },
      "rule": {
-      "description": "Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.",
+      "description": "rule is the strategy that will dictate what FSGroup is used in the SecurityContext.",
       "type": "string"
      }
     }
    },
    "io.k8s.api.policy.v1beta1.HostPortRange": {
-    "description": "Host Port Range defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
+    "description": "HostPortRange defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
     "required": [
      "min",
      "max"
@@ -81731,19 +81833,19 @@
     }
    },
    "io.k8s.api.policy.v1beta1.IDRange": {
-    "description": "ID Range provides a min/max of an allowed range of IDs.",
+    "description": "IDRange provides a min/max of an allowed range of IDs.",
     "required": [
      "min",
      "max"
     ],
     "properties": {
      "max": {
-      "description": "Max is the end of the range, inclusive.",
+      "description": "max is the end of the range, inclusive.",
       "type": "integer",
       "format": "int64"
      },
      "min": {
-      "description": "Min is the start of the range, inclusive.",
+      "description": "min is the start of the range, inclusive.",
       "type": "integer",
       "format": "int64"
      }
@@ -81874,7 +81976,7 @@
     }
    },
    "io.k8s.api.policy.v1beta1.PodSecurityPolicy": {
-    "description": "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+    "description": "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -81902,7 +82004,7 @@
     ]
    },
    "io.k8s.api.policy.v1beta1.PodSecurityPolicyList": {
-    "description": "Pod Security Policy List is a list of PodSecurityPolicy objects.",
+    "description": "PodSecurityPolicyList is a list of PodSecurityPolicy objects.",
     "required": [
      "items"
     ],
@@ -81912,7 +82014,7 @@
       "type": "string"
      },
      "items": {
-      "description": "Items is a list of schema objects.",
+      "description": "items is a list of schema objects.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.PodSecurityPolicy"
@@ -81936,7 +82038,7 @@
     ]
    },
    "io.k8s.api.policy.v1beta1.PodSecurityPolicySpec": {
-    "description": "Pod Security Policy Spec defines the policy enforced.",
+    "description": "PodSecurityPolicySpec defines the policy enforced.",
     "required": [
      "seLinux",
      "runAsUser",
@@ -81945,43 +82047,43 @@
     ],
     "properties": {
      "allowPrivilegeEscalation": {
-      "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
+      "description": "allowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
       "type": "boolean"
      },
      "allowedCapabilities": {
-      "description": "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
+      "description": "allowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both allowedCapabilities and requiredDropCapabilities.",
       "type": "array",
       "items": {
        "type": "string"
       }
      },
      "allowedFlexVolumes": {
-      "description": "AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"Volumes\" field.",
+      "description": "allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"volumes\" field.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.AllowedFlexVolume"
       }
      },
      "allowedHostPaths": {
-      "description": "is a white list of allowed host paths. Empty indicates that all host paths may be used.",
+      "description": "allowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.AllowedHostPath"
       }
      },
      "defaultAddCapabilities": {
-      "description": "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capability in both DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly allowed, and need not be included in the AllowedCapabilities list.",
+      "description": "defaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capability in both defaultAddCapabilities and requiredDropCapabilities. Capabilities added here are implicitly allowed, and need not be included in the allowedCapabilities list.",
       "type": "array",
       "items": {
        "type": "string"
       }
      },
      "defaultAllowPrivilegeEscalation": {
-      "description": "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.",
+      "description": "defaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.",
       "type": "boolean"
      },
      "fsGroup": {
-      "description": "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
+      "description": "fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
       "$ref": "#/definitions/io.k8s.api.policy.v1beta1.FSGroupStrategyOptions"
      },
      "hostIPC": {
@@ -82008,11 +82110,11 @@
       "type": "boolean"
      },
      "readOnlyRootFilesystem": {
-      "description": "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
+      "description": "readOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
       "type": "boolean"
      },
      "requiredDropCapabilities": {
-      "description": "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
+      "description": "requiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
       "type": "array",
       "items": {
        "type": "string"
@@ -82027,11 +82129,11 @@
       "$ref": "#/definitions/io.k8s.api.policy.v1beta1.SELinuxStrategyOptions"
      },
      "supplementalGroups": {
-      "description": "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
+      "description": "supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
       "$ref": "#/definitions/io.k8s.api.policy.v1beta1.SupplementalGroupsStrategyOptions"
      },
      "volumes": {
-      "description": "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
+      "description": "volumes is a white list of allowed volume plugins. Empty indicates that no volumes may be used. To allow all volumes you may use '*'.",
       "type": "array",
       "items": {
        "type": "string"
@@ -82040,32 +82142,32 @@
     }
    },
    "io.k8s.api.policy.v1beta1.RunAsUserStrategyOptions": {
-    "description": "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.",
     "required": [
      "rule"
     ],
     "properties": {
      "ranges": {
-      "description": "Ranges are the allowed ranges of uids that may be used.",
+      "description": "ranges are the allowed ranges of uids that may be used. If you would like to force a single uid then supply a single range with the same start and end. Required for MustRunAs.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.IDRange"
       }
      },
      "rule": {
-      "description": "Rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
+      "description": "rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
       "type": "string"
      }
     }
    },
    "io.k8s.api.policy.v1beta1.SELinuxStrategyOptions": {
-    "description": "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.",
     "required": [
      "rule"
     ],
     "properties": {
      "rule": {
-      "description": "type is the strategy that will dictate the allowable labels that may be set.",
+      "description": "rule is the strategy that will dictate the allowable labels that may be set.",
       "type": "string"
      },
      "seLinuxOptions": {
@@ -82078,14 +82180,14 @@
     "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
     "properties": {
      "ranges": {
-      "description": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end.",
+      "description": "ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end. Required for MustRunAs.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.IDRange"
       }
      },
      "rule": {
-      "description": "Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
+      "description": "rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
       "type": "string"
      }
     }
@@ -82143,7 +82245,6 @@
    "io.k8s.api.rbac.v1.ClusterRoleBinding": {
     "description": "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
     "required": [
-     "subjects",
      "roleRef"
     ],
     "properties": {
@@ -82327,7 +82428,6 @@
    "io.k8s.api.rbac.v1.RoleBinding": {
     "description": "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
     "required": [
-     "subjects",
      "roleRef"
     ],
     "properties": {
@@ -82531,7 +82631,6 @@
    "io.k8s.api.rbac.v1alpha1.ClusterRoleBinding": {
     "description": "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
     "required": [
-     "subjects",
      "roleRef"
     ],
     "properties": {
@@ -82715,7 +82814,6 @@
    "io.k8s.api.rbac.v1alpha1.RoleBinding": {
     "description": "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
     "required": [
-     "subjects",
      "roleRef"
     ],
     "properties": {
@@ -82919,7 +83017,6 @@
    "io.k8s.api.rbac.v1beta1.ClusterRoleBinding": {
     "description": "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
     "required": [
-     "subjects",
      "roleRef"
     ],
     "properties": {
@@ -83103,7 +83200,6 @@
    "io.k8s.api.rbac.v1beta1.RoleBinding": {
     "description": "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
     "required": [
-     "subjects",
      "roleRef"
     ],
     "properties": {
@@ -85395,7 +85491,6 @@
     "description": "APIServiceSpec contains information for locating and communicating with a server. Only https is supported, though you are able to disable certificate verification.",
     "required": [
      "service",
-     "caBundle",
      "groupPriorityMinimum",
      "versionPriority"
     ],
@@ -85541,7 +85636,6 @@
     "description": "APIServiceSpec contains information for locating and communicating with a server. Only https is supported, though you are able to disable certificate verification.",
     "required": [
      "service",
-     "caBundle",
      "groupPriorityMinimum",
      "versionPriority"
     ],

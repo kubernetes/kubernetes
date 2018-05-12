@@ -64,7 +64,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	if err := options.RecommendedOptions.ApplyTo(genericConfig, nil); err != nil {
 		return nil, err
 	}
-	if err := options.APIEnablement.ApplyTo(&genericConfig.Config, extensionsapiserver.DefaultAPIResourceConfigSource(), extensionsapiserver.Registry); err != nil {
+	if err := options.APIEnablement.ApplyTo(&genericConfig.Config, extensionsapiserver.DefaultAPIResourceConfigSource(), extensionsapiserver.Scheme); err != nil {
 		return nil, err
 	}
 
@@ -90,7 +90,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 
 func StartServer(config *extensionsapiserver.Config) (chan struct{}, *rest.Config, error) {
 	stopCh := make(chan struct{})
-	server, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	server, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -139,7 +139,7 @@ func StartDefaultServer() (chan struct{}, *rest.Config, error) {
 	return StartServer(config)
 }
 
-func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynamic.ClientPool, error) {
+func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynamic.Interface, error) {
 	stopCh, config, err := StartDefaultServer()
 	if err != nil {
 		return nil, nil, nil, err
@@ -151,5 +151,11 @@ func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynami
 		return nil, nil, nil, err
 	}
 
-	return stopCh, apiExtensionsClient, dynamic.NewDynamicClientPool(config), nil
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		close(stopCh)
+		return nil, nil, nil, err
+	}
+
+	return stopCh, apiExtensionsClient, dynamicClient, nil
 }

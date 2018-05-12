@@ -32,7 +32,7 @@ import (
 )
 
 // NewKubeadmCommand return cobra.Command to run kubeadm command
-func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster",
@@ -77,7 +77,7 @@ func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(NewCmdConfig(out))
 	cmds.AddCommand(NewCmdInit(out))
 	cmds.AddCommand(NewCmdJoin(out))
-	cmds.AddCommand(NewCmdReset(out))
+	cmds.AddCommand(NewCmdReset(in, out))
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdToken(out, err))
 	cmds.AddCommand(upgrade.NewCmdUpgrade(out))

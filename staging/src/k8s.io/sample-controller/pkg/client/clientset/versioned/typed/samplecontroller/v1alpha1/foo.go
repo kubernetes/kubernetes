@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ type FoosGetter interface {
 type FooInterface interface {
 	Create(*v1alpha1.Foo) (*v1alpha1.Foo, error)
 	Update(*v1alpha1.Foo) (*v1alpha1.Foo, error)
+	UpdateStatus(*v1alpha1.Foo) (*v1alpha1.Foo, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*v1alpha1.Foo, error)
@@ -114,6 +115,22 @@ func (c *foos) Update(foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
 		Namespace(c.ns).
 		Resource("foos").
 		Name(foo.Name).
+		Body(foo).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+
+func (c *foos) UpdateStatus(foo *v1alpha1.Foo) (result *v1alpha1.Foo, err error) {
+	result = &v1alpha1.Foo{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("foos").
+		Name(foo.Name).
+		SubResource("status").
 		Body(foo).
 		Do().
 		Into(result)

@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"net/url"
 	"reflect"
 	"testing"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -268,7 +268,7 @@ type mockPodGetter struct {
 	pod *api.Pod
 }
 
-func (g mockPodGetter) Get(genericapirequest.Context, string, *metav1.GetOptions) (runtime.Object, error) {
+func (g mockPodGetter) Get(context.Context, string, *metav1.GetOptions) (runtime.Object, error) {
 	return g.pod, nil
 }
 
@@ -370,7 +370,7 @@ func TestCheckLogLocation(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+		"v1",
 		"Pod",
 		PodToSelectableFields(&api.Pod{}),
 		nil,

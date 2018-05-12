@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -107,6 +108,13 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
+	// serverTLSBootstrap enables server certificate bootstrap. Instead of self
+	// signing a serving certificate, the Kubelet will request a certificate from
+	// the certificates.k8s.io API. This requires an approver to approve the
+	// certificate signing requests. The RotateKubeletServerCertificate feature
+	// must be enabled.
+	// Default: false
+	ServerTLSBootstrap bool `json:"serverTLSBootstrap,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	// Defaults:
 	//   anonymous:
@@ -249,6 +257,11 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
+	// Map of QoS resource reservation percentages (memory only for now).
+	// Requires the QOSReserved feature gate to be enabled.
+	// Default: nil
+	// +optional
+	QOSReserved map[string]string `json:"qosReserved,omitempty"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	// Default: "2m"
@@ -499,4 +512,16 @@ type KubeletAnonymousAuthentication struct {
 	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SerializedNodeConfigSource allows us to serialize v1.NodeConfigSource.
+// This type is used internally by the Kubelet for tracking checkpointed dynamic configs.
+// It exists in the kubeletconfig API group because it is classified as a versioned input to the Kubelet.
+type SerializedNodeConfigSource struct {
+	metav1.TypeMeta `json:",inline"`
+	// Source is the source that we are serializing
+	// +optional
+	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
 }

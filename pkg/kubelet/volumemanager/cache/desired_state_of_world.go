@@ -171,7 +171,7 @@ type podToMount struct {
 	// generate the volume plugin object, and passed to plugin methods.
 	// For non-PVC volumes this is the same as defined in the pod object. For
 	// PVC volumes it is from the dereferenced PV object.
-	spec *volume.Spec
+	volumeSpec *volume.Spec
 
 	// outerVolumeSpecName is the volume.Spec.Name() of the volume as referenced
 	// directly in the pod. If the volume was referenced through a persistent
@@ -220,16 +220,14 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		volumeName = util.GetUniqueVolumeNameForNonAttachableVolume(podName, volumePlugin, volumeSpec)
 	}
 
-	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
-	if !volumeExists {
-		volumeObj = volumeToMount{
+	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
+		dsw.volumesToMount[volumeName] = volumeToMount{
 			volumeName:         volumeName,
 			podsToMount:        make(map[types.UniquePodName]podToMount),
 			pluginIsAttachable: attachable,
 			volumeGidValue:     volumeGidValue,
 			reportedInUse:      false,
 		}
-		dsw.volumesToMount[volumeName] = volumeObj
 	}
 
 	// Create new podToMount object. If it already exists, it is refreshed with
@@ -238,7 +236,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	dsw.volumesToMount[volumeName].podsToMount[podName] = podToMount{
 		podName:             podName,
 		pod:                 pod,
-		spec:                volumeSpec,
+		volumeSpec:          volumeSpec,
 		outerVolumeSpecName: outerVolumeSpecName,
 	}
 	return volumeName, nil
@@ -314,7 +312,7 @@ func (dsw *desiredStateOfWorld) VolumeExistsWithSpecName(podName types.UniquePod
 	defer dsw.RUnlock()
 	for _, volumeObj := range dsw.volumesToMount {
 		for name, podObj := range volumeObj.podsToMount {
-			if podName == name && podObj.spec.Name() == volumeSpecName {
+			if podName == name && podObj.volumeSpec.Name() == volumeSpecName {
 				return true
 			}
 		}
@@ -351,7 +349,7 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 						VolumeName:          volumeName,
 						PodName:             podName,
 						Pod:                 podObj.pod,
-						VolumeSpec:          podObj.spec,
+						VolumeSpec:          podObj.volumeSpec,
 						PluginIsAttachable:  volumeObj.pluginIsAttachable,
 						OuterVolumeSpecName: podObj.outerVolumeSpecName,
 						VolumeGidValue:      volumeObj.volumeGidValue,

@@ -30,7 +30,7 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
-	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -277,6 +277,8 @@ func TestSetUpPodFailure(t *testing.T) {
 	cID := kubecontainer.ContainerID{Type: runtimeName, ID: libdocker.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
 	mockPlugin.EXPECT().Name().Return("mockNetworkPlugin").AnyTimes()
 	mockPlugin.EXPECT().SetUpPod(ns, name, cID).Return(errors.New("setup pod error")).AnyTimes()
+	// If SetUpPod() fails, we expect TearDownPod() to immediately follow
+	mockPlugin.EXPECT().TearDownPod(ns, name, cID)
 	// Assume network plugin doesn't return error, dockershim should still be able to return not ready correctly.
 	mockPlugin.EXPECT().GetPodNetworkStatus(ns, name, cID).Return(&network.PodNetworkStatus{IP: net.IP("127.0.0.01")}, nil).AnyTimes()
 

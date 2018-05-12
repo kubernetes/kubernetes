@@ -27,8 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/kubelet/network"
 )
+
+// defaultNetworkInterfaceName is used for collectng network stats.
+// This logic relies on knowledge of the container runtime implementation and
+// is not reliable.
+const defaultNetworkInterfaceName = "eth0"
 
 func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsapi.CPUStats, *statsapi.MemoryStats) {
 	cstat, found := latestContainerStats(info)
@@ -153,7 +157,7 @@ func cadvisorInfoToNetworkStats(name string, info *cadvisorapiv2.ContainerInfo) 
 			TxErrors: &inter.TxErrors,
 		}
 
-		if inter.Name == network.DefaultInterfaceName {
+		if inter.Name == defaultNetworkInterfaceName {
 			iStats.InterfaceStats = iStat
 		}
 

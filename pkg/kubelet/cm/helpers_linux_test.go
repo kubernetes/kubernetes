@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"strconv"
 )
 
 // getResourceList returns a ResourceList with the
@@ -57,10 +58,12 @@ func TestResourceConfigForPod(t *testing.T) {
 	guaranteedShares := MilliCPUToShares(100)
 	guaranteedQuota, guaranteedPeriod := MilliCPUToQuota(100)
 	memoryQuantity = resource.MustParse("100Mi")
+	cpuNoLimit := int64(-1)
 	guaranteedMemory := memoryQuantity.Value()
 	testCases := map[string]struct {
-		pod      *v1.Pod
-		expected *ResourceConfig
+		pod              *v1.Pod
+		expected         *ResourceConfig
+		enforceCPULimits bool
 	}{
 		"besteffort": {
 			pod: &v1.Pod{
@@ -72,7 +75,8 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &minShares},
+			enforceCPULimits: true,
+			expected:         &ResourceConfig{CpuShares: &minShares},
 		},
 		"burstable-no-limits": {
 			pod: &v1.Pod{
@@ -84,7 +88,8 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &burstableShares},
+			enforceCPULimits: true,
+			expected:         &ResourceConfig{CpuShares: &burstableShares},
 		},
 		"burstable-with-limits": {
 			pod: &v1.Pod{
@@ -96,7 +101,21 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &burstableShares, CpuQuota: &burstableQuota, CpuPeriod: &burstablePeriod, Memory: &burstableMemory},
+			enforceCPULimits: true,
+			expected:         &ResourceConfig{CpuShares: &burstableShares, CpuQuota: &burstableQuota, CpuPeriod: &burstablePeriod, Memory: &burstableMemory},
+		},
+		"burstable-with-limits-no-cpu-enforcement": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+			},
+			enforceCPULimits: false,
+			expected:         &ResourceConfig{CpuShares: &burstableShares, CpuQuota: &cpuNoLimit, CpuPeriod: &burstablePeriod, Memory: &burstableMemory},
 		},
 		"burstable-partial-limits": {
 			pod: &v1.Pod{
@@ -111,7 +130,8 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &burstablePartialShares},
+			enforceCPULimits: true,
+			expected:         &ResourceConfig{CpuShares: &burstablePartialShares},
 		},
 		"guaranteed": {
 			pod: &v1.Pod{
@@ -123,11 +143,25 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &guaranteedShares, CpuQuota: &guaranteedQuota, CpuPeriod: &guaranteedPeriod, Memory: &guaranteedMemory},
+			enforceCPULimits: true,
+			expected:         &ResourceConfig{CpuShares: &guaranteedShares, CpuQuota: &guaranteedQuota, CpuPeriod: &guaranteedPeriod, Memory: &guaranteedMemory},
+		},
+		"guaranteed-no-cpu-enforcement": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+						},
+					},
+				},
+			},
+			enforceCPULimits: false,
+			expected:         &ResourceConfig{CpuShares: &guaranteedShares, CpuQuota: &cpuNoLimit, CpuPeriod: &guaranteedPeriod, Memory: &guaranteedMemory},
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := ResourceConfigForPod(testCase.pod)
+		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits)
 		if !reflect.DeepEqual(actual.CpuPeriod, testCase.expected.CpuPeriod) {
 			t.Errorf("unexpected result, test: %v, cpu period not as expected", testName)
 		}
@@ -195,5 +229,84 @@ func TestMilliCPUToQuota(t *testing.T) {
 		if quota != testCase.quota || period != testCase.period {
 			t.Errorf("Input %v, expected quota %v period %v, but got quota %v period %v", testCase.input, testCase.quota, testCase.period, quota, period)
 		}
+	}
+}
+
+func TestHugePageLimits(t *testing.T) {
+	Mi := int64(1024 * 1024)
+	type inputStruct struct {
+		key   string
+		input string
+	}
+
+	testCases := []struct {
+		name     string
+		inputs   []inputStruct
+		expected map[int64]int64
+	}{
+		{
+			name: "no valid hugepages",
+			inputs: []inputStruct{
+				{
+					key:   "2Mi",
+					input: "128",
+				},
+			},
+			expected: map[int64]int64{},
+		},
+		{
+			name: "2Mi only",
+			inputs: []inputStruct{
+				{
+					key:   v1.ResourceHugePagesPrefix + "2Mi",
+					input: "128",
+				},
+			},
+			expected: map[int64]int64{2 * Mi: 128},
+		},
+		{
+			name: "2Mi and 4Mi",
+			inputs: []inputStruct{
+				{
+					key:   v1.ResourceHugePagesPrefix + "2Mi",
+					input: "128",
+				},
+				{
+					key:   v1.ResourceHugePagesPrefix + strconv.FormatInt(2*Mi, 10),
+					input: "256",
+				},
+				{
+					key:   v1.ResourceHugePagesPrefix + "4Mi",
+					input: "512",
+				},
+				{
+					key:   "4Mi",
+					input: "1024",
+				},
+			},
+			expected: map[int64]int64{2 * Mi: 384, 4 * Mi: 512},
+		},
+	}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.name, func(t *testing.T) {
+			resourceList := v1.ResourceList{}
+
+			for _, input := range testcase.inputs {
+				value, err := resource.ParseQuantity(input.input)
+				if err != nil {
+					t.Fatalf("error in parsing hugepages, value: %s", input.input)
+				} else {
+					resourceList[v1.ResourceName(input.key)] = value
+				}
+			}
+
+			resultValue := HugePageLimits(resourceList)
+
+			if !reflect.DeepEqual(testcase.expected, resultValue) {
+				t.Errorf("unexpected result, expected: %v, actual: %v", testcase.expected, resultValue)
+			}
+		})
+
 	}
 }

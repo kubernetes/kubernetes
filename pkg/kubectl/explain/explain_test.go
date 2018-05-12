@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -56,7 +57,7 @@ func TestSplitAndParseResourceRequest(t *testing.T) {
 		},
 	}
 
-	mapper := scheme.Registry.RESTMapper(scheme.Versions...)
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	for _, test := range tests {
 		gotInResource, gotFieldsPath, err := SplitAndParseResourceRequest(test.inresource, mapper)
 		if err != nil {

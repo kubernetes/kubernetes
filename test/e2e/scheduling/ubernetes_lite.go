@@ -32,6 +32,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = SIGDescribe("Multi-AZ Clusters", func() {
@@ -91,7 +92,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			Containers: []v1.Container{
 				{
 					Name:  "test",
-					Image: framework.GetPauseImageName(f.ClientSet),
+					Image: imageutils.GetPauseImageName(),
 				},
 			},
 		},
@@ -223,7 +224,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, controller.Name); err != nil {
+		if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, controller.Name); err != nil {
 			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()

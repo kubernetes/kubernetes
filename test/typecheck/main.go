@@ -24,6 +24,7 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -60,6 +61,8 @@ var (
 		"linux/arm64", "linux/ppc64le",
 		"linux/s390x", "darwin/386",
 	}
+	darwinPlatString  = "darwin/386,darwin/amd64"
+	windowsPlatString = "windows/386,windows/amd64"
 )
 
 type analyzer struct {
@@ -69,6 +72,7 @@ type analyzer struct {
 	failed    bool
 	platform  string
 	donePaths map[string]interface{}
+	errors    []string
 }
 
 func newAnalyzer(platform string) *analyzer {
@@ -120,9 +124,17 @@ func (a *analyzer) handleError(err error) {
 			return
 		}
 	}
-	// TODO(rmmh): dedup errors across platforms?
-	fmt.Fprintf(os.Stderr, "%sERROR(%s) %s\n", logPrefix, a.platform, err)
+	a.errors = append(a.errors, err.Error())
+	if *serial {
+		fmt.Fprintf(os.Stderr, "%sERROR(%s) %s\n", logPrefix, a.platform, err)
+	}
 	a.failed = true
+}
+
+func (a *analyzer) dumpAndResetErrors() []string {
+	es := a.errors
+	a.errors = nil
+	return es
 }
 
 // collect extracts test metadata from a file.
@@ -262,6 +274,51 @@ func (c *collector) handlePath(path string, info os.FileInfo, err error) error {
 	return nil
 }
 
+type analyzerResult struct {
+	platform string
+	dir      string
+	errors   []string
+}
+
+func dedupeErrors(out io.Writer, results chan analyzerResult, nDirs, nPlatforms int) {
+	pkgRes := make(map[string][]analyzerResult)
+	for done := 0; done < nDirs; {
+		res := <-results
+		pkgRes[res.dir] = append(pkgRes[res.dir], res)
+		if len(pkgRes[res.dir]) != nPlatforms {
+			continue // expect more results for dir
+		}
+		done++
+		// Collect list of platforms for each error
+		errPlats := map[string][]string{}
+		for _, res := range pkgRes[res.dir] {
+			for _, err := range res.errors {
+				errPlats[err] = append(errPlats[err], res.platform)
+			}
+		}
+		// Print each error (in the same order!) once.
+		for _, res := range pkgRes[res.dir] {
+			for _, err := range res.errors {
+				if errPlats[err] == nil {
+					continue // already printed
+				}
+				sort.Strings(errPlats[err])
+				plats := strings.Join(errPlats[err], ",")
+				if len(errPlats[err]) == len(crossPlatforms) {
+					plats = "all"
+				} else if plats == darwinPlatString {
+					plats = "darwin"
+				} else if plats == windowsPlatString {
+					plats = "windows"
+				}
+				fmt.Fprintf(out, "%sERROR(%s) %s\n", logPrefix, plats, err)
+				delete(errPlats, err)
+			}
+		}
+		delete(pkgRes, res.dir)
+	}
+}
+
 func main() {
 	flag.Parse()
 	args := flag.Args()
@@ -296,6 +353,15 @@ func main() {
 	var processedDirs int64
 	var currentWork int64 // (dir_index << 8) | platform_index
 	statuses := make([]int, len(ps))
+	var results chan analyzerResult
+	if !*serial {
+		results = make(chan analyzerResult)
+		wg.Add(1)
+		go func() {
+			dedupeErrors(os.Stderr, results, len(c.dirs), len(ps))
+			wg.Done()
+		}()
+	}
 	for i, p := range ps {
 		wg.Add(1)
 		fn := func(i int, p string) {
@@ -305,6 +371,9 @@ func main() {
 				a.collect(dir)
 				atomic.AddInt64(&processedDirs, 1)
 				atomic.StoreInt64(&currentWork, int64(n<<8|i))
+				if results != nil {
+					results <- analyzerResult{p, dir, a.dumpAndResetErrors()}
+				}
 			}
 			if a.failed {
 				statuses[i] = 1

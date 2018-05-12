@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server"
 	. "k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
@@ -55,7 +54,6 @@ func setUp(t *testing.T) Config {
 	codecs := serializer.NewCodecFactory(scheme)
 
 	config := NewConfig(codecs)
-	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 
 	return *config
 }
@@ -497,7 +495,7 @@ NextTest:
 				return
 			}
 
-			s, err := config.Complete(nil).New("test", server.EmptyDelegate)
+			s, err := config.Complete(nil).New("test", server.NewEmptyDelegate())
 			if err != nil {
 				t.Errorf("%q - failed creating the server: %v", title, err)
 				return

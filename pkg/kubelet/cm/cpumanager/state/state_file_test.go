@@ -18,7 +18,6 @@ package state
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -69,9 +68,6 @@ func stderrCapture(t *testing.T, f func() State) (bytes.Buffer, State) {
 }
 
 func TestFileStateTryRestore(t *testing.T) {
-	flag.Set("alsologtostderr", "true")
-	flag.Parse()
-
 	testCases := []struct {
 		description      string
 		stateFileContent string
@@ -292,9 +288,6 @@ func TestFileStateTryRestorePanic(t *testing.T) {
 }
 
 func TestUpdateStateFile(t *testing.T) {
-	flag.Set("alsologtostderr", "true")
-	flag.Parse()
-
 	testCases := []struct {
 		description   string
 		expErr        string

@@ -44,7 +44,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 
@@ -754,7 +753,7 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 	for {
 		response, err := s.ec2.DescribeInstances(request)
 		if err != nil {
-			recordAwsMetric("describe_instance", 0, err)
+			recordAWSMetric("describe_instance", 0, err)
 			return nil, fmt.Errorf("error listing AWS instances: %q", err)
 		}
 
@@ -769,7 +768,7 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 		request.NextToken = nextToken
 	}
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("describe_instance", timeTaken, nil)
+	recordAWSMetric("describe_instance", timeTaken, nil)
 	return results, nil
 }
 
@@ -787,7 +786,7 @@ func (s *awsSdkEC2) AttachVolume(request *ec2.AttachVolumeInput) (*ec2.VolumeAtt
 	requestTime := time.Now()
 	resp, err := s.ec2.AttachVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("attach_volume", timeTaken, err)
+	recordAWSMetric("attach_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -795,7 +794,7 @@ func (s *awsSdkEC2) DetachVolume(request *ec2.DetachVolumeInput) (*ec2.VolumeAtt
 	requestTime := time.Now()
 	resp, err := s.ec2.DetachVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("detach_volume", timeTaken, err)
+	recordAWSMetric("detach_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -808,7 +807,7 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 		response, err := s.ec2.DescribeVolumes(request)
 
 		if err != nil {
-			recordAwsMetric("describe_volume", 0, err)
+			recordAWSMetric("describe_volume", 0, err)
 			return nil, err
 		}
 
@@ -821,7 +820,7 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 		request.NextToken = nextToken
 	}
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("describe_volume", timeTaken, nil)
+	recordAWSMetric("describe_volume", timeTaken, nil)
 	return results, nil
 }
 
@@ -829,7 +828,7 @@ func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (*ec2.Volume, e
 	requestTime := time.Now()
 	resp, err := s.ec2.CreateVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("create_volume", timeTaken, err)
+	recordAWSMetric("create_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -837,7 +836,7 @@ func (s *awsSdkEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (*ec2.DeleteVol
 	requestTime := time.Now()
 	resp, err := s.ec2.DeleteVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("delete_volume", timeTaken, err)
+	recordAWSMetric("delete_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -845,7 +844,7 @@ func (s *awsSdkEC2) ModifyVolume(request *ec2.ModifyVolumeInput) (*ec2.ModifyVol
 	requestTime := time.Now()
 	resp, err := s.ec2.ModifyVolume(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("modify_volume", timeTaken, err)
+	recordAWSMetric("modify_volume", timeTaken, err)
 	return resp, err
 }
 
@@ -856,7 +855,7 @@ func (s *awsSdkEC2) DescribeVolumeModifications(request *ec2.DescribeVolumesModi
 	for {
 		resp, err := s.ec2.DescribeVolumesModifications(request)
 		if err != nil {
-			recordAwsMetric("describe_volume_modification", 0, err)
+			recordAWSMetric("describe_volume_modification", 0, err)
 			return nil, fmt.Errorf("error listing volume modifictions : %v", err)
 		}
 		results = append(results, resp.VolumesModifications...)
@@ -867,7 +866,7 @@ func (s *awsSdkEC2) DescribeVolumeModifications(request *ec2.DescribeVolumesModi
 		request.NextToken = nextToken
 	}
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("describe_volume_modification", timeTaken, nil)
+	recordAWSMetric("describe_volume_modification", timeTaken, nil)
 	return results, nil
 }
 
@@ -900,7 +899,7 @@ func (s *awsSdkEC2) CreateTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOut
 	requestTime := time.Now()
 	resp, err := s.ec2.CreateTags(request)
 	timeTaken := time.Since(requestTime).Seconds()
-	recordAwsMetric("create_tags", timeTaken, err)
+	recordAWSMetric("create_tags", timeTaken, err)
 	return resp, err
 }
 
@@ -1147,7 +1146,7 @@ func (c *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
 	c.kubeClient = clientBuilder.ClientOrDie("aws-cloud-provider")
 	c.eventBroadcaster = record.NewBroadcaster()
 	c.eventBroadcaster.StartLogging(glog.Infof)
-	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(c.kubeClient.CoreV1().RESTClient()).Events("")})
+	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.kubeClient.CoreV1().Events("")})
 	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "aws-cloud-provider"})
 }
 
@@ -1318,24 +1317,6 @@ func (c *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 	return extractNodeAddresses(instance)
 }
 
-// ExternalID returns the cloud provider ID of the node with the specified nodeName (deprecated).
-func (c *Cloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	if c.selfAWSInstance.nodeName == nodeName {
-		// We assume that if this is run on the instance itself, the instance exists and is alive
-		return c.selfAWSInstance.awsID, nil
-	}
-	// We must verify that the instance still exists
-	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-	instance, err := c.findInstanceByNodeName(nodeName)
-	if err != nil {
-		return "", err
-	}
-	if instance == nil {
-		return "", cloudprovider.InstanceNotFound
-	}
-	return aws.StringValue(instance.InstanceId), nil
-}
-
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
@@ -1366,6 +1347,11 @@ func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 	}
 
 	return true, nil
+}
+
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (c *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified nodeName.
@@ -3697,7 +3683,11 @@ func findSecurityGroupForInstance(instance *ec2.Instance, taggedSecurityGroups m
 		// We create instances with one SG
 		// If users create multiple SGs, they must tag one of them as being k8s owned
 		if len(tagged) != 1 {
-			return nil, fmt.Errorf("Multiple tagged security groups found for instance %s; ensure only the k8s security group is tagged", instanceID)
+			taggedGroups := ""
+			for _, v := range tagged {
+				taggedGroups += fmt.Sprintf("%s(%s) ", *v.GroupId, *v.GroupName)
+			}
+			return nil, fmt.Errorf("Multiple tagged security groups found for instance %s; ensure only the k8s security group is tagged; the tagged groups were %v", instanceID, taggedGroups)
 		}
 		return tagged[0], nil
 	}
@@ -4341,13 +4331,4 @@ func setNodeDisk(
 		nodeDiskMap[nodeName] = volumeMap
 	}
 	volumeMap[volumeID] = check
-}
-
-func recordAwsMetric(actionName string, timeTaken float64, err error) {
-	if err != nil {
-		awsApiErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
-	} else {
-		awsApiMetric.With(prometheus.Labels{"request": actionName}).Observe(timeTaken)
-	}
-
 }

@@ -80,8 +80,6 @@ type crdHandler struct {
 	// which is suited for most read and rarely write cases
 	customStorage atomic.Value
 
-	requestContextMapper apirequest.RequestContextMapper
-
 	crdLister listers.CustomResourceDefinitionLister
 
 	delegate          http.Handler
@@ -109,7 +107,6 @@ type crdStorageMap map[types.UID]*crdInfo
 func NewCustomResourceDefinitionHandler(
 	versionDiscoveryHandler *versionDiscoveryHandler,
 	groupDiscoveryHandler *groupDiscoveryHandler,
-	requestContextMapper apirequest.RequestContextMapper,
 	crdInformer informers.CustomResourceDefinitionInformer,
 	delegate http.Handler,
 	restOptionsGetter generic.RESTOptionsGetter,
@@ -118,7 +115,6 @@ func NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
 		customStorage:           atomic.Value{},
-		requestContextMapper:    requestContextMapper,
 		crdLister:               crdInformer.Lister(),
 		delegate:                delegate,
 		restOptionsGetter:       restOptionsGetter,
@@ -138,11 +134,7 @@ func NewCustomResourceDefinitionHandler(
 }
 
 func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx, ok := r.requestContextMapper.Get(req)
-	if !ok {
-		responsewriters.InternalError(w, req, fmt.Errorf("no context found for request"))
-		return
-	}
+	ctx := req.Context()
 	requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 	if !ok {
 		responsewriters.InternalError(w, req, fmt.Errorf("no RequestInfo found in the context"))
@@ -240,11 +232,11 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
 			return nil
 		}
-		return handlers.CreateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
+		return handlers.CreateResource(storage, requestScope, r.admission)
 	case "update":
-		return handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
+		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
-		return handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
+		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	case "delete":
 		allowsOptions := true
 		return handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
@@ -265,9 +257,9 @@ func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, reque
 	case "get":
 		return handlers.GetResource(storage, nil, requestScope)
 	case "update":
-		return handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
+		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
-		return handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
+		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
 		http.Error(w, fmt.Sprintf("unhandled verb %q", requestInfo.Verb), http.StatusMethodNotAllowed)
 		return nil
@@ -282,9 +274,9 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 	case "get":
 		return handlers.GetResource(storage, nil, requestScope)
 	case "update":
-		return handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
+		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
-		return handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
+		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
 		http.Error(w, fmt.Sprintf("unhandled verb %q", requestInfo.Verb), http.StatusMethodNotAllowed)
 		return nil
@@ -393,7 +385,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Status.AcceptedNames.Kind}
 	typer := UnstructuredObjectTyper{
 		Delegate:          parameterScheme,
-		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(nil),
+		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(),
 	}
 	creator := unstructuredCreator{}
 
@@ -457,22 +449,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 	clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
 
-	var ctxFn handlers.ContextFunc
-	ctxFn = func(req *http.Request) apirequest.Context {
-		ret, _ := r.requestContextMapper.Get(req)
-		return ret
-	}
-
 	requestScope := handlers.RequestScope{
 		Namer: handlers.ContextBasedNaming{
-			GetContext:         ctxFn,
 			SelfLinker:         meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,
 			SelfLinkPathPrefix: selfLinkPrefix,
-		},
-		ContextFunc: func(req *http.Request) apirequest.Context {
-			ret, _ := r.requestContextMapper.Get(req)
-			return ret
 		},
 
 		Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator},
@@ -511,7 +492,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	ret.scaleRequestScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme())
 	ret.scaleRequestScope.Kind = autoscalingv1.SchemeGroupVersion.WithKind("Scale")
 	ret.scaleRequestScope.Namer = handlers.ContextBasedNaming{
-		GetContext:         ctxFn,
 		SelfLinker:         meta.NewAccessor(),
 		ClusterScoped:      clusterScoped,
 		SelfLinkPathPrefix: selfLinkPrefix,
@@ -521,7 +501,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	// override status subresource values
 	ret.statusRequestScope.Subresource = "status"
 	ret.statusRequestScope.Namer = handlers.ContextBasedNaming{
-		GetContext:         ctxFn,
 		SelfLinker:         meta.NewAccessor(),
 		ClusterScoped:      clusterScoped,
 		SelfLinkPathPrefix: selfLinkPrefix,

@@ -38,6 +38,7 @@ import (
 // 1. If a request is not from a node (NodeIdentity() returns isNode=false), reject
 // 2. If a specific node cannot be identified (NodeIdentity() returns nodeName=""), reject
 // 3. If a request is for a secret, configmap, persistent volume or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
+//    node <- configmap
 //    node <- pod
 //    node <- pod <- secret
 //    node <- pod <- configmap
@@ -209,6 +210,11 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 	startingVertex, exists := r.graph.getVertex_rlocked(startingType, startingNamespace, startingName)
 	if !exists {
 		return false, fmt.Errorf("node %q cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+	}
+
+	// Fast check to see if we know of a destination edge
+	if r.graph.destinationEdgeIndex[startingVertex.ID()].has(nodeVertex.ID()) {
+		return true, nil
 	}
 
 	found := false

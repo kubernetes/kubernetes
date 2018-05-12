@@ -1,5 +1,15 @@
 # GENERATED FILE. Use with Kubernetes 1.7+
 # TO UPDATE, modify files in install/kubernetes/templates and run install/updateVersion.sh
+#
+# Required for Istio as k8s addon.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+  labels:
+    istio-injection: enabled
+    addonmanager.kubernetes.io/mode: Reconcile
+--
 ################################
 # Istio system namespace
 ################################
@@ -290,7 +300,7 @@ spec:
       serviceAccountName: istio-mixer-service-account
       containers:
       - name: statsd-to-prometheus
-        image: prom/statsd-exporter:v0.5.0
+        image: gcr.io/istio-release/statsd-exporter:v0.5.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9102
@@ -302,7 +312,7 @@ spec:
         - name: config-volume
           mountPath: /etc/statsd
       - name: mixer
-        image: gcr.io/istio-release/mixer:0.5.1
+        image: gcr.io/istio-release/mixer:0.6.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9091
@@ -317,7 +327,7 @@ spec:
           - -v
           - "2"
       - name: istio-proxy
-        image: gcr.io/istio-release/proxy:0.5.1
+        image: gcr.io/istio-release/proxy:0.6.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 15004
@@ -596,6 +606,25 @@ spec:
 kind: CustomResourceDefinition
 apiVersion: apiextensions.k8s.io/v1beta1
 metadata:
+  name: solarwindses.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    package: solarwinds
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: solarwinds
+    plural: solarwindses
+    singular: solarwinds
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
   name: stackdrivers.config.istio.io
   labels:
     k8s-app: istio
@@ -653,7 +682,7 @@ spec:
 kind: CustomResourceDefinition
 apiVersion: apiextensions.k8s.io/v1beta1
 metadata:
-  name: apikeies.config.istio.io
+  name: apikeys.config.istio.io
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
@@ -663,7 +692,7 @@ spec:
   group: config.istio.io
   names:
     kind: apikey
-    plural: apikeies
+    plural: apikeys
     singular: apikey
   scope: Namespaced
   version: v1alpha2
@@ -1339,16 +1368,16 @@ spec:
   attribute_bindings:
     # Fill the new attributes from the adapter produced output.
     # $out refers to an instance of OutputTemplate message
-    source.ip: $out.source_pod_ip
-    source.labels: $out.source_labels
-    source.namespace: $out.source_namespace
-    source.service: $out.source_service
-    source.serviceAccount: $out.source_service_account_name
-    destination.ip: $out.destination_pod_ip
-    destination.labels: $out.destination_labels
-    destination.namespace: $out.destination_namespace
-    destination.service: $out.destination_service
-    destination.serviceAccount: $out.destination_service_account_name
+    source.ip: $out.source_pod_ip | ip("0.0.0.0")
+    source.labels: $out.source_labels | emptyStringMap()
+    source.namespace: $out.source_namespace | "default"
+    source.service: $out.source_service | "unknown"
+    source.serviceAccount: $out.source_service_account_name | "unknown"
+    destination.ip: $out.destination_pod_ip | ip("0.0.0.0")
+    destination.labels: $out.destination_labels | emptyStringMap()
+    destination.namespace: $out.destination_namespace | "default"
+    destination.service: $out.destination_service | "unknown"
+    destination.serviceAccount: $out.destination_service_account_name | "unknown"
 ---
 ################################
 # Istio configMap cluster-wide
@@ -1378,8 +1407,9 @@ data:
     enableTracing: true
     #
     # To disable the mixer completely (including metrics), comment out
-    # the following line
-    mixerAddress: istio-mixer.istio-system:15004
+    # the following lines
+    mixerCheckServer: istio-mixer.istio-system:15004
+    mixerReportServer: istio-mixer.istio-system:15004
     # This is the ingress service name, update if you used a different name
     ingressService: istio-ingress
     #
@@ -1486,6 +1516,57 @@ spec:
   scope: Namespaced
   version: v1alpha2
 ---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: v1alpha2routerules.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: config.istio.io
+  names:
+    kind: V1alpha2RouteRule
+    listKind: V1alpha2RouteRuleList
+    plural: v1alpha2routerules
+    singular: v1alpha2routerule
+  scope: Namespaced
+  version: v1alpha2
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: destinationrules.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: config.istio.io
+  names:
+    kind: DestinationRule
+    listKind: DestinationRuleList
+    plural: destinationrules
+    singular: destinationrule
+  scope: Namespaced
+  version: v1alpha2
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: externalservices.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: config.istio.io
+  names:
+    kind: ExternalService
+    listKind: ExternalServiceList
+    plural: externalservices
+    singular: externalservice
+  scope: Namespaced
+  version: v1alpha2
+---
 # Pilot service for discovery
 apiVersion: v1
 kind: Service
@@ -1538,7 +1619,7 @@ spec:
       serviceAccountName: istio-pilot-service-account
       containers:
       - name: discovery
-        image: gcr.io/istio-release/pilot:0.5.1
+        image: gcr.io/istio-release/pilot:0.6.0
         imagePullPolicy: IfNotPresent
         args: ["discovery", "-v", "2", "--admission-service", "istio-pilot"]
         ports:
@@ -1555,11 +1636,13 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.namespace
+        - name: PILOT_THROTTLE
+          value: "200"
         volumeMounts:
         - name: config-volume
           mountPath: /etc/istio/config
       - name: istio-proxy
-        image: gcr.io/istio-release/proxy:0.5.1
+        image: gcr.io/istio-release/proxy:0.6.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 15003
@@ -1639,7 +1722,7 @@ spec:
       serviceAccountName: istio-ingress-service-account
       containers:
       - name: istio-ingress
-        image: gcr.io/istio-release/proxy:0.5.1
+        image: gcr.io/istio-release/proxy:0.6.0
         args:
         - proxy
         - ingress
@@ -1731,7 +1814,7 @@ spec:
       serviceAccountName: istio-ca-service-account
       containers:
       - name: istio-ca
-        image: gcr.io/istio-release/istio-ca:0.5.1
+        image: gcr.io/istio-release/istio-ca:0.6.0
         imagePullPolicy: IfNotPresent
         command: ["/usr/local/bin/istio_ca"]
         args:
@@ -1776,21 +1859,16 @@ spec:
       annotations:
         sidecar.istio.io/inject: "false"
     spec:
+      serviceAccountName: grafana
       containers:
       - name: grafana
-        image: gcr.io/istio-release/grafana:0.5.1
+        image: gcr.io/istio-release/grafana:0.6.0
         imagePullPolicy: IfNotPresent
         ports:
           - containerPort: 3000
         env:
-        - name: GRAFANA_PORT
-          value: "3000"
-        - name: GF_AUTH_BASIC_ENABLED
-          value: "false"
-        - name: GF_AUTH_ANONYMOUS_ENABLED
-          value: "true"
-        - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-          value: Admin
+          # Only put environment related config here. Generic Istio config
+          # should go in addons/grafana/grafana.ini.
         - name: GF_PATHS_DATA
           value: /data/grafana
         volumeMounts:
@@ -1799,6 +1877,15 @@ spec:
       volumes:
       - name: grafana-data
         emptyDir: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
 ---
 ---
 apiVersion: v1
@@ -2032,7 +2119,7 @@ spec:
       serviceAccountName: prometheus
       containers:
       - name: prometheus
-        image: docker.io/prom/prometheus:v2.0.0
+        image: gcr.io/istio-release/prom/prometheus:v2.0.0
         imagePullPolicy: IfNotPresent
         args:
           - '--storage.tsdb.retention=6h'
@@ -2071,6 +2158,7 @@ rules:
   - services
   - endpoints
   - pods
+  - nodes/proxy
   verbs: ["get", "list", "watch"]
 - apiGroups: [""]
   resources:
@@ -2114,7 +2202,7 @@ spec:
     spec:
       containers:
       - name: servicegraph
-        image: gcr.io/istio-release/servicegraph:0.5.1
+        image: gcr.io/istio-release/servicegraph:0.6.0
         imagePullPolicy: IfNotPresent
         ports:
           - containerPort: 8088
@@ -2156,7 +2244,7 @@ spec:
     spec:
       containers:
       - name: zipkin
-        image: docker.io/openzipkin/zipkin:latest
+        image: gcr.io/istio-release/zipkin:2.5.3
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9411

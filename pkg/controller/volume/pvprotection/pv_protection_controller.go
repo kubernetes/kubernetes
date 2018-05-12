@@ -45,13 +45,17 @@ type Controller struct {
 	pvListerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
+
+	// allows overriding of StorageObjectInUseProtection feature Enabled/Disabled for testing
+	storageObjectInUseProtectionEnabled bool
 }
 
 // NewPVProtectionController returns a new *Controller.
-func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) *Controller {
+func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
 	e := &Controller{
 		client: cl,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvprotection"),
+		storageObjectInUseProtectionEnabled: storageObjectInUseProtectionFeatureEnabled,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("persistentvolume_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
@@ -119,7 +123,7 @@ func (c *Controller) processPV(pvName string) error {
 	glog.V(4).Infof("Processing PV %s", pvName)
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Since(startTime))
 	}()
 
 	pv, err := c.pvLister.Get(pvName)
@@ -151,6 +155,10 @@ func (c *Controller) processPV(pvName string) error {
 }
 
 func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
+	// Skip adding Finalizer in case the StorageObjectInUseProtection feature is not enabled
+	if !c.storageObjectInUseProtectionEnabled {
+		return nil
+	}
 	pvClone := pv.DeepCopy()
 	pvClone.ObjectMeta.Finalizers = append(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumes().Update(pvClone)

@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -109,6 +108,9 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 		break
 	default:
 		panic(fmt.Errorf("invalid target: " + target))
+	}
+	if strings.HasSuffix(dnsName, "in-addr.arpa") || strings.HasSuffix(dnsName, "in-addr.arpa.") {
+		cmd = append(cmd, []string{"-t", "ptr"}...)
 	}
 	cmd = append(cmd, dnsName)
 
@@ -266,8 +268,8 @@ func generateDNSServerPod(aRecords map[string]string) *v1.Pod {
 	return pod
 }
 
-func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
-	t.dnsServerPod = generateDNSServerPod(aRecords)
+func (t *dnsTestCommon) createDNSPodFromObj(pod *v1.Pod) {
+	t.dnsServerPod = pod
 
 	var err error
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(t.dnsServerPod)
@@ -278,6 +280,40 @@ func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Get(
 		t.dnsServerPod.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
+	t.createDNSPodFromObj(generateDNSServerPod(aRecords))
+}
+
+func (t *dnsTestCommon) createDNSServerWithPtrRecord() {
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "e2e-dns-configmap-dns-server-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "dns",
+					Image: imageutils.GetE2EImage(imageutils.DNSMasq),
+					Command: []string{
+						"/usr/sbin/dnsmasq",
+						"-u", "root",
+						"-k",
+						"--log-facility", "-",
+						"--host-record=my.test,192.0.2.123",
+						"-q",
+					},
+				},
+			},
+			DNSPolicy: "Default",
+		},
+	}
+
+	t.createDNSPodFromObj(pod)
 }
 
 func (t *dnsTestCommon) deleteDNSServerPod() {
@@ -292,7 +328,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, servic
 	dnsPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "dns-test-" + string(uuid.NewUUID()),

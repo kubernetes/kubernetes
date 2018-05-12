@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/term"
 )
@@ -145,7 +146,7 @@ func TestPodAndContainer(t *testing.T) {
 
 			cmd := &cobra.Command{}
 			options := test.p
-			options.Err = bytes.NewBuffer([]byte{})
+			options.ErrOut = bytes.NewBuffer([]byte{})
 			err := options.Complete(tf, cmd, test.args, test.argsLenAtDash)
 			if test.expectError && err == nil {
 				t.Errorf("%s: unexpected non-error", test.name)
@@ -195,7 +196,7 @@ func TestExec(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -206,7 +207,6 @@ func TestExec(t *testing.T) {
 						body := objBody(codec, test.pod)
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 					default:
-						// Ensures no GET is performed when deleting by name
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
 					}
@@ -214,9 +214,6 @@ func TestExec(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
-			bufOut := bytes.NewBuffer([]byte{})
-			bufErr := bytes.NewBuffer([]byte{})
-			bufIn := bytes.NewBuffer([]byte{})
 			ex := &fakeRemoteExecutor{}
 			if test.execErr {
 				ex.execErr = fmt.Errorf("exec error")
@@ -225,9 +222,7 @@ func TestExec(t *testing.T) {
 				StreamOptions: StreamOptions{
 					PodName:       "foo",
 					ContainerName: "bar",
-					In:            bufIn,
-					Out:           bufOut,
-					Err:           bufErr,
+					IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
 				},
 				Executor: ex,
 			}
@@ -278,16 +273,14 @@ func execPod() *api.Pod {
 }
 
 func TestSetupTTY(t *testing.T) {
-	stderr := &bytes.Buffer{}
+	streams, _, _, stderr := genericclioptions.NewTestIOStreams()
 
 	// test 1 - don't attach stdin
 	o := &StreamOptions{
 		// InterruptParent: ,
-		Stdin: false,
-		In:    &bytes.Buffer{},
-		Out:   &bytes.Buffer{},
-		Err:   stderr,
-		TTY:   true,
+		Stdin:     false,
+		IOStreams: streams,
+		TTY:       true,
 	}
 
 	tty := o.setupTTY()
@@ -335,7 +328,7 @@ func TestSetupTTY(t *testing.T) {
 	// test 3 - request a TTY, but stdin is not a terminal
 	o.Stdin = true
 	o.In = &bytes.Buffer{}
-	o.Err = stderr
+	o.ErrOut = stderr
 	o.TTY = true
 
 	tty = o.setupTTY()

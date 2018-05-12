@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,19 +31,19 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 		name           string
 		deploymentName string
 		images         []string
-		expected       *extensionsv1beta1.Deployment
+		expected       *appsv1.Deployment
 		expectErr      bool
 	}{
 		{
 			name:           "deployment name and images ok",
 			deploymentName: "images-name-ok",
-			images:         []string{"nn/image1", "registry/nn/image2", "nn/image3:tag", "nn/image4@digest"},
-			expected: &extensionsv1beta1.Deployment{
+			images:         []string{"nn/image1", "registry/nn/image2", "nn/image3:tag", "nn/image4@digest", "nn/image5@sha256:digest"},
+			expected: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "images-name-ok",
 					Labels: map[string]string{"app": "images-name-ok"},
 				},
-				Spec: extensionsv1beta1.DeploymentSpec{
+				Spec: appsv1.DeploymentSpec{
 					Replicas: &one,
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "images-name-ok"},
@@ -58,6 +58,7 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 								{Name: "image2", Image: "registry/nn/image2"},
 								{Name: "image3", Image: "nn/image3:tag"},
 								{Name: "image4", Image: "nn/image4@digest"},
+								{Name: "image5", Image: "nn/image5@sha256:digest"},
 							},
 						},
 					},
@@ -82,7 +83,7 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		generator := &DeploymentBasicGeneratorV1{
+		generator := &DeploymentBasicAppsGeneratorV1{
 			BaseDeploymentGenerator{
 				Name:   test.deploymentName,
 				Images: test.images,
@@ -95,8 +96,8 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*extensionsv1beta1.Deployment), test.expected) {
-			t.Errorf("test: %v\nexpected:\n%#v\nsaw:\n%#v", test.name, test.expected, obj.(*extensionsv1beta1.Deployment))
+		if !reflect.DeepEqual(obj.(*appsv1.Deployment), test.expected) {
+			t.Errorf("test: %v\nexpected:\n%#v\nsaw:\n%#v", test.name, test.expected, obj.(*appsv1.Deployment))
 		}
 	}
 }

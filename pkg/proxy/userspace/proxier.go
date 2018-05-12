@@ -447,7 +447,7 @@ func (proxier *Proxier) mergeService(service *api.Service) sets.String {
 		info.portal.port = int(servicePort.Port)
 		info.externalIPs = service.Spec.ExternalIPs
 		// Deep-copy in case the service instance changes
-		info.loadBalancerStatus = *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
+		info.loadBalancerStatus = *service.Status.LoadBalancer.DeepCopy()
 		info.nodePort = int(servicePort.NodePort)
 		info.sessionAffinityType = service.Spec.SessionAffinity
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
@@ -1095,7 +1095,7 @@ func (proxier *Proxier) iptablesHostNodePortArgs(nodePort int, protocol api.Prot
 // Build a slice of iptables args for an from-non-local public-port rule.
 func (proxier *Proxier) iptablesNonLocalNodePortArgs(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := iptablesCommonPortalArgs(nil, false, false, proxyPort, protocol, service)
-	args = append(args, "-m", "comment", "--comment", service.String(), "-m", "state", "--state", "NEW", "-j", "ACCEPT")
+	args = append(args, "-m", "state", "--state", "NEW", "-j", "ACCEPT")
 	return args
 }
 

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -87,7 +88,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 	}
 
 	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil)
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, legacyscheme.Registry.RESTMapper(), nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme), nil)
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)
@@ -101,6 +102,9 @@ func TestGCAdmission(t *testing.T) {
 		return err == nil
 	}
 	expectCantSetOwnerRefError := func(err error) bool {
+		if err == nil {
+			return false
+		}
 		return strings.Contains(err.Error(), "cannot set an ownerRef on a resource you can't delete")
 	}
 	tests := []struct {
@@ -139,7 +143,7 @@ func TestGCAdmission(t *testing.T) {
 			username:   "non-deleter",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
 			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
-			checkError: expectCantSetOwnerRefError,
+			checkError: expectNoError,
 		},
 		{
 			name:       "non-pod-deleter, create, no objectref change",
@@ -153,7 +157,7 @@ func TestGCAdmission(t *testing.T) {
 			username:   "non-pod-deleter",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
 			newObj:     &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
-			checkError: expectCantSetOwnerRefError,
+			checkError: expectNoError,
 		},
 		{
 			name:       "non-pod-deleter, create, objectref change, but not a pod",
@@ -253,32 +257,34 @@ func TestGCAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 	}
-	gcAdmit, err := newGCPermissionsEnforcement()
-	if err != nil {
-		t.Error(err)
-	}
 
 	for _, tc := range tests {
-		operation := admission.Create
-		if tc.oldObj != nil {
-			operation = admission.Update
-		}
-		user := &user.DefaultInfo{Name: tc.username}
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
+		t.Run(tc.name, func(t *testing.T) {
+			gcAdmit, err := newGCPermissionsEnforcement()
+			if err != nil {
+				t.Error(err)
+			}
 
-		err := gcAdmit.Validate(attributes)
-		if !tc.checkError(err) {
-			t.Errorf("%v: unexpected err: %v", tc.name, err)
-		}
+			operation := admission.Create
+			if tc.oldObj != nil {
+				operation = admission.Update
+			}
+			user := &user.DefaultInfo{Name: tc.username}
+			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
+
+			err = gcAdmit.Validate(attributes)
+			if !tc.checkError(err) {
+				t.Errorf("unexpected err: %v", err)
+			}
+		})
 	}
 }
 
 func TestBlockOwnerDeletionAdmission(t *testing.T) {
 	podWithOwnerRefs := func(refs ...metav1.OwnerReference) *api.Pod {
 		var refSlice []metav1.OwnerReference
-		for _, ref := range refs {
-			refSlice = append(refSlice, ref)
-		}
+		refSlice = append(refSlice, refs...)
+
 		return &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				OwnerReferences: refSlice,

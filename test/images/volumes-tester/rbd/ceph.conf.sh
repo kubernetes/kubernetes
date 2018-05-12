@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -29,8 +29,12 @@ host = cephbox
 mon addr = $1
 
 [osd]
-osd journal size = 128 
+osd journal size = 128
 journal dio = false
+
+# allow running on ext4
+osd max object name len = 256
+osd max object namespace len = 64
 
 [osd.0]
 osd host = cephbox

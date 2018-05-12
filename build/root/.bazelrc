@@ -15,6 +15,7 @@ build --sandbox_tmpfs_path=/tmp
 build --sandbox_fake_username
 
 # Enable go race detection.
+build:unit --features=race
 test:unit --features=race
 test:unit --test_tag_filters=-e2e,-integration
 test:unit --flaky_test_attempts=3

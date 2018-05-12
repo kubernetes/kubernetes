@@ -81,6 +81,32 @@ func TestNewDeployment(t *testing.T) {
 	if newRS.Annotations[v1.LastAppliedConfigAnnotation] != "" {
 		t.Errorf("expected new ReplicaSet last-applied annotation not copied from Deployment %s", tester.deployment.Name)
 	}
+
+	// New RS should contain pod-template-hash in its selector, label, and template label
+	rsHash, err := checkRSHashLabels(newRS)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// All pods targeted by the deployment should contain pod-template-hash in their labels
+	selector, err := metav1.LabelSelectorAsSelector(tester.deployment.Spec.Selector)
+	if err != nil {
+		t.Fatalf("failed to parse deployment %s selector: %v", name, err)
+	}
+	pods, err := c.CoreV1().Pods(ns.Name).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		t.Fatalf("failed to list pods of deployment %s: %v", name, err)
+	}
+	if len(pods.Items) != int(replicas) {
+		t.Errorf("expected %d pods, got %d pods", replicas, len(pods.Items))
+	}
+	podHash, err := checkPodsHashLabel(pods)
+	if err != nil {
+		t.Error(err)
+	}
+	if rsHash != podHash {
+		t.Errorf("found mismatching pod-template-hash value: rs hash = %s whereas pod hash = %s", rsHash, podHash)
+	}
 }
 
 // Deployments should support roll out, roll back, and roll over
@@ -652,104 +678,6 @@ func checkPodsHashLabel(pods *v1.PodList) (string, error) {
 		}
 	}
 	return hash, nil
-}
-
-// Deployment should label adopted ReplicaSets and Pods.
-func TestDeploymentLabelAdopted(t *testing.T) {
-	s, closeFn, rm, dc, informers, c := dcSetup(t)
-	defer closeFn()
-	name := "test-adopted-deployment"
-	ns := framework.CreateTestingNamespace(name, s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
-
-	// Create a RS to be adopted by the deployment.
-	rsName := "test-adopted-controller"
-	replicas := int32(1)
-	rs := newReplicaSet(rsName, ns.Name, replicas)
-	_, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Create(rs)
-	if err != nil {
-		t.Fatalf("failed to create replicaset %s: %v", rsName, err)
-	}
-	// Mark RS pods as ready.
-	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
-	if err != nil {
-		t.Fatalf("failed to parse replicaset %s selector: %v", rsName, err)
-	}
-	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		pods, err := c.CoreV1().Pods(ns.Name).List(metav1.ListOptions{LabelSelector: selector.String()})
-		if err != nil {
-			return false, err
-		}
-		if len(pods.Items) != int(replicas) {
-			return false, nil
-		}
-		for _, pod := range pods.Items {
-			if err = markPodReady(c, ns.Name, &pod); err != nil {
-				return false, nil
-			}
-		}
-		return true, nil
-	}); err != nil {
-		t.Fatalf("failed to mark pods replicaset %s as ready: %v", rsName, err)
-	}
-
-	// Create a Deployment to adopt the old rs.
-	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
-	if tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment); err != nil {
-		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
-	}
-
-	// Wait for the Deployment to be updated to revision 1
-	if err = tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
-		t.Fatal(err)
-	}
-
-	// The RS and pods should be relabeled after the Deployment finishes adopting it and completes.
-	if err := tester.waitForDeploymentComplete(); err != nil {
-		t.Fatal(err)
-	}
-
-	// There should be no old RSes (overlapping RS)
-	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(tester.deployment, c.ExtensionsV1beta1())
-	if err != nil {
-		t.Fatalf("failed to get all replicasets owned by deployment %s: %v", name, err)
-	}
-	if len(oldRSs) != 0 || len(allOldRSs) != 0 {
-		t.Errorf("expected deployment to have no old replicasets, got %d old replicasets", len(allOldRSs))
-	}
-
-	// New RS should be relabeled, i.e. contain pod-template-hash in its selector, label, and template label
-	rsHash, err := checkRSHashLabels(newRS)
-	if err != nil {
-		t.Error(err)
-	}
-
-	// All pods targeted by the deployment should contain pod-template-hash in their labels, and there should be only 3 pods
-	selector, err = metav1.LabelSelectorAsSelector(tester.deployment.Spec.Selector)
-	if err != nil {
-		t.Fatalf("failed to parse deployment %s selector: %v", name, err)
-	}
-	pods, err := c.CoreV1().Pods(ns.Name).List(metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil {
-		t.Fatalf("failed to list pods of deployment %s: %v", name, err)
-	}
-	if len(pods.Items) != int(replicas) {
-		t.Errorf("expected %d pods, got %d pods", replicas, len(pods.Items))
-	}
-	podHash, err := checkPodsHashLabel(pods)
-	if err != nil {
-		t.Error(err)
-	}
-	if rsHash != podHash {
-		t.Errorf("found mismatching pod-template-hash value: rs hash = %s whereas pod hash = %s", rsHash, podHash)
-	}
 }
 
 // Deployment should have a timeout condition when it fails to progress after given deadline.

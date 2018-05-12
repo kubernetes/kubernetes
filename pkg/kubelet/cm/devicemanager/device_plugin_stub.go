@@ -17,13 +17,14 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
 	"path"
+	"sync"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
@@ -35,6 +36,7 @@ type Stub struct {
 	socket string
 
 	stop   chan interface{}
+	wg     sync.WaitGroup
 	update chan []*pluginapi.Device
 
 	server *grpc.Server
@@ -70,7 +72,8 @@ func (m *Stub) SetAllocFunc(f stubAllocFunc) {
 	m.allocFunc = f
 }
 
-// Start starts the gRPC server of the device plugin
+// Start starts the gRPC server of the device plugin. Can only
+// be called once.
 func (m *Stub) Start() error {
 	err := m.cleanup()
 	if err != nil {
@@ -82,10 +85,14 @@ func (m *Stub) Start() error {
 		return err
 	}
 
+	m.wg.Add(1)
 	m.server = grpc.NewServer([]grpc.ServerOption{}...)
 	pluginapi.RegisterDevicePluginServer(m.server, m)
 
-	go m.server.Serve(sock)
+	go func() {
+		defer m.wg.Done()
+		m.server.Serve(sock)
+	}()
 	_, conn, err := dial(m.socket)
 	if err != nil {
 		return err
@@ -96,18 +103,27 @@ func (m *Stub) Start() error {
 	return nil
 }
 
-// Stop stops the gRPC server
+// Stop stops the gRPC server. Can be called without a prior Start
+// and more than once. Not safe to be called concurrently by different
+// goroutines!
 func (m *Stub) Stop() error {
+	if m.server == nil {
+		return nil
+	}
 	m.server.Stop()
-	close(m.stop)
+	m.wg.Wait()
+	m.server = nil
+	close(m.stop) // This prevents re-starting the server.
 
 	return m.cleanup()
 }
 
 // Register registers the device plugin for the given resourceName with Kubelet.
 func (m *Stub) Register(kubeletEndpoint, resourceName string, preStartContainerFlag bool) error {
-	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithInsecure(), grpc.WithBlock(),
-		grpc.WithTimeout(10*time.Second),
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, kubeletEndpoint, grpc.WithInsecure(), grpc.WithBlock(),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
 		}))

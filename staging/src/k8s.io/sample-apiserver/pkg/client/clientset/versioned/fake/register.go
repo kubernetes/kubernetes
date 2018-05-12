@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 )
 
 var scheme = runtime.NewScheme()
@@ -51,4 +52,5 @@ func init() {
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
 	wardlev1alpha1.AddToScheme(scheme)
+	wardlev1beta1.AddToScheme(scheme)
 }

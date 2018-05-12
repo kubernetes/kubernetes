@@ -17,13 +17,14 @@ limitations under the License.
 package set
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"path"
 	"strings"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -40,7 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -60,19 +62,29 @@ func TestResourcesLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdResources(tf, buf, buf)
+	outputFormat := "name"
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdResources(tf, streams)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
-		Out:               buf,
+	opts := SetResourcesOptions{
+		PrintFlags: &printers.PrintFlags{
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+			NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+
+			OutputFormat: &outputFormat,
+		},
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",
 		Requests:          "cpu=200m,memory=512Mi",
-		ContainerSelector: "*"}
+		ContainerSelector: "*",
+		IOStreams:         streams,
+	}
 
 	err := opts.Complete(tf, cmd, []string{})
 	if err == nil {
@@ -105,19 +117,29 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdResources(tf, buf, buf)
+	outputFormat := "name"
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdResources(tf, streams)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
-		Out:               buf,
+	opts := SetResourcesOptions{
+		PrintFlags: &printers.PrintFlags{
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+			NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+
+			OutputFormat: &outputFormat,
+		},
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",
 		Requests:          "cpu=200m,memory=512Mi",
-		ContainerSelector: "*"}
+		ContainerSelector: "*",
+		IOStreams:         streams,
+	}
 
 	err := opts.Complete(tf, cmd, []string{})
 	if err == nil {
@@ -478,14 +500,24 @@ func TestSetResourcesRemote(t *testing.T) {
 				}),
 				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 			}
-			buf := new(bytes.Buffer)
-			cmd := NewCmdResources(tf, buf, buf)
-			cmd.SetOutput(buf)
-			cmd.Flags().Set("output", "yaml")
-			opts := ResourcesOptions{
-				Out:               buf,
+
+			outputFormat := "yaml"
+
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			cmd := NewCmdResources(tf, streams)
+			cmd.Flags().Set("output", outputFormat)
+			opts := SetResourcesOptions{
+				PrintFlags: &printers.PrintFlags{
+					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+					NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+
+					OutputFormat: &outputFormat,
+				},
+
 				Limits:            "cpu=200m,memory=512Mi",
-				ContainerSelector: "*"}
+				ContainerSelector: "*",
+				IOStreams:         streams,
+			}
 			err := opts.Complete(tf, cmd, input.args)
 			if err == nil {
 				err = opts.Validate()

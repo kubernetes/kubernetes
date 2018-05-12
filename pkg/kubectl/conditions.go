@@ -26,11 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
-	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 )
@@ -96,30 +94,6 @@ func StatefulSetHasDesiredReplicas(ssClient appsclient.StatefulSetsGetter, ss *a
 		// StatefulSet, but till then concurrent stop operations on the same StatefulSet might have
 		// unintended side effects.
 		return ss.Status.ObservedGeneration != nil && *ss.Status.ObservedGeneration >= desiredGeneration && ss.Status.Replicas == ss.Spec.Replicas, nil
-	}
-}
-
-// JobHasDesiredParallelism returns a condition that will be true if the desired parallelism count
-// for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
-func JobHasDesiredParallelism(jobClient batchclient.JobsGetter, job *batch.Job) wait.ConditionFunc {
-	return func() (bool, error) {
-		job, err := jobClient.Jobs(job.Namespace).Get(job.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		// desired parallelism can be either the exact number, in which case return immediately
-		if job.Status.Active == *job.Spec.Parallelism {
-			return true, nil
-		}
-		if job.Spec.Completions == nil {
-			// A job without specified completions needs to wait for Active to reach Parallelism.
-			return false, nil
-		}
-
-		// otherwise count successful
-		progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
-		return progress == 0, nil
 	}
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"net"
 	"reflect"
 	"strings"
@@ -64,12 +65,16 @@ type serviceStorage struct {
 	Err                error
 }
 
-func (s *serviceStorage) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (s *serviceStorage) NamespaceScoped() bool {
+	return true
+}
+
+func (s *serviceStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	s.GottenID = name
 	return s.Service, s.Err
 }
 
-func (s *serviceStorage) GetService(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
+func (s *serviceStorage) GetService(ctx context.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
 	return s.Service, s.Err
 }
 
@@ -77,7 +82,7 @@ func (s *serviceStorage) NewList() runtime.Object {
 	panic("not implemented")
 }
 
-func (s *serviceStorage) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (s *serviceStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
 
 	// Copy metadata from internal list into result
@@ -102,7 +107,7 @@ func (s *serviceStorage) New() runtime.Object {
 	panic("not implemented")
 }
 
-func (s *serviceStorage) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	svc := obj.(*api.Service)
 	s.CreatedID = obj.(metav1.Object).GetName()
 	s.Service = svc.DeepCopy()
@@ -115,7 +120,7 @@ func (s *serviceStorage) Create(ctx genericapirequest.Context, obj runtime.Objec
 	return svc, s.Err
 }
 
-func (s *serviceStorage) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	s.UpdatedID = name
 	obj, err := objInfo.UpdatedObject(ctx, s.OldService)
 	if err != nil {
@@ -125,24 +130,24 @@ func (s *serviceStorage) Update(ctx genericapirequest.Context, name string, objI
 	return s.Service, s.Created, s.Err
 }
 
-func (s *serviceStorage) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (s *serviceStorage) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	s.DeletedID = name
 	return s.Service, s.DeletedImmediately, s.Err
 }
 
-func (s *serviceStorage) DeleteCollection(ctx genericapirequest.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (s *serviceStorage) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	panic("not implemented")
 }
 
-func (s *serviceStorage) Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *serviceStorage) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	panic("not implemented")
 }
 
-func (s *serviceStorage) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (s *serviceStorage) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	panic("not implemented")
 }
 
-func (s *serviceStorage) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+func (s *serviceStorage) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	panic("not implemented")
 }
 
@@ -207,7 +212,7 @@ func makeIPNet(t *testing.T) *net.IPNet {
 	return net
 }
 
-func releaseServiceNodePorts(t *testing.T, ctx genericapirequest.Context, svcName string, rest *REST, registry ServiceStorage) {
+func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, rest *REST, registry ServiceStorage) {
 	obj, err := registry.Get(ctx, svcName, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)

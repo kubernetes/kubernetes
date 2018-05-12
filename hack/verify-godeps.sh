@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -35,7 +35,7 @@ kube::util::ensure_godep_version
 
 if [[ -z ${TMP_GOPATH:-} ]]; then
   # Create a nice clean place to put our new godeps
-  _tmpdir="$(mktemp -d -t gopath.XXXXXX)"
+  _tmpdir="$(kube::realpath $(mktemp -d -t gopath.XXXXXX))"
 else
   # reuse what we might have saved previously
   _tmpdir="${TMP_GOPATH}"
@@ -64,8 +64,9 @@ _kubetmp="${_kubetmp}/kubernetes"
 
 # Do all our work in the new GOPATH
 export GOPATH="${_tmpdir}"
+export PATH="${GOPATH}/bin:${PATH}"
 
-pushd "${_kubetmp}" 2>&1 > /dev/null
+pushd "${_kubetmp}" > /dev/null 2>&1
   # Restore the Godeps into our temp directory
   hack/godep-restore.sh
 
@@ -78,11 +79,11 @@ pushd "${_kubetmp}" 2>&1 > /dev/null
 
   # Recreate the Godeps using the nice clean set we just downloaded
   hack/godep-save.sh
-popd 2>&1 > /dev/null
+popd > /dev/null 2>&1
 
 ret=0
 
-pushd "${KUBE_ROOT}" 2>&1 > /dev/null
+pushd "${KUBE_ROOT}" > /dev/null 2>&1
   # Test for diffs
   if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
     echo "Your Godeps.json is different:" >&2
@@ -117,9 +118,9 @@ pushd "${KUBE_ROOT}" 2>&1 > /dev/null
     fi
     ret=1
   fi
-popd 2>&1 > /dev/null
+popd > /dev/null 2>&1
 
-if [[ ${ret} > 0 ]]; then
+if [[ ${ret} -gt 0 ]]; then
   exit ${ret}
 fi
 

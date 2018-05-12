@@ -135,7 +135,7 @@ func NewAttachDetachController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
@@ -522,6 +522,10 @@ func (adc *attachDetachController) GetVolumeDevicePluginDir(podUID string) strin
 	return ""
 }
 
+func (adc *attachDetachController) GetPodsDir() string {
+	return ""
+}
+
 func (adc *attachDetachController) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
 	return ""
 }
@@ -606,4 +610,8 @@ func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
 
 func (adc *attachDetachController) GetNodeName() types.NodeName {
 	return ""
+}
+
+func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
+	return adc.recorder
 }

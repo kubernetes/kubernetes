@@ -3414,17 +3414,21 @@
    },
    "v1.NodeSelectorTerm": {
     "id": "v1.NodeSelectorTerm",
-    "description": "A null or empty node selector term matches no objects.",
-    "required": [
-     "matchExpressions"
-    ],
+    "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed.",
     "properties": {
      "matchExpressions": {
       "type": "array",
       "items": {
        "$ref": "v1.NodeSelectorRequirement"
       },
-      "description": "Required. A list of node selector requirements. The requirements are ANDed."
+      "description": "A list of node selector requirements by node's labels."
+     },
+     "matchFields": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorRequirement"
+      },
+      "description": "A list of node selector requirements by node's fields."
      }
     }
    },

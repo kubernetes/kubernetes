@@ -20,14 +20,14 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -150,27 +150,36 @@ func (a *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 
 func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
 	var err error
-	lun, err := strconv.Atoi(devicePath)
-	if err != nil {
-		return "", fmt.Errorf("azureDisk - Wait for attach expect device path as a lun number, instead got: %s (%v)", devicePath, err)
-	}
 
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
+	diskController, err := getDiskController(a.plugin.host)
+	if err != nil {
+		return "", err
+	}
+
+	nodeName := types.NodeName(a.plugin.host.GetHostName())
+	diskName := volumeSource.DiskName
+
+	glog.V(5).Infof("azureDisk - WaitForAttach: begin to GetDiskLun by diskName(%s), DataDiskURI(%s), nodeName(%s), devicePath(%s)",
+		diskName, volumeSource.DataDiskURI, nodeName, devicePath)
+	lun, err := diskController.GetDiskLun(diskName, volumeSource.DataDiskURI, nodeName)
+	if err != nil {
+		return "", err
+	}
+	glog.V(5).Infof("azureDisk - WaitForAttach: GetDiskLun succeeded, got lun(%v)", lun)
 	exec := a.plugin.host.GetExec(a.plugin.GetPluginName())
 
 	io := &osIOHandler{}
 	scsiHostRescan(io, exec)
 
-	diskName := volumeSource.DiskName
-	nodeName := a.plugin.host.GetHostName()
 	newDevicePath := ""
 
 	err = wait.Poll(1*time.Second, timeout, func() (bool, error) {
-		if newDevicePath, err = findDiskByLun(lun, io, exec); err != nil {
+		if newDevicePath, err = findDiskByLun(int(lun), io, exec); err != nil {
 			return false, fmt.Errorf("azureDisk - WaitForAttach ticker failed node (%s) disk (%s) lun(%v) err(%s)", nodeName, diskName, lun, err)
 		}
 
@@ -200,7 +209,7 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 	}
 
 	if volumeSource.Kind == nil { // this spec was constructed from info on the node
-		pdPath := path.Join(a.plugin.host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, volumeSource.DataDiskURI)
+		pdPath := filepath.Join(a.plugin.host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, volumeSource.DataDiskURI)
 		return pdPath, nil
 	}
 

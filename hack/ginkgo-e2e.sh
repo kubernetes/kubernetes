@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -160,6 +160,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --node-tag="${NODE_TAG:-}" \
   --master-tag="${MASTER_TAG:-}" \
   --cluster-monitoring-mode="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}" \
+  --prometheus-monitoring="${KUBE_ENABLE_PROMETHEUS_MONITORING:-false}" \
   ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \

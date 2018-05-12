@@ -17,6 +17,7 @@ limitations under the License.
 package nodelifecycle
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -1360,6 +1361,118 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 	}
 }
 
+func TestCloudProviderNodeShutdown(t *testing.T) {
+
+	testCases := []struct {
+		testName string
+		node     *v1.Node
+		shutdown bool
+	}{
+		{
+			testName: "node shutdowned add taint",
+			shutdown: true,
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+		{
+			testName: "node started after shutdown remove taint",
+			shutdown: false,
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+					Taints: []v1.Taint{
+						{
+							Key:    algorithm.TaintNodeShutdown,
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			fnh := &testutil.FakeNodeHandler{
+				Existing:  []*v1.Node{tc.node},
+				Clientset: fake.NewSimpleClientset(),
+			}
+			nodeController, _ := newNodeLifecycleControllerFromClient(
+				nil,
+				fnh,
+				10*time.Minute,
+				testRateLimiterQPS,
+				testRateLimiterQPS,
+				testLargeClusterThreshold,
+				testUnhealthyThreshold,
+				testNodeMonitorGracePeriod,
+				testNodeStartupGracePeriod,
+				testNodeMonitorPeriod,
+				false)
+			nodeController.cloud = &fakecloud.FakeCloud{}
+			nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
+			nodeController.recorder = testutil.NewFakeRecorder()
+			nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
+				return tc.shutdown, nil
+			}
+
+			if err := nodeController.syncNodeStore(fnh); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err := nodeController.monitorNodeStatus(); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if len(fnh.UpdatedNodes) != 1 {
+				t.Errorf("Node was not updated")
+			}
+			if tc.shutdown {
+				if len(fnh.UpdatedNodes[0].Spec.Taints) != 1 {
+					t.Errorf("Node Taint was not added")
+				}
+				if fnh.UpdatedNodes[0].Spec.Taints[0].Key != "node.cloudprovider.kubernetes.io/shutdown" {
+					t.Errorf("Node Taint key is not correct")
+				}
+			} else {
+				if len(fnh.UpdatedNodes[0].Spec.Taints) != 0 {
+					t.Errorf("Node Taint was not removed after node is back in ready state")
+				}
+			}
+		})
+	}
+
+}
+
 // TestCloudProviderNoRateLimit tests that monitorNodes() immediately deletes
 // pods and the node when kubelet has not reported, and the cloudprovider says
 // the node is gone.
@@ -1402,6 +1515,9 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 	nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
 	nodeController.recorder = testutil.NewFakeRecorder()
 	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
+		return false, nil
+	}
+	nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
 		return false, nil
 	}
 	// monitorNodeStatus should allow this node to be immediately deleted
@@ -1543,9 +1659,6 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
-						},
 					},
 				},
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
@@ -1620,9 +1733,6 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 						},
 					},
-					Spec: v1.NodeSpec{
-						ExternalID: "node0",
-					},
 				},
 			},
 		},
@@ -1650,9 +1760,6 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
-						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
 						},
 					},
 				},
@@ -1755,9 +1862,6 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
-						},
 					},
 				},
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
@@ -1788,9 +1892,6 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
-						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
 						},
 					},
 				},
@@ -2208,9 +2309,6 @@ func TestNodeEventGeneration(t *testing.T) {
 					UID:               "1234567890",
 					CreationTimestamp: metav1.Date(2015, 8, 10, 0, 0, 0, 0, time.UTC),
 				},
-				Spec: v1.NodeSpec{
-					ExternalID: "node0",
-				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
@@ -2240,6 +2338,9 @@ func TestNodeEventGeneration(t *testing.T) {
 		false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
 	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
+		return false, nil
+	}
+	nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
 		return false, nil
 	}
 	nodeController.now = func() metav1.Time { return fakeNow }

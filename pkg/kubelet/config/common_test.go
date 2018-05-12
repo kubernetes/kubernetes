@@ -78,7 +78,7 @@ func TestDecodeSinglePod(t *testing.T) {
 		t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", pod, podOut, string(json))
 	}
 
-	for _, gv := range legacyscheme.Registry.EnabledVersionsForGroup(v1.GroupName) {
+	for _, gv := range legacyscheme.Scheme.PrioritizedVersionsForGroup(v1.GroupName) {
 		info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), "application/yaml")
 		encoder := legacyscheme.Codecs.EncoderForVersion(info.Serializer, gv)
 		yaml, err := runtime.Encode(encoder, pod)
@@ -144,7 +144,7 @@ func TestDecodePodList(t *testing.T) {
 		t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", podList, &podListOut, string(json))
 	}
 
-	for _, gv := range legacyscheme.Registry.EnabledVersionsForGroup(v1.GroupName) {
+	for _, gv := range legacyscheme.Scheme.PrioritizedVersionsForGroup(v1.GroupName) {
 		info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), "application/yaml")
 		encoder := legacyscheme.Codecs.EncoderForVersion(info.Serializer, gv)
 		yaml, err := runtime.Encode(encoder, podList)

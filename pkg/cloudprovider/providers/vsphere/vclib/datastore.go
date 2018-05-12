@@ -17,14 +17,15 @@ limitations under the License.
 package vclib
 
 import (
+	"context"
 	"fmt"
+
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 // Datastore extends the govmomi Datastore object

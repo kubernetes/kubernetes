@@ -58,7 +58,7 @@ func NewCertificateController(
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	cc := &CertificateController{
 		kubeClient: kubeClient,
@@ -169,7 +169,7 @@ func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 func (cc *CertificateController) syncFunc(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing certificate request %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing certificate request %q (%v)", key, time.Since(startTime))
 	}()
 	csr, err := cc.csrLister.Get(key)
 	if errors.IsNotFound(err) {

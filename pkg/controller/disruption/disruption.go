@@ -294,7 +294,7 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 
 	if dc.kubeClient != nil {
 		glog.Infof("Sending events to api server.")
-		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(dc.kubeClient.CoreV1().RESTClient()).Events("")})
+		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.kubeClient.CoreV1().Events("")})
 	} else {
 		glog.Infof("No api server defined - no events will be sent to API server.")
 	}
@@ -471,7 +471,7 @@ func (dc *DisruptionController) processNextRecheckWorkItem() bool {
 func (dc *DisruptionController) sync(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing PodDisruptionBudget %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing PodDisruptionBudget %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)

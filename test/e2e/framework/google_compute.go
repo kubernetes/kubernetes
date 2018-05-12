@@ -35,8 +35,12 @@ func lookupClusterImageSources() (string, string, error) {
 	gcloudf := func(argv ...string) ([]string, error) {
 		args := []string{"compute"}
 		args = append(args, argv...)
-		args = append(args, "--project", TestContext.CloudConfig.ProjectID,
-			"--zone", TestContext.CloudConfig.Zone)
+		args = append(args, "--project", TestContext.CloudConfig.ProjectID)
+		if TestContext.CloudConfig.MultiMaster {
+			args = append(args, "--region", TestContext.CloudConfig.Region)
+		} else {
+			args = append(args, "--zone", TestContext.CloudConfig.Zone)
+		}
 		outputBytes, err := exec.Command("gcloud", args...).CombinedOutput()
 		str := strings.Replace(string(outputBytes), ",", "\n", -1)
 		str = strings.Replace(str, ";", "\n", -1)

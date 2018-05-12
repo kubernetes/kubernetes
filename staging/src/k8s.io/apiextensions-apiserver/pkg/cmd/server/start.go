@@ -51,7 +51,7 @@ func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomRes
 		StdErr: errOut,
 	}
 
-	// the shared informer is not needed for kube-aggregator. Disable the kubeconfig flag and the client creation.
+	// the shared informer is not needed for apiextentions apiserver. Disable the kubeconfig flag and the client creation.
 	o.RecommendedOptions.CoreAPI = nil
 
 	return o
@@ -86,7 +86,7 @@ func NewCommandStartCustomResourceDefinitionsServer(out, errOut io.Writer, stopC
 func (o CustomResourceDefinitionsServerOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
-	errors = append(errors, o.APIEnablement.Validate(apiserver.Registry)...)
+	errors = append(errors, o.APIEnablement.Validate(apiserver.Scheme)...)
 	return utilerrors.NewAggregate(errors)
 }
 
@@ -104,7 +104,7 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
 		return nil, err
 	}
-	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Registry); err != nil {
+	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Scheme); err != nil {
 		return nil, err
 	}
 
@@ -137,7 +137,7 @@ func (o CustomResourceDefinitionsServerOptions) RunCustomResourceDefinitionsServ
 		return err
 	}
 
-	server, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	server, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return err
 	}

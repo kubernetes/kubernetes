@@ -18,12 +18,12 @@ package metrics
 
 import (
 	"bufio"
-	//"fmt"
 	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -32,6 +32,13 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+// resettableCollector is the interface implemented by prometheus.MetricVec
+// that can be used by Prometheus to collect metrics and reset their values.
+type resettableCollector interface {
+	prometheus.Collector
+	Reset()
+}
 
 var (
 	// TODO(a-robinson): Add unit tests for the handling of these metrics once
@@ -96,6 +103,16 @@ var (
 		[]string{"requestKind"},
 	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
+
+	metrics = []resettableCollector{
+		requestCounter,
+		longRunningRequestGauge,
+		requestLatencies,
+		requestLatenciesSummary,
+		responseSizes,
+		DroppedRequests,
+		currentInflightRequests,
+	}
 )
 
 const (
@@ -105,15 +122,22 @@ const (
 	MutatingKind = "mutating"
 )
 
-func init() {
-	// Register all metrics.
-	prometheus.MustRegister(requestCounter)
-	prometheus.MustRegister(longRunningRequestGauge)
-	prometheus.MustRegister(requestLatencies)
-	prometheus.MustRegister(requestLatenciesSummary)
-	prometheus.MustRegister(responseSizes)
-	prometheus.MustRegister(DroppedRequests)
-	prometheus.MustRegister(currentInflightRequests)
+var registerMetrics sync.Once
+
+// Register all metrics.
+func Register() {
+	registerMetrics.Do(func() {
+		for _, metric := range metrics {
+			prometheus.MustRegister(metric)
+		}
+	})
+}
+
+// Reset all metrics.
+func Reset() {
+	for _, metric := range metrics {
+		metric.Reset()
+	}
 }
 
 func UpdateInflightRequestMetrics(nonmutating, mutating int) {
@@ -170,13 +194,6 @@ func MonitorRequest(req *http.Request, verb, resource, subresource, scope, conte
 	}
 }
 
-func Reset() {
-	requestCounter.Reset()
-	requestLatencies.Reset()
-	requestLatenciesSummary.Reset()
-	responseSizes.Reset()
-}
-
 // InstrumentRouteFunc works like Prometheus' InstrumentHandlerFunc but wraps
 // the go-restful RouteFunction instead of a HandlerFunc plus some Kubernetes endpoint specific information.
 func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc restful.RouteFunction) restful.RouteFunction {
@@ -198,7 +215,7 @@ func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc re
 
 		routeFunc(request, response)
 
-		MonitorRequest(request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Now().Sub(now))
+		MonitorRequest(request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
 	})
 }
 
@@ -220,7 +237,7 @@ func InstrumentHandlerFunc(verb, resource, subresource, scope string, handler ht
 
 		handler(w, req)
 
-		MonitorRequest(req, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Now().Sub(now))
+		MonitorRequest(req, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
 	}
 }
 

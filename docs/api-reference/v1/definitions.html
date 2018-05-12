@@ -403,9 +403,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <p><a href="#_v1_node">v1.Node</a></p>
 </li>
 <li>
-<p><a href="#_v1_nodeconfigsource">v1.NodeConfigSource</a></p>
-</li>
-<li>
 <p><a href="#_v1_nodelist">v1.NodeList</a></p>
 </li>
 <li>
@@ -3663,6 +3660,68 @@ Examples:<br>
 
 </div>
 <div class="sect2">
+<h3 id="_v1_configmapnodeconfigsource">v1.ConfigMapNodeConfigSource</h3>
+<div class="paragraph">
+<p>ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Namespace is the metadata.namespace of the referenced ConfigMap. This field is required in all cases.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name is the metadata.name of the referenced ConfigMap. This field is required in all cases.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UID is the metadata.UID of the referenced ConfigMap. This field is currently reqired in Node.Spec.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap. This field is forbidden in Node.Spec.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">kubeletConfigKey</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">KubeletConfigKey declares which key of the referenced ConfigMap corresponds to the KubeletConfiguration structure This field is required in all cases.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_endpointport">v1.EndpointPort</h3>
 <div class="paragraph">
 <p>EndpointPort is a tuple that describes a single port.</p>
@@ -5830,24 +5889,10 @@ Examples:<br>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds">https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">configMap</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ConfigMap is a reference to a Node&#8217;s ConfigMap</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">apiVersion</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="https://git.k8s.io/community/contributors/devel/api-conventions.md#resources">https://git.k8s.io/community/contributors/devel/api-conventions.md#resources</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">configMapRef</p></td>
-<td class="tableblock halign-left valign-top"></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectreference">v1.ObjectReference</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_configmapnodeconfigsource">v1.ConfigMapNodeConfigSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -6457,7 +6502,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_nodeselectorterm">v1.NodeSelectorTerm</h3>
 <div class="paragraph">
-<p>A null or empty node selector term matches no objects.</p>
+<p>A null or empty node selector term matches no objects. The requirements of them are ANDed.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6479,8 +6524,15 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">matchExpressions</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Required. A list of node selector requirements. The requirements are ANDed.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A list of node selector requirements by node&#8217;s labels.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_nodeselectorrequirement">v1.NodeSelectorRequirement</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">matchFields</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A list of node selector requirements by node&#8217;s fields.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_nodeselectorrequirement">v1.NodeSelectorRequirement</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -6491,7 +6543,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_localvolumesource">v1.LocalVolumeSource</h3>
 <div class="paragraph">
-<p>Local represents directly-attached storage with node affinity</p>
+<p>Local represents directly-attached storage with node affinity (Beta feature)</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6513,7 +6565,7 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The full path to the volume on the node For alpha, this path must be a directory Once block as a source is supported, then this path can point to a block device</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The full path to the volume on the node. It can be either a directory or block device (disk, partition, &#8230;). Directories can be represented only by PersistentVolume with VolumeMode=Filesystem. Block devices can be represented only by VolumeMode=Block, which also requires the BlockVolume alpha feature gate to be enabled.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -11385,13 +11437,6 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">externalID</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">providerID</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">ID of the node assigned by the cloud provider in the format: &lt;ProviderName&gt;://&lt;ProviderSpecificNodeID&gt;</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -11417,6 +11462,13 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">If specified, the source to get node configuration from The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_nodeconfigsource">v1.NodeConfigSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">externalID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deprecated. Not all kubelets will set this field. Remove field after 1.13. see: <a href="https://issues.k8s.io/61966">https://issues.k8s.io/61966</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>

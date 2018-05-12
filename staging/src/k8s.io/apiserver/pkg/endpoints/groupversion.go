@@ -22,14 +22,13 @@ import (
 
 	"github.com/emicklei/go-restful"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
@@ -56,7 +55,8 @@ type APIGroupVersion struct {
 	// version (for when the inevitable meta/v2 group emerges).
 	MetaGroupVersion *schema.GroupVersion
 
-	Mapper meta.RESTMapper
+	// RootScopedKinds are the root scoped kinds for the primary GroupVersion
+	RootScopedKinds sets.String
 
 	// Serializer is used to determine how to convert responses from API methods into bytes to send over
 	// the wire.
@@ -70,8 +70,7 @@ type APIGroupVersion struct {
 	Linker          runtime.SelfLinker
 	UnsafeConvertor runtime.ObjectConvertor
 
-	Admit   admission.Interface
-	Context request.RequestContextMapper
+	Admit admission.Interface
 
 	MinRequestTimeout time.Duration
 
@@ -93,7 +92,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	}
 
 	apiResources, ws, registrationErrors := installer.Install()
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources}, g.Context)
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
 	return utilerrors.NewAggregate(registrationErrors)

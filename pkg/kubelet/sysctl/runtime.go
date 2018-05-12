@@ -31,7 +31,6 @@ const (
 	dockerMinimumAPIVersion = "1.24.0"
 
 	dockerTypeName = "docker"
-	rktTypeName    = "rkt"
 )
 
 // TODO: The admission logic in this file is runtime-dependent. It should be
@@ -70,14 +69,6 @@ func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, er
 				Admit:   false,
 				Reason:  UnsupportedReason,
 				Message: "Docker API version before 1.24 does not support sysctls",
-			},
-		}, nil
-	case rktTypeName:
-		return &runtimeAdmitHandler{
-			result: lifecycle.PodAdmitResult{
-				Admit:   false,
-				Reason:  UnsupportedReason,
-				Message: "Rkt does not support sysctls",
 			},
 		}, nil
 	default:

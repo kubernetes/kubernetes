@@ -25,6 +25,8 @@ import (
 	"path"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -40,7 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -77,22 +80,32 @@ func TestSetServiceAccountLocal(t *testing.T) {
 					return nil, nil
 				}),
 			}
+
+			outputFormat := "yaml"
+
 			tf.Namespace = "test"
-			out := new(bytes.Buffer)
-			cmd := NewCmdServiceAccount(tf, out, out)
-			cmd.SetOutput(out)
-			cmd.Flags().Set("output", "yaml")
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdServiceAccount(tf, streams)
+			cmd.Flags().Set("output", outputFormat)
 			cmd.Flags().Set("local", "true")
 			testapi.Default = testapi.Groups[input.apiGroup]
-			saConfig := serviceAccountConfig{fileNameOptions: resource.FilenameOptions{
-				Filenames: []string{input.yaml}},
-				out:   out,
-				local: true}
+			saConfig := SetServiceAccountOptions{
+				PrintFlags: &printers.PrintFlags{
+					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+					NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+
+					OutputFormat: &outputFormat,
+				},
+				fileNameOptions: resource.FilenameOptions{
+					Filenames: []string{input.yaml}},
+				local:     true,
+				IOStreams: streams,
+			}
 			err := saConfig.Complete(tf, cmd, []string{serviceAccount})
 			assert.NoError(t, err)
 			err = saConfig.Run()
 			assert.NoError(t, err)
-			assert.Contains(t, out.String(), "serviceAccountName: "+serviceAccount, fmt.Sprintf("serviceaccount not updated for %s", input.yaml))
+			assert.Contains(t, buf.String(), "serviceAccountName: "+serviceAccount, fmt.Sprintf("serviceaccount not updated for %s", input.yaml))
 		})
 	}
 }
@@ -114,15 +127,24 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdServiceAccount(tf, buf, buf)
-	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
+	outputFormat := "name"
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdServiceAccount(tf, streams)
+	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
-	opts := serviceAccountConfig{fileNameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
-		out:   buf,
-		local: true}
+	opts := SetServiceAccountOptions{
+		PrintFlags: &printers.PrintFlags{
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+			NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+
+			OutputFormat: &outputFormat,
+		},
+		fileNameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
+		local:     true,
+		IOStreams: streams,
+	}
 
 	err := opts.Complete(tf, cmd, []string{serviceAccount})
 	if err == nil {
@@ -349,13 +371,23 @@ func TestSetServiceAccountRemote(t *testing.T) {
 				}),
 				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 			}
-			out := new(bytes.Buffer)
-			cmd := NewCmdServiceAccount(tf, out, out)
-			cmd.SetOutput(out)
-			cmd.Flags().Set("output", "yaml")
-			saConfig := serviceAccountConfig{
-				out:   out,
-				local: false}
+
+			outputFormat := "yaml"
+
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			cmd := NewCmdServiceAccount(tf, streams)
+			cmd.Flags().Set("output", outputFormat)
+			saConfig := SetServiceAccountOptions{
+				PrintFlags: &printers.PrintFlags{
+					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+					NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+
+					OutputFormat: &outputFormat,
+				},
+
+				local:     false,
+				IOStreams: streams,
+			}
 			err := saConfig.Complete(tf, cmd, input.args)
 			assert.NoError(t, err)
 			err = saConfig.Run()
@@ -385,12 +417,22 @@ func TestServiceAccountValidation(t *testing.T) {
 					return nil, nil
 				}),
 			}
-			tf.Namespace = "test"
-			out := bytes.NewBuffer([]byte{})
-			cmd := NewCmdServiceAccount(tf, out, out)
-			cmd.SetOutput(out)
 
-			saConfig := &serviceAccountConfig{}
+			outputFormat := ""
+
+			tf.Namespace = "test"
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			cmd := NewCmdServiceAccount(tf, streams)
+
+			saConfig := &SetServiceAccountOptions{
+				PrintFlags: &printers.PrintFlags{
+					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
+					NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+
+					OutputFormat: &outputFormat,
+				},
+				IOStreams: streams,
+			}
 			err := saConfig.Complete(tf, cmd, input.args)
 			assert.EqualError(t, err, input.errorString)
 		})

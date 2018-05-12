@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -40,7 +40,6 @@ ETCD_PORT=${ETCD_PORT:-2379}
 ETCD_PREFIX=${ETCD_PREFIX:-randomPrefix}
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
-KUBE_API_VERSIONS=""
 RUNTIME_CONFIG=""
 
 ETCDCTL=$(which etcdctl)
@@ -51,13 +50,12 @@ DISABLE_ADMISSION_PLUGINS="ServiceAccount,NamespaceLifecycle,LimitRanger,Mutatin
 function startApiServer() {
   local storage_versions=${1:-""}
   local storage_media_type=${2:-""}
-  kube::log::status "Starting kube-apiserver with KUBE_API_VERSIONS: ${KUBE_API_VERSIONS}"
-  kube::log::status "                        and storage-media-type: ${storage_media_type}"
-  kube::log::status "                            and runtime-config: ${RUNTIME_CONFIG}"
-  kube::log::status "                 and storage-version overrides: ${storage_versions}"
+  kube::log::status "Starting kube-apiserver with..."
+  kube::log::status "                        storage-media-type: ${storage_media_type}"
+  kube::log::status "                            runtime-config: ${RUNTIME_CONFIG}"
+  kube::log::status "                 storage-version overrides: ${storage_versions}"
 
-  KUBE_API_VERSIONS="${KUBE_API_VERSIONS}" \
-    "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+  "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
     --insecure-bind-address="${API_HOST}" \
     --bind-address="${API_HOST}" \
     --insecure-port="${API_PORT}" \
@@ -97,7 +95,6 @@ function cleanup() {
 trap cleanup EXIT SIGINT
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
-make -C "${KUBE_ROOT}" WHAT=cluster/images/etcd/attachlease
 
 kube::etcd::start
 echo "${ETCD_VERSION}" > "${ETCD_DIR}/version.txt"
@@ -106,11 +103,11 @@ echo "${ETCD_VERSION}" > "${ETCD_DIR}/version.txt"
 
 # source_file,resource,namespace,name,old_version,new_version
 tests=(
-examples/persistent-volume-provisioning/rbd/rbd-storage-class.yaml,storageclasses,,slow,v1beta1,v1
+test/e2e/testing-manifests/rbd-storage-class.yaml,storageclasses,,slow,v1beta1,v1
 )
 
 KUBE_OLD_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1beta1,extensions/v1beta1"
-KUBE_NEW_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1,extensions/v1beta1"
+KUBE_NEW_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1,extensions/v1beta1,policy/v1beta1"
 KUBE_OLD_STORAGE_VERSIONS="storage.k8s.io/v1beta1"
 KUBE_NEW_STORAGE_VERSIONS="storage.k8s.io/v1"
 
@@ -121,8 +118,7 @@ KUBE_NEW_STORAGE_VERSIONS="storage.k8s.io/v1"
 # but KUBE_OLD_API_VERSION is the latest (storage) version.
 # Additionally use KUBE_STORAGE_MEDIA_TYPE_JSON for storage encoding.
 #######################################################
-KUBE_API_VERSIONS="v1,${KUBE_OLD_API_VERSION},${KUBE_NEW_API_VERSION}"
-RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
+RUNTIME_CONFIG="api/all=false,api/v1=true,apiregistration.k8s.io/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
 startApiServer ${KUBE_OLD_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
 
@@ -156,8 +152,7 @@ killApiServer
 # Still use KUBE_STORAGE_MEDIA_TYPE_JSON for storage encoding.
 #######################################################
 
-KUBE_API_VERSIONS="v1,${KUBE_NEW_API_VERSION},${KUBE_OLD_API_VERSION}"
-RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
+RUNTIME_CONFIG="api/all=false,api/v1=true,apiregistration.k8s.io/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
 startApiServer ${KUBE_NEW_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
 # Update etcd objects, so that will now be stored in the new api version.
@@ -187,8 +182,7 @@ killApiServer
 # However, change storage encoding to KUBE_STORAGE_MEDIA_TYPE_PROTOBUF.
 #######################################################
 
-KUBE_API_VERSIONS="v1,${KUBE_NEW_API_VERSION}"
-RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_NEW_API_VERSION}=true"
+RUNTIME_CONFIG="api/all=false,api/v1=true,apiregistration.k8s.io/v1=true,${KUBE_NEW_API_VERSION}=true"
 
 # This seems to reduce flakiness.
 sleep 1

@@ -11,6 +11,7 @@ go_test(
     srcs = ["controller_history_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",

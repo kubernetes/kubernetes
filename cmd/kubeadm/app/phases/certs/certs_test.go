@@ -466,6 +466,7 @@ func TestUsingExternalCA(t *testing.T) {
 			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
 				CreatePKIAssets,
 				deleteCAKey,
+				deleteFrontProxyCAKey,
 			},
 			expected: true,
 		},
@@ -583,16 +584,17 @@ func TestValidateMethods(t *testing.T) {
 }
 
 func deleteCAKey(cfg *kubeadmapi.MasterConfiguration) error {
-	if err := os.Remove(filepath.Join(cfg.CertificatesDir, "ca.key")); err != nil {
-		return fmt.Errorf("failed removing ca.key: %v", err)
+	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
+		return fmt.Errorf("failed removing %s: %v", kubeadmconstants.CAKeyName, err)
 	}
 	return nil
 }
 
-func assertIsCa(t *testing.T, cert *x509.Certificate) {
-	if !cert.IsCA {
-		t.Error("cert is not a valida CA")
+func deleteFrontProxyCAKey(cfg *kubeadmapi.MasterConfiguration) error {
+	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
+		return fmt.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
 	}
+	return nil
 }
 
 func TestCreateCertificateFilesMethods(t *testing.T) {

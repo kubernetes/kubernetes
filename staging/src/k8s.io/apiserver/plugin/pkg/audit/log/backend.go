@@ -94,3 +94,7 @@ func (b *backend) Run(stopCh <-chan struct{}) error {
 func (b *backend) Shutdown() {
 	// Nothing to do here.
 }
+
+func (b *backend) String() string {
+	return PluginName
+}

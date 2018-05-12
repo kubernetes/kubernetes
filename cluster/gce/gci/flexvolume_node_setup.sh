@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -81,10 +81,10 @@ flex_clean() {
   umount_silent ${MOUNTER_PATH}
   rm -rf ${MOUNTER_PATH}
   
-  if [ -n ${IMAGE_URL:-} ]; then
+  if [[ -n ${IMAGE_URL:-} ]]; then
     docker rmi -f ${IMAGE_URL} &> /dev/null || /bin/true
   fi
-  if [ -n ${MOUNTER_DEFAULT_NAME:-} ]; then
+  if [[ -n ${MOUNTER_DEFAULT_NAME:-} ]]; then
     docker rm -f ${MOUNTER_DEFAULT_NAME} &> /dev/null || /bin/true
   fi
 }
@@ -119,7 +119,7 @@ generate_chroot_wrapper() {
 
       mkdir -p $wrapper_dir
       cat >$wrapper_path <<EOF
-#!/bin/bash
+#!/usr/bin/env bash
 chroot ${MOUNTER_PATH} ${driver_path} "\$@"
 EOF
 

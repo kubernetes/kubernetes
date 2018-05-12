@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -357,6 +358,7 @@ func TestPlugin(t *testing.T) {
 						FSType:       "ext4",
 					},
 				},
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
 			},
 		}, false),
 		root: tmpDir,
@@ -532,6 +534,9 @@ func TestGetDeviceMountPath(t *testing.T) {
 
 // https://github.com/kubernetes/kubernetes/issues/57744
 func TestConstructVolumeSpec(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skipf("TestConstructVolumeSpec is not supported on GOOS=%s", runtime.GOOS)
+	}
 	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)

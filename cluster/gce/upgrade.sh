@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -291,18 +291,17 @@ function upgrade-node-env() {
 # Note: This is called multiple times from do-node-upgrade() in parallel, so should be thread-safe.
 function do-single-node-upgrade() {
   local -r instance="$1"
-  instance_id=$(gcloud compute instances describe "${instance}" \
-    --format='get(id)' \
-    --project="${PROJECT}" \
-    --zone="${ZONE}" 2>&1) && describe_rc=$? || describe_rc=$?
-  if [[ "${describe_rc}" != 0 ]]; then
-    echo "== FAILED to describe ${instance} =="
-    echo "${instance_id}"
-    return ${describe_rc}
+  local kubectl_rc
+  local boot_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
+  if [[ "${kubectl_rc}" != 0 ]]; then
+    echo "== FAILED to get bootID ${instance} =="
+    echo "${boot_id}"
+    return ${kubectl_rc}
   fi
 
   # Drain node
   echo "== Draining ${instance}. == " >&2
+  local drain_rc
   "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-local-data --force --ignore-daemonsets "${instance}" \
     && drain_rc=$? || drain_rc=$?
   if [[ "${drain_rc}" != 0 ]]; then
@@ -312,7 +311,8 @@ function do-single-node-upgrade() {
 
   # Recreate instance
   echo "== Recreating instance ${instance}. ==" >&2
-  recreate=$(gcloud compute instance-groups managed recreate-instances "${group}" \
+  local recreate_rc
+  local recreate=$(gcloud compute instance-groups managed recreate-instances "${group}" \
     --project="${PROJECT}" \
     --zone="${ZONE}" \
     --instances="${instance}" 2>&1) && recreate_rc=$? || recreate_rc=$?
@@ -322,55 +322,31 @@ function do-single-node-upgrade() {
     return ${recreate_rc}
   fi
 
-  # Wait for instance to be recreated
-  echo "== Waiting for instance ${instance} to be recreated. ==" >&2
-  while true; do
-    new_instance_id=$(gcloud compute instances describe "${instance}" \
-      --format='get(id)' \
-      --project="${PROJECT}" \
-      --zone="${ZONE}" 2>&1) && describe_rc=$? || describe_rc=$?
-    if [[ "${describe_rc}" != 0 ]]; then
-      echo "== FAILED to describe ${instance} =="
-      echo "${new_instance_id}"
-      echo "  (Will retry.)"
-    elif [[ "${new_instance_id}" == "${instance_id}" ]]; then
-      echo -n .
-    else
-      echo "Instance ${instance} recreated."
-      break
-    fi
-    sleep 1
-  done
-
-  # Wait for k8s node object to reflect new instance id
+  # Wait for node status to reflect a new boot ID. This guarantees us
+  # that the node status in the API is from a different boot. This
+  # does not guarantee that the status is from the upgraded node, but
+  # it is a best effort approximation.
   echo "== Waiting for new node to be added to k8s.  ==" >&2
   while true; do
-    external_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.spec.externalID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
+    local new_boot_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
     if [[ "${kubectl_rc}" != 0 ]]; then
       echo "== FAILED to get node ${instance} =="
-      echo "${external_id}"
+      echo "${boot_id}"
       echo "  (Will retry.)"
-    elif [[ "${external_id}" == "${new_instance_id}" ]]; then
+    elif [[ "${boot_id}" != "${new_boot_id}" ]]; then
       echo "Node ${instance} recreated."
       break
-    elif [[ "${external_id}" == "${instance_id}" ]]; then
-      echo -n .
     else
-      echo "Unexpected external_id '${external_id}' matches neither old ('${instance_id}') nor new ('${new_instance_id}')."
-      echo "  (Will retry.)"
+      echo -n .
     fi
     sleep 1
   done
 
-  # Wait for the node to not have SchedulingDisabled=True and also to have
-  # Ready=True.
+  # Wait for the node to have Ready=True.
   echo "== Waiting for ${instance} to become ready. ==" >&2
   while true; do
-    cordoned=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "SchedulingDisabled")].status}')
-    ready=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "Ready")].status}')
-    if [[ "${cordoned}" == 'True' ]]; then
-      echo "Node ${instance} is still not ready: SchedulingDisabled=${ready}"
-    elif [[ "${ready}" != 'True' ]]; then
+    local ready=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "Ready")].status}')
+    if [[ "${ready}" != 'True' ]]; then
       echo "Node ${instance} is still not ready: Ready=${ready}"
     else
       echo "Node ${instance} Ready=${ready}"
@@ -378,6 +354,16 @@ function do-single-node-upgrade() {
     fi
     sleep 1
   done
+
+  # Uncordon the node.
+  echo "== Uncordon ${instance}. == " >&2
+  local uncordon_rc
+  "${KUBE_ROOT}/cluster/kubectl.sh" uncordon "${instance}" \
+    && uncordon_rc=$? || uncordon_rc=$?
+  if [[ "${uncordon_rc}" != 0 ]]; then
+    echo "== FAILED to uncordon ${instance} =="
+    return ${uncordon_rc}
+  fi
 }
 
 # Prereqs:

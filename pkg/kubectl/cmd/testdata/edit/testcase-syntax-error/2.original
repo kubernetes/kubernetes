@@ -2,7 +2,7 @@
 # and an empty file will abort the edit. If an error occurs while saving this file will be
 # reopened with the relevant failures.
 #
-# The edited file had a syntax error: error converting YAML to JSON: yaml: line 17: could not find expected ':'
+# The edited file had a syntax error: error parsing edited-file: error converting YAML to JSON: yaml: line 17: could not find expected ':'
 #
 apiVersion: v1
 kind: Service

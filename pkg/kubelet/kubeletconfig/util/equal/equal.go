@@ -18,33 +18,6 @@ package equal
 
 import apiv1 "k8s.io/api/core/v1"
 
-// ConfigSourceEq returns true if the two config sources are semantically equivalent in the context of dynamic config
-func ConfigSourceEq(a, b *apiv1.NodeConfigSource) bool {
-	if a == b {
-		return true
-	} else if a == nil || b == nil {
-		// not equal, and one is nil
-		return false
-	}
-	// check equality of config source subifelds
-	if a.ConfigMapRef != b.ConfigMapRef {
-		return ObjectRefEq(a.ConfigMapRef, b.ConfigMapRef)
-	}
-	// all internal subfields of the config source are equal
-	return true
-}
-
-// ObjectRefEq returns true if the two object references are semantically equivalent in the context of dynamic config
-func ObjectRefEq(a, b *apiv1.ObjectReference) bool {
-	if a == b {
-		return true
-	} else if a == nil || b == nil {
-		// not equal, and one is nil
-		return false
-	}
-	return a.UID == b.UID && a.Namespace == b.Namespace && a.Name == b.Name
-}
-
 // KubeletConfigOkEq returns true if the two conditions are semantically equivalent in the context of dynamic config
 func KubeletConfigOkEq(a, b *apiv1.NodeCondition) bool {
 	return a.Message == b.Message && a.Reason == b.Reason && a.Status == b.Status

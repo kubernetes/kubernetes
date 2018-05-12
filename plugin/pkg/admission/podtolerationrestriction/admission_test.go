@@ -37,21 +37,6 @@ import (
 
 // TestPodAdmission verifies various scenarios involving pod/namespace tolerations
 func TestPodAdmission(t *testing.T) {
-	namespace := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testNamespace",
-			Namespace: "",
-		},
-	}
-
-	mockClient := &fake.Clientset{}
-	handler, informerFactory, err := newHandlerForTest(mockClient)
-	if err != nil {
-		t.Errorf("unexpected error initializing handler: %v", err)
-	}
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informerFactory.Start(stopCh)
 
 	CPU1000m := resource.MustParse("1000m")
 	CPU500m := resource.MustParse("500m")
@@ -230,57 +215,74 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if test.namespaceTolerations != nil {
-			tolerationStr, err := json.Marshal(test.namespaceTolerations)
-			if err != nil {
-				t.Errorf("error in marshalling namespace tolerations %v", test.namespaceTolerations)
+		t.Run(test.testName, func(t *testing.T) {
+			namespace := &api.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "testNamespace",
+					Namespace:   "",
+					Annotations: map[string]string{},
+				},
 			}
-			namespace.Annotations = map[string]string{NSDefaultTolerations: string(tolerationStr)}
-		}
 
-		if test.whitelist != nil {
-			tolerationStr, err := json.Marshal(test.whitelist)
-			if err != nil {
-				t.Errorf("error in marshalling namespace whitelist %v", test.whitelist)
+			if test.namespaceTolerations != nil {
+				tolerationStr, err := json.Marshal(test.namespaceTolerations)
+				if err != nil {
+					t.Errorf("error in marshalling namespace tolerations %v", test.namespaceTolerations)
+				}
+				namespace.Annotations = map[string]string{NSDefaultTolerations: string(tolerationStr)}
 			}
-			namespace.Annotations[NSWLTolerations] = string(tolerationStr)
-		}
 
-		informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
+			if test.whitelist != nil {
+				tolerationStr, err := json.Marshal(test.whitelist)
+				if err != nil {
+					t.Errorf("error in marshalling namespace whitelist %v", test.whitelist)
+				}
+				namespace.Annotations[NSWLTolerations] = string(tolerationStr)
+			}
 
-		handler.pluginConfig = &pluginapi.Configuration{Default: test.defaultClusterTolerations, Whitelist: test.clusterWhitelist}
-		pod := test.pod
-		pod.Spec.Tolerations = test.podTolerations
+			mockClient := fake.NewSimpleClientset(namespace)
+			handler, informerFactory, err := newHandlerForTest(mockClient)
+			if err != nil {
+				t.Fatalf("unexpected error initializing handler: %v", err)
+			}
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			informerFactory.Start(stopCh)
 
-		// copy the original pod for tests of uninitialized pod updates.
-		oldPod := *pod
-		oldPod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init"}}}
-		oldPod.Spec.Tolerations = []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}}
+			handler.pluginConfig = &pluginapi.Configuration{Default: test.defaultClusterTolerations, Whitelist: test.clusterWhitelist}
+			pod := test.pod
+			pod.Spec.Tolerations = test.podTolerations
 
-		err := handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
-		}
+			// copy the original pod for tests of uninitialized pod updates.
+			oldPod := *pod
+			oldPod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init"}}}
+			oldPod.Spec.Tolerations = []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}}
 
-		updatedPodTolerations := pod.Spec.Tolerations
-		if test.admit && !tolerations.EqualTolerations(updatedPodTolerations, test.mergedTolerations) {
-			t.Errorf("Test: %s, expected: %#v but got: %#v", test.testName, test.mergedTolerations, updatedPodTolerations)
-		}
+			err = handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+			if test.admit && err != nil {
+				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+			} else if !test.admit && err == nil {
+				t.Errorf("Test: %s, expected an error", test.testName)
+			}
 
-		// handles update of uninitialized pod like it's newly created.
-		err = handler.Admit(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
-		}
+			updatedPodTolerations := pod.Spec.Tolerations
+			if test.admit && !tolerations.EqualTolerations(updatedPodTolerations, test.mergedTolerations) {
+				t.Errorf("Test: %s, expected: %#v but got: %#v", test.testName, test.mergedTolerations, updatedPodTolerations)
+			}
 
-		updatedPodTolerations = pod.Spec.Tolerations
-		if test.admit && !tolerations.EqualTolerations(updatedPodTolerations, test.mergedTolerations) {
-			t.Errorf("Test: %s, expected: %#v but got: %#v", test.testName, test.mergedTolerations, updatedPodTolerations)
-		}
+			// handles update of uninitialized pod like it's newly created.
+			err = handler.Admit(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+			if test.admit && err != nil {
+				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+			} else if !test.admit && err == nil {
+				t.Errorf("Test: %s, expected an error", test.testName)
+			}
+
+			updatedPodTolerations = pod.Spec.Tolerations
+			if test.admit && !tolerations.EqualTolerations(updatedPodTolerations, test.mergedTolerations) {
+				t.Errorf("Test: %s, expected: %#v but got: %#v", test.testName, test.mergedTolerations, updatedPodTolerations)
+			}
+		})
 	}
 }
 

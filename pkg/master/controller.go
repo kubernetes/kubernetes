@@ -152,7 +152,22 @@ func (c *Controller) Stop() {
 		c.runner.Stop()
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	c.EndpointReconciler.StopReconciling("kubernetes", c.PublicIP, endpointPorts)
+	finishedReconciling := make(chan struct{})
+	go func() {
+		defer close(finishedReconciling)
+		glog.Infof("Shutting down kubernetes service endpoint reconciler")
+		if err := c.EndpointReconciler.StopReconciling("kubernetes", c.PublicIP, endpointPorts); err != nil {
+			glog.Error(err)
+		}
+	}()
+
+	select {
+	case <-finishedReconciling:
+		// done
+	case <-time.After(2 * c.EndpointInterval):
+		// don't block server shutdown forever if we can't reach etcd to remove ourselves
+		glog.Warning("StopReconciling() timed out")
+	}
 }
 
 // RunKubernetesNamespaces periodically makes sure that all internal namespaces exist
@@ -257,7 +272,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
-			SessionAffinity: api.ServiceAffinityClientIP,
+			SessionAffinity: api.ServiceAffinityNone,
 			Type:            serviceType,
 		},
 	}

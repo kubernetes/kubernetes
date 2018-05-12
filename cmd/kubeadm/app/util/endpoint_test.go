@@ -24,234 +24,322 @@ import (
 
 func TestGetMasterEndpoint(t *testing.T) {
 	var tests = []struct {
-		name     string
-		cfg      *kubeadmapi.MasterConfiguration
-		endpoint string
-		expected bool
+		name             string
+		api              *kubeadmapi.API
+		expectedEndpoint string
+		expectedError    bool
 	}{
 		{
-			name: "bad controlplane endpooint dns",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					ControlPlaneEndpoint: "bad!!cp.k8s.io",
-					BindPort:             1234,
-				},
+			name: "use ControlPlaneEndpoint (dns) if fully defined",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "cp.k8s.io:1234",
+				BindPort:             4567,
+				AdvertiseAddress:     "4.5.6.7",
 			},
-			endpoint: "https://cp.k8s.io:1234",
-			expected: false,
+			expectedEndpoint: "https://cp.k8s.io:1234",
 		},
 		{
-			name: "both DNS and IP passed",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress:     "1.2.3.4",
-					ControlPlaneEndpoint: "cp.k8s.io",
-					BindPort:             1234,
-				},
+			name: "use ControlPlaneEndpoint (ipv4) if fully defined",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "1.2.3.4:1234",
+				BindPort:             4567,
+				AdvertiseAddress:     "4.5.6.7",
 			},
-			endpoint: "https://cp.k8s.io:1234",
-			expected: true,
+			expectedEndpoint: "https://1.2.3.4:1234",
 		},
 		{
-			name: "valid DNS endpoint",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					ControlPlaneEndpoint: "cp.k8s.io",
-					BindPort:             1234,
-				},
+			name: "use ControlPlaneEndpoint (ipv6) if fully defined",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "[2001:db8::1]:1234",
+				BindPort:             4567,
+				AdvertiseAddress:     "4.5.6.7",
 			},
-			endpoint: "https://cp.k8s.io:1234",
-			expected: true,
+			expectedEndpoint: "https://[2001:db8::1]:1234",
 		},
 		{
-			name: "valid IPv4 endpoint",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         1234,
-				},
+			name: "use ControlPlaneEndpoint (dns) + BindPort if ControlPlaneEndpoint defined without port",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "cp.k8s.io",
+				BindPort:             4567,
+				AdvertiseAddress:     "4.5.6.7",
 			},
-			endpoint: "https://1.2.3.4:1234",
-			expected: true,
+			expectedEndpoint: "https://cp.k8s.io:4567",
 		},
 		{
-			name: "valid IPv6 endpoint",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "2001:db8::1",
-					BindPort:         4321,
-				},
+			name: "use ControlPlaneEndpoint (ipv4) + BindPort if ControlPlaneEndpoint defined without port",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "1.2.3.4",
+				BindPort:             4567,
+				AdvertiseAddress:     "4.5.6.7",
 			},
-			endpoint: "https://[2001:db8::1]:4321",
-			expected: true,
+			expectedEndpoint: "https://1.2.3.4:4567",
 		},
 		{
-			name: "invalid IPv4 endpoint",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         1234,
-				},
+			name: "use ControlPlaneEndpoint (ipv6) + BindPort if ControlPlaneEndpoint defined without port",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "2001:db8::1",
+				BindPort:             4567,
+				AdvertiseAddress:     "4.5.6.7",
 			},
-			endpoint: "https://[1.2.3.4]:1234",
-			expected: false,
+			expectedEndpoint: "https://[2001:db8::1]:4567",
 		},
 		{
-			name: "invalid IPv6 endpoint",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "2001:db8::1",
-					BindPort:         4321,
-				},
+			name: "use AdvertiseAddress (ipv4) + BindPort if ControlPlaneEndpoint is not defined",
+			api: &kubeadmapi.API{
+				BindPort:         4567,
+				AdvertiseAddress: "4.5.6.7",
 			},
-			endpoint: "https://2001:db8::1:4321",
-			expected: false,
+			expectedEndpoint: "https://4.5.6.7:4567",
 		},
 		{
-			name: "invalid IPv4 AdvertiseAddress",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "1.2.34",
-					BindPort:         1234,
-				},
+			name: "use AdvertiseAddress (ipv6) + BindPort if ControlPlaneEndpoint is not defined",
+			api: &kubeadmapi.API{
+				BindPort:         4567,
+				AdvertiseAddress: "2001:db8::1",
 			},
-			endpoint: "https://1.2.3.4:1234",
-			expected: false,
+			expectedEndpoint: "https://[2001:db8::1]:4567",
 		},
 		{
-			name: "invalid IPv6 AdvertiseAddress",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "2001::db8::1",
-					BindPort:         4321,
-				},
+			name: "fail if invalid BindPort",
+			api: &kubeadmapi.API{
+				BindPort: 0,
 			},
-			endpoint: "https://[2001:db8::1]:4321",
-			expected: false,
+			expectedError: true,
+		},
+		{
+			name: "fail if invalid ControlPlaneEndpoint (dns)",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "bad!!.cp.k8s.io",
+				BindPort:             4567,
+			},
+			expectedError: true,
+		},
+		{
+			name: "fail if invalid ControlPlaneEndpoint (ip4)",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "1..0",
+				BindPort:             4567,
+			},
+			expectedError: true,
+		},
+		{
+			name: "fail if invalid ControlPlaneEndpoint (ip6)",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
+				BindPort:             4567,
+			},
+			expectedError: true,
+		},
+		{
+			name: "fail if invalid ControlPlaneEndpoint (port)",
+			api: &kubeadmapi.API{
+				ControlPlaneEndpoint: "cp.k8s.io:0",
+				BindPort:             4567,
+			},
+			expectedError: true,
+		},
+		{
+			name: "fail if invalid AdvertiseAddress (ip4)",
+			api: &kubeadmapi.API{
+				AdvertiseAddress: "1..0",
+				BindPort:         4567,
+			},
+			expectedError: true,
+		},
+		{
+			name: "fail if invalid AdvertiseAddress (ip6)",
+			api: &kubeadmapi.API{
+				AdvertiseAddress: "1200::AB00:1234::2552:7777:1313",
+				BindPort:         4567,
+			},
+			expectedError: true,
 		},
 	}
+
 	for _, rt := range tests {
-		actual, err := GetMasterEndpoint(rt.cfg)
-		if err != nil && rt.expected {
-			t.Error(err)
+		actualEndpoint, actualError := GetMasterEndpoint(rt.api)
+
+		if (actualError != nil) && !rt.expectedError {
+			t.Errorf("%s unexpected failure: %v", rt.name, actualError)
+			continue
+		} else if (actualError == nil) && rt.expectedError {
+			t.Errorf("%s passed when expected to fail", rt.name)
+			continue
 		}
-		if actual != rt.endpoint && rt.expected {
-			t.Errorf(
-				"%s test case failed:\n\texpected: %s\n\t actual: %s",
-				rt.name,
-				rt.endpoint,
-				(actual),
-			)
+
+		if actualEndpoint != rt.expectedEndpoint {
+			t.Errorf("%s returned invalid endpoint %s, expected %s", rt.name, actualEndpoint, rt.expectedEndpoint)
 		}
 	}
 }
 
-func TestGetMasterHostPort(t *testing.T) {
+func TestParseHostPort(t *testing.T) {
+
 	var tests = []struct {
-		name     string
-		cfg      *kubeadmapi.MasterConfiguration
-		hostPort string
-		expected bool
+		name          string
+		hostport      string
+		expectedHost  string
+		expectedPort  string
+		expectedError bool
 	}{
 		{
-			name: "valid IPv4 master host and port",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         1234,
-				},
-			},
-			hostPort: "1.2.3.4:1234",
-			expected: true,
+			name:         "valid dns",
+			hostport:     "cp.k8s.io",
+			expectedHost: "cp.k8s.io",
+			expectedPort: "",
 		},
 		{
-			name: "valid IPv6 master host port",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "2001:db8::1",
-					BindPort:         4321,
-				},
-			},
-			hostPort: "[2001:db8::1]:4321",
-			expected: true,
+			name:         "valid dns:port",
+			hostport:     "cp.k8s.io:1234",
+			expectedHost: "cp.k8s.io",
+			expectedPort: "1234",
 		},
 		{
-			name: "invalid IPv4 address",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "1.2.34",
-					BindPort:         1234,
-				},
-			},
-			hostPort: "1.2.3.4:1234",
-			expected: false,
+			name:         "valid ip4",
+			hostport:     "1.2.3.4",
+			expectedHost: "1.2.3.4",
+			expectedPort: "",
 		},
 		{
-			name: "invalid IPv6 address",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "2001::db8::1",
-					BindPort:         4321,
-				},
-			},
-			hostPort: "[2001:db8::1]:4321",
-			expected: false,
+			name:         "valid ipv4:port",
+			hostport:     "1.2.3.4:1234",
+			expectedHost: "1.2.3.4",
+			expectedPort: "1234",
 		},
 		{
-			name: "invalid TCP port number",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         987654321,
-				},
-			},
-			hostPort: "1.2.3.4:987654321",
-			expected: false,
+			name:         "valid ipv6",
+			hostport:     "2001:db8::1",
+			expectedHost: "2001:db8::1",
+			expectedPort: "",
 		},
 		{
-			name: "invalid negative TCP port number",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         -987654321,
-				},
-			},
-			hostPort: "1.2.3.4:-987654321",
-			expected: false,
+			name:         "valid ipv6:port",
+			hostport:     "[2001:db8::1]:1234",
+			expectedHost: "2001:db8::1",
+			expectedPort: "1234",
 		},
 		{
-			name: "unspecified IPv4 TCP port",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "1.2.3.4",
-				},
-			},
-			hostPort: "1.2.3.4:0",
-			expected: true,
+			name:          "invalid port(not a number)",
+			hostport:      "cp.k8s.io:aaa",
+			expectedError: true,
 		},
 		{
-			name: "unspecified IPv6 TCP port",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					AdvertiseAddress: "1:2:3::4",
-				},
-			},
-			hostPort: "[1:2:3::4]:0",
-			expected: true,
+			name:          "invalid port(out of range, positive port number)",
+			hostport:      "cp.k8s.io:987654321",
+			expectedError: true,
+		},
+		{
+			name:          "invalid port(out of range, negative port number)",
+			hostport:      "cp.k8s.io:-987654321",
+			expectedError: true,
+		},
+		{
+			name:          "invalid port(out of range, negative port number)",
+			hostport:      "cp.k8s.io:123:123",
+			expectedError: true,
+		},
+		{
+			name:          "invalid dns",
+			hostport:      "bad!!cp.k8s.io",
+			expectedError: true,
+		},
+		{
+			name:          "invalid valid dns:port",
+			hostport:      "bad!!cp.k8s.io:1234",
+			expectedError: true,
+		},
+		{
+			name:         "invalid ip4, but valid DNS",
+			hostport:     "259.2.3.4",
+			expectedHost: "259.2.3.4",
+		},
+		{
+			name:          "invalid ip4",
+			hostport:      "1..3.4",
+			expectedError: true,
+		},
+		{
+			name:          "invalid ip4(2):port",
+			hostport:      "1..3.4:1234",
+			expectedError: true,
+		},
+		{
+			name:          "invalid ipv6",
+			hostport:      "1200::AB00:1234::2552:7777:1313",
+			expectedError: true,
+		},
+		{
+			name:          "invalid ipv6:port",
+			hostport:      "[1200::AB00:1234::2552:7777:1313]:1234",
+			expectedError: true,
 		},
 	}
+
 	for _, rt := range tests {
-		actual, err := GetMasterHostPort(rt.cfg)
-		if err != nil && rt.expected {
-			t.Error(err)
+		actualHost, actualPort, actualError := ParseHostPort(rt.hostport)
+
+		if (actualError != nil) && !rt.expectedError {
+			t.Errorf("%s unexpected failure: %v", rt.name, actualError)
+			continue
+		} else if (actualError == nil) && rt.expectedError {
+			t.Errorf("%s passed when expected to fail", rt.name)
+			continue
 		}
-		if actual != rt.hostPort && rt.expected {
-			t.Errorf(
-				"%s test case failed:\n\texpected: %s\n\t actual: %s",
-				rt.name,
-				rt.hostPort,
-				(actual),
-			)
+
+		if actualHost != rt.expectedHost {
+			t.Errorf("%s returned invalid host %s, expected %s", rt.name, actualHost, rt.expectedHost)
+			continue
+		}
+
+		if actualPort != rt.expectedPort {
+			t.Errorf("%s returned invalid port %s, expected %s", rt.name, actualPort, rt.expectedPort)
+		}
+	}
+}
+
+func TestParsePort(t *testing.T) {
+
+	var tests = []struct {
+		name          string
+		port          string
+		expectedPort  int
+		expectedError bool
+	}{
+		{
+			name:         "valid port",
+			port:         "1234",
+			expectedPort: 1234,
+		},
+		{
+			name:          "invalid port (not a number)",
+			port:          "a",
+			expectedError: true,
+		},
+		{
+			name:          "invalid port (<1)",
+			port:          "-10",
+			expectedError: true,
+		},
+		{
+			name:          "invalid port (>65535)",
+			port:          "66535",
+			expectedError: true,
+		},
+	}
+
+	for _, rt := range tests {
+		actualPort, actualError := parsePort(rt.port)
+
+		if (actualError != nil) && !rt.expectedError {
+			t.Errorf("%s unexpected failure: %v", rt.name, actualError)
+			continue
+		} else if (actualError == nil) && rt.expectedError {
+			t.Errorf("%s passed when expected to fail", rt.name)
+			continue
+		}
+
+		if actualPort != rt.expectedPort {
+			t.Errorf("%s returned invalid port %d, expected %d", rt.name, actualPort, rt.expectedPort)
 		}
 	}
 }

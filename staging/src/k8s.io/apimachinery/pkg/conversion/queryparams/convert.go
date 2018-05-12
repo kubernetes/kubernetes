@@ -174,6 +174,9 @@ func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 			kind = ft.Kind()
 			if !field.IsNil() {
 				field = reflect.Indirect(field)
+				// If the field is non-nil, it should be added to params
+				// and the omitempty should be overwite to false
+				omitempty = false
 			}
 		}
 

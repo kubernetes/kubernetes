@@ -21,12 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	clientset "k8s.io/client-go/kubernetes"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -45,106 +40,6 @@ const (
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 
-// This just exports required functions from kubelet proper, for use by network
-// plugins.
-// TODO(#35457): get rid of this backchannel to the kubelet. The scope of
-// the back channel is restricted to host-ports/testing, and restricted
-// to kubenet. No other network plugin wrapper needs it. Other plugins
-// only require a way to access namespace information, which they can do
-// directly through the methods implemented by criNetworkHost.
-type networkHost struct {
-	kubelet *Kubelet
-}
-
-func (nh *networkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
-	return nh.kubelet.GetPodByName(name, namespace)
-}
-
-func (nh *networkHost) GetKubeClient() clientset.Interface {
-	return nh.kubelet.kubeClient
-}
-
-func (nh *networkHost) GetRuntime() kubecontainer.Runtime {
-	return nh.kubelet.getRuntime()
-}
-
-func (nh *networkHost) SupportsLegacyFeatures() bool {
-	return true
-}
-
-// criNetworkHost implements the part of network.Host required by the
-// cri (NamespaceGetter). It leechs off networkHost for all other
-// methods, because networkHost is slated for deletion.
-type criNetworkHost struct {
-	*networkHost
-	// criNetworkHost currently support legacy features. Hence no need to support PortMappingGetter
-	*network.NoopPortMappingGetter
-}
-
-// GetNetNS returns the network namespace of the given containerID.
-// This method satisfies the network.NamespaceGetter interface for
-// networkHost. It's only meant to be used from network plugins
-// that are directly invoked by the kubelet (aka: legacy, pre-cri).
-// Any network plugin invoked by a cri must implement NamespaceGetter
-// to talk directly to the runtime instead.
-func (c *criNetworkHost) GetNetNS(containerID string) (string, error) {
-	return c.kubelet.getRuntime().GetNetNS(kubecontainer.ContainerID{Type: "", ID: containerID})
-}
-
-// NoOpLegacyHost implements the network.LegacyHost interface for the remote
-// runtime shim by just returning empties. It doesn't support legacy features
-// like host port and bandwidth shaping.
-type NoOpLegacyHost struct{}
-
-// GetPodByName always returns "nil, true" for 'NoOpLegacyHost'
-func (n *NoOpLegacyHost) GetPodByName(namespace, name string) (*v1.Pod, bool) {
-	return nil, true
-}
-
-// GetKubeClient always returns "nil" for 'NoOpLegacyHost'
-func (n *NoOpLegacyHost) GetKubeClient() clientset.Interface {
-	return nil
-}
-
-// getRuntime always returns "nil" for 'NoOpLegacyHost'
-func (n *NoOpLegacyHost) GetRuntime() kubecontainer.Runtime {
-	return nil
-}
-
-// SupportsLegacyFeatures always returns "false" for 'NoOpLegacyHost'
-func (n *NoOpLegacyHost) SupportsLegacyFeatures() bool {
-	return false
-}
-
-// effectiveHairpinMode determines the effective hairpin mode given the
-// configured mode, container runtime, and whether cbr0 should be configured.
-func effectiveHairpinMode(hairpinMode kubeletconfig.HairpinMode, containerRuntime string, networkPlugin string) (kubeletconfig.HairpinMode, error) {
-	// The hairpin mode setting doesn't matter if:
-	// - We're not using a bridge network. This is hard to check because we might
-	//   be using a plugin.
-	// - It's set to hairpin-veth for a container runtime that doesn't know how
-	//   to set the hairpin flag on the veth's of containers. Currently the
-	//   docker runtime is the only one that understands this.
-	// - It's set to "none".
-	if hairpinMode == kubeletconfig.PromiscuousBridge || hairpinMode == kubeletconfig.HairpinVeth {
-		// Only on docker.
-		if containerRuntime != kubetypes.DockerContainerRuntime {
-			glog.Warningf("Hairpin mode set to %q but container runtime is %q, ignoring", hairpinMode, containerRuntime)
-			return kubeletconfig.HairpinNone, nil
-		}
-		if hairpinMode == kubeletconfig.PromiscuousBridge && networkPlugin != "kubenet" {
-			// This is not a valid combination, since promiscuous-bridge only works on kubenet. Users might be using the
-			// default values (from before the hairpin-mode flag existed) and we
-			// should keep the old behavior.
-			glog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", hairpinMode, kubeletconfig.HairpinVeth)
-			return kubeletconfig.HairpinVeth, nil
-		}
-	} else if hairpinMode != kubeletconfig.HairpinNone {
-		return "", fmt.Errorf("unknown value: %q", hairpinMode)
-	}
-	return hairpinMode, nil
-}
-
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
 // requires special networking configuration.
 func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
@@ -159,16 +54,6 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 	return supported
 }
 
-// syncNetworkStatus updates the network state
-func (kl *Kubelet) syncNetworkStatus() {
-	// For cri integration, network state will be updated in updateRuntimeUp,
-	// we'll get runtime network status through cri directly.
-	// TODO: Remove this once we completely switch to cri integration.
-	if kl.networkPlugin != nil {
-		kl.runtimeState.setNetworkState(kl.networkPlugin.Status())
-	}
-}
-
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
 // from the current CIDR.
 func (kl *Kubelet) updatePodCIDR(cidr string) {
@@ -178,16 +63,8 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 		return
 	}
 
-	// kubelet -> network plugin
-	// cri runtime shims are responsible for their own network plugins
-	if kl.networkPlugin != nil {
-		details := make(map[string]interface{})
-		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = cidr
-		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
-	}
-
 	// kubelet -> generic runtime -> runtime shim -> network plugin
-	// docker/rkt non-cri implementations have a passthrough UpdatePodCIDR
+	// docker/non-cri implementations have a passthrough UpdatePodCIDR
 	if err := kl.getRuntime().UpdatePodCIDR(cidr); err != nil {
 		glog.Errorf("Failed to update pod CIDR: %v", err)
 		return

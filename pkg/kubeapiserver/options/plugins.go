@@ -34,13 +34,10 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/extendedresourcetoleration"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
 	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
-	"k8s.io/kubernetes/plugin/pkg/admission/initialresources"
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
-	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
-	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/resize"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podpreset"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
@@ -49,6 +46,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/label"
+	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/resize"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageclass/setdefault"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageobjectinuseprotection"
 
@@ -68,7 +67,6 @@ var AllOrderedPlugins = []string{
 	exists.PluginName,                       // NamespaceExists
 	scdeny.PluginName,                       // SecurityContextDeny
 	antiaffinity.PluginName,                 // LimitPodHardAntiAffinityTopology
-	initialresources.PluginName,             // InitialResources
 	podpreset.PluginName,                    // PodPreset
 	limitranger.PluginName,                  // LimitRanger
 	serviceaccount.PluginName,               // ServiceAccount
@@ -109,7 +107,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	extendedresourcetoleration.Register(plugins)
 	gc.Register(plugins)
 	imagepolicy.Register(plugins)
-	initialresources.Register(plugins)
 	limitranger.Register(plugins)
 	autoprovision.Register(plugins)
 	exists.Register(plugins)

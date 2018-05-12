@@ -23,9 +23,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
@@ -36,7 +36,7 @@ import (
 // to avoid confusion with the convention in quota
 // 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name v1.ResourceName) bool {
-	if IsDefaultNamespaceResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
+	if IsNativeResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
 		return false
 	}
 	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
@@ -47,13 +47,18 @@ func IsExtendedResourceName(name v1.ResourceName) bool {
 	return true
 }
 
-// IsDefaultNamespaceResource returns true if the resource name is in the
+// IsPrefixedNativeResource returns true if the resource name is in the
+// *kubernetes.io/ namespace.
+func IsPrefixedNativeResource(name v1.ResourceName) bool {
+	return strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+}
+
+// IsNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
 // implicitly in the kubernetes.io/ namespace.
-func IsDefaultNamespaceResource(name v1.ResourceName) bool {
+func IsNativeResource(name v1.ResourceName) bool {
 	return !strings.Contains(string(name), "/") ||
-		strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
-
+		IsPrefixedNativeResource(name)
 }
 
 // IsHugePageResourceName returns true if the resource name has the huge page
@@ -80,19 +85,17 @@ func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, erro
 	return resource.ParseQuantity(pageSize)
 }
 
-var overcommitBlacklist = sets.NewString(string(v1.ResourceNvidiaGPU))
-
 // IsOvercommitAllowed returns true if the resource is in the default
-// namespace and not blacklisted and is not hugepages.
+// namespace and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {
-	return IsDefaultNamespaceResource(name) &&
-		!IsHugePageResourceName(name) &&
-		!overcommitBlacklist.Has(string(name))
+	return IsNativeResource(name) &&
+		!IsHugePageResourceName(name)
 }
 
 // Extended and Hugepages resources
 func IsScalarResourceName(name v1.ResourceName) bool {
-	return IsExtendedResourceName(name) || IsHugePageResourceName(name)
+	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
+		IsPrefixedNativeResource(name)
 }
 
 // this function aims to check if the service's ClusterIP is set or not
@@ -242,6 +245,71 @@ func NodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (label
 		selector = selector.Add(*r)
 	}
 	return selector, nil
+}
+
+// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
+// fields.Selector.
+func NodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (fields.Selector, error) {
+	if len(nsm) == 0 {
+		return fields.Nothing(), nil
+	}
+
+	selectors := []fields.Selector{}
+	for _, expr := range nsm {
+		switch expr.Operator {
+		case v1.NodeSelectorOpIn:
+			if len(expr.Values) != 1 {
+				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+					len(expr.Values), expr.Operator)
+			}
+			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
+
+		case v1.NodeSelectorOpNotIn:
+			if len(expr.Values) != 1 {
+				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+					len(expr.Values), expr.Operator)
+			}
+			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
+
+		default:
+			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
+		}
+	}
+
+	return fields.AndSelectors(selectors...), nil
+}
+
+// MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;
+// nil or empty term matches no objects.
+func MatchNodeSelectorTerms(
+	nodeSelectorTerms []v1.NodeSelectorTerm,
+	nodeLabels labels.Set,
+	nodeFields fields.Set,
+) bool {
+	for _, req := range nodeSelectorTerms {
+		// nil or empty term selects no objects
+		if len(req.MatchExpressions) == 0 && len(req.MatchFields) == 0 {
+			continue
+		}
+
+		if len(req.MatchExpressions) != 0 {
+			labelSelector, err := NodeSelectorRequirementsAsSelector(req.MatchExpressions)
+			if err != nil || !labelSelector.Matches(nodeLabels) {
+				continue
+			}
+		}
+
+		if len(req.MatchFields) != 0 {
+			fieldSelector, err := NodeSelectorRequirementsAsFieldSelector(req.MatchFields)
+			if err != nil || !fieldSelector.Matches(nodeFields) {
+				continue
+			}
+		}
+
+		return true
+	}
+
+	return false
 }
 
 // AddOrUpdateTolerationInPodSpec tries to add a toleration to the toleration list in PodSpec.
@@ -417,34 +485,4 @@ func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
 	}
 
 	return ""
-}
-
-// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
-// and converts it to the NodeAffinity type in api.
-// TODO: update when storage node affinity graduates to beta
-func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*v1.NodeAffinity, error) {
-	if len(annotations) > 0 && annotations[v1.AlphaStorageNodeAffinityAnnotation] != "" {
-		var affinity v1.NodeAffinity
-		err := json.Unmarshal([]byte(annotations[v1.AlphaStorageNodeAffinityAnnotation]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
-// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
-// TODO: update when storage node affinity graduates to beta
-func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *v1.NodeAffinity) error {
-	if affinity == nil {
-		return nil
-	}
-
-	json, err := json.Marshal(*affinity)
-	if err != nil {
-		return err
-	}
-	annotations[v1.AlphaStorageNodeAffinityAnnotation] = string(json)
-	return nil
 }

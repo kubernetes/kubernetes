@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -47,8 +47,7 @@ function kfind() {
                 -path ./staging -o \
                 -path ./_\* -o     \
                 -path ./.\* -o     \
-                -path ./docs -o    \
-                -path ./examples   \
+                -path ./docs       \
             \) -prune              \
         \)                         \
         \)                         \

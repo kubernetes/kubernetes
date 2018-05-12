@@ -23,6 +23,7 @@ import (
 
 	autoscalingapi "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -153,14 +154,14 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				return true, &metrics, nil
 			} else {
 				name := getForAction.GetName()
-				mapper := legacyscheme.Registry.RESTMapper()
+				mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
 				assert.NotNil(t, tc.singleObject, "should have only requested a single-object metric when we asked for metrics for a single object")
 				gk := schema.FromAPIVersionAndKind(tc.singleObject.APIVersion, tc.singleObject.Kind).GroupKind()
 				mapping, err := mapper.RESTMapping(gk)
 				if err != nil {
 					return true, nil, fmt.Errorf("unable to get mapping for %s: %v", gk.String(), err)
 				}
-				groupResource := schema.GroupResource{Group: mapping.GroupVersionKind.Group, Resource: mapping.Resource}
+				groupResource := mapping.Resource.GroupResource()
 
 				assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
 				assert.Equal(t, tc.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -71,8 +71,7 @@ function kube::protoc::format() {
   local package=${1}
 
   # Update boilerplate for the generated file.
-  echo "$(cat hack/boilerplate/boilerplate.go.txt ${package}/api.pb.go)" > ${package}/api.pb.go
-  sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${package}/api.pb.go
+  echo "$(cat hack/boilerplate/boilerplate.generatego.txt ${package}/api.pb.go)" > ${package}/api.pb.go
 
   # Run gofmt to clean up the generated code.
   kube::golang::verify_go_version

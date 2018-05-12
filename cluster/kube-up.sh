@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -63,6 +63,8 @@ echo "... calling verify-prereqs" >&2
 verify-prereqs
 echo "... calling verify-kube-binaries" >&2
 verify-kube-binaries
+echo "... calling verify-release-tars" >&2
+verify-release-tars
 
 echo "... calling kube-up" >&2
 kube-up

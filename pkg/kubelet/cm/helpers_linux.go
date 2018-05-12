@@ -103,7 +103,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool) *ResourceConfig {
 	// sum requests and limits.
 	reqs, limits := resource.PodRequestsAndLimits(pod)
 
@@ -144,6 +144,11 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 				hugePageLimits[k] = v
 			}
 		}
+	}
+
+	// quota is not capped when cfs quota is disabled
+	if !enforceCPULimits {
+		cpuQuota = int64(-1)
 	}
 
 	// determine the qos class

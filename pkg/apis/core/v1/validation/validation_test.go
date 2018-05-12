@@ -21,6 +21,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -30,36 +32,15 @@ func TestValidateResourceRequirements(t *testing.T) {
 		requirements v1.ResourceRequirements
 	}{
 		{
-			Name: "GPU only setting Limits",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-			},
-		},
-		{
-			Name: "GPU setting Limits equals Requests",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-			},
-		},
-		{
-			Name: "Resources with GPU with Requests",
+			Name: "Resources with Requests equal to Limits",
 			requirements: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):       resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory):    resource.MustParse("10G"),
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("1"),
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 				},
 				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):       resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory):    resource.MustParse("10G"),
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("1"),
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -110,36 +91,6 @@ func TestValidateResourceRequirements(t *testing.T) {
 		requirements v1.ResourceRequirements
 	}{
 		{
-			Name: "GPU only setting Requests",
-			requirements: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-			},
-		},
-		{
-			Name: "GPU setting Limits less than Requests",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("11"),
-				},
-			},
-		},
-		{
-			Name: "GPU setting Limits larger than Requests",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("9"),
-				},
-			},
-		},
-		{
 			Name: "Resources with Requests Larger Than Limits",
 			requirements: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
@@ -174,6 +125,229 @@ func TestValidateResourceRequirements(t *testing.T) {
 	for _, tc := range errorCase {
 		if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) == 0 {
 			t.Errorf("%q expected error", tc.Name)
+		}
+	}
+}
+
+func TestValidatePodLogOptions(t *testing.T) {
+
+	var (
+		positiveLine             = int64(8)
+		negativeLine             = int64(-8)
+		limitBytesGreaterThan1   = int64(12)
+		limitBytesLessThan1      = int64(0)
+		sinceSecondsGreaterThan1 = int64(10)
+		sinceSecondsLessThan1    = int64(0)
+		timestamp                = metav1.Now()
+	)
+
+	successCase := []struct {
+		Name          string
+		podLogOptions v1.PodLogOptions
+	}{
+		{
+			Name:          "Empty PodLogOptions",
+			podLogOptions: v1.PodLogOptions{},
+		},
+		{
+			Name: "PodLogOptions with TailLines",
+			podLogOptions: v1.PodLogOptions{
+				TailLines: &positiveLine,
+			},
+		},
+		{
+			Name: "PodLogOptions with LimitBytes",
+			podLogOptions: v1.PodLogOptions{
+				LimitBytes: &limitBytesGreaterThan1,
+			},
+		},
+		{
+			Name: "PodLogOptions with only sinceSeconds",
+			podLogOptions: v1.PodLogOptions{
+				SinceSeconds: &sinceSecondsGreaterThan1,
+			},
+		},
+		{
+			Name: "PodLogOptions with LimitBytes with TailLines",
+			podLogOptions: v1.PodLogOptions{
+				LimitBytes: &limitBytesGreaterThan1,
+				TailLines:  &positiveLine,
+			},
+		},
+		{
+			Name: "PodLogOptions with LimitBytes with TailLines with SinceSeconds",
+			podLogOptions: v1.PodLogOptions{
+				LimitBytes:   &limitBytesGreaterThan1,
+				TailLines:    &positiveLine,
+				SinceSeconds: &sinceSecondsGreaterThan1,
+			},
+		},
+	}
+	for _, tc := range successCase {
+		if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) != 0 {
+			t.Errorf("%q unexpected error: %v", tc.Name, errs)
+		}
+	}
+
+	errorCase := []struct {
+		Name          string
+		podLogOptions v1.PodLogOptions
+	}{
+		{
+			Name: "Invalid podLogOptions with Negative TailLines",
+			podLogOptions: v1.PodLogOptions{
+				TailLines:    &negativeLine,
+				LimitBytes:   &limitBytesGreaterThan1,
+				SinceSeconds: &sinceSecondsGreaterThan1,
+			},
+		},
+		{
+			Name: "Invalid podLogOptions with zero or negative LimitBytes",
+			podLogOptions: v1.PodLogOptions{
+				TailLines:    &positiveLine,
+				LimitBytes:   &limitBytesLessThan1,
+				SinceSeconds: &sinceSecondsGreaterThan1,
+			},
+		},
+		{
+			Name: "Invalid podLogOptions with zero or negative SinceSeconds",
+			podLogOptions: v1.PodLogOptions{
+				TailLines:    &negativeLine,
+				LimitBytes:   &limitBytesGreaterThan1,
+				SinceSeconds: &sinceSecondsLessThan1,
+			},
+		}, {
+			Name: "Invalid podLogOptions with both SinceSeconds and SinceTime set",
+			podLogOptions: v1.PodLogOptions{
+				TailLines:    &negativeLine,
+				LimitBytes:   &limitBytesGreaterThan1,
+				SinceSeconds: &sinceSecondsGreaterThan1,
+				SinceTime:    &timestamp,
+			},
+		},
+	}
+	for _, tc := range errorCase {
+		if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) == 0 {
+			t.Errorf("%q expected error", tc.Name)
+		}
+	}
+}
+
+func TestAccumulateUniqueHostPorts(t *testing.T) {
+	successCase := []struct {
+		containers  []v1.Container
+		accumulator *sets.String
+		fldPath     *field.Path
+		result      string
+	}{
+		{
+			containers: []v1.Container{
+				{
+					Ports: []v1.ContainerPort{
+						{
+							HostPort: 8080,
+							Protocol: v1.ProtocolUDP,
+						},
+					},
+				},
+				{
+					Ports: []v1.ContainerPort{
+						{
+							HostPort: 8080,
+							Protocol: v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			accumulator: &sets.String{},
+			fldPath:     field.NewPath("spec", "containers"),
+			result:      "HostPort is not allocated",
+		},
+		{
+			containers: []v1.Container{
+				{
+					Ports: []v1.ContainerPort{
+						{
+							HostPort: 8080,
+							Protocol: v1.ProtocolUDP,
+						},
+					},
+				},
+				{
+					Ports: []v1.ContainerPort{
+						{
+							HostPort: 8081,
+							Protocol: v1.ProtocolUDP,
+						},
+					},
+				},
+			},
+			accumulator: &sets.String{},
+			fldPath:     field.NewPath("spec", "containers"),
+			result:      "HostPort is not allocated",
+		},
+	}
+	for index, tc := range successCase {
+		if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) != 0 {
+			t.Errorf("unexpected error for test case %v: %v", index, errs)
+		}
+	}
+	errorCase := []struct {
+		containers  []v1.Container
+		accumulator *sets.String
+		fldPath     *field.Path
+		result      string
+	}{
+		{
+			containers: []v1.Container{
+				{
+					Ports: []v1.ContainerPort{
+						{
+							HostPort: 8080,
+							Protocol: v1.ProtocolUDP,
+						},
+					},
+				},
+				{
+					Ports: []v1.ContainerPort{
+						{
+							HostPort: 8080,
+							Protocol: v1.ProtocolUDP,
+						},
+					},
+				},
+			},
+			accumulator: &sets.String{},
+			fldPath:     field.NewPath("spec", "containers"),
+			result:      "HostPort is already allocated",
+		},
+		{
+			containers: []v1.Container{
+				{
+					Ports: []v1.ContainerPort{
+						{
+							HostPort: 8080,
+							Protocol: v1.ProtocolUDP,
+						},
+					},
+				},
+				{
+					Ports: []v1.ContainerPort{
+						{
+							HostPort: 8081,
+							Protocol: v1.ProtocolUDP,
+						},
+					},
+				},
+			},
+			accumulator: &sets.String{"8080/UDP": sets.Empty{}},
+			fldPath:     field.NewPath("spec", "containers"),
+			result:      "HostPort is already allocated",
+		},
+	}
+	for index, tc := range errorCase {
+		if errs := AccumulateUniqueHostPorts(tc.containers, tc.accumulator, tc.fldPath); len(errs) == 0 {
+			t.Errorf("test case %v: expected error %v, but get nil", index, tc.result)
 		}
 	}
 }

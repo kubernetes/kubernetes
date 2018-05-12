@@ -25,6 +25,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -48,6 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
+
+const defaultKubeConfig = "/etc/kubernetes/admin.conf"
 
 // NewCmdToken returns cobra.Command for token management
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
@@ -84,7 +88,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	}
 
 	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,
-		"kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
+		"kubeconfig", defaultKubeConfig, "The KubeConfig file to use when talking to the cluster. If the flag is not set a set of standard locations are searched for an existing KubeConfig file")
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		"dry-run", dryRun, "Whether to enable dry-run mode or not")
 
@@ -115,10 +119,12 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) != 0 {
 				cfg.Token = args[0]
 			}
-
+			glog.V(1).Infoln("[token] validating mixed arguments")
 			err := validation.ValidateMixedArguments(tokenCmd.Flags())
 			kubeadmutil.CheckErr(err)
 
+			glog.V(1).Infoln("[token] getting Clientsets from KubeConfig file")
+			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -150,6 +156,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			This command will list all bootstrap tokens for you.
 		`),
 		Run: func(tokenCmd *cobra.Command, args []string) {
+			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -173,6 +180,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) < 1 {
 				kubeadmutil.CheckErr(fmt.Errorf("missing subcommand; 'token delete' is missing token of form [%q]", tokenutil.TokenIDRegexpString))
 			}
+			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -211,11 +219,13 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiext.MasterConfiguration, description string, printJoinCommand bool, kubeConfigFile string) error {
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
+	glog.V(1).Infoln("[token] loading configurations")
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 	if err != nil {
 		return err
 	}
 
+	glog.V(1).Infoln("[token] creating token")
 	err = tokenphase.CreateNewToken(client, internalcfg.Token, internalcfg.TokenTTL.Duration, internalcfg.TokenUsages, internalcfg.TokenGroups, description)
 	if err != nil {
 		return err
@@ -238,6 +248,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 
 // RunGenerateToken just generates a random token for the user
 func RunGenerateToken(out io.Writer) error {
+	glog.V(1).Infoln("[token] generating randodm token")
 	token, err := tokenutil.GenerateToken()
 	if err != nil {
 		return err
@@ -250,6 +261,7 @@ func RunGenerateToken(out io.Writer) error {
 // RunListTokens lists details on all existing bootstrap tokens on the server.
 func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) error {
 	// First, build our selector for bootstrap tokens only
+	glog.V(1).Infoln("[token] preparing selector for bootstrap token")
 	tokenSelector := fields.SelectorFromSet(
 		map[string]string{
 			api.SecretTypeField: string(bootstrapapi.SecretTypeBootstrapToken),
@@ -259,6 +271,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 		FieldSelector: tokenSelector.String(),
 	}
 
+	glog.V(1).Infoln("[token] retrieving list of bootstrap tokens")
 	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("failed to list bootstrap tokens [%v]", err)
@@ -338,6 +351,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIDOrToken string) error {
 	// Assume the given first argument is a token id and try to parse it
 	tokenID := tokenIDOrToken
+	glog.V(1).Infoln("[token] parsing token ID")
 	if err := tokenutil.ParseTokenID(tokenIDOrToken); err != nil {
 		if tokenID, _, err = tokenutil.ParseToken(tokenIDOrToken); err != nil {
 			return fmt.Errorf("given token or token id %q didn't match pattern [%q] or [%q]", tokenIDOrToken, tokenutil.TokenIDRegexpString, tokenutil.TokenRegexpString)
@@ -345,6 +359,7 @@ func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIDOrToken st
 	}
 
 	tokenSecretName := fmt.Sprintf("%s%s", bootstrapapi.BootstrapTokenSecretPrefix, tokenID)
+	glog.V(1).Infoln("[token] deleting token")
 	if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
 		return fmt.Errorf("failed to delete bootstrap token [%v]", err)
 	}
@@ -371,4 +386,17 @@ func getClientset(file string, dryRun bool) (clientset.Interface, error) {
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
+}
+
+func findExistingKubeConfig(file string) string {
+	// The user did provide a --kubeconfig flag. Respect that and threat it as an
+	// explicit path without building a DefaultClientConfigLoadingRules object.
+	if file != defaultKubeConfig {
+		return file
+	}
+	// The user did not provide a --kubeconfig flag. Find a config in the standard
+	// locations using DefaultClientConfigLoadingRules, but also consider `defaultKubeConfig`.
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	rules.Precedence = append(rules.Precedence, defaultKubeConfig)
+	return rules.GetDefaultFilename()
 }

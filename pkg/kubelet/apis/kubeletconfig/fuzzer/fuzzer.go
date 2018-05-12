@@ -63,6 +63,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 			obj.CPUManagerPolicy = "none"
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
+			obj.QOSReserved = map[string]string{
+				"memory": "50%",
+			}
 			obj.OOMScoreAdj = int32(qos.KubeletOOMScoreAdj)
 			obj.Port = ports.KubeletPort
 			obj.ReadOnlyPort = ports.KubeletReadOnlyPort

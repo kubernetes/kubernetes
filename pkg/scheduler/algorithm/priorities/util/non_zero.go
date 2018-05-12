@@ -32,9 +32,8 @@ const DefaultMilliCPURequest int64 = 100 // 0.1 core
 // DefaultMemoryRequest defines default memory request size.
 const DefaultMemoryRequest int64 = 200 * 1024 * 1024 // 200 MB
 
-// GetNonzeroRequests returns the default resource request if none is found or what is provided on the request
-// TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity v1.ResourceList"
-// as an additional argument here) rather than using constants
+// GetNonzeroRequests returns the default resource request if none is found or
+// what is provided on the request.
 func GetNonzeroRequests(requests *v1.ResourceList) (int64, int64) {
 	var outMilliCPU, outMemory int64
 	// Override if un-set, but not if explicitly set to zero

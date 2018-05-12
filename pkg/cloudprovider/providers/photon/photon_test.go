@@ -133,22 +133,7 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances() returned false")
 	}
 
-	externalId, err := i.ExternalID(context.TODO(), NodeName)
-	if err != nil {
-		t.Fatalf("Instances.ExternalID(%s) failed: %s", testVM, err)
-	}
-	t.Logf("Found ExternalID(%s) = %s\n", testVM, externalId)
-
 	nonExistingVM := types.NodeName(rand.String(15))
-	externalId, err = i.ExternalID(context.TODO(), nonExistingVM)
-	if err == cloudprovider.InstanceNotFound {
-		t.Logf("VM %s was not found as expected\n", nonExistingVM)
-	} else if err == nil {
-		t.Fatalf("Instances.ExternalID did not fail as expected, VM %s was found", nonExistingVM)
-	} else {
-		t.Fatalf("Instances.ExternalID did not fail as expected, err: %v", err)
-	}
-
 	instanceId, err := i.InstanceID(context.TODO(), NodeName)
 	if err != nil {
 		t.Fatalf("Instances.InstanceID(%s) failed: %s", testVM, err)

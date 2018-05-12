@@ -712,10 +712,6 @@ func (instances *instances) NodeAddressesByProviderID(ctx context.Context, provi
 	return []v1.NodeAddress{}, errors.New("Not implemented")
 }
 
-func (instances *instances) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	return "", errors.New("Not implemented")
-}
-
 func (instances *instances) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	return instances.instanceID, nil
 }
@@ -732,12 +728,16 @@ func (instances *instances) InstanceExistsByProviderID(ctx context.Context, prov
 	return false, errors.New("unimplemented")
 }
 
+func (instances *instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
+}
+
 func (instances *instances) List(filter string) ([]types.NodeName, error) {
 	return []types.NodeName{}, errors.New("Not implemented")
 }
 
 func (instances *instances) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return errors.New("Not implemented")
+	return cloudprovider.NotImplemented
 }
 
 func (instances *instances) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {

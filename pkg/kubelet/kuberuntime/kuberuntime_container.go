@@ -106,11 +106,15 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		restartCount = containerStatus.RestartCount + 1
 	}
 
-	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef, containerType)
+	containerConfig, cleanupAction, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef, containerType)
+	if cleanupAction != nil {
+		defer cleanupAction()
+	}
 	if err != nil {
 		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
 		return grpc.ErrorDesc(err), ErrCreateContainerConfig
 	}
+
 	containerID, err := m.runtimeService.CreateContainer(podSandboxID, containerConfig, podSandboxConfig)
 	if err != nil {
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
@@ -146,9 +150,15 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	legacySymlink := legacyLogSymlink(containerID, containerMeta.Name, sandboxMeta.Name,
 		sandboxMeta.Namespace)
 	containerLog := filepath.Join(podSandboxConfig.LogDirectory, containerConfig.LogPath)
-	if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
-		glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
-			legacySymlink, containerID, containerLog, err)
+	// only create legacy symlink if containerLog path exists (or the error is not IsNotExist).
+	// Because if containerLog path does not exist, only dandling legacySymlink is created.
+	// This dangling legacySymlink is later removed by container gc, so it does not make sense
+	// to create it in the first place. it happens when journald logging driver is used with docker.
+	if _, err := m.osInterface.Stat(containerLog); !os.IsNotExist(err) {
+		if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
+			glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
+				legacySymlink, containerID, containerLog, err)
+		}
 	}
 
 	// Step 4: execute the post start hook.
@@ -172,27 +182,27 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, containerType kubecontainer.ContainerType) (*runtimeapi.ContainerConfig, error) {
-	opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
+func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, containerType kubecontainer.ContainerType) (*runtimeapi.ContainerConfig, func(), error) {
+	opts, cleanupAction, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	uid, username, err := m.getImageUser(container.Image)
 	if err != nil {
-		return nil, err
+		return nil, cleanupAction, err
 	}
 
 	// Verify RunAsNonRoot. Non-root verification only supports numeric user.
 	if err := verifyRunAsNonRoot(pod, container, uid, username); err != nil {
-		return nil, err
+		return nil, cleanupAction, err
 	}
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
 	logDir := BuildContainerLogsDirectory(kubetypes.UID(pod.UID), container.Name)
 	err = m.osInterface.MkdirAll(logDir, 0755)
 	if err != nil {
-		return nil, fmt.Errorf("create container log directory for container %s failed: %v", container.Name, err)
+		return nil, cleanupAction, fmt.Errorf("create container log directory for container %s failed: %v", container.Name, err)
 	}
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	restartCountUint32 := uint32(restartCount)
@@ -217,7 +227,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 
 	// set platform specific configurations.
 	if err := m.applyPlatformSpecificContainerConfig(config, container, pod, uid, username); err != nil {
-		return nil, err
+		return nil, cleanupAction, err
 	}
 
 	// set environment variables
@@ -231,7 +241,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	}
 	config.Envs = envs
 
-	return config, nil
+	return config, cleanupAction, nil
 }
 
 // makeDevices generates container devices for kubelet runtime v1.
@@ -726,10 +736,7 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *v1.Pod, containerID ku
 		glog.V(4).Infof("failed to get container status for %v: %v", containerID.String(), err)
 		return fmt.Errorf("Unable to retrieve container logs for %v", containerID.String())
 	}
-	labeledInfo := getContainerInfoFromLabels(status.Labels)
-	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
-	path := buildFullContainerLogsPath(pod.UID, labeledInfo.ContainerName, annotatedInfo.RestartCount)
-	return m.ReadLogs(path, containerID.ID, logOptions, stdout, stderr)
+	return m.ReadLogs(status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
 }
 
 // GetExec gets the endpoint the runtime will serve the exec request from.

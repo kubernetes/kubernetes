@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
@@ -92,6 +93,10 @@ func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
 
 func (f *fakeVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
 	return path.Join(f.rootDir, "plugins", pluginName, "volumeDevices")
+}
+
+func (f *fakeVolumeHost) GetPodsDir() string {
+	return path.Join(f.rootDir, "pods")
 }
 
 func (f *fakeVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
@@ -189,6 +194,10 @@ func (f *fakeVolumeHost) GetNodeName() types.NodeName {
 	return types.NodeName(f.nodeName)
 }
 
+func (f *fakeVolumeHost) GetEventRecorder() record.EventRecorder {
+	return nil
+}
+
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
 		return []VolumePlugin{
@@ -250,7 +259,17 @@ func (plugin *FakeVolumePlugin) GetPluginName() string {
 }
 
 func (plugin *FakeVolumePlugin) GetVolumeName(spec *Spec) (string, error) {
-	return spec.Name(), nil
+	var volumeName string
+	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
+		volumeName = spec.Volume.GCEPersistentDisk.PDName
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.GCEPersistentDisk != nil {
+		volumeName = spec.PersistentVolume.Spec.GCEPersistentDisk.PDName
+	}
+	if volumeName == "" {
+		volumeName = spec.Name()
+	}
+	return volumeName, nil
 }
 
 func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {

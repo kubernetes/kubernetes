@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
@@ -70,7 +70,7 @@ type Framework struct {
 
 	InternalClientset *internalclientset.Clientset
 	AggregatorClient  *aggregatorclient.Clientset
-	ClientPool        dynamic.ClientPool
+	DynamicClient     dynamic.Interface
 
 	ScalesGetter scaleclient.ScalesGetter
 
@@ -167,7 +167,8 @@ func (f *Framework) BeforeEach() {
 		Expect(err).NotTo(HaveOccurred())
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
-		f.ClientPool = dynamic.NewClientPool(config, legacyscheme.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+		f.DynamicClient, err = dynamic.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
 
 		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
 		// as they are required when creating a REST client.
@@ -182,7 +183,7 @@ func (f *Framework) BeforeEach() {
 		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
-		restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoClient, meta.InterfacesForUnstructured)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 		restMapper.Reset()
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
@@ -288,7 +289,7 @@ func (f *Framework) AfterEach() {
 				if f.NamespaceDeletionTimeout != 0 {
 					timeout = f.NamespaceDeletionTimeout
 				}
-				if err := deleteNS(f.ClientSet, f.ClientPool, ns.Name, timeout); err != nil {
+				if err := deleteNS(f.ClientSet, f.DynamicClient, ns.Name, timeout); err != nil {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
 					} else {
@@ -399,16 +400,25 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	ns, err := createTestingNS(baseName, f.ClientSet, labels)
 	// check ns instead of err to see if it's nil as we may
 	// fail to create serviceAccount in it.
-	// In this case, we should not forget to delete the namespace.
-	if ns != nil {
-		f.namespacesToDelete = append(f.namespacesToDelete, ns)
-	}
+	f.AddNamespacesToDelete(ns)
 
 	if err == nil && !f.SkipPrivilegedPSPBinding {
 		CreatePrivilegedPSPBinding(f, ns.Name)
 	}
 
 	return ns, err
+}
+
+// AddNamespacesToDelete adds one or more namespaces to be deleted when the test
+// completes.
+func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
+	for _, ns := range namespaces {
+		if ns == nil {
+			continue
+		}
+		f.namespacesToDelete = append(f.namespacesToDelete, ns)
+
+	}
 }
 
 // WaitForPodTerminated waits for the pod to be terminated with the given reason.

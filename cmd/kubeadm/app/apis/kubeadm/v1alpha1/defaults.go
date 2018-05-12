@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"net/url"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,7 +39,7 @@ const (
 	// DefaultClusterDNSIP defines default DNS IP
 	DefaultClusterDNSIP = "10.96.0.10"
 	// DefaultKubernetesVersion defines default kubernetes version
-	DefaultKubernetesVersion = "stable-1.9"
+	DefaultKubernetesVersion = "stable-1.10"
 	// DefaultAPIBindPort defines default API port
 	DefaultAPIBindPort = 6443
 	// DefaultAuthorizationModes defines default authorization modes
@@ -51,6 +52,8 @@ const (
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
 	// DefaultCRISocket defines the default cri socket
 	DefaultCRISocket = "/var/run/dockershim.sock"
+	// DefaultClusterName defines the default cluster name
+	DefaultClusterName = "kubernetes"
 
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"
@@ -68,6 +71,9 @@ const (
 	DefaultProxyBindAddressv6 = "::"
 	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
 	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
+
+	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the NodeConfiguration)
+	DefaultDiscoveryTimeout = 5 * time.Minute
 )
 
 var (
@@ -132,6 +138,10 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.Etcd.DataDir = DefaultEtcdDataDir
 	}
 
+	if obj.ClusterName == "" {
+		obj.ClusterName = DefaultClusterName
+	}
+
 	SetDefaultsEtcdSelfHosted(obj)
 	if features.Enabled(obj.FeatureGates, features.DynamicKubeletConfig) {
 		SetDefaults_KubeletConfiguration(obj)
@@ -176,6 +186,14 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 		if err == nil && u.Scheme == "file" {
 			obj.DiscoveryFile = u.Path
 		}
+	}
+	if obj.DiscoveryTimeout == nil {
+		obj.DiscoveryTimeout = &metav1.Duration{
+			Duration: DefaultDiscoveryTimeout,
+		}
+	}
+	if obj.ClusterName == "" {
+		obj.ClusterName = DefaultClusterName
 	}
 }
 

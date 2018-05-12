@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 
 	authorization "k8s.io/api/authorization/v1beta1"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -234,24 +234,15 @@ func convertToSARExtra(extra map[string][]string) map[string]authorization.Extra
 	return ret
 }
 
-// NOTE: client-go doesn't provide a registry. client-go does registers the
-// authorization/v1beta1. We construct a registry that acknowledges
-// authorization/v1beta1 as an enabled version to pass a check enforced in
-// NewGenericWebhook.
-var registry = registered.NewOrDie("")
-
-func init() {
-	registry.RegisterVersions(groupVersions)
-	if err := registry.EnableVersions(groupVersions...); err != nil {
-		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
-	}
-}
-
 // subjectAccessReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a SubjectAccessReviewInterface that uses that client. Note that the client submits SubjectAccessReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string) (authorizationclient.SubjectAccessReviewInterface, error) {
-	gw, err := webhook.NewGenericWebhook(registry, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+	localScheme := runtime.NewScheme()
+	scheme.AddToScheme(localScheme)
+	localScheme.SetVersionPriority(groupVersions...)
+
+	gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {
 		return nil, err
 	}

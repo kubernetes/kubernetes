@@ -18,6 +18,7 @@ package monitoring
 
 import (
 	"fmt"
+	"strings"
 
 	gcm "google.golang.org/api/monitoring/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -25,6 +26,7 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"os/exec"
 )
 
 var (
@@ -52,6 +54,11 @@ var (
 			},
 		},
 	}
+	StagingDeploymentsLocation = "https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/staging/"
+	AdapterForOldResourceModel = "adapter_old_resource_model.yaml"
+	AdapterForNewResourceModel = "adapter_new_resource_model.yaml"
+	AdapterDefault             = AdapterForOldResourceModel
+	ClusterAdminBinding        = "e2e-test-cluster-admin-binding"
 )
 
 // CustomMetricContainerSpec allows to specify a config for StackdriverExporterDeployment
@@ -82,7 +89,7 @@ func SimpleStackdriverExporterDeployment(name, namespace string, replicas int32,
 func StackdriverExporterDeployment(name, namespace string, replicas int32, containers []CustomMetricContainerSpec) *extensions.Deployment {
 	podSpec := corev1.PodSpec{Containers: []corev1.Container{}}
 	for _, containerSpec := range containers {
-		podSpec.Containers = append(podSpec.Containers, stackdriverExporterContainerSpec(containerSpec.Name, containerSpec.MetricName, containerSpec.MetricValue))
+		podSpec.Containers = append(podSpec.Containers, stackdriverExporterContainerSpec(containerSpec.Name, namespace, containerSpec.MetricName, containerSpec.MetricValue))
 	}
 
 	return &extensions.Deployment{
@@ -119,23 +126,44 @@ func StackdriverExporterPod(podName, namespace, podLabel, metricName string, met
 			},
 		},
 		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{stackdriverExporterContainerSpec(StackdriverExporter, metricName, metricValue)},
+			Containers: []corev1.Container{stackdriverExporterContainerSpec(StackdriverExporter, namespace, metricName, metricValue)},
 		},
 	}
 }
 
-func stackdriverExporterContainerSpec(name string, metricName string, metricValue int64) corev1.Container {
+func stackdriverExporterContainerSpec(name string, namespace string, metricName string, metricValue int64) corev1.Container {
 	return corev1.Container{
 		Name:            name,
-		Image:           "k8s.gcr.io/sd-dummy-exporter:v0.1.0",
+		Image:           "k8s.gcr.io/sd-dummy-exporter:v0.2.0",
 		ImagePullPolicy: corev1.PullPolicy("Always"),
-		Command:         []string{"/sd_dummy_exporter", "--pod-id=$(POD_ID)", "--metric-name=" + metricName, fmt.Sprintf("--metric-value=%v", metricValue)},
+		Command: []string{
+			"/bin/sh",
+			"-c",
+			strings.Join([]string{
+				"./sd_dummy_exporter",
+				"--pod-id=$(POD_ID)",
+				"--pod-name=$(POD_NAME)",
+				"--namespace=" + namespace,
+				"--metric-name=" + metricName,
+				fmt.Sprintf("--metric-value=%v", metricValue),
+				"--use-old-resource-model",
+				"--use-new-resource-model",
+			}, " "),
+		},
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_ID",
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
 						FieldPath: "metadata.uid",
+					},
+				},
+			},
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "metadata.name",
 					},
 				},
 			},
@@ -210,9 +238,35 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 	}
 }
 
-// CreateAdapter creates Custom Metrics - Stackdriver adapter.
-func CreateAdapter() error {
-	stat, err := framework.RunKubectl("create", "-f", "https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/adapter-beta.yaml")
+// CreateAdapter creates Custom Metrics - Stackdriver adapter
+// adapterDeploymentFile should be a filename for adapter deployment located in StagingDeploymentLocation
+func CreateAdapter(adapterDeploymentFile string) error {
+	// A workaround to make the work on GKE. GKE doesn't normally allow to create cluster roles,
+	// which the adapter deployment does. The solution is to create cluster role binding for
+	// cluster-admin role and currently used service account.
+	err := createClusterAdminBinding()
+	if err != nil {
+		return err
+	}
+	adapterURL := StagingDeploymentsLocation + adapterDeploymentFile
+	err = exec.Command("wget", adapterURL).Run()
+	if err != nil {
+		return err
+	}
+	stat, err := framework.RunKubectl("create", "-f", adapterURL)
+	framework.Logf(stat)
+	return err
+}
+
+func createClusterAdminBinding() error {
+	stdout, stderr, err := framework.RunCmd("gcloud", "config", "get-value", "core/account")
+	if err != nil {
+		framework.Logf(stderr)
+		return err
+	}
+	serviceAccount := strings.TrimSpace(stdout)
+	framework.Logf("current service account: %q", serviceAccount)
+	stat, err := framework.RunKubectl("create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
 	framework.Logf(stat)
 	return err
 }
@@ -251,8 +305,23 @@ func CleanupDescriptors(service *gcm.Service, projectId string) {
 }
 
 // CleanupAdapter deletes Custom Metrics - Stackdriver adapter deployments.
-func CleanupAdapter() error {
-	stat, err := framework.RunKubectl("delete", "-f", "https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/adapter-beta.yaml")
+func CleanupAdapter(adapterDeploymentFile string) {
+	stat, err := framework.RunKubectl("delete", "-f", adapterDeploymentFile)
 	framework.Logf(stat)
-	return err
+	if err != nil {
+		framework.Logf("Failed to delete adapter deployments: %s", err)
+	}
+	err = exec.Command("rm", adapterDeploymentFile).Run()
+	if err != nil {
+		framework.Logf("Failed to delete adapter deployment file: %s", err)
+	}
+	cleanupClusterAdminBinding()
+}
+
+func cleanupClusterAdminBinding() {
+	stat, err := framework.RunKubectl("delete", "clusterrolebinding", ClusterAdminBinding)
+	framework.Logf(stat)
+	if err != nil {
+		framework.Logf("Failed to delete cluster admin binding: %s", err)
+	}
 }

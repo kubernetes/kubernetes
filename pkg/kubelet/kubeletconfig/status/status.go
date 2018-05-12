@@ -51,8 +51,6 @@ const (
 
 	// CurFailLoadReasonFmt indicates that the Kubelet failed to load the current config checkpoint for an API source
 	CurFailLoadReasonFmt = "failed to load current: %s"
-	// CurFailParseReasonFmt indicates that the Kubelet failed to parse the current config checkpoint for an API source
-	CurFailParseReasonFmt = "failed to parse current: %s"
 	// CurFailValidateReasonFmt indicates that the Kubelet failed to validate the current config checkpoint for an API source
 	CurFailValidateReasonFmt = "failed to validate current: %s"
 
@@ -60,8 +58,6 @@ const (
 
 	// LkgFailLoadReasonFmt indicates that the Kubelet failed to load the last-known-good config checkpoint for an API source
 	LkgFailLoadReasonFmt = "failed to load last-known-good: %s"
-	// LkgFailParseReasonFmt indicates that the Kubelet failed to parse the last-known-good config checkpoint for an API source
-	LkgFailParseReasonFmt = "failed to parse last-known-good: %s"
 	// LkgFailValidateReasonFmt indicates that the Kubelet failed to validate the last-known-good config checkpoint for an API source
 	LkgFailValidateReasonFmt = "failed to validate last-known-good: %s"
 
@@ -69,11 +65,11 @@ const (
 	FailSyncReasonFmt = "failed to sync, reason: %s"
 	// FailSyncReasonAllNilSubfields is used when no subfields are set
 	FailSyncReasonAllNilSubfields = "invalid NodeConfigSource, exactly one subfield must be non-nil, but all were nil"
-	// FailSyncReasonPartialObjectReference is used when some required subfields remain unset
-	FailSyncReasonPartialObjectReference = "invalid ObjectReference, all of UID, Name, and Namespace must be specified"
+	// FailSyncReasonPartialConfigMapSource is used when some required subfields remain unset
+	FailSyncReasonPartialConfigMapSource = "invalid ConfigSource.ConfigMap, all of UID, Name, Namespace, and KubeletConfigKey must be specified"
 	// FailSyncReasonUIDMismatchFmt is used when there is a UID mismatch between the referenced and downloaded ConfigMaps,
 	// this can happen because objects must be downloaded by namespace/name, rather than by UID
-	FailSyncReasonUIDMismatchFmt = "invalid ConfigSource.ConfigMapRef.UID: %s does not match %s.UID: %s"
+	FailSyncReasonUIDMismatchFmt = "invalid ConfigSource.ConfigMap.UID: %s does not match %s.UID: %s"
 	// FailSyncReasonDownloadFmt is used when the download fails, e.g. due to network issues
 	FailSyncReasonDownloadFmt = "failed to download: %s"
 	// FailSyncReasonInformer is used when the informer fails to report the Node object
@@ -260,7 +256,7 @@ func (c *configOkCondition) Sync(client clientset.Interface, nodeName string) {
 		err = fmt.Errorf("unsupported media type %q", mediaType)
 		return
 	}
-	versions := legacyscheme.Registry.EnabledVersionsForGroup(api.GroupName)
+	versions := legacyscheme.Scheme.PrioritizedVersionsForGroup(api.GroupName)
 	if len(versions) == 0 {
 		err = fmt.Errorf("no enabled versions for group %q", api.GroupName)
 		return

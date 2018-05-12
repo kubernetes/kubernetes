@@ -17,13 +17,13 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -63,7 +63,7 @@ func (r *ScaleREST) New() runtime.Object {
 	return &autoscaling.Scale{}
 }
 
-func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	rc, err := (*r.registry).GetController(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)
@@ -71,7 +71,7 @@ func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *met
 	return scaleFromRC(rc), nil
 }
 
-func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	rc, err := (*r.registry).GetController(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)
@@ -123,6 +123,10 @@ func scaleFromRC(rc *api.ReplicationController) *autoscaling.Scale {
 
 // Dummy implementation
 type RcREST struct{}
+
+func (r *RcREST) NamespaceScoped() bool {
+	return true
+}
 
 func (r *RcREST) New() runtime.Object {
 	return &extensions.ReplicationControllerDummy{}

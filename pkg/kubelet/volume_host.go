@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -92,6 +93,10 @@ func (kvh *kubeletVolumeHost) GetVolumeDevicePluginDir(pluginName string) string
 	return kvh.kubelet.getVolumeDevicePluginDir(pluginName)
 }
 
+func (kvh *kubeletVolumeHost) GetPodsDir() string {
+	return kvh.kubelet.getPodsDir()
+}
+
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	dir := kvh.kubelet.getPodVolumeDir(podUID, pluginName, volumeName)
 	if runtime.GOOS == "windows" {
@@ -148,7 +153,7 @@ func (kvh *kubeletVolumeHost) GetCloudProvider() cloudprovider.Interface {
 func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
 	exec, err := kvh.getMountExec(pluginName)
 	if err != nil {
-		glog.V(2).Info("Error finding mount pod for plugin %s: %s", pluginName, err.Error())
+		glog.V(2).Infof("Error finding mount pod for plugin %s: %s", pluginName, err.Error())
 		// Use the default mounter
 		exec = nil
 	}
@@ -198,10 +203,14 @@ func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {
 	return kvh.kubelet.nodeName
 }
 
+func (kvh *kubeletVolumeHost) GetEventRecorder() record.EventRecorder {
+	return kvh.kubelet.recorder
+}
+
 func (kvh *kubeletVolumeHost) GetExec(pluginName string) mount.Exec {
 	exec, err := kvh.getMountExec(pluginName)
 	if err != nil {
-		glog.V(2).Info("Error finding mount pod for plugin %s: %s", pluginName, err.Error())
+		glog.V(2).Infof("Error finding mount pod for plugin %s: %s", pluginName, err.Error())
 		// Use the default exec
 		exec = nil
 	}

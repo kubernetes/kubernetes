@@ -20,75 +20,36 @@ import (
 	"fmt"
 
 	apiv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 )
 
 const configMapConfigKey = "kubelet"
 
-// configMapCheckpoint implements Checkpoint, backed by a v1/ConfigMap config source object
-type configMapCheckpoint struct {
-	kubeletCodecs *serializer.CodecFactory // codecs for the KubeletConfiguration
-	configMap     *apiv1.ConfigMap
+// configMapPayload implements Payload, backed by a v1/ConfigMap config source object
+type configMapPayload struct {
+	cm *apiv1.ConfigMap
 }
 
-// NewConfigMapCheckpoint returns a Checkpoint backed by `cm`. `cm` must be non-nil
-// and have a non-empty ObjectMeta.UID, or an error will be returned.
-func NewConfigMapCheckpoint(cm *apiv1.ConfigMap) (Checkpoint, error) {
+var _ Payload = (*configMapPayload)(nil)
+
+// NewConfigMapPayload constructs a Payload backed by a ConfigMap, which must have a non-empty UID
+func NewConfigMapPayload(cm *apiv1.ConfigMap) (Payload, error) {
 	if cm == nil {
-		return nil, fmt.Errorf("ConfigMap must be non-nil to be treated as a Checkpoint")
+		return nil, fmt.Errorf("ConfigMap must be non-nil to be a Payload")
 	} else if len(cm.ObjectMeta.UID) == 0 {
-		return nil, fmt.Errorf("ConfigMap must have a UID to be treated as a Checkpoint")
+		return nil, fmt.Errorf("ConfigMap must have a UID to be a Payload")
 	}
 
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		return nil, err
-	}
-
-	return &configMapCheckpoint{kubeletCodecs, cm}, nil
+	return &configMapPayload{cm}, nil
 }
 
-// UID returns the UID of a configMapCheckpoint
-func (c *configMapCheckpoint) UID() string {
-	return string(c.configMap.UID)
+func (p *configMapPayload) UID() string {
+	return string(p.cm.UID)
 }
 
-// Parse extracts the KubeletConfiguration from v1/ConfigMap checkpoints, applies defaults, and converts to the internal type
-func (c *configMapCheckpoint) Parse() (*kubeletconfig.KubeletConfiguration, error) {
-	const emptyCfgErr = "config was empty, but some parameters are required"
-
-	if len(c.configMap.Data) == 0 {
-		return nil, fmt.Errorf(emptyCfgErr)
-	}
-
-	config, ok := c.configMap.Data[configMapConfigKey]
-	if !ok {
-		return nil, fmt.Errorf("key %q not found in ConfigMap", configMapConfigKey)
-	} else if len(config) == 0 {
-		return nil, fmt.Errorf(emptyCfgErr)
-	}
-
-	return utilcodec.DecodeKubeletConfiguration(c.kubeletCodecs, []byte(config))
+func (p *configMapPayload) Files() map[string]string {
+	return p.cm.Data
 }
 
-// Encode encodes a configMapCheckpoint
-func (c *configMapCheckpoint) Encode() ([]byte, error) {
-	cm := c.configMap
-	encoder, err := utilcodec.NewJSONEncoder(apiv1.GroupName)
-	if err != nil {
-		return nil, err
-	}
-	data, err := runtime.Encode(encoder, cm)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func (c *configMapCheckpoint) object() interface{} {
-	return c.configMap
+func (p *configMapPayload) object() interface{} {
+	return p.cm
 }

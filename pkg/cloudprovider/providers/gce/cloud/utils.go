@@ -25,9 +25,9 @@ import (
 )
 
 const (
-	gaPrefix    = "https://www.googleapis.com/compute/v1/"
-	alphaPrefix = "https://www.googleapis.com/compute/alpha/"
-	betaPrefix  = "https://www.googleapis.com/compute/beta/"
+	gaPrefix    = "https://www.googleapis.com/compute/v1"
+	alphaPrefix = "https://www.googleapis.com/compute/alpha"
+	betaPrefix  = "https://www.googleapis.com/compute/beta"
 )
 
 // ResourceID identifies a GCE resource as parsed from compute resource URL.
@@ -51,8 +51,27 @@ func (r *ResourceID) Equal(other *ResourceID) bool {
 	return false
 }
 
+// RelativeResourceName returns the relative resource name string
+// representing this ResourceID.
+func (r *ResourceID) RelativeResourceName() string {
+	return RelativeResourceName(r.ProjectID, r.Resource, r.Key)
+}
+
+// ResourcePath returns the resource path representing this ResourceID.
+func (r *ResourceID) ResourcePath() string {
+	return ResourcePath(r.Resource, r.Key)
+}
+
+func (r *ResourceID) SelfLink(ver meta.Version) string {
+	return SelfLink(ver, r.ProjectID, r.Resource, r.Key)
+}
+
 // ParseResourceURL parses resource URLs of the following formats:
 //
+//   global/<res>/<name>
+//   regions/<region>/<res>/<name>
+//   zones/<zone>/<res>/<name>
+//   projects/<proj>
 //   projects/<proj>/global/<res>/<name>
 //   projects/<proj>/regions/<region>/<res>/<name>
 //   projects/<proj>/zones/<zone>/<res>/<name>
@@ -62,64 +81,63 @@ func (r *ResourceID) Equal(other *ResourceID) bool {
 func ParseResourceURL(url string) (*ResourceID, error) {
 	errNotValid := fmt.Errorf("%q is not a valid resource URL", url)
 
-	// Remove the prefix up to ...projects/
+	// Trim prefix off URL leaving "projects/..."
 	projectsIndex := strings.Index(url, "/projects/")
 	if projectsIndex >= 0 {
 		url = url[projectsIndex+1:]
 	}
 
 	parts := strings.Split(url, "/")
-	if len(parts) < 2 || parts[0] != "projects" {
+	if len(parts) < 2 || len(parts) > 6 {
 		return nil, errNotValid
 	}
 
-	ret := &ResourceID{ProjectID: parts[1]}
-	if len(parts) == 2 {
+	ret := &ResourceID{}
+	scopedName := parts
+	if parts[0] == "projects" {
 		ret.Resource = "projects"
-		return ret, nil
-	}
+		ret.ProjectID = parts[1]
+		scopedName = parts[2:]
 
-	if len(parts) < 4 {
-		return nil, errNotValid
-	}
-
-	if len(parts) == 4 {
-		switch parts[2] {
-		case "regions":
-			ret.Resource = "regions"
-			ret.Key = meta.GlobalKey(parts[3])
+		if len(scopedName) == 0 {
 			return ret, nil
-		case "zones":
-			ret.Resource = "zones"
-			ret.Key = meta.GlobalKey(parts[3])
+		}
+	}
+
+	switch scopedName[0] {
+	case "global":
+		if len(scopedName) != 3 {
+			return nil, errNotValid
+		}
+		ret.Resource = scopedName[1]
+		ret.Key = meta.GlobalKey(scopedName[2])
+		return ret, nil
+	case "regions":
+		switch len(scopedName) {
+		case 2:
+			ret.Resource = "regions"
+			ret.Key = meta.GlobalKey(scopedName[1])
+			return ret, nil
+		case 4:
+			ret.Resource = scopedName[2]
+			ret.Key = meta.RegionalKey(scopedName[3], scopedName[1])
 			return ret, nil
 		default:
 			return nil, errNotValid
 		}
-	}
-
-	switch parts[2] {
-	case "global":
-		if len(parts) != 5 {
-			return nil, errNotValid
-		}
-		ret.Resource = parts[3]
-		ret.Key = meta.GlobalKey(parts[4])
-		return ret, nil
-	case "regions":
-		if len(parts) != 6 {
-			return nil, errNotValid
-		}
-		ret.Resource = parts[4]
-		ret.Key = meta.RegionalKey(parts[5], parts[3])
-		return ret, nil
 	case "zones":
-		if len(parts) != 6 {
+		switch len(scopedName) {
+		case 2:
+			ret.Resource = "zones"
+			ret.Key = meta.GlobalKey(scopedName[1])
+			return ret, nil
+		case 4:
+			ret.Resource = scopedName[2]
+			ret.Key = meta.ZonalKey(scopedName[3], scopedName[1])
+			return ret, nil
+		default:
 			return nil, errNotValid
 		}
-		ret.Resource = parts[4]
-		ret.Key = meta.ZonalKey(parts[5], parts[3])
-		return ret, nil
 	}
 	return nil, errNotValid
 }
@@ -130,6 +148,38 @@ func copyViaJSON(dest, src interface{}) error {
 		return err
 	}
 	return json.Unmarshal(bytes, dest)
+}
+
+// ResourcePath returns the path starting from the location.
+// Example: regions/us-central1/subnetworks/my-subnet
+func ResourcePath(resource string, key *meta.Key) string {
+	switch resource {
+	case "zones", "regions":
+		return fmt.Sprintf("%s/%s", resource, key.Name)
+	case "projects":
+		return "invalid-resource"
+	}
+
+	switch key.Type() {
+	case meta.Zonal:
+		return fmt.Sprintf("zones/%s/%s/%s", key.Zone, resource, key.Name)
+	case meta.Regional:
+		return fmt.Sprintf("regions/%s/%s/%s", key.Region, resource, key.Name)
+	case meta.Global:
+		return fmt.Sprintf("global/%s/%s", resource, key.Name)
+	}
+	return "invalid-key-type"
+}
+
+// RelativeResourceName returns the path starting from project.
+// Example: projects/my-project/regions/us-central1/subnetworks/my-subnet
+func RelativeResourceName(project, resource string, key *meta.Key) string {
+	switch resource {
+	case "projects":
+		return fmt.Sprintf("projects/%s", project)
+	default:
+		return fmt.Sprintf("projects/%s/%s", project, ResourcePath(resource, key))
+	}
 }
 
 // SelfLink returns the self link URL for the given object.
@@ -146,13 +196,6 @@ func SelfLink(ver meta.Version, project, resource string, key *meta.Key) string 
 		prefix = "invalid-prefix"
 	}
 
-	switch key.Type() {
-	case meta.Zonal:
-		return fmt.Sprintf("%sprojects/%s/zones/%s/%s/%s", prefix, project, key.Zone, resource, key.Name)
-	case meta.Regional:
-		return fmt.Sprintf("%sprojects/%s/regions/%s/%s/%s", prefix, project, key.Region, resource, key.Name)
-	case meta.Global:
-		return fmt.Sprintf("%sprojects/%s/%s/%s", prefix, project, resource, key.Name)
-	}
-	return "invalid-self-link"
+	return fmt.Sprintf("%s/%s", prefix, RelativeResourceName(project, resource, key))
+
 }

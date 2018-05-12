@@ -74,23 +74,26 @@ metadata:
   name: coredns
   namespace: kube-system
   labels:
-    k8s-app: coredns
+    k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "CoreDNS"
 spec:
-  replicas: 2
+  # replicas: not specified here:
+  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
+  # 2. Default is 1.
+  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
   selector:
     matchLabels:
-      k8s-app: coredns
+      k8s-app: kube-dns
   template:
     metadata:
       labels:
-        k8s-app: coredns
+        k8s-app: kube-dns
     spec:
       serviceAccountName: coredns
       tolerations:
@@ -140,16 +143,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: coredns
+  name: kube-dns
   namespace: kube-system
   labels:
-    k8s-app: coredns
+    k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "CoreDNS"
 spec:
   selector:
-    k8s-app: coredns
+    k8s-app: kube-dns
   clusterIP: $DNS_SERVER_IP
   ports:
   - name: dns

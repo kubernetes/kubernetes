@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,9 +84,53 @@ type Interface interface {
 	// MakeDir creates a new directory.
 	// Will operate in the host mount namespace if kubelet is running in a container
 	MakeDir(pathname string) error
+	// SafeMakeDir makes sure that the created directory does not escape given
+	// base directory mis-using symlinks. The directory is created in the same
+	// mount namespace as where kubelet is running. Note that the function makes
+	// sure that it creates the directory somewhere under the base, nothing
+	// else. E.g. if the directory already exists, it may exists outside of the
+	// base due to symlinks.
+	SafeMakeDir(pathname string, base string, perm os.FileMode) error
 	// ExistsPath checks whether the path exists.
 	// Will operate in the host mount namespace if kubelet is running in a container
 	ExistsPath(pathname string) bool
+	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
+	// pod volume directory.
+	CleanSubPaths(podDir string, volumeName string) error
+	// PrepareSafeSubpath does everything that's necessary to prepare a subPath
+	// that's 1) inside given volumePath and 2) immutable after this call.
+	//
+	// newHostPath - location of prepared subPath. It should be used instead of
+	// hostName when running the container.
+	// cleanupAction - action to run when the container is running or it failed to start.
+	//
+	// CleanupAction must be called immediately after the container with given
+	// subpath starts. On the other hand, Interface.CleanSubPaths must be called
+	// when the pod finishes.
+	PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error)
+	// GetMountRefs finds all mount references to the path, returns a
+	// list of paths. Path could be a mountpoint path, device or a normal
+	// directory (for bind mount).
+	GetMountRefs(pathname string) ([]string, error)
+	// GetFSGroup returns FSGroup of the path.
+	GetFSGroup(pathname string) (int64, error)
+}
+
+type Subpath struct {
+	// index of the VolumeMount for this container
+	VolumeMountIndex int
+	// Full path to the subpath directory on the host
+	Path string
+	// name of the volume that is a valid directory name.
+	VolumeName string
+	// Full path to the volume path
+	VolumePath string
+	// Path to the pod's directory, including pod UID
+	PodDir string
+	// Name of the container
+	ContainerName string
+	// True if the mount needs to be readonly
+	ReadOnly bool
 }
 
 // Exec executes command where mount utilities are. This can be either the host,
@@ -129,22 +174,19 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 	return mounter.formatAndMount(source, target, fstype, options)
 }
 
-// GetMountRefsByDev finds all references to the device provided
+// getMountRefsByDev finds all references to the device provided
 // by mountPath; returns a list of paths.
-func GetMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
+// Note that mountPath should be path after the evaluation of any symblolic links.
+func getMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
 	mps, err := mounter.List()
 	if err != nil {
 		return nil, err
-	}
-	slTarget, err := filepath.EvalSymlinks(mountPath)
-	if err != nil {
-		slTarget = mountPath
 	}
 
 	// Finding the device mounted to mountPath
 	diskDev := ""
 	for i := range mps {
-		if slTarget == mps[i].Path {
+		if mountPath == mps[i].Path {
 			diskDev = mps[i].Device
 			break
 		}
@@ -153,8 +195,8 @@ func GetMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
 	// Find all references to the device.
 	var refs []string
 	for i := range mps {
-		if mps[i].Device == diskDev || mps[i].Device == slTarget {
-			if mps[i].Path != slTarget {
+		if mps[i].Device == diskDev || mps[i].Device == mountPath {
+			if mps[i].Path != mountPath {
 				refs = append(refs, mps[i].Path)
 			}
 		}
@@ -237,7 +279,13 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
 func isBind(options []string) (bool, []string) {
-	bindRemountOpts := []string{"remount"}
+	// Because we have an FD opened on the subpath bind mount, the "bind" option
+	// needs to be included, otherwise the mount target will error as busy if you
+	// remount as readonly.
+	//
+	// As a consequence, all read only bind mounts will no longer change the underlying
+	// volume mount to be read only.
+	bindRemountOpts := []string{"bind", "remount"}
 	bind := false
 
 	if len(options) != 0 {
@@ -273,4 +321,57 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 		}
 	}
 	return count > 0
+}
+
+// pathWithinBase checks if give path is within given base directory.
+func pathWithinBase(fullPath, basePath string) bool {
+	rel, err := filepath.Rel(basePath, fullPath)
+	if err != nil {
+		return false
+	}
+	if startsWithBackstep(rel) {
+		// Needed to escape the base path
+		return false
+	}
+	return true
+}
+
+// startsWithBackstep checks if the given path starts with a backstep segment
+func startsWithBackstep(rel string) bool {
+	// normalize to / and check for ../
+	return rel == ".." || strings.HasPrefix(filepath.ToSlash(rel), "../")
+}
+
+// getFileType checks for file/directory/socket and block/character devices
+func getFileType(pathname string) (FileType, error) {
+	var pathType FileType
+	info, err := os.Stat(pathname)
+	if os.IsNotExist(err) {
+		return pathType, fmt.Errorf("path %q does not exist", pathname)
+	}
+	// err in call to os.Stat
+	if err != nil {
+		return pathType, err
+	}
+
+	// checks whether the mode is the target mode
+	isSpecificMode := func(mode, targetMode os.FileMode) bool {
+		return mode&targetMode == targetMode
+	}
+
+	mode := info.Mode()
+	if mode.IsDir() {
+		return FileTypeDirectory, nil
+	} else if mode.IsRegular() {
+		return FileTypeFile, nil
+	} else if isSpecificMode(mode, os.ModeSocket) {
+		return FileTypeSocket, nil
+	} else if isSpecificMode(mode, os.ModeDevice) {
+		if isSpecificMode(mode, os.ModeCharDevice) {
+			return FileTypeCharDev, nil
+		}
+		return FileTypeBlockDev, nil
+	}
+
+	return pathType, fmt.Errorf("only recognise file, directory, socket, block device and character device")
 }

@@ -454,26 +454,14 @@ func getInstanceID(pc *PCCloud, name string) (string, error) {
 	return vmID, err
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (pc *PCCloud) ExternalID(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
-	name := string(nodeName)
-	if name == pc.localK8sHostname {
-		return pc.localInstanceID, nil
-	} else {
-		// We assume only master need to get InstanceID of a node other than itself
-		ID, err := getInstanceID(pc, name)
-		if err != nil {
-			glog.Errorf("Photon Cloud Provider: getInstanceID failed for ExternalID. Error[%v]", err)
-			return ID, err
-		} else {
-			return ID, nil
-		}
-	}
-}
-
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (pc *PCCloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (pc *PCCloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, cloudprovider.NotImplemented
 }
 

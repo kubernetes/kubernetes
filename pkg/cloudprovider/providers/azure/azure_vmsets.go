@@ -17,8 +17,8 @@ limitations under the License.
 package azure
 
 import (
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,9 +35,9 @@ type VMSet interface {
 	// GetInstanceTypeByNodeName gets the instance type by node name.
 	GetInstanceTypeByNodeName(name string) (string, error)
 	// GetIPByNodeName gets machine private IP and public IP by node name.
-	GetIPByNodeName(name, vmSetName string) (string, string, error)
-	// GetPrimaryInterface gets machine primary network interface by node name and vmSet.
-	GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error)
+	GetIPByNodeName(name string) (string, string, error)
+	// GetPrimaryInterface gets machine primary network interface by node name.
+	GetPrimaryInterface(nodeName string) (network.Interface, error)
 	// GetNodeNameByProviderID gets the node name by provider ID.
 	GetNodeNameByProviderID(providerID string) (types.NodeName, error)
 
@@ -54,18 +54,14 @@ type VMSet interface {
 	GetVMSetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error)
 	// EnsureHostsInPool ensures the given Node's primary IP configurations are
 	// participating in the specified LoadBalancer Backend Pool.
-	EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string) error
+	EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string, isInternal bool) error
 	// EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified vmSet.
-	EnsureBackendPoolDeleted(poolID, vmSetName string) error
+	EnsureBackendPoolDeleted(poolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error
 
 	// AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI, and lun.
 	AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error
 	// DetachDiskByName detaches a vhd from host. The vhd can be identified by diskName or diskURI.
 	DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error
-	// GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI.
-	GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error)
-	// GetNextDiskLun searches all vhd attachment on the host and find unused lun. Return -1 if all luns are used.
-	GetNextDiskLun(nodeName types.NodeName) (int32, error)
-	// DisksAreAttached checks if a list of volumes are attached to the node with the specified NodeName.
-	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
+	// GetDataDisks gets a list of data disks attached to the node.
+	GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error)
 }

@@ -1468,8 +1468,8 @@ func TestUpdateRcWithRetries(t *testing.T) {
 		{StatusCode: 200, Header: header, Body: objBody(codec, rc)},
 	}
 	fakeClient := &manualfake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
-		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+		NegotiatedSerializer: legacyscheme.Codecs,
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
@@ -1495,7 +1495,7 @@ func TestUpdateRcWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
 	restClient, _ := restclient.RESTClientFor(clientConfig)
 	restClient.Client = fakeClient.Client
 	clientset := internalclientset.New(restClient)
@@ -1561,8 +1561,8 @@ func TestAddDeploymentHash(t *testing.T) {
 	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &manualfake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
-		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+		NegotiatedSerializer: legacyscheme.Codecs,
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			header := http.Header{}
 			header.Set("Content-Type", runtime.ContentTypeJSON)
@@ -1596,7 +1596,7 @@ func TestAddDeploymentHash(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
 	restClient, _ := restclient.RESTClientFor(clientConfig)
 	restClient.Client = fakeClient.Client
 	clientset := internalclientset.New(restClient)

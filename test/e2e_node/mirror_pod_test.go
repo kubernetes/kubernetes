@@ -64,7 +64,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			uid := pod.UID
 
 			By("update the static pod container image")
-			image := imageutils.GetPauseImageNameForHostArch()
+			image := imageutils.GetPauseImageName()
 			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 

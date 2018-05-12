@@ -542,9 +542,9 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	// set up tmp caCertsPkiVolumePath for testing
-	caCertsPkiVolumePath = fmt.Sprintf("%s/etc/pki", tmpdir)
-	defer func() { caCertsPkiVolumePath = "/etc/pki" }()
+	// set up tmp caCertsExtraVolumePaths for testing
+	caCertsExtraVolumePaths = []string{fmt.Sprintf("%s/etc/pki", tmpdir), fmt.Sprintf("%s/usr/share/ca-certificates", tmpdir)}
+	defer func() { caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates"} }()
 
 	for _, rt := range tests {
 		mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
@@ -615,30 +615,62 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 	mounts.AddHostPathMounts("component", vols, volMounts)
 	hostPathMounts := []kubeadmapi.HostPathMount{
 		{
-			Name:      "foo",
-			HostPath:  "/tmp/qux",
-			MountPath: "/tmp/qux",
+			Name:      "foo-0",
+			HostPath:  "/tmp/qux-0",
+			MountPath: "/tmp/qux-0",
+			Writable:  false,
+			PathType:  v1.HostPathFile,
+		},
+		{
+			Name:      "bar-0",
+			HostPath:  "/tmp/asd-0",
+			MountPath: "/tmp/asd-0",
+			Writable:  true,
+			PathType:  v1.HostPathDirectory,
+		},
+		{
+			Name:      "foo-1",
+			HostPath:  "/tmp/qux-1",
+			MountPath: "/tmp/qux-1",
+			Writable:  false,
+			PathType:  v1.HostPathFileOrCreate,
+		},
+		{
+			Name:      "bar-1",
+			HostPath:  "/tmp/asd-1",
+			MountPath: "/tmp/asd-1",
+			Writable:  true,
+			PathType:  v1.HostPathDirectoryOrCreate,
 		},
 	}
-	mounts.AddExtraHostPathMounts("component", hostPathMounts, true, &hostPathDirectoryOrCreate)
-	if _, ok := mounts.volumes["component"]["foo"]; !ok {
-		t.Errorf("Expected to find volume %q", "foo")
-	}
-	vol, _ := mounts.volumes["component"]["foo"]
-	if vol.Name != "foo" {
-		t.Errorf("Expected volume name %q", "foo")
-	}
-	if vol.HostPath.Path != "/tmp/qux" {
-		t.Errorf("Expected host path %q", "/tmp/qux")
-	}
-	if _, ok := mounts.volumeMounts["component"]["foo"]; !ok {
-		t.Errorf("Expected to find volume mount %q", "foo")
-	}
-	volMount, _ := mounts.volumeMounts["component"]["foo"]
-	if volMount.Name != "foo" {
-		t.Errorf("Expected volume mount name %q", "foo")
-	}
-	if volMount.MountPath != "/tmp/qux" {
-		t.Errorf("Expected container path %q", "/tmp/qux")
+	mounts.AddExtraHostPathMounts("component", hostPathMounts)
+	for _, hostMount := range hostPathMounts {
+		volumeName := hostMount.Name
+		if _, ok := mounts.volumes["component"][volumeName]; !ok {
+			t.Errorf("Expected to find volume %q", volumeName)
+		}
+		vol := mounts.volumes["component"][volumeName]
+		if vol.Name != volumeName {
+			t.Errorf("Expected volume name %q", volumeName)
+		}
+		if vol.HostPath.Path != hostMount.HostPath {
+			t.Errorf("Expected host path %q", hostMount.HostPath)
+		}
+		if _, ok := mounts.volumeMounts["component"][volumeName]; !ok {
+			t.Errorf("Expected to find volume mount %q", volumeName)
+		}
+		if *vol.HostPath.Type != v1.HostPathType(hostMount.PathType) {
+			t.Errorf("Expected to host path type %q", hostMount.PathType)
+		}
+		volMount, _ := mounts.volumeMounts["component"][volumeName]
+		if volMount.Name != volumeName {
+			t.Errorf("Expected volume mount name %q", volumeName)
+		}
+		if volMount.MountPath != hostMount.MountPath {
+			t.Errorf("Expected container path %q", hostMount.MountPath)
+		}
+		if volMount.ReadOnly != !hostMount.Writable {
+			t.Errorf("Expected volume writable setting %t", hostMount.Writable)
+		}
 	}
 }
