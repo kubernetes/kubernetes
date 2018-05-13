@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -348,7 +349,13 @@ func TestRoundTripper(t *testing.T) {
 
 	get := func(t *testing.T, statusCode int) {
 		t.Helper()
-		resp, err := client.Get(server.URL)
+		u, _ := url.Parse(server.URL)
+		request := &http.Request{
+			Method: "GET",
+			URL:    u,
+		}
+
+		resp, err := client.Do(request)
 		if err != nil {
 			t.Fatal(err)
 		}
