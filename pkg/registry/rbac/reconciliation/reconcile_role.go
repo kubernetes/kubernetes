@@ -214,6 +214,11 @@ func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions 
 	_, result.MissingAggregationRuleSelectors = aggregationRuleCovers(existing.GetAggregationRule(), expected.GetAggregationRule())
 
 	switch {
+	case expected.GetAggregationRule() == nil && existing.GetAggregationRule() != nil:
+		// we didn't expect this to be an aggregated role at all, remove the existing aggregation
+		result.Role.SetAggregationRule(nil)
+		result.Operation = ReconcileUpdate
+
 	case !removeExtraPermissions && len(result.MissingAggregationRuleSelectors) > 0:
 		// add missing rules in the union case
 		aggregationRule := result.Role.GetAggregationRule()
