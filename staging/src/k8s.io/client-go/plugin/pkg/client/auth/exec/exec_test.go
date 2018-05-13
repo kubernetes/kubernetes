@@ -301,6 +301,7 @@ func TestGetToken(t *testing.T) {
 
 func TestRoundTripper(t *testing.T) {
 	wantToken := ""
+	tokenFromUser := ""
 
 	n := time.Now()
 	now := func() time.Time { return n }
@@ -353,6 +354,12 @@ func TestRoundTripper(t *testing.T) {
 		request := &http.Request{
 			Method: "GET",
 			URL:    u,
+		}
+
+		if tokenFromUser != "" {
+			request.Header = http.Header{
+				"Authorization": []string{fmt.Sprintf("bearer %s", tokenFromUser)},
+			}
 		}
 
 		resp, err := client.Do(request)
@@ -416,5 +423,39 @@ func TestRoundTripper(t *testing.T) {
 	}`)
 	wantToken = "token4"
 	// Old token is expired, should refresh automatically without hitting a 401.
+	get(t, http.StatusOK)
+
+	//test tokenFromUser scenario, configure execAuth to return invalid token
+	setOutput(`{
+		"kind": "ExecCredential",
+		"apiVersion": "client.authentication.k8s.io/v1alpha1",
+		"status": {
+			"token": "some-invalid-token"
+		}
+	}`)
+
+	// tokenFromUser is valid, so we should get OK response
+	tokenFromUser = "token1"
+	wantToken = "token1"
+	get(t, http.StatusOK)
+
+	//tokenFromUser is invalid/expired, and execAuth also returns invalid token
+	tokenFromUser = "invalid-token"
+	wantToken = "valid-token"
+	get(t, http.StatusUnauthorized)
+
+	//tokenFromUser is invalid/expired, BUT execAuth returns valid token
+	setOutput(`{
+		"kind": "ExecCredential",
+		"apiVersion": "client.authentication.k8s.io/v1alpha1",
+		"status": {
+			"token": "some-valid-token"
+		}
+	}`)
+	tokenFromUser = "invalid-token"
+	wantToken = "some-valid-token"
+	// some-invalid-token is still cached, hits unauthorized but causes token to rotate.
+	get(t, http.StatusUnauthorized)
+	// Follow up request uses the rotated token (some-valid-token).
 	get(t, http.StatusOK)
 }
