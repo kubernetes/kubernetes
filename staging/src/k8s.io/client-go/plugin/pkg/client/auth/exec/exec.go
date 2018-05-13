@@ -166,7 +166,10 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// If a user has already set credentials, use that. This makes commands like
 	// "kubectl get --token (token) pods" work.
 	if req.Header.Get("Authorization") != "" {
-		return r.base.RoundTrip(req)
+		resp, err := r.base.RoundTrip(req)
+		if resp.StatusCode != http.StatusUnauthorized {
+			return resp, err
+		}
 	}
 
 	token, err := r.a.token()
