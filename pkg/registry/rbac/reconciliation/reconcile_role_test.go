@@ -350,6 +350,32 @@ func TestComputeReconciledRoleAggregationRules(t *testing.T) {
 			expectedReconciledRole:       aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}, {"foo": "bar"}})),
 			expectedReconciliationNeeded: true,
 		},
+		"unexpected aggregation": {
+			// desired role is not aggregated
+			expectedRole: role(rules("pods", "nodes", "secrets"), nil, nil),
+			// existing role is aggregated
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}})),
+			removeExtraPermissions: false,
+
+			// reconciled role should have desired permissions and not be aggregated
+			expectedReconciledRole:       role(rules("pods", "nodes", "secrets"), nil, nil),
+			expectedReconciliationNeeded: true,
+		},
+		"unexpected aggregation with differing permissions": {
+			// desired role is not aggregated
+			expectedRole: role(rules("pods", "nodes", "secrets"), nil, nil),
+			// existing role is aggregated and has other permissions
+			actualRole: func() *rbac.ClusterRole {
+				r := aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}}))
+				r.Rules = rules("deployments")
+				return r
+			}(),
+			removeExtraPermissions: false,
+
+			// reconciled role should have aggregation removed, preserve differing permissions, and include desired permissions
+			expectedReconciledRole:       role(rules("deployments", "pods", "nodes", "secrets"), nil, nil),
+			expectedReconciliationNeeded: true,
+		},
 	}
 
 	for k, tc := range tests {
