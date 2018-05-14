@@ -23,7 +23,6 @@ import (
 	_ "github.com/golang/glog"
 	"github.com/spf13/pflag"
 
-	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 )
 
