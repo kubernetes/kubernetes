@@ -71,10 +71,6 @@
 			"Rev": "05fbef0ca5da472bbf96c9322b84a53edc03c9fd"
 		},
 		{
-			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "583c0c0531f06d5278b7d917446061adc344b5cd"
-		},
-		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
 			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
