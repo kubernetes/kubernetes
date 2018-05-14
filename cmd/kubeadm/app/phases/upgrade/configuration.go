@@ -25,11 +25,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // FetchConfiguration fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
@@ -107,12 +107,12 @@ func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiv1alpha1.MasterConfigura
 		return nil, fmt.Errorf("unable to decode config from bytes: %v", err)
 	}
 
-	if err := kubeadmapiv1alpha1.Migrate(decoded, cfg); err != nil {
+	if err := kubeadmapiv1alpha1.Migrate(decoded, cfg, kubeadmscheme.Codecs); err != nil {
 		return nil, fmt.Errorf("unable to migrate config from previous version: %v", err)
 	}
 	// Default and convert to the internal version
-	legacyscheme.Scheme.Default(cfg)
-	legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
+	kubeadmscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 	// Applies dynamic defaults to settings not provided with flags
 	if err := configutil.SetInitDynamicDefaults(internalcfg); err != nil {
@@ -123,6 +123,6 @@ func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiv1alpha1.MasterConfigura
 		return nil, err
 	}
 	// Finally converts back to the external version
-	legacyscheme.Scheme.Convert(internalcfg, finalCfg, nil)
+	kubeadmscheme.Scheme.Convert(internalcfg, finalCfg, nil)
 	return finalCfg, nil
 }

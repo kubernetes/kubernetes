@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -30,7 +31,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
@@ -96,7 +96,7 @@ func NewCmdKubeletWriteInitConfig() *cobra.Command {
 				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 				KubernetesVersion: "v1.9.0",
 			}
-			legacyscheme.Scheme.Default(cfg)
+			kubeadmscheme.Scheme.Default(cfg)
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -130,7 +130,7 @@ func NewCmdKubeletUploadDynamicConfig() *cobra.Command {
 				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 				KubernetesVersion: "v1.9.0",
 			}
-			legacyscheme.Scheme.Default(cfg)
+			kubeadmscheme.Scheme.Default(cfg)
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -155,7 +155,7 @@ func NewCmdKubeletUploadDynamicConfig() *cobra.Command {
 // NewCmdKubeletEnableDynamicConfig calls cobra.Command for enabling dynamic kubelet configuration on node
 func NewCmdKubeletEnableDynamicConfig() *cobra.Command {
 	cfg := &kubeadmapiv1alpha1.NodeConfiguration{}
-	legacyscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath string
 	cmd := &cobra.Command{
@@ -188,7 +188,7 @@ func getNodeName(cfgPath string, cfg *kubeadmapiv1alpha1.NodeConfiguration) (str
 		if err != nil {
 			return "", fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 			return "", fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}

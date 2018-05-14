@@ -37,6 +37,7 @@ import (
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -47,7 +48,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -99,7 +99,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	}
 
 	// Default values for the cobra help text
-	legacyscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath, description string
 	var printJoinCommand bool

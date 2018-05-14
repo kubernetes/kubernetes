@@ -29,8 +29,8 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -47,7 +47,7 @@ var migrations = map[string][]configMutationFunc{
 
 // Migrate takes a map representing a config file and an object to decode into.
 // The map is transformed into a format suitable for encoding into the supplied object, then serialised and decoded.
-func Migrate(in map[string]interface{}, obj runtime.Object) error {
+func Migrate(in map[string]interface{}, obj runtime.Object, codecs serializer.CodecFactory) error {
 	kind := reflect.TypeOf(obj).Elem().Name()
 	migrationsForKind := migrations[kind]
 
@@ -65,7 +65,7 @@ func Migrate(in map[string]interface{}, obj runtime.Object) error {
 		return fmt.Errorf("couldn't json encode object: %v", err)
 	}
 
-	return runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), buf.Bytes(), obj)
+	return runtime.DecodeInto(codecs.UniversalDecoder(), buf.Bytes(), obj)
 }
 
 func proxyFeatureListToMap(m map[string]interface{}) error {

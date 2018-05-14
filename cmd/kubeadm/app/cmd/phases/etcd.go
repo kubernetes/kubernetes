@@ -22,11 +22,11 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
@@ -71,7 +71,7 @@ func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Comman
 	}
 
 	// Default values for the cobra help text
-	legacyscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath string
 	var subCmds []*cobra.Command

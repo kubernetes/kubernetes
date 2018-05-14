@@ -27,10 +27,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubeproxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
@@ -113,7 +113,7 @@ func CreateRBACRules(client clientset.Interface) error {
 
 func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientset.Interface) error {
 	kubeproxyConfigMap := &v1.ConfigMap{}
-	if err := kuberuntime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), configMapBytes, kubeproxyConfigMap); err != nil {
+	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configMapBytes, kubeproxyConfigMap); err != nil {
 		return fmt.Errorf("unable to decode kube-proxy configmap %v", err)
 	}
 
@@ -123,7 +123,7 @@ func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 	}
 
 	kubeproxyDaemonSet := &apps.DaemonSet{}
-	if err := kuberuntime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
+	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
 		return fmt.Errorf("unable to decode kube-proxy daemonset %v", err)
 	}
 

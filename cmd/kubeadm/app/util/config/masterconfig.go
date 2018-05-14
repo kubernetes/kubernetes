@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package config
 
 import (
 	"fmt"
@@ -26,12 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -84,7 +84,7 @@ func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiv1alpha1.MasterCo
 		if err != nil {
 			return fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 			return fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
@@ -110,8 +110,8 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
 	// static default values to cfg only for values not provided with flags
-	legacyscheme.Scheme.Default(defaultversionedcfg)
-	legacyscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
+	kubeadmscheme.Scheme.Default(defaultversionedcfg)
+	kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(internalcfg); err != nil {
 		return nil, err
