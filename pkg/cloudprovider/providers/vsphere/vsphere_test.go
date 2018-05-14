@@ -25,12 +25,40 @@ import (
 	"strings"
 	"testing"
 
+	lookup "github.com/vmware/govmomi/lookup/simulator"
 	"github.com/vmware/govmomi/simulator"
+	"github.com/vmware/govmomi/simulator/vpx"
+	sts "github.com/vmware/govmomi/sts/simulator"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 )
+
+// localhostCert was generated from crypto/tls/generate_cert.go with the following command:
+//     go run generate_cert.go  --rsa-bits 512 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+var localhostCert = `-----BEGIN CERTIFICATE-----
+MIIBjzCCATmgAwIBAgIRAKpi2WmTcFrVjxrl5n5YDUEwDQYJKoZIhvcNAQELBQAw
+EjEQMA4GA1UEChMHQWNtZSBDbzAgFw03MDAxMDEwMDAwMDBaGA8yMDg0MDEyOTE2
+MDAwMFowEjEQMA4GA1UEChMHQWNtZSBDbzBcMA0GCSqGSIb3DQEBAQUAA0sAMEgC
+QQC9fEbRszP3t14Gr4oahV7zFObBI4TfA5i7YnlMXeLinb7MnvT4bkfOJzE6zktn
+59zP7UiHs3l4YOuqrjiwM413AgMBAAGjaDBmMA4GA1UdDwEB/wQEAwICpDATBgNV
+HSUEDDAKBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MC4GA1UdEQQnMCWCC2V4
+YW1wbGUuY29thwR/AAABhxAAAAAAAAAAAAAAAAAAAAABMA0GCSqGSIb3DQEBCwUA
+A0EAUsVE6KMnza/ZbodLlyeMzdo7EM/5nb5ywyOxgIOCf0OOLHsPS9ueGLQX9HEG
+//yjTXuhNcUugExIjM/AIwAZPQ==
+-----END CERTIFICATE-----`
+
+// localhostKey is the private key for localhostCert.
+var localhostKey = `-----BEGIN RSA PRIVATE KEY-----
+MIIBOwIBAAJBAL18RtGzM/e3XgavihqFXvMU5sEjhN8DmLtieUxd4uKdvsye9Phu
+R84nMTrOS2fn3M/tSIezeXhg66quOLAzjXcCAwEAAQJBAKcRxH9wuglYLBdI/0OT
+BLzfWPZCEw1vZmMR2FF1Fm8nkNOVDPleeVGTWoOEcYYlQbpTmkGSxJ6ya+hqRi6x
+goECIQDx3+X49fwpL6B5qpJIJMyZBSCuMhH4B7JevhGGFENi3wIhAMiNJN5Q3UkL
+IuSvv03kaPR5XVQ99/UeEetUgGvBcABpAiBJSBzVITIVCGkGc7d+RCf49KTCIklv
+bGWObufAR8Ni4QIgWpILjW8dkGg8GOUZ0zaNA6Nvt6TIv2UWGJ4v5PoV98kCIQDx
+rIiZs5QbKdycsv9gQJzwQAogC8o04X3Zz3dsoX+h4A==
+-----END RSA PRIVATE KEY-----`
 
 func configFromEnv() (cfg VSphereConfig, ok bool) {
 	var InsecureFlag bool
@@ -61,14 +89,9 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	return
 }
 
-// configFromEnvOrSim returns config from configFromEnv if set,
-// otherwise starts a vcsim instance and returns config for use against the vcsim instance.
-func configFromEnvOrSim() (VSphereConfig, func()) {
-	cfg, ok := configFromEnv()
-	if ok {
-		return cfg, func() {}
-	}
-
+// configFromSim starts a vcsim instance and returns config for use against the vcsim instance.
+func configFromSim() (VSphereConfig, func()) {
+	var cfg VSphereConfig
 	model := simulator.VPX()
 
 	err := model.Create()
@@ -78,6 +101,13 @@ func configFromEnvOrSim() (VSphereConfig, func()) {
 
 	model.Service.TLS = new(tls.Config)
 	s := model.Service.NewServer()
+
+	// STS simulator
+	path, handler := sts.New(s.URL, vpx.Setting)
+	model.Service.ServeMux.Handle(path, handler)
+
+	// Lookup Service simulator
+	model.Service.RegisterSDK(lookup.New())
 
 	cfg.Global.InsecureFlag = true
 	cfg.Global.VCenterIP = s.URL.Hostname()
@@ -103,6 +133,15 @@ func configFromEnvOrSim() (VSphereConfig, func()) {
 		s.Close()
 		model.Remove()
 	}
+}
+
+// configFromEnvOrSim returns config from configFromEnv if set, otherwise returns configFromSim.
+func configFromEnvOrSim() (VSphereConfig, func()) {
+	cfg, ok := configFromEnv()
+	if ok {
+		return cfg, func() {}
+	}
+	return configFromSim()
 }
 
 func TestReadConfig(t *testing.T) {
@@ -179,7 +218,36 @@ func TestVSphereLogin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to connect to vSphere: %s", err)
 	}
-	defer vcInstance.conn.Logout(ctx)
+	vcInstance.conn.Logout(ctx)
+}
+
+func TestVSphereLoginByToken(t *testing.T) {
+	cfg, cleanup := configFromSim()
+	defer cleanup()
+
+	// Configure for SAML token auth
+	cfg.Global.User = localhostCert
+	cfg.Global.Password = localhostKey
+
+	// Create vSphere configuration object
+	vs, err := newControllerNode(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	}
+
+	ctx := context.Background()
+
+	// Create vSphere client
+	vcInstance, ok := vs.vsphereInstanceMap[cfg.Global.VCenterIP]
+	if !ok {
+		t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
+	}
+
+	err = vcInstance.conn.Connect(ctx)
+	if err != nil {
+		t.Errorf("Failed to connect to vSphere: %s", err)
+	}
+	vcInstance.conn.Logout(ctx)
 }
 
 func TestZones(t *testing.T) {
