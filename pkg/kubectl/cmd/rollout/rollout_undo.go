@@ -65,6 +65,7 @@ var (
 func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &UndoOptions{
 		PrintFlags: printers.NewPrintFlags("", legacyscheme.Scheme),
+		ToRevision: int64(0),
 	}
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
@@ -90,7 +91,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ValidArgs: validArgs,
 	}
 
-	cmd.Flags().Int64("to-revision", 0, "The revision to rollback to. Default to 0 (last revision).")
+	cmd.Flags().Int64Var(&o.ToRevision, "to-revision", o.ToRevision, "The revision to rollback to. Default to 0 (last revision).")
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
@@ -102,7 +103,6 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
-	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
 	o.Out = out
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
