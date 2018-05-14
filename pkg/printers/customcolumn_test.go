@@ -47,20 +47,22 @@ func TestMassageJSONPath(t *testing.T) {
 		{input: "{{foo.bar}", expectErr: true},
 	}
 	for _, test := range tests {
-		output, err := printers.RelaxedJSONPathExpression(test.input)
-		if err != nil && !test.expectErr {
-			t.Errorf("unexpected error: %v", err)
-			continue
-		}
-		if test.expectErr {
-			if err == nil {
-				t.Error("unexpected non-error")
+		t.Run(test.input, func(t *testing.T) {
+			output, err := printers.RelaxedJSONPathExpression(test.input)
+			if err != nil && !test.expectErr {
+				t.Errorf("unexpected error: %v", err)
+				return
 			}
-			continue
-		}
-		if output != test.expectedOutput {
-			t.Errorf("input: %s, expected: %s, saw: %s", test.input, test.expectedOutput, output)
-		}
+			if test.expectErr {
+				if err == nil {
+					t.Error("unexpected non-error")
+				}
+				return
+			}
+			if output != test.expectedOutput {
+				t.Errorf("input: %s, expected: %s, saw: %s", test.input, test.expectedOutput, output)
+			}
+		})
 	}
 }
 
@@ -113,33 +115,34 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		printer, err := printers.NewCustomColumnsPrinterFromSpec(test.spec, legacyscheme.Codecs.UniversalDecoder(), test.noHeaders)
-		if test.expectErr {
-			if err == nil {
-				t.Errorf("[%s] unexpected non-error", test.name)
+		t.Run(test.name, func(t *testing.T) {
+			printer, err := printers.NewCustomColumnsPrinterFromSpec(test.spec, legacyscheme.Codecs.UniversalDecoder(), test.noHeaders)
+			if test.expectErr {
+				if err == nil {
+					t.Errorf("[%s] unexpected non-error", test.name)
+				}
+				return
 			}
-			continue
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("[%s] unexpected error: %v", test.name, err)
-			continue
-		}
-		if test.noHeaders {
-			buffer := &bytes.Buffer{}
-
-			printer.PrintObj(&api.Pod{}, buffer)
-			if err != nil {
-				t.Fatalf("An error occurred printing Pod: %#v", err)
+			if !test.expectErr && err != nil {
+				t.Errorf("[%s] unexpected error: %v", test.name, err)
+				return
 			}
+			if test.noHeaders {
+				buffer := &bytes.Buffer{}
 
-			if contains(strings.Fields(buffer.String()), "API_VERSION") {
-				t.Errorf("unexpected header API_VERSION")
+				printer.PrintObj(&api.Pod{}, buffer)
+				if err != nil {
+					t.Fatalf("An error occurred printing Pod: %#v", err)
+				}
+
+				if contains(strings.Fields(buffer.String()), "API_VERSION") {
+					t.Errorf("unexpected header API_VERSION")
+				}
+
+			} else if !reflect.DeepEqual(test.expectedColumns, printer.Columns) {
+				t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v\n", test.name, test.expectedColumns, printer.Columns)
 			}
-
-		} else if !reflect.DeepEqual(test.expectedColumns, printer.Columns) {
-			t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v\n", test.name, test.expectedColumns, printer.Columns)
-		}
-
+		})
 	}
 }
 
@@ -215,23 +218,24 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		reader := bytes.NewBufferString(test.spec)
-		printer, err := printers.NewCustomColumnsPrinterFromTemplate(reader, legacyscheme.Codecs.UniversalDecoder())
-		if test.expectErr {
-			if err == nil {
-				t.Errorf("[%s] unexpected non-error", test.name)
+		t.Run(test.name, func(t *testing.T) {
+			reader := bytes.NewBufferString(test.spec)
+			printer, err := printers.NewCustomColumnsPrinterFromTemplate(reader, legacyscheme.Codecs.UniversalDecoder())
+			if test.expectErr {
+				if err == nil {
+					t.Errorf("[%s] unexpected non-error", test.name)
+				}
+				return
 			}
-			continue
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("[%s] unexpected error: %v", test.name, err)
-			continue
-		}
+			if !test.expectErr && err != nil {
+				t.Errorf("[%s] unexpected error: %v", test.name, err)
+				return
+			}
 
-		if !reflect.DeepEqual(test.expectedColumns, printer.Columns) {
-			t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v\n", test.name, test.expectedColumns, printer.Columns)
-		}
-
+			if !reflect.DeepEqual(test.expectedColumns, printer.Columns) {
+				t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v\n", test.name, test.expectedColumns, printer.Columns)
+			}
+		})
 	}
 }
 
@@ -310,17 +314,19 @@ foo       baz           <none>
 	}
 
 	for _, test := range tests {
-		printer := &printers.CustomColumnsPrinter{
-			Columns: test.columns,
-			Decoder: legacyscheme.Codecs.UniversalDecoder(),
-		}
-		buffer := &bytes.Buffer{}
-		if err := printer.PrintObj(test.obj, buffer); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if buffer.String() != test.expectedOutput {
-			t.Errorf("\nexpected:\n'%s'\nsaw\n'%s'\n", test.expectedOutput, buffer.String())
-		}
+		t.Run(test.expectedOutput, func(t *testing.T) {
+			printer := &printers.CustomColumnsPrinter{
+				Columns: test.columns,
+				Decoder: legacyscheme.Codecs.UniversalDecoder(),
+			}
+			buffer := &bytes.Buffer{}
+			if err := printer.PrintObj(test.obj, buffer); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if buffer.String() != test.expectedOutput {
+				t.Errorf("\nexpected:\n'%s'\nsaw\n'%s'\n", test.expectedOutput, buffer.String())
+			}
+		})
 	}
 }
 

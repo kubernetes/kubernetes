@@ -26,13 +26,15 @@ import (
 )
 
 func TestTemplate(t *testing.T) {
-	testCase := map[string]struct {
+	testCase := []struct {
+		name      string
 		template  string
 		obj       runtime.Object
 		expectOut string
 		expectErr func(error) (string, bool)
 	}{
-		"support base64 decoding of secret data": {
+		{
+			name:     "support base64 decoding of secret data",
 			template: "{{ .data.username | base64decode }}",
 			obj: &v1.Secret{
 				Data: map[string][]byte{
@@ -41,7 +43,8 @@ func TestTemplate(t *testing.T) {
 			},
 			expectOut: "hunter",
 		},
-		"test error path for base64 decoding": {
+		{
+			name:     "test error path for base64 decoding",
 			template: "{{ .data.username | base64decode }}",
 			obj:      &badlyMarshaledSecret{},
 			expectErr: func(err error) (string, bool) {
@@ -50,41 +53,43 @@ func TestTemplate(t *testing.T) {
 			},
 		},
 	}
-	for name, test := range testCase {
-		buffer := &bytes.Buffer{}
+	for _, test := range testCase {
+		t.Run(test.name, func(t *testing.T) {
+			buffer := &bytes.Buffer{}
 
-		p, err := NewGoTemplatePrinter([]byte(test.template))
-		if err != nil {
-			if test.expectErr == nil {
-				t.Errorf("[%s]expected success but got:\n %v\n", name, err)
-				continue
+			p, err := NewGoTemplatePrinter([]byte(test.template))
+			if err != nil {
+				if test.expectErr == nil {
+					t.Errorf("[%s]expected success but got:\n %v\n", test.name, err)
+					return
+				}
+				if expected, ok := test.expectErr(err); !ok {
+					t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, expected, err)
+				}
+				return
 			}
-			if expected, ok := test.expectErr(err); !ok {
-				t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", name, expected, err)
-			}
-			continue
-		}
 
-		err = p.PrintObj(test.obj, buffer)
-		if err != nil {
-			if test.expectErr == nil {
-				t.Errorf("[%s]expected success but got:\n %v\n", name, err)
-				continue
+			err = p.PrintObj(test.obj, buffer)
+			if err != nil {
+				if test.expectErr == nil {
+					t.Errorf("[%s]expected success but got:\n %v\n", test.name, err)
+					return
+				}
+				if expected, ok := test.expectErr(err); !ok {
+					t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, expected, err)
+				}
+				return
 			}
-			if expected, ok := test.expectErr(err); !ok {
-				t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", name, expected, err)
+
+			if test.expectErr != nil {
+				t.Errorf("[%s]expect:\n error\n but got:\n no error\n", test.name)
+				return
 			}
-			continue
-		}
 
-		if test.expectErr != nil {
-			t.Errorf("[%s]expect:\n error\n but got:\n no error\n", name)
-			continue
-		}
-
-		if test.expectOut != buffer.String() {
-			t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", name, test.expectOut, buffer.String())
-		}
+			if test.expectOut != buffer.String() {
+				t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, test.expectOut, buffer.String())
+			}
+		})
 	}
 }
 
