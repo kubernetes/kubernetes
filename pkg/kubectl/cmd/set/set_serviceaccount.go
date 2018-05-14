@@ -34,6 +34,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -152,7 +153,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	resources := args[:len(args)-1]
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -174,7 +175,6 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 func (o *SetServiceAccountOptions) Run() error {
 	patchErrs := []error{}
 	patchFn := func(info *resource.Info) ([]byte, error) {
-		info.Object = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 		_, err := o.updatePodSpecForObject(info.Object, func(podSpec *v1.PodSpec) error {
 			podSpec.ServiceAccountName = o.serviceAccountName
 			return nil
@@ -187,10 +187,10 @@ func (o *SetServiceAccountOptions) Run() error {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+		return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 	}
 
-	patches := CalculatePatches(o.infos, cmdutil.InternalVersionJSONEncoder(), patchFn)
+	patches := CalculatePatches(o.infos, scheme.DefaultJSONEncoder(), patchFn)
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
@@ -198,19 +198,18 @@ func (o *SetServiceAccountOptions) Run() error {
 			continue
 		}
 		if o.local || o.dryRun {
-			if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, patch.Info.Mapping), o.Out); err != nil {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
 		}
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			patchErrs = append(patchErrs, fmt.Errorf("failed to patch ServiceAccountName %v", err))
 			continue
 		}
-		info.Refresh(patched, true)
 
-		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+		if err := o.PrintObj(actual, o.Out); err != nil {
 			return err
 		}
 	}

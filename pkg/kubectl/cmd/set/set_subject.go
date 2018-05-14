@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/printers"
-
 	"github.com/spf13/cobra"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -34,7 +33,9 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -52,7 +53,7 @@ var (
 	kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run | kubectl set subject --local -f - --user=foo -o yaml`)
 )
 
-type updateSubjects func(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac.Subject)
+type updateSubjects func(existings []rbacv1.Subject, targets []rbacv1.Subject) (bool, []rbacv1.Subject)
 
 // SubjectOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
 // referencing the cmd.Flags
@@ -138,7 +139,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
@@ -194,10 +195,10 @@ func (o *SubjectOptions) Validate() error {
 }
 
 func (o *SubjectOptions) Run(fn updateSubjects) error {
-	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-		subjects := []rbac.Subject{}
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+		subjects := []rbacv1.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
-			subject := rbac.Subject{
+			subject := rbacv1.Subject{
 				Kind:     rbac.UserKind,
 				APIGroup: rbac.GroupName,
 				Name:     user,
@@ -205,7 +206,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			subjects = append(subjects, subject)
 		}
 		for _, group := range sets.NewString(o.Groups...).List() {
-			subject := rbac.Subject{
+			subject := rbacv1.Subject{
 				Kind:     rbac.GroupKind,
 				APIGroup: rbac.GroupName,
 				Name:     group,
@@ -219,7 +220,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			if len(namespace) == 0 {
 				namespace = o.namespace
 			}
-			subject := rbac.Subject{
+			subject := rbacv1.Subject{
 				Kind:      rbac.ServiceAccountKind,
 				Namespace: namespace,
 				Name:      name,
@@ -230,7 +231,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
 		if transformed && err == nil {
 			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
-			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping))
+			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 		}
 		return nil, err
 	})
@@ -256,26 +257,25 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch subjects to rolebinding: %v\n", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
-		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+		return o.PrintObj(actual, o.Out)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
 
 //Note: the obj mutates in the function
-func updateSubjectForObject(obj runtime.Object, subjects []rbac.Subject, fn updateSubjects) (bool, error) {
+func updateSubjectForObject(obj runtime.Object, subjects []rbacv1.Subject, fn updateSubjects) (bool, error) {
 	switch t := obj.(type) {
-	case *rbac.RoleBinding:
+	case *rbacv1.RoleBinding:
 		transformed, result := fn(t.Subjects, subjects)
 		t.Subjects = result
 		return transformed, nil
-	case *rbac.ClusterRoleBinding:
+	case *rbacv1.ClusterRoleBinding:
 		transformed, result := fn(t.Subjects, subjects)
 		t.Subjects = result
 		return transformed, nil
@@ -284,7 +284,7 @@ func updateSubjectForObject(obj runtime.Object, subjects []rbac.Subject, fn upda
 	}
 }
 
-func addSubjects(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac.Subject) {
+func addSubjects(existings []rbacv1.Subject, targets []rbacv1.Subject) (bool, []rbacv1.Subject) {
 	transformed := false
 	updated := existings
 	for _, item := range targets {
@@ -296,7 +296,7 @@ func addSubjects(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac
 	return transformed, updated
 }
 
-func contain(slice []rbac.Subject, item rbac.Subject) bool {
+func contain(slice []rbacv1.Subject, item rbacv1.Subject) bool {
 	for _, v := range slice {
 		if v == item {
 			return true

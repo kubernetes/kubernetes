@@ -193,7 +193,7 @@ func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.Po
 		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
 
 	default:
-		return false, fmt.Errorf("the object is not a pod or does not have a pod template")
+		return false, fmt.Errorf("the object is not a pod or does not have a pod template: %T", t)
 	}
 }
 

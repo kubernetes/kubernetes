@@ -35,6 +35,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -173,7 +174,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -222,9 +223,8 @@ func (o *SetResourcesOptions) Validate() error {
 
 func (o *SetResourcesOptions) Run() error {
 	allErrs := []error{}
-	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		transformed := false
-		info.Object = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) != 0 {
@@ -260,7 +260,7 @@ func (o *SetResourcesOptions) Run() error {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+		return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 	})
 
 	for _, patch := range patches {
@@ -277,20 +277,19 @@ func (o *SetResourcesOptions) Run() error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, patch.Info.Mapping), o.Out); err != nil {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch limit update to pod template %v\n", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
-		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+		if err := o.PrintObj(actual, o.Out); err != nil {
 			return err
 		}
 	}

@@ -34,6 +34,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -144,7 +145,7 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	o.builder = f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -201,9 +202,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
-		CalculatePatch(patch, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-			versioned := cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
-			patch.Info.Object = versioned
+		CalculatePatch(patch, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
 			if selectErr != nil {
 				return nil, selectErr
@@ -214,7 +213,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 				glog.V(4).Infof("error recording current command: %v", err)
 			}
 
-			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 		})
 
 		if patch.Err != nil {
@@ -224,13 +223,12 @@ func (o *SetSelectorOptions) RunSelector() error {
 			return o.PrintObj(info.Object, o.Out)
 		}
 
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			return err
 		}
 
-		info.Refresh(patched, true)
-		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, info.Mapping), o.Out)
+		return o.PrintObj(actual, o.Out)
 	})
 }
 
