@@ -431,6 +431,12 @@ def set_final_status():
         hookenv.status_set('waiting', 'Waiting to retry addon deployment')
         return
 
+    req_sent = is_state('kubernetes-master.cloud-request-sent')
+    aws_ready = is_state('endpoint.aws.ready')
+    gcp_ready = is_state('endpoint.gcp.ready')
+    if req_sent and not (aws_ready or gcp_ready):
+        hookenv.status_set('waiting', 'waiting for cloud integration')
+
     if addons_configured and not all_kube_system_pods_running():
         hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
         return
@@ -1395,8 +1401,6 @@ def poke_network_unavailable():
     discussion about refactoring the affected code but nothing has happened
     in a while.
     """
-    if is_state('kubernetes-master.networkunavailble.cleared'):
-        return
     cmd = ['kubectl', 'get', 'nodes', '-o', 'json']
 
     try:
@@ -1447,8 +1451,6 @@ def poke_network_unavailable():
             hookenv.log('failed to parse node status: {}'.format(body),
                         hookenv.ERROR)
             return
-
-    set_state('kubernetes-master.networkunavailble.cleared')
 
 
 def apiserverVersion():
@@ -1527,11 +1529,11 @@ def request_integration():
     cloud.enable_dns_management()
     cloud.enable_block_storage_management()
     set_state('kubernetes-master.cloud-request-sent')
-    hookenv.status_set('waiting', 'waiting for cloud integration')
 
 
 @when_none('endpoint.aws.joined',
            'endpoint.gcp.joined')
+@when('kubernetes-master.cloud-request-sent')
 def clear_requested_integration():
     remove_state('kubernetes-master.cloud-request-sent')
 
