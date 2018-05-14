@@ -63,6 +63,14 @@ func (s *DistributedVirtualSwitch) AddDVPortgroupTask(c *types.AddDVPortgroup_Ta
 				VmVnicNetworkResourcePoolKey: spec.VmVnicNetworkResourcePoolKey,
 			}
 
+			if pg.Config.DefaultPortConfig == nil {
+				pg.Config.DefaultPortConfig = &types.VMwareDVSPortSetting{
+					Vlan: new(types.VmwareDistributedVirtualSwitchVlanIdSpec),
+				}
+			}
+
+			pg.PortKeys = []string{}
+
 			s.Portgroup = append(s.Portgroup, pg.Self)
 			s.Summary.PortgroupName = append(s.Summary.PortgroupName, pg.Name)
 
@@ -111,10 +119,13 @@ func (s *DistributedVirtualSwitch) ReconfigureDvsTask(req *types.ReconfigureDvs_
 					Map.AddReference(pg, &pg.Host, member.Host)
 				}
 			case types.ConfigSpecOperationRemove:
-				if pg := FindReference(host.Network, s.Portgroup...); pg != nil {
-					return nil, &types.ResourceInUse{
-						Type: pg.Type,
-						Name: pg.Value,
+				for _, ref := range host.Vm {
+					vm := Map.Get(ref).(*VirtualMachine)
+					if pg := FindReference(vm.Network, s.Portgroup...); pg != nil {
+						return nil, &types.ResourceInUse{
+							Type: pg.Type,
+							Name: pg.Value,
+						}
 					}
 				}
 
@@ -169,10 +180,6 @@ func (s *DistributedVirtualSwitch) dvPortgroups(_ *types.DistributedVirtualSwitc
 				Setting: pg.Config.DefaultPortConfig,
 			},
 		})
-
-		if pg.PortKeys == nil {
-			continue
-		}
 
 		for _, key := range pg.PortKeys {
 			res = append(res, types.DistributedVirtualPort{

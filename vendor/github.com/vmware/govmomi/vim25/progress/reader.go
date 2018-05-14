@@ -100,11 +100,12 @@ func NewReader(ctx context.Context, s Sinker, r io.Reader, size int64) *reader {
 // underlying channel.
 func (r *reader) Read(b []byte) (int, error) {
 	n, err := r.r.Read(b)
-	if err != nil {
+	r.pos += int64(n)
+
+	if err != nil && err != io.EOF {
 		return n, err
 	}
 
-	r.pos += int64(n)
 	q := readerReport{
 		t:    time.Now(),
 		pos:  r.pos,

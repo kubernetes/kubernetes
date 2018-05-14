@@ -173,6 +173,25 @@ func CreateStandaloneHost(f *Folder, spec types.HostConnectSpec) (*HostSystem, t
 	return host, nil
 }
 
+func (h *HostSystem) DestroyTask(req *types.Destroy_Task) soap.HasFault {
+	task := CreateTask(h, "destroy", func(t *Task) (types.AnyType, types.BaseMethodFault) {
+		if len(h.Vm) > 0 {
+			return nil, &types.ResourceInUse{}
+		}
+
+		f := Map.getEntityParent(h, "Folder").(*Folder)
+		f.removeChild(h.Reference())
+
+		return nil, nil
+	})
+
+	return &methods.Destroy_TaskBody{
+		Res: &types.Destroy_TaskResponse{
+			Returnval: task.Run(),
+		},
+	}
+}
+
 func (h *HostSystem) EnterMaintenanceModeTask(spec *types.EnterMaintenanceMode_Task) soap.HasFault {
 	task := CreateTask(h, "enterMaintenanceMode", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		h.Runtime.InMaintenanceMode = true

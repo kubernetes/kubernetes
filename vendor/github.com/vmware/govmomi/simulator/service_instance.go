@@ -19,8 +19,10 @@ package simulator
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/simulator/vpx"
+	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -36,7 +38,7 @@ func NewServiceInstance(content types.ServiceContent, folder mo.Folder) *Service
 
 	s := &ServiceInstance{}
 
-	s.Self = methods.ServiceInstance
+	s.Self = vim25.ServiceInstance
 	s.Content = content
 
 	Map.Put(s)
@@ -49,6 +51,7 @@ func NewServiceInstance(content types.ServiceContent, folder mo.Folder) *Service
 	if content.About.ApiType == "HostAgent" {
 		CreateDefaultESX(f)
 	} else {
+		content.About.InstanceUuid = uuid.New().String()
 		setting = vpx.Setting
 	}
 
