@@ -25,7 +25,11 @@ type CustomResourceDefinitionSpec struct {
 	// Group is the group this resource belongs in
 	Group string `json:"group" protobuf:"bytes,1,opt,name=group"`
 	// Version is the version this resource belongs in
-	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
+	// Should be always first item in Versions field if provided.
+	// Optional, but at least one of Version or Versions must be set.
+	// Deprecated: Please use `Versions`.
+	// +optional
+	Version string `json:"version,omitempty" protobuf:"bytes,2,opt,name=version"`
 	// Names are the names used to describe this custom resource
 	Names CustomResourceDefinitionNames `json:"names" protobuf:"bytes,3,opt,name=names"`
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
@@ -38,6 +42,23 @@ type CustomResourceDefinitionSpec struct {
 	// subresources via the CustomResourceSubresources feature gate.
 	// +optional
 	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,6,opt,name=subresources"`
+	// Versions is the list of all supported versions for this resource.
+	// If Version field is provided, this field is optional.
+	// Validation: All versions must use the same validation schema for now. i.e., top
+	// level Validation field is applied to all of these versions.
+	// Order: The order of these versions is used to determine the order in discovery API
+	// (preferred version first).
+	Versions []CustomResourceDefinitionVersion `json:"versions,omitempty" protobuf:"bytes,7,rep,name=versions"`
+}
+
+type CustomResourceDefinitionVersion struct {
+	// Name is the version name, e.g. “v1”, “v2beta1”, etc.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// Served is a flag enabling/disabling this version from being served via REST APIs
+	Served bool `json:"served" protobuf:"varint,2,opt,name=served"`
+	// Storage flags the version as storage version. There must be exactly one
+	// flagged as storage version.
+	Storage bool `json:"storage" protobuf:"varint,3,opt,name=storage"`
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
@@ -119,6 +140,14 @@ type CustomResourceDefinitionStatus struct {
 	// AcceptedNames are the names that are actually being used to serve discovery
 	// They may be different than the names in spec.
 	AcceptedNames CustomResourceDefinitionNames `json:"acceptedNames" protobuf:"bytes,2,opt,name=acceptedNames"`
+
+	// StoredVersions are all versions of CustomResources that were ever persisted. Tracking these
+	// versions allows a migration path for stored versions in etcd. The field is mutable
+	// so the migration controller can first finish a migration to another version (i.e.
+	// that no old objects are left in the storage), and then remove the rest of the
+	// versions from this list.
+	// None of the versions in this list can be removed from the spec.Versions field.
+	StoredVersions []string `protobuf:"bytes,3,rep,name=storedVersions"`
 }
 
 // CustomResourceCleanupFinalizer is the name of the finalizer which will delete instances of

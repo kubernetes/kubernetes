@@ -26,6 +26,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -78,6 +79,336 @@ func TestClusterScopedCRUD(t *testing.T) {
 	ns := ""
 	testSimpleCRUD(t, ns, noxuDefinition, dynamicClient)
 	testFieldSelector(t, ns, noxuDefinition, dynamicClient)
+}
+
+func TestVersionedNamspacedScopedCRD(t *testing.T) {
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := "not-the-default"
+	testSimpleVersionedCRUD(t, ns, noxuDefinition, dynamicClient)
+}
+
+func TestVersionedClusterScopedCRD(t *testing.T) {
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := ""
+	testSimpleVersionedCRUD(t, ns, noxuDefinition, dynamicClient)
+}
+
+func TestStoragedVersionInNamespacedCRDStatus(t *testing.T) {
+	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
+	ns := "not-the-default"
+	testStoragedVersionInCRDStatus(t, ns, noxuDefinition)
+}
+
+func TestStoragedVersionInClusterScopedCRDStatus(t *testing.T) {
+	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	ns := ""
+	testStoragedVersionInCRDStatus(t, ns, noxuDefinition)
+}
+
+func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition) {
+	versionsV1Beta1Storage := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+		{
+			Name:    "v1beta1",
+			Served:  true,
+			Storage: true,
+		},
+		{
+			Name:    "v1beta2",
+			Served:  true,
+			Storage: false,
+		},
+	}
+	versionsV1Beta2Storage := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+		{
+			Name:    "v1beta1",
+			Served:  true,
+			Storage: false,
+		},
+		{
+			Name:    "v1beta2",
+			Served:  true,
+			Storage: true,
+		},
+	}
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition.Spec.Versions = versionsV1Beta1Storage
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The storage version list should be empty
+	crd, err := testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(crd.Status.StoredVersions) > 0 {
+		crd.Status.StoredVersions = []string{}
+		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().UpdateStatus(crd)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Changing CRD without any writes should keep the list empty
+	crd.Spec.Versions = versionsV1Beta2Storage
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crd, err = testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := []string{}, crd.Status.StoredVersions; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	version := "v1beta1" // This version should not matter as the storage version is what we are testing here
+	noxuResourceClient := NewNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, version)
+
+	// Writing when storage is v1beta2 should update the list
+	_, err = instantiateVersionedCustomResource(t, testserver.NewVersionedNoxuInstance(ns, "foo", version), noxuResourceClient, noxuDefinition, version)
+	if err != nil {
+		t.Fatalf("unable to create noxu Instance:%v", err)
+	}
+	crd, err = testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := []string{"v1beta2"}, crd.Status.StoredVersions; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	// Changing CRD storage to v1beta1 and another write should update stored version.
+	crd.Spec.Versions = versionsV1Beta1Storage
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crd, err = testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := []string{"v1beta2"}, crd.Status.StoredVersions; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	_, err = instantiateVersionedCustomResource(t, testserver.NewVersionedNoxuInstance(ns, "bar", version), noxuResourceClient, noxuDefinition, version)
+	if err != nil {
+		t.Fatalf("unable to create noxu Instance:%v", err)
+	}
+	crd, err = testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := []string{"v1beta2", "v1beta1"}, crd.Status.StoredVersions; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestVersionedNamspacedScopedCRDListOperationOnly(t *testing.T) {
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := "not-the-default"
+	noxuResourceClients := map[string]dynamic.ResourceInterface{}
+	noxuWatchs := map[string]watch.Interface{}
+	//storageVersion := ""
+	for _, v := range noxuDefinition.Spec.Versions {
+		if v.Served {
+			noxuResourceClients[v.Name] = NewNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, v.Name)
+			noxuWatchs[v.Name], err = noxuResourceClients[v.Name].Watch(metav1.ListOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	version := "v1beta1"
+	createdNoxuInstance, err := instantiateVersionedCustomResource(t, testserver.NewVersionedNoxuInstance(ns, "foo", version), noxuResourceClients[version], noxuDefinition, version)
+	if err != nil {
+		t.Fatalf("unable to create noxu Instance:%v", err)
+	}
+	gottenNoxuInstance, err := noxuResourceClients[version].Get("foo", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := createdNoxuInstance, gottenNoxuInstance; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	listWithItem, err := noxuResourceClients[version].List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := 1, len(listWithItem.Items); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := *createdNoxuInstance, listWithItem.Items[0]; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func testSimpleVersionedCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.Interface) {
+	var err error
+	noxuResourceClients := map[string]dynamic.ResourceInterface{}
+	noxuWatchs := map[string]watch.Interface{}
+	for _, v := range noxuDefinition.Spec.Versions {
+		if v.Served {
+			noxuResourceClients[v.Name] = NewNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, v.Name)
+			noxuWatchs[v.Name], err = noxuResourceClients[v.Name].Watch(metav1.ListOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	defer func() {
+		for _, w := range noxuWatchs {
+			w.Stop()
+		}
+	}()
+
+	for version, noxuResourceClient := range noxuResourceClients {
+		createdNoxuInstance, err := instantiateVersionedCustomResource(t, testserver.NewVersionedNoxuInstance(ns, "foo", version), noxuResourceClient, noxuDefinition, version)
+		if err != nil {
+			t.Fatalf("unable to create noxu Instance:%v", err)
+		}
+		if e, a := noxuDefinition.Spec.Group+"/"+version, createdNoxuInstance.GetAPIVersion(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		for watchVersion, noxuWatch := range noxuWatchs {
+			select {
+			case watchEvent := <-noxuWatch.ResultChan():
+				if e, a := watch.Added, watchEvent.Type; e != a {
+					t.Errorf("expected %v, got %v", e, a)
+					break
+				}
+				createdObjectMeta, err := meta.Accessor(watchEvent.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// it should have a UUID
+				if len(createdObjectMeta.GetUID()) == 0 {
+					t.Errorf("missing uuid: %#v", watchEvent.Object)
+				}
+				if e, a := ns, createdObjectMeta.GetNamespace(); e != a {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+				createdTypeMeta, err := meta.TypeAccessor(watchEvent.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if e, a := noxuDefinition.Spec.Group+"/"+watchVersion, createdTypeMeta.GetAPIVersion(); e != a {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+				if e, a := noxuDefinition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+			case <-time.After(5 * time.Second):
+				t.Errorf("missing watch event")
+			}
+		}
+
+		// Get test
+		// TODO(mehdy): This should be a loop getting all versions.
+		gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e, a := createdNoxuInstance, gottenNoxuInstance; !reflect.DeepEqual(e, a) {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+
+		// List test
+		listWithItem, err := noxuResourceClient.List(metav1.ListOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e, a := 1, len(listWithItem.Items); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		if e, a := *createdNoxuInstance, listWithItem.Items[0]; !reflect.DeepEqual(e, a) {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+
+		// Delete test
+		if err := noxuResourceClient.Delete("foo", v1.NewDeleteOptions(0)); err != nil {
+			t.Fatal(err)
+		}
+
+		listWithoutItem, err := noxuResourceClient.List(metav1.ListOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e, a := 0, len(listWithoutItem.Items); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+
+		for _, noxuWatch := range noxuWatchs {
+			select {
+			case watchEvent := <-noxuWatch.ResultChan():
+				if e, a := watch.Deleted, watchEvent.Type; e != a {
+					t.Errorf("expected %v, got %v", e, a)
+					break
+				}
+				deletedObjectMeta, err := meta.Accessor(watchEvent.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// it should have a UUID
+				createdObjectMeta, err := meta.Accessor(createdNoxuInstance)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if e, a := createdObjectMeta.GetUID(), deletedObjectMeta.GetUID(); e != a {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+
+			case <-time.After(5 * time.Second):
+				t.Errorf("missing watch event")
+			}
+		}
+
+		// Delete test
+		if err := noxuResourceClient.DeleteCollection(v1.NewDeleteOptions(0), v1.ListOptions{}); err != nil {
+			t.Fatal(err)
+		}
+
+	}
 }
 
 func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.Interface) {

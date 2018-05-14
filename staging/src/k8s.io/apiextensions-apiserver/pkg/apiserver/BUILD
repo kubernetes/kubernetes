@@ -13,6 +13,7 @@ go_library(
         "customresource_discovery.go",
         "customresource_discovery_controller.go",
         "customresource_handler.go",
+        "helpers.go",
     ],
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
     deps = [
@@ -24,9 +25,11 @@ go_library(
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion:go_default_library",
@@ -84,6 +87,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:all-srcs",
     ],
     tags = ["automanaged"],
@@ -93,5 +97,5 @@ go_test(
     name = "go_default_test",
     srcs = ["customresource_handler_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library"],
+    deps = ["//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion:go_default_library"],
 )
