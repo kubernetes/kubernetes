@@ -208,6 +208,15 @@ func (s *serviceAccount) Validate(a admission.Attributes) (err error) {
 		if hasSecrets {
 			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference secrets"))
 		}
+		for _, v := range pod.Spec.Volumes {
+			if proj := v.Projected; proj != nil {
+				for _, projSource := range proj.Sources {
+					if projSource.ServiceAccountToken != nil {
+						return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not use ServiceAccountToken volume projections"))
+					}
+				}
+			}
+		}
 		return nil
 	}
 

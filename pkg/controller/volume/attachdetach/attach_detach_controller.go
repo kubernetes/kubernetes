@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -583,6 +584,12 @@ func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) 
 func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
 	return func(_, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
+	}
+}
+
+func (adc *attachDetachController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+		return nil, fmt.Errorf("GetServiceAccountToken unsupported in attachDetachController")
 	}
 }
 
