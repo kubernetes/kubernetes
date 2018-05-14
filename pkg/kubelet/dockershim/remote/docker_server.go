@@ -25,7 +25,6 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
 // DockerServer is the grpc server of dockershim.
@@ -64,9 +63,7 @@ func (s *DockerServer) Start() error {
 	runtimeapi.RegisterRuntimeServiceServer(s.server, s.service)
 	runtimeapi.RegisterImageServiceServer(s.server, s.service)
 	go func() {
-		// Use interrupt handler to make sure the server to be stopped properly.
-		h := interrupt.New(nil, s.Stop)
-		err := h.Run(func() error { return s.server.Serve(l) })
+		err := s.server.Serve(l)
 		if err != nil {
 			glog.Errorf("Failed to serve connections: %v", err)
 		}
