@@ -382,12 +382,17 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	)
 	parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
+	clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
 	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Status.AcceptedNames.Kind}
-	typer := UnstructuredObjectTyper{
-		Delegate:          parameterScheme,
-		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(),
+	typer := unstructuredObjectTyper{
+		delegate:          parameterScheme,
+		unstructuredTyper: discovery.NewUnstructuredObjectTyper(),
 	}
 	creator := unstructuredCreator{}
+	converter := crdObjectConverter{
+		unstructuredDelegate: unstructured.UnstructuredObjectConverter{},
+		clusterScoped:        clusterScoped,
+	}
 
 	validator, _, err := apiservervalidation.NewSchemaValidator(crd.Spec.Validation)
 	if err != nil {
@@ -434,7 +439,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			statusSpec,
 			scaleSpec,
 		),
-		r.restOptionsGetter,
+		crdConversionRESTOptionsGetter{
+			delegate:       r.restOptionsGetter,
+			converter:      converter,
+			decoderVersion: schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version},
+			encoderVersion: schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version},
+		},
 		crd.Status.AcceptedNames.Categories,
 		table,
 	)
@@ -447,8 +457,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version, "namespaces") + "/"
 	}
 
-	clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
-
 	requestScope := handlers.RequestScope{
 		Namer: handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
@@ -456,17 +464,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			SelfLinkPathPrefix: selfLinkPrefix,
 		},
 
-		Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator},
+		Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: converter},
 		ParameterCodec: parameterCodec,
 
-		Creater: creator,
-		Convertor: crdObjectConverter{
-			UnstructuredObjectConverter: unstructured.UnstructuredObjectConverter{},
-			clusterScoped:               clusterScoped,
-		},
-		Defaulter:       unstructuredDefaulter{parameterScheme},
+		Creater:         creator,
+		Convertor:       converter,
+		Defaulter:       unstructuredNoopDefaulter{parameterScheme},
 		Typer:           typer,
-		UnsafeConvertor: unstructured.UnstructuredObjectConverter{},
+		UnsafeConvertor: converter,
 
 		Resource: schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Status.AcceptedNames.Plural},
 		Kind:     kind,
@@ -517,10 +522,18 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	return ret, nil
 }
 
-// crdObjectConverter is a converter that supports field selectors for CRDs.
+// crdObjectConverter wraps an unstructured object converter adding:
+// - support for field selectors
+// - support for UnstructuredList, applying the delegate to each item.
 type crdObjectConverter struct {
-	unstructured.UnstructuredObjectConverter
-	clusterScoped bool
+	unstructuredDelegate unstructured.UnstructuredObjectConverter
+	clusterScoped        bool
+}
+
+var _ runtime.ObjectConvertor = crdObjectConverter{}
+
+func (c crdObjectConverter) Convert(in, out, context interface{}) error {
+	return c.unstructuredDelegate.Convert(in, out, context)
 }
 
 func (c crdObjectConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
@@ -535,9 +548,37 @@ func (c crdObjectConverter) ConvertFieldLabel(version, kind, label, value string
 	}
 }
 
+func (c crdObjectConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
+	kind := in.GetObjectKind().GroupVersionKind()
+	if kind.Empty() {
+		return in, nil
+	}
+
+	if unstructList, ok := in.(*unstructured.UnstructuredList); ok {
+		gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{kind})
+		if !ok {
+			return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
+		}
+		in.GetObjectKind().SetGroupVersionKind(gvk)
+
+		for i := range unstructList.Items {
+			out, err := c.unstructuredDelegate.ConvertToVersion(&unstructList.Items[i], target)
+			if err != nil {
+				return nil, err
+			}
+			unstructList.Items[i] = *out.(*unstructured.Unstructured)
+		}
+
+		return in, nil
+	}
+
+	return c.unstructuredDelegate.ConvertToVersion(in, target)
+}
+
 type unstructuredNegotiatedSerializer struct {
-	typer   runtime.ObjectTyper
-	creator runtime.ObjectCreater
+	typer     runtime.ObjectTyper
+	creator   runtime.ObjectCreater
+	converter runtime.ObjectConvertor
 }
 
 func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
@@ -562,28 +603,28 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 }
 
 func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	return versioning.NewDefaultingCodecForScheme(Scheme, encoder, nil, gv, nil)
+	return versioning.NewCodec(encoder, nil, s.converter, Scheme, Scheme, Scheme, gv, nil)
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	return versioning.NewDefaultingCodecForScheme(Scheme, nil, decoder, nil, gv)
+	return versioning.NewCodec(nil, decoder, s.converter, Scheme, Scheme, Scheme, gv, nil)
 }
 
-type UnstructuredObjectTyper struct {
-	Delegate          runtime.ObjectTyper
-	UnstructuredTyper runtime.ObjectTyper
+type unstructuredObjectTyper struct {
+	delegate          runtime.ObjectTyper
+	unstructuredTyper runtime.ObjectTyper
 }
 
-func (t UnstructuredObjectTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, bool, error) {
+func (t unstructuredObjectTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, bool, error) {
 	// Delegate for things other than Unstructured.
 	if _, ok := obj.(runtime.Unstructured); !ok {
-		return t.Delegate.ObjectKinds(obj)
+		return t.delegate.ObjectKinds(obj)
 	}
-	return t.UnstructuredTyper.ObjectKinds(obj)
+	return t.unstructuredTyper.ObjectKinds(obj)
 }
 
-func (t UnstructuredObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
-	return t.Delegate.Recognizes(gvk) || t.UnstructuredTyper.Recognizes(gvk)
+func (t unstructuredObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
+	return t.delegate.Recognizes(gvk) || t.unstructuredTyper.Recognizes(gvk)
 }
 
 type unstructuredCreator struct{}
@@ -594,11 +635,13 @@ func (c unstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, 
 	return ret, nil
 }
 
-type unstructuredDefaulter struct {
+// unstructuredNoopDefaulter ignores Unstructured, and delegates everything else.
+// For Unstructured we (will) do defaulting during decoding.
+type unstructuredNoopDefaulter struct {
 	delegate runtime.ObjectDefaulter
 }
 
-func (d unstructuredDefaulter) Default(in runtime.Object) {
+func (d unstructuredNoopDefaulter) Default(in runtime.Object) {
 	// Delegate for things other than Unstructured.
 	if _, ok := in.(runtime.Unstructured); !ok {
 		d.delegate.Default(in)
@@ -639,4 +682,30 @@ func (in crdStorageMap) clone() crdStorageMap {
 		out[key] = value
 	}
 	return out
+}
+
+// crdConversionRESTOptionsGetter overrides the codec with one using the custom converter
+// and custom encoder and decoder version.
+type crdConversionRESTOptionsGetter struct {
+	delegate       generic.RESTOptionsGetter
+	converter      runtime.ObjectConvertor
+	encoderVersion schema.GroupVersion
+	decoderVersion schema.GroupVersion
+}
+
+func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+	ret, err := t.delegate.GetRESTOptions(resource)
+	if err == nil {
+		ret.StorageConfig.Codec = versioning.NewCodec(
+			ret.StorageConfig.Codec,
+			ret.StorageConfig.Codec,
+			t.converter,
+			&unstructuredCreator{},
+			discovery.NewUnstructuredObjectTyper(nil),
+			&unstructuredNoopDefaulter{delegate: Scheme},
+			t.encoderVersion,
+			t.decoderVersion,
+		)
+	}
+	return ret, err
 }
