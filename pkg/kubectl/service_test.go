@@ -41,6 +41,8 @@ func TestGenerateService(t *testing.T) {
 				"container-port": "1234",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -70,6 +72,8 @@ func TestGenerateService(t *testing.T) {
 				"container-port": "foobar",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -99,6 +103,8 @@ func TestGenerateService(t *testing.T) {
 				"container-port": "1234",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Labels: map[string]string{
@@ -132,6 +138,8 @@ func TestGenerateService(t *testing.T) {
 				"external-ip":    "1.2.3.4",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -163,6 +171,8 @@ func TestGenerateService(t *testing.T) {
 				"type":           "LoadBalancer",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -194,6 +204,8 @@ func TestGenerateService(t *testing.T) {
 				"type":           string(v1.ServiceTypeNodePort),
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -225,6 +237,8 @@ func TestGenerateService(t *testing.T) {
 				"type": string(v1.ServiceTypeNodePort),
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -254,6 +268,8 @@ func TestGenerateService(t *testing.T) {
 				"container-port": "1234",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -284,6 +300,8 @@ func TestGenerateService(t *testing.T) {
 				"session-affinity": "ClientIP",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -315,6 +333,8 @@ func TestGenerateService(t *testing.T) {
 				"cluster-ip":     "10.10.10.10",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -345,6 +365,8 @@ func TestGenerateService(t *testing.T) {
 				"cluster-ip":     "None",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -374,6 +396,8 @@ func TestGenerateService(t *testing.T) {
 				"container-port": "foobar",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -408,6 +432,8 @@ func TestGenerateService(t *testing.T) {
 				"target-port": "1234",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -441,6 +467,8 @@ func TestGenerateService(t *testing.T) {
 				"protocol": "TCP",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -474,6 +502,8 @@ func TestGenerateService(t *testing.T) {
 				"protocols": "8080/UDP",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -507,6 +537,8 @@ func TestGenerateService(t *testing.T) {
 				"protocols": "8080/UDP,8081/TCP",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -547,6 +579,8 @@ func TestGenerateService(t *testing.T) {
 				"cluster-ip":     "None",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -568,6 +602,8 @@ func TestGenerateService(t *testing.T) {
 				"cluster-ip": "None",
 			},
 			expected: v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},

@@ -118,6 +118,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 			},
 		},
 	}
+	deployment.SetGroupVersionKind(extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment"))
 	return &deployment, nil
 }
 
@@ -206,6 +207,7 @@ func (DeploymentAppsV1Beta1) Generate(genericParams map[string]interface{}) (run
 			},
 		},
 	}
+	deployment.SetGroupVersionKind(appsv1beta1.SchemeGroupVersion.WithKind("Deployment"))
 	return &deployment, nil
 }
 
@@ -376,6 +378,7 @@ func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, err
 			},
 		},
 	}
+	job.SetGroupVersionKind(batchv1.SchemeGroupVersion.WithKind("Job"))
 
 	return &job, nil
 }
@@ -477,6 +480,7 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 			},
 		},
 	}
+	cronJob.SetGroupVersionKind(batchv2alpha1.SchemeGroupVersion.WithKind("CronJob"))
 
 	return &cronJob, nil
 }
@@ -578,6 +582,7 @@ func (CronJobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Ob
 			},
 		},
 	}
+	cronJob.SetGroupVersionKind(batchv1beta1.SchemeGroupVersion.WithKind("CronJob"))
 
 	return &cronJob, nil
 }
@@ -741,6 +746,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 			},
 		},
 	}
+	controller.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("ReplicationController"))
 	return &controller, nil
 }
 
@@ -901,6 +907,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			RestartPolicy: restartPolicy,
 		},
 	}
+	pod.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Pod"))
 	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
 	if err = updatePodContainers(params, args, envs, imagePullPolicy, &pod.Spec); err != nil {
 		return nil, err

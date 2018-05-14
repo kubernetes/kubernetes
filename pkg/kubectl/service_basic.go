@@ -252,6 +252,7 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 			ExternalName: s.ExternalName,
 		},
 	}
+	service.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Service"))
 	if len(s.ClusterIP) > 0 {
 		service.Spec.ClusterIP = s.ClusterIP
 	}

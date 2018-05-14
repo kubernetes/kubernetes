@@ -33,9 +33,9 @@ var (
 	disallowedPackagePrefixes = []string{
 		"k8s.io/kubernetes/pkg/apis/",
 	}
-)
 
-var internalObjectPreventer = &illegalPackageSourceChecker{disallowedPackagePrefixes}
+	internalObjectPreventer = &illegalPackageSourceChecker{disallowedPackagePrefixes}
+)
 
 type NoCompatiblePrinterError struct {
 	OutputFormat *string

@@ -35,6 +35,8 @@ func TestNamespaceGenerate(t *testing.T) {
 				"name": "foo",
 			},
 			expected: &v1.Namespace{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Namespace"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},

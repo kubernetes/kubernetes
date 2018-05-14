@@ -46,6 +46,8 @@ func TestGenerate(t *testing.T) {
 				"port":              "",
 			},
 			expected: &v1.ReplicationController{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ReplicationController"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -80,6 +82,8 @@ func TestGenerate(t *testing.T) {
 				"env":      []string{"a=b", "c=d"},
 			},
 			expected: &v1.ReplicationController{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ReplicationController"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -124,6 +128,8 @@ func TestGenerate(t *testing.T) {
 				"args":              []string{"bar", "baz", "blah"},
 			},
 			expected: &v1.ReplicationController{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ReplicationController"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -159,6 +165,8 @@ func TestGenerate(t *testing.T) {
 				"command":  "true",
 			},
 			expected: &v1.ReplicationController{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ReplicationController"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -191,6 +199,8 @@ func TestGenerate(t *testing.T) {
 				"port":     "80",
 			},
 			expected: &v1.ReplicationController{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ReplicationController"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -229,6 +239,8 @@ func TestGenerate(t *testing.T) {
 				"hostport":          "80",
 			},
 			expected: &v1.ReplicationController{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ReplicationController"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -277,6 +289,8 @@ func TestGenerate(t *testing.T) {
 				"labels":   "foo=bar,baz=blah",
 			},
 			expected: &v1.ReplicationController{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ReplicationController"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -353,6 +367,8 @@ func TestGenerate(t *testing.T) {
 				"limits":   "cpu=400m,memory=200Mi",
 			},
 			expected: &v1.ReplicationController{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ReplicationController"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -417,6 +433,8 @@ func TestGeneratePod(t *testing.T) {
 				"port":  "",
 			},
 			expected: &v1.Pod{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -452,6 +470,8 @@ func TestGeneratePod(t *testing.T) {
 				"env":               []string{"a=b", "c=d"},
 			},
 			expected: &v1.Pod{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -486,6 +506,8 @@ func TestGeneratePod(t *testing.T) {
 				"port":  "80",
 			},
 			expected: &v1.Pod{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -516,6 +538,8 @@ func TestGeneratePod(t *testing.T) {
 				"hostport": "80",
 			},
 			expected: &v1.Pod{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"run": "foo"},
@@ -556,6 +580,8 @@ func TestGeneratePod(t *testing.T) {
 				"labels":   "foo=bar,baz=blah",
 			},
 			expected: &v1.Pod{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -582,6 +608,8 @@ func TestGeneratePod(t *testing.T) {
 				"stdin":    "true",
 			},
 			expected: &v1.Pod{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -611,6 +639,8 @@ func TestGeneratePod(t *testing.T) {
 				"leave-stdin-open": "true",
 			},
 			expected: &v1.Pod{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -670,6 +700,8 @@ func TestGenerateDeployment(t *testing.T) {
 				"limits":            "cpu=400m,memory=200Mi",
 			},
 			expected: &extensionsv1beta1.Deployment{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: extensionsv1beta1.SchemeGroupVersion.String(), Kind: "Deployment"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -763,6 +795,8 @@ func TestGenerateAppsDeployment(t *testing.T) {
 				"limits":            "cpu=400m,memory=200Mi",
 			},
 			expected: &appsv1beta1.Deployment{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: appsv1beta1.SchemeGroupVersion.String(), Kind: "Deployment"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -855,6 +889,8 @@ func TestGenerateJob(t *testing.T) {
 				"restart":          "OnFailure",
 			},
 			expected: &batchv1.Job{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -947,6 +983,8 @@ func TestGenerateCronJobAlpha(t *testing.T) {
 				"schedule":         "0/5 * * * ?",
 			},
 			expected: &batchv2alpha1.CronJob{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv2alpha1.SchemeGroupVersion.String(), Kind: "CronJob"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
@@ -1045,6 +1083,8 @@ func TestGenerateCronJobBeta(t *testing.T) {
 				"schedule":         "0/5 * * * ?",
 			},
 			expected: &batchv1beta1.CronJob{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv1beta1.SchemeGroupVersion.String(), Kind: "CronJob"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},

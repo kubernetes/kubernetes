@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -197,7 +198,7 @@ func TestIllegalPackageSourceCheckerDirectlyThroughPrinters(t *testing.T) {
 }
 
 func internalPod() *api.Pod {
-	return &api.Pod{
+	ret := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -210,12 +211,15 @@ func internalPod() *api.Pod {
 			Phase: api.PodRunning,
 		},
 	}
+	return ret
 }
 
 func externalPod() *v1.Pod {
-	return &v1.Pod{
+	ret := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
 	}
+	ret.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
+	return ret
 }

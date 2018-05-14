@@ -42,6 +42,8 @@ func TestQuotaGenerate(t *testing.T) {
 				"hard": hard,
 			},
 			expected: &v1.ResourceQuota{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ResourceQuota"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -62,6 +64,8 @@ func TestQuotaGenerate(t *testing.T) {
 				"scopes": "BestEffort,NotTerminating",
 			},
 			expected: &v1.ResourceQuota{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ResourceQuota"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -82,6 +86,8 @@ func TestQuotaGenerate(t *testing.T) {
 				"scopes": "",
 			},
 			expected: &v1.ResourceQuota{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ResourceQuota"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},

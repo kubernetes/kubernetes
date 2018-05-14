@@ -134,6 +134,8 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				"cert": validCertPath,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -153,6 +155,8 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				"append-hash": true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-272h6tt825",
 				},
@@ -171,6 +175,8 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				"cert": invalidCertPath,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -189,6 +195,8 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				"cert": mismatchCertPath,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},

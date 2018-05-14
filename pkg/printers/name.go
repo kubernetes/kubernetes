@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -37,8 +36,6 @@ type NamePrinter struct {
 	// took place on an object, to be included in the
 	// finalized "successful" message.
 	Operation string
-
-	Typer runtime.ObjectTyper
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
@@ -64,6 +61,10 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return nil
 	}
 
+	if obj.GetObjectKind().GroupVersionKind().Empty() {
+		return fmt.Errorf("missing apiVersion or kind")
+	}
+
 	name := "<unknown>"
 	if acc, err := meta.Accessor(obj); err == nil {
 		if n := acc.GetName(); len(n) > 0 {
@@ -71,34 +72,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
-	return printObj(w, name, p.Operation, p.ShortOutput, GetObjectGroupKind(obj, p.Typer))
-}
-
-func GetObjectGroupKind(obj runtime.Object, typer runtime.ObjectTyper) schema.GroupKind {
-	if obj == nil {
-		return schema.GroupKind{Kind: "<unknown>"}
-	}
-	groupVersionKind := obj.GetObjectKind().GroupVersionKind()
-	if len(groupVersionKind.Kind) > 0 {
-		return groupVersionKind.GroupKind()
-	}
-
-	if gvks, _, err := typer.ObjectKinds(obj); err == nil {
-		for _, gvk := range gvks {
-			if len(gvk.Kind) == 0 {
-				continue
-			}
-			return gvk.GroupKind()
-		}
-	}
-
-	if uns, ok := obj.(*unstructured.Unstructured); ok {
-		if len(uns.GroupVersionKind().Kind) > 0 {
-			return uns.GroupVersionKind().GroupKind()
-		}
-	}
-
-	return schema.GroupKind{Kind: "<unknown>"}
+	return printObj(w, name, p.Operation, p.ShortOutput, obj.GetObjectKind().GroupVersionKind().GroupKind())
 }
 
 func printObj(w io.Writer, name string, operation string, shortOutput bool, groupKind schema.GroupKind) error {

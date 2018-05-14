@@ -82,6 +82,8 @@ func (s *PodDisruptionBudgetV1Generator) StructuredGenerate() (runtime.Object, e
 
 	minAvailable := intstr.Parse(s.MinAvailable)
 	return &policy.PodDisruptionBudget{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: policy.SchemeGroupVersion.String(), Kind: "PodDisruptionBudget"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 		},
@@ -169,6 +171,8 @@ func (s *PodDisruptionBudgetV2Generator) StructuredGenerate() (runtime.Object, e
 	if len(s.MaxUnavailable) > 0 {
 		maxUnavailable := intstr.Parse(s.MaxUnavailable)
 		return &policy.PodDisruptionBudget{
+			// this is ok because we know exactly how we want to be serialized
+			TypeMeta: metav1.TypeMeta{APIVersion: policy.SchemeGroupVersion.String(), Kind: "PodDisruptionBudget"},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: s.Name,
 			},
@@ -182,6 +186,8 @@ func (s *PodDisruptionBudgetV2Generator) StructuredGenerate() (runtime.Object, e
 	if len(s.MinAvailable) > 0 {
 		minAvailable := intstr.Parse(s.MinAvailable)
 		return &policy.PodDisruptionBudget{
+			// this is ok because we know exactly how we want to be serialized
+			TypeMeta: metav1.TypeMeta{APIVersion: policy.SchemeGroupVersion.String(), Kind: "PodDisruptionBudget"},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: s.Name,
 			},

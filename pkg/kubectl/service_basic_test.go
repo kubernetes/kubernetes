@@ -41,6 +41,8 @@ func TestServiceBasicGenerate(t *testing.T) {
 			clusterip:   "",
 			serviceType: v1.ServiceTypeClusterIP,
 			expected: &v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "clusterip-ok",
 					Labels: map[string]string{"app": "clusterip-ok"},
@@ -71,6 +73,8 @@ func TestServiceBasicGenerate(t *testing.T) {
 			clusterip:   "None",
 			serviceType: v1.ServiceTypeClusterIP,
 			expected: &v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "clusterip-none-ok",
 					Labels: map[string]string{"app": "clusterip-none-ok"},
@@ -88,6 +92,8 @@ func TestServiceBasicGenerate(t *testing.T) {
 			clusterip:   "None",
 			serviceType: v1.ServiceTypeClusterIP,
 			expected: &v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "clusterip-none-and-port-mapping",
 					Labels: map[string]string{"app": "clusterip-none-and-port-mapping"},
@@ -105,6 +111,8 @@ func TestServiceBasicGenerate(t *testing.T) {
 			clusterip:   "",
 			serviceType: v1.ServiceTypeLoadBalancer,
 			expected: &v1.Service{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "loadbalancer-ok",
 					Labels: map[string]string{"app": "loadbalancer-ok"},

@@ -48,6 +48,8 @@ func TestPodDisruptionBudgetV1Generate(t *testing.T) {
 				"selector":      selector,
 			},
 			expectPDB: &policy.PodDisruptionBudget{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: policy.SchemeGroupVersion.String(), Kind: "PodDisruptionBudget"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
@@ -94,6 +96,8 @@ func TestPodDisruptionBudgetV1Generate(t *testing.T) {
 				"selector":      selector,
 			},
 			expectPDB: &policy.PodDisruptionBudget{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: policy.SchemeGroupVersion.String(), Kind: "PodDisruptionBudget"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
@@ -183,6 +187,8 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"selector":        selector,
 			},
 			expectPDB: &policy.PodDisruptionBudget{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: policy.SchemeGroupVersion.String(), Kind: "PodDisruptionBudget"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
@@ -200,6 +206,8 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"selector":        selector,
 			},
 			expectPDB: &policy.PodDisruptionBudget{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: policy.SchemeGroupVersion.String(), Kind: "PodDisruptionBudget"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},

@@ -101,6 +101,8 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 	podSpec, labels, selector, err := s.structuredGenerate()
 	one := int32(1)
 	return &extensionsv1beta1.Deployment{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: extensionsv1beta1.SchemeGroupVersion.String(), Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
@@ -131,6 +133,8 @@ func (s *DeploymentBasicAppsGeneratorV1Beta1) StructuredGenerate() (runtime.Obje
 	podSpec, labels, selector, err := s.structuredGenerate()
 	one := int32(1)
 	return &appsv1beta1.Deployment{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: appsv1beta1.SchemeGroupVersion.String(), Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
@@ -161,6 +165,8 @@ func (s *DeploymentBasicAppsGeneratorV1) StructuredGenerate() (runtime.Object, e
 	podSpec, labels, selector, err := s.structuredGenerate()
 	one := int32(1)
 	return &appsv1.Deployment{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
