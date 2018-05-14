@@ -76,8 +76,6 @@ type PrintFlags struct {
 	NamePrintFlags     *NamePrintFlags
 
 	OutputFormat *string
-
-	Scheme runtime.ObjectConvertor
 }
 
 func (f *PrintFlags) Complete(successTemplate string) error {
@@ -125,8 +123,6 @@ func NewPrintFlags(operation string, scheme runtime.ObjectConvertor) *PrintFlags
 
 	return &PrintFlags{
 		OutputFormat: &outputFormat,
-
-		Scheme: scheme,
 
 		JSONYamlPrintFlags: NewJSONYamlPrintFlags(scheme),
 		NamePrintFlags:     NewNamePrintFlags(operation, scheme),
