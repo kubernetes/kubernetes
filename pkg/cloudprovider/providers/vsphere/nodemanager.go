@@ -281,20 +281,18 @@ func (nm *NodeManager) UnRegisterAttachedDisk(nodeName k8stypes.NodeName, volPat
 	nm.attachedDisksLock.Unlock()
 	return nil
 }
-func (nm *NodeManager) GetAttachedDisks(nodeName k8stypes.NodeName) ([]string, error) {
+func (nm *NodeManager) GetAttachedDisks(nodeName k8stypes.NodeName) []string {
 	nm.attachedDisksLock.Lock()
 	attachedDisks := nm.attachedDisks[convertToString(nodeName)]
 	nm.attachedDisksLock.Unlock()
-	if attachedDisks == nil {
-		return []string{}, fmt.Errorf("Attached disks not found for node %q", convertToString(nodeName))
-	}
 
 	disks := []string{}
-	for disk := range attachedDisks {
-		disks = append(disks, disk)
+	if attachedDisks != nil {
+		for disk := range attachedDisks {
+			disks = append(disks, disk)
+		}
 	}
-
-	return disks, nil
+	return disks
 }
 
 // GetNodeInfo returns a NodeInfo which datacenter, vm and vc server ip address.

@@ -46,13 +46,15 @@ import (
 
 // VSphere Cloud Provider constants
 const (
-	ProviderName                  = "vsphere"
-	VolDir                        = "kubevols"
-	RoundTripperDefaultCount      = 3
-	DummyVMPrefixName             = "vsphere-k8s"
-	MacOuiVC                      = "00:50:56"
-	MacOuiEsx                     = "00:0c:29"
-	CleanUpDummyVMRoutineInterval = 5
+	ProviderName                    = "vsphere"
+	VolDir                          = "kubevols"
+	RoundTripperDefaultCount        = 3
+	DummyVMPrefixName               = "vsphere-k8s"
+	MacOuiVC                        = "00:50:56"
+	MacOuiEsx                       = "00:0c:29"
+	CleanUpDummyVMRoutineInterval   = 5
+	CheckDisksOnNodeDeletedMaxRetry = 10
+	CheckDisksOnNodeDeletedInterval = 1
 )
 
 var cleanUpRoutineInitialized = false
@@ -1305,15 +1307,25 @@ func (vs *VSphere) NodeDeleted(obj interface{}) {
 	}
 
 	glog.V(4).Infof("Node deleted: %+v", node)
-	disks, err := vs.nodeManager.GetAttachedDisks(convertToK8sType(node.ObjectMeta.Name))
-	if err == nil {
-		for _, disk := range disks {
-			if err := vs.DetachDisk(disk, convertToK8sType(node.ObjectMeta.Name)); err != nil {
-				glog.Errorf("Error %q while detaching disk %q from node %q", err, disk, convertToK8sType(node.ObjectMeta.Name))
+	go func() {
+		nodeName := convertToK8sType(node.ObjectMeta.Name)
+		for i := 0; i < CheckDisksOnNodeDeletedMaxRetry; i++ {
+			disks := vs.nodeManager.GetAttachedDisks(nodeName)
+			for _, disk := range disks {
+				if err := vs.DetachDisk(disk, nodeName); err != nil {
+					glog.Errorf("Error %q while detaching disk %q from node %q", err, disk, nodeName)
+				}
 			}
+			if disks := vs.nodeManager.GetAttachedDisks(nodeName); len(disks) == 0 {
+				glog.V(4).Infof("Disks were detached from deleted node %q, unregister the node", node.ObjectMeta.Name)
+				vs.nodeManager.UnRegisterNode(node)
+				return
+			}
+			time.Sleep(CheckDisksOnNodeDeletedInterval * time.Minute)
 		}
-	}
-	vs.nodeManager.UnRegisterNode(node)
+		glog.Errorf("Disks not detached from deleted node %q for long time, force to unregister the node", node.ObjectMeta.Name)
+		vs.nodeManager.UnRegisterNode(node)
+	}()
 }
 
 func (vs *VSphere) NodeManager() (nodeManager *NodeManager) {
