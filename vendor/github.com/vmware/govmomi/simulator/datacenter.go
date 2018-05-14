@@ -133,3 +133,28 @@ func (dc *Datacenter) PowerOnMultiVMTask(ctx *Context, req *types.PowerOnMultiVM
 		},
 	}
 }
+
+func (d *Datacenter) DestroyTask(req *types.Destroy_Task) soap.HasFault {
+	task := CreateTask(d, "destroy", func(t *Task) (types.AnyType, types.BaseMethodFault) {
+		folders := []types.ManagedObjectReference{
+			d.VmFolder,
+			d.HostFolder,
+		}
+
+		for _, ref := range folders {
+			if len(Map.Get(ref).(*Folder).ChildEntity) != 0 {
+				return nil, &types.ResourceInUse{}
+			}
+		}
+
+		Map.Get(*d.Parent).(*Folder).removeChild(d.Self)
+
+		return nil, nil
+	})
+
+	return &methods.Destroy_TaskBody{
+		Res: &types.Destroy_TaskResponse{
+			Returnval: task.Run(),
+		},
+	}
+}

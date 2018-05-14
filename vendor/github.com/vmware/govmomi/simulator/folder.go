@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 	"path"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -514,6 +515,17 @@ func (f *Folder) CreateDVSTask(req *types.CreateDVS_Task) soap.HasFault {
 			}
 		}
 
+		dvs.AddDVPortgroupTask(&types.AddDVPortgroup_Task{
+			Spec: []types.DVPortgroupConfigSpec{{
+				Name: dvs.Name + "-DVUplinks" + strings.TrimPrefix(dvs.Self.Value, "dvs"),
+				DefaultPortConfig: &types.VMwareDVSPortSetting{
+					Vlan: &types.VmwareDistributedVirtualSwitchTrunkVlanSpec{
+						VlanId: []types.NumericRange{{Start: 0, End: 4094}},
+					},
+				},
+			}},
+		})
+
 		return dvs.Reference(), nil
 	})
 
@@ -526,4 +538,46 @@ func (f *Folder) CreateDVSTask(req *types.CreateDVS_Task) soap.HasFault {
 
 func (f *Folder) RenameTask(r *types.Rename_Task) soap.HasFault {
 	return RenameTask(f, r)
+}
+
+func (f *Folder) DestroyTask(req *types.Destroy_Task) soap.HasFault {
+	type destroyer interface {
+		mo.Reference
+		DestroyTask(*types.Destroy_Task) soap.HasFault
+	}
+
+	task := CreateTask(f, "destroy", func(*Task) (types.AnyType, types.BaseMethodFault) {
+		// Attempt to destroy all children
+		for _, c := range f.ChildEntity {
+			obj, ok := Map.Get(c).(destroyer)
+			if !ok {
+				continue
+			}
+
+			var fault types.BaseMethodFault
+			Map.WithLock(obj, func() {
+				id := obj.DestroyTask(&types.Destroy_Task{
+					This: c,
+				}).(*methods.Destroy_TaskBody).Res.Returnval
+
+				t := Map.Get(id).(*Task)
+				if t.Info.Error != nil {
+					fault = t.Info.Error.Fault // For example, can't destroy a powered on VM
+				}
+			})
+			if fault != nil {
+				return nil, fault
+			}
+		}
+
+		// Remove the folder itself
+		Map.Get(*f.Parent).(*Folder).removeChild(f.Self)
+		return nil, nil
+	})
+
+	return &methods.Destroy_TaskBody{
+		Res: &types.Destroy_TaskResponse{
+			Returnval: task.Run(),
+		},
+	}
 }
