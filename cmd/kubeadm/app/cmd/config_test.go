@@ -26,7 +26,7 @@ import (
 
 	"github.com/renstrom/dedent"
 
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
@@ -99,7 +99,7 @@ func TestListImagesRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := cmd.NewListImages(configFilePath, &kubeadmapiext.MasterConfiguration{})
+			i, err := cmd.NewListImages(configFilePath, &kubeadmapiv1alpha1.MasterConfiguration{})
 			if err != nil {
 				t.Fatalf("Failed getting the kubeadm images command: %v", err)
 			}
@@ -124,7 +124,7 @@ func TestListImagesRunWithCustomConfigPath(t *testing.T) {
 func TestConfigListImagesRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiext.MasterConfiguration
+		cfg            kubeadmapiv1alpha1.MasterConfiguration
 		expectedImages int
 	}{
 		{
@@ -133,8 +133,8 @@ func TestConfigListImagesRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiext.MasterConfiguration{
-				Etcd: kubeadmapiext.Etcd{
+			cfg: kubeadmapiv1alpha1.MasterConfiguration{
+				Etcd: kubeadmapiv1alpha1.Etcd{
 					Endpoints: []string{"hi"},
 				},
 			},
@@ -142,7 +142,7 @@ func TestConfigListImagesRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiext.MasterConfiguration{
+			cfg: kubeadmapiv1alpha1.MasterConfiguration{
 				FeatureGates: map[string]bool{
 					features.CoreDNS: true,
 				},

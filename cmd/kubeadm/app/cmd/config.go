@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -129,7 +129,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 			// The default configuration is empty; everything should come from the file on disk
 			glog.V(1).Infoln("[config] creating empty default configuration")
-			defaultcfg := &kubeadmapiext.MasterConfiguration{}
+			defaultcfg := &kubeadmapiv1alpha1.MasterConfiguration{}
 			// Upload the configuration using the file; don't care about the defaultcfg really
 			glog.V(1).Infof("[config] uploading configuration")
 			err = uploadConfiguration(client, cfgPath, defaultcfg)
@@ -142,7 +142,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiext.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha1.MasterConfiguration{}
 	legacyscheme.Scheme.Default(cfg)
 
 	var featureGatesString string
@@ -192,7 +192,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 }
 
 // uploadConfiguration handles the uploading of the configuration internally
-func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiext.MasterConfiguration) error {
+func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1alpha1.MasterConfiguration) error {
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk
@@ -208,8 +208,8 @@ func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg 
 
 // NewCmdConfigListImages returns the "kubeadm images" command
 func NewCmdConfigListImages(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.MasterConfiguration{}
-	kubeadmapiext.SetDefaults_MasterConfiguration(cfg)
+	cfg := &kubeadmapiv1alpha1.MasterConfiguration{}
+	kubeadmapiv1alpha1.SetDefaults_MasterConfiguration(cfg)
 	var cfgPath, featureGatesString string
 	var err error
 
@@ -232,7 +232,7 @@ func NewCmdConfigListImages(out io.Writer) *cobra.Command {
 }
 
 // NewListImages returns a "kubeadm images" command
-func NewListImages(cfgPath string, cfg *kubeadmapiext.MasterConfiguration) (*ListImages, error) {
+func NewListImages(cfgPath string, cfg *kubeadmapiv1alpha1.MasterConfiguration) (*ListImages, error) {
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cfg to an internal cfg: %v", err)
@@ -259,7 +259,7 @@ func (i *ListImages) Run(out io.Writer) error {
 }
 
 // AddListImagesConfigFlag adds the flags that configure kubeadm
-func AddListImagesConfigFlag(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, featureGatesString *string) {
+func AddListImagesConfigFlag(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha1.MasterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane.`,

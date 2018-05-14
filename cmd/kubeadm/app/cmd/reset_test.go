@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -57,7 +57,7 @@ func assertDirEmpty(t *testing.T, path string) {
 
 func TestNewReset(t *testing.T) {
 	var in io.Reader
-	certsDir := kubeadmapiext.DefaultCertificatesDir
+	certsDir := kubeadmapiv1alpha1.DefaultCertificatesDir
 	criSocketPath := "/var/run/dockershim.sock"
 	skipPreFlight := false
 	forceReset := true
