@@ -353,18 +353,18 @@ func NewProxier(ipt utiliptables.Interface,
 		filterRules:         bytes.NewBuffer(nil),
 		netlinkHandle:       NewNetLinkHandle(),
 		ipset:               ipset,
-		loopbackSet:         NewIPSet(ipset, KubeLoopBackIPSet, utilipset.HashIPPortIP, isIPv6),
-		clusterIPSet:        NewIPSet(ipset, KubeClusterIPSet, utilipset.HashIPPort, isIPv6),
-		externalIPSet:       NewIPSet(ipset, KubeExternalIPSet, utilipset.HashIPPort, isIPv6),
-		lbSet:               NewIPSet(ipset, KubeLoadBalancerSet, utilipset.HashIPPort, isIPv6),
-		lbFWSet:             NewIPSet(ipset, KubeLoadbalancerFWSet, utilipset.HashIPPort, isIPv6),
-		lbLocalSet:          NewIPSet(ipset, KubeLoadBalancerLocalSet, utilipset.HashIPPort, isIPv6),
-		lbWhiteListIPSet:    NewIPSet(ipset, KubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, isIPv6),
-		lbWhiteListCIDRSet:  NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, isIPv6),
-		nodePortSetTCP:      NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
-		nodePortLocalSetTCP: NewIPSet(ipset, KubeNodePortLocalSetTCP, utilipset.BitmapPort, false),
-		nodePortSetUDP:      NewIPSet(ipset, KubeNodePortSetUDP, utilipset.BitmapPort, false),
-		nodePortLocalSetUDP: NewIPSet(ipset, KubeNodePortLocalSetUDP, utilipset.BitmapPort, false),
+		loopbackSet:         NewIPSet(ipset, kubeLoopBackIPSet, utilipset.HashIPPortIP, isIPv6, kubeLoopBackIPSetComment),
+		clusterIPSet:        NewIPSet(ipset, kubeClusterIPSet, utilipset.HashIPPort, isIPv6, kubeClusterIPSetComment),
+		externalIPSet:       NewIPSet(ipset, kubeExternalIPSet, utilipset.HashIPPort, isIPv6, kubeExternalIPSetComment),
+		lbSet:               NewIPSet(ipset, kubeLoadBalancerSet, utilipset.HashIPPort, isIPv6, kubeLoadBalancerSetComment),
+		lbFWSet:             NewIPSet(ipset, kubeLoadbalancerFWSet, utilipset.HashIPPort, isIPv6, kubeLoadbalancerFWSetComment),
+		lbLocalSet:          NewIPSet(ipset, kubeLoadBalancerLocalSet, utilipset.HashIPPort, isIPv6, kubeLoadBalancerLocalSetComment),
+		lbWhiteListIPSet:    NewIPSet(ipset, kubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, isIPv6, kubeLoadBalancerSourceIPSetComment),
+		lbWhiteListCIDRSet:  NewIPSet(ipset, kubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, isIPv6, kubeLoadBalancerSourceCIDRSetComment),
+		nodePortSetTCP:      NewIPSet(ipset, kubeNodePortSetTCP, utilipset.BitmapPort, false, kubeNodePortSetTCPComment),
+		nodePortLocalSetTCP: NewIPSet(ipset, kubeNodePortLocalSetTCP, utilipset.BitmapPort, false, kubeNodePortLocalSetTCPComment),
+		nodePortSetUDP:      NewIPSet(ipset, kubeNodePortSetUDP, utilipset.BitmapPort, false, kubeNodePortSetUDPComment),
+		nodePortLocalSetUDP: NewIPSet(ipset, kubeNodePortLocalSetUDP, utilipset.BitmapPort, false, kubeNodePortLocalSetUDPComment),
 		nodePortAddresses:   nodePortAddresses,
 		networkInterfacer:   utilproxy.RealNetwork{},
 	}
@@ -558,9 +558,9 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	encounteredError = cleanupIptablesLeftovers(ipt) || encounteredError
 	// Destroy ip sets created by ipvs Proxier.  We should call it after cleaning up
 	// iptables since we can NOT delete ip set which is still referenced by iptables.
-	ipSetsToDestroy := []string{KubeLoopBackIPSet, KubeClusterIPSet, KubeLoadBalancerSet, KubeNodePortSetTCP, KubeNodePortSetUDP,
-		KubeExternalIPSet, KubeLoadbalancerFWSet, KubeLoadBalancerSourceIPSet, KubeLoadBalancerSourceCIDRSet,
-		KubeLoadBalancerLocalSet, KubeNodePortLocalSetUDP, KubeNodePortLocalSetTCP}
+	ipSetsToDestroy := []string{kubeClusterIPSet, kubeClusterIPSet, kubeLoadBalancerSet, kubeNodePortSetTCP, kubeNodePortSetUDP,
+		kubeExternalIPSet, kubeLoadbalancerFWSet, kubeLoadBalancerSourceIPSet, kubeLoadBalancerSourceCIDRSet,
+		kubeLoadBalancerLocalSet, kubeNodePortLocalSetUDP, kubeNodePortLocalSetTCP}
 	for _, set := range ipSetsToDestroy {
 		err = ipset.DestroySet(set)
 		if err != nil {
@@ -1191,6 +1191,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if !proxier.loopbackSet.isEmpty() {
 		args = append(args[:0],
 			"-A", string(kubePostroutingChain),
+			"-m", "comment", "--comment", proxier.loopbackSet.Comment,
 			"-m", "set", "--match-set", proxier.loopbackSet.Name,
 			"dst,dst,src",
 		)
@@ -1199,6 +1200,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if !proxier.clusterIPSet.isEmpty() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
+			"-m", "comment", "--comment", proxier.clusterIPSet.Comment,
 			"-m", "set", "--match-set", proxier.clusterIPSet.Name,
 			"dst,dst",
 		)
@@ -1217,6 +1219,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Build masquerade rules for packets to external IPs.
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
+			"-m", "comment", "--comment", proxier.externalIPSet.Comment,
 			"-m", "set", "--match-set", proxier.externalIPSet.Name,
 			"dst,dst",
 		)
@@ -1238,6 +1241,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Build masquerade rules for packets which cross node visit load balancer ingress IPs.
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
+			"-m", "comment", "--comment", proxier.lbSet.Comment,
 			"-m", "set", "--match-set", proxier.lbSet.Name,
 			"dst,dst",
 		)
@@ -1247,6 +1251,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if !proxier.lbFWSet.isEmpty() {
 				args = append(args[:0],
 					"-A", string(KubeLoadBalancerChain),
+					"-m", "comment", "--comment", proxier.lbFWSet.Comment,
 					"-m", "set", "--match-set", proxier.lbFWSet.Name,
 					"dst,dst",
 				)
@@ -1255,6 +1260,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if !proxier.lbWhiteListCIDRSet.isEmpty() {
 				args = append(args[:0],
 					"-A", string(KubeFireWallChain),
+					"-m", "comment", "--comment", proxier.lbWhiteListCIDRSet.Comment,
 					"-m", "set", "--match-set", proxier.lbWhiteListCIDRSet.Name,
 					"dst,dst,src",
 				)
@@ -1263,6 +1269,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if !proxier.lbWhiteListIPSet.isEmpty() {
 				args = append(args[:0],
 					"-A", string(KubeFireWallChain),
+					"-m", "comment", "--comment", proxier.lbWhiteListIPSet.Comment,
 					"-m", "set", "--match-set", proxier.lbWhiteListIPSet.Name,
 					"dst,dst,src",
 				)
@@ -1279,6 +1286,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if !proxier.lbLocalSet.isEmpty() {
 			args = append(args[:0],
 				"-A", string(KubeLoadBalancerChain),
+				"-m", "comment", "--comment", proxier.lbLocalSet.Comment,
 				"-m", "set", "--match-set", proxier.lbLocalSet.Name,
 				"dst,dst",
 			)
@@ -1297,6 +1305,7 @@ func (proxier *Proxier) syncProxyRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "tcp", "-p", "tcp",
+			"-m", "comment", "--comment", proxier.nodePortSetTCP.Comment,
 			"-m", "set", "--match-set", proxier.nodePortSetTCP.Name,
 			"dst",
 		)
@@ -1305,6 +1314,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if !proxier.nodePortLocalSetTCP.isEmpty() {
 			args = append(args[:0],
 				"-A", string(KubeNodePortChain),
+				"-m", "comment", "--comment", proxier.nodePortLocalSetTCP.Comment,
 				"-m", "set", "--match-set", proxier.nodePortLocalSetTCP.Name,
 				"dst",
 			)
@@ -1323,6 +1333,7 @@ func (proxier *Proxier) syncProxyRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "udp", "-p", "udp",
+			"-m", "comment", "--comment", proxier.nodePortSetUDP.Comment,
 			"-m", "set", "--match-set", proxier.nodePortSetUDP.Name,
 			"dst",
 		)
@@ -1330,6 +1341,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if !proxier.nodePortLocalSetUDP.isEmpty() {
 			args = append(args[:0],
 				"-A", string(KubeNodePortChain),
+				"-m", "comment", "--comment", proxier.nodePortLocalSetUDP.Comment,
 				"-m", "set", "--match-set", proxier.nodePortLocalSetUDP.Name,
 				"dst",
 			)
