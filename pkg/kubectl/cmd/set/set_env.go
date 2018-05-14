@@ -414,18 +414,17 @@ func (o *EnvOptions) RunEnv() error {
 		}
 
 		if o.Local || o.dryRun {
-			if err := o.PrintObj(patch.Info.Object, o.Out); err != nil {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v\n", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
 		// make sure arguments to set or replace environment variables are set
 		// before returning a successful message
@@ -433,7 +432,7 @@ func (o *EnvOptions) RunEnv() error {
 			return fmt.Errorf("at least one environment variable must be provided")
 		}
 
-		if err := o.PrintObj(info.Object, o.Out); err != nil {
+		if err := o.PrintObj(actual, o.Out); err != nil {
 			return err
 		}
 	}
