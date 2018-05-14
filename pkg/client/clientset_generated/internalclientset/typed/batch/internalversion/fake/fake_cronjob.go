@@ -62,7 +62,7 @@ func (c *FakeCronJobs) List(opts v1.ListOptions) (result *batch.CronJobList, err
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &batch.CronJobList{}
+	list := &batch.CronJobList{ListMeta: obj.(*batch.CronJobList).ListMeta}
 	for _, item := range obj.(*batch.CronJobList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
