@@ -81,32 +81,34 @@ var (
 	}
 
 	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]struct {
-		TaintKey string
-		Status   v1.ConditionStatus
+		taintKey string
+		// noScheduleStatus is the condition under which the node should be tainted as not schedulable for this
+		// NodeConditionType
+		noScheduleStatus v1.ConditionStatus
 	}{
 		v1.NodeReady: {
-			TaintKey: algorithm.TaintNodeNotReady,
-			Status:   v1.ConditionFalse,
+			taintKey:         algorithm.TaintNodeNotReady,
+			noScheduleStatus: v1.ConditionFalse,
 		},
 		v1.NodeMemoryPressure: {
-			TaintKey: algorithm.TaintNodeMemoryPressure,
-			Status:   v1.ConditionTrue,
+			taintKey:         algorithm.TaintNodeMemoryPressure,
+			noScheduleStatus: v1.ConditionTrue,
 		},
 		v1.NodeOutOfDisk: {
-			TaintKey: algorithm.TaintNodeOutOfDisk,
-			Status:   v1.ConditionTrue,
+			taintKey:         algorithm.TaintNodeOutOfDisk,
+			noScheduleStatus: v1.ConditionTrue,
 		},
 		v1.NodeDiskPressure: {
-			TaintKey: algorithm.TaintNodeDiskPressure,
-			Status:   v1.ConditionTrue,
+			taintKey:         algorithm.TaintNodeDiskPressure,
+			noScheduleStatus: v1.ConditionTrue,
 		},
 		v1.NodeNetworkUnavailable: {
-			TaintKey: algorithm.TaintNodeNetworkUnavailable,
-			Status:   v1.ConditionTrue,
+			taintKey:         algorithm.TaintNodeNetworkUnavailable,
+			noScheduleStatus: v1.ConditionTrue,
 		},
 		v1.NodePIDPressure: {
-			TaintKey: algorithm.TaintNodePIDPressure,
-			Status:   v1.ConditionTrue,
+			taintKey:         algorithm.TaintNodePIDPressure,
+			noScheduleStatus: v1.ConditionTrue,
 		},
 	}
 
@@ -453,12 +455,12 @@ func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
 
 func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 	// Map node's condition to Taints.
-	taints := []v1.Taint{}
+	var taints []v1.Taint
 	for _, condition := range node.Status.Conditions {
-		if taintKeyStatus, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
-			if condition.Status == taintKeyStatus.Status {
+		if taint, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
+			if condition.Status == taint.noScheduleStatus {
 				taints = append(taints, v1.Taint{
-					Key:    taintKeyStatus.TaintKey,
+					Key:    taint.taintKey,
 					Effect: v1.TaintEffectNoSchedule,
 				})
 			}
