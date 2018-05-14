@@ -968,22 +968,18 @@ func (proxier *Proxier) syncProxyRules() {
 
 			lps := make([]utilproxy.LocalPort, 0)
 			for address := range addresses {
-				if utilproxy.IsZeroCIDR(address) {
-					lp := utilproxy.LocalPort{
-						Description: "nodePort for " + svcNameString,
-						IP:          "",
-						Port:        svcInfo.NodePort,
-						Protocol:    protocol,
-					}
-					lps = append(lps, lp)
-					// If we encounter a zero CIDR, then there is no point in processing the rest of the addresses.
-					break
-				}
 				lp := utilproxy.LocalPort{
 					Description: "nodePort for " + svcNameString,
 					IP:          address,
 					Port:        svcInfo.NodePort,
 					Protocol:    protocol,
+				}
+				if utilproxy.IsZeroCIDR(address) {
+					// Empty IP address means all
+					lp.IP = ""
+					lps = append(lps, lp)
+					// If we encounter a zero CIDR, then there is no point in processing the rest of the addresses.
+					break
 				}
 				lps = append(lps, lp)
 			}
