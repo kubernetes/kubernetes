@@ -385,6 +385,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 		{"/"},
 		{"/swagger-ui/"},
 		{"/debug/pprof/"},
+		{"/debug/flags/"},
 		{"/version"},
 	} {
 		resp := httptest.NewRecorder()
