@@ -37,7 +37,7 @@ const (
 
 func TestNewCmdConfigListImages(t *testing.T) {
 	var output bytes.Buffer
-	images := cmd.NewCmdConfigListImages(&output)
+	images := cmd.NewCmdConfigImagesList(&output)
 	images.Run(nil, nil)
 	actual := strings.Split(output.String(), "\n")
 	if len(actual) != defaultNumberOfImages {
@@ -45,7 +45,7 @@ func TestNewCmdConfigListImages(t *testing.T) {
 	}
 }
 
-func TestListImagesRunWithCustomConfigPath(t *testing.T) {
+func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 	testcases := []struct {
 		name               string
 		expectedImageCount int
@@ -99,7 +99,7 @@ func TestListImagesRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := cmd.NewListImages(configFilePath, &kubeadmapiv1alpha1.MasterConfiguration{})
+			i, err := cmd.NewImagesList(configFilePath, &kubeadmapiv1alpha1.MasterConfiguration{})
 			if err != nil {
 				t.Fatalf("Failed getting the kubeadm images command: %v", err)
 			}
@@ -121,7 +121,7 @@ func TestListImagesRunWithCustomConfigPath(t *testing.T) {
 	}
 }
 
-func TestConfigListImagesRunWithoutPath(t *testing.T) {
+func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
 		cfg            kubeadmapiv1alpha1.MasterConfiguration
@@ -153,7 +153,7 @@ func TestConfigListImagesRunWithoutPath(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			i, err := cmd.NewListImages("", &tc.cfg)
+			i, err := cmd.NewImagesList("", &tc.cfg)
 			if err != nil {
 				t.Fatalf("did not expect an error while creating the Images command: %v", err)
 			}

@@ -66,7 +66,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 
 	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
-	cmd.AddCommand(NewCmdConfigListImages(out))
+	cmd.AddCommand(NewCmdConfigImages(out))
 	return cmd
 }
 
@@ -206,50 +206,61 @@ func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg 
 	return uploadconfig.UploadConfiguration(internalcfg, client)
 }
 
-// NewCmdConfigListImages returns the "kubeadm images" command
-func NewCmdConfigListImages(out io.Writer) *cobra.Command {
+// NewCmdConfigImages returns the "config images" command
+func NewCmdConfigImages(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "images",
+		Short: "Interact with container images used by kubeadm.",
+		RunE:  cmdutil.SubCmdRunE("images"),
+	}
+	cmd.AddCommand(NewCmdConfigImagesList(out))
+	return cmd
+}
+
+// NewCmdConfigImagesList returns the "config images list" command
+func NewCmdConfigImagesList(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapiv1alpha1.MasterConfiguration{}
 	kubeadmapiv1alpha1.SetDefaults_MasterConfiguration(cfg)
 	var cfgPath, featureGatesString string
 	var err error
 
 	cmd := &cobra.Command{
-		Use:   "list-images",
+		Use:   "list",
 		Short: "Print a list of images kubeadm will use. The configuration file is used in case any images or image repositories are customized.",
 		Run: func(_ *cobra.Command, _ []string) {
 			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
-			listImages, err := NewListImages(cfgPath, cfg)
+			imagesList, err := NewImagesList(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(listImages.Run(out))
+			kubeadmutil.CheckErr(imagesList.Run(out))
 		},
 	}
-	AddListImagesConfigFlag(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddListImagesFlags(cmd.PersistentFlags(), &cfgPath)
+	AddImagesListConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
+	AddImagesListFlags(cmd.PersistentFlags(), &cfgPath)
 
 	return cmd
 }
 
-// NewListImages returns a "kubeadm images" command
-func NewListImages(cfgPath string, cfg *kubeadmapiv1alpha1.MasterConfiguration) (*ListImages, error) {
+// NewImagesList returns the underlying struct for the "kubeadm config images list" command
+func NewImagesList(cfgPath string, cfg *kubeadmapiv1alpha1.MasterConfiguration) (*ImagesList, error) {
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cfg to an internal cfg: %v", err)
 	}
 
-	return &ListImages{
+	return &ImagesList{
 		cfg: internalcfg,
 	}, nil
 }
 
-// ListImages defines the struct used for "kubeadm images"
-type ListImages struct {
+// ImagesList defines the struct used for "kubeadm config images list"
+type ImagesList struct {
 	cfg *kubeadmapi.MasterConfiguration
 }
 
-// Run runs the images command and writes the result to the io.Writer passed in
-func (i *ListImages) Run(out io.Writer) error {
+// Run gets a list of images kubeadm expects to use and writes the result to the io.Writer passed in
+func (i *ImagesList) Run(out io.Writer) error {
 	imgs := images.GetAllImages(i.cfg)
 	for _, img := range imgs {
 		fmt.Fprintln(out, img)
@@ -258,8 +269,8 @@ func (i *ListImages) Run(out io.Writer) error {
 	return nil
 }
 
-// AddListImagesConfigFlag adds the flags that configure kubeadm
-func AddListImagesConfigFlag(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha1.MasterConfiguration, featureGatesString *string) {
+// AddImagesListConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
+func AddImagesListConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha1.MasterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane.`,
@@ -268,7 +279,7 @@ func AddListImagesConfigFlag(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha1.Mast
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 }
 
-// AddListImagesFlags adds the flag that defines the location of the config file
-func AddListImagesFlags(flagSet *flag.FlagSet, cfgPath *string) {
+// AddImagesListFlags adds the flag that defines the location of the config file
+func AddImagesListFlags(flagSet *flag.FlagSet, cfgPath *string) {
 	flagSet.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file.")
 }
