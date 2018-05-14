@@ -603,6 +603,7 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		setupFunc     func(cfg *kubeadmapi.MasterConfiguration) error
 		createFunc    func(cfg *kubeadmapi.MasterConfiguration) error
 		expectedFiles []string
+		externalEtcd  bool
 	}{
 		{
 			createFunc: CreatePKIAssets,
@@ -615,6 +616,18 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 				kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName,
 				kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
 				kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName,
+				kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName,
+				kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName,
+				kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName,
+			},
+		},
+		{
+			createFunc:   CreatePKIAssets,
+			externalEtcd: true,
+			expectedFiles: []string{
+				kubeadmconstants.CACertName, kubeadmconstants.CAKeyName,
+				kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName,
+				kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName,
 				kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName,
 				kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName,
 				kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName,
@@ -683,6 +696,10 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 			Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 			NodeName:        "valid-hostname",
 			CertificatesDir: tmpdir,
+		}
+
+		if test.externalEtcd {
+			cfg.Etcd.Endpoints = []string{"192.168.1.1:2379"}
 		}
 
 		// executes setup func (if necessary)
