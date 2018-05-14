@@ -210,6 +210,7 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) *ap
 
 func TestCanUseIPVSProxier(t *testing.T) {
 	testCases := []struct {
+		name         string
 		mods         []string
 		kernelErr    error
 		ipsetVersion string
@@ -218,6 +219,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 	}{
 		// case 0, kernel error
 		{
+			name:         "kernel error",
 			mods:         []string{"foo", "bar", "baz"},
 			kernelErr:    fmt.Errorf("oops"),
 			ipsetVersion: "0.0",
@@ -225,6 +227,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		},
 		// case 1, ipset error
 		{
+			name:         "ipset error",
 			mods:         []string{"foo", "bar", "baz"},
 			ipsetVersion: MinIPSetCheckVersion,
 			ipsetErr:     fmt.Errorf("oops"),
@@ -232,43 +235,50 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		},
 		// case 2, missing required kernel modules and ipset version too low
 		{
+			name:         "missing required kernel modules and ipset version too low",
 			mods:         []string{"foo", "bar", "baz"},
 			ipsetVersion: "1.1",
 			ok:           false,
 		},
 		// case 3, missing required ip_vs_* kernel modules
 		{
+			name:         "missing required ip_vs_* kernel modules",
 			mods:         []string{"ip_vs", "a", "bc", "def"},
 			ipsetVersion: MinIPSetCheckVersion,
 			ok:           false,
 		},
 		// case 4, ipset version too low
 		{
+			name:         "ipset version too low",
 			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
 			ipsetVersion: "4.3.0",
 			ok:           false,
 		},
 		// case 5
 		{
+			name:         "test5",
 			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
 			ipsetVersion: MinIPSetCheckVersion,
 			ok:           true,
 		},
 		// case 6
 		{
+			name:         "test6",
 			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4", "foo", "bar"},
 			ipsetVersion: "6.19",
 			ok:           true,
 		},
 	}
 
-	for i := range testCases {
-		handle := &fakeKernelHandler{modules: testCases[i].mods}
-		versioner := &fakeIPSetVersioner{version: testCases[i].ipsetVersion, err: testCases[i].ipsetErr}
-		ok, _ := CanUseIPVSProxier(handle, versioner)
-		if ok != testCases[i].ok {
-			t.Errorf("Case [%d], expect %v, got %v", i, testCases[i].ok, ok)
-		}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			handle := &fakeKernelHandler{modules: tt.mods}
+			versioner := &fakeIPSetVersioner{version: tt.ipsetVersion, err: tt.ipsetErr}
+			ok, _ := CanUseIPVSProxier(handle, versioner)
+			if ok != tt.ok {
+				t.Fatalf("expected %v, got %v", tt.ok, ok)
+			}
+		})
 	}
 }
 
@@ -329,23 +339,25 @@ func TestGetNodeIPs(t *testing.T) {
 		},
 	}
 
-	for i := range testCases {
-		fake := netlinktest.NewFakeNetlinkHandle()
-		for dev, addresses := range testCases[i].devAddresses {
-			fake.SetLocalAddresses(dev, addresses...)
-		}
-		r := realIPGetter{nl: fake}
-		ips, err := r.NodeIPs()
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		ipStrs := sets.NewString()
-		for _, ip := range ips {
-			ipStrs.Insert(ip.String())
-		}
-		if !ipStrs.Equal(sets.NewString(testCases[i].expectIPs...)) {
-			t.Errorf("case[%d], unexpected mismatch, expected: %v, got: %v", i, testCases[i].expectIPs, ips)
-		}
+	for _, tt := range testCases {
+		t.Run(fmt.Sprintf("%+v", tt.devAddresses), func(t *testing.T) {
+			fake := netlinktest.NewFakeNetlinkHandle()
+			for dev, addresses := range tt.devAddresses {
+				fake.SetLocalAddresses(dev, addresses...)
+			}
+			r := realIPGetter{nl: fake}
+			ips, err := r.NodeIPs()
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			ipStrs := sets.NewString()
+			for _, ip := range ips {
+				ipStrs.Insert(ip.String())
+			}
+			if !ipStrs.Equal(sets.NewString(tt.expectIPs...)) {
+				t.Fatalf("unexpected mismatch, expected: %v, got: %v", tt.expectIPs, ips)
+			}
+		})
 	}
 }
 

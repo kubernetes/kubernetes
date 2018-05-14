@@ -340,22 +340,28 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 	}
 
 	for _, errorCase := range errorCases {
-		if errs := validateKubeProxyIPTablesConfiguration(errorCase.config, newPath.Child("KubeProxyIPTablesConfiguration")); len(errs) == 0 {
-			t.Errorf("expected failure for %s", errorCase.msg)
-		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
-			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
-		}
+		t.Run(errorCase.msg, func(t *testing.T) {
+			errs := validateKubeProxyIPTablesConfiguration(errorCase.config, newPath.Child("KubeProxyIPTablesConfiguration"))
+			if len(errs) == 0 {
+				t.Fatal("expected failure")
+			}
+			if !strings.Contains(errs[0].Error(), errorCase.msg) {
+				t.Fatalf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+			}
+		})
 	}
 }
 
 func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 	testCases := []struct {
+		name      string
 		config    kubeproxyconfig.KubeProxyIPVSConfiguration
 		expectErr bool
 		reason    string
 	}{
 		{
+			name: "SyncPeriod must be greater than 0 when SyncPeriod < 0 and MinSyncPeriod > 0",
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				SyncPeriod:    metav1.Duration{Duration: -5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
@@ -364,6 +370,7 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 			reason:    "SyncPeriod must be greater than 0",
 		},
 		{
+			name: "SyncPeriod must be greater than 0 when SyncPeriod = 0 and MinSyncPeriod > 0",
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				SyncPeriod:    metav1.Duration{Duration: 0 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
@@ -372,6 +379,7 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 			reason:    "SyncPeriod must be greater than 0",
 		},
 		{
+			name: "MinSyncPeriod must be greater than 0 when SyncPeriod > 0 and MinSyncPeriod < 0",
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: -1 * time.Second},
@@ -380,6 +388,7 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 			reason:    "MinSyncPeriod must be greater than or equal to 0",
 		},
 		{
+			name: "SyncPeriod must be greater than or equal to MinSyncPeriod when SyncPeriod < MinSyncPeriod",
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				SyncPeriod:    metav1.Duration{Duration: 1 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
@@ -387,24 +396,24 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 			expectErr: true,
 			reason:    "SyncPeriod must be greater than or equal to MinSyncPeriod",
 		},
-		// SyncPeriod == MinSyncPeriod
 		{
+			name: "SyncPeriod == MinSyncPeriod",
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 			},
 			expectErr: false,
 		},
-		// SyncPeriod > MinSyncPeriod
 		{
+			name: "SyncPeriod > MinSyncPeriod",
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 			},
 			expectErr: false,
 		},
-		// SyncPeriod can be 0
 		{
+			name: "MinSyncPeriod can be 0",
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 0 * time.Second},
@@ -414,13 +423,15 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		errs := validateKubeProxyIPVSConfiguration(test.config, newPath.Child("KubeProxyIPVSConfiguration"))
-		if len(errs) == 0 && test.expectErr {
-			t.Errorf("Expect error, got nil, reason: %s", test.reason)
-		}
-		if len(errs) > 0 && !test.expectErr {
-			t.Errorf("Unexpected error: %v", errs)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			errs := validateKubeProxyIPVSConfiguration(test.config, newPath.Child("KubeProxyIPVSConfiguration"))
+			if len(errs) == 0 && test.expectErr {
+				t.Fatalf("Expect error, got nil, reason: %s", test.reason)
+			}
+			if len(errs) > 0 && !test.expectErr {
+				t.Fatalf("Unexpected error: %v", errs)
+			}
+		})
 	}
 }
 
@@ -449,10 +460,12 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 	}
 
 	errorCases := []struct {
+		name   string
 		config kubeproxyconfig.KubeProxyConntrackConfiguration
 		msg    string
 	}{
 		{
+			name: "must be greater than or equal to 0 when KubeProxyConntrackConfiguration.Max < 0",
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				Max:        pointer.Int32Ptr(-1),
 				MaxPerCore: pointer.Int32Ptr(1),
@@ -463,6 +476,7 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 			msg: "must be greater than or equal to 0",
 		},
 		{
+			name: "must be greater than or equal to 0 when KubeProxyConntrackConfiguration.MaxPerCore < 0",
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				Max:        pointer.Int32Ptr(2),
 				MaxPerCore: pointer.Int32Ptr(-1),
@@ -473,6 +487,7 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 			msg: "must be greater than or equal to 0",
 		},
 		{
+			name: "must be greater than or equal to 0 when KubeProxyConntrackConfiguration.Min < 0",
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				Max:        pointer.Int32Ptr(2),
 				MaxPerCore: pointer.Int32Ptr(1),
@@ -483,6 +498,7 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 			msg: "must be greater than or equal to 0",
 		},
 		{
+			name: "must be greater than or equal to 0 when KubeProxyConntrackConfiguration.TCPEstablishedTimeout < 0",
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				Max:        pointer.Int32Ptr(4),
 				MaxPerCore: pointer.Int32Ptr(1),
@@ -493,6 +509,7 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 			msg: "must be greater than or equal to 0",
 		},
 		{
+			name: "must be greater than or equal to 0 when KubeProxyConntrackConfiguration.TCPCloseWaitTimeout < 0",
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				Max:        pointer.Int32Ptr(4),
 				MaxPerCore: pointer.Int32Ptr(1),
@@ -505,11 +522,15 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 	}
 
 	for _, errorCase := range errorCases {
-		if errs := validateKubeProxyConntrackConfiguration(errorCase.config, newPath.Child("KubeProxyConntrackConfiguration")); len(errs) == 0 {
-			t.Errorf("expected failure for %s", errorCase.msg)
-		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
-			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
-		}
+		t.Run(errorCase.name, func(t *testing.T) {
+			errs := validateKubeProxyConntrackConfiguration(errorCase.config, newPath.Child("KubeProxyConntrackConfiguration"))
+			if len(errs) == 0 {
+				t.Fatal("expected failure")
+			}
+			if !strings.Contains(errs[0].Error(), errorCase.msg) {
+				t.Fatalf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+			}
+		})
 	}
 }
 

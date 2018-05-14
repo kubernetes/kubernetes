@@ -43,11 +43,13 @@ func TestCheckIPSetVersion(t *testing.T) {
 		{"total junk", false},
 	}
 
-	for i := range testCases {
-		valid := checkMinVersion(testCases[i].vstring)
-		if testCases[i].valid != valid {
-			t.Errorf("Expected result: %v, Got result: %v", testCases[i].valid, valid)
-		}
+	for _, tt := range testCases {
+		t.Run(tt.vstring, func(t *testing.T) {
+			valid := checkMinVersion(tt.vstring)
+			if tt.valid != valid {
+				t.Fatalf("expected result: %v, Got result: %v", tt.valid, valid)
+			}
+		})
 	}
 }
 
@@ -181,26 +183,27 @@ func TestSyncIPSetEntries(t *testing.T) {
 		},
 	}
 
-	for i := range testCases {
-		set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCases[i].set.Name, testCases[i].setType, testCases[i].ipv6, "comment-"+testCases[i].set.Name)
-
-		if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		for _, entry := range testCases[i].expectedEntries {
-			set.handle.AddEntry(entry, testCases[i].set, true)
-		}
-
-		set.activeEntries.Insert(testCases[i].activeEntries...)
-		set.syncIPSetEntries()
-		for _, entry := range testCases[i].expectedEntries {
-			found, err := set.handle.TestEntry(entry, testCases[i].set.Name)
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
+	for _, tt := range testCases {
+		t.Run(tt.set.Name, func(t *testing.T) {
+			set := NewIPSet(fakeipset.NewFake(testIPSetVersion), tt.set.Name, tt.setType, tt.ipv6, "comment-"+tt.set.Name)
+			if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
+				t.Fatalf("Unexpected error: %v", err)
 			}
-			if !found {
-				t.Errorf("Unexpected entry 172.17.0.4,tcp:80 not found in set foo")
+			for _, entry := range tt.expectedEntries {
+				set.handle.AddEntry(entry, tt.set, true)
 			}
-		}
+
+			set.activeEntries.Insert(tt.activeEntries...)
+			set.syncIPSetEntries()
+			for _, entry := range tt.expectedEntries {
+				found, err := set.handle.TestEntry(entry, tt.set.Name)
+				if err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if !found {
+					t.Fatalf("Unexpected entry 172.17.0.4,tcp:80 not found in set foo")
+				}
+			}
+		})
 	}
 }

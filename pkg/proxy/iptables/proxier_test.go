@@ -296,49 +296,51 @@ func TestDeleteEndpointConnections(t *testing.T) {
 
 	// Run the test cases
 	for _, tc := range testCases {
-		priorExecs := fexec.CommandCalls
-		priorGlogErrs := glog.Stats.Error.Lines()
+		t.Run(tc.description, func(t *testing.T) {
+			priorExecs := fexec.CommandCalls
+			priorGlogErrs := glog.Stats.Error.Lines()
 
-		input := []proxy.ServiceEndpoint{tc.epSvcPair}
-		fakeProxier.deleteEndpointConnections(input)
+			input := []proxy.ServiceEndpoint{tc.epSvcPair}
+			fakeProxier.deleteEndpointConnections(input)
 
-		// For UDP connections, check the executed conntrack command
-		var expExecs int
-		if tc.protocol == UDP {
-			isIPv6 := func(ip string) bool {
-				netIP := net.ParseIP(ip)
-				if netIP.To4() == nil {
-					return true
+			// For UDP connections, check the executed conntrack command
+			var expExecs int
+			if tc.protocol == UDP {
+				isIPv6 := func(ip string) bool {
+					netIP := net.ParseIP(ip)
+					if netIP.To4() == nil {
+						return true
+					}
+					return false
 				}
-				return false
+				endpointIP := utilproxy.IPPart(tc.endpoint)
+				expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)
+				if isIPv6(endpointIP) {
+					expectCommand += " -f ipv6"
+				}
+				actualCommand := strings.Join(fcmd.CombinedOutputLog[fexec.CommandCalls-1], " ")
+				if actualCommand != expectCommand {
+					t.Fatalf("expected command: %s, but executed %s", expectCommand, actualCommand)
+				}
+				expExecs = 1
 			}
-			endpointIP := utilproxy.IPPart(tc.endpoint)
-			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)
-			if isIPv6(endpointIP) {
-				expectCommand += " -f ipv6"
-			}
-			actualCommand := strings.Join(fcmd.CombinedOutputLog[fexec.CommandCalls-1], " ")
-			if actualCommand != expectCommand {
-				t.Errorf("%s: Expected command: %s, but executed %s", tc.description, expectCommand, actualCommand)
-			}
-			expExecs = 1
-		}
 
-		// Check the number of times conntrack was executed
-		execs := fexec.CommandCalls - priorExecs
-		if execs != expExecs {
-			t.Errorf("%s: Expected conntrack to be executed %d times, but got %d", tc.description, expExecs, execs)
-		}
+			// Check the number of times conntrack was executed
+			execs := fexec.CommandCalls - priorExecs
+			if execs != expExecs {
+				t.Fatalf("expected conntrack to be executed %d times, but got %d", expExecs, execs)
+			}
 
-		// Check the number of new glog errors
-		var expGlogErrs int64
-		if tc.simulatedErr != "" && tc.simulatedErr != conntrack.NoConnectionToDelete {
-			expGlogErrs = 1
-		}
-		glogErrs := glog.Stats.Error.Lines() - priorGlogErrs
-		if glogErrs != expGlogErrs {
-			t.Errorf("%s: Expected %d glogged errors, but got %d", tc.description, expGlogErrs, glogErrs)
-		}
+			// Check the number of new glog errors
+			var expGlogErrs int64
+			if tc.simulatedErr != "" && tc.simulatedErr != conntrack.NoConnectionToDelete {
+				expGlogErrs = 1
+			}
+			glogErrs := glog.Stats.Error.Lines() - priorGlogErrs
+			if glogErrs != expGlogErrs {
+				t.Fatalf("Expected %d glogged errors, but got %d", expGlogErrs, glogErrs)
+			}
+		})
 	}
 }
 
@@ -448,14 +450,14 @@ func hasJump(rules []iptablestest.Rule, destChain, destIP string, destPort int) 
 }
 
 func TestHasJump(t *testing.T) {
-	testCases := map[string]struct {
+	testCases := []struct {
 		rules     []iptablestest.Rule
 		destChain string
 		destIP    string
 		destPort  int
 		expected  bool
 	}{
-		"case 1": {
+		{
 			// Match the 1st rule(both dest IP and dest Port)
 			rules: []iptablestest.Rule{
 				{"-d ": "10.20.30.41/32", "--dport ": "80", "-p ": "tcp", "-j ": "REJECT"},
@@ -466,7 +468,7 @@ func TestHasJump(t *testing.T) {
 			destPort:  80,
 			expected:  true,
 		},
-		"case 2": {
+		{
 			// Match the 2nd rule(dest Port)
 			rules: []iptablestest.Rule{
 				{"-d ": "10.20.30.41/32", "-p ": "tcp", "-j ": "REJECT"},
@@ -477,7 +479,7 @@ func TestHasJump(t *testing.T) {
 			destPort:  3001,
 			expected:  true,
 		},
-		"case 3": {
+		{
 			// Match both dest IP and dest Port
 			rules: []iptablestest.Rule{
 				{"-d ": "1.2.3.4/32", "--dport ": "80", "-p ": "tcp", "-j ": "KUBE-XLB-GF53O3C2HZEXL2XN"},
@@ -487,7 +489,7 @@ func TestHasJump(t *testing.T) {
 			destPort:  80,
 			expected:  true,
 		},
-		"case 4": {
+		{
 			// Match dest IP but doesn't match dest Port
 			rules: []iptablestest.Rule{
 				{"-d ": "1.2.3.4/32", "--dport ": "80", "-p ": "tcp", "-j ": "KUBE-XLB-GF53O3C2HZEXL2XN"},
@@ -497,7 +499,7 @@ func TestHasJump(t *testing.T) {
 			destPort:  8080,
 			expected:  false,
 		},
-		"case 5": {
+		{
 			// Match dest Port but doesn't match dest IP
 			rules: []iptablestest.Rule{
 				{"-d ": "1.2.3.4/32", "--dport ": "80", "-p ": "tcp", "-j ": "KUBE-XLB-GF53O3C2HZEXL2XN"},
@@ -507,7 +509,7 @@ func TestHasJump(t *testing.T) {
 			destPort:  80,
 			expected:  false,
 		},
-		"case 6": {
+		{
 			// Match the 2nd rule(dest IP)
 			rules: []iptablestest.Rule{
 				{"-d ": "10.20.30.41/32", "-p ": "tcp", "-j ": "REJECT"},
@@ -519,7 +521,7 @@ func TestHasJump(t *testing.T) {
 			destPort:  8080,
 			expected:  true,
 		},
-		"case 7": {
+		{
 			// Match the 2nd rule(dest Port)
 			rules: []iptablestest.Rule{
 				{"-d ": "10.20.30.41/32", "-p ": "tcp", "-j ": "REJECT"},
@@ -530,7 +532,7 @@ func TestHasJump(t *testing.T) {
 			destPort:  3001,
 			expected:  true,
 		},
-		"case 8": {
+		{
 			// Match the 1st rule(dest IP)
 			rules: []iptablestest.Rule{
 				{"-d ": "10.20.30.41/32", "-p ": "tcp", "-j ": "REJECT"},
@@ -541,7 +543,7 @@ func TestHasJump(t *testing.T) {
 			destPort:  8080,
 			expected:  true,
 		},
-		"case 9": {
+		{
 			rules: []iptablestest.Rule{
 				{"-j ": "KUBE-SEP-LWSOSDSHMKPJHHJV"},
 			},
@@ -550,7 +552,7 @@ func TestHasJump(t *testing.T) {
 			destPort:  0,
 			expected:  true,
 		},
-		"case 10": {
+		{
 			rules: []iptablestest.Rule{
 				{"-j ": "KUBE-SEP-FOO"},
 			},
@@ -561,10 +563,16 @@ func TestHasJump(t *testing.T) {
 		},
 	}
 
-	for k, tc := range testCases {
-		if got := hasJump(tc.rules, tc.destChain, tc.destIP, tc.destPort); got != tc.expected {
-			t.Errorf("%v: expected %v, got %v", k, tc.expected, got)
+	for _, tc := range testCases {
+		var rules []string
+		for _, rule := range tc.rules {
+			rules = append(rules, fmt.Sprintf("%v", rule))
 		}
+		t.Run(strings.Join(rules, ";"), func(t *testing.T) {
+			if got := hasJump(tc.rules, tc.destChain, tc.destIP, tc.destPort); got != tc.expected {
+				t.Fatalf("expected %v, got %v", tc.expected, got)
+			}
+		})
 	}
 }
 
@@ -1702,6 +1710,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		// previousEndpoints and currentEndpoints are used to call appropriate
 		// handlers OnEndpoints* (based on whether corresponding values are nil
 		// or non-nil) and must be of equal length.
+		name                      string
 		previousEndpoints         []*api.Endpoints
 		currentEndpoints          []*api.Endpoints
 		oldEndpoints              map[proxy.ServicePortName][]*endpointsInfo
@@ -1711,6 +1720,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks      map[types.NamespacedName]int
 	}{{
 		// Case[0]: nothing
+		name:                      "nothing",
 		oldEndpoints:              map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedResult:            map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -1718,6 +1728,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[1]: no change, unnamed port
+		name: "no change, unnamed port",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", unnamedPort),
 		},
@@ -1739,6 +1750,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[2]: no change, named port, local
+		name: "no change, named port, local",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPortLocal),
 		},
@@ -1762,6 +1774,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[3]: no change, multiple subsets
+		name: "no change, multiple subsets",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", multipleSubsets),
 		},
@@ -1789,6 +1802,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[4]: no change, multiple subsets, multiple ports, local
+		name: "no change, multiple subsets, multiple ports, local",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", multipleSubsetsMultiplePortsLocal),
 		},
@@ -1824,6 +1838,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[5]: no change, multiple endpoints, subsets, IPs, and ports
+		name: "no change, multiple endpoints, subsets, IPs, and ports",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", multipleSubsetsIPsPorts1),
 			makeTestEndpoints("ns2", "ep2", multipleSubsetsIPsPorts2),
@@ -1892,6 +1907,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[6]: add an Endpoints
+		name: "add an Endpoints",
 		previousEndpoints: []*api.Endpoints{
 			nil,
 		},
@@ -1913,6 +1929,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[7]: remove an Endpoints
+		name: "remove an Endpoints",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", unnamedPortLocal),
 		},
@@ -1933,6 +1950,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[8]: add an IP and port
+		name: "add an IP and port",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPort),
 		},
@@ -1963,6 +1981,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[9]: remove an IP and port
+		name: "remove an IP and port",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPortsLocalNoLocal),
 		},
@@ -1998,6 +2017,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[10]: add a subset
+		name: "add a subset",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPort),
 		},
@@ -2026,6 +2046,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[11]: remove a subset
+		name: "remove a subset",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", multipleSubsets),
 		},
@@ -2053,6 +2074,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[12]: rename a port
+		name: "rename a port",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPort),
 		},
@@ -2079,6 +2101,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks: map[types.NamespacedName]int{},
 	}, {
 		// Case[13]: renumber a port
+		name: "renumber a port",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPort),
 		},
@@ -2103,6 +2126,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[14]: complex add and remove
+		name: "complex add and remove",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", complexBefore1),
 			makeTestEndpoints("ns2", "ep2", complexBefore2),
@@ -2178,6 +2202,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[15]: change from 0 endpoint address to 1 unnamed port
+		name: "change from 0 endpoint address to 1 unnamed port",
 		previousEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", emptyEndpoint),
 		},
@@ -2199,72 +2224,74 @@ func Test_updateEndpointsMap(t *testing.T) {
 	}
 
 	for tci, tc := range testCases {
-		ipt := iptablestest.NewFake()
-		fp := NewFakeProxier(ipt)
-		fp.hostname = nodeName
+		t.Run(tc.name, func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			fp.hostname = nodeName
 
-		// First check that after adding all previous versions of endpoints,
-		// the fp.oldEndpoints is as we expect.
-		for i := range tc.previousEndpoints {
-			if tc.previousEndpoints[i] != nil {
-				fp.OnEndpointsAdd(tc.previousEndpoints[i])
-			}
-		}
-		proxy.UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
-		compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
-
-		// Now let's call appropriate handlers to get to state we want to be.
-		if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
-			t.Fatalf("[%d] different lengths of previous and current endpoints", tci)
-			continue
-		}
-
-		for i := range tc.previousEndpoints {
-			prev, curr := tc.previousEndpoints[i], tc.currentEndpoints[i]
-			switch {
-			case prev == nil:
-				fp.OnEndpointsAdd(curr)
-			case curr == nil:
-				fp.OnEndpointsDelete(prev)
-			default:
-				fp.OnEndpointsUpdate(prev, curr)
-			}
-		}
-		result := proxy.UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
-		newMap := fp.endpointsMap
-		compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
-		if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
-			t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedStaleEndpoints), len(result.StaleEndpoints), result.StaleEndpoints)
-		}
-		for _, x := range tc.expectedStaleEndpoints {
-			found := false
-			for _, stale := range result.StaleEndpoints {
-				if stale == x {
-					found = true
-					break
+			// First check that after adding all previous versions of endpoints,
+			// the fp.oldEndpoints is as we expect.
+			for i := range tc.previousEndpoints {
+				if tc.previousEndpoints[i] != nil {
+					fp.OnEndpointsAdd(tc.previousEndpoints[i])
 				}
 			}
-			if !found {
-				t.Errorf("[%d] expected staleEndpoints[%v], but didn't find it: %v", tci, x, result.StaleEndpoints)
+			proxy.UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
+			compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
+
+			// Now let's call appropriate handlers to get to state we want to be.
+			if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
+				t.Fatalf("different lengths of previous and current endpoints")
+				return
 			}
-		}
-		if len(result.StaleServiceNames) != len(tc.expectedStaleServiceNames) {
-			t.Errorf("[%d] expected %d staleServiceNames, got %d: %v", tci, len(tc.expectedStaleServiceNames), len(result.StaleServiceNames), result.StaleServiceNames)
-		}
-		for svcName := range tc.expectedStaleServiceNames {
-			found := false
-			for _, stale := range result.StaleServiceNames {
-				if stale == svcName {
-					found = true
+
+			for i := range tc.previousEndpoints {
+				prev, curr := tc.previousEndpoints[i], tc.currentEndpoints[i]
+				switch {
+				case prev == nil:
+					fp.OnEndpointsAdd(curr)
+				case curr == nil:
+					fp.OnEndpointsDelete(prev)
+				default:
+					fp.OnEndpointsUpdate(prev, curr)
 				}
 			}
-			if !found {
-				t.Errorf("[%d] expected staleServiceNames[%v], but didn't find it: %v", tci, svcName, result.StaleServiceNames)
+			result := proxy.UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
+			newMap := fp.endpointsMap
+			compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
+			if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
+				t.Fatalf("expected %d staleEndpoints, got %d: %v", len(tc.expectedStaleEndpoints), len(result.StaleEndpoints), result.StaleEndpoints)
 			}
-		}
-		if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
-			t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
-		}
+			for _, x := range tc.expectedStaleEndpoints {
+				found := false
+				for _, stale := range result.StaleEndpoints {
+					if stale == x {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Fatalf("expected staleEndpoints[%v], but didn't find it: %v", x, result.StaleEndpoints)
+				}
+			}
+			if len(result.StaleServiceNames) != len(tc.expectedStaleServiceNames) {
+				t.Fatalf("expected %d staleServiceNames, got %d: %v", len(tc.expectedStaleServiceNames), len(result.StaleServiceNames), result.StaleServiceNames)
+			}
+			for svcName := range tc.expectedStaleServiceNames {
+				found := false
+				for _, stale := range result.StaleServiceNames {
+					if stale == svcName {
+						found = true
+					}
+				}
+				if !found {
+					t.Fatalf("expected staleServiceNames[%v], but didn't find it: %v", svcName, result.StaleServiceNames)
+				}
+			}
+			if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
+				t.Fatalf("expected healthchecks %v, got %v", tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
+			}
+		})
 	}
 }
 
