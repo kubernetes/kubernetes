@@ -24,15 +24,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ghodss/yaml"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -100,7 +100,7 @@ func printConfiguration(cfg *kubeadmapiv1alpha1.MasterConfiguration, w io.Writer
 		return
 	}
 
-	cfgYaml, err := yaml.Marshal(*cfg)
+	cfgYaml, err := kubeadmutil.MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha1.SchemeGroupVersion, kubeadmscheme.Codecs)
 	if err == nil {
 		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
 
