@@ -23,6 +23,13 @@ Changes should not be made to these files manually, and when creating your own
 controller based off of this implementation you should not copy these files and
 instead run the `update-codegen` script to generate your own.
 
+## Details
+
+The sample controller uses [client-go library](https://github.com/kubernetes/client-go/tree/master/tools/cache) extensively.
+The details of interaction points of the sample controller with various mechanisms from this library are
+explained [here](docs/controller-client-go.md).
+
+
 ## Purpose
 
 This is an example of how to build a kube-like controller with a single type.
