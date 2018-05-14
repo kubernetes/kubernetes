@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -108,7 +108,7 @@ func NewCmdBootstrapToken() *cobra.Command {
 
 // NewSubCmdBootstrapTokenAll returns the Cobra command for running the token all sub-phase
 func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiext.MasterConfiguration{
+	cfg := &kubeadmapiv1alpha1.MasterConfiguration{
 		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 		KubernetesVersion: "v1.9.0",
@@ -166,7 +166,7 @@ func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 
 // NewSubCmdBootstrapToken returns the Cobra command for running the create token phase
 func NewSubCmdBootstrapToken(kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiext.MasterConfiguration{
+	cfg := &kubeadmapiv1alpha1.MasterConfiguration{
 		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 		KubernetesVersion: "v1.9.0",
@@ -278,7 +278,7 @@ func NewSubCmdNodeBootstrapTokenAutoApprove(kubeConfigFile *string) *cobra.Comma
 	return cmd
 }
 
-func addBootstrapTokenFlags(flagSet *pflag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, cfgPath, description *string, skipTokenPrint *bool) {
+func addBootstrapTokenFlags(flagSet *pflag.FlagSet, cfg *kubeadmapiv1alpha1.MasterConfiguration, cfgPath, description *string, skipTokenPrint *bool) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental",
@@ -309,7 +309,7 @@ func addBootstrapTokenFlags(flagSet *pflag.FlagSet, cfg *kubeadmapiext.MasterCon
 	)
 }
 
-func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfgPath string, cfg *kubeadmapiext.MasterConfiguration, description string, skipTokenPrint bool) error {
+func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1alpha1.MasterConfiguration, description string, skipTokenPrint bool) error {
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
