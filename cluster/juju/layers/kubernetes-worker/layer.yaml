@@ -14,6 +14,7 @@ includes:
   - 'interface:kube-control'
   - 'interface:aws'
   - 'interface:gcp'
+  - 'interface:mount'
 config:
   deletes:
     - install_from_upstream
