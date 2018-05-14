@@ -96,7 +96,21 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			Version:      crd.Spec.Version,
 		})
 
-		if crd.Spec.Version != version.Version {
+		foundThisVersion := false
+		for _, v := range crd.Spec.Versions {
+			if !v.Served {
+				continue
+			}
+			apiVersionsForDiscovery = append(apiVersionsForDiscovery, metav1.GroupVersionForDiscovery{
+				GroupVersion: crd.Spec.Group + "/" + v.Name,
+				Version:      v.Name,
+			})
+			if v.Name == version.Version {
+				foundThisVersion = true
+			}
+		}
+
+		if !foundThisVersion {
 			continue
 		}
 		foundVersion = true
@@ -207,7 +221,9 @@ func (c *DiscoveryController) processNextWorkItem() bool {
 }
 
 func (c *DiscoveryController) enqueue(obj *apiextensions.CustomResourceDefinition) {
-	c.queue.Add(schema.GroupVersion{Group: obj.Spec.Group, Version: obj.Spec.Version})
+	for _, v := range obj.Spec.Versions {
+		c.queue.Add(schema.GroupVersion{Group: obj.Spec.Group, Version: v.Name})
+	}
 }
 
 func (c *DiscoveryController) addCustomResourceDefinition(obj interface{}) {

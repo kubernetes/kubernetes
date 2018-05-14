@@ -100,6 +100,57 @@ func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 	}
 }
 
+func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "mygroup.example.com",
+			Version: "v1beta1",
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:     "noxus",
+				Singular:   "nonenglishnoxu",
+				Kind:       "WishIHadChosenNoxu",
+				ShortNames: []string{"foo", "bar", "abc", "def"},
+				ListKind:   "NoxuItemList",
+				Categories: []string{"all"},
+			},
+			Scope: scope,
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: false,
+				},
+				{
+					Name:    "v1beta2",
+					Served:  true,
+					Storage: true,
+				},
+			},
+		},
+	}
+}
+
+func NewVersionedNoxuInstance(namespace, name, version string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "mygroup.example.com/" + version,
+			"kind":       "WishIHadChosenNoxu",
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+				"name":      name,
+			},
+			"content": map[string]interface{}{
+				"key": "value",
+			},
+			"num": map[string]interface{}{
+				"num1": noxuInstanceNum,
+				"num2": 1000000,
+			},
+		},
+	}
+}
+
 func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus2.mygroup.example.com"},
@@ -161,20 +212,33 @@ func CreateNewCustomResourceDefinitionWatchUnsafe(crd *apiextensionsv1beta1.Cust
 		return err
 	}
 
-	// wait until the resource appears in discovery
-	err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
-		resourceList, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + crd.Spec.Version)
-		if err != nil {
-			return false, nil
-		}
-		for _, resource := range resourceList.APIResources {
-			if resource.Name == crd.Spec.Names.Plural {
-				return true, nil
+	versions := []string{}
+
+	if len(crd.Spec.Versions) != 0 {
+		for _, v := range crd.Spec.Versions {
+			if v.Served {
+				versions = append(versions, v.Name)
 			}
 		}
-		return false, nil
-	})
+	} else {
+		versions = append(versions, crd.Spec.Version)
+	}
 
+	for _, version := range versions {
+		// wait until all the resource versions appear in discovery
+		err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+			resourceList, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
+			if err != nil {
+				return false, nil
+			}
+			for _, resource := range resourceList.APIResources {
+				if resource.Name == crd.Spec.Names.Plural {
+					return true, nil
+				}
+			}
+			return false, nil
+		})
+	}
 	return err
 }
 
