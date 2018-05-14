@@ -42,6 +42,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  advertiseAddress: ""
 	  bindPort: 0
 	  controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1alpha1
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -55,6 +56,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  image: ""
 	  keyFile: ""
 	imageRepository: ""
+	kind: MasterConfiguration
 	kubeProxy: {}
 	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
@@ -80,6 +82,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  advertiseAddress: ""
 	  bindPort: 0
 	  controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1alpha1
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -93,6 +96,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  image: ""
 	  keyFile: ""
 	imageRepository: ""
+	kind: MasterConfiguration
 	kubeProxy: {}
 	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
@@ -123,6 +127,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  advertiseAddress: ""
 	  bindPort: 0
 	  controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1alpha1
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -141,6 +146,7 @@ func TestPrintConfiguration(t *testing.T) {
 	    etcdVersion: v0.1.0
 	    operatorVersion: v0.1.0
 	imageRepository: ""
+	kind: MasterConfiguration
 	kubeProxy: {}
 	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
