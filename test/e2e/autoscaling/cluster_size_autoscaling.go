@@ -253,6 +253,32 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(2))
 	})
 
+	It("Should not scale GPU pool up if pod does not require GPUs [Feature:ClusterSizeAutoscalingGpu]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		const gpuPoolName = "gpu-pool"
+		addGpuNodePool(gpuPoolName, "nvidia-tesla-k80", 1, 0)
+		defer deleteNodePool(gpuPoolName)
+
+		installNvidiaDriversDaemonSet()
+
+		By("Enable autoscaler")
+		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 1))
+		defer disableAutoscaler(gpuPoolName, 0, 1)
+		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(0))
+
+		By("Schedule bunch of pods beyond point of filling default pool but do not request any GPUs")
+		ReserveMemory(f, "memory-reservation", 100, nodeCount*memAllocatableMb, false, 1*time.Second)
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, "memory-reservation")
+
+		// Verify that cluster size is increased
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+
+		// Expect gpu pool to stay intact
+		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(0))
+	})
+
 	It("Should scale down GPU pool from 1 [Feature:ClusterSizeAutoscalingGpu]", func() {
 		framework.SkipUnlessProviderIs("gke")
 
