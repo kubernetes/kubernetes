@@ -2636,8 +2636,8 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "flocker",
+			errtype:  field.ErrorTypeRequiredOneOf,
+			errfield: "flocker: datasetName,datasetUUID",
 		},
 		{
 			name: "both specified",
@@ -4178,7 +4178,7 @@ func TestValidateEnv(t *testing.T) {
 				Name:      "abc",
 				ValueFrom: &core.EnvVarSource{},
 			}},
-			expectedError: "[0].valueFrom: Invalid value: \"\": must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`",
+			expectedError: "[0].valueFrom: fieldRef,resourceFieldRef,configMapKeyRef,secretKeyRef: One of the values is required: \"\": exactly one must have a value",
 		},
 		{
 			name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
@@ -4514,7 +4514,7 @@ func TestValidateEnvFrom(t *testing.T) {
 			envs: []core.EnvFromSource{
 				{},
 			},
-			expectedError: "field: Invalid value: \"\": must specify one of: `configMapRef` or `secretRef`",
+			expectedError: "field: configMapRef,secretRef: One of the values is required: \"\": exactly one must have a value",
 		},
 		{
 			name: "multiple refs",

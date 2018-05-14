@@ -56,7 +56,7 @@ func TestValidateEmptyPodPresetItems(t *testing.T) {
 	}
 
 	errList := ValidatePodPreset(emptyPodPreset)
-	if !strings.Contains(errList.ToAggregate().Error(), "must specify at least one") {
+	if !strings.Contains(errList.ToAggregate().Error(), "exactly one must have a value") {
 		t.Fatal("empty pod preset with label selector should return an error")
 	}
 }

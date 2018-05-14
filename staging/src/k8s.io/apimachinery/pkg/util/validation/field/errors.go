@@ -98,6 +98,9 @@ const (
 	// provided (e.g. empty strings, null values, or empty arrays).  See
 	// Required().
 	ErrorTypeRequired ErrorType = "FieldValueRequired"
+	// ErrorTypeRequiredOneOf is used to report at lease one of required
+	// values that are not provided.
+	ErrorTypeRequiredOneOf ErrorType = "FieldValueRequiredOneOf"
 	// ErrorTypeDuplicate is used to report collisions of values that must be
 	// unique (e.g. unique IDs).  See Duplicate().
 	ErrorTypeDuplicate ErrorType = "FieldValueDuplicate"
@@ -128,6 +131,8 @@ func (t ErrorType) String() string {
 		return "Not found"
 	case ErrorTypeRequired:
 		return "Required value"
+	case ErrorTypeRequiredOneOf:
+		return "One of the values is required"
 	case ErrorTypeDuplicate:
 		return "Duplicate value"
 	case ErrorTypeInvalid:
@@ -156,6 +161,12 @@ func NotFound(field *Path, value interface{}) *Error {
 // values, or empty arrays).
 func Required(field *Path, detail string) *Error {
 	return &Error{ErrorTypeRequired, field.String(), "", detail}
+}
+
+// RequiredOneOf returns a *Error indicating "one of values required".  This is used
+// to report at least one of required values that are not provided.
+func RequiredOneOf(field *Path, fields []string, detail string) *Error {
+	return &Error{ErrorTypeRequiredOneOf, fmt.Sprintf("%s: %s", field.String(), strings.Join(fields, ",")), "", detail}
 }
 
 // Duplicate returns a *Error indicating "duplicate value".  This is
