@@ -103,14 +103,13 @@ var (
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
 			- 'journalctl -xeu kubelet'
-		
-		Additionally a control plane component may not have come up in docker. If that's the case, you can enumerate 
-		all docker containers that have been started (including ones that have crashed and exited) by running the
-		following commands:
-			- 'docker ps -a'
-		
-		Once you have that list, you can inspect the logs for any pod with:
-			- 'docker logs $CONTAINERID'
+
+		Additionally, a control plane component may have crashed or exited when started by the container runtime.
+		To troubleshoot, list all containers using your preferred container runtimes CLI, e.g. docker.
+		Here is one example how you may list all Kubernetes containers running in docker:
+			- 'docker ps -a | grep kube | grep -v pause'
+			Once you have found the failing container, you can inspect its logs with:
+			- 'docker logs CONTAINERID'
 		`)))
 )
 
