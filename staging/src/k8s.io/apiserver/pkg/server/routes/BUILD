@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "flags.go",
         "index.go",
         "metrics.go",
         "openapi.go",
