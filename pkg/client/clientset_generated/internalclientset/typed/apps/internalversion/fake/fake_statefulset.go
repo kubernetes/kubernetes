@@ -63,7 +63,7 @@ func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *apps.StatefulSetLi
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &apps.StatefulSetList{}
+	list := &apps.StatefulSetList{ListMeta: obj.(*apps.StatefulSetList).ListMeta}
 	for _, item := range obj.(*apps.StatefulSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

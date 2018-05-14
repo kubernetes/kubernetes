@@ -62,7 +62,7 @@ func (c *FakeControllerRevisions) List(opts v1.ListOptions) (result *apps.Contro
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &apps.ControllerRevisionList{}
+	list := &apps.ControllerRevisionList{ListMeta: obj.(*apps.ControllerRevisionList).ListMeta}
 	for _, item := range obj.(*apps.ControllerRevisionList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

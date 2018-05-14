@@ -59,7 +59,7 @@ func (c *FakeNodes) List(opts v1.ListOptions) (result *core_v1.NodeList, err err
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core_v1.NodeList{}
+	list := &core_v1.NodeList{ListMeta: obj.(*core_v1.NodeList).ListMeta}
 	for _, item := range obj.(*core_v1.NodeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

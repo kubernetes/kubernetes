@@ -59,7 +59,7 @@ func (c *FakePersistentVolumes) List(opts v1.ListOptions) (result *core.Persiste
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.PersistentVolumeList{}
+	list := &core.PersistentVolumeList{ListMeta: obj.(*core.PersistentVolumeList).ListMeta}
 	for _, item := range obj.(*core.PersistentVolumeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

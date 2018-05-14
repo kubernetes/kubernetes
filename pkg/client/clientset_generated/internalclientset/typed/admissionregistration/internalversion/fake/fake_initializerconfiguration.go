@@ -59,7 +59,7 @@ func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *admis
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &admissionregistration.InitializerConfigurationList{}
+	list := &admissionregistration.InitializerConfigurationList{ListMeta: obj.(*admissionregistration.InitializerConfigurationList).ListMeta}
 	for _, item := range obj.(*admissionregistration.InitializerConfigurationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

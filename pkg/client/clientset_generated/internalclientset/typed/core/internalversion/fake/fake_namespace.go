@@ -59,7 +59,7 @@ func (c *FakeNamespaces) List(opts v1.ListOptions) (result *core.NamespaceList, 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.NamespaceList{}
+	list := &core.NamespaceList{ListMeta: obj.(*core.NamespaceList).ListMeta}
 	for _, item := range obj.(*core.NamespaceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

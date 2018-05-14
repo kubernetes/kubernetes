@@ -59,7 +59,7 @@ func (c *FakeFischers) List(opts v1.ListOptions) (result *wardle.FischerList, er
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &wardle.FischerList{}
+	list := &wardle.FischerList{ListMeta: obj.(*wardle.FischerList).ListMeta}
 	for _, item := range obj.(*wardle.FischerList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

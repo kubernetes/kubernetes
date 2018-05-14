@@ -59,7 +59,7 @@ func (c *FakeCustomResourceDefinitions) List(opts v1.ListOptions) (result *apiex
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &apiextensions.CustomResourceDefinitionList{}
+	list := &apiextensions.CustomResourceDefinitionList{ListMeta: obj.(*apiextensions.CustomResourceDefinitionList).ListMeta}
 	for _, item := range obj.(*apiextensions.CustomResourceDefinitionList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

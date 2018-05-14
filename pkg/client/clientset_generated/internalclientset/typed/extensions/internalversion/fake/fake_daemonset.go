@@ -62,7 +62,7 @@ func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSet
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &extensions.DaemonSetList{}
+	list := &extensions.DaemonSetList{ListMeta: obj.(*extensions.DaemonSetList).ListMeta}
 	for _, item := range obj.(*extensions.DaemonSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

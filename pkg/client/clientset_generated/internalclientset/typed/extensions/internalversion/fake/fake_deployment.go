@@ -63,7 +63,7 @@ func (c *FakeDeployments) List(opts v1.ListOptions) (result *extensions.Deployme
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &extensions.DeploymentList{}
+	list := &extensions.DeploymentList{ListMeta: obj.(*extensions.DeploymentList).ListMeta}
 	for _, item := range obj.(*extensions.DeploymentList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

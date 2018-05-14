@@ -59,7 +59,7 @@ func (c *FakeAPIServices) List(opts v1.ListOptions) (result *apiregistration.API
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &apiregistration.APIServiceList{}
+	list := &apiregistration.APIServiceList{ListMeta: obj.(*apiregistration.APIServiceList).ListMeta}
 	for _, item := range obj.(*apiregistration.APIServiceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
