@@ -41,7 +41,6 @@ go_library(
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/mholt/caddy/caddyfile:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",
@@ -51,6 +50,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ],
 )
 

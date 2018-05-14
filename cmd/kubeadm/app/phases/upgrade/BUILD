@@ -17,6 +17,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
@@ -37,7 +38,6 @@ go_library(
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/dryrun:go_default_library",
         "//cmd/kubeadm/app/util/etcd:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/version:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",
@@ -78,6 +78,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
@@ -87,7 +88,6 @@ go_test(
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/etcd:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
