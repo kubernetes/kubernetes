@@ -22,7 +22,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	kubectlscheme "k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 // JSONYamlPrintFlags provides default flags necessary for json/yaml printing.
@@ -49,9 +48,7 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, er
 		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &outputFormat}
 	}
 
-	// wrap the printer in a versioning printer that understands when to convert and when not to convert
-	return NewVersionedPrinter(printer, f.Scheme, f.Scheme.(runtime.ObjectTyper), kubectlscheme.Scheme.PrioritizedVersionsAllGroups()...), nil
-
+	return printer, nil
 }
 
 // AddFlags receives a *cobra.Command reference and binds

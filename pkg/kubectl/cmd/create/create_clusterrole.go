@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -156,7 +157,10 @@ func (c *CreateClusterRoleOptions) Validate() error {
 }
 
 func (c *CreateClusterRoleOptions) RunCreateRole() error {
-	clusterRole := &rbacv1.ClusterRole{}
+	clusterRole := &rbacv1.ClusterRole{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "ClusterRole"},
+	}
 	clusterRole.Name = c.Name
 	rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, c.NonResourceURLs)
 	if err != nil {

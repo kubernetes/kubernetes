@@ -56,16 +56,28 @@ func TestIllegalPackageSourceCheckerThroughPrintFlags(t *testing.T) {
 			obj:                  internalPod(),
 		},
 		{
-			name:                 "json printer: json printer is wrapped in a versioned printer - internal obj should be converted with no error",
-			expectInternalObjErr: false,
+			name:                 "json printer: object containing package path beginning with forbidden prefix is rejected",
+			expectInternalObjErr: true,
 			output:               "json",
 			obj:                  internalPod(),
 		},
 		{
-			name:                 "yaml printer: yaml printer is wrapped in a versioned printer - internal obj should be converted with no error",
+			name:                 "json printer: object containing package path with no forbidden prefix returns no error",
 			expectInternalObjErr: false,
+			obj:                  externalPod(),
+			output:               "json",
+		},
+		{
+			name:                 "yaml printer: object containing package path beginning with forbidden prefix is rejected",
+			expectInternalObjErr: true,
 			output:               "yaml",
 			obj:                  internalPod(),
+		},
+		{
+			name:                 "yaml printer: object containing package path with no forbidden prefix returns no error",
+			expectInternalObjErr: false,
+			obj:                  externalPod(),
+			output:               "yaml",
 		},
 	}
 

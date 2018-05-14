@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"strings"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -42,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -420,6 +418,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			lastMapping = mapping
 		}
 
+		// ensure a versioned object is passed to the custom-columns printer
+		// if we are using OpenAPI columns to print
+		if o.PrintWithOpenAPICols {
+			printer.PrintObj(info.Object, w)
+			continue
+		}
+
 		internalObj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
 		if err != nil {
 			// if there's an error, try to print what you have (mirrors old behavior).
@@ -726,48 +731,4 @@ func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping
 
 func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 	return cmdutil.GetFlagString(cmd, "output") != ""
-}
-
-// outputOptsForMappingFromOpenAPI looks for the output format metatadata in the
-// openapi schema and modifies the passed print options for the mapping if found.
-func updatePrintOptionsForOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping, printOpts *printers.PrintOptions) bool {
-
-	// user has not specified any output format, check if OpenAPI has
-	// default specification to print this resource type
-	api, err := f.OpenAPISchema()
-	if err != nil {
-		// Error getting schema
-		return false
-	}
-	// Found openapi metadata for this resource
-	schema := api.LookupResource(mapping.GroupVersionKind)
-	if schema == nil {
-		// Schema not found, return empty columns
-		return false
-	}
-
-	columns, found := openapi.GetPrintColumns(schema.GetExtensions())
-	if !found {
-		// Extension not found, return empty columns
-		return false
-	}
-
-	return outputOptsFromStr(columns, printOpts)
-}
-
-// outputOptsFromStr parses the print-column metadata and generates printer.OutputOptions object.
-func outputOptsFromStr(columnStr string, printOpts *printers.PrintOptions) bool {
-	if columnStr == "" {
-		return false
-	}
-	parts := strings.SplitN(columnStr, "=", 2)
-	if len(parts) < 2 {
-		return false
-	}
-
-	printOpts.OutputFormatType = parts[0]
-	printOpts.OutputFormatArgument = parts[1]
-	printOpts.AllowMissingKeys = true
-
-	return true
 }
