@@ -39,14 +39,21 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		CreateCACertAndKeyFiles,
 		CreateAPIServerCertAndKeyFiles,
 		CreateAPIServerKubeletClientCertAndKeyFiles,
+		CreateServiceAccountKeyAndPublicKeyFiles,
+		CreateFrontProxyCACertAndKeyFiles,
+		CreateFrontProxyClientCertAndKeyFiles,
+	}
+	etcdCertActions := []func(cfg *kubeadmapi.MasterConfiguration) error{
 		CreateEtcdCACertAndKeyFiles,
 		CreateEtcdServerCertAndKeyFiles,
 		CreateEtcdPeerCertAndKeyFiles,
 		CreateEtcdHealthcheckClientCertAndKeyFiles,
 		CreateAPIServerEtcdClientCertAndKeyFiles,
-		CreateServiceAccountKeyAndPublicKeyFiles,
-		CreateFrontProxyCACertAndKeyFiles,
-		CreateFrontProxyClientCertAndKeyFiles,
+	}
+
+	// Currently this is the only way we have to identify static pod etcd vs external etcd
+	if len(cfg.Etcd.Endpoints) == 0 {
+		certActions = append(certActions, etcdCertActions...)
 	}
 
 	for _, action := range certActions {
