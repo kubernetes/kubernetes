@@ -29,7 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -246,7 +246,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		defaultArguments["audit-policy-file"] = kubeadmconstants.GetStaticPodAuditPolicyFile()
 		defaultArguments["audit-log-path"] = filepath.Join(kubeadmconstants.StaticPodAuditPolicyLogDir, kubeadmconstants.AuditPolicyLogFile)
 		if cfg.AuditPolicyConfiguration.LogMaxAge == nil {
-			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", kubeadmapiext.DefaultAuditPolicyLogMaxAge)
+			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", kubeadmapiv1alpha1.DefaultAuditPolicyLogMaxAge)
 		} else {
 			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", *cfg.AuditPolicyConfiguration.LogMaxAge)
 		}
@@ -390,7 +390,7 @@ func getAuthzParameters(modes []string) []string {
 	strset := sets.NewString(modes...)
 
 	if len(modes) == 0 {
-		return []string{fmt.Sprintf("--authorization-mode=%s", kubeadmapiext.DefaultAuthorizationModes)}
+		return []string{fmt.Sprintf("--authorization-mode=%s", kubeadmapiv1alpha1.DefaultAuthorizationModes)}
 	}
 
 	if strset.Has(authzmodes.ModeABAC) {

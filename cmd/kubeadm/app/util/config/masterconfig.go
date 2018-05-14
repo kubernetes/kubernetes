@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -53,9 +53,9 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	cfg.API.AdvertiseAddress = ip.String()
 	ip = net.ParseIP(cfg.API.AdvertiseAddress)
 	if ip.To4() != nil {
-		cfg.KubeProxy.Config.BindAddress = kubeadmapiext.DefaultProxyBindAddressv4
+		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha1.DefaultProxyBindAddressv4
 	} else {
-		cfg.KubeProxy.Config.BindAddress = kubeadmapiext.DefaultProxyBindAddressv6
+		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha1.DefaultProxyBindAddressv6
 	}
 	// Resolve possible version labels and validate version string
 	err = NormalizeKubernetesVersion(cfg)
@@ -77,7 +77,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 // TryLoadMasterConfiguration tries to loads a Master configuration from the given file (if defined)
-func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiext.MasterConfiguration) error {
+func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiv1alpha1.MasterConfiguration) error {
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
@@ -97,7 +97,7 @@ func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiext.MasterConfigu
 // Then the external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiext.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
+func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha1.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
 	glog.V(1).Infoln("configuring files and defaults to internal config")
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
