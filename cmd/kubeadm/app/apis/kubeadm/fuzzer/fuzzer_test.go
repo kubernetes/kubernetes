@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package install
+package fuzzer
 
 import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
-	kubeadmfuzzer "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForAPIGroup(t, Install, kubeadmfuzzer.Funcs)
+	roundtrip.RoundTripTestForAPIGroup(t, scheme.AddToScheme, Funcs)
 }

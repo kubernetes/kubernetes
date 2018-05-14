@@ -25,10 +25,8 @@ import (
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
-
 	// Register the kubeadm configuration types because CLI flag generation
 	// depends on the generated defaults.
-	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 )
 
 // NewKubeadmCommand return cobra.Command to run kubeadm command

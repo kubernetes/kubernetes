@@ -30,6 +30,7 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -37,7 +38,6 @@ import (
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -487,9 +487,9 @@ func getAPIServerHash(dir string) (string, error) {
 func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.MasterConfiguration, error) {
 	externalcfg := &kubeadmapiv1alpha1.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version)), externalcfg); err != nil {
+	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version)), externalcfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config: %v", err)
 	}
-	legacyscheme.Scheme.Convert(externalcfg, internalcfg, nil)
+	kubeadmscheme.Scheme.Convert(externalcfg, internalcfg, nil)
 	return internalcfg, nil
 }

@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 const test196 = "testdata/kubeadm196.yaml"
@@ -36,8 +38,12 @@ func TestUpgrade(t *testing.T) {
 		t.Fatalf("couldn't unmarshal test yaml: %v", err)
 	}
 
-	var obj MasterConfiguration
-	if err := Migrate(decoded, &obj); err != nil {
+	scheme := runtime.NewScheme()
+	AddToScheme(scheme)
+	codecs := serializer.NewCodecFactory(scheme)
+
+	obj := &MasterConfiguration{}
+	if err := Migrate(decoded, obj, codecs); err != nil {
 		t.Fatalf("couldn't decode migrated object: %v", err)
 	}
 }
