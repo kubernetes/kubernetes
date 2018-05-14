@@ -93,6 +93,7 @@ func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address on which to serve on.")
 	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
 	cmd.Flags().StringP("unix-socket", "u", "", "Unix socket on which to run the proxy.")
+	cmd.Flags().Duration("keepalive", 0, "keepalive specifies the keep-alive period for an active network connection. Set to 0 to disable keepalive.")
 	return cmd
 }
 
@@ -141,7 +142,9 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		filter = nil
 	}
 
-	server, err := proxy.NewServer(staticDir, apiProxyPrefix, staticPrefix, filter, clientConfig)
+	keepalive := cmdutil.GetFlagDuration(cmd, "keepalive")
+
+	server, err := proxy.NewServer(staticDir, apiProxyPrefix, staticPrefix, filter, clientConfig, keepalive)
 
 	// Separate listening from serving so we can report the bound port
 	// when it is chosen by os (eg: port == 0)
