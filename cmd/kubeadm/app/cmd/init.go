@@ -585,14 +585,7 @@ func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
-		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10255/healthz"); err != nil {
-			errC <- err
-		}
-	}(errorChan, waiter)
-
-	go func(errC chan error, waiter apiclient.Waiter) {
-		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
-		if err := waiter.WaitForHealthyKubelet(60*time.Second, "http://localhost:10255/healthz/syncloop"); err != nil {
+		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10248/healthz"); err != nil {
 			errC <- err
 		}
 	}(errorChan, waiter)
