@@ -62,7 +62,7 @@ func (c *FakePodTemplates) List(opts v1.ListOptions) (result *core.PodTemplateLi
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.PodTemplateList{}
+	list := &core.PodTemplateList{ListMeta: obj.(*core.PodTemplateList).ListMeta}
 	for _, item := range obj.(*core.PodTemplateList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

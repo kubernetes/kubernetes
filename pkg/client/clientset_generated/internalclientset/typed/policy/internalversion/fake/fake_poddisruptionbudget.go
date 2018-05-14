@@ -62,7 +62,7 @@ func (c *FakePodDisruptionBudgets) List(opts v1.ListOptions) (result *policy.Pod
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &policy.PodDisruptionBudgetList{}
+	list := &policy.PodDisruptionBudgetList{ListMeta: obj.(*policy.PodDisruptionBudgetList).ListMeta}
 	for _, item := range obj.(*policy.PodDisruptionBudgetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

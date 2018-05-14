@@ -62,7 +62,7 @@ func (c *FakeLimitRanges) List(opts v1.ListOptions) (result *core_v1.LimitRangeL
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core_v1.LimitRangeList{}
+	list := &core_v1.LimitRangeList{ListMeta: obj.(*core_v1.LimitRangeList).ListMeta}
 	for _, item := range obj.(*core_v1.LimitRangeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

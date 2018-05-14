@@ -58,7 +58,7 @@ func (c *FakeNodeMetricses) List(opts v1.ListOptions) (result *v1beta1.NodeMetri
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.NodeMetricsList{}
+	list := &v1beta1.NodeMetricsList{ListMeta: obj.(*v1beta1.NodeMetricsList).ListMeta}
 	for _, item := range obj.(*v1beta1.NodeMetricsList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
