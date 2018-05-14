@@ -103,13 +103,13 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		}
 	}
 
-	// Upgrade kube-dns and kube-proxy
+	// Upgrade kube-dns/CoreDNS and kube-proxy
 	if err := dns.EnsureDNSAddon(cfg, client); err != nil {
 		errs = append(errs, err)
 	}
-	// Remove the old kube-dns deployment if coredns is now used
+	// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
 	if !dryRun {
-		if err := removeOldKubeDNSDeploymentIfCoreDNSIsUsed(cfg, client); err != nil {
+		if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg, client); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -120,24 +120,28 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	return errors.NewAggregate(errs)
 }
 
-func removeOldKubeDNSDeploymentIfCoreDNSIsUsed(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
-	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
-		return apiclient.TryRunCommand(func() error {
-			coreDNSDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNS, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if coreDNSDeployment.Status.ReadyReplicas == 0 {
-				return fmt.Errorf("the CoreDNS deployment isn't ready yet")
-			}
-			err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, kubeadmconstants.KubeDNS)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-			return nil
-		}, 10)
-	}
-	return nil
+func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+	return apiclient.TryRunCommand(func() error {
+		installedDeploymentName := kubeadmconstants.KubeDNS
+		deploymentToDelete := kubeadmconstants.CoreDNS
+
+		if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
+			installedDeploymentName = kubeadmconstants.CoreDNS
+			deploymentToDelete = kubeadmconstants.KubeDNS
+		}
+		dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(installedDeploymentName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if dnsDeployment.Status.ReadyReplicas == 0 {
+			return fmt.Errorf("the DNS deployment isn't ready yet")
+		}
+		err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}, 10)
 }
 
 func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
