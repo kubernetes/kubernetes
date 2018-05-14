@@ -234,6 +234,10 @@ func TestPodSecrets(t *testing.T) {
 						SecretRef: &v1.LocalObjectReference{
 							Name: "Spec.Volumes[*].VolumeSource.CephFS.SecretRef"}}}}, {
 				VolumeSource: v1.VolumeSource{
+					Cinder: &v1.CinderVolumeSource{
+						SecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.Cinder.SecretRef"}}}}, {
+				VolumeSource: v1.VolumeSource{
 					FlexVolume: &v1.FlexVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
 							Name: "Spec.Volumes[*].VolumeSource.FlexVolume.SecretRef"}}}}, {
@@ -287,6 +291,7 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef",
 		"Spec.Volumes[*].VolumeSource.AzureFile.SecretName",
 		"Spec.Volumes[*].VolumeSource.CephFS.SecretRef",
+		"Spec.Volumes[*].VolumeSource.Cinder.SecretRef",
 		"Spec.Volumes[*].VolumeSource.FlexVolume.SecretRef",
 		"Spec.Volumes[*].VolumeSource.Projected.Sources[*].Secret",
 		"Spec.Volumes[*].VolumeSource.RBD.SecretRef",

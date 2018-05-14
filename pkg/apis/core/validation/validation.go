@@ -1196,6 +1196,27 @@ func validateCinderVolumeSource(cd *core.CinderVolumeSource, fldPath *field.Path
 	if len(cd.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
 	}
+	if cd.SecretRef != nil {
+		if len(cd.SecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
+		}
+	}
+	return allErrs
+}
+
+func validateCinderPersistentVolumeSource(cd *core.CinderPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cd.VolumeID) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
+	}
+	if cd.SecretRef != nil {
+		if len(cd.SecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
+		}
+		if len(cd.SecretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
+		}
+	}
 	return allErrs
 }
 
@@ -1622,7 +1643,7 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("cinder"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateCinderVolumeSource(pv.Spec.Cinder, specPath.Child("cinder"))...)
+			allErrs = append(allErrs, validateCinderPersistentVolumeSource(pv.Spec.Cinder, specPath.Child("cinder"))...)
 		}
 	}
 	if pv.Spec.FC != nil {
