@@ -32,39 +32,66 @@ import (
 // TestSecondsSinceSync verifies that proper results are returned
 // when checking the time between syncs
 func TestSecondsSinceSync(t *testing.T) {
-	tunneler := &SSHTunneler{}
-	assert := assert.New(t)
+	tests := []struct {
+		name     string
+		lastSync int64
+		clock    *clock.FakeClock
+		want     int64
+	}{
+		{
+			name:     "Nano Second. No difference",
+			lastSync: time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix(),
+			clock:    clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC)),
+			want:     int64(0),
+		},
+		{
+			name:     "Second",
+			lastSync: time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix(),
+			clock:    clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC)),
+			want:     int64(1),
+		},
+		{
+			name:     "Minute",
+			lastSync: time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix(),
+			clock:    clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC)),
+			want:     int64(60),
+		},
+		{
+			name:     "Hour",
+			lastSync: time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix(),
+			clock:    clock.NewFakeClock(time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC)),
+			want:     int64(3600),
+		},
+		{
+			name:     "Day",
+			lastSync: time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix(),
+			clock:    clock.NewFakeClock(time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC)),
+			want:     int64(86400),
+		},
+		{
+			name:     "Month",
+			lastSync: time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix(),
+			clock:    clock.NewFakeClock(time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC)),
+			want:     int64(2678400),
+		},
+		{
+			name:     "Future Month. Should be -Month",
+			lastSync: time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC).Unix(),
+			clock:    clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC)),
+			want:     int64(-2678400),
+		},
+	}
 
-	tunneler.lastSync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tunneler := &SSHTunneler{}
+			assert := assert.New(t)
+			tunneler.lastSync = tt.lastSync
+			tunneler.clock = tt.clock
+			assert.Equal(int64(tt.want), tunneler.SecondsSinceSync())
+		})
+	}
 
-	// Nano Second. No difference.
-	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC))
-	assert.Equal(int64(0), tunneler.SecondsSinceSync())
-
-	// Second
-	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC))
-	assert.Equal(int64(1), tunneler.SecondsSinceSync())
-
-	// Minute
-	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC))
-	assert.Equal(int64(60), tunneler.SecondsSinceSync())
-
-	// Hour
-	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC))
-	assert.Equal(int64(3600), tunneler.SecondsSinceSync())
-
-	// Day
-	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC))
-	assert.Equal(int64(86400), tunneler.SecondsSinceSync())
-
-	// Month
-	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC))
-	assert.Equal(int64(2678400), tunneler.SecondsSinceSync())
-
-	// Future Month. Should be -Month.
-	tunneler.lastSync = time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC).Unix()
-	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC))
-	assert.Equal(int64(-2678400), tunneler.SecondsSinceSync())
 }
 
 // generateTempFile creates a temporary file path
