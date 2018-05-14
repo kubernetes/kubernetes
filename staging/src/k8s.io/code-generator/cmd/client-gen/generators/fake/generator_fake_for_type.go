@@ -334,7 +334,7 @@ func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type
 	if label == nil {
 		label = $.Everything|raw$()
 	}
-	list := &$.type|raw$List{}
+	list := &$.type|raw$List{ListMeta: obj.(*$.type|raw$List).ListMeta}
 	for _, item := range obj.(*$.type|raw$List).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
