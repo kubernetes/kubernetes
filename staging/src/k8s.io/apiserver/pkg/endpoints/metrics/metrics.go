@@ -93,6 +93,14 @@ var (
 		},
 		[]string{"requestKind"},
 	)
+	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
+	RegisteredWatchers = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "apiserver_registered_watchers",
+			Help: "Number of currently registered watchers for a given resources",
+		},
+		[]string{"group", "version", "kind"},
+	)
 	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = prometheus.NewGaugeVec(
@@ -111,6 +119,7 @@ var (
 		requestLatenciesSummary,
 		responseSizes,
 		DroppedRequests,
+		RegisteredWatchers,
 		currentInflightRequests,
 	}
 )
