@@ -46,7 +46,7 @@ func (util *DiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) er
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	cloud, err := b.plugin.getCloudProvider()
+	cloud, err := b.plugin.getCloudProvider(b.secretName, b.secretNs)
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (util *DiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 	}
 	glog.V(2).Infof("Successfully unmounted main device: %s\n", globalPDPath)
 
-	cloud, err := cd.plugin.getCloudProvider()
+	cloud, err := cd.plugin.getCloudProvider(cd.secretName, cd.secretNs)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (util *DiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 
 // DeleteVolume uses the cloud entrypoint to delete specified volume
 func (util *DiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
-	cloud, err := cd.plugin.getCloudProvider()
+	cloud, err := cd.plugin.getCloudProvider(cd.secretName, cd.secretNs)
 	if err != nil {
 		return err
 	}
@@ -163,11 +163,6 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 
 // CreateVolume uses the cloud provider entrypoint for creating a volume
 func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
-	cloud, err := c.plugin.getCloudProvider()
-	if err != nil {
-		return "", 0, nil, "", err
-	}
-
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
@@ -175,6 +170,9 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 	name := volutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // Cinder volume name can have up to 255 characters
 	vtype := ""
 	availability := ""
+	secretName := c.secretName
+	secretNs := c.secretNs
+
 	// Apply ProvisionerParameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
 	for k, v := range c.options.Parameters {
@@ -185,6 +183,10 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 			availability = v
 		case volume.VolumeParameterFSType:
 			fstype = v
+		case "secretname":
+			secretName = v
+		case "secretnamespace":
+			secretNs = v
 		default:
 			return "", 0, nil, "", fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
 		}
@@ -206,6 +208,11 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 		if len(zones) > 0 {
 			availability = volutil.ChooseZoneForVolume(zones, c.options.PVC.Name)
 		}
+	}
+
+	cloud, err := c.plugin.getCloudProvider(secretName, secretNs)
+	if err != nil {
+		return "", 0, nil, "", err
 	}
 
 	volumeID, volumeAZ, IgnoreVolumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)

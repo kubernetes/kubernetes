@@ -2058,6 +2058,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Optional: points to a secret object that has enough information to connect to OpenStack. The secret data can contain fields from the \"[Global]\" section of the cloud configuration file. The values of these fields essentially override the values from the main configuration file set up by the administrator. This is helpful for example to customize the \"domain-id\", \"tenant-id\", \"user-id\" and \"password\" for specific pod(s)"
      }
     }
    },

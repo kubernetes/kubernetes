@@ -30,9 +30,10 @@ import (
 func TestRoutes(t *testing.T) {
 	const clusterName = "ignored"
 
-	cfg, ok := configFromEnv()
-	if !ok {
-		t.Skipf("No config found in environment")
+	var cfg Config
+	configFromEnv(&cfg)
+	if !checkGlobalInfo(cfg) {
+		t.Skip("No config found in environment")
 	}
 
 	os, err := newOpenStack(cfg)

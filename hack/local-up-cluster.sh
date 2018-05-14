@@ -114,18 +114,6 @@ START_MODE=${START_MODE:-"all"}
 # A list of controllers to enable
 KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 
-# sanity check for OpenStack provider
-if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
-    if [ "${CLOUD_CONFIG}" == "" ]; then
-        echo "Missing CLOUD_CONFIG env for OpenStack provider!"
-        exit 1
-    fi
-    if [ ! -f "${CLOUD_CONFIG}" ]; then
-        echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
-        exit 1
-    fi
-fi
-
 # set feature gates if using ipvs mode
 if [ "${KUBE_PROXY_MODE}" == "ipvs" ]; then
     # If required kernel modules are not available, fall back to iptables.
