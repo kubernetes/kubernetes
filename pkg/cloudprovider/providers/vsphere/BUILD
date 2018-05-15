@@ -39,7 +39,10 @@ go_test(
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
+        "//vendor/github.com/vmware/govmomi/lookup/simulator:go_default_library",
         "//vendor/github.com/vmware/govmomi/simulator:go_default_library",
+        "//vendor/github.com/vmware/govmomi/simulator/vpx:go_default_library",
+        "//vendor/github.com/vmware/govmomi/sts/simulator:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
     ],
