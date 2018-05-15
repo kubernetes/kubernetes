@@ -167,6 +167,7 @@ func (p *factoryAttrsPluginEnvProvider) Env() (plugins.EnvList, error) {
 	}, nil
 }
 
+// pluginLoader provides the implementation to be used to load cli plugins.
 // pluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.
 // If this env var is not set, it defaults to
 //   "~/.kube/plugins", plus
@@ -182,6 +183,7 @@ func pluginLoader() plugins.PluginLoader {
 	}
 }
 
+// pluginRunner provides the implementation to be used to run cli plugins.
 func pluginRunner() plugins.PluginRunner {
 	return &plugins.ExecPluginRunner{}
 }
