@@ -221,14 +221,14 @@ func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, 
 			if strings.TrimSpace(s) == "" {
 				continue
 			}
-			params = []string{"-r", criSocketPath, "stop", s}
+			params = []string{"-r", criSocketPath, "stopp", s}
 			glog.V(1).Infof("[reset] Executing command %s %s", crictlPath, strings.Join(params, " "))
 			if err := execer.Command(crictlPath, params...).Run(); err != nil {
 				glog.Infof("[reset] failed to stop the running containers using crictl: %v. Trying to use docker instead", err)
 				resetWithDocker(execer, dockerCheck)
 				return
 			}
-			params = []string{"-r", criSocketPath, "rm", s}
+			params = []string{"-r", criSocketPath, "rmp", s}
 			glog.V(1).Infof("[reset] Executing command %s %s", crictlPath, strings.Join(params, " "))
 			if err := execer.Command(crictlPath, params...).Run(); err != nil {
 				glog.Infof("[reset] failed to remove the running containers using crictl: %v. Trying to use docker instead", err)
