@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 )
 
 // cpuManagerCheckpointName is the name of checkpoint file

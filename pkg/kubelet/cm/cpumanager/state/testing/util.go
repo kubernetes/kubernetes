@@ -35,10 +35,7 @@ func (mc *MockCheckpoint) UnmarshalCheckpoint(blob []byte) error {
 	return nil
 }
 
-// GetChecksum fakes getting checksum
-func (mc *MockCheckpoint) GetChecksum() uint64 {
-	return 0
+// VerifyChecksum fakes verifying checksum
+func (mc *MockCheckpoint) VerifyChecksum() error {
+	return nil
 }
-
-// UpdateChecksum fakes updating cheksum
-func (mc *MockCheckpoint) UpdateChecksum() {}

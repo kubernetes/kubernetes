@@ -13,10 +13,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/checkpointmanager:go_default_library",
+        "//pkg/kubelet/checkpointmanager/checksum:go_default_library",
         "//pkg/kubelet/checkpointmanager/errors:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
-        "//pkg/kubelet/util/store:go_default_library",
-        "//pkg/util/hash:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )

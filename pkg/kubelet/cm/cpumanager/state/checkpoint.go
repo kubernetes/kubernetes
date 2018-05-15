@@ -18,55 +18,50 @@ package state
 
 import (
 	"encoding/json"
-	"hash/fnv"
 
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )
 
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpoint{}
 
 // CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint
 type CPUManagerCheckpoint struct {
-	PolicyName    string
-	DefaultCPUSet string
-	Entries       map[string]string
-	Checksum      uint64
+	PolicyName    string            `json:"policyName"`
+	DefaultCPUSet string            `json:"defaultCpuSet"`
+	Entries       map[string]string `json:"entries,omitempty"`
+	Checksum      checksum.Checksum `json:"checksum"`
 }
 
 // NewCPUManagerCheckpoint returns an instance of Checkpoint
 func NewCPUManagerCheckpoint() *CPUManagerCheckpoint {
-	return &CPUManagerCheckpoint{Entries: make(map[string]string)}
+	return &CPUManagerCheckpoint{
+		Entries: make(map[string]string),
+	}
 }
 
 // MarshalCheckpoint returns marshalled checkpoint
 func (cp *CPUManagerCheckpoint) MarshalCheckpoint() ([]byte, error) {
+	// make sure checksum wasn't set before so it doesn't affect output checksum
+	cp.Checksum = 0
+	cp.Checksum = checksum.New(cp)
 	return json.Marshal(*cp)
 }
 
 // UnmarshalCheckpoint tries to unmarshal passed bytes to checkpoint
 func (cp *CPUManagerCheckpoint) UnmarshalCheckpoint(blob []byte) error {
-	if err := json.Unmarshal(blob, cp); err != nil {
-		return err
-	}
-	if cp.Checksum != cp.GetChecksum() {
-		return errors.ErrCorruptCheckpoint
-	}
-	return nil
+	return json.Unmarshal(blob, cp)
 }
 
-// GetChecksum returns calculated checksum of checkpoint
-func (cp *CPUManagerCheckpoint) GetChecksum() uint64 {
-	orig := cp.Checksum
+// VerifyChecksum verifies that current checksum of checkpoint is valid
+func (cp *CPUManagerCheckpoint) VerifyChecksum() error {
+	if cp.Checksum == 0 {
+		// accept empty checksum for compatibility with old file backend
+		return nil
+	}
+	ck := cp.Checksum
 	cp.Checksum = 0
-	hash := fnv.New32a()
-	hashutil.DeepHashObject(hash, *cp)
-	cp.Checksum = orig
-	return uint64(hash.Sum32())
-}
-
-// UpdateChecksum calculates and updates checksum of the checkpoint
-func (cp *CPUManagerCheckpoint) UpdateChecksum() {
-	cp.Checksum = cp.GetChecksum()
+	err := ck.Verify(cp)
+	cp.Checksum = ck
+	return err
 }

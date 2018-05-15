@@ -48,7 +48,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"PolicyName": "none",
 				"DefaultCPUSet": "4-6",
 				"Entries": {},
-				"Checksum": 861251554
+				"Checksum": 2912033808
 			}`,
 			"none",
 			"",
@@ -65,7 +65,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 					"container1": "4-6",
 					"container2": "1-3"
 				},
-				"Checksum": 2604807655
+				"Checksum": 1535905563
 			}`,
 			"none",
 			"",
@@ -102,7 +102,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"PolicyName": "other",
 				"DefaultCPUSet": "1-3",
 				"Entries": {},
-				"Checksum": 4266067046
+				"Checksum": 4195836012
 			}`,
 			"none",
 			`configured policy "none" differs from state checkpoint policy "other"`,
@@ -114,7 +114,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"PolicyName": "none",
 				"DefaultCPUSet": "1.3",
 				"Entries": {},
-				"Checksum": 4073769779
+				"Checksum": 1025273327
 			}`,
 			"none",
 			`could not parse default cpu set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
@@ -129,7 +129,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 					"container1": "4-6",
 					"container2": "asd"
 				},
-				"Checksum": 3835486974
+				"Checksum": 2764213924
 			}`,
 			"none",
 			`could not parse cpuset "asd" for container id "container2": strconv.Atoi: parsing "asd": invalid syntax`,
