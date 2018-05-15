@@ -924,31 +924,52 @@ func (cont *GCEIngressController) backendMode(svcPorts map[string]v1.ServicePort
 		return false, fmt.Errorf("failed to list backend services: %v", err)
 	}
 
+	hcList, err := gceCloud.ListHealthChecks()
+	if err != nil {
+		return false, fmt.Errorf("failed to list health checks: %v", err)
+	}
+
 	uid := cont.UID
 	if len(uid) > 8 {
 		uid = uid[:8]
 	}
 
 	matchingBackendService := 0
-	for _, bs := range beList {
+	for svcName, sp := range svcPorts {
 		match := false
-		for svcName, sp := range svcPorts {
-			// Non-NEG BackendServices are named with the Nodeport in the name.
-			// NEG BackendServices' names contain the a sha256 hash of a string.
-			negString := strings.Join([]string{uid, cont.Ns, svcName, sp.TargetPort.String()}, ";")
-			negHash := fmt.Sprintf("%x", sha256.Sum256([]byte(negString)))[:8]
-
+		bsMatch := &compute.BackendService{}
+		// Non-NEG BackendServices are named with the Nodeport in the name.
+		// NEG BackendServices' names contain the a sha256 hash of a string.
+		negString := strings.Join([]string{uid, cont.Ns, svcName, sp.TargetPort.String()}, ";")
+		negHash := fmt.Sprintf("%x", sha256.Sum256([]byte(negString)))[:8]
+		for _, bs := range beList {
 			if strings.Contains(bs.Name, strconv.Itoa(int(sp.NodePort))) ||
 				strings.Contains(bs.Name, negHash) {
 				match = true
+				bsMatch = bs
 				matchingBackendService += 1
+				break
 			}
 		}
+
 		if match {
-			for _, be := range bs.Backends {
+			for _, be := range bsMatch.Backends {
 				if !strings.Contains(be.Group, keyword) {
 					return false, nil
 				}
+			}
+
+			// Check that the correct HealthCheck exists for the BackendService
+			hcMatch := false
+			for _, hc := range hcList {
+				if hc.Name == bsMatch.Name {
+					hcMatch = true
+					break
+				}
+			}
+
+			if !hcMatch {
+				return false, fmt.Errorf("missing healthcheck for backendservice: %v", bsMatch.Name)
 			}
 		}
 	}
