@@ -81,6 +81,9 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 						}
 					}
 				}
+				if b.ServiceAccountToken != nil {
+					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
@@ -223,6 +226,9 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
+				}
+				if b.ServiceAccountToken != nil {
+					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
 				}
 			}
 		}

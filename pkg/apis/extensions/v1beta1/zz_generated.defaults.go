@@ -88,6 +88,9 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 						}
 					}
 				}
+				if b.ServiceAccountToken != nil {
+					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
@@ -231,6 +234,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
+				}
+				if b.ServiceAccountToken != nil {
+					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
 				}
 			}
 		}
@@ -397,6 +403,9 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
+				}
+				if b.ServiceAccountToken != nil {
+					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
 				}
 			}
 		}
