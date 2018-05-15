@@ -39,7 +39,6 @@ type NamespaceInterface interface {
 	Update(*v1.Namespace) (*v1.Namespace, error)
 	UpdateStatus(*v1.Namespace) (*v1.Namespace, error)
 	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Namespace, error)
 	List(opts meta_v1.ListOptions) (*v1.NamespaceList, error)
 	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
@@ -134,16 +133,6 @@ func (c *namespaces) Delete(name string, options *meta_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("namespaces").
 		Name(name).
-		Body(options).
-		Do().
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *namespaces) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
-	return c.client.Delete().
-		Resource("namespaces").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()

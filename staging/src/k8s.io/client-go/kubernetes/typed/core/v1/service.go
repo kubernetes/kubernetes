@@ -39,7 +39,6 @@ type ServiceInterface interface {
 	Update(*v1.Service) (*v1.Service, error)
 	UpdateStatus(*v1.Service) (*v1.Service, error)
 	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Service, error)
 	List(opts meta_v1.ListOptions) (*v1.ServiceList, error)
 	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
@@ -143,17 +142,6 @@ func (c *services) Delete(name string, options *meta_v1.DeleteOptions) error {
 		Namespace(c.ns).
 		Resource("services").
 		Name(name).
-		Body(options).
-		Do().
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *services) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("services").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
 		Do().
 		Error()
