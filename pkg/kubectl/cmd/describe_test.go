@@ -88,7 +88,7 @@ func TestDescribeObject(t *testing.T) {
 	_, _, rc := testData()
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	d := &testDescriber{Output: "test output"}
 	tf.DescriberVal = d
@@ -125,7 +125,7 @@ func TestDescribeListObjects(t *testing.T) {
 	pods, _, _ := testData()
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	d := &testDescriber{Output: "test output"}
 	tf.DescriberVal = d
@@ -148,7 +148,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 	pods, _, _ := testData()
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	d := &testDescriber{Output: "test output"}
 	tf.DescriberVal = d
@@ -170,7 +170,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	pods, _, _ := testData()
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	d := &testDescriber{Output: "test output"}
 	tf.DescriberVal = d

@@ -40,8 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
 func TestPortsForObject(t *testing.T) {
@@ -471,8 +470,8 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper := restmapper.NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
-	b := resource.NewFakeBuilder(fakeClient(), mapper, categories.LegacyCategoryExpander)
+	mapper := restmapper.NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme), ds)
+	b := resource.NewFakeBuilder(fakeClient(), mapper, resource.FakeCategoryExpander)
 
 	for _, test := range tests {
 		replaced := b.ReplaceAliases(test.arg)

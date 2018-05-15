@@ -428,7 +428,7 @@ func BuildGenericConfig(
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.APIEnablement.ApplyTo(genericConfig, master.DefaultAPIResourceConfigSource(), legacyscheme.Registry); lastErr != nil {
+	if lastErr = s.APIEnablement.ApplyTo(genericConfig, master.DefaultAPIResourceConfigSource(), legacyscheme.Scheme); lastErr != nil {
 		return
 	}
 
@@ -579,7 +579,7 @@ func BuildAdmissionPluginInitializers(
 
 	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {
 		discoveryRESTMapper.Reset()
-		go utilwait.Until(discoveryRESTMapper.Reset, 10*time.Second, context.StopCh)
+		go utilwait.Until(discoveryRESTMapper.Reset, 30*time.Second, context.StopCh)
 		return nil
 	}
 
@@ -619,7 +619,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 	}
 	storageFactory, err := kubeapiserver.NewStorageFactory(
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, legacyscheme.Codecs,
-		serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Registry), storageGroupsToEncodingVersion,
+		serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme), storageGroupsToEncodingVersion,
 		// The list includes resources that need to be stored in a different
 		// group version than other resources in the groups.
 		// FIXME (soltysh): this GroupVersionResource override should be configurable

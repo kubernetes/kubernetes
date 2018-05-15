@@ -48,10 +48,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -76,37 +75,13 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 	return f
 }
 
-// RESTMapper returns a mapper.
-func (f *ring1Factory) RESTMapper() (meta.RESTMapper, error) {
+func (f *ring1Factory) CategoryExpander() (restmapper.CategoryExpander, error) {
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
 
-	// allow conversion between typed and unstructured objects
-	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	// TODO: should this also indicate it recognizes typed objects?
-	expander := restmapper.NewShortcutExpander(mapper, discoveryClient)
-	return expander, nil
-}
-
-func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {
-	legacyExpander := categories.LegacyCategoryExpander
-
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err == nil {
-		// fallback is the legacy expander wrapped with discovery based filtering
-		fallbackExpander, err := categories.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
-		CheckErr(err)
-
-		// by default use the expander that discovers based on "categories" field from the API
-		discoveryCategoryExpander, err := categories.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
-		CheckErr(err)
-
-		return discoveryCategoryExpander
-	}
-
-	return legacyExpander
+	return restmapper.NewDiscoveryCategoryExpander(discoveryClient), nil
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
@@ -142,7 +117,7 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 		cfg.APIPath = "/api"
 	}
 	gv := mapping.GroupVersionKind.GroupVersion()
-	cfg.ContentConfig = dynamic.ContentConfig()
+	cfg.ContentConfig = resource.UnstructuredPlusDefaultContentConfig()
 	cfg.GroupVersion = &gv
 	return restclient.RESTClientFor(cfg)
 }
@@ -171,13 +146,8 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 		return nil, err
 	}
 
-	clientConfigCopy := *clientConfig
-	clientConfigCopy.APIPath = dynamic.LegacyAPIPathResolverFunc(mapping.GroupVersionKind)
-	gv := mapping.GroupVersionKind.GroupVersion()
-	clientConfigCopy.GroupVersion = &gv
-
 	// used to fetch the resource
-	dynamicClient, err := dynamic.NewClient(&clientConfigCopy, gv)
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}

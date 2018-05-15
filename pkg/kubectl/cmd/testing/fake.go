@@ -47,11 +47,10 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -269,7 +268,8 @@ func NewTestFactory() *TestFactory {
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
 
 	configFlags := cmdutil.NewTestConfigFlags().
-		WithClientConfig(clientConfig)
+		WithClientConfig(clientConfig).
+		WithRESTMapper(testRESTMapper())
 
 	return &TestFactory{
 		Factory:           cmdutil.NewFactory(configFlags),
@@ -286,8 +286,8 @@ func (f *TestFactory) Cleanup() {
 	os.Remove(f.tempConfigFile.Name())
 }
 
-func (f *TestFactory) CategoryExpander() categories.CategoryExpander {
-	return categories.LegacyCategoryExpander
+func (f *TestFactory) CategoryExpander() (restmapper.CategoryExpander, error) {
+	return resource.FakeCategoryExpander, nil
 }
 
 func (f *TestFactory) ClientConfig() (*restclient.Config, error) {
@@ -334,6 +334,7 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
 	mapper, err := f.RESTMapper()
+	categoryExpander, err2 := f.CategoryExpander()
 
 	return resource.NewFakeBuilder(
 		func(version schema.GroupVersion) (resource.RESTClient, error) {
@@ -346,8 +347,8 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 			return f.Client, nil
 		},
 		mapper,
-		f.CategoryExpander(),
-	).AddError(err)
+		categoryExpander,
+	).AddError(err).AddError(err2)
 }
 
 func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
@@ -397,7 +398,7 @@ func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
 	return clientset, nil
 }
 
-func (f *TestFactory) DynamicClient() (dynamic.DynamicInterface, error) {
+func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 	if f.FakeDynamicClient != nil {
 		return f.FakeDynamicClient, nil
 	}
@@ -428,7 +429,7 @@ func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) 
 	return f.ClientSet()
 }
 
-func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
+func testRESTMapper() meta.RESTMapper {
 	groupResources := testDynamicResources()
 	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
 	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
@@ -436,14 +437,13 @@ func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
 	mapper = meta.FirstHitRESTMapper{
 		MultiRESTMapper: meta.MultiRESTMapper{
 			mapper,
-			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme),
+			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		},
 	}
 
-	// TODO: should probably be the external scheme
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
-	return expander, nil
+	return expander
 }
 
 func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {

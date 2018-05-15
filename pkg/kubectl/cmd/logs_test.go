@@ -53,7 +53,7 @@ func TestLog(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -140,7 +140,7 @@ func TestValidateLogFlags(t *testing.T) {
 			name:     "container name combined with --all-containers",
 			flags:    map[string]string{"all-containers": "true"},
 			args:     []string{"my-pod", "my-container"},
-			expected: "--all-containers=true should not be specifiled with container",
+			expected: "--all-containers=true should not be specified with container",
 		},
 	}
 	for _, test := range tests {
@@ -152,7 +152,7 @@ func TestValidateLogFlags(t *testing.T) {
 		}
 		// checkErr breaks tests in case of errors, plus we just
 		// need to check errors returned by the command validation
-		o := NewLogsOptions(streams)
+		o := NewLogsOptions(streams, test.flags["all-containers"] == "true")
 		cmd.Run = func(cmd *cobra.Command, args []string) {
 			o.Complete(f, cmd, args)
 			out = o.Validate().Error()
@@ -213,7 +213,7 @@ func TestLogComplete(t *testing.T) {
 		}
 		// checkErr breaks tests in case of errors, plus we just
 		// need to check errors returned by the command validation
-		o := NewLogsOptions(genericclioptions.NewTestIOStreamsDiscard())
+		o := NewLogsOptions(genericclioptions.NewTestIOStreamsDiscard(), false)
 		err = o.Complete(f, cmd, test.args)
 		out = err.Error()
 		if !strings.Contains(out, test.expected) {

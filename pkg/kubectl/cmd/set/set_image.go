@@ -26,10 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
@@ -87,7 +88,7 @@ var (
 
 func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 	return &SetImageOptions{
-		PrintFlags:  printers.NewPrintFlags("image updated"),
+		PrintFlags:  printers.NewPrintFlags("image updated", legacyscheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -161,7 +162,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -274,21 +275,20 @@ func (o *SetImageOptions) Run() error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(patch.Info.Object, o.Out); err != nil {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
 		}
 
 		// patch the change
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
-		if err := o.PrintObj(info.Object, o.Out); err != nil {
+		if err := o.PrintObj(actual, o.Out); err != nil {
 			return err
 		}
 	}

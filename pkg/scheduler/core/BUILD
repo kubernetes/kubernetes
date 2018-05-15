@@ -57,7 +57,6 @@ go_library(
         "//pkg/scheduler/volumebinder:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

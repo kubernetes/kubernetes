@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -56,7 +57,7 @@ type ClusterInfoDumpOptions struct {
 // NewCmdCreateSecret groups subcommands to create various types of secrets
 func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoDumpOptions{
-		PrintFlags: printers.NewPrintFlags(""),
+		PrintFlags: printers.NewPrintFlags("", legacyscheme.Scheme),
 
 		IOStreams: ioStreams,
 	}
@@ -71,9 +72,9 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().StringVar(&o.OutputDir, "output-directory", "", i18n.T("Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"))
-	cmd.Flags().StringSliceVar(&o.Namespaces, "namespaces", []string{}, "A comma separated list of namespaces to dump.")
-	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", false, "If true, dump all namespaces.  If true, --namespaces is ignored.")
+	cmd.Flags().StringVar(&o.OutputDir, "output-directory", o.OutputDir, i18n.T("Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"))
+	cmd.Flags().StringSliceVar(&o.Namespaces, "namespaces", o.Namespaces, "A comma separated list of namespaces to dump.")
+	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If true, dump all namespaces.  If true, --namespaces is ignored.")
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	return cmd
 }

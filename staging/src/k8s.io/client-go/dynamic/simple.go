@@ -17,7 +17,6 @@ limitations under the License.
 package dynamic
 
 import (
-	"fmt"
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -31,39 +30,13 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type DynamicInterface interface {
-	Resource(resource schema.GroupVersionResource) NamespaceableDynamicResourceInterface
-
-	// Deprecated, this isn't how we want to do it
-	ClusterSubresource(resource schema.GroupVersionResource, subresource string) DynamicResourceInterface
-	// Deprecated, this isn't how we want to do it
-	NamespacedSubresource(resource schema.GroupVersionResource, subresource, namespace string) DynamicResourceInterface
-}
-
-type DynamicResourceInterface interface {
-	Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error)
-	Update(obj *unstructured.Unstructured) (*unstructured.Unstructured, error)
-	UpdateStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*unstructured.Unstructured, error)
-	List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*unstructured.Unstructured, error)
-}
-
-type NamespaceableDynamicResourceInterface interface {
-	Namespace(string) DynamicResourceInterface
-	DynamicResourceInterface
-}
-
 type dynamicClient struct {
 	client *rest.RESTClient
 }
 
-var _ DynamicInterface = &dynamicClient{}
+var _ Interface = &dynamicClient{}
 
-func NewForConfig(inConfig *rest.Config) (DynamicInterface, error) {
+func NewForConfig(inConfig *rest.Config) (Interface, error) {
 	config := rest.CopyConfig(inConfig)
 	// for serializing the options
 	config.GroupVersion = &schema.GroupVersion{}
@@ -84,40 +57,36 @@ func NewForConfig(inConfig *rest.Config) (DynamicInterface, error) {
 }
 
 type dynamicResourceClient struct {
-	client      *dynamicClient
-	namespace   string
-	resource    schema.GroupVersionResource
-	subresource string
+	client    *dynamicClient
+	namespace string
+	resource  schema.GroupVersionResource
 }
 
-func (c *dynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableDynamicResourceInterface {
+func (c *dynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface {
 	return &dynamicResourceClient{client: c, resource: resource}
 }
 
-func (c *dynamicClient) ClusterSubresource(resource schema.GroupVersionResource, subresource string) DynamicResourceInterface {
-	return &dynamicResourceClient{client: c, resource: resource, subresource: subresource}
-}
-func (c *dynamicClient) NamespacedSubresource(resource schema.GroupVersionResource, subresource, namespace string) DynamicResourceInterface {
-	return &dynamicResourceClient{client: c, resource: resource, namespace: namespace, subresource: subresource}
-}
-
-func (c *dynamicResourceClient) Namespace(ns string) DynamicResourceInterface {
+func (c *dynamicResourceClient) Namespace(ns string) ResourceInterface {
 	ret := *c
 	ret.namespace = ns
 	return &ret
 }
 
-func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	if len(c.subresource) > 0 {
-		return nil, fmt.Errorf("create not supported for subresources")
-	}
-
+func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error) {
 	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
+	name := ""
+	if len(subresources) > 0 {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+		name = accessor.GetName()
+	}
 
-	result := c.client.client.Post().AbsPath(c.makeURLSegments("")...).Body(outBytes).Do()
+	result := c.client.client.Post().AbsPath(append(c.makeURLSegments(name), subresources...)...).Body(outBytes).Do()
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -133,7 +102,7 @@ func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured) (*unstruc
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
-func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -143,7 +112,7 @@ func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured) (*unstruc
 		return nil, err
 	}
 
-	result := c.client.client.Put().AbsPath(c.makeURLSegments(accessor.GetName())...).Body(outBytes).Do()
+	result := c.client.client.Put().AbsPath(append(c.makeURLSegments(accessor.GetName()), subresources...)...).Body(outBytes).Do()
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -171,6 +140,10 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured) (*u
 	}
 
 	result := c.client.client.Put().AbsPath(append(c.makeURLSegments(accessor.GetName()), "status")...).Body(outBytes).Do()
+	if err := result.Error(); err != nil {
+		return nil, err
+	}
+
 	retBytes, err := result.Raw()
 	if err != nil {
 		return nil, err
@@ -182,7 +155,7 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured) (*u
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
-func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions) error {
+func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, subresources ...string) error {
 	if opts == nil {
 		opts = &metav1.DeleteOptions{}
 	}
@@ -191,15 +164,11 @@ func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions) 
 		return err
 	}
 
-	result := c.client.client.Delete().AbsPath(c.makeURLSegments(name)...).Body(deleteOptionsByte).Do()
+	result := c.client.client.Delete().AbsPath(append(c.makeURLSegments(name), subresources...)...).Body(deleteOptionsByte).Do()
 	return result.Error()
 }
 
 func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
-	if len(c.subresource) > 0 {
-		return fmt.Errorf("deletecollection not supported for subresources")
-	}
-
 	if opts == nil {
 		opts = &metav1.DeleteOptions{}
 	}
@@ -212,8 +181,8 @@ func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, lis
 	return result.Error()
 }
 
-func (c *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
-	result := c.client.client.Get().AbsPath(c.makeURLSegments(name)...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do()
+func (c *dynamicResourceClient) Get(name string, opts metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	result := c.client.client.Get().AbsPath(append(c.makeURLSegments(name), subresources...)...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do()
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -229,10 +198,6 @@ func (c *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstr
 }
 
 func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
-	if len(c.subresource) > 0 {
-		return nil, fmt.Errorf("list not supported for subresources")
-	}
-
 	result := c.client.client.Get().AbsPath(c.makeURLSegments("")...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do()
 	if err := result.Error(); err != nil {
 		return nil, err
@@ -257,10 +222,6 @@ func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.Uns
 }
 
 func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	if len(c.subresource) > 0 {
-		return nil, fmt.Errorf("watch not supported for subresources")
-	}
-
 	internalGV := schema.GroupVersions{
 		{Group: c.resource.Group, Version: runtime.APIVersionInternal},
 		// always include the legacy group as a decoding target to handle non-error `Status` return types
@@ -320,15 +281,6 @@ func (c *dynamicResourceClient) makeURLSegments(name string) []string {
 
 	if len(name) > 0 {
 		url = append(url, name)
-
-		// subresources only work on things with names
-		if len(c.subresource) > 0 {
-			url = append(url, c.subresource)
-		}
-	} else {
-		if len(c.subresource) > 0 {
-			panic("somehow snuck a subresource and an empty name.  programmer error")
-		}
 	}
 
 	return url

@@ -32,7 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -102,8 +102,8 @@ var (
 
 // NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.NodeConfiguration{}
-	legacyscheme.Scheme.Default(cfg)
+	cfg := &kubeadmapiv1alpha1.NodeConfiguration{}
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var skipPreFlight bool
 	var cfgPath string
@@ -129,7 +129,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 }
 
 // NewValidJoin validates the command line that are passed to the cobra command
-func NewValidJoin(cfg *kubeadmapiext.NodeConfiguration, args []string, skipPreFlight bool, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
+func NewValidJoin(cfg *kubeadmapiv1alpha1.NodeConfiguration, args []string, skipPreFlight bool, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
 	cfg.DiscoveryTokenAPIServers = args
 
 	var err error
@@ -137,9 +137,9 @@ func NewValidJoin(cfg *kubeadmapiext.NodeConfiguration, args []string, skipPreFl
 		return nil, err
 	}
 
-	legacyscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Default(cfg)
 	internalcfg := &kubeadmapi.NodeConfiguration{}
-	legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
+	kubeadmscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 	if err != nil {
@@ -150,7 +150,7 @@ func NewValidJoin(cfg *kubeadmapiext.NodeConfiguration, args []string, skipPreFl
 }
 
 // AddJoinConfigFlags adds join flags bound to the config to the specified flagset
-func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfiguration, featureGatesString *string) {
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha1.NodeConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.DiscoveryFile, "discovery-file", "",
 		"A file or url from which to load cluster information.")
@@ -220,7 +220,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, i
 			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
 		glog.V(1).Infoln("[join] decoding configuration information")
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}

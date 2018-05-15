@@ -142,7 +142,7 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	options := &DeploymentOpts{
 		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
+			PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
 			DryRun:     true,
 			IOStreams:  ioStreams,
 		},
@@ -153,6 +153,6 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	err = options.Run(tf)
+	err = options.Run()
 	assert.Error(t, err, "at least one image must be specified")
 }

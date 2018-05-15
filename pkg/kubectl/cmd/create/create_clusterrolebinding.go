@@ -52,8 +52,8 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 		Long:    clusterRoleBindingLong,
 		Example: clusterRoleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -70,7 +70,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 	return cmd
 }
 
-func (o *ClusterRoleBindingOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *ClusterRoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -90,10 +90,10 @@ func (o *ClusterRoleBindingOpts) Complete(cmd *cobra.Command, args []string) err
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateClusterRoleBinding is the implementation of the create clusterrolebinding command.
-func (o *ClusterRoleBindingOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *ClusterRoleBindingOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }

@@ -24,10 +24,12 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -670,29 +672,7 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
-		for rName, rQuantity := range container.Resources.Requests {
-			switch rName {
-			case v1.ResourceMemory:
-				if mem := rQuantity.Value(); mem > result.Memory {
-					result.Memory = mem
-				}
-			case v1.ResourceEphemeralStorage:
-				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > result.EphemeralStorage {
-					result.EphemeralStorage = ephemeralStorage
-				}
-			case v1.ResourceCPU:
-				if cpu := rQuantity.MilliValue(); cpu > result.MilliCPU {
-					result.MilliCPU = cpu
-				}
-			default:
-				if v1helper.IsScalarResourceName(rName) {
-					value := rQuantity.Value()
-					if value > result.ScalarResources[rName] {
-						result.SetScalar(rName, value)
-					}
-				}
-			}
-		}
+		result.SetMaxResource(container.Resources.Requests)
 	}
 
 	return result
@@ -775,21 +755,16 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 // nodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
 // terms are ORed, and an empty list of terms will match nothing.
 func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSelectorTerm) bool {
-	for _, req := range nodeSelectorTerms {
-		nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelector(req.MatchExpressions)
-		if err != nil {
-			glog.V(10).Infof("Failed to parse MatchExpressions: %+v, regarding as not match.", req.MatchExpressions)
-			return false
-		}
-		if nodeSelector.Matches(labels.Set(node.Labels)) {
-			return true
-		}
+	nodeFields := map[string]string{}
+	for k, f := range algorithm.NodeFieldSelectorKeys {
+		nodeFields[k] = f(node)
 	}
-	return false
+	return v1helper.MatchNodeSelectorTerms(nodeSelectorTerms, labels.Set(node.Labels), fields.Set(nodeFields))
 }
 
-// The pod can only schedule onto nodes that satisfy requirements in both NodeAffinity and nodeSelector.
-func podMatchesNodeLabels(pod *v1.Pod, node *v1.Node) bool {
+// podMatchesNodeSelectorAndAffinityTerms checks whether the pod is schedulable onto nodes according to
+// the requirements in both NodeAffinity and nodeSelector.
+func podMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
 	// Check if node.Labels match pod.Spec.NodeSelector.
 	if len(pod.Spec.NodeSelector) > 0 {
 		selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
@@ -840,7 +815,7 @@ func PodMatchNodeSelector(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInf
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
-	if podMatchesNodeLabels(pod, node) {
+	if podMatchesNodeSelectorAndAffinityTerms(pod, node) {
 		return true, nil, nil
 	}
 	return false, []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}, nil

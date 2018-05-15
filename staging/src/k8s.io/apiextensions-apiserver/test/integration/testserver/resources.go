@@ -178,7 +178,7 @@ func CreateNewCustomResourceDefinitionWatchUnsafe(crd *apiextensionsv1beta1.Cust
 	return err
 }
 
-func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.DynamicInterface) error {
+func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) error {
 	err := CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionsClient)
 	if err != nil {
 		return err
@@ -209,14 +209,14 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 	return nil
 }
 
-func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dynamicClientSet dynamic.DynamicInterface) error {
+func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dynamicClientSet dynamic.Interface) error {
 	ns := ""
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
 		ns = "aval"
 	}
 
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
-	var resourceClient dynamic.DynamicResourceInterface
+	var resourceClient dynamic.ResourceInterface
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
 		resourceClient = dynamicClientSet.Resource(gvr).Namespace(ns)
 	} else {
@@ -246,6 +246,7 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 			"gamma":   "bar",
 			"delta":   "hello",
 			"epsilon": "foobar",
+			"spec":    map[string]interface{}{},
 		},
 	}
 	if _, err := resourceClient.Create(instance); err != nil {
@@ -272,6 +273,25 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("gave up waiting for watch event")
 	}
+}
+
+// UpdateCustomResourceDefinition updates a CRD, retrying up to 5 times on version conflict errors.
+func UpdateCustomResourceDefinition(client clientset.Interface, name string, update func(*apiextensionsv1beta1.CustomResourceDefinition)) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
+	for i := 0; i < 5; i++ {
+		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get CustomResourceDefinition %q: %v", name, err)
+		}
+		update(crd)
+		crd, err = client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+		if err == nil {
+			return crd, nil
+		}
+		if !errors.IsConflict(err) {
+			return nil, fmt.Errorf("failed to update CustomResourceDefinition %q: %v", name, err)
+		}
+	}
+	return nil, fmt.Errorf("too many retries after conflicts updating CustomResourceDefinition %q", name)
 }
 
 func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {

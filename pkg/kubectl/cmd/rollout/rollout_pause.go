@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -63,7 +63,7 @@ var (
 
 func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &PauseConfig{
-		PrintFlags: printers.NewPrintFlags("paused"),
+		PrintFlags: printers.NewPrintFlags("paused", legacyscheme.Scheme),
 		IOStreams:  streams,
 	}
 

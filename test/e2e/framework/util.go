@@ -506,7 +506,7 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 	}
 }
 
-func SkipIfMissingResource(dynamicClient dynamic.DynamicInterface, gvr schema.GroupVersionResource, namespace string) {
+func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
 	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
 	_, err := resourceClient.List(metav1.ListOptions{})
 	if err != nil {
@@ -1086,7 +1086,7 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 
 // deleteNS deletes the provided namespace, waits for it to be completely deleted, and then checks
 // whether there are any pods remaining in a non-terminating state.
-func deleteNS(c clientset.Interface, dynamicClient dynamic.DynamicInterface, namespace string, timeout time.Duration) error {
+func deleteNS(c clientset.Interface, dynamicClient dynamic.Interface, namespace string, timeout time.Duration) error {
 	startTime := time.Now()
 	if err := c.CoreV1().Namespaces().Delete(namespace, nil); err != nil {
 		return err
@@ -1141,7 +1141,7 @@ func deleteNS(c clientset.Interface, dynamicClient dynamic.DynamicInterface, nam
 		// no remaining content, but namespace was not deleted (namespace controller is probably wedged)
 		return fmt.Errorf("namespace %v was not deleted with limit: %v, namespace is empty but is not yet removed", namespace, err)
 	}
-	Logf("namespace %v deletion completed in %s", namespace, time.Now().Sub(startTime))
+	Logf("namespace %v deletion completed in %s", namespace, time.Since(startTime))
 	return nil
 }
 
@@ -1221,6 +1221,8 @@ func isDynamicDiscoveryError(err error) bool {
 			// garbage_collector
 		case "wardle.k8s.io":
 			// aggregator
+		case "metrics.k8s.io":
+			// aggregated metrics server add-on, no persisted resources
 		default:
 			Logf("discovery error for unexpected group: %#v", gv)
 			return false
@@ -1230,7 +1232,7 @@ func isDynamicDiscoveryError(err error) bool {
 }
 
 // hasRemainingContent checks if there is remaining content in the namespace via API discovery
-func hasRemainingContent(c clientset.Interface, dynamicClient dynamic.DynamicInterface, namespace string) (bool, error) {
+func hasRemainingContent(c clientset.Interface, dynamicClient dynamic.Interface, namespace string) (bool, error) {
 	// some tests generate their own framework.Client rather than the default
 	// TODO: ensure every test call has a configured dynamicClient
 	if dynamicClient == nil {
@@ -2606,6 +2608,18 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 	return nodes
 }
 
+// GetReadyNodesIncludingTaintedOrDie returns all ready nodes, even those which are tainted.
+// There are cases when we care about tainted nodes
+// E.g. in tests related to nodes with gpu we care about nodes despite
+// presence of nvidia.com/gpu=present:NoSchedule taint
+func GetReadyNodesIncludingTaintedOrDie(c clientset.Interface) (nodes *v1.NodeList) {
+	nodes = waitListSchedulableNodesOrDie(c)
+	FilterNodes(nodes, func(node v1.Node) bool {
+		return isNodeSchedulable(&node)
+	})
+	return nodes
+}
+
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
 	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
@@ -3051,13 +3065,13 @@ func DeleteResourceAndPods(clientset clientset.Interface, internalClientset inte
 	if err := testutils.DeleteResourceUsingReaperWithRetries(internalClientset, kind, ns, name, nil, scaleClient); err != nil {
 		return fmt.Errorf("error while stopping %v: %s: %v", kind, name, err)
 	}
-	deleteTime := time.Now().Sub(startTime)
+	deleteTime := time.Since(startTime)
 	Logf("Deleting %v %s took: %v", kind, name, deleteTime)
 	err = waitForPodsInactive(ps, 100*time.Millisecond, 10*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
-	terminatePodTime := time.Now().Sub(startTime) - deleteTime
+	terminatePodTime := time.Since(startTime) - deleteTime
 	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
 	// this is to relieve namespace controller's pressure when deleting the
 	// namespace after a test.
@@ -3065,7 +3079,7 @@ func DeleteResourceAndPods(clientset clientset.Interface, internalClientset inte
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
 	}
-	gcPodTime := time.Now().Sub(startTime) - terminatePodTime
+	gcPodTime := time.Since(startTime) - terminatePodTime
 	Logf("Garbage collecting %v %s pods took: %v", kind, name, gcPodTime)
 	return nil
 }
@@ -3103,7 +3117,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	if err := testutils.DeleteResourceWithRetries(c, kind, ns, name, deleteOption); err != nil {
 		return err
 	}
-	deleteTime := time.Now().Sub(startTime)
+	deleteTime := time.Since(startTime)
 	Logf("Deleting %v %s took: %v", kind, name, deleteTime)
 
 	var interval, timeout time.Duration
@@ -3127,7 +3141,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
-	terminatePodTime := time.Now().Sub(startTime) - deleteTime
+	terminatePodTime := time.Since(startTime) - deleteTime
 	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
 
 	err = waitForPodsGone(ps, interval, 10*time.Minute)

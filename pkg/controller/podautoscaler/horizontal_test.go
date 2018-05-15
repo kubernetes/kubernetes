@@ -512,7 +512,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		}
 
 		name := getForAction.GetName()
-		mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme)
+		mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
 		metrics := &cmapi.MetricValueList{}
 		var matchedTarget *autoscalingv2.MetricSpec
 		for i, target := range tc.metricsTarget {
@@ -650,7 +650,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		eventClient.Core(),
 		testScaleClient,
 		testClient.Autoscaling(),
-		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme),
+		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		replicaCalc,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		controller.NoResyncPeriodFunc(),

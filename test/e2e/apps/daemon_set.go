@@ -79,12 +79,12 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			}
 		}
 		if daemonsets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
-			framework.Logf("daemonset: %s", runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), daemonsets))
+			framework.Logf("daemonset: %s", runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(legacyscheme.Scheme.PrioritizedVersionsAllGroups()...), daemonsets))
 		} else {
 			framework.Logf("unable to dump daemonsets: %v", err)
 		}
 		if pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
-			framework.Logf("pods: %s", runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), pods))
+			framework.Logf("pods: %s", runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(legacyscheme.Scheme.PrioritizedVersionsAllGroups()...), pods))
 		} else {
 			framework.Logf("unable to dump pods: %v", err)
 		}

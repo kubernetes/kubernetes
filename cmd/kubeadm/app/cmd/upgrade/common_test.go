@@ -20,12 +20,12 @@ import (
 	"bytes"
 	"testing"
 
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 )
 
 func TestPrintConfiguration(t *testing.T) {
 	var tests = []struct {
-		cfg           *kubeadmapiext.MasterConfiguration
+		cfg           *kubeadmapiv1alpha1.MasterConfiguration
 		buf           *bytes.Buffer
 		expectedBytes []byte
 	}{
@@ -34,7 +34,7 @@ func TestPrintConfiguration(t *testing.T) {
 			expectedBytes: []byte(""),
 		},
 		{
-			cfg: &kubeadmapiext.MasterConfiguration{
+			cfg: &kubeadmapiv1alpha1.MasterConfiguration{
 				KubernetesVersion: "v1.7.1",
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
@@ -42,6 +42,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  advertiseAddress: ""
 	  bindPort: 0
 	  controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1alpha1
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -55,6 +56,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  image: ""
 	  keyFile: ""
 	imageRepository: ""
+	kind: MasterConfiguration
 	kubeProxy: {}
 	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
@@ -69,9 +71,9 @@ func TestPrintConfiguration(t *testing.T) {
 `),
 		},
 		{
-			cfg: &kubeadmapiext.MasterConfiguration{
+			cfg: &kubeadmapiv1alpha1.MasterConfiguration{
 				KubernetesVersion: "v1.7.1",
-				Networking: kubeadmapiext.Networking{
+				Networking: kubeadmapiv1alpha1.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 				},
 			},
@@ -80,6 +82,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  advertiseAddress: ""
 	  bindPort: 0
 	  controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1alpha1
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -93,6 +96,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  image: ""
 	  keyFile: ""
 	imageRepository: ""
+	kind: MasterConfiguration
 	kubeProxy: {}
 	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1
@@ -107,10 +111,10 @@ func TestPrintConfiguration(t *testing.T) {
 `),
 		},
 		{
-			cfg: &kubeadmapiext.MasterConfiguration{
+			cfg: &kubeadmapiv1alpha1.MasterConfiguration{
 				KubernetesVersion: "v1.7.1",
-				Etcd: kubeadmapiext.Etcd{
-					SelfHosted: &kubeadmapiext.SelfHostedEtcd{
+				Etcd: kubeadmapiv1alpha1.Etcd{
+					SelfHosted: &kubeadmapiv1alpha1.SelfHostedEtcd{
 						CertificatesDir:    "/var/foo",
 						ClusterServiceName: "foo",
 						EtcdVersion:        "v0.1.0",
@@ -123,6 +127,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  advertiseAddress: ""
 	  bindPort: 0
 	  controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1alpha1
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -141,6 +146,7 @@ func TestPrintConfiguration(t *testing.T) {
 	    etcdVersion: v0.1.0
 	    operatorVersion: v0.1.0
 	imageRepository: ""
+	kind: MasterConfiguration
 	kubeProxy: {}
 	kubeletConfiguration: {}
 	kubernetesVersion: v1.7.1

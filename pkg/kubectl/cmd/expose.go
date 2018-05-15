@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -100,7 +100,7 @@ type ExposeServiceOptions struct {
 	Namespace string
 	Mapper    meta.RESTMapper
 
-	DynamicClient dynamic.DynamicInterface
+	DynamicClient dynamic.Interface
 	Builder       *resource.Builder
 
 	Recorder genericclioptions.Recorder
@@ -110,7 +110,7 @@ type ExposeServiceOptions struct {
 func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServiceOptions {
 	return &ExposeServiceOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		PrintFlags:  printers.NewPrintFlags("exposed"),
+		PrintFlags:  printers.NewPrintFlags("exposed", legacyscheme.Scheme),
 
 		Recorder:  genericclioptions.NoopRecorder{},
 		IOStreams: ioStreams,

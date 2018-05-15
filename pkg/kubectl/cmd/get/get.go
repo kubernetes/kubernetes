@@ -20,12 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-
-	"net/url"
 
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -45,7 +44,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -136,11 +135,12 @@ const (
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
 	return &GetOptions{
-		PrintFlags: NewGetPrintFlags(),
+		PrintFlags: NewGetPrintFlags(legacyscheme.Scheme),
 		CmdParent:  parent,
 
-		IOStreams: streams,
-		ChunkSize: 500,
+		IOStreams:   streams,
+		ChunkSize:   500,
+		ServerPrint: true,
 	}
 }
 
@@ -174,8 +174,8 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
-	addOpenAPIPrintColumnFlags(cmd)
-	addServerPrintColumnFlags(cmd)
+	addOpenAPIPrintColumnFlags(cmd, o)
+	addServerPrintColumnFlags(cmd, o)
 	cmd.Flags().BoolVar(&o.Export, "export", o.Export, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	return cmd
@@ -189,8 +189,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		}
 		return nil
 	}
-
-	o.ServerPrint = cmdutil.GetFlagBool(cmd, useServerPrintColumns)
 
 	var err error
 	o.Namespace, o.ExplicitNamespace, err = f.DefaultNamespace()
@@ -222,7 +220,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 
 	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
-	o.PrintWithOpenAPICols = cmdutil.GetFlagBool(cmd, useOpenAPIPrintColumnFlagLabel)
 
 	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
@@ -721,12 +718,12 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 }
 
-func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, false, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
+func addOpenAPIPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
+	cmd.Flags().BoolVar(&opt.PrintWithOpenAPICols, useOpenAPIPrintColumnFlagLabel, opt.PrintWithOpenAPICols, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
 }
 
-func addServerPrintColumnFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(useServerPrintColumns, true, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
+func addServerPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
+	cmd.Flags().BoolVar(&opt.ServerPrint, useServerPrintColumns, opt.ServerPrint, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
 }
 
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {

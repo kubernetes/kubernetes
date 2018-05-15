@@ -66,7 +66,7 @@ type RESTStorageProvider struct {
 var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(rbac.GroupName, legacyscheme.Registry, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(rbac.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
@@ -319,6 +319,10 @@ func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clus
 		}
 		if err != nil {
 			return err
+		}
+		if existingRole.AggregationRule != nil {
+			// the old role already moved to an aggregated role, so there are no custom rules to migrate at this point
+			return nil
 		}
 		glog.V(1).Infof("migrating %v to %v", existingRole.Name, newName)
 		existingRole.Name = newName

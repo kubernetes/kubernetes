@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -82,7 +82,7 @@ type AutoscaleOptions struct {
 
 func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOptions {
 	return &AutoscaleOptions{
-		PrintFlags:      printers.NewPrintFlags("autoscaled"),
+		PrintFlags:      printers.NewPrintFlags("autoscaled", legacyscheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
 		RecordFlags:     genericclioptions.NewRecordFlags(),
 		Recorder:        genericclioptions.NoopRecorder{},

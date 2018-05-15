@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,9 +25,11 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
@@ -49,6 +52,7 @@ const (
 	flagUsername         = "username"
 	flagPassword         = "password"
 	flagTimeout          = "request-timeout"
+	flagHTTPCacheDir     = "cache-dir"
 )
 
 // TODO(juanvallejo): move to pkg/kubectl/genericclioptions once
@@ -198,6 +202,18 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 
+// RESTMapper returns a mapper.
+func (f *ConfigFlags) ToRESTMapper() (meta.RESTMapper, error) {
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
+	expander := restmapper.NewShortcutExpander(mapper, discoveryClient)
+	return expander, nil
+}
+
 func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
@@ -209,7 +225,7 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 		flags.StringVar(f.KubeConfig, "kubeconfig", *f.KubeConfig, "Path to the kubeconfig file to use for CLI requests.")
 	}
 	if f.CacheDir != nil {
-		flags.StringVar(f.CacheDir, FlagHTTPCacheDir, *f.CacheDir, "Default HTTP cache directory")
+		flags.StringVar(f.CacheDir, flagHTTPCacheDir, *f.CacheDir, "Default HTTP cache directory")
 	}
 
 	// add config options
@@ -300,6 +316,7 @@ func stringptr(val string) *string {
 type TestConfigFlags struct {
 	clientConfig    clientcmd.ClientConfig
 	discoveryClient discovery.CachedDiscoveryInterface
+	restMapper      meta.RESTMapper
 }
 
 func (f *TestConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
@@ -317,8 +334,25 @@ func (f *TestConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterfac
 	return f.discoveryClient, nil
 }
 
+func (f *TestConfigFlags) ToRESTMapper() (meta.RESTMapper, error) {
+	if f.restMapper != nil {
+		return f.restMapper, nil
+	}
+	if f.discoveryClient != nil {
+		mapper := restmapper.NewDeferredDiscoveryRESTMapper(f.discoveryClient)
+		expander := restmapper.NewShortcutExpander(mapper, f.discoveryClient)
+		return expander, nil
+	}
+	return nil, fmt.Errorf("no restmapper")
+}
+
 func (f *TestConfigFlags) WithClientConfig(clientConfig clientcmd.ClientConfig) *TestConfigFlags {
 	f.clientConfig = clientConfig
+	return f
+}
+
+func (f *TestConfigFlags) WithRESTMapper(mapper meta.RESTMapper) *TestConfigFlags {
+	f.restMapper = mapper
 	return f
 }
 

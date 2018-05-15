@@ -105,7 +105,7 @@ func NodeRules() []rbac.PolicyRule {
 		// Use the NodeRestriction admission plugin to limit a node to creating/updating its own API object.
 		rbac.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 		rbac.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
-		rbac.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+		rbac.NewRule("update", "patch", "delete").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
 		// TODO: restrict to the bound node as creator in the NodeRestrictions admission plugin
 		rbac.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),

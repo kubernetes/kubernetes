@@ -30,19 +30,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	utilsexec "k8s.io/utils/exec"
-)
-
-var (
-	crictlSandboxesParamsFormat = "%s -r %s sandboxes --quiet | xargs -r"
-	crictlStopParamsFormat      = "%s -r %s stops %s"
-	crictlRemoveParamsFormat    = "%s -r %s rms %s"
 )
 
 // NewCmdReset returns the "kubeadm reset" command
@@ -77,7 +71,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
 
 	cmd.PersistentFlags().StringVar(
-		&certsDir, "cert-dir", kubeadmapiext.DefaultCertificatesDir,
+		&certsDir, "cert-dir", kubeadmapiv1alpha1.DefaultCertificatesDir,
 		"The path to the directory where the certificates are stored. If specified, clean this directory.",
 	)
 
@@ -181,7 +175,7 @@ func (r *Reset) Run(out io.Writer) error {
 
 	// Remove contents from the config and pki directories
 	glog.V(1).Infoln("[reset] removing contents from the config and pki directories")
-	if r.certsDir != kubeadmapiext.DefaultCertificatesDir {
+	if r.certsDir != kubeadmapiv1alpha1.DefaultCertificatesDir {
 		glog.Warningf("[reset] WARNING: cleaning a non-default certificates directory: %q\n", r.certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, r.certsDir)
@@ -213,28 +207,31 @@ func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, 
 		glog.Infof("[reset] cleaning up running containers using crictl with socket %s\n", criSocketPath)
 		glog.V(1).Infoln("[reset] listing running pods using crictl")
 
-		listcmd := fmt.Sprintf(crictlSandboxesParamsFormat, crictlPath, criSocketPath)
-		glog.V(1).Infof("[reset] executing comand %q", listcmd)
-		output, err := execer.Command(listcmd).CombinedOutput()
+		params := []string{"-r", criSocketPath, "pods", "--quiet"}
+		glog.V(1).Infof("[reset] executing command %s %s", crictlPath, strings.Join(params, " "))
+		output, err := execer.Command(crictlPath, params...).CombinedOutput()
 		if err != nil {
-			glog.Infoln("[reset] failed to list running pods using crictl. Trying using docker instead")
+			glog.Infof("[reset] failed to list running pods using crictl: %s. Trying using docker instead", err)
 			resetWithDocker(execer, dockerCheck)
 			return
 		}
 		sandboxes := strings.Split(string(output), " ")
 		glog.V(1).Infoln("[reset] stopping and removing running containers using crictl")
 		for _, s := range sandboxes {
-			stopcmd := fmt.Sprintf(crictlStopParamsFormat, crictlPath, criSocketPath, s)
-			glog.V(1).Infof("[reset] executing command %q", stopcmd)
-			if err := execer.Command(stopcmd).Run(); err != nil {
-				glog.Infoln("[reset] failed to stop the running containers using crictl. Trying using docker instead")
+			if strings.TrimSpace(s) == "" {
+				continue
+			}
+			params = []string{"-r", criSocketPath, "stop", s}
+			glog.V(1).Infof("[reset] executing command %s %s", crictlPath, strings.Join(params, " "))
+			if err := execer.Command(crictlPath, params...).Run(); err != nil {
+				glog.Infof("[reset] failed to stop the running containers using crictl: %s. Trying using docker instead", err)
 				resetWithDocker(execer, dockerCheck)
 				return
 			}
-			removecmd := fmt.Sprintf(crictlRemoveParamsFormat, crictlPath, criSocketPath, s)
-			glog.V(1).Infof("[reset] executing command %q", removecmd)
-			if err := execer.Command(removecmd).Run(); err != nil {
-				glog.Infoln("[reset] failed to remove the running containers using crictl. Trying using docker instead")
+			params = []string{"-r", criSocketPath, "rm", s}
+			glog.V(1).Infof("[reset] executing command %s %s", crictlPath, strings.Join(params, " "))
+			if err := execer.Command(crictlPath, params...).Run(); err != nil {
+				glog.Infof("[reset] failed to remove the running containers using crictl: %s. Trying using docker instead", err)
 				resetWithDocker(execer, dockerCheck)
 				return
 			}

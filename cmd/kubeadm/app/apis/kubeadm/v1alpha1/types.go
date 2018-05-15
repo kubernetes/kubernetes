@@ -278,6 +278,8 @@ type HostPathMount struct {
 	MountPath string `json:"mountPath"`
 	// Writable controls write access to the volume
 	Writable bool `json:"writable,omitempty"`
+	// PathType is the type of the HostPath.
+	PathType v1.HostPathType `json:"pathType,omitempty"`
 }
 
 // KubeProxy contains elements describing the proxy configuration.

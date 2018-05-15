@@ -36,7 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -61,7 +62,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -103,13 +103,20 @@ var (
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
 			- 'journalctl -xeu kubelet'
+
+		Additionally, a control plane component may have crashed or exited when started by the container runtime.
+		To troubleshoot, list all containers using your preferred container runtimes CLI, e.g. docker.
+		Here is one example how you may list all Kubernetes containers running in docker:
+			- 'docker ps -a | grep kube | grep -v pause'
+			Once you have found the failing container, you can inspect its logs with:
+			- 'docker logs CONTAINERID'
 		`)))
 )
 
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.MasterConfiguration{}
-	legacyscheme.Scheme.Default(cfg)
+	cfg := &kubeadmapiv1alpha1.MasterConfiguration{}
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath string
 	var skipPreFlight bool
@@ -122,14 +129,15 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		Use:   "init",
 		Short: "Run this command in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
+
 			var err error
 			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
 
-			legacyscheme.Scheme.Default(cfg)
+			kubeadmscheme.Scheme.Default(cfg)
 			internalcfg := &kubeadmapi.MasterConfiguration{}
-			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
+			kubeadmscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
@@ -148,7 +156,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, featureGatesString *string) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha1.MasterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
@@ -187,7 +195,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 	)
 	flagSet.StringVar(
 		&cfg.Token, "token", cfg.Token,
-		"The token to use for establishing bidirectional trust between nodes and masters.",
+		"The token to use for establishing bidirectional trust between nodes and masters. The format is [a-z0-9]{6}\\.[a-z0-9]{16} - e.g. abcdef.0123456789abcdef",
 	)
 	flagSet.DurationVar(
 		&cfg.TokenTTL.Duration, "token-ttl", cfg.TokenTTL.Duration,
@@ -239,7 +247,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePrefligh
 		if err != nil {
 			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
@@ -577,14 +585,7 @@ func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
-		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10255/healthz"); err != nil {
-			errC <- err
-		}
-	}(errorChan, waiter)
-
-	go func(errC chan error, waiter apiclient.Waiter) {
-		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
-		if err := waiter.WaitForHealthyKubelet(60*time.Second, "http://localhost:10255/healthz/syncloop"); err != nil {
+		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10248/healthz"); err != nil {
 			errC <- err
 		}
 	}(errorChan, waiter)

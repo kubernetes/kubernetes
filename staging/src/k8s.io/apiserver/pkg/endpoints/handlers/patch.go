@@ -48,6 +48,11 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		trace := utiltrace.New("Patch " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
+		if isDryRun(req.URL) {
+			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			return
+		}
+
 		// Do this first, otherwise name extraction can fail for unrecognized content types
 		// TODO: handle this in negotiation
 		contentType := req.Header.Get("Content-Type")

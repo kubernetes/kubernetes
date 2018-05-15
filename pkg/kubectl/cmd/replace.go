@@ -29,11 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
@@ -96,7 +97,7 @@ func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
 		// we only support "-o name" for this command, so only register the name printer
 		PrintFlags: &printers.PrintFlags{
 			OutputFormat:   &outputFormat,
-			NamePrintFlags: printers.NewNamePrintFlags("replaced"),
+			NamePrintFlags: printers.NewNamePrintFlags("replaced", legacyscheme.Scheme),
 		},
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 

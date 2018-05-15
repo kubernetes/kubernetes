@@ -33,7 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -79,7 +80,7 @@ var (
 
 func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions {
 	return &SetSelectorOptions{
-		PrintFlags:  printers.NewPrintFlags("selector updated"),
+		PrintFlags:  printers.NewPrintFlags("selector updated", legacyscheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -108,8 +109,8 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
-	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().Bool("local", false, "If true, set selector will NOT contact api-server but run locally.")
+	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, set selector will NOT contact api-server but run locally.")
 	cmd.Flags().String("resource-version", "", "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "the resource to update the selectors"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.fileOptions, usage)
@@ -129,8 +130,6 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	o.local = cmdutil.GetFlagBool(cmd, "local")
-	o.all = cmdutil.GetFlagBool(cmd, "all")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 
@@ -146,7 +145,7 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	o.builder = f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -203,9 +202,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
-		CalculatePatch(patch, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-			versioned := cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
-			patch.Info.Object = versioned
+		CalculatePatch(patch, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
 			if selectErr != nil {
 				return nil, selectErr
@@ -216,7 +213,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 				glog.V(4).Infof("error recording current command: %v", err)
 			}
 
-			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 		})
 
 		if patch.Err != nil {
@@ -226,13 +223,12 @@ func (o *SetSelectorOptions) RunSelector() error {
 			return o.PrintObj(info.Object, o.Out)
 		}
 
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			return err
 		}
 
-		info.Refresh(patched, true)
-		return o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, info.Mapping), o.Out)
+		return o.PrintObj(actual, o.Out)
 	})
 }
 

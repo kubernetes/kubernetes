@@ -19,14 +19,14 @@ package phases
 import (
 	"github.com/spf13/cobra"
 
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
@@ -47,14 +47,14 @@ var (
 // NewCmdMarkMaster returns the Cobra command for running the mark-master phase
 func NewCmdMarkMaster() *cobra.Command {
 
-	cfg := &kubeadmapiext.MasterConfiguration{
+	cfg := &kubeadmapiv1alpha1.MasterConfiguration{
 		// KubernetesVersion is not used by mark master, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 		KubernetesVersion: "v1.9.0",
 	}
 
 	// Default values for the cobra help text
-	legacyscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath, kubeConfigFile string
 	cmd := &cobra.Command{

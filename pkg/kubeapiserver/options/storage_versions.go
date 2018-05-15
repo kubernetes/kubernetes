@@ -22,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
+	"sort"
+
 	"github.com/spf13/pflag"
 )
 
@@ -40,8 +42,8 @@ type StorageSerializationOptions struct {
 
 func NewStorageSerializationOptions() *StorageSerializationOptions {
 	return &StorageSerializationOptions{
-		DefaultStorageVersions: legacyscheme.Registry.AllPreferredGroupVersions(),
-		StorageVersions:        legacyscheme.Registry.AllPreferredGroupVersions(),
+		DefaultStorageVersions: ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
+		StorageVersions:        ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
 	}
 }
 
@@ -103,4 +105,17 @@ func (s *StorageSerializationOptions) AddFlags(fs *pflag.FlagSet) {
 		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all known groups.")
 
+}
+
+// ToPreferredVersionString returns the preferred versions of all registered
+// groups in the form of "group1/version1,group2/version2,...".  This is compatible
+// with the flag format
+func ToPreferredVersionString(versions []schema.GroupVersion) string {
+	var defaults []string
+	for _, version := range versions {
+		defaults = append(defaults, version.String())
+	}
+	// sorting provides stable output for help.
+	sort.Strings(defaults)
+	return strings.Join(defaults, ",")
 }

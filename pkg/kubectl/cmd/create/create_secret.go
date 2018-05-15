@@ -89,8 +89,8 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 		Long:    secretLong,
 		Example: secretExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -107,7 +107,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	return cmd
 }
 
-func (o *SecretGenericOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *SecretGenericOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -128,12 +128,12 @@ func (o *SecretGenericOpts) Complete(cmd *cobra.Command, args []string) error {
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateSecretGeneric is the implementation of the create secret generic command
-func (o *SecretGenericOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *SecretGenericOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -174,8 +174,8 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 		Long:    secretForDockerRegistryLong,
 		Example: secretForDockerRegistryExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -196,7 +196,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	return cmd
 }
 
-func (o *SecretDockerRegistryOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *SecretDockerRegistryOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -228,12 +228,12 @@ func (o *SecretDockerRegistryOpts) Complete(cmd *cobra.Command, args []string) e
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateSecretDockerRegistry is the implementation of the create secret docker-registry command
-func (o *SecretDockerRegistryOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *SecretDockerRegistryOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -265,8 +265,8 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Long:    secretForTLSLong,
 		Example: secretForTLSExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -281,7 +281,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	return cmd
 }
 
-func (o *SecretTLSOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *SecretTLSOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -306,10 +306,10 @@ func (o *SecretTLSOpts) Complete(cmd *cobra.Command, args []string) error {
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateSecretTLS is the implementation of the create secret tls command
-func (o *SecretTLSOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *SecretTLSOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }

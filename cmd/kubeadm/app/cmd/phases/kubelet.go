@@ -23,14 +23,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
@@ -91,12 +91,12 @@ func NewCmdKubeletWriteInitConfig() *cobra.Command {
 		Long:    kubeletWriteInitConfigLongDesc,
 		Example: kubeletWriteInitConfigExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := &kubeadmapiext.MasterConfiguration{
+			cfg := &kubeadmapiv1alpha1.MasterConfiguration{
 				// KubernetesVersion is not used by kubelet init, but we set this explicitly to avoid
 				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 				KubernetesVersion: "v1.9.0",
 			}
-			legacyscheme.Scheme.Default(cfg)
+			kubeadmscheme.Scheme.Default(cfg)
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -125,12 +125,12 @@ func NewCmdKubeletUploadDynamicConfig() *cobra.Command {
 		Long:    kubeletUploadDynamicConfigLongDesc,
 		Example: kubeletUploadDynamicConfigExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := &kubeadmapiext.MasterConfiguration{
+			cfg := &kubeadmapiv1alpha1.MasterConfiguration{
 				// KubernetesVersion is not used by kubelet upload, but we set this explicitly to avoid
 				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 				KubernetesVersion: "v1.9.0",
 			}
-			legacyscheme.Scheme.Default(cfg)
+			kubeadmscheme.Scheme.Default(cfg)
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -154,8 +154,8 @@ func NewCmdKubeletUploadDynamicConfig() *cobra.Command {
 
 // NewCmdKubeletEnableDynamicConfig calls cobra.Command for enabling dynamic kubelet configuration on node
 func NewCmdKubeletEnableDynamicConfig() *cobra.Command {
-	cfg := &kubeadmapiext.NodeConfiguration{}
-	legacyscheme.Scheme.Default(cfg)
+	cfg := &kubeadmapiv1alpha1.NodeConfiguration{}
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath string
 	cmd := &cobra.Command{
@@ -182,13 +182,13 @@ func NewCmdKubeletEnableDynamicConfig() *cobra.Command {
 	return cmd
 }
 
-func getNodeName(cfgPath string, cfg *kubeadmapiext.NodeConfiguration) (string, error) {
+func getNodeName(cfgPath string, cfg *kubeadmapiv1alpha1.NodeConfiguration) (string, error) {
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
 			return "", fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 			return "", fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
