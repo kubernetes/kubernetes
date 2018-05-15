@@ -341,6 +341,10 @@ func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clus
 		if err != nil {
 			return err
 		}
+		if existingRole.AggregationRule != nil {
+			// the old role already moved to an aggregated role, so there are no custom rules to migrate at this point
+			return nil
+		}
 		glog.V(1).Infof("migrating %v to %v", existingRole.Name, newName)
 		existingRole.Name = newName
 		existingRole.ResourceVersion = "" // clear this so the object can be created.
