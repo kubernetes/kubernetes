@@ -54,11 +54,6 @@ type MasterConfiguration struct {
 	// single node configurations).
 	NoTaintMaster bool
 
-	// Mark the controller and api server pods as privileged as some cloud
-	// controllers like openstack need escalated privileges under some conditions
-	// example - loading a config drive to fetch node information.
-	PrivilegedPods bool
-
 	// Token is used for establishing bidirectional trust between nodes and masters.
 	// Used for joining nodes in the cluster.
 	Token string
