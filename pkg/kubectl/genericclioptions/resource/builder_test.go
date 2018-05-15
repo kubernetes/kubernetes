@@ -50,6 +50,7 @@ import (
 
 	// TODO we need to remove this linkage and create our own scheme
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -108,26 +109,31 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) FakeC
 
 func testData() (*v1.PodList, *v1.ServiceList) {
 	pods := &v1.PodList{
+		TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "PodList"},
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
 		Items: []v1.Pod{
 			{
+				TypeMeta:   metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 				Spec:       V1DeepEqualSafePodSpec(),
 			},
 			{
+				TypeMeta:   metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
 				Spec:       V1DeepEqualSafePodSpec(),
 			},
 		},
 	}
 	svc := &v1.ServiceList{
+		TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "ServiceList"},
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "16",
 		},
 		Items: []v1.Service{
 			{
+				TypeMeta:   metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Service"},
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 				Spec: v1.ServiceSpec{
 					Type:            "ClusterIP",
@@ -610,12 +616,12 @@ func TestResourceByName(t *testing.T) {
 		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 	if !apiequality.Semantic.DeepEqual(&pods.Items[0], test.Objects()[0]) {
-		t.Errorf("unexpected object: %#v", test.Objects()[0])
+		t.Error(diff.ObjectDiff(&pods.Items[0], test.Objects()[0]))
 	}
 
 	mapping, err := b.Do().ResourceMapping()
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatal(err)
 	}
 	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)

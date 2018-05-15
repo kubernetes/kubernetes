@@ -165,6 +165,8 @@ func (o *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 		annotations[k] = v
 	}
 	job := &batchv1.Job{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        o.Name,
 			Namespace:   o.Namespace,

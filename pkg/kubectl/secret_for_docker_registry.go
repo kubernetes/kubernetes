@@ -88,6 +88,7 @@ func (s SecretForDockerRegistryGeneratorV1) StructuredGenerate() (runtime.Object
 		return nil, err
 	}
 	secret := &v1.Secret{}
+	secret.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Secret"))
 	secret.Name = s.Name
 	secret.Type = v1.SecretTypeDockerConfigJson
 	secret.Data = map[string][]byte{}

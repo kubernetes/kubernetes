@@ -648,7 +648,11 @@ func TestTransformUnstructuredError(t *testing.T) {
 			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","status":"Failure","code":404}`)))},
 			ErrFn: apierrors.IsBadRequest,
 			Transformed: &apierrors.StatusError{
-				ErrStatus: metav1.Status{Status: metav1.StatusFailure, Code: http.StatusNotFound},
+				ErrStatus: metav1.Status{
+					// this is filled in by decoding
+					TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"},
+					Status:   metav1.StatusFailure, Code: http.StatusNotFound,
+				},
 			},
 		},
 		{
@@ -670,7 +674,11 @@ func TestTransformUnstructuredError(t *testing.T) {
 			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","status":"Failure","code":404}`)))},
 			ErrFn: apierrors.IsBadRequest,
 			Transformed: &apierrors.StatusError{
-				ErrStatus: metav1.Status{Status: metav1.StatusFailure, Code: http.StatusNotFound},
+				ErrStatus: metav1.Status{
+					// this is filled in by decoding
+					TypeMeta: metav1.TypeMeta{APIVersion: "", Kind: "Status"},
+					Status:   metav1.StatusFailure, Code: http.StatusNotFound,
+				},
 			},
 		},
 		{

@@ -38,6 +38,8 @@ func TestPriorityClassV1Generator(t *testing.T) {
 				"description":    "high priority class",
 			},
 			expected: &scheduling.PriorityClass{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: scheduling.SchemeGroupVersion.String(), Kind: "PriorityClass"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -55,6 +57,8 @@ func TestPriorityClassV1Generator(t *testing.T) {
 				"description":    "high priority class",
 			},
 			expected: &scheduling.PriorityClass{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: scheduling.SchemeGroupVersion.String(), Kind: "PriorityClass"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},

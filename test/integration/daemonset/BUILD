@@ -18,6 +18,7 @@ go_test(
         "//pkg/controller/daemon:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

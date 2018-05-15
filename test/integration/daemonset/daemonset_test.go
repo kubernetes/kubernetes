@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -287,7 +289,7 @@ func validateFailedPlacementEvent(eventClient corev1typed.EventInterface, t *tes
 			return false, nil
 		}
 		if len(eventList.Items) > 1 {
-			t.Errorf("Expected 1 event got %d", len(eventList.Items))
+			t.Errorf("Expected 1 event got %s", spew.Sdump(eventList.Items))
 		}
 		event := eventList.Items[0]
 		if event.Type != v1.EventTypeWarning {

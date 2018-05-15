@@ -90,6 +90,7 @@ func (g *ResourceQuotaGeneratorV1) StructuredGenerate() (runtime.Object, error) 
 	}
 
 	resourceQuota := &v1.ResourceQuota{}
+	resourceQuota.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("ResourceQuota"))
 	resourceQuota.Name = g.Name
 	resourceQuota.Spec.Hard = resourceList
 	resourceQuota.Spec.Scopes = scopes

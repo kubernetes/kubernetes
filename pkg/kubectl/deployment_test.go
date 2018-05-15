@@ -39,6 +39,8 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 			deploymentName: "images-name-ok",
 			images:         []string{"nn/image1", "registry/nn/image2", "nn/image3:tag", "nn/image4@digest", "nn/image5@sha256:digest"},
 			expected: &appsv1.Deployment{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "images-name-ok",
 					Labels: map[string]string{"app": "images-name-ok"},

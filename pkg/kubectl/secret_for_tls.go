@@ -88,6 +88,7 @@ func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		return nil, err
 	}
 	secret := &v1.Secret{}
+	secret.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Secret"))
 	secret.Name = s.Name
 	secret.Type = v1.SecretTypeTLS
 	secret.Data = map[string][]byte{}

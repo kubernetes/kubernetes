@@ -49,6 +49,8 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 				"docker-email":    email,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -69,6 +71,8 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 				"append-hash":     true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-548cm7fgdh",
 				},
@@ -87,6 +91,8 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 				"docker-password": password,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},

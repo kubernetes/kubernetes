@@ -66,6 +66,7 @@ func (g *NamespaceGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		return nil, err
 	}
 	namespace := &v1.Namespace{}
+	namespace.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Namespace"))
 	namespace.Name = g.Name
 	return namespace, nil
 }

@@ -186,6 +186,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 			Ports:    ports,
 		},
 	}
+	service.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Service"))
 	targetPortString := params["target-port"]
 	if len(targetPortString) == 0 {
 		targetPortString = params["container-port"]

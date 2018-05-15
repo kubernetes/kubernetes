@@ -43,6 +43,8 @@ func TestCreateJobFromCronJob(t *testing.T) {
 	expectedLabels["test-label"] = "test-value"
 
 	expectJob := &batchv1.Job{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   testNamespaceName,
 			Labels:      expectedLabels,

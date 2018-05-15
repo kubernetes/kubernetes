@@ -75,6 +75,8 @@ func (s PriorityClassV1Generator) Generate(params map[string]interface{}) (runti
 // StructuredGenerate outputs a priorityClass object using the configured fields.
 func (s *PriorityClassV1Generator) StructuredGenerate() (runtime.Object, error) {
 	return &scheduling.PriorityClass{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: scheduling.SchemeGroupVersion.String(), Kind: "PriorityClass"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 		},

@@ -115,8 +115,11 @@ func TestDoRequestFailed(t *testing.T) {
 		t.Errorf("unexpected error type %v", err)
 	}
 	actual := ss.Status()
-	if !reflect.DeepEqual(status, &actual) {
-		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, &actual))
+	expected := status.DeepCopy()
+	// this is filled in by decoding
+	expected.TypeMeta = metav1.TypeMeta{APIVersion: "v1", Kind: "Status"}
+	if !reflect.DeepEqual(expected, &actual) {
+		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(expected, &actual))
 	}
 }
 

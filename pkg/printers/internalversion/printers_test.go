@@ -232,7 +232,9 @@ func (obj *TestUnknownType) DeepCopyObject() runtime.Object {
 func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc func(data []byte, v interface{}) error) {
 	buf := bytes.NewBuffer([]byte{})
 
-	err := printer.PrintObj(&testData, buf)
+	localTestData := testData
+	localTestData.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "TestStruct"})
+	err := printer.PrintObj(&localTestData, buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,13 +250,14 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 	if err := runtime.DecodeInto(s, buf.Bytes(), &poutput); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(testData, poutput) {
-		t.Errorf("Test data and unmarshaled data are not equal: %v", diff.ObjectDiff(poutput, testData))
+	if !reflect.DeepEqual(localTestData, poutput) {
+		t.Errorf("Test data and unmarshaled data are not equal: %v", diff.ObjectDiff(poutput, localTestData))
 	}
 
 	obj := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 	}
+	obj.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
 	buf.Reset()
 	printer.PrintObj(obj, buf)
 	var objOut v1.Pod
@@ -390,10 +393,25 @@ func TestNamePrinter(t *testing.T) {
 				},
 				Items: []runtime.RawExtension{
 					{
-						Raw: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "foo"}}`),
+						Object: &v1.Pod{
+							TypeMeta: metav1.TypeMeta{
+								Kind: "Pod",
+							},
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "foo",
+							},
+						},
 					},
 					{
-						Raw: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "bar"}}`),
+						Object: &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"kind":       "Pod",
+								"apiVersion": "v1",
+								"metadata": map[string]interface{}{
+									"name": "bar",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -573,15 +591,12 @@ func TestPrinters(t *testing.T) {
 		"template":  templatePrinter,
 		"template2": templatePrinter2,
 		"jsonpath":  jsonpathPrinter,
-		"name": &printers.NamePrinter{
-			Typer:    legacyscheme.Scheme,
-			Decoders: []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme},
-		},
+		"name":      &printers.NamePrinter{},
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &v1.Pod{ObjectMeta: om("pod")},
 		"emptyPodList":    &v1.PodList{},
-		"nonEmptyPodList": &v1.PodList{Items: []v1.Pod{{}}},
+		"nonEmptyPodList": &v1.PodList{Items: []v1.Pod{{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"}}}},
 		"endpoints": &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Addresses: []v1.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
@@ -597,6 +612,10 @@ func TestPrinters(t *testing.T) {
 	for pName, p := range genericPrinters {
 		for oName, obj := range objects {
 			b := &bytes.Buffer{}
+			if pName == "name" {
+				obj.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
+			}
+
 			if err := p.PrintObj(obj, b); err != nil {
 				if set, found := expectedErrors[pName]; found && set.Has(oName) {
 					// expected error
