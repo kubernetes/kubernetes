@@ -2420,11 +2420,19 @@ function start-lb-controller {
     prepare-log-file /var/log/glbc.log
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
 
-    local -r glbc_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
-    if [[ ! -z "${GCE_GLBC_IMAGE:-}" ]]; then
-      sed -i "s@image:.*@image: ${GCE_GLBC_IMAGE}@" "${glbc_manifest}"
+    local -r src_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
+    local -r dest_manifest="/etc/kubernetes/manifests/glbc.manifest"
+
+    if [[ -n "${CUSTOM_INGRESS_YAML:-}" ]]; then
+      echo "${CUSTOM_INGRESS_YAML}" > "${dest_manifest}"
+    else
+      cp "${src_manifest}" "${dest_manifest}"
     fi
-    cp "${glbc_manifest}" /etc/kubernetes/manifests/
+
+    # Override the glbc image if GCE_GLBC_IMAGE is specified.
+    if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
+      sed -i "s|image:.*|image: ${GCE_GLBC_IMAGE}|" "${dest_manifest}"
+    fi
   fi
 }
 
