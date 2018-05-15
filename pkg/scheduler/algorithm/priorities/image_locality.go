@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 // This is a reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
