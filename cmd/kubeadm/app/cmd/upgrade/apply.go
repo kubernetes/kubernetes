@@ -26,6 +26,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -37,7 +38,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -87,7 +87,7 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 			// If the version is specified in config file, pick up that value.
 			if flags.parent.cfgPath != "" {
 				glog.V(1).Infof("fetching configuration from file", flags.parent.cfgPath)
-				cfg, err := upgrade.FetchConfigurationFromFile(flags.parent.cfgPath)
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(parentFlags.cfgPath, &kubeadmapiv1alpha1.MasterConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {
@@ -147,26 +147,21 @@ func RunApply(flags *applyFlags) error {
 		return err
 	}
 
-	// Grab the external, versioned configuration and convert it to the internal type for usage here later
-	glog.V(1).Infof("[upgrade/apply] converting configuration for internal use")
-	internalcfg := &kubeadmapi.MasterConfiguration{}
-	legacyscheme.Scheme.Convert(upgradeVars.cfg, internalcfg, nil)
-
 	// Validate requested and validate actual version
 	glog.V(1).Infof("[upgrade/apply] validating requested and actual version")
-	if err := configutil.NormalizeKubernetesVersion(internalcfg); err != nil {
+	if err := configutil.NormalizeKubernetesVersion(upgradeVars.cfg); err != nil {
 		return err
 	}
 
 	// Use normalized version string in all following code.
-	flags.newK8sVersionStr = internalcfg.KubernetesVersion
+	flags.newK8sVersionStr = upgradeVars.cfg.KubernetesVersion
 	k8sVer, err := version.ParseSemantic(flags.newK8sVersionStr)
 	if err != nil {
 		return fmt.Errorf("unable to parse normalized version %q as a semantic version", flags.newK8sVersionStr)
 	}
 	flags.newK8sVersion = k8sVer
 
-	if err := features.ValidateVersion(features.InitFeatureGates, internalcfg.FeatureGates, internalcfg.KubernetesVersion); err != nil {
+	if err := features.ValidateVersion(features.InitFeatureGates, upgradeVars.cfg.FeatureGates, upgradeVars.cfg.KubernetesVersion); err != nil {
 		return err
 	}
 
@@ -186,18 +181,18 @@ func RunApply(flags *applyFlags) error {
 	// Use a prepuller implementation based on creating DaemonSets
 	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
 	glog.V(1).Infof("[upgrade/apply] creating prepuller")
-	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, internalcfg)
+	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, upgradeVars.cfg)
 	upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout)
 
 	// Now; perform the upgrade procedure
 	glog.V(1).Infof("[upgrade/apply] performing upgrade")
-	if err := PerformControlPlaneUpgrade(flags, upgradeVars.client, upgradeVars.waiter, internalcfg); err != nil {
+	if err := PerformControlPlaneUpgrade(flags, upgradeVars.client, upgradeVars.waiter, upgradeVars.cfg); err != nil {
 		return fmt.Errorf("[upgrade/apply] FATAL: %v", err)
 	}
 
 	// Upgrade RBAC rules and addons.
 	glog.V(1).Infof("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg, flags.newK8sVersion, flags.dryRun); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, upgradeVars.cfg, flags.newK8sVersion, flags.dryRun); err != nil {
 		return fmt.Errorf("[upgrade/postupgrade] FATAL post-upgrade error: %v", err)
 	}
 
