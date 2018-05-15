@@ -3410,6 +3410,7 @@ type ServicePort struct {
 }
 
 // +genclient
+// +genclient:skipVerbs=deleteCollection
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -4013,6 +4014,7 @@ const (
 
 // +genclient
 // +genclient:nonNamespaced
+// +genclient:skipVerbs=deleteCollection
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Namespace provides a scope for Names.
