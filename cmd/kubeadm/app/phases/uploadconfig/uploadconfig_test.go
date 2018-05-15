@@ -25,9 +25,9 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 func TestUploadConfiguration(t *testing.T) {
@@ -99,12 +99,12 @@ func TestUploadConfiguration(t *testing.T) {
 				decodedExtCfg := &kubeadmapiv1alpha1.MasterConfiguration{}
 				decodedCfg := &kubeadmapi.MasterConfiguration{}
 
-				if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), []byte(configData), decodedExtCfg); err != nil {
+				if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(configData), decodedExtCfg); err != nil {
 					t.Errorf("unable to decode config from bytes: %v", err)
 				}
 				// Default and convert to the internal version
-				legacyscheme.Scheme.Default(decodedExtCfg)
-				legacyscheme.Scheme.Convert(decodedExtCfg, decodedCfg, nil)
+				kubeadmscheme.Scheme.Default(decodedExtCfg)
+				kubeadmscheme.Scheme.Convert(decodedExtCfg, decodedCfg, nil)
 
 				if decodedCfg.KubernetesVersion != cfg.KubernetesVersion {
 					t.Errorf("Decoded value doesn't match, decoded = %#v, expected = %#v", decodedCfg.KubernetesVersion, cfg.KubernetesVersion)
