@@ -62,7 +62,7 @@ func (c *FakePersistentVolumeClaims) List(opts v1.ListOptions) (result *core_v1.
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core_v1.PersistentVolumeClaimList{}
+	list := &core_v1.PersistentVolumeClaimList{ListMeta: obj.(*core_v1.PersistentVolumeClaimList).ListMeta}
 	for _, item := range obj.(*core_v1.PersistentVolumeClaimList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

@@ -62,7 +62,7 @@ func (c *FakePodPresets) List(opts v1.ListOptions) (result *settings.PodPresetLi
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &settings.PodPresetList{}
+	list := &settings.PodPresetList{ListMeta: obj.(*settings.PodPresetList).ListMeta}
 	for _, item := range obj.(*settings.PodPresetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

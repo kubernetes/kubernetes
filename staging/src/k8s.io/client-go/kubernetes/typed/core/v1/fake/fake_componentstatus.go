@@ -59,7 +59,7 @@ func (c *FakeComponentStatuses) List(opts v1.ListOptions) (result *core_v1.Compo
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core_v1.ComponentStatusList{}
+	list := &core_v1.ComponentStatusList{ListMeta: obj.(*core_v1.ComponentStatusList).ListMeta}
 	for _, item := range obj.(*core_v1.ComponentStatusList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

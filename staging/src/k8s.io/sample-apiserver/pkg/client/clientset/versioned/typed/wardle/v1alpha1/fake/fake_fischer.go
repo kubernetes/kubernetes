@@ -59,7 +59,7 @@ func (c *FakeFischers) List(opts v1.ListOptions) (result *v1alpha1.FischerList, 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.FischerList{}
+	list := &v1alpha1.FischerList{ListMeta: obj.(*v1alpha1.FischerList).ListMeta}
 	for _, item := range obj.(*v1alpha1.FischerList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

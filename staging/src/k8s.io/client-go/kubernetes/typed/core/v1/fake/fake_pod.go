@@ -62,7 +62,7 @@ func (c *FakePods) List(opts v1.ListOptions) (result *core_v1.PodList, err error
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core_v1.PodList{}
+	list := &core_v1.PodList{ListMeta: obj.(*core_v1.PodList).ListMeta}
 	for _, item := range obj.(*core_v1.PodList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
