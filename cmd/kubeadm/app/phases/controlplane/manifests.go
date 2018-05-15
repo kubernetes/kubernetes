@@ -27,7 +27,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -217,11 +216,30 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", *cfg.AuditPolicyConfiguration.LogMaxAge)
 		}
 	}
-
+	if cfg.APIServerExtraArgs == nil {
+		cfg.APIServerExtraArgs = map[string]string{}
+	}
+	cfg.APIServerExtraArgs["authorization-mode"] = getAuthzModes(cfg.APIServerExtraArgs["authorization-mode"])
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.APIServerExtraArgs)...)
-	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
 
 	return command
+}
+
+// getAuthzModes gets the authorization-related parameters to the api server
+// Node,RBAC should be fixed in this order at the beginning
+// AlwaysAllow and AlwaysDeny is ignored as they are only for testing
+func getAuthzModes(authzModeExtraArgs string) string {
+	modes := []string{
+		authzmodes.ModeNode,
+		authzmodes.ModeRBAC,
+	}
+	if strings.Contains(authzModeExtraArgs, authzmodes.ModeABAC) {
+		modes = append(modes, authzmodes.ModeABAC)
+	}
+	if strings.Contains(authzModeExtraArgs, authzmodes.ModeWebhook) {
+		modes = append(modes, authzmodes.ModeWebhook)
+	}
+	return strings.Join(modes, ",")
 }
 
 // calcNodeCidrSize determines the size of the subnets used on each node, based
@@ -334,26 +352,4 @@ func getProxyEnvVars() []v1.EnvVar {
 		}
 	}
 	return envs
-}
-
-// getAuthzParameters gets the authorization-related parameters to the api server
-// At this point, we can assume the list of authorization modes is valid (due to that it has been validated in the API machinery code already)
-// If the list is empty; it's defaulted (mostly for unit testing)
-func getAuthzParameters(modes []string) []string {
-	command := []string{}
-	strset := sets.NewString(modes...)
-
-	if len(modes) == 0 {
-		return []string{fmt.Sprintf("--authorization-mode=%s", kubeadmapiv1alpha2.DefaultAuthorizationModes)}
-	}
-
-	if strset.Has(authzmodes.ModeABAC) {
-		command = append(command, "--authorization-policy-file="+kubeadmconstants.AuthorizationPolicyPath)
-	}
-	if strset.Has(authzmodes.ModeWebhook) {
-		command = append(command, "--authorization-webhook-config-file="+kubeadmconstants.AuthorizationWebhookConfigPath)
-	}
-
-	command = append(command, "--authorization-mode="+strings.Join(modes, ","))
-	return command
 }
