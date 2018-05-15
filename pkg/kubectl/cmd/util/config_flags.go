@@ -18,7 +18,6 @@ package util
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -32,8 +31,6 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/transport"
 )
 
 const (
@@ -54,6 +51,8 @@ const (
 	flagTimeout          = "request-timeout"
 	flagHTTPCacheDir     = "cache-dir"
 )
+
+var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
 
 // TODO(juanvallejo): move to pkg/kubectl/genericclioptions once
 // the dependency on cmdutil is broken here.
@@ -179,27 +178,15 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	// double it just so we don't end up here again for a while.  This config is only used for discovery.
 	config.Burst = 100
 
-	cacheDir := filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+	// retrieve a user-provided value for the "cache-dir"
+	// defaulting to ~/.kube/http-cache if no user-value is given.
+	httpCacheDir := defaultCacheDir
 	if f.CacheDir != nil {
-		cacheDir = *f.CacheDir
+		httpCacheDir = *f.CacheDir
 	}
 
-	if len(cacheDir) > 0 {
-		wt := config.WrapTransport
-		config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			if wt != nil {
-				rt = wt(rt)
-			}
-			return transport.NewCacheRoundTripper(cacheDir, rt)
-		}
-	}
-
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	cacheDir = computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), config.Host)
-	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), config.Host)
+	return discovery.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
 
 // RESTMapper returns a mapper.
@@ -293,6 +280,7 @@ func NewConfigFlags() *ConfigFlags {
 		Timeout:    stringptr("0"),
 		KubeConfig: stringptr(""),
 
+		CacheDir:         stringptr(defaultCacheDir),
 		ClusterName:      stringptr(""),
 		AuthInfoName:     stringptr(""),
 		Context:          stringptr(""),
