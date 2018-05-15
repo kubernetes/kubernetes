@@ -45,10 +45,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 		{
 			"Restore default cpu set",
 			`{
-				"PolicyName": "none",
-				"DefaultCPUSet": "4-6",
-				"Entries": {},
-				"Checksum": 2912033808
+				"policyName": "none",
+				"defaultCPUSet": "4-6",
+				"entries": {},
+				"checksum": 2912033808
 			}`,
 			"none",
 			"",
@@ -59,13 +59,13 @@ func TestCheckpointStateRestore(t *testing.T) {
 		{
 			"Restore valid checkpoint",
 			`{
-				"PolicyName": "none",
-				"DefaultCPUSet": "1-3",
-				"Entries": {
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
 					"container1": "4-6",
 					"container2": "1-3"
 				},
-				"Checksum": 1535905563
+				"checksum": 1535905563
 			}`,
 			"none",
 			"",
@@ -80,10 +80,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 		{
 			"Restore checkpoint with invalid checksum",
 			`{
-				"PolicyName": "none",
-				"DefaultCPUSet": "4-6",
-				"Entries": {},
-				"Checksum": 1337
+				"policyName": "none",
+				"defaultCPUSet": "4-6",
+				"entries": {},
+				"checksum": 1337
 			}`,
 			"none",
 			"checkpoint is corrupted",
@@ -99,10 +99,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 		{
 			"Restore checkpoint with invalid policy name",
 			`{
-				"PolicyName": "other",
-				"DefaultCPUSet": "1-3",
-				"Entries": {},
-				"Checksum": 4195836012
+				"policyName": "other",
+				"defaultCPUSet": "1-3",
+				"entries": {},
+				"checksum": 4195836012
 			}`,
 			"none",
 			`configured policy "none" differs from state checkpoint policy "other"`,
@@ -111,10 +111,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 		{
 			"Restore checkpoint with unparsable default cpu set",
 			`{
-				"PolicyName": "none",
-				"DefaultCPUSet": "1.3",
-				"Entries": {},
-				"Checksum": 1025273327
+				"policyName": "none",
+				"defaultCPUSet": "1.3",
+				"entries": {},
+				"checksum": 1025273327
 			}`,
 			"none",
 			`could not parse default cpu set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
@@ -123,13 +123,13 @@ func TestCheckpointStateRestore(t *testing.T) {
 		{
 			"Restore checkpoint with unparsable assignment entry",
 			`{
-				"PolicyName": "none",
-				"DefaultCPUSet": "1-3",
-				"Entries": {
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
 					"container1": "4-6",
 					"container2": "asd"
 				},
-				"Checksum": 2764213924
+				"checksum": 2764213924
 			}`,
 			"none",
 			`could not parse cpuset "asd" for container id "container2": strconv.Atoi: parsing "asd": invalid syntax`,
