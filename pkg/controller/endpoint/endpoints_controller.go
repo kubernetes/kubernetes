@@ -64,7 +64,7 @@ const (
 	// containers in the pod and marks it "Running", till the kubelet stops all
 	// containers and deletes the pod from the apiserver.
 	// This field is deprecated. v1.Service.PublishNotReadyAddresses will replace it
-	// subsequent releases.
+	// subsequent releases.  It will be removed no sooner than 1.13.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
@@ -420,7 +420,8 @@ func (e *EndpointController) syncService(key string) error {
 		return err
 	}
 
-	var tolerateUnreadyEndpoints bool
+	// If the user specified the older (deprecated) annotation, we have to respect it.
+	tolerateUnreadyEndpoints := service.Spec.PublishNotReadyAddresses
 	if v, ok := service.Annotations[TolerateUnreadyEndpointsAnnotation]; ok {
 		b, err := strconv.ParseBool(v)
 		if err == nil {
