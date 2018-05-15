@@ -27,6 +27,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -37,7 +38,7 @@ import (
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	command := app.NewAPIServerCommand()
+	command := app.NewAPIServerCommand(server.SetupSignalHandler())
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the

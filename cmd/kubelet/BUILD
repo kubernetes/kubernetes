@@ -21,6 +21,7 @@ go_library(
         "//cmd/kubelet/app:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/version/prometheus:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/logs:go_default_library",
     ],
 )

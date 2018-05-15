@@ -48,7 +48,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
-	"k8s.io/apiserver/pkg/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
@@ -109,7 +108,7 @@ const etcdRetryLimit = 60
 const etcdRetryInterval = 1 * time.Second
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
-func NewAPIServerCommand() *cobra.Command {
+func NewAPIServerCommand(stopCh <-chan struct{}) *cobra.Command {
 	s := options.NewServerRunOptions()
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
@@ -132,7 +131,6 @@ cluster's shared state through which all other components interact.`,
 				return utilerrors.NewAggregate(errs)
 			}
 
-			stopCh := server.SetupSignalHandler()
 			return Run(completedOptions, stopCh)
 		},
 	}
