@@ -35,7 +35,7 @@ const (
 	defaultNumberOfImages = 8
 )
 
-func TestNewCmdConfigListImages(t *testing.T) {
+func TestNewCmdConfigImagesList(t *testing.T) {
 	var output bytes.Buffer
 	images := cmd.NewCmdConfigImagesList(&output)
 	images.Run(nil, nil)
@@ -168,5 +168,29 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 				t.Fatalf("expected %v images but got %v", tc.expectedImages, actual)
 			}
 		})
+	}
+}
+
+type fakePuller struct {
+	count map[string]int
+}
+
+func (f *fakePuller) Pull(image string) error {
+	f.count[image]++
+	return nil
+}
+
+func TestImagesPull(t *testing.T) {
+	puller := &fakePuller{
+		count: make(map[string]int),
+	}
+	images := []string{"a", "b", "c", "d", "a"}
+	ip := cmd.NewImagesPull(puller, images)
+	err := ip.PullAll()
+	if err != nil {
+		t.Fatalf("expected nil but found %v", err)
+	}
+	if puller.count["a"] != 2 {
+		t.Fatalf("expected 2 but found %v", puller.count["a"])
 	}
 }
