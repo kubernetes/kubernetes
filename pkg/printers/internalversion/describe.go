@@ -2764,6 +2764,14 @@ func describeStatefulSet(ps *apps.StatefulSet, selector labels.Selector, events 
 		printLabelsMultiline(w, "Labels", ps.Labels)
 		printAnnotationsMultiline(w, "Annotations", ps.Annotations)
 		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", ps.Spec.Replicas, ps.Status.Replicas)
+		w.Write(LEVEL_0, "Update Strategy:\t%s\n", ps.Spec.UpdateStrategy.Type)
+		if ps.Spec.UpdateStrategy.RollingUpdate != nil {
+			ru := ps.Spec.UpdateStrategy.RollingUpdate
+			if ru.Partition != 0 {
+				w.Write(LEVEL_1, "Partition:\t%d\n", ru.Partition)
+			}
+		}
+
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		DescribePodTemplate(&ps.Spec.Template, w)
 		describeVolumeClaimTemplates(ps.Spec.VolumeClaimTemplates, w)
