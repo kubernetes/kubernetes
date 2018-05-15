@@ -20,12 +20,12 @@ import (
 	"bytes"
 	"testing"
 
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func TestPrintConfiguration(t *testing.T) {
 	var tests = []struct {
-		cfg           *kubeadmapiv1alpha1.MasterConfiguration
+		cfg           *kubeadmapi.MasterConfiguration
 		buf           *bytes.Buffer
 		expectedBytes []byte
 	}{
@@ -34,7 +34,7 @@ func TestPrintConfiguration(t *testing.T) {
 			expectedBytes: []byte(""),
 		},
 		{
-			cfg: &kubeadmapiv1alpha1.MasterConfiguration{
+			cfg: &kubeadmapi.MasterConfiguration{
 				KubernetesVersion: "v1.7.1",
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
@@ -71,9 +71,9 @@ func TestPrintConfiguration(t *testing.T) {
 `),
 		},
 		{
-			cfg: &kubeadmapiv1alpha1.MasterConfiguration{
+			cfg: &kubeadmapi.MasterConfiguration{
 				KubernetesVersion: "v1.7.1",
-				Networking: kubeadmapiv1alpha1.Networking{
+				Networking: kubeadmapi.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 				},
 			},
@@ -111,10 +111,10 @@ func TestPrintConfiguration(t *testing.T) {
 `),
 		},
 		{
-			cfg: &kubeadmapiv1alpha1.MasterConfiguration{
+			cfg: &kubeadmapi.MasterConfiguration{
 				KubernetesVersion: "v1.7.1",
-				Etcd: kubeadmapiv1alpha1.Etcd{
-					SelfHosted: &kubeadmapiv1alpha1.SelfHostedEtcd{
+				Etcd: kubeadmapi.Etcd{
+					SelfHosted: &kubeadmapi.SelfHostedEtcd{
 						CertificatesDir:    "/var/foo",
 						ClusterServiceName: "foo",
 						EtcdVersion:        "v0.1.0",
