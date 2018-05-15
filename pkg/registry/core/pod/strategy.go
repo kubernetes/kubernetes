@@ -42,11 +42,11 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	podhelpers "k8s.io/kubernetes/pkg/registry/core/pod/helpers"
 )
 
 // podStrategy implements behavior for Pods
@@ -72,7 +72,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		QOSClass: qos.GetPodQOS(pod),
 	}
 
-	podutil.DropDisabledAlphaFields(&pod.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&pod.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -81,8 +81,8 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
-	podutil.DropDisabledAlphaFields(&newPod.Spec)
-	podutil.DropDisabledAlphaFields(&oldPod.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&newPod.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&oldPod.Spec)
 }
 
 // Validate validates a new pod.

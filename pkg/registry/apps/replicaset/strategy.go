@@ -38,9 +38,9 @@ import (
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	podhelpers "k8s.io/kubernetes/pkg/registry/core/pod/helpers"
 )
 
 // rsStrategy implements verification logic for ReplicaSets.
@@ -79,7 +79,7 @@ func (rsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	rs.Generation = 1
 
-	pod.DropDisabledAlphaFields(&rs.Spec.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&rs.Spec.Template.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -89,8 +89,8 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	// update is not allowed to set status
 	newRS.Status = oldRS.Status
 
-	pod.DropDisabledAlphaFields(&newRS.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldRS.Spec.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&newRS.Spec.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&oldRS.Spec.Template.Spec)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push

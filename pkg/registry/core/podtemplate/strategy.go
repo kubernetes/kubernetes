@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	podhelpers "k8s.io/kubernetes/pkg/registry/core/pod/helpers"
 )
 
 // podTemplateStrategy implements behavior for PodTemplates
@@ -47,7 +47,7 @@ func (podTemplateStrategy) NamespaceScoped() bool {
 func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	template := obj.(*api.PodTemplate)
 
-	pod.DropDisabledAlphaFields(&template.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&template.Template.Spec)
 }
 
 // Validate validates a new pod template.
@@ -70,8 +70,8 @@ func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	newTemplate := obj.(*api.PodTemplate)
 	oldTemplate := old.(*api.PodTemplate)
 
-	pod.DropDisabledAlphaFields(&newTemplate.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldTemplate.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&newTemplate.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&oldTemplate.Template.Spec)
 }
 
 // ValidateUpdate is the default update validation for an end user.

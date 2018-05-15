@@ -24,9 +24,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	podhelpers "k8s.io/kubernetes/pkg/registry/core/pod/helpers"
 )
 
 // cronJobStrategy implements verification logic for Replication Controllers.
@@ -54,7 +54,7 @@ func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 	cronJob := obj.(*batch.CronJob)
 	cronJob.Status = batch.CronJobStatus{}
 
-	pod.DropDisabledAlphaFields(&cronJob.Spec.JobTemplate.Spec.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&cronJob.Spec.JobTemplate.Spec.Template.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -63,8 +63,8 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	oldCronJob := old.(*batch.CronJob)
 	newCronJob.Status = oldCronJob.Status
 
-	pod.DropDisabledAlphaFields(&newCronJob.Spec.JobTemplate.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldCronJob.Spec.JobTemplate.Spec.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&newCronJob.Spec.JobTemplate.Spec.Template.Spec)
+	podhelpers.DropDisabledPodSpecAlphaFields(&oldCronJob.Spec.JobTemplate.Spec.Template.Spec)
 }
 
 // Validate validates a new scheduled job.
