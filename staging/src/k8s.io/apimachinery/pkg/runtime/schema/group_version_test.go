@@ -109,8 +109,8 @@ func TestKindForGroupVersionKinds(t *testing.T) {
 		},
 		{
 			input:  []GroupVersionKind{{Group: "batch", Version: "v3alpha1", Kind: "CronJob"}},
-			target: GroupVersionKind{Group: "batch", Version: "v1", Kind: "CronJob"},
-			ok:     true,
+			target: GroupVersionKind{},
+			ok:     false,
 		},
 		{
 			input:  []GroupVersionKind{{Group: "policy", Version: "v1beta1", Kind: "PodDisruptionBudget"}},
@@ -124,14 +124,16 @@ func TestKindForGroupVersionKinds(t *testing.T) {
 		},
 	}
 
-	for i, c := range cases {
-		target, ok := gvks.KindForGroupVersionKinds(c.input)
-		if c.target != target {
-			t.Errorf("%d: unexpected target: %v, expected %v", i, target, c.target)
-		}
-		if c.ok != ok {
-			t.Errorf("%d: unexpected ok: %v, expected %v", i, ok, c.ok)
-		}
+	for _, c := range cases {
+		t.Run("value", func(t *testing.T) {
+			target, ok := gvks.KindForGroupVersionKinds(c.input)
+			if c.target != target {
+				t.Errorf("unexpected target: %v, expected %v", target, c.target)
+			}
+			if c.ok != ok {
+				t.Errorf("unexpected ok: %v, expected %v", ok, c.ok)
+			}
+		})
 	}
 }
 
