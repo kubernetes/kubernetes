@@ -233,10 +233,6 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, i
 		return nil, err
 	}
 
-	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infoln("[preflight] starting kubelet service if it's inactive")
-	preflight.TryStartKubelet(ignorePreflightErrors)
-
 	return &Join{cfg: cfg}, nil
 }
 
@@ -263,6 +259,9 @@ func (j *Join) Run(out io.Writer) error {
 	if err := kubeconfigutil.WriteToDisk(kubeconfigFile, cfg); err != nil {
 		return fmt.Errorf("couldn't save bootstrap-kubelet.conf to disk: %v", err)
 	}
+
+	// Try to start the kubelet service
+	kubeletphase.TryStartKubelet()
 
 	// Write the ca certificate to disk so kubelet can use it for authentication
 	cluster := cfg.Contexts[cfg.CurrentContext].Cluster

@@ -278,10 +278,6 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePrefligh
 		return nil, err
 	}
 
-	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infof("Starting kubelet")
-	preflight.TryStartKubelet(ignorePreflightErrors)
-
 	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun}, nil
 }
 
@@ -346,6 +342,9 @@ func (i *Init) Run(out io.Writer) error {
 			}
 		}
 	}
+
+	// Try to start the kubelet service
+	kubeletphase.TryStartKubelet()
 
 	// Temporarily set cfg.CertificatesDir to the "real value" when writing controlplane manifests
 	// This is needed for writing the right kind of manifests

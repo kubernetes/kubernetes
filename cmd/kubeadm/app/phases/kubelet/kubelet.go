@@ -39,6 +39,7 @@ import (
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	"k8s.io/kubernetes/pkg/util/initsystem"
 )
 
 // CreateBaseKubeletConfiguration creates base kubelet configuration for dynamic kubelet configuration feature.
@@ -232,4 +233,21 @@ func writeInitKubeletConfigToDisk(kubeletConfig []byte) error {
 		return fmt.Errorf("failed to write initial remote configuration of kubelet into file %q: %v", baseConfigFile, err)
 	}
 	return nil
+}
+
+// TryStartKubelet attempts to bring up kubelet service
+func TryStartKubelet() {
+
+	// If we notice that the kubelet service is inactive, try to start it
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		fmt.Println("[kubelet] No supported init system detected, won't ensure kubelet is running.")
+	} else if initSystem.ServiceExists("kubelet") && !initSystem.ServiceIsActive("kubelet") {
+
+		fmt.Println("[kubelet] Starting the kubelet service")
+		if err := initSystem.ServiceStart("kubelet"); err != nil {
+			fmt.Printf("[kubelet] WARNING: Unable to start the kubelet service: [%v]\n", err)
+			fmt.Println("[kubelet] WARNING: Please ensure kubelet is running manually.")
+		}
+	}
 }

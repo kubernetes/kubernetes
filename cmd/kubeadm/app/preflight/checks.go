@@ -111,13 +111,13 @@ func (criCheck CRICheck) Check() (warnings, errors []error) {
 	return warnings, errors
 }
 
-// ServiceCheck verifies that the given service is enabled and active. If we do not
+// ServiceCheck verifies that the given service is enabled and its 'active' status is what is wanted. If we do not
 // detect a supported init system however, all checks are skipped and a warning is
 // returned.
 type ServiceCheck struct {
-	Service       string
-	CheckIfActive bool
-	Label         string
+	Service    string
+	WantActive bool
+	Label      string
 }
 
 // Name returns label for ServiceCheck. If not provided, will return based on the service parameter
@@ -128,7 +128,7 @@ func (sc ServiceCheck) Name() string {
 	return fmt.Sprintf("Service-%s", strings.Title(sc.Service))
 }
 
-// Check validates if the service is enabled and active.
+// Check validates if the service is enabled and active/not active as requested.
 func (sc ServiceCheck) Check() (warnings, errors []error) {
 	glog.V(1).Infoln("validating if the service is enabled and active")
 	initSystem, err := initsystem.GetInitSystem()
@@ -149,10 +149,13 @@ func (sc ServiceCheck) Check() (warnings, errors []error) {
 				sc.Service, sc.Service))
 	}
 
-	if sc.CheckIfActive && !initSystem.ServiceIsActive(sc.Service) {
-		errors = append(errors,
-			fmt.Errorf("%s service is not active, please run 'systemctl start %s.service'",
-				sc.Service, sc.Service))
+	if sc.WantActive != initSystem.ServiceIsActive(sc.Service) {
+		error_msg := fmt.Errorf("%s service is active, please run 'systemctl stop %s.service'", sc.Service, sc.Service)
+
+		if sc.WantActive {
+			error_msg = fmt.Errorf("%s service is not active, please run 'systemctl start %s.service'", sc.Service, sc.Service)
+		}
+		errors = append(errors, error_msg)
 	}
 
 	return warnings, errors
@@ -962,7 +965,7 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 	if cfg.GetCRISocket() != kubeadmdefaults.DefaultCRISocket {
 		checks = append(checks, CRICheck{socket: cfg.GetCRISocket(), exec: execer})
 	} else {
-		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
+		checks = append(checks, ServiceCheck{Service: "docker", WantActive: true})
 	}
 
 	// non-windows checks
@@ -987,7 +990,7 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.GetNodeName()},
 		KubeletVersionCheck{KubernetesVersion: cfg.GetKubernetesVersion(), exec: execer},
-		ServiceCheck{Service: "kubelet", CheckIfActive: false},
+		ServiceCheck{Service: "kubelet", WantActive: false},
 		PortOpenCheck{port: 10250})
 	return checks
 }
@@ -1037,25 +1040,6 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 		return &Error{Msg: errs.String()}
 	}
 	return nil
-}
-
-// TryStartKubelet attempts to bring up kubelet service
-func TryStartKubelet(ignorePreflightErrors sets.String) {
-	if setHasItemOrAll(ignorePreflightErrors, "StartKubelet") {
-		return
-	}
-	// If we notice that the kubelet service is inactive, try to start it
-	initSystem, err := initsystem.GetInitSystem()
-	if err != nil {
-		glog.Infoln("[preflight] no supported init system detected, won't ensure kubelet is running.")
-	} else if initSystem.ServiceExists("kubelet") && !initSystem.ServiceIsActive("kubelet") {
-
-		glog.Infoln("[preflight] starting the kubelet service")
-		if err := initSystem.ServiceStart("kubelet"); err != nil {
-			glog.Warningf("[preflight] unable to start the kubelet service: [%v]\n", err)
-			glog.Warningf("[preflight] please ensure kubelet is running manually.")
-		}
-	}
 }
 
 // setHasItemOrAll is helper function that return true if item is present in the set (case insensitive) or special key 'all' is present

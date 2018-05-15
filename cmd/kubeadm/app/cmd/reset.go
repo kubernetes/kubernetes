@@ -148,7 +148,8 @@ func (r *Reset) Run(out io.Writer) error {
 	}
 
 	glog.Infoln("[reset] removing kubernetes-managed containers")
-	dockerCheck := preflight.ServiceCheck{Service: "docker", CheckIfActive: true}
+	dockerCheck := preflight.ServiceCheck{Service: "docker", WantActive: true}
+
 	execer := utilsexec.New()
 
 	reset(execer, dockerCheck, r.criSocketPath)
