@@ -28,10 +28,12 @@ from charms.leadership import leader_get, leader_set
 
 from shutil import move
 
+from pathlib import Path
 from shlex import split
 from subprocess import check_call
 from subprocess import check_output
 from subprocess import CalledProcessError
+from urllib.request import Request, urlopen
 
 from charms import layer
 from charms.layer import snap
@@ -40,7 +42,7 @@ from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import is_state
 from charms.reactive import endpoint_from_flag
-from charms.reactive import when, when_any, when_not
+from charms.reactive import when, when_any, when_not, when_none
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.kubernetes.common import get_version
 from charms.kubernetes.common import retry
@@ -60,6 +62,8 @@ from charmhelpers.contrib.charmsupport import nrpe
 # need because our bin names contain them (e.g. 'snap.foo.daemon'). The
 # default regex in charmhelpers doesn't allow periods, but nagios itself does.
 nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
+
+gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
@@ -426,6 +430,12 @@ def set_final_status():
     if components_started and not addons_configured:
         hookenv.status_set('waiting', 'Waiting to retry addon deployment')
         return
+
+    req_sent = is_state('kubernetes-master.cloud-request-sent')
+    aws_ready = is_state('endpoint.aws.ready')
+    gcp_ready = is_state('endpoint.gcp.ready')
+    if req_sent and not (aws_ready or gcp_ready):
+        hookenv.status_set('waiting', 'waiting for cloud integration')
 
     if addons_configured and not all_kube_system_pods_running():
         hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
@@ -1227,6 +1237,10 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
 
     if is_state('endpoint.aws.ready'):
         api_opts['cloud-provider'] = 'aws'
+    elif is_state('endpoint.gcp.ready'):
+        cloud_config_path = _cloud_config_path('kube-apiserver')
+        api_opts['cloud-provider'] = 'gce'
+        api_opts['cloud-config'] = str(cloud_config_path)
 
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
     restart_apiserver()
@@ -1251,6 +1265,10 @@ def configure_controller_manager():
 
     if is_state('endpoint.aws.ready'):
         controller_opts['cloud-provider'] = 'aws'
+    elif is_state('endpoint.gcp.ready'):
+        cloud_config_path = _cloud_config_path('kube-controller-manager')
+        controller_opts['cloud-provider'] = 'gce'
+        controller_opts['cloud-config'] = str(cloud_config_path)
 
     configure_kubernetes_service('kube-controller-manager', controller_opts,
                                  'controller-manager-extra-args')
@@ -1351,19 +1369,88 @@ def all_kube_system_pods_running():
 
     try:
         output = check_output(cmd).decode('utf-8')
+        result = json.loads(output)
     except CalledProcessError:
         hookenv.log('failed to get kube-system pod status')
         return False
+    hookenv.log('Checking system pods status: {}'.format(', '.join(
+        '='.join([pod['metadata']['name'], pod['status']['phase']])
+        for pod in result['items'])))
 
-    result = json.loads(output)
-    for pod in result['items']:
-        status = pod['status']['phase']
-        # Evicted nodes should re-spawn
-        if status != 'Running' and \
-           pod['status'].get('reason', '') != 'Evicted':
-            return False
+    all_pending = all(pod['status']['phase'] == 'Pending'
+                      for pod in result['items'])
+    if is_state('endpoint.gcp.ready') and all_pending:
+        poke_network_unavailable()
+        return False
 
-    return True
+    # All pods must be Running or Evicted (which should re-spawn)
+    all_running = all(pod['status']['phase'] == 'Running' or
+                      pod['status'].get('reason', '') == 'Evicted'
+                      for pod in result['items'])
+    return all_running
+
+
+def poke_network_unavailable():
+    """
+    Work around https://github.com/kubernetes/kubernetes/issues/44254 by
+    manually poking the status into the API server to tell the nodes they have
+    a network route.
+
+    This is needed because kubelet sets the NetworkUnavailable flag and expects
+    the network plugin to clear it, which only kubenet does. There is some
+    discussion about refactoring the affected code but nothing has happened
+    in a while.
+    """
+    cmd = ['kubectl', 'get', 'nodes', '-o', 'json']
+
+    try:
+        output = check_output(cmd).decode('utf-8')
+        nodes = json.loads(output)['items']
+    except CalledProcessError:
+        hookenv.log('failed to get kube-system nodes')
+        return
+    except (KeyError, json.JSONDecodeError) as e:
+        hookenv.log('failed to parse kube-system node status '
+                    '({}): {}'.format(e, output), hookenv.ERROR)
+        return
+
+    for node in nodes:
+        node_name = node['metadata']['name']
+        url = 'http://localhost:8080/api/v1/nodes/{}/status'.format(node_name)
+        with urlopen(url) as response:
+            code = response.getcode()
+            body = response.read().decode('utf8')
+        if code != 200:
+            hookenv.log('failed to get node status from {} [{}]: {}'.format(
+                url, code, body), hookenv.ERROR)
+            return
+        try:
+            node_info = json.loads(body)
+            conditions = node_info['status']['conditions']
+            i = [c['type'] for c in conditions].index('NetworkUnavailable')
+            if conditions[i]['status'] == 'True':
+                hookenv.log('Clearing NetworkUnavailable from {}'.format(
+                    node_name))
+                conditions[i] = {
+                    "type": "NetworkUnavailable",
+                    "status": "False",
+                    "reason": "RouteCreated",
+                    "message": "Manually set through k8s api",
+                }
+                req = Request(url, method='PUT',
+                              data=json.dumps(node_info).encode('utf8'),
+                              headers={'Content-Type': 'application/json'})
+                with urlopen(req) as response:
+                    code = response.getcode()
+                    body = response.read().decode('utf8')
+                if code not in (200, 201, 202):
+                    hookenv.log('failed to update node status [{}]: {}'.format(
+                        code, body), hookenv.ERROR)
+                    return
+        except (json.JSONDecodeError, KeyError):
+            hookenv.log('failed to parse node status: {}'.format(body),
+                        hookenv.ERROR)
+            return
 
 
 def apiserverVersion():
@@ -1389,7 +1476,7 @@ def getStorageBackend():
 @when('leadership.is_leader')
 @when_not('leadership.set.cluster_tag')
 def create_cluster_tag():
-    cluster_tag = 'kubernetes-{}'.format(token_generator())
+    cluster_tag = 'kubernetes-{}'.format(token_generator().lower())
     leader_set(cluster_tag=cluster_tag)
 
 
@@ -1408,37 +1495,100 @@ def clear_cluster_tag_sent():
     remove_state('kubernetes-master.cluster-tag-sent')
 
 
-@when('endpoint.aws.joined',
-      'leadership.set.cluster_tag')
-@when_not('kubernetes-master.aws-request-sent')
+@when_any('endpoint.aws.joined',
+          'endpoint.gcp.joined')
+@when('leadership.set.cluster_tag')
+@when_not('kubernetes-master.cloud-request-sent')
 def request_integration():
-    hookenv.status_set('maintenance', 'requesting aws integration')
-    aws = endpoint_from_flag('endpoint.aws.joined')
+    hookenv.status_set('maintenance', 'requesting cloud integration')
     cluster_tag = leader_get('cluster_tag')
-    aws.tag_instance({
-        'KubernetesCluster': cluster_tag,
-        'k8s.io/role/master': 'true',
-    })
-    aws.tag_instance_security_group({
-        'KubernetesCluster': cluster_tag,
-    })
-    aws.enable_instance_inspection()
-    aws.enable_network_management()
-    aws.enable_dns_management()
-    aws.enable_load_balancer_management()
-    aws.enable_block_storage_management()
-    aws.enable_object_storage_management(['kubernetes-*'])
-    set_state('kubernetes-master.aws-request-sent')
-    hookenv.status_set('waiting', 'waiting for aws integration')
+    if is_state('endpoint.aws.joined'):
+        cloud = endpoint_from_flag('endpoint.aws.joined')
+        cloud.tag_instance({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+            'k8s.io/role/master': 'true',
+        })
+        cloud.tag_instance_security_group({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.tag_instance_subnet({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.enable_object_storage_management(['kubernetes-*'])
+        cloud.enable_load_balancer_management()
+    elif is_state('endpoint.gcp.joined'):
+        cloud = endpoint_from_flag('endpoint.gcp.joined')
+        cloud.label_instance({
+            'k8s-io-cluster-name': cluster_tag,
+            'k8s-io-role-master': 'master',
+        })
+        cloud.enable_object_storage_management()
+        cloud.enable_security_management()
+    cloud.enable_instance_inspection()
+    cloud.enable_network_management()
+    cloud.enable_dns_management()
+    cloud.enable_block_storage_management()
+    set_state('kubernetes-master.cloud-request-sent')
 
 
-@when_not('endpoint.aws.joined')
+@when_none('endpoint.aws.joined',
+           'endpoint.gcp.joined')
+@when('kubernetes-master.cloud-request-sent')
 def clear_requested_integration():
-    remove_state('kubernetes-master.aws-request-sent')
+    remove_state('kubernetes-master.cloud-request-sent')
 
 
-@when('endpoint.aws.ready')
-@when_not('kubernetes-master.restarted-for-aws')
-def restart_for_aws():
-    set_state('kubernetes-master.restarted-for-aws')
+@when_any('endpoint.aws.ready',
+          'endpoint.gcp.ready')
+@when_not('kubernetes-master.restarted-for-cloud')
+def restart_for_cloud():
+    if is_state('endpoint.gcp.ready'):
+        _write_gcp_snap_config('kube-apiserver')
+        _write_gcp_snap_config('kube-controller-manager')
+    set_state('kubernetes-master.restarted-for-cloud')
     remove_state('kubernetes-master.components.started')  # force restart
+
+
+def _snap_common_path(component):
+    return Path('/var/snap/{}/common'.format(component))
+
+
+def _cloud_config_path(component):
+    return _snap_common_path(component) / 'cloud-config.conf'
+
+
+def _gcp_creds_path(component):
+    return _snap_common_path(component) / 'gcp-creds.json'
+
+
+def _daemon_env_path(component):
+    return _snap_common_path(component) / 'environment'
+
+
+def _write_gcp_snap_config(component):
+    # gcp requires additional credentials setup
+    gcp = endpoint_from_flag('endpoint.gcp.ready')
+    creds_path = _gcp_creds_path(component)
+    with creds_path.open('w') as fp:
+        os.fchmod(fp.fileno(), 0o600)
+        fp.write(gcp.credentials)
+
+    # create a cloud-config file that sets token-url to nil to make the
+    # services use the creds env var instead of the metadata server, as
+    # well as making the cluster multizone
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text('[Global]\n'
+                                 'token-url = nil\n'
+                                 'multizone = true\n')
+
+    daemon_env_path = _daemon_env_path(component)
+    if daemon_env_path.exists():
+        daemon_env = daemon_env_path.read_text()
+        if not daemon_env.endswith('\n'):
+            daemon_env += '\n'
+    else:
+        daemon_env = ''
+    if gcp_creds_env_key not in daemon_env:
+        daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
+        daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
+        daemon_env_path.write_text(daemon_env)
