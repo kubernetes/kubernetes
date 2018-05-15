@@ -189,7 +189,7 @@ func WithMaxInFlightPerUserLimit(
 	limit int,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
-	if limit == 0 {
+	if limit <= 0 {
 		return handler
 	}
 
@@ -214,53 +214,46 @@ func WithMaxInFlightPerUserLimit(
 			return
 		}
 
-		var username string
+		var uid string
 		if currUser, ok := apirequest.UserFrom(ctx); ok {
-			username = currUser.GetName()
+			uid = currUser.GetUID()
 		}
 
 		var c chan bool
-		if limit != 0 {
-			userLimits.lock.Lock()
-			if c, ok = userLimits.chans[username]; !ok {
-				c = make(chan bool, limit)
-				userLimits.chans[username] = c
-			}
-			userLimits.lock.Unlock()
+		userLimits.lock.Lock()
+		if c, ok = userLimits.chans[uid]; !ok {
+			c = make(chan bool, limit)
+			userLimits.chans[uid] = c
 		}
+		userLimits.lock.Unlock()
 		isMutatingRequest := !nonMutatingRequestVerbs.Has(requestInfo.Verb)
 
-		if c == nil {
+		select {
+		case c <- true:
+			defer func() {
+				<-c
+			}()
 			handler.ServeHTTP(w, r)
-		} else {
 
-			select {
-			case c <- true:
-				defer func() {
-					<-c
-				}()
-				handler.ServeHTTP(w, r)
-
-			default:
-				// We need to split this data between buckets used for throttling.
-				if isMutatingRequest {
-					metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
-				} else {
-					metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
-				}
-				// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
-				// that he should always get an answer.  It's a super-admin or a loopback connection.
-				if currUser, ok := apirequest.UserFrom(ctx); ok {
-					for _, group := range currUser.GetGroups() {
-						if group == user.SystemPrivilegedGroup {
-							handler.ServeHTTP(w, r)
-							return
-						}
+		default:
+			// We need to split this data between buckets used for throttling.
+			if isMutatingRequest {
+				metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
+			} else {
+				metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
+			}
+			// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
+			// that he should always get an answer.  It's a super-admin or a loopback connection.
+			if currUser, ok := apirequest.UserFrom(ctx); ok {
+				for _, group := range currUser.GetGroups() {
+					if group == user.SystemPrivilegedGroup {
+						handler.ServeHTTP(w, r)
+						return
 					}
 				}
-				metrics.Record(r, requestInfo, "", http.StatusTooManyRequests, 0, 0)
-				tooManyRequests(r, w)
 			}
+			metrics.Record(r, requestInfo, "", http.StatusTooManyRequests, 0, 0)
+			tooManyRequests(r, w)
 		}
 	})
 }

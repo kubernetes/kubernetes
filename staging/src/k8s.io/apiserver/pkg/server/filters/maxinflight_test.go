@@ -90,7 +90,7 @@ func withFakeUser(handler http.Handler) http.Handler {
 		userInfo := new(user.DefaultInfo)
 
 		if userName := r.URL.Query().Get("user"); userName != "" {
-			userInfo.Name = userName
+			userInfo.UID = userName
 		}
 
 		if len(r.Header["Groups"]) > 0 {
