@@ -39,6 +39,8 @@ type SelectorSpread struct {
 	controllerLister  algorithm.ControllerLister
 	replicaSetLister  algorithm.ReplicaSetLister
 	statefulSetLister algorithm.StatefulSetLister
+	// ServiceAntiAffinity works on custom labels
+	label string
 }
 
 // NewSelectorSpreadPriority creates a SelectorSpread.
@@ -46,12 +48,14 @@ func NewSelectorSpreadPriority(
 	serviceLister algorithm.ServiceLister,
 	controllerLister algorithm.ControllerLister,
 	replicaSetLister algorithm.ReplicaSetLister,
-	statefulSetLister algorithm.StatefulSetLister) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+	statefulSetLister algorithm.StatefulSetLister,
+	label string) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 	selectorSpread := &SelectorSpread{
 		serviceLister:     serviceLister,
 		controllerLister:  controllerLister,
 		replicaSetLister:  replicaSetLister,
 		statefulSetLister: statefulSetLister,
+		label:             label,
 	}
 	return selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce
 }
@@ -127,7 +131,14 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		if result[i].Score > maxCountByNodeName {
 			maxCountByNodeName = result[i].Score
 		}
-		zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+		var zoneID string
+		if len(s.label) > 0 {
+			// ServiceAntiAffinity works on custom labels
+			zoneID = utilnode.GetNodeLabelValue(nodeNameToInfo[result[i].Host].Node(), s.label)
+		} else {
+			zoneID = utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+		}
+
 		if zoneID == "" {
 			continue
 		}
@@ -154,7 +165,13 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		}
 		// If there is zone information present, incorporate it
 		if haveZones {
-			zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+			var zoneID string
+			if len(s.label) > 0 {
+				// ServiceAntiAffinity works on custom labels
+				zoneID = utilnode.GetNodeLabelValue(nodeNameToInfo[result[i].Host].Node(), s.label)
+			} else {
+				zoneID = utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+			}
 			if zoneID != "" {
 				zoneScore := MaxPriorityFloat64
 				if maxCountByZone > 0 {
@@ -173,113 +190,13 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 	return nil
 }
 
-// ServiceAntiAffinity contains information to calculate service anti-affinity priority.
-type ServiceAntiAffinity struct {
-	podLister     algorithm.PodLister
-	serviceLister algorithm.ServiceLister
-	label         string
-}
-
 // NewServiceAntiAffinityPriority creates a ServiceAntiAffinity.
-func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, label string) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
-	antiAffinity := &ServiceAntiAffinity{
-		podLister:     podLister,
-		serviceLister: serviceLister,
-		label:         label,
-	}
-	return antiAffinity.CalculateAntiAffinityPriorityMap, antiAffinity.CalculateAntiAffinityPriorityReduce
-}
+func NewServiceAntiAffinityPriority(
+	serviceLister algorithm.ServiceLister,
+	controllerLister algorithm.ControllerLister,
+	replicaSetLister algorithm.ReplicaSetLister,
+	statefulSetLister algorithm.StatefulSetLister,
+	label string) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 
-// Classifies nodes into ones with labels and without labels.
-func (s *ServiceAntiAffinity) getNodeClassificationByLabels(nodes []*v1.Node) (map[string]string, []string) {
-	labeledNodes := map[string]string{}
-	nonLabeledNodes := []string{}
-	for _, node := range nodes {
-		if labels.Set(node.Labels).Has(s.label) {
-			label := labels.Set(node.Labels).Get(s.label)
-			labeledNodes[node.Name] = label
-		} else {
-			nonLabeledNodes = append(nonLabeledNodes, node.Name)
-		}
-	}
-	return labeledNodes, nonLabeledNodes
-}
-
-// filteredPod get pods based on namespace and selector
-func filteredPod(namespace string, selector labels.Selector, nodeInfo *schedulercache.NodeInfo) (pods []*v1.Pod) {
-	if nodeInfo.Pods() == nil || len(nodeInfo.Pods()) == 0 || selector == nil {
-		return []*v1.Pod{}
-	}
-	for _, pod := range nodeInfo.Pods() {
-		// Ignore pods being deleted for spreading purposes
-		// Similar to how it is done for SelectorSpreadPriority
-		if namespace == pod.Namespace && pod.DeletionTimestamp == nil && selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, pod)
-		}
-	}
-	return
-}
-
-// CalculateAntiAffinityPriorityMap spreads pods by minimizing the number of pods belonging to the same service
-// on given machine
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
-	var firstServiceSelector labels.Selector
-
-	node := nodeInfo.Node()
-	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
-	}
-	priorityMeta, ok := meta.(*priorityMetadata)
-	if ok {
-		firstServiceSelector = priorityMeta.podFirstServiceSelector
-	} else {
-		firstServiceSelector = getFirstServiceSelector(pod, s.serviceLister)
-	}
-	//pods matched namespace,selector on current node
-	matchedPodsOfNode := filteredPod(pod.Namespace, firstServiceSelector, nodeInfo)
-
-	return schedulerapi.HostPriority{
-		Host:  node.Name,
-		Score: int(len(matchedPodsOfNode)),
-	}, nil
-}
-
-// CalculateAntiAffinityPriorityReduce computes each node score with the same value for a particular label.
-// The label to be considered is provided to the struct (ServiceAntiAffinity).
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
-	var numServicePods int
-	var label string
-	podCounts := map[string]int{}
-	labelNodesStatus := map[string]string{}
-	maxPriorityFloat64 := float64(schedulerapi.MaxPriority)
-
-	for _, hostPriority := range result {
-		numServicePods += hostPriority.Score
-		if !labels.Set(nodeNameToInfo[hostPriority.Host].Node().Labels).Has(s.label) {
-			continue
-		}
-		label = labels.Set(nodeNameToInfo[hostPriority.Host].Node().Labels).Get(s.label)
-		labelNodesStatus[hostPriority.Host] = label
-		podCounts[label] += hostPriority.Score
-	}
-
-	//score int - scale of 0-maxPriority
-	// 0 being the lowest priority and maxPriority being the highest
-	for i, hostPriority := range result {
-		label, ok := labelNodesStatus[hostPriority.Host]
-		if !ok {
-			result[i].Host = hostPriority.Host
-			result[i].Score = int(0)
-			continue
-		}
-		// initializing to the default/max node score of maxPriority
-		fScore := maxPriorityFloat64
-		if numServicePods > 0 {
-			fScore = maxPriorityFloat64 * (float64(numServicePods-podCounts[label]) / float64(numServicePods))
-		}
-		result[i].Host = hostPriority.Host
-		result[i].Score = int(fScore)
-	}
-
-	return nil
+	return NewSelectorSpreadPriority(serviceLister, controllerLister, replicaSetLister, statefulSetLister, label)
 }

@@ -132,6 +132,19 @@ func GetZoneKey(node *v1.Node) string {
 	return region + ":\x00:" + failureDomain
 }
 
+func GetNodeLabelValue(node *v1.Node, label string) string {
+	labels := node.Labels
+	if labels == nil {
+		return ""
+	}
+
+	if value, ok := labels[label]; ok && len(value) > 0 {
+		return value
+	}
+
+	return ""
+}
+
 // SetNodeCondition updates specific node condition with patch operation.
 func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.NodeCondition) error {
 	generatePatch := func(condition v1.NodeCondition) ([]byte, error) {

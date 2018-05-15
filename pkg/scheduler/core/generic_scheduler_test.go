@@ -650,7 +650,7 @@ func TestZeroRequest(t *testing.T) {
 			schedulertesting.FakeServiceLister([]*v1.Service{}),
 			schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
 			schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
-			schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+			schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}), "")
 		pc := algorithm.PriorityConfig{Map: selectorSpreadPriorityMap, Reduce: selectorSpreadPriorityReduce, Weight: 1}
 		priorityConfigs = append(priorityConfigs, pc)
 
