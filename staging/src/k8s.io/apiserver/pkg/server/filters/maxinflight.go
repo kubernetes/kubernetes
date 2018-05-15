@@ -28,6 +28,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 
+	"sync/atomic"
+
 	"github.com/golang/glog"
 )
 
@@ -183,6 +185,46 @@ func WithMaxInFlightLimit(
 	})
 }
 
+// userRequests is used to store request semaphores per user
+type userRequestChans struct {
+	atomic.Value
+	mu sync.Mutex
+}
+
+func newUserRequestChans() *userRequestChans {
+	result := new(userRequestChans)
+	result.Store(make(map[string]chan bool))
+	return result
+}
+
+// getChan returns existing user chan or creates new, stores it in the map and returns ones
+func (urc *userRequestChans) getChan(key string, limit int) chan bool {
+	// check, if semaphore already exists
+	m1 := urc.Load().(map[string]chan bool)
+	if val, ok := m1[key]; ok {
+		return val
+	}
+
+	urc.mu.Lock() // synchronize with other potential writers
+	defer urc.mu.Unlock()
+
+	// re-check, if semaphore appears before mutex was acquired
+	m1 = urc.Load().(map[string]chan bool)
+	if val, ok := m1[key]; ok {
+		return val // semaphore already initialized, we don't need to rewrite it
+	}
+
+	m2 := make(map[string]chan bool) // create a new value
+	for k, v := range m1 {
+		m2[k] = v // copy all data from the current object to the new one
+	}
+
+	m2[key] = make(chan bool, limit) // create new semaphore
+	urc.Store(m2)                    // atomically replace the current object with the new one
+
+	return m2[key]
+}
+
 // WithMaxInFlightPerUserLimit limits the number of in-flight requests to buffer size of the passed in channel.
 func WithMaxInFlightPerUserLimit(
 	handler http.Handler,
@@ -193,12 +235,7 @@ func WithMaxInFlightPerUserLimit(
 		return handler
 	}
 
-	userLimits := struct {
-		lock  sync.Mutex
-		chans map[string]chan bool
-	}{
-		chans: make(map[string]chan bool),
-	}
+	requestChans := newUserRequestChans()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -219,15 +256,7 @@ func WithMaxInFlightPerUserLimit(
 			uid = currUser.GetUID()
 		}
 
-		var c chan bool
-		userLimits.lock.Lock()
-		if c, ok = userLimits.chans[uid]; !ok {
-			c = make(chan bool, limit)
-			userLimits.chans[uid] = c
-		}
-		userLimits.lock.Unlock()
-		isMutatingRequest := !nonMutatingRequestVerbs.Has(requestInfo.Verb)
-
+		c := requestChans.getChan(uid, limit)
 		select {
 		case c <- true:
 			defer func() {
@@ -237,10 +266,10 @@ func WithMaxInFlightPerUserLimit(
 
 		default:
 			// We need to split this data between buckets used for throttling.
-			if isMutatingRequest {
-				metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
-			} else {
+			if nonMutatingRequestVerbs.Has(requestInfo.Verb) {
 				metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
+			} else {
+				metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
 			}
 			// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
 			// that he should always get an answer.  It's a super-admin or a loopback connection.
