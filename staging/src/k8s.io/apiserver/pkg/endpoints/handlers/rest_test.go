@@ -394,8 +394,6 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 			timeout: 1 * time.Second,
 
-			schemaReferenceObj: schemaReferenceObj,
-
 			restPatcher: testPatcher,
 			name:        name,
 			patchType:   patchType,
