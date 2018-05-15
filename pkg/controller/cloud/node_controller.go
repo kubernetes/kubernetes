@@ -112,7 +112,7 @@ func NewCloudNodeController(
 
 // This controller deletes a node if kubelet is not reporting
 // and the node is gone from the cloud provider.
-func (cnc *CloudNodeController) Run() {
+func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
 	// The following loops run communicate with the APIServer with a worst case complexity
@@ -120,10 +120,10 @@ func (cnc *CloudNodeController) Run() {
 	// very infrequently. DO NOT MODIFY this to perform frequent operations.
 
 	// Start a loop to periodically update the node addresses obtained from the cloud
-	go wait.Until(cnc.UpdateNodeStatus, cnc.nodeStatusUpdateFrequency, wait.NeverStop)
+	go wait.Until(cnc.UpdateNodeStatus, cnc.nodeStatusUpdateFrequency, stopCh)
 
 	// Start a loop to periodically check if any nodes have been deleted from cloudprovider
-	go wait.Until(cnc.MonitorNode, cnc.nodeMonitorPeriod, wait.NeverStop)
+	go wait.Until(cnc.MonitorNode, cnc.nodeMonitorPeriod, stopCh)
 }
 
 // UpdateNodeStatus updates the node status, such as node addresses
