@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -124,13 +123,9 @@ func TestDynamicClient(t *testing.T) {
 }
 
 func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {
-	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
-	if err != nil {
+	pod := &v1.Pod{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, pod); err != nil {
 		return nil, err
 	}
-	pod := new(v1.Pod)
-	err = runtime.DecodeInto(testapi.Default.Codec(), json, pod)
-	pod.Kind = ""
-	pod.APIVersion = ""
-	return pod, err
+	return pod, nil
 }

@@ -255,18 +255,13 @@ func (e DirectEncoder) Encode(obj runtime.Object, stream io.Writer) error {
 	return err
 }
 
-// DirectDecoder clears the group version kind of a deserialized object.
+// DirectDecoder does not do conversion.
 type DirectDecoder struct {
 	runtime.Decoder
 }
 
-// Decode does not do conversion. It removes the gvk during deserialization.
+// Decode does not do conversion.
 func (d DirectDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	obj, gvk, err := d.Decoder.Decode(data, defaults, into)
-	if obj != nil {
-		kind := obj.GetObjectKind()
-		// clearing the gvk is just a convention of a codec
-		kind.SetGroupVersionKind(schema.GroupVersionKind{})
-	}
 	return obj, gvk, err
 }
