@@ -3331,15 +3331,15 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/clock",
-			"Rev": "aedf551cdb8b0119df3a19c65fde413a13b34997"
+			"Rev": "258e2a2fa64568210fbd6267cf1d8fd87c3cb86e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec",
-			"Rev": "aedf551cdb8b0119df3a19c65fde413a13b34997"
+			"Rev": "258e2a2fa64568210fbd6267cf1d8fd87c3cb86e"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec/testing",
-			"Rev": "aedf551cdb8b0119df3a19c65fde413a13b34997"
+			"Rev": "258e2a2fa64568210fbd6267cf1d8fd87c3cb86e"
 		},
 		{
 			"ImportPath": "vbom.ml/util/sortorder",
