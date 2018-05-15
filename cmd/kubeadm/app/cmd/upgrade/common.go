@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -42,7 +43,7 @@ import (
 // TODO - Restructure or rename upgradeVariables
 type upgradeVariables struct {
 	client        clientset.Interface
-	cfg           *kubeadmapiv1alpha1.MasterConfiguration
+	cfg           *kubeadmapi.MasterConfiguration
 	versionGetter upgrade.VersionGetter
 	waiter        apiclient.Waiter
 }
@@ -94,13 +95,16 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 }
 
 // printConfiguration prints the external version of the API to yaml
-func printConfiguration(cfg *kubeadmapiv1alpha1.MasterConfiguration, w io.Writer) {
+func printConfiguration(cfg *kubeadmapi.MasterConfiguration, w io.Writer) {
 	// Short-circuit if cfg is nil, so we can safely get the value of the pointer below
 	if cfg == nil {
 		return
 	}
 
-	cfgYaml, err := kubeadmutil.MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha1.SchemeGroupVersion, kubeadmscheme.Codecs)
+	externalcfg := &kubeadmapiv1alpha1.MasterConfiguration{}
+	kubeadmscheme.Scheme.Convert(cfg, externalcfg, nil)
+
+	cfgYaml, err := kubeadmutil.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha1.SchemeGroupVersion, kubeadmscheme.Codecs)
 	if err == nil {
 		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
 

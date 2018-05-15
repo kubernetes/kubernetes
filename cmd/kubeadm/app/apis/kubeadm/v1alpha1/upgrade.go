@@ -18,15 +18,13 @@ package v1alpha1
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/ugorji/go/codec"
-	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -100,36 +98,4 @@ func proxyFeatureListToMap(m map[string]interface{}) error {
 
 	unstructured.SetNestedMap(m, gateMap, featureGatePath...)
 	return nil
-}
-
-// LoadYAML is a small wrapper around go-yaml that ensures all nested structs are map[string]interface{} instead of map[interface{}]interface{}.
-func LoadYAML(bytes []byte) (map[string]interface{}, error) {
-	var decoded map[interface{}]interface{}
-	if err := yaml.Unmarshal(bytes, &decoded); err != nil {
-		return map[string]interface{}{}, fmt.Errorf("couldn't unmarshal YAML: %v", err)
-	}
-
-	converted, ok := convert(decoded).(map[string]interface{})
-	if !ok {
-		return map[string]interface{}{}, errors.New("yaml is not a map")
-	}
-
-	return converted, nil
-}
-
-// https://stackoverflow.com/questions/40737122/convert-yaml-to-json-without-struct-golang
-func convert(i interface{}) interface{} {
-	switch x := i.(type) {
-	case map[interface{}]interface{}:
-		m2 := map[string]interface{}{}
-		for k, v := range x {
-			m2[k.(string)] = convert(v)
-		}
-		return m2
-	case []interface{}:
-		for i, v := range x {
-			x[i] = convert(v)
-		}
-	}
-	return i
 }
