@@ -36,9 +36,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -49,11 +49,10 @@ import (
 func TestResourcesLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -72,8 +71,8 @@ func TestResourcesLocal(t *testing.T) {
 
 	opts := SetResourcesOptions{
 		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
-			NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
+			NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
 
 			OutputFormat: &outputFormat,
 		},
@@ -104,11 +103,10 @@ func TestResourcesLocal(t *testing.T) {
 func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -127,8 +125,8 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 
 	opts := SetResourcesOptions{
 		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
-			NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
+			NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
 
 			OutputFormat: &outputFormat,
 		},
@@ -471,17 +469,16 @@ func TestSetResourcesRemote(t *testing.T) {
 			testapi.Default = testapi.Groups[input.testAPIGroup]
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
-			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-			ns := legacyscheme.Codecs
+
 			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
-				NegotiatedSerializer: ns,
+				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
 					switch p, m := req.URL.Path, req.Method; {
 					case p == resourcePath && m == http.MethodGet:
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
 					case p == resourcePath && m == http.MethodPatch:
 						stream, err := req.GetBody()
 						if err != nil {
@@ -492,7 +489,7 @@ func TestSetResourcesRemote(t *testing.T) {
 							return nil, err
 						}
 						assert.Contains(t, string(bytes), "200m", fmt.Sprintf("resources not updated for %#v", input.object))
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "resources", req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -508,8 +505,8 @@ func TestSetResourcesRemote(t *testing.T) {
 			cmd.Flags().Set("output", outputFormat)
 			opts := SetResourcesOptions{
 				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(legacyscheme.Scheme),
-					NamePrintFlags:     printers.NewNamePrintFlags("", legacyscheme.Scheme),
+					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
+					NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
 
 					OutputFormat: &outputFormat,
 				},
