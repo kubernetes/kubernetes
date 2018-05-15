@@ -17,22 +17,23 @@ limitations under the License.
 package priorityclass
 
 import (
+	"context"
+
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 // Registry is an interface for things that know how to store PriorityClass.
 type Registry interface {
-	ListPriorityClasses(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*scheduling.PriorityClassList, error)
-	CreatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc) error
-	UpdatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
-	GetPriorityClass(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*scheduling.PriorityClass, error)
-	DeletePriorityClass(ctx genericapirequest.Context, name string) error
-	WatchPriorityClasses(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	ListPriorityClasses(ctx context.Context, options *metainternalversion.ListOptions) (*scheduling.PriorityClassList, error)
+	CreatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc) error
+	UpdatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	GetPriorityClass(ctx context.Context, name string, options *metav1.GetOptions) (*scheduling.PriorityClass, error)
+	DeletePriorityClass(ctx context.Context, name string) error
+	WatchPriorityClasses(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListPriorityClasses(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*scheduling.PriorityClassList, error) {
+func (s *storage) ListPriorityClasses(ctx context.Context, options *metainternalversion.ListOptions) (*scheduling.PriorityClassList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -55,21 +56,21 @@ func (s *storage) ListPriorityClasses(ctx genericapirequest.Context, options *me
 	return obj.(*scheduling.PriorityClassList), nil
 }
 
-func (s *storage) CreatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc) error {
+func (s *storage) CreatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc) error {
 	_, err := s.Create(ctx, pc, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+func (s *storage) UpdatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
 	_, _, err := s.Update(ctx, pc.Name, rest.DefaultUpdatedObjectInfo(pc), createValidation, updateValidation)
 	return err
 }
 
-func (s *storage) WatchPriorityClasses(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchPriorityClasses(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetPriorityClass(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*scheduling.PriorityClass, error) {
+func (s *storage) GetPriorityClass(ctx context.Context, name string, options *metav1.GetOptions) (*scheduling.PriorityClass, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -77,7 +78,7 @@ func (s *storage) GetPriorityClass(ctx genericapirequest.Context, name string, o
 	return obj.(*scheduling.PriorityClass), nil
 }
 
-func (s *storage) DeletePriorityClass(ctx genericapirequest.Context, name string) error {
+func (s *storage) DeletePriorityClass(ctx context.Context, name string) error {
 	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }

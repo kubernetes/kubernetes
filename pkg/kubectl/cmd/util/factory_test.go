@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -25,48 +24,23 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/util/flag"
-	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
-func TestNewFactoryDefaultFlagBindings(t *testing.T) {
-	factory := NewFactory(nil)
-
-	if !factory.FlagSet().HasFlags() {
-		t.Errorf("Expected flags, but didn't get any")
-	}
-}
-
-func TestNewFactoryNoFlagBindings(t *testing.T) {
-	clientConfig := clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &clientcmd.ConfigOverrides{})
-	factory := NewFactory(clientConfig)
-
-	if factory.FlagSet().HasFlags() {
-		t.Errorf("Expected zero flags, but got %v", factory.FlagSet())
-	}
-}
-
 func TestPortsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -97,7 +71,7 @@ func TestPortsForObject(t *testing.T) {
 }
 
 func TestProtocolsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -135,7 +109,7 @@ func TestProtocolsForObject(t *testing.T) {
 }
 
 func TestLabelsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	tests := []struct {
 		name     string
@@ -186,7 +160,7 @@ func TestLabelsForObject(t *testing.T) {
 }
 
 func TestCanBeExposed(t *testing.T) {
-	factory := NewFactory(nil)
+	factory := NewFactory(NewTestConfigFlags())
 	tests := []struct {
 		kind      schema.GroupKind
 		expectErr bool
@@ -209,18 +183,6 @@ func TestCanBeExposed(t *testing.T) {
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-	}
-}
-
-func TestFlagUnderscoreRenaming(t *testing.T) {
-	factory := NewFactory(nil)
-
-	factory.FlagSet().SetNormalizeFunc(flag.WordSepNormalizeFunc)
-	factory.FlagSet().Bool("valid_flag", false, "bool value")
-
-	// In case of failure of this test check this PR: spf13/pflag#23
-	if factory.FlagSet().Lookup("valid_flag").Name != "valid-flag" {
-		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.FlagSet().Lookup("valid_flag").Name)
 	}
 }
 
@@ -418,41 +380,6 @@ func TestGetFirstPod(t *testing.T) {
 	}
 }
 
-func TestPrintObjectSpecificMessage(t *testing.T) {
-	f := NewFactory(nil)
-	tests := []struct {
-		obj          runtime.Object
-		expectOutput bool
-	}{
-		{
-			obj:          &api.Service{},
-			expectOutput: false,
-		},
-		{
-			obj:          &api.Pod{},
-			expectOutput: false,
-		},
-		{
-			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer}},
-			expectOutput: false,
-		},
-		{
-			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort}},
-			expectOutput: true,
-		},
-	}
-	for _, test := range tests {
-		buff := &bytes.Buffer{}
-		f.PrintObjectSpecificMessage(test.obj, buff)
-		if test.expectOutput && buff.Len() == 0 {
-			t.Errorf("Expected output, saw none for %v", test.obj)
-		}
-		if !test.expectOutput && buff.Len() > 0 {
-			t.Errorf("Expected no output, saw %s for %v", buff.String(), test.obj)
-		}
-	}
-}
-
 func TestMakePortsString(t *testing.T) {
 	tests := []struct {
 		ports          []api.ServicePort
@@ -505,56 +432,6 @@ func TestMakePortsString(t *testing.T) {
 		output := makePortsString(test.ports, test.useNodePort)
 		if output != test.expectedOutput {
 			t.Errorf("expected: %s, saw: %s.", test.expectedOutput, output)
-		}
-	}
-}
-
-func fakeClient() resource.ClientMapper {
-	return resource.ClientMapperFunc(func(*meta.RESTMapping) (resource.RESTClient, error) {
-		return &manualfake.RESTClient{}, nil
-	})
-}
-
-func TestDiscoveryReplaceAliases(t *testing.T) {
-	tests := []struct {
-		name     string
-		arg      string
-		expected string
-	}{
-		{
-			name:     "no-replacement",
-			arg:      "service",
-			expected: "service",
-		},
-		{
-			name:     "all-replacement",
-			arg:      "all",
-			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions",
-		},
-		{
-			name:     "alias-in-comma-separated-arg",
-			arg:      "all,secrets",
-			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions,secrets",
-		},
-	}
-
-	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
-	b := resource.NewBuilder(
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  legacyscheme.Scheme,
-			ClientMapper: fakeClient(),
-			Decoder:      testapi.Default.Codec(),
-		},
-		nil,
-		categories.LegacyCategoryExpander,
-	)
-
-	for _, test := range tests {
-		replaced := b.ReplaceAliases(test.arg)
-		if replaced != test.expected {
-			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
 		}
 	}
 }

@@ -3,6 +3,10 @@ kind: Ingress
 metadata:
   name: echomap
 spec:
+  # kubemci requires a default backend.
+  backend:
+    serviceName: echoheadersx
+    servicePort: 80
   rules:
   - host: foo.bar.com
     http:
@@ -22,4 +26,3 @@ spec:
         backend:
           serviceName: echoheadersx
           servicePort: 80
-

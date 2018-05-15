@@ -38,7 +38,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    cgo = True,
     importpath = "github.com/opencontainers/runc/libcontainer/apparmor",
     visibility = ["//visibility:public"],
 )

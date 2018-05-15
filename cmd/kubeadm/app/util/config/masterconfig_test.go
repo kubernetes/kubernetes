@@ -14,4 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+// TODO: write unit tests for the functions in this package
+package config

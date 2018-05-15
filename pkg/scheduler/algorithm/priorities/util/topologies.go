@@ -70,6 +70,7 @@ func NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
 	return false
 }
 
+// Topologies contains topologies information of nodes.
 type Topologies struct {
 	DefaultKeys []string
 }

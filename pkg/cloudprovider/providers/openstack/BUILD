@@ -24,8 +24,10 @@ go_library(
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack:go_default_library",
@@ -73,7 +75,6 @@ go_test(
         "openstack_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",

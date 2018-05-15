@@ -56,7 +56,6 @@ go_library(
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/util/mount:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
-            "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/util/mount:go_default_library",

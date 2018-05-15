@@ -18,6 +18,8 @@ limitations under the License.
 package policybased
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -43,7 +45,11 @@ func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleRe
 	return &Storage{s, authorizer, ruleResolver}
 }
 
-func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *Storage) NamespaceScoped() bool {
+	return true
+}
+
+func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
 	}
@@ -70,12 +76,12 @@ func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, crea
 	return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
 }
 
-func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Update(ctx, name, obj, createValidation, updateValidation)
 	}
 
-	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
+	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx context.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		// Get the namespace from the context (populated from the URL).
 		// The namespace in the object can be empty until StandardStorage.Update()->BeforeUpdate() populates it from the context.
 		namespace, ok := genericapirequest.NamespaceFrom(ctx)

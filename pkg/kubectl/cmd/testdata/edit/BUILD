@@ -7,7 +7,6 @@ load(
 go_binary(
     name = "edit",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/testdata/edit",
     visibility = ["//visibility:public"],
 )
 

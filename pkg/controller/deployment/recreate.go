@@ -104,8 +104,19 @@ func oldPodsRunning(newRS *extensions.ReplicaSet, oldRSs []*extensions.ReplicaSe
 		if newRS != nil && newRS.UID == rsUID {
 			continue
 		}
-		if len(podList.Items) > 0 {
-			return true
+		for _, pod := range podList.Items {
+			switch pod.Status.Phase {
+			case v1.PodFailed, v1.PodSucceeded:
+				// Don't count pods in terminal state.
+				continue
+			case v1.PodUnknown:
+				// This happens in situation like when the node is temporarily disconnected from the cluster.
+				// If we can't be sure that the pod is not running, we have to count it.
+				return true
+			default:
+				// Pod is not in terminal phase.
+				return true
+			}
 		}
 	}
 	return false

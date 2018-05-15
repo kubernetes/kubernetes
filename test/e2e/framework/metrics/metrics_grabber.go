@@ -158,7 +158,7 @@ func (g *MetricsGrabber) GrabFromControllerManager() (ControllerManagerMetrics, 
 	if !g.registeredMaster {
 		return ControllerManagerMetrics{}, fmt.Errorf("Master's Kubelet is not registered. Skipping ControllerManager's metrics gathering.")
 	}
-	output, err := g.getMetricsFromPod(g.client, fmt.Sprintf("%v-%v", "kube-controller-manager", g.masterName), metav1.NamespaceSystem, ports.ControllerManagerPort)
+	output, err := g.getMetricsFromPod(g.client, fmt.Sprintf("%v-%v", "kube-controller-manager", g.masterName), metav1.NamespaceSystem, ports.InsecureKubeControllerManagerPort)
 	if err != nil {
 		return ControllerManagerMetrics{}, err
 	}

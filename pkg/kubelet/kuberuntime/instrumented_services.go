@@ -20,7 +20,7 @@ import (
 	"time"
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -136,6 +136,15 @@ func (in instrumentedRuntimeService) UpdateContainerResources(containerID string
 	defer recordOperation(operation, time.Now())
 
 	err := in.service.UpdateContainerResources(containerID, resources)
+	recordError(operation, err)
+	return err
+}
+
+func (in instrumentedRuntimeService) ReopenContainerLog(containerID string) error {
+	const operation = "reopen_container_log"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.ReopenContainerLog(containerID)
 	recordError(operation, err)
 	return err
 }

@@ -19,23 +19,25 @@ package set
 import (
 	"errors"
 	"fmt"
-	"io"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/util/env"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
-
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -92,74 +94,79 @@ var (
 )
 
 type EnvOptions struct {
-	Out io.Writer
-	Err io.Writer
-	In  io.Reader
-
+	PrintFlags *printers.PrintFlags
 	resource.FilenameOptions
-	EnvParams []string
-	EnvArgs   []string
-	Resources []string
 
-	All         bool
-	Resolve     bool
-	List        bool
-	ShortOutput bool
-	Local       bool
-	Overwrite   bool
-	DryRun      bool
-
-	ResourceVersion   string
+	EnvParams         []string
+	All               bool
+	Resolve           bool
+	List              bool
+	Local             bool
+	Overwrite         bool
 	ContainerSelector string
 	Selector          string
-	Output            string
 	From              string
 	Prefix            string
 
-	Mapper  meta.RESTMapper
-	Builder *resource.Builder
-	Infos   []*resource.Info
-	Encoder runtime.Encoder
+	PrintObj printers.ResourcePrinterFunc
 
-	Cmd *cobra.Command
+	envArgs                []string
+	resources              []string
+	output                 string
+	dryRun                 bool
+	builder                func() *resource.Builder
+	updatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+	namespace              string
+	enforceNamespace       bool
+	clientset              *kubernetes.Clientset
 
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
-	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	genericclioptions.IOStreams
+}
+
+// NewEnvOptions returns an EnvOptions indicating all containers in the selected
+// pod templates are selected by default and allowing environment to be overwritten
+func NewEnvOptions(streams genericclioptions.IOStreams) *EnvOptions {
+	return &EnvOptions{
+		PrintFlags: printers.NewPrintFlags("env updated", legacyscheme.Scheme),
+
+		ContainerSelector: "*",
+		Overwrite:         true,
+
+		IOStreams: streams,
+	}
 }
 
 // NewCmdEnv implements the OpenShift cli env command
-func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Command {
-	options := &EnvOptions{
-		Out: out,
-		Err: errout,
-		In:  in,
-	}
+func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewEnvOptions(streams)
 	cmd := &cobra.Command{
-		Use:     "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
+		Use: "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
+		DisableFlagsInUseLine: true,
 		Short:   "Update environment variables on a pod template",
 		Long:    envLong,
 		Example: fmt.Sprintf(envExample),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.RunEnv(f))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunEnv())
 		},
 	}
 	usage := "the resource to update the env"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change - may use wildcards")
-	cmd.Flags().StringP("from", "", "", "The name of a resource from which to inject environment variables")
-	cmd.Flags().StringP("prefix", "", "", "Prefix to append to variable names")
-	cmd.Flags().StringArrayVarP(&options.EnvParams, "env", "e", options.EnvParams, "Specify a key-value pair for an environment variable to set into each container.")
-	cmd.Flags().BoolVar(&options.List, "list", options.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
-	cmd.Flags().BoolVar(&options.Resolve, "resolve", options.Resolve, "If true, show secret or configmap references when listing variables")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
-	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set env will NOT contact api-server but run locally.")
-	cmd.Flags().BoolVar(&options.All, "all", options.All, "If true, select all resources in the namespace of the specified resource types")
-	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", true, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmd.Flags().StringVarP(&o.ContainerSelector, "containers", "c", o.ContainerSelector, "The names of containers in the selected pod templates to change - may use wildcards")
+	cmd.Flags().StringVarP(&o.From, "from", "", "", "The name of a resource from which to inject environment variables")
+	cmd.Flags().StringVarP(&o.Prefix, "prefix", "", "", "Prefix to append to variable names")
+	cmd.Flags().StringArrayVarP(&o.EnvParams, "env", "e", o.EnvParams, "Specify a key-value pair for an environment variable to set into each container.")
+	cmd.Flags().BoolVar(&o.List, "list", o.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
+	cmd.Flags().BoolVar(&o.Resolve, "resolve", o.Resolve, "If true, show secret or configmap references when listing variables")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
+	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set env will NOT contact api-server but run locally.")
+	cmd.Flags().BoolVar(&o.All, "all", o.All, "If true, select all resources in the namespace of the specified resource types")
+	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
+
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddPrinterFlags(cmd)
-
 	return cmd
 }
 
@@ -177,70 +184,69 @@ func keyToEnvName(key string) string {
 }
 
 func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	resources, envArgs, ok := envutil.SplitEnvironmentFromResources(args)
+	if o.All && len(o.Selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
+	ok := false
+	o.resources, o.envArgs, ok = envutil.SplitEnvironmentFromResources(args)
 	if !ok {
-		return cmdutil.UsageErrorf(o.Cmd, "all resources must be specified before environment changes: %s", strings.Join(args, " "))
-	}
-	if len(o.Filenames) == 0 && len(resources) < 1 {
-		return cmdutil.UsageErrorf(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
+		return fmt.Errorf("all resources must be specified before environment changes: %s", strings.Join(args, " "))
 	}
 
-	o.Mapper, _ = f.Object()
-	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
-	o.Encoder = f.JSONEncoder()
-	o.ContainerSelector = cmdutil.GetFlagString(cmd, "containers")
-	o.List = cmdutil.GetFlagBool(cmd, "list")
-	o.Resolve = cmdutil.GetFlagBool(cmd, "resolve")
-	o.Selector = cmdutil.GetFlagString(cmd, "selector")
-	o.All = cmdutil.GetFlagBool(cmd, "all")
-	o.Overwrite = cmdutil.GetFlagBool(cmd, "overwrite")
-	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.From = cmdutil.GetFlagString(cmd, "from")
-	o.Prefix = cmdutil.GetFlagString(cmd, "prefix")
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	o.PrintObject = f.PrintObject
+	o.updatePodSpecForObject = f.UpdatePodSpecForObject
+	o.output = cmdutil.GetFlagString(cmd, "output")
+	o.dryRun = cmdutil.GetDryRunFlag(cmd)
 
-	o.EnvArgs = envArgs
-	o.Resources = resources
-	o.Cmd = cmd
-
-	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-
-	if o.List && len(o.Output) > 0 {
-		return cmdutil.UsageErrorf(o.Cmd, "--list and --output may not be specified together")
+	if o.dryRun {
+		// TODO(juanvallejo): This can be cleaned up even further by creating
+		// a PrintFlags struct that binds the --dry-run flag, and whose
+		// ToPrinter method returns a printer that understands how to print
+		// this success message.
+		o.PrintFlags.Complete("%s (dry run)")
 	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = printer.PrintObj
+
+	o.clientset, err = f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	o.builder = f.NewBuilder
 
 	return nil
 }
 
+func (o *EnvOptions) Validate() error {
+	if len(o.Filenames) == 0 && len(o.resources) < 1 {
+		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
+	}
+	if o.List && len(o.output) > 0 {
+		return fmt.Errorf("--list and --output may not be specified together")
+	}
+	return nil
+}
+
 // RunEnv contains all the necessary functionality for the OpenShift cli env command
-func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
-	var kubeClient *kubernetes.Clientset
-	if o.List {
-		client, err := f.KubernetesClientSet()
-		if err != nil {
-			return err
-		}
-		kubeClient = client
-	}
-
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-
-	env, remove, err := envutil.ParseEnv(append(o.EnvParams, o.EnvArgs...), o.In)
+func (o *EnvOptions) RunEnv() error {
+	env, remove, err := envutil.ParseEnv(append(o.EnvParams, o.envArgs...), o.In)
 	if err != nil {
 		return err
 	}
 
 	if len(o.From) != 0 {
-		b := f.NewBuilder().
-			Internal().
+		b := o.builder().
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			LocalParam(o.Local).
 			ContinueOnError().
-			NamespaceParam(cmdNamespace).DefaultNamespace().
-			FilenameParam(enforceNamespace, &o.FilenameOptions).
+			NamespaceParam(o.namespace).DefaultNamespace().
+			FilenameParam(o.enforceNamespace, &o.FilenameOptions).
 			Flatten()
 
 		if !o.Local {
@@ -256,11 +262,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		for _, info := range infos {
-			versionedObject, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
-			if err != nil {
-				return err
-			}
-			switch from := versionedObject.(type) {
+			switch from := info.Object.(type) {
 			case *v1.Secret:
 				for key := range from.Data {
 					envVar := v1.EnvVar{
@@ -303,31 +305,30 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 	}
 
-	b := f.NewBuilder().
-		Internal().
+	b := o.builder().
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		NamespaceParam(o.namespace).DefaultNamespace().
+		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
 		Flatten()
 
 	if !o.Local {
 		b.LabelSelectorParam(o.Selector).
-			ResourceTypeOrNameArgs(o.All, o.Resources...).
+			ResourceTypeOrNameArgs(o.All, o.resources...).
 			Latest()
 	}
 
-	o.Infos, err = b.Do().Infos()
+	infos, err := b.Do().Infos()
 	if err != nil {
 		return err
 	}
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
-		info.Object = info.AsVersioned()
-		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
+	patches := CalculatePatches(infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+		_, err := o.updatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) == 0 {
-				fmt.Fprintf(o.Err, "warning: %s/%s does not have any containers matching %q\n", info.Mapping.Resource, info.Name, o.ContainerSelector)
+				fmt.Fprintf(o.ErrOut, "warning: %s/%s does not have any containers matching %q\n", info.Mapping.Resource, info.Name, o.ContainerSelector)
 				return nil
 			}
 			for _, c := range containers {
@@ -356,7 +357,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 							continue
 						}
 
-						value, err := envutil.GetEnvVarRefValue(kubeClient, cmdNamespace, store, env.ValueFrom, info.Object, c)
+						value, err := envutil.GetEnvVarRefValue(o.clientset, o.namespace, store, env.ValueFrom, info.Object, c)
 						// Print the resolved value
 						if err == nil {
 							fmt.Fprintf(o.Out, "%s=%s\n", env.Name, value)
@@ -378,7 +379,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 					}
 					sort.Strings(errs)
 					for _, err := range errs {
-						fmt.Fprintln(o.Err, err)
+						fmt.Fprintln(o.ErrOut, err)
 					}
 				}
 			}
@@ -389,7 +390,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		})
 
 		if err == nil {
-			return runtime.Encode(o.Encoder, info.Object)
+			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 		}
 		return nil, err
 	})
@@ -412,34 +413,28 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			continue
 		}
 
-		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
+		if o.Local || o.dryRun {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v\n", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
 		// make sure arguments to set or replace environment variables are set
 		// before returning a successful message
-		if len(env) == 0 && len(o.EnvArgs) == 0 {
+		if len(env) == 0 && len(o.envArgs) == 0 {
 			return fmt.Errorf("at least one environment variable must be provided")
 		}
 
-		if len(o.Output) > 0 {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
-				return err
-			}
-			continue
+		if err := o.PrintObj(actual, o.Out); err != nil {
+			return err
 		}
-
-		f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

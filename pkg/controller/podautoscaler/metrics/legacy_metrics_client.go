@@ -28,7 +28,6 @@ import (
 
 	autoscaling "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
-	clientgov1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
@@ -91,7 +90,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		podSum := int64(0)
 		missing := len(m.Containers) == 0
 		for _, c := range m.Containers {
-			resValue, found := c.Usage[clientgov1.ResourceName(resource)]
+			resValue, found := c.Usage[v1.ResourceName(resource)]
 			if !found {
 				missing = true
 				glog.V(2).Infof("missing resource metric %v for container %s in pod %s/%s", resource, c.Name, namespace, m.Name)
@@ -176,6 +175,10 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 
 func (h *HeapsterMetricsClient) GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (int64, time.Time, error) {
 	return 0, time.Time{}, fmt.Errorf("object metrics are not yet supported")
+}
+
+func (h *HeapsterMetricsClient) GetExternalMetric(metricName, namespace string, selector labels.Selector) ([]int64, time.Time, error) {
+	return nil, time.Time{}, fmt.Errorf("external metrics aren't supported")
 }
 
 func collapseTimeSamples(metrics heapster.MetricResult, duration time.Duration) (int64, time.Time, bool) {

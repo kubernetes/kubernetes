@@ -42,16 +42,18 @@ func TestValidateStorageClass(t *testing.T) {
 	successCases := []storage.StorageClass{
 		{
 			// empty parameters
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "kubernetes.io/foo-provisioner",
-			Parameters:    map[string]string{},
-			ReclaimPolicy: &deleteReclaimPolicy,
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "kubernetes.io/foo-provisioner",
+			Parameters:        map[string]string{},
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &immediateMode1,
 		},
 		{
 			// nil parameters
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "kubernetes.io/foo-provisioner",
-			ReclaimPolicy: &deleteReclaimPolicy,
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "kubernetes.io/foo-provisioner",
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &immediateMode1,
 		},
 		{
 			// some parameters
@@ -62,13 +64,15 @@ func TestValidateStorageClass(t *testing.T) {
 				"foo-parameter":               "free-form-string",
 				"foo-parameter2":              "{\"embedded\": \"json\", \"with\": {\"structures\":\"inside\"}}",
 			},
-			ReclaimPolicy: &deleteReclaimPolicy,
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &immediateMode1,
 		},
 		{
 			// retain reclaimPolicy
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "kubernetes.io/foo-provisioner",
-			ReclaimPolicy: &retainReclaimPolicy,
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "kubernetes.io/foo-provisioner",
+			ReclaimPolicy:     &retainReclaimPolicy,
+			VolumeBindingMode: &immediateMode1,
 		},
 	}
 
@@ -144,6 +148,7 @@ func TestAlphaExpandPersistentVolumesFeatureValidation(t *testing.T) {
 		Parameters:           map[string]string{},
 		ReclaimPolicy:        &deleteReclaimPolicy,
 		AllowVolumeExpansion: &falseVar,
+		VolumeBindingMode:    &immediateMode1,
 	}
 
 	// Enable alpha feature ExpandPersistentVolumes
@@ -462,6 +467,10 @@ func TestValidateVolumeBindingModeAlphaDisabled(t *testing.T) {
 		"invalid mode":   makeClassWithBinding(&invalidMode),
 	}
 
+	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
+	}
 	for testName, storageClass := range errorCases {
 		if errs := ValidateStorageClass(storageClass); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %v", testName)

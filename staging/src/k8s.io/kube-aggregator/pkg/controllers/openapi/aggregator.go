@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
 	"k8s.io/apiserver/pkg/server"
@@ -51,7 +51,8 @@ type specAggregator struct {
 	openAPISpecs map[string]*openAPISpecInfo
 
 	// provided for dynamic OpenAPI spec
-	openAPIService *handler.OpenAPIService
+	openAPIService          *handler.OpenAPIService
+	openAPIVersionedService *handler.OpenAPIService
 }
 
 var _ AggregationManager = &specAggregator{}
@@ -109,8 +110,16 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Install handler
+	// NOTE: [DEPRECATION] We will announce deprecation for format-separated endpoints for OpenAPI spec,
+	// and switch to a single /openapi/v2 endpoint in Kubernetes 1.10. The design doc and deprecation process
+	// are tracked at: https://docs.google.com/document/d/19lEqE9lc4yHJ3WJAJxS_G7TcORIJXGHyq3wpwcH28nU.
 	s.openAPIService, err = handler.RegisterOpenAPIService(
 		specToServe, "/swagger.json", pathHandler)
+	if err != nil {
+		return nil, err
+	}
+	s.openAPIVersionedService, err = handler.RegisterOpenAPIVersionedService(
+		specToServe, "/openapi/v2", pathHandler)
 	if err != nil {
 		return nil, err
 	}
@@ -207,14 +216,25 @@ func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err err
 
 // updateOpenAPISpec aggregates all OpenAPI specs.  It is not thread-safe. The caller is responsible to hold proper locks.
 func (s *specAggregator) updateOpenAPISpec() error {
-	if s.openAPIService == nil {
+	if s.openAPIService == nil || s.openAPIVersionedService == nil {
+		// openAPIVersionedService and deprecated openAPIService should be initialized together
+		if !(s.openAPIService == nil && s.openAPIVersionedService == nil) {
+			return fmt.Errorf("unexpected openapi service initialization error")
+		}
 		return nil
 	}
 	specToServe, err := s.buildOpenAPISpec()
 	if err != nil {
 		return err
 	}
-	return s.openAPIService.UpdateSpec(specToServe)
+	// openAPIService.UpdateSpec and openAPIVersionedService.UpdateSpec read the same swagger spec
+	// serially and update their local caches separately. Both endpoints will have same spec in
+	// their caches if the caller is holding proper locks.
+	err = s.openAPIService.UpdateSpec(specToServe)
+	if err != nil {
+		return err
+	}
+	return s.openAPIVersionedService.UpdateSpec(specToServe)
 }
 
 // tryUpdatingServiceSpecs tries updating openAPISpecs map with specified specInfo, and keeps the map intact

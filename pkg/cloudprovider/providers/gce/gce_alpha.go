@@ -18,8 +18,6 @@ package gce
 
 import (
 	"fmt"
-
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 const (
@@ -29,17 +27,8 @@ const (
 	// tier to use. Currently supports "Standard" and "Premium" (default).
 	AlphaFeatureNetworkTiers = "NetworkTiers"
 
-	AlphaFeatureGCEDisk = "DiskAlphaAPI"
-
 	AlphaFeatureNetworkEndpointGroup = "NetworkEndpointGroup"
 )
-
-// All known alpha features
-var knownAlphaFeatures = map[string]bool{
-	AlphaFeatureNetworkTiers:         true,
-	AlphaFeatureGCEDisk:              true,
-	AlphaFeatureNetworkEndpointGroup: true,
-}
 
 type AlphaFeatureGate struct {
 	features map[string]bool
@@ -49,17 +38,12 @@ func (af *AlphaFeatureGate) Enabled(key string) bool {
 	return af.features[key]
 }
 
-func NewAlphaFeatureGate(features []string) (*AlphaFeatureGate, error) {
-	errList := []error{}
+func NewAlphaFeatureGate(features []string) *AlphaFeatureGate {
 	featureMap := make(map[string]bool)
 	for _, name := range features {
-		if _, ok := knownAlphaFeatures[name]; !ok {
-			errList = append(errList, fmt.Errorf("alpha feature %q is not supported.", name))
-		} else {
-			featureMap[name] = true
-		}
+		featureMap[name] = true
 	}
-	return &AlphaFeatureGate{featureMap}, utilerrors.NewAggregate(errList)
+	return &AlphaFeatureGate{featureMap}
 }
 
 func (gce *GCECloud) alphaFeatureEnabled(feature string) error {

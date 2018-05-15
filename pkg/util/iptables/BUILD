@@ -75,7 +75,6 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/iptables",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/util/dbus:go_default_library",

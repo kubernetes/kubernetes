@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -122,7 +122,7 @@ message CarpSpec {
   map<string, string> nodeSelector = 7;
 
   // ServiceAccountName is the name of the ServiceAccount to use to run this carp.
-  // More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md
+  // More info: https://git.k8s.io/community/contributors/design-proposals/auth/service_accounts.md
   // +optional
   optional string serviceAccountName = 8;
 

@@ -29,7 +29,7 @@ import (
 type PriorityClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -39,6 +39,9 @@ type PriorityClass struct {
 
 	// globalDefault specifies whether this PriorityClass should be considered as
 	// the default priority for pods that do not have any priority class.
+	// Only one PriorityClass can be marked as `globalDefault`. However, if more than
+	// one PriorityClasses exists with their `globalDefault` field set to true,
+	// the smallest value of such global default PriorityClasses will be used as the default priority.
 	// +optional
 	GlobalDefault bool `json:"globalDefault,omitempty" protobuf:"bytes,3,opt,name=globalDefault"`
 
@@ -54,7 +57,7 @@ type PriorityClass struct {
 type PriorityClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

@@ -17,6 +17,7 @@ limitations under the License.
 package localsubjectaccessreview
 
 import (
+	"context"
 	"fmt"
 
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,11 +38,15 @@ func NewREST(authorizer authorizer.Authorizer) *REST {
 	return &REST{authorizer}
 }
 
+func (r *REST) NamespaceScoped() bool {
+	return true
+}
+
 func (r *REST) New() runtime.Object {
 	return &authorizationapi.LocalSubjectAccessReview{}
 }
 
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	localSubjectAccessReview, ok := obj.(*authorizationapi.LocalSubjectAccessReview)
 	if !ok {
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("not a LocaLocalSubjectAccessReview: %#v", obj))

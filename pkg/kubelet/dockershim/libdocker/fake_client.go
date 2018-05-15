@@ -61,6 +61,7 @@ type FakeDockerClient struct {
 	called               []calledDetail
 	pulled               []string
 	EnableTrace          bool
+	RandGenerator        *rand.Rand
 
 	// Created, Started, Stopped and Removed all contain container docker ID
 	Created []string
@@ -99,6 +100,7 @@ func NewFakeDockerClient() *FakeDockerClient {
 		EnableTrace:         true,
 		ImageInspects:       make(map[string]*dockertypes.ImageInspect),
 		ImageIDsNeedingAuth: make(map[string]dockertypes.AuthConfig),
+		RandGenerator:       rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -120,6 +122,13 @@ func (f *FakeDockerClient) WithTraceDisabled() *FakeDockerClient {
 	f.Lock()
 	defer f.Unlock()
 	f.EnableTrace = false
+	return f
+}
+
+func (f *FakeDockerClient) WithRandSource(source rand.Source) *FakeDockerClient {
+	f.Lock()
+	defer f.Unlock()
+	f.RandGenerator = rand.New(source)
 	return f
 }
 
@@ -597,7 +606,8 @@ func (f *FakeDockerClient) StartContainer(id string) error {
 	container.State.Running = true
 	container.State.Pid = os.Getpid()
 	container.State.StartedAt = dockerTimestampToString(timestamp)
-	container.NetworkSettings.IPAddress = "2.3.4.5"
+	r := f.RandGenerator.Uint32()
+	container.NetworkSettings.IPAddress = fmt.Sprintf("10.%d.%d.%d", byte(r>>16), byte(r>>8), byte(r))
 	f.ContainerMap[id] = container
 	f.updateContainerStatus(id, StatusRunningPrefix)
 	f.normalSleep(200, 50, 50)

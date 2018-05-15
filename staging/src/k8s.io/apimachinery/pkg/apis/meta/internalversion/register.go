@@ -18,7 +18,7 @@ package internalversion
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -79,16 +79,16 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&metav1.DeleteOptions{},
 	)
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&metav1alpha1.Table{},
-		&metav1alpha1.TableOptions{},
-		&metav1alpha1.PartialObjectMetadata{},
-		&metav1alpha1.PartialObjectMetadataList{},
+		&metav1beta1.Table{},
+		&metav1beta1.TableOptions{},
+		&metav1beta1.PartialObjectMetadata{},
+		&metav1beta1.PartialObjectMetadataList{},
 	)
-	scheme.AddKnownTypes(metav1alpha1.SchemeGroupVersion,
-		&metav1alpha1.Table{},
-		&metav1alpha1.TableOptions{},
-		&metav1alpha1.PartialObjectMetadata{},
-		&metav1alpha1.PartialObjectMetadataList{},
+	scheme.AddKnownTypes(metav1beta1.SchemeGroupVersion,
+		&metav1beta1.Table{},
+		&metav1beta1.TableOptions{},
+		&metav1beta1.PartialObjectMetadata{},
+		&metav1beta1.PartialObjectMetadataList{},
 	)
 	// Allow delete options to be decoded across all version in this scheme (we may want to be more clever than this)
 	scheme.AddUnversionedTypes(SchemeGroupVersion, &metav1.DeleteOptions{})

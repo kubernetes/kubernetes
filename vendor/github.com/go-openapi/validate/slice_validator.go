@@ -67,6 +67,9 @@ func (s *schemaSliceValidator) Validate(data interface{}) *Result {
 		itemsSize = int64(len(s.Items.Schemas))
 		for i := int64(0); i < itemsSize; i++ {
 			validator := NewSchemaValidator(&s.Items.Schemas[i], s.Root, fmt.Sprintf("%s.%d", s.Path, i), s.KnownFormats)
+			if val.Len() <= int(i) {
+				break
+			}
 			result.Merge(validator.Validate(val.Index(int(i)).Interface()))
 		}
 

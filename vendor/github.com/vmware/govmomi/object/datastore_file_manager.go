@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2017-2018 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/vmware/govmomi/vim25/progress"
 	"github.com/vmware/govmomi/vim25/soap"
 )
 
@@ -36,7 +37,8 @@ type DatastoreFileManager struct {
 	FileManager        *FileManager
 	VirtualDiskManager *VirtualDiskManager
 
-	Force bool
+	Force            bool
+	DatacenterTarget *Datacenter
 }
 
 // NewFileManager creates a new instance of DatastoreFileManager
@@ -49,9 +51,23 @@ func (d Datastore) NewFileManager(dc *Datacenter, force bool) *DatastoreFileMana
 		FileManager:        NewFileManager(c),
 		VirtualDiskManager: NewVirtualDiskManager(c),
 		Force:              force,
+		DatacenterTarget:   dc,
 	}
 
 	return m
+}
+
+func (m *DatastoreFileManager) WithProgress(ctx context.Context, s progress.Sinker) context.Context {
+	return context.WithValue(ctx, m, s)
+}
+
+func (m *DatastoreFileManager) wait(ctx context.Context, task *Task) error {
+	var logger progress.Sinker
+	if s, ok := ctx.Value(m).(progress.Sinker); ok {
+		logger = s
+	}
+	_, err := task.WaitForResult(ctx, logger)
+	return err
 }
 
 // Delete dispatches to the appropriate Delete method based on file name extension
@@ -73,7 +89,7 @@ func (m *DatastoreFileManager) DeleteFile(ctx context.Context, name string) erro
 		return err
 	}
 
-	return task.Wait(ctx)
+	return m.wait(ctx, task)
 }
 
 // DeleteVirtualDisk calls VirtualDiskManager.DeleteVirtualDisk
@@ -94,7 +110,74 @@ func (m *DatastoreFileManager) DeleteVirtualDisk(ctx context.Context, name strin
 		return err
 	}
 
-	return task.Wait(ctx)
+	return m.wait(ctx, task)
+}
+
+// CopyFile calls FileManager.CopyDatastoreFile
+func (m *DatastoreFileManager) CopyFile(ctx context.Context, src string, dst string) error {
+	srcp := m.Path(src)
+	dstp := m.Path(dst)
+
+	task, err := m.FileManager.CopyDatastoreFile(ctx, srcp.String(), m.Datacenter, dstp.String(), m.DatacenterTarget, m.Force)
+	if err != nil {
+		return err
+	}
+
+	return m.wait(ctx, task)
+}
+
+// Copy dispatches to the appropriate FileManager or VirtualDiskManager Copy method based on file name extension
+func (m *DatastoreFileManager) Copy(ctx context.Context, src string, dst string) error {
+	srcp := m.Path(src)
+	dstp := m.Path(dst)
+
+	f := m.FileManager.CopyDatastoreFile
+
+	if srcp.IsVMDK() {
+		// types.VirtualDiskSpec=nil as it is not implemented by vCenter
+		f = func(ctx context.Context, src string, srcDC *Datacenter, dst string, dstDC *Datacenter, force bool) (*Task, error) {
+			return m.VirtualDiskManager.CopyVirtualDisk(ctx, src, srcDC, dst, dstDC, nil, force)
+		}
+	}
+
+	task, err := f(ctx, srcp.String(), m.Datacenter, dstp.String(), m.DatacenterTarget, m.Force)
+	if err != nil {
+		return err
+	}
+
+	return m.wait(ctx, task)
+}
+
+// MoveFile calls FileManager.MoveDatastoreFile
+func (m *DatastoreFileManager) MoveFile(ctx context.Context, src string, dst string) error {
+	srcp := m.Path(src)
+	dstp := m.Path(dst)
+
+	task, err := m.FileManager.MoveDatastoreFile(ctx, srcp.String(), m.Datacenter, dstp.String(), m.DatacenterTarget, m.Force)
+	if err != nil {
+		return err
+	}
+
+	return m.wait(ctx, task)
+}
+
+// Move dispatches to the appropriate FileManager or VirtualDiskManager Move method based on file name extension
+func (m *DatastoreFileManager) Move(ctx context.Context, src string, dst string) error {
+	srcp := m.Path(src)
+	dstp := m.Path(dst)
+
+	f := m.FileManager.MoveDatastoreFile
+
+	if srcp.IsVMDK() {
+		f = m.VirtualDiskManager.MoveVirtualDisk
+	}
+
+	task, err := f(ctx, srcp.String(), m.Datacenter, dstp.String(), m.DatacenterTarget, m.Force)
+	if err != nil {
+		return err
+	}
+
+	return m.wait(ctx, task)
 }
 
 // Path converts path name to a DatastorePath

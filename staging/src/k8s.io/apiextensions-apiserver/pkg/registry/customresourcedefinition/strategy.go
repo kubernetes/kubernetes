@@ -17,6 +17,7 @@ limitations under the License.
 package customresourcedefinition
 
 import (
+	"context"
 	"fmt"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -24,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -35,6 +35,7 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
+// strategy implements behavior for CustomResources.
 type strategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
@@ -48,7 +49,8 @@ func (strategy) NamespaceScoped() bool {
 	return false
 }
 
-func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+// PrepareForCreate clears the status of a CustomResourceDefinition before creation.
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	crd := obj.(*apiextensions.CustomResourceDefinition)
 	crd.Status = apiextensions.CustomResourceDefinitionStatus{}
 	crd.Generation = 1
@@ -57,9 +59,13 @@ func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Obje
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
 		crd.Spec.Validation = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
+		crd.Spec.Subresources = nil
+	}
 }
 
-func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newCRD := obj.(*apiextensions.CustomResourceDefinition)
 	oldCRD := old.(*apiextensions.CustomResourceDefinition)
 	newCRD.Status = oldCRD.Status
@@ -80,24 +86,34 @@ func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime
 		newCRD.Spec.Validation = nil
 		oldCRD.Spec.Validation = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
+		newCRD.Spec.Subresources = nil
+		oldCRD.Spec.Subresources = nil
+	}
 }
 
-func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+// Validate validates a new CustomResourceDefinition.
+func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return validation.ValidateCustomResourceDefinition(obj.(*apiextensions.CustomResourceDefinition))
 }
 
+// AllowCreateOnUpdate is false for CustomResourceDefinition; this means a POST is
+// needed to create one.
 func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+// AllowUnconditionalUpdate is the default update policy for CustomResourceDefinition objects.
 func (strategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
+// Canonicalize normalizes the object after validation.
 func (strategy) Canonicalize(obj runtime.Object) {
 }
 
-func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+// ValidateUpdate is the default update validation for an end user updating status.
+func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
 }
 
@@ -114,7 +130,7 @@ func (statusStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (statusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newObj := obj.(*apiextensions.CustomResourceDefinition)
 	oldObj := old.(*apiextensions.CustomResourceDefinition)
 	newObj.Spec = oldObj.Spec
@@ -139,14 +155,15 @@ func (statusStrategy) AllowUnconditionalUpdate() bool {
 func (statusStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (statusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateUpdateCustomResourceDefinitionStatus(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	apiserver, ok := obj.(*apiextensions.CustomResourceDefinition)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a CustomResourceDefinition.")
+		return nil, nil, false, fmt.Errorf("given object is not a CustomResourceDefinition")
 	}
 	return labels.Set(apiserver.ObjectMeta.Labels), CustomResourceDefinitionToSelectableFields(apiserver), apiserver.Initializers != nil, nil
 }

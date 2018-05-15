@@ -33,11 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-const (
-	cannotHaveStepsAfterError                = "Cannot have steps after %v.  %v are remaining"
-	additionStepRequiredUnlessUnsettingError = "Must have additional steps after %v unless you are unsetting it"
-)
-
 type setOptions struct {
 	configAccess  clientcmd.ConfigAccess
 	propertyName  string
@@ -56,7 +51,8 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 	options := &setOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:   "set PROPERTY_NAME PROPERTY_VALUE",
+		Use: "set PROPERTY_NAME PROPERTY_VALUE",
+		DisableFlagsInUseLine: true,
 		Short: i18n.T("Sets an individual value in a kubeconfig file"),
 		Long:  set_long,
 		Run: func(cmd *cobra.Command, args []string) {

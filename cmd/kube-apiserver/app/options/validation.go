@@ -18,6 +18,10 @@ package options
 
 import (
 	"fmt"
+
+	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -46,34 +50,41 @@ func validateServiceNodePort(options *ServerRunOptions) []error {
 }
 
 // Validate checks ServerRunOptions and return a slice of found errors.
-func (options *ServerRunOptions) Validate() []error {
+func (s *ServerRunOptions) Validate() []error {
 	var errors []error
-	if errs := options.Etcd.Validate(); len(errs) > 0 {
+	if errs := s.Etcd.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	if errs := validateClusterIPFlags(options); len(errs) > 0 {
+	if errs := validateClusterIPFlags(s); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	if errs := validateServiceNodePort(options); len(errs) > 0 {
+	if errs := validateServiceNodePort(s); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	if errs := options.SecureServing.Validate(); len(errs) > 0 {
+	if errs := s.SecureServing.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	if errs := options.Authentication.Validate(); len(errs) > 0 {
+	if errs := s.Authentication.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	if errs := options.Audit.Validate(); len(errs) > 0 {
+	if errs := s.Authorization.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	if errs := options.Admission.Validate(); len(errs) > 0 {
+	if errs := s.Audit.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	if errs := options.InsecureServing.Validate("insecure-port"); len(errs) > 0 {
+	if errs := s.Admission.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	if options.MasterCount <= 0 {
-		errors = append(errors, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", options.MasterCount))
+	if errs := s.InsecureServing.Validate(); len(errs) > 0 {
+		errors = append(errors, errs...)
 	}
+	if s.MasterCount <= 0 {
+		errors = append(errors, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
+	}
+	if errs := s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
+
 	return errors
 }

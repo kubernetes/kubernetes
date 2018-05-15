@@ -18,7 +18,7 @@ package selinux
 
 import (
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"testing"
 )
 
@@ -27,14 +27,14 @@ func TestRunAsAnyOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewRunAsAny %v", err)
 	}
-	_, err = NewRunAsAny(&extensions.SELinuxStrategyOptions{})
+	_, err = NewRunAsAny(&policy.SELinuxStrategyOptions{})
 	if err != nil {
 		t.Errorf("unexpected error initializing NewRunAsAny %v", err)
 	}
 }
 
 func TestRunAsAnyGenerate(t *testing.T) {
-	s, err := NewRunAsAny(&extensions.SELinuxStrategyOptions{})
+	s, err := NewRunAsAny(&policy.SELinuxStrategyOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewRunAsAny %v", err)
 	}
@@ -48,7 +48,7 @@ func TestRunAsAnyGenerate(t *testing.T) {
 }
 
 func TestRunAsAnyValidate(t *testing.T) {
-	s, err := NewRunAsAny(&extensions.SELinuxStrategyOptions{
+	s, err := NewRunAsAny(&policy.SELinuxStrategyOptions{
 		SELinuxOptions: &api.SELinuxOptions{
 			Level: "foo",
 		},
@@ -61,7 +61,7 @@ func TestRunAsAnyValidate(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("unexpected errors validating with ")
 	}
-	s, err = NewRunAsAny(&extensions.SELinuxStrategyOptions{})
+	s, err = NewRunAsAny(&policy.SELinuxStrategyOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewRunAsAny %v", err)
 	}

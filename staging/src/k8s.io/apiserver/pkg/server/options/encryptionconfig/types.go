@@ -81,6 +81,6 @@ type KMSConfig struct {
 	// cacheSize is the maximum number of secrets which are cached in memory. The default value is 1000.
 	// +optional
 	CacheSize int `json:"cachesize,omitempty"`
-	// configfile is the path to the configuration file for the named KMS provider.
-	ConfigFile string `json:"configfile"`
+	// the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
+	Endpoint string `json:"endpoint"`
 }

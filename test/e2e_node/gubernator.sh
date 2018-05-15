@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -22,7 +22,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source cluster/lib/logging.sh
+source hack/lib/logging.sh
 
 
 if [[ $# -eq 0 || ! $1 =~ ^[Yy]$ ]]; then

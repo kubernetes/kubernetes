@@ -133,7 +133,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 
 	// kubectl create -f deploy.yaml
 	deploymentName := "sample-apiserver-deployment"
-	etcdImage := "quay.io/coreos/etcd:v3.1.10"
+	etcdImage := "quay.io/coreos/etcd:v3.2.18"
 	podLabels := map[string]string{"app": "sample-apiserver", "apiserver": "true"}
 	replicas := int32(1)
 	zero := int64(0)
@@ -291,6 +291,13 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	})
 	framework.ExpectNoError(err, "creating role binding %s:sample-apiserver to access configMap", namespace)
 
+	// Wait for the extension apiserver to be up and healthy
+	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
+	// NOTE: aggregated apis should generally be set up in there own namespace (<aggregated-api-namespace>). As the test framework
+	// is setting up a new namespace, we are just using that.
+	err = framework.WaitForDeploymentComplete(client, deployment)
+	framework.ExpectNoError(err, "deploying extension apiserver in namespace %s", namespace)
+
 	// kubectl create -f apiservice.yaml
 	_, err = aggrclient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.k8s.io"},
@@ -308,13 +315,6 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	})
 	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", "v1alpha1.wardle.k8s.io", namespace)
 
-	// Wait for the extension apiserver to be up and healthy
-	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
-	// NOTE: aggregated apis should generally be set up in there own namespace (<aggregated-api-namespace>). As the test framework
-	// is setting up a new namespace, we are just using that.
-	err = framework.WaitForDeploymentComplete(client, deployment)
-
-	// We seem to need to do additional waiting until the extension api service is actually up.
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		request := restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders")
 		request.SetHeader("Accept", "application/json")
@@ -323,6 +323,9 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			status, ok := err.(*apierrs.StatusError)
 			if !ok {
 				return false, err
+			}
+			if status.Status().Code == 503 {
+				return false, nil
 			}
 			if status.Status().Code == 404 && strings.HasPrefix(err.Error(), "the server could not find the requested resource") {
 				return false, nil
@@ -379,19 +382,15 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	flunderName = generateFlunderName("dynamic-flunder")
 
 	// Rerun the Create/List/Delete tests using the Dynamic client.
-	resources, err := client.Discovery().ServerPreferredNamespacedResources()
-	framework.ExpectNoError(err, "getting server preferred namespaces resources for dynamic client")
+	resources, discoveryErr := client.Discovery().ServerPreferredNamespacedResources()
 	groupVersionResources, err := discovery.GroupVersionResources(resources)
 	framework.ExpectNoError(err, "getting group version resources for dynamic client")
 	gvr := schema.GroupVersionResource{Group: "wardle.k8s.io", Version: "v1alpha1", Resource: "flunders"}
 	_, ok := groupVersionResources[gvr]
 	if !ok {
-		framework.Failf("could not find group version resource for dynamic client and wardle/flunders.")
+		framework.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
 	}
-	clientPool := f.ClientPool
-	dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
-	framework.ExpectNoError(err, "getting group version resources for dynamic client")
-	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
+	dynamicClient := f.DynamicClient.Resource(gvr).Namespace(namespace)
 
 	// kubectl create -f flunders-1.yaml
 	// Request Body: {"apiVersion":"wardle.k8s.io/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}
@@ -408,27 +407,23 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	unstruct := &unstructuredv1.Unstructured{}
 	err = unstruct.UnmarshalJSON(jsonFlunder)
 	framework.ExpectNoError(err, "unmarshalling test-flunder as unstructured for create using dynamic client")
-	unstruct, err = dynamicClient.Resource(&apiResource, namespace).Create(unstruct)
+	unstruct, err = dynamicClient.Create(unstruct)
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 
 	// kubectl get flunders
-	obj, err := dynamicClient.Resource(&apiResource, namespace).List(metav1.ListOptions{})
+	unstructuredList, err := dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
-	unstructuredList, ok := obj.(*unstructuredv1.UnstructuredList)
-	validateErrorWithDebugInfo(f, err, pods, "casting flunders list(%T) as unstructuredList using dynamic client", obj)
 	if len(unstructuredList.Items) != 1 {
 		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	// kubectl delete flunder test-flunder
-	err = dynamicClient.Resource(&apiResource, namespace).Delete(flunderName, &metav1.DeleteOptions{})
+	err = dynamicClient.Delete(flunderName, &metav1.DeleteOptions{})
 	validateErrorWithDebugInfo(f, err, pods, "deleting flunders(%v) using dynamic client", unstructuredList.Items)
 
 	// kubectl get flunders
-	obj, err = dynamicClient.Resource(&apiResource, namespace).List(metav1.ListOptions{})
+	unstructuredList, err = dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
-	unstructuredList, ok = obj.(*unstructuredv1.UnstructuredList)
-	validateErrorWithDebugInfo(f, err, pods, "casting flunders list(%T) as unstructuredList using dynamic client", obj)
 	if len(unstructuredList.Items) != 0 {
 		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}

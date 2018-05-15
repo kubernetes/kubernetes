@@ -126,7 +126,7 @@ func Add(a api.ResourceList, b api.ResourceList) api.ResourceList {
 	return result
 }
 
-// SubtractWithNonNegativeResult - substracts and returns result of a - b but
+// SubtractWithNonNegativeResult - subtracts and returns result of a - b but
 // makes sure we don't return negative values to prevent negative resource usage.
 func SubtractWithNonNegativeResult(a api.ResourceList, b api.ResourceList) api.ResourceList {
 	zero := resource.MustParse("0")
@@ -263,7 +263,7 @@ func CalculateUsage(namespaceName string, scopes []api.ResourceQuotaScope, hardL
 	for _, evaluator := range evaluators {
 		potentialResources = append(potentialResources, evaluator.MatchingResources(hardResources)...)
 	}
-	// NOTE: the intersection just removes duplicates since the evaluator match intersects wtih hard
+	// NOTE: the intersection just removes duplicates since the evaluator match intersects with hard
 	matchedResources := Intersection(hardResources, potentialResources)
 
 	// sum the observed usage from each evaluator

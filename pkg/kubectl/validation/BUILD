@@ -18,7 +18,6 @@ go_test(
         ":testdata",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/validation",
 )
 
 go_library(

@@ -34,23 +34,27 @@ import (
 // Returns false if the value is missing.
 // No error is returned for a nil field.
 func NestedFieldCopy(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return nil, found, err
 	}
 	return runtime.DeepCopyJSONValue(val), true, nil
 }
 
-func nestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
+// NestedFieldNoCopy returns a reference to a nested field.
+// Returns false if value is not found and an error if unable
+// to traverse obj.
+func NestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{}, bool, error) {
 	var val interface{} = obj
-	for _, field := range fields {
+
+	for i, field := range fields {
 		if m, ok := val.(map[string]interface{}); ok {
 			val, ok = m[field]
 			if !ok {
 				return nil, false, nil
 			}
 		} else {
-			return nil, false, fmt.Errorf("%v is of the type %T, expected map[string]interface{}", val, val)
+			return nil, false, fmt.Errorf("%v accessor error: %v is of the type %T, expected map[string]interface{}", jsonPath(fields[:i+1]), val, val)
 		}
 	}
 	return val, true, nil
@@ -59,13 +63,13 @@ func nestedFieldNoCopy(obj map[string]interface{}, fields ...string) (interface{
 // NestedString returns the string value of a nested field.
 // Returns false if value is not found and an error if not a string.
 func NestedString(obj map[string]interface{}, fields ...string) (string, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return "", found, err
 	}
 	s, ok := val.(string)
 	if !ok {
-		return "", false, fmt.Errorf("%v is of the type %T, expected string", val, val)
+		return "", false, fmt.Errorf("%v accessor error: %v is of the type %T, expected string", jsonPath(fields), val, val)
 	}
 	return s, true, nil
 }
@@ -73,13 +77,13 @@ func NestedString(obj map[string]interface{}, fields ...string) (string, bool, e
 // NestedBool returns the bool value of a nested field.
 // Returns false if value is not found and an error if not a bool.
 func NestedBool(obj map[string]interface{}, fields ...string) (bool, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return false, found, err
 	}
 	b, ok := val.(bool)
 	if !ok {
-		return false, false, fmt.Errorf("%v is of the type %T, expected bool", val, val)
+		return false, false, fmt.Errorf("%v accessor error: %v is of the type %T, expected bool", jsonPath(fields), val, val)
 	}
 	return b, true, nil
 }
@@ -87,13 +91,13 @@ func NestedBool(obj map[string]interface{}, fields ...string) (bool, bool, error
 // NestedFloat64 returns the float64 value of a nested field.
 // Returns false if value is not found and an error if not a float64.
 func NestedFloat64(obj map[string]interface{}, fields ...string) (float64, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return 0, found, err
 	}
 	f, ok := val.(float64)
 	if !ok {
-		return 0, false, fmt.Errorf("%v is of the type %T, expected float64", val, val)
+		return 0, false, fmt.Errorf("%v accessor error: %v is of the type %T, expected float64", jsonPath(fields), val, val)
 	}
 	return f, true, nil
 }
@@ -101,13 +105,13 @@ func NestedFloat64(obj map[string]interface{}, fields ...string) (float64, bool,
 // NestedInt64 returns the int64 value of a nested field.
 // Returns false if value is not found and an error if not an int64.
 func NestedInt64(obj map[string]interface{}, fields ...string) (int64, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return 0, found, err
 	}
 	i, ok := val.(int64)
 	if !ok {
-		return 0, false, fmt.Errorf("%v is of the type %T, expected int64", val, val)
+		return 0, false, fmt.Errorf("%v accessor error: %v is of the type %T, expected int64", jsonPath(fields), val, val)
 	}
 	return i, true, nil
 }
@@ -115,20 +119,20 @@ func NestedInt64(obj map[string]interface{}, fields ...string) (int64, bool, err
 // NestedStringSlice returns a copy of []string value of a nested field.
 // Returns false if value is not found and an error if not a []interface{} or contains non-string items in the slice.
 func NestedStringSlice(obj map[string]interface{}, fields ...string) ([]string, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return nil, found, err
 	}
 	m, ok := val.([]interface{})
 	if !ok {
-		return nil, false, fmt.Errorf("%v is of the type %T, expected []interface{}", val, val)
+		return nil, false, fmt.Errorf("%v accessor error: %v is of the type %T, expected []interface{}", jsonPath(fields), val, val)
 	}
 	strSlice := make([]string, 0, len(m))
 	for _, v := range m {
 		if str, ok := v.(string); ok {
 			strSlice = append(strSlice, str)
 		} else {
-			return nil, false, fmt.Errorf("contains non-string key in the slice: %v is of the type %T, expected string", v, v)
+			return nil, false, fmt.Errorf("%v accessor error: contains non-string key in the slice: %v is of the type %T, expected string", jsonPath(fields), v, v)
 		}
 	}
 	return strSlice, true, nil
@@ -137,13 +141,13 @@ func NestedStringSlice(obj map[string]interface{}, fields ...string) ([]string, 
 // NestedSlice returns a deep copy of []interface{} value of a nested field.
 // Returns false if value is not found and an error if not a []interface{}.
 func NestedSlice(obj map[string]interface{}, fields ...string) ([]interface{}, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return nil, found, err
 	}
 	_, ok := val.([]interface{})
 	if !ok {
-		return nil, false, fmt.Errorf("%v is of the type %T, expected []interface{}", val, val)
+		return nil, false, fmt.Errorf("%v accessor error: %v is of the type %T, expected []interface{}", jsonPath(fields), val, val)
 	}
 	return runtime.DeepCopyJSONValue(val).([]interface{}), true, nil
 }
@@ -160,7 +164,7 @@ func NestedStringMap(obj map[string]interface{}, fields ...string) (map[string]s
 		if str, ok := v.(string); ok {
 			strMap[k] = str
 		} else {
-			return nil, false, fmt.Errorf("contains non-string key in the map: %v is of the type %T, expected string", v, v)
+			return nil, false, fmt.Errorf("%v accessor error: contains non-string key in the map: %v is of the type %T, expected string", jsonPath(fields), v, v)
 		}
 	}
 	return strMap, true, nil
@@ -179,31 +183,32 @@ func NestedMap(obj map[string]interface{}, fields ...string) (map[string]interfa
 // nestedMapNoCopy returns a map[string]interface{} value of a nested field.
 // Returns false if value is not found and an error if not a map[string]interface{}.
 func nestedMapNoCopy(obj map[string]interface{}, fields ...string) (map[string]interface{}, bool, error) {
-	val, found, err := nestedFieldNoCopy(obj, fields...)
+	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return nil, found, err
 	}
 	m, ok := val.(map[string]interface{})
 	if !ok {
-		return nil, false, fmt.Errorf("%v is of the type %T, expected map[string]interface{}", val, val)
+		return nil, false, fmt.Errorf("%v accessor error: %v is of the type %T, expected map[string]interface{}", jsonPath(fields), val, val)
 	}
 	return m, true, nil
 }
 
 // SetNestedField sets the value of a nested field to a deep copy of the value provided.
-// Returns false if value cannot be set because one of the nesting levels is not a map[string]interface{}.
-func SetNestedField(obj map[string]interface{}, value interface{}, fields ...string) bool {
+// Returns an error if value cannot be set because one of the nesting levels is not a map[string]interface{}.
+func SetNestedField(obj map[string]interface{}, value interface{}, fields ...string) error {
 	return setNestedFieldNoCopy(obj, runtime.DeepCopyJSONValue(value), fields...)
 }
 
-func setNestedFieldNoCopy(obj map[string]interface{}, value interface{}, fields ...string) bool {
+func setNestedFieldNoCopy(obj map[string]interface{}, value interface{}, fields ...string) error {
 	m := obj
-	for _, field := range fields[:len(fields)-1] {
+
+	for i, field := range fields[:len(fields)-1] {
 		if val, ok := m[field]; ok {
 			if valMap, ok := val.(map[string]interface{}); ok {
 				m = valMap
 			} else {
-				return false
+				return fmt.Errorf("value cannot be set because %v is not a map[string]interface{}", jsonPath(fields[:i+1]))
 			}
 		} else {
 			newVal := make(map[string]interface{})
@@ -212,12 +217,12 @@ func setNestedFieldNoCopy(obj map[string]interface{}, value interface{}, fields 
 		}
 	}
 	m[fields[len(fields)-1]] = value
-	return true
+	return nil
 }
 
 // SetNestedStringSlice sets the string slice value of a nested field.
-// Returns false if value cannot be set because one of the nesting levels is not a map[string]interface{}.
-func SetNestedStringSlice(obj map[string]interface{}, value []string, fields ...string) bool {
+// Returns an error if value cannot be set because one of the nesting levels is not a map[string]interface{}.
+func SetNestedStringSlice(obj map[string]interface{}, value []string, fields ...string) error {
 	m := make([]interface{}, 0, len(value)) // convert []string into []interface{}
 	for _, v := range value {
 		m = append(m, v)
@@ -226,14 +231,14 @@ func SetNestedStringSlice(obj map[string]interface{}, value []string, fields ...
 }
 
 // SetNestedSlice sets the slice value of a nested field.
-// Returns false if value cannot be set because one of the nesting levels is not a map[string]interface{}.
-func SetNestedSlice(obj map[string]interface{}, value []interface{}, fields ...string) bool {
+// Returns an error if value cannot be set because one of the nesting levels is not a map[string]interface{}.
+func SetNestedSlice(obj map[string]interface{}, value []interface{}, fields ...string) error {
 	return SetNestedField(obj, value, fields...)
 }
 
 // SetNestedStringMap sets the map[string]string value of a nested field.
-// Returns false if value cannot be set because one of the nesting levels is not a map[string]interface{}.
-func SetNestedStringMap(obj map[string]interface{}, value map[string]string, fields ...string) bool {
+// Returns an error if value cannot be set because one of the nesting levels is not a map[string]interface{}.
+func SetNestedStringMap(obj map[string]interface{}, value map[string]string, fields ...string) error {
 	m := make(map[string]interface{}, len(value)) // convert map[string]string into map[string]interface{}
 	for k, v := range value {
 		m[k] = v
@@ -242,8 +247,8 @@ func SetNestedStringMap(obj map[string]interface{}, value map[string]string, fie
 }
 
 // SetNestedMap sets the map[string]interface{} value of a nested field.
-// Returns false if value cannot be set because one of the nesting levels is not a map[string]interface{}.
-func SetNestedMap(obj map[string]interface{}, value map[string]interface{}, fields ...string) bool {
+// Returns an error if value cannot be set because one of the nesting levels is not a map[string]interface{}.
+func SetNestedMap(obj map[string]interface{}, value map[string]interface{}, fields ...string) error {
 	return SetNestedField(obj, value, fields...)
 }
 
@@ -266,6 +271,10 @@ func getNestedString(obj map[string]interface{}, fields ...string) string {
 		return ""
 	}
 	return val
+}
+
+func jsonPath(fields []string) string {
+	return "." + strings.Join(fields, ".")
 }
 
 func extractOwnerReference(v map[string]interface{}) metav1.OwnerReference {
@@ -425,6 +434,21 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 		list.Items = append(list.Items, *unstruct)
 	}
 	return nil
+}
+
+type JSONFallbackEncoder struct {
+	runtime.Encoder
+}
+
+func (c JSONFallbackEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	err := c.Encoder.Encode(obj, w)
+	if runtime.IsNotRegisteredError(err) {
+		switch obj.(type) {
+		case *Unstructured, *UnstructuredList:
+			return UnstructuredJSONScheme.Encode(obj, w)
+		}
+	}
+	return err
 }
 
 // UnstructuredObjectConverter is an ObjectConverter for use with

@@ -62,12 +62,31 @@ func TestValidatePolicy(t *testing.T) {
 			expected: nil,
 		},
 		{
+			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", PreemptVerb: "preempt"}}},
+			expected: nil,
+		},
+		{
 			policy: api.Policy{
 				ExtenderConfigs: []api.ExtenderConfig{
 					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind"},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind"},
 				}},
 			expected: errors.New("Only one extender can implement bind, found 2"),
+		},
+		{
+			policy: api.Policy{
+				ExtenderConfigs: []api.ExtenderConfig{
+					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []api.ExtenderManagedResource{{Name: "foo.com/bar"}}},
+					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind", ManagedResources: []api.ExtenderManagedResource{{Name: "foo.com/bar"}}},
+				}},
+			expected: errors.New("Duplicate extender managed resource name foo.com/bar"),
+		},
+		{
+			policy: api.Policy{
+				ExtenderConfigs: []api.ExtenderConfig{
+					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []api.ExtenderManagedResource{{Name: "kubernetes.io/foo"}}},
+				}},
+			expected: errors.New("kubernetes.io/foo is an invalid extended resource name"),
 		},
 	}
 

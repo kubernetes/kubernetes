@@ -30,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
@@ -89,7 +90,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 		mediaType += ";stream=watch"
 	}
 
-	ctx := scope.ContextFunc(req)
+	ctx := req.Context()
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
 		scope.err(fmt.Errorf("missing requestInfo"), w, req)
@@ -140,6 +141,10 @@ type WatchServer struct {
 // ServeHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked
 // or over a websocket connection.
 func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	kind := s.Scope.Kind
+	metrics.RegisteredWatchers.WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
+	defer metrics.RegisteredWatchers.WithLabelValues(kind.Group, kind.Version, kind.Kind).Dec()
+
 	w = httplog.Unlogged(w)
 
 	if wsstream.IsWebSocketRequest(req) {

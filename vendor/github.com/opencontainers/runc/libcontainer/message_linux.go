@@ -18,6 +18,8 @@ const (
 	SetgroupAttr    uint16 = 27285
 	OomScoreAdjAttr uint16 = 27286
 	RootlessAttr    uint16 = 27287
+	UidmapPathAttr  uint16 = 27288
+	GidmapPathAttr  uint16 = 27289
 )
 
 type Int32msg struct {
@@ -75,13 +77,13 @@ func (msg *Boolmsg) Serialize() []byte {
 	native.PutUint16(buf[0:2], uint16(msg.Len()))
 	native.PutUint16(buf[2:4], msg.Type)
 	if msg.Value {
-		buf[4] = 1
+		native.PutUint32(buf[4:8], uint32(1))
 	} else {
-		buf[4] = 0
+		native.PutUint32(buf[4:8], uint32(0))
 	}
 	return buf
 }
 
 func (msg *Boolmsg) Len() int {
-	return unix.NLA_HDRLEN + 1
+	return unix.NLA_HDRLEN + 4 // alignment
 }

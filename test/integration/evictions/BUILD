@@ -12,7 +12,6 @@ go_test(
         "evictions_test.go",
         "main_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/evictions",
     tags = ["integration"],
     deps = [
         "//pkg/controller/disruption:go_default_library",

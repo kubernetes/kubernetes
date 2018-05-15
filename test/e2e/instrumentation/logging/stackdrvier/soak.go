@@ -49,7 +49,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 			maxPodCount := 10
 			jobDuration := 30 * time.Minute
 			linesPerPodPerSecond := 100
-			// TODO(crassirostris): Increase to 21 hrs
+			// TODO(instrumentation): Increase to 21 hrs
 			testDuration := 3 * time.Hour
 			ingestionInterval := 1 * time.Minute
 			ingestionTimeout := testDuration + 30*time.Minute

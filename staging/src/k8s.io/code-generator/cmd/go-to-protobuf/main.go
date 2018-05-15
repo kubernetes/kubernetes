@@ -29,6 +29,7 @@ var g = protobuf.New()
 
 func init() {
 	g.BindFlags(flag.CommandLine)
+	goflag.Set("logtostderr", "true")
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 }
 

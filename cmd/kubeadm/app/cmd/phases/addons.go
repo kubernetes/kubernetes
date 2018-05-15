@@ -19,11 +19,13 @@ package phases
 import (
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -32,7 +34,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
@@ -80,6 +81,7 @@ func EnsureAllAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Inter
 		proxyaddon.EnsureProxyAddon,
 	}
 
+	glog.V(1).Infoln("[addon] installing all addons")
 	for _, action := range addonActions {
 		err := action(cfg, client)
 		if err != nil {
@@ -92,9 +94,9 @@ func EnsureAllAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Inter
 
 // getAddonsSubCommands returns sub commands for addons phase
 func getAddonsSubCommands() []*cobra.Command {
-	cfg := &kubeadmapiext.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha1.MasterConfiguration{}
 	// Default values for the cobra help text
-	legacyscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath, kubeConfigFile, featureGatesString string
 	var subCmds []*cobra.Command
@@ -139,12 +141,12 @@ func getAddonsSubCommands() []*cobra.Command {
 
 		// Add flags to the command
 		cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
-		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!")
+		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental")
 		cmd.Flags().StringVar(&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion, `Choose a specific Kubernetes version for the control plane`)
 		cmd.Flags().StringVar(&cfg.ImageRepository, "image-repository", cfg.ImageRepository, `Choose a container registry to pull control plane images from`)
 
 		if properties.use == "all" || properties.use == "kube-proxy" {
-			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, `The IP address or DNS name the API server is accessible on`)
+			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, `The IP address the API server is accessible on`)
 			cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, `The port the API server is accessible on`)
 			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, `The range of IP addresses used for the Pod network`)
 		}
@@ -162,7 +164,7 @@ func getAddonsSubCommands() []*cobra.Command {
 }
 
 // runAddonsCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiext.MasterConfiguration, kubeConfigFile *string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
+func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiv1alpha1.MasterConfiguration, kubeConfigFile *string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a clousure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
@@ -180,7 +182,7 @@ func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client c
 		}
 
 		internalcfg := &kubeadmapi.MasterConfiguration{}
-		legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
+		kubeadmscheme.Scheme.Convert(cfg, internalcfg, nil)
 		client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 		kubeadmutil.CheckErr(err)
 		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)

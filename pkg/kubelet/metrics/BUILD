@@ -25,6 +25,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/metrics/collectors:all-srcs",
+    ],
     tags = ["automanaged"],
 )

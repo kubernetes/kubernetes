@@ -25,11 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	flag "github.com/spf13/pflag"
-
-	"github.com/go-openapi/spec"
 	inf "gopkg.in/inf.v0"
-	openapi "k8s.io/kube-openapi/pkg/common"
 )
 
 // Quantity is a fixed-point representation of a number.
@@ -399,17 +395,15 @@ func (q Quantity) DeepCopy() Quantity {
 	return q
 }
 
-// OpenAPIDefinition returns openAPI definition for this type.
-func (_ Quantity) OpenAPIDefinition() openapi.OpenAPIDefinition {
-	return openapi.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type:   []string{"string"},
-				Format: "",
-			},
-		},
-	}
-}
+// OpenAPISchemaType is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+//
+// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
+func (_ Quantity) OpenAPISchemaType() []string { return []string{"string"} }
+
+// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+func (_ Quantity) OpenAPISchemaFormat() string { return "" }
 
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
@@ -750,44 +744,4 @@ func (q *Quantity) Copy() *Quantity {
 		d:      infDecAmount{tmp.Set(q.d.Dec)},
 		Format: q.Format,
 	}
-}
-
-// qFlag is a helper type for the Flag function
-type qFlag struct {
-	dest *Quantity
-}
-
-// Sets the value of the internal Quantity. (used by flag & pflag)
-func (qf qFlag) Set(val string) error {
-	q, err := ParseQuantity(val)
-	if err != nil {
-		return err
-	}
-	// This copy is OK because q will not be referenced again.
-	*qf.dest = q
-	return nil
-}
-
-// Converts the value of the internal Quantity to a string. (used by flag & pflag)
-func (qf qFlag) String() string {
-	return qf.dest.String()
-}
-
-// States the type of flag this is (Quantity). (used by pflag)
-func (qf qFlag) Type() string {
-	return "quantity"
-}
-
-// QuantityFlag is a helper that makes a quantity flag (using standard flag package).
-// Will panic if defaultValue is not a valid quantity.
-func QuantityFlag(flagName, defaultValue, description string) *Quantity {
-	q := MustParse(defaultValue)
-	flag.Var(NewQuantityFlagValue(&q), flagName, description)
-	return &q
-}
-
-// NewQuantityFlagValue returns an object that can be used to back a flag,
-// pointing at the given Quantity variable.
-func NewQuantityFlagValue(q *Quantity) flag.Value {
-	return qFlag{q}
 }

@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["name_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/api/validation/path",
 )
 
 go_library(

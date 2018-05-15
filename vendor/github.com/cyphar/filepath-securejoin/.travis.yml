@@ -1,0 +1,19 @@
+# Copyright (C) 2017 SUSE LLC. All rights reserved.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file.
+
+language: go
+go:
+    - 1.7.x
+    - 1.8.x
+    - tip
+
+os:
+    - linux
+    - osx
+
+script:
+    - go test -cover -v ./...
+
+notifications:
+    email: false

@@ -23,39 +23,28 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-var testNamespaceColumnDefinitions = []metav1alpha1.TableColumnDefinition{
+var testNamespaceColumnDefinitions = []metav1beta1.TableColumnDefinition{
 	{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 	{Name: "Status", Type: "string", Description: "The status of the namespace"},
 	{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 }
 
-func testPrintNamespace(obj *api.Namespace, options PrintOptions) ([]metav1alpha1.TableRow, error) {
+func testPrintNamespace(obj *api.Namespace, options PrintOptions) ([]metav1beta1.TableRow, error) {
 	if options.WithNamespace {
 		return nil, fmt.Errorf("namespace is not namespaced")
 	}
-	row := metav1alpha1.TableRow{
+	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
 	row.Cells = append(row.Cells, obj.Name, obj.Status.Phase, "<unknow>")
-	return []metav1alpha1.TableRow{row}, nil
+	return []metav1beta1.TableRow{row}, nil
 }
 
-func testPrintNamespaceList(list *api.NamespaceList, options PrintOptions) ([]metav1alpha1.TableRow, error) {
-	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := testPrintNamespace(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
 func TestPrintRowsForHandlerEntry(t *testing.T) {
 	printFunc := reflect.ValueOf(testPrintNamespace)
 
@@ -69,7 +58,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 	}{
 		"no tablecolumndefinition and includeheader flase": {
 			h: &handlerEntry{
-				columnDefinitions: []metav1alpha1.TableColumnDefinition{},
+				columnDefinitions: []metav1beta1.TableColumnDefinition{},
 				printRows:         true,
 				printFunc:         printFunc,
 			},
@@ -82,7 +71,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 		},
 		"no tablecolumndefinition and includeheader true": {
 			h: &handlerEntry{
-				columnDefinitions: []metav1alpha1.TableColumnDefinition{},
+				columnDefinitions: []metav1beta1.TableColumnDefinition{},
 				printRows:         true,
 				printFunc:         printFunc,
 			},

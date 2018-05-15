@@ -1,5 +1,7 @@
 reviewers:
   - bowei
+  - rramkumar1
+  - MrHohn
   - deads2k
   - enisoc
   - enj # for test/integration/etcd/etcd_storage_path_test.go
@@ -26,6 +28,9 @@ reviewers:
   - vishh
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
+  - cblecker
+  - rramkumar1
+  - MrHohn
   - deads2k
   - enisoc
   - enj # for test/integration/etcd/etcd_storage_path_test.go
@@ -50,4 +55,4 @@ approvers:
   - sttts
   - timothysc
   - zmerlynn
-  - vishh 
+  - vishh

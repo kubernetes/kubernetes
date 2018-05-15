@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["token_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node",
     deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
 )
 
@@ -25,12 +24,14 @@ go_library(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/token:go_default_library",
-        "//pkg/bootstrap/api:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
+        "//vendor/k8s.io/client-go/tools/bootstrap/token/util:go_default_library",
     ],
 )
 

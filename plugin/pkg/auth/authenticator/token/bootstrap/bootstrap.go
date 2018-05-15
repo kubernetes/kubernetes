@@ -31,8 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 )
 
@@ -149,28 +150,29 @@ func (t *TokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, e
 	}, true, nil
 }
 
-// Copied from k8s.io/kubernetes/pkg/bootstrap/api
+// Copied from k8s.io/client-go/tools/bootstrap/token/api
 func getSecretString(secret *api.Secret, key string) string {
-	if secret.Data == nil {
+	data, ok := secret.Data[key]
+	if !ok {
 		return ""
 	}
-	if val, ok := secret.Data[key]; ok {
-		return string(val)
-	}
-	return ""
+
+	return string(data)
 }
 
-// Copied from k8s.io/kubernetes/pkg/bootstrap/api
+// Copied from k8s.io/client-go/tools/bootstrap/token/api
 func isSecretExpired(secret *api.Secret) bool {
 	expiration := getSecretString(secret, bootstrapapi.BootstrapTokenExpirationKey)
 	if len(expiration) > 0 {
 		expTime, err2 := time.Parse(time.RFC3339, expiration)
 		if err2 != nil {
-			tokenErrorf(secret, "has unparsable expiration time (%s). Treating as expired.", expiration)
+			glog.V(3).Infof("Unparseable expiration time (%s) in %s/%s Secret: %v. Treating as expired.",
+				expiration, secret.Namespace, secret.Name, err2)
 			return true
 		}
 		if time.Now().After(expTime) {
-			tokenErrorf(secret, "has expired.", expiration)
+			glog.V(3).Infof("Expired bootstrap token in %s/%s Secret: %v",
+				secret.Namespace, secret.Name, expiration)
 			return true
 		}
 	}
@@ -180,8 +182,10 @@ func isSecretExpired(secret *api.Secret) bool {
 // Copied from kubernetes/cmd/kubeadm/app/util/token
 
 var (
+	// tokenRegexpString defines id.secret regular expression pattern
 	tokenRegexpString = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"
-	tokenRegexp       = regexp.MustCompile(tokenRegexpString)
+	// tokenRegexp is a compiled regular expression of TokenRegexpString
+	tokenRegexp = regexp.MustCompile(tokenRegexpString)
 )
 
 // parseToken tries and parse a valid token from a string.
@@ -209,7 +213,7 @@ func getGroups(secret *api.Secret) ([]string, error) {
 
 	// validate the names of the extra groups
 	for _, group := range strings.Split(extraGroupsString, ",") {
-		if err := bootstrapapi.ValidateBootstrapGroupName(group); err != nil {
+		if err := bootstraputil.ValidateBootstrapGroupName(group); err != nil {
 			return nil, err
 		}
 		groups.Insert(group)

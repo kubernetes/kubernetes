@@ -152,7 +152,22 @@ func (c *Controller) Stop() {
 		c.runner.Stop()
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	c.EndpointReconciler.StopReconciling("kubernetes", c.PublicIP, endpointPorts)
+	finishedReconciling := make(chan struct{})
+	go func() {
+		defer close(finishedReconciling)
+		glog.Infof("Shutting down kubernetes service endpoint reconciler")
+		if err := c.EndpointReconciler.StopReconciling("kubernetes", c.PublicIP, endpointPorts); err != nil {
+			glog.Error(err)
+		}
+	}()
+
+	select {
+	case <-finishedReconciling:
+		// done
+	case <-time.After(2 * c.EndpointInterval):
+		// don't block server shutdown forever if we can't reach etcd to remove ourselves
+		glog.Warning("StopReconciling() timed out")
+	}
 }
 
 // RunKubernetesNamespaces periodically makes sure that all internal namespaces exist
@@ -160,7 +175,7 @@ func (c *Controller) RunKubernetesNamespaces(ch chan struct{}) {
 	wait.Until(func() {
 		// Loop the system namespace list, and create them if they do not exist
 		for _, ns := range c.SystemNamespaces {
-			if err := c.CreateNamespaceIfNeeded(ns); err != nil {
+			if err := createNamespaceIfNeeded(c.NamespaceClient, ns); err != nil {
 				runtime.HandleError(fmt.Errorf("unable to create required kubernetes system namespace %s: %v", ns, err))
 			}
 		}
@@ -185,7 +200,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	// TODO: when it becomes possible to change this stuff,
 	// stop polling and start watching.
 	// TODO: add endpoints of all replicas, not just the elected master.
-	if err := c.CreateNamespaceIfNeeded(metav1.NamespaceDefault); err != nil {
+	if err := createNamespaceIfNeeded(c.NamespaceClient, metav1.NamespaceDefault); err != nil {
 		return err
 	}
 
@@ -198,25 +213,6 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 	return nil
-}
-
-// CreateNamespaceIfNeeded will create a namespace if it doesn't already exist
-func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
-	if _, err := c.NamespaceClient.Namespaces().Get(ns, metav1.GetOptions{}); err == nil {
-		// the namespace already exists
-		return nil
-	}
-	newNs := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ns,
-			Namespace: "",
-		},
-	}
-	_, err := c.NamespaceClient.Namespaces().Create(newNs)
-	if err != nil && errors.IsAlreadyExists(err) {
-		err = nil
-	}
-	return err
 }
 
 // createPortAndServiceSpec creates an array of service ports.
@@ -276,7 +272,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
-			SessionAffinity: api.ServiceAffinityClientIP,
+			SessionAffinity: api.ServiceAffinityNone,
 			Type:            serviceType,
 		},
 	}

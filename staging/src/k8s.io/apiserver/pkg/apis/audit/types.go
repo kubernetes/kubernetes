@@ -125,6 +125,14 @@ type Event struct {
 	RequestReceivedTimestamp metav1.MicroTime
 	// Time the request reached current audit stage.
 	StageTimestamp metav1.MicroTime
+
+	// Annotations is an unstructured key value map stored with an audit event that may be set by
+	// plugins invoked in the request serving chain, including authentication, authorization and
+	// admission plugins. Keys should uniquely identify the informing component to avoid name
+	// collisions (e.g. podsecuritypolicy.admission.k8s.io/policy). Values should be short. Annotations
+	// are included in the Metadata level.
+	// +optional
+	Annotations map[string]string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -226,10 +234,19 @@ type GroupResources struct {
 	// The empty string represents the core API group.
 	// +optional
 	Group string
-	// Resources is a list of resources within the API group. Subresources are
-	// matched using a "/" to indicate the subresource. For example, "pods/log"
-	// would match request to the log subresource of pods. The top level resource
-	// does not match subresources, "pods" doesn't match "pods/log".
+	// Resources is a list of resources this rule applies to.
+	//
+	// For example:
+	// 'pods' matches pods.
+	// 'pods/log' matches the log subresource of pods.
+	// '*' matches all resources and their subresources.
+	// 'pods/*' matches all subresources of pods.
+	// '*/scale' matches all scale subresources.
+	//
+	// If wildcard is present, the validation rule will ensure resources do not
+	// overlap with each other.
+	//
+	// An empty list implies all resources and subresources in this API groups apply.
 	// +optional
 	Resources []string
 	// ResourceNames is a list of resource instance names that the policy matches.

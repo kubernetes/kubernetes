@@ -26,13 +26,14 @@ kube::util::ensure-gnu-sed
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 
-# The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
-kube::util::go_install_from_commit \
-    github.com/kubernetes/repo-infra/kazel \
-    ae4e9a3906ace4ba657b7a09242610c6266e832c
-kube::util::go_install_from_commit \
-    github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle \
-    737df20c53499fd84b67f04c6ca9ccdee2e77089
+# Ensure that we find the binaries we build before anything else.
+export GOBIN="${KUBE_OUTPUT_BINPATH}"
+PATH="${GOBIN}:${PATH}"
+
+# Install tools we need, but only from vendor/...
+go install ./vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle
+
+go install ./vendor/github.com/kubernetes/repo-infra/kazel
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 

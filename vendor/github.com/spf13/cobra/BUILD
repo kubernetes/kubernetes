@@ -3,9 +3,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "args.go",
         "bash_completions.go",
         "cobra.go",
         "command.go",
+        "zsh_completions.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "command_notwin.go",

@@ -63,6 +63,38 @@ func TestMakePayload(t *testing.T) {
 			success: true,
 		},
 		{
+			name: "no overrides binary data",
+			configMap: &v1.ConfigMap{
+				BinaryData: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644},
+				"bar": {Data: []byte("bar"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
+			name: "no overrides mixed data",
+			configMap: &v1.ConfigMap{
+				BinaryData: map[string][]byte{
+					"foo": []byte("foo"),
+				},
+				Data: map[string]string{
+					"bar": "bar",
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644},
+				"bar": {Data: []byte("bar"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
 			name: "basic 1",
 			mappings: []v1.KeyToPath{
 				{
@@ -466,13 +498,35 @@ func TestPluginOptional(t *testing.T) {
 		}
 	}
 
+	datadirSymlink := path.Join(volumePath, "..data")
+	datadir, err := os.Readlink(datadirSymlink)
+	if err != nil && os.IsNotExist(err) {
+		t.Fatalf("couldn't find volume path's data dir, %s", datadirSymlink)
+	} else if err != nil {
+		t.Fatalf("couldn't read symlink, %s", datadirSymlink)
+	}
+	datadirPath := path.Join(volumePath, datadir)
+
 	infos, err := ioutil.ReadDir(volumePath)
 	if err != nil {
 		t.Fatalf("couldn't find volume path, %s", volumePath)
 	}
 	if len(infos) != 0 {
-		t.Errorf("empty directory, %s, not found", volumePath)
+		for _, fi := range infos {
+			if fi.Name() != "..data" && fi.Name() != datadir {
+				t.Errorf("empty data directory, %s, is not empty. Contains: %s", datadirSymlink, fi.Name())
+			}
+		}
 	}
+
+	infos, err = ioutil.ReadDir(datadirPath)
+	if err != nil {
+		t.Fatalf("couldn't find volume data path, %s", datadirPath)
+	}
+	if len(infos) != 0 {
+		t.Errorf("empty data directory, %s, is not empty. Contains: %s", datadirSymlink, infos[0].Name())
+	}
+
 	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
 }
 

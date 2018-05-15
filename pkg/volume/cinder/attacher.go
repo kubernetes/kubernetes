@@ -17,6 +17,7 @@ limitations under the License.
 package cinder
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -27,16 +28,14 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type cinderDiskAttacher struct {
 	host           volume.VolumeHost
-	cinderProvider CinderProvider
+	cinderProvider BlockStorageProvider
 }
 
 var _ volume.Attacher = &cinderDiskAttacher{}
@@ -58,7 +57,7 @@ const (
 )
 
 func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
-	cinder, err := getCloudProvider(plugin.host.GetCloudProvider())
+	cinder, err := plugin.getCloudProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -187,23 +186,7 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 		volumeSpecMap[volumeSource.VolumeID] = spec
 	}
 
-	instanceID, err := attacher.nodeInstanceID(nodeName)
-	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			// If node doesn't exist, OpenStack Nova will assume the volumes are not attached to it.
-			// Mark the volumes as detached and return false without error.
-			glog.Warningf("VolumesAreAttached: node %q does not exist.", nodeName)
-			for spec := range volumesAttachedCheck {
-				volumesAttachedCheck[spec] = false
-			}
-
-			return volumesAttachedCheck, nil
-		}
-
-		return volumesAttachedCheck, err
-	}
-
-	attachedResult, err := attacher.cinderProvider.DisksAreAttached(instanceID, volumeIDList)
+	attachedResult, err := attacher.cinderProvider.DisksAreAttachedByName(nodeName, volumeIDList)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Errorf(
@@ -232,7 +215,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 	volumeID := volumeSource.VolumeID
 
 	if devicePath == "" {
-		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty.", volumeID)
+		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty", volumeID)
 	}
 
 	ticker := time.NewTicker(probeVolumeInitDelay)
@@ -254,16 +237,15 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 			if exists && err == nil {
 				glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil
-			} else {
-				// Log an error, and continue checking periodically
-				glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
-				// Using exponential backoff instead of linear
-				ticker.Stop()
-				duration = time.Duration(float64(duration) * probeVolumeFactor)
-				ticker = time.NewTicker(duration)
 			}
+			// Log an error, and continue checking periodically
+			glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
+			// Using exponential backoff instead of linear
+			ticker.Stop()
+			duration = time.Duration(float64(duration) * probeVolumeFactor)
+			ticker = time.NewTicker(duration)
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)
+			return "", fmt.Errorf("could not find attached Cinder disk %q. Timeout waiting for mount paths to be created", volumeID)
 		}
 	}
 }
@@ -303,8 +285,8 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 		options = append(options, "ro")
 	}
 	if notMnt {
-		diskMounter := volumehelper.NewSafeFormatAndMountFromHost(cinderVolumePluginName, attacher.host)
-		mountOptions := volume.MountOptionFromSpec(spec, options...)
+		diskMounter := volumeutil.NewSafeFormatAndMountFromHost(cinderVolumePluginName, attacher.host)
+		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
@@ -316,13 +298,13 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 
 type cinderDiskDetacher struct {
 	mounter        mount.Interface
-	cinderProvider CinderProvider
+	cinderProvider BlockStorageProvider
 }
 
 var _ volume.Detacher = &cinderDiskDetacher{}
 
 func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
-	cinder, err := getCloudProvider(plugin.host.GetCloudProvider())
+	cinder, err := plugin.getCloudProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -381,20 +363,10 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 
 func (detacher *cinderDiskDetacher) Detach(volumeName string, nodeName types.NodeName) error {
 	volumeID := path.Base(volumeName)
-	instances, res := detacher.cinderProvider.Instances()
-	if !res {
-		return fmt.Errorf("failed to list openstack instances")
-	}
-	instanceID, err := instances.InstanceID(nodeName)
-	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
-		instanceID = instanceID[(ind + 1):]
-	}
-
 	if err := detacher.waitOperationFinished(volumeID); err != nil {
 		return err
 	}
-
-	attached, err := detacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
+	attached, instanceID, err := detacher.cinderProvider.DiskIsAttachedByName(nodeName, volumeID)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
@@ -429,7 +401,7 @@ func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (str
 	if !res {
 		return "", fmt.Errorf("failed to list openstack instances")
 	}
-	instanceID, err := instances.InstanceID(nodeName)
+	instanceID, err := instances.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		return "", err
 	}

@@ -17,86 +17,17 @@ limitations under the License.
 package dockershim
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	utilstore "k8s.io/kubernetes/pkg/kubelet/dockershim/testing"
 )
 
-func NewTestPersistentCheckpointHandler() CheckpointHandler {
-	return &PersistentCheckpointHandler{store: utilstore.NewMemStore()}
-}
-
-func TestPersistentCheckpointHandler(t *testing.T) {
-	var err error
-	handler := NewTestPersistentCheckpointHandler()
-	port80 := int32(80)
-	port443 := int32(443)
-	proto := protocolTCP
-
-	checkpoint1 := NewPodSandboxCheckpoint("ns1", "sandbox1")
-	checkpoint1.Data.PortMappings = []*PortMapping{
-		{
-			&proto,
-			&port80,
-			&port80,
-		},
-		{
-			&proto,
-			&port443,
-			&port443,
-		},
-	}
-	checkpoint1.Data.HostNetwork = true
-
-	checkpoints := []struct {
-		podSandboxID      string
-		checkpoint        *PodSandboxCheckpoint
-		expectHostNetwork bool
-	}{
-		{
-			"id1",
-			checkpoint1,
-			true,
-		},
-		{
-			"id2",
-			NewPodSandboxCheckpoint("ns2", "sandbox2"),
-			false,
-		},
-	}
-
-	for _, tc := range checkpoints {
-		// Test CreateCheckpoints
-		err = handler.CreateCheckpoint(tc.podSandboxID, tc.checkpoint)
-		assert.NoError(t, err)
-
-		// Test GetCheckpoints
-		checkpoint, err := handler.GetCheckpoint(tc.podSandboxID)
-		assert.NoError(t, err)
-		assert.Equal(t, *checkpoint, *tc.checkpoint)
-		assert.Equal(t, checkpoint.Data.HostNetwork, tc.expectHostNetwork)
-	}
-	// Test ListCheckpoints
-	keys, err := handler.ListCheckpoints()
-	assert.NoError(t, err)
-	sort.Strings(keys)
-	assert.Equal(t, keys, []string{"id1", "id2"})
-
-	// Test RemoveCheckpoints
-	err = handler.RemoveCheckpoint("id1")
-	assert.NoError(t, err)
-	// Test Remove Nonexisted Checkpoints
-	err = handler.RemoveCheckpoint("id1")
-	assert.NoError(t, err)
-
-	// Test ListCheckpoints
-	keys, err = handler.ListCheckpoints()
-	assert.NoError(t, err)
-	assert.Equal(t, keys, []string{"id2"})
-
-	// Test Get NonExisted Checkpoint
-	_, err = handler.GetCheckpoint("id1")
-	assert.Error(t, err)
+func TestPodSandboxCheckpoint(t *testing.T) {
+	data := &CheckpointData{HostNetwork: true}
+	checkpoint := NewPodSandboxCheckpoint("ns1", "sandbox1", data)
+	version, name, namespace, _, hostNetwork := checkpoint.GetData()
+	assert.Equal(t, schemaVersion, version)
+	assert.Equal(t, "ns1", namespace)
+	assert.Equal(t, "sandbox1", name)
+	assert.Equal(t, true, hostNetwork)
 }

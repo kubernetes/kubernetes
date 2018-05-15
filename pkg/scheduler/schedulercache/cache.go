@@ -24,6 +24,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/golang/glog"
 	policy "k8s.io/api/policy/v1beta1"
@@ -80,10 +82,42 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 	}
 }
 
+// Snapshot takes a snapshot of the current schedulerCache. The method has performance impact,
+// and should be only used in non-critical path.
+func (cache *schedulerCache) Snapshot() *Snapshot {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	nodes := make(map[string]*NodeInfo)
+	for k, v := range cache.nodes {
+		nodes[k] = v.Clone()
+	}
+
+	assumedPods := make(map[string]bool)
+	for k, v := range cache.assumedPods {
+		assumedPods[k] = v
+	}
+
+	pdbs := make(map[string]*policy.PodDisruptionBudget)
+	for k, v := range cache.pdbs {
+		pdbs[k] = v.DeepCopy()
+	}
+
+	return &Snapshot{
+		Nodes:       nodes,
+		AssumedPods: assumedPods,
+		Pdbs:        pdbs,
+	}
+}
+
 func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*NodeInfo) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	for name, info := range cache.nodes {
+		if utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && info.TransientInfo != nil {
+			// Transient scheduler info is reset here.
+			info.TransientInfo.resetTransientSchedulerInfo()
+		}
 		if current, ok := nodeNameToInfo[name]; !ok || current.generation != info.generation {
 			nodeNameToInfo[name] = info.Clone()
 		}
@@ -131,7 +165,7 @@ func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	if _, ok := cache.podStates[key]; ok {
-		return fmt.Errorf("pod %v state wasn't initial but get assumed", key)
+		return fmt.Errorf("pod %v is in the cache, so can't be assumed", key)
 	}
 
 	cache.addPod(pod)
@@ -178,7 +212,7 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 
 	currState, ok := cache.podStates[key]
 	if ok && currState.pod.Spec.NodeName != pod.Spec.NodeName {
-		return fmt.Errorf("pod %v state was assumed on a different node", key)
+		return fmt.Errorf("pod %v was assumed on %v but assigned to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 	}
 
 	switch {
@@ -191,7 +225,7 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 		delete(cache.assumedPods, key)
 		delete(cache.podStates, key)
 	default:
-		return fmt.Errorf("pod %v state wasn't assumed but get forgotten", key)
+		return fmt.Errorf("pod %v wasn't assumed so cannot be forgotten", key)
 	}
 	return nil
 }
@@ -241,7 +275,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 	case ok && cache.assumedPods[key]:
 		if currState.pod.Spec.NodeName != pod.Spec.NodeName {
 			// The pod was added to a different node than it was assumed to.
-			glog.Warningf("Pod %v assumed to a different node than added to.", key)
+			glog.Warningf("Pod %v was assumed to be on %v but got added to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 			// Clean this up.
 			cache.removePod(currState.pod)
 			cache.addPod(pod)
@@ -257,7 +291,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 		}
 		cache.podStates[key] = ps
 	default:
-		return fmt.Errorf("pod was already in added state. Pod key: %v", key)
+		return fmt.Errorf("pod %v was already in added state", key)
 	}
 	return nil
 }
@@ -284,7 +318,7 @@ func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("pod %v state wasn't added but get updated", key)
+		return fmt.Errorf("pod %v is not added to scheduler cache, so cannot be updated", key)
 	}
 	return nil
 }
@@ -304,7 +338,7 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 	// before Remove event, in which case the state would change from Assumed to Added.
 	case ok && !cache.assumedPods[key]:
 		if currState.pod.Spec.NodeName != pod.Spec.NodeName {
-			glog.Errorf("Pod %v removed from a different node than previously added to.", key)
+			glog.Errorf("Pod %v was assumed to be on %v but got added to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 			glog.Fatalf("Schedulercache is corrupted and can badly affect scheduling decisions")
 		}
 		err := cache.removePod(currState.pod)
@@ -313,7 +347,7 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 		}
 		delete(cache.podStates, key)
 	default:
-		return fmt.Errorf("pod state wasn't added but get removed. Pod key: %v", key)
+		return fmt.Errorf("pod %v is not found in scheduler cache, so cannot be removed from it", key)
 	}
 	return nil
 }
@@ -345,7 +379,7 @@ func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 
 	podState, ok := cache.podStates[key]
 	if !ok {
-		return nil, fmt.Errorf("pod %v does not exist", key)
+		return nil, fmt.Errorf("pod %v does not exist in scheduler cache", key)
 	}
 
 	return podState.pod, nil
@@ -398,7 +432,7 @@ func (cache *schedulerCache) AddPDB(pdb *policy.PodDisruptionBudget) error {
 	defer cache.mu.Unlock()
 
 	// Unconditionally update cache.
-	cache.pdbs[pdb.Name] = pdb
+	cache.pdbs[string(pdb.UID)] = pdb
 	return nil
 }
 
@@ -410,7 +444,7 @@ func (cache *schedulerCache) RemovePDB(pdb *policy.PodDisruptionBudget) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	delete(cache.pdbs, pdb.Name)
+	delete(cache.pdbs, string(pdb.UID))
 	return nil
 }
 
@@ -424,6 +458,13 @@ func (cache *schedulerCache) ListPDBs(selector labels.Selector) ([]*policy.PodDi
 		}
 	}
 	return pdbs, nil
+}
+
+func (cache *schedulerCache) IsUpToDate(n *NodeInfo) bool {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	node, ok := cache.nodes[n.Node().Name]
+	return ok && n.generation == node.generation
 }
 
 func (cache *schedulerCache) run() {

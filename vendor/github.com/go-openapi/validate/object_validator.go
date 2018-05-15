@@ -15,8 +15,10 @@
 package validate
 
 import (
+	"log"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/spec"
@@ -45,10 +47,45 @@ func (o *objectValidator) Applies(source interface{}, kind reflect.Kind) bool {
 	// there is a problem in the type validator where it will be unhappy about null values
 	// so that requires more testing
 	r := reflect.TypeOf(source) == specSchemaType && (kind == reflect.Map || kind == reflect.Struct)
-	//fmt.Printf("object validator for %q applies %t for %T (kind: %v)\n", o.Path, r, source, kind)
+	if Debug {
+		log.Printf("object validator for %q applies %t for %T (kind: %v)\n", o.Path, r, source, kind)
+	}
 	return r
 }
 
+func (o *objectValidator) isPropertyName() bool {
+	p := strings.Split(o.Path, ".")
+	return p[len(p)-1] == "properties" && p[len(p)-2] != "properties"
+}
+func (o *objectValidator) checkArrayMustHaveItems(res *Result, val map[string]interface{}) {
+	if t, typeFound := val["type"]; typeFound {
+		if tpe, ok := t.(string); ok && tpe == "array" {
+			if _, itemsKeyFound := val["items"]; !itemsKeyFound {
+				res.AddErrors(errors.Required("items", o.Path))
+			}
+		}
+	}
+}
+
+func (o *objectValidator) checkItemsMustBeTypeArray(res *Result, val map[string]interface{}) {
+	if !o.isPropertyName() {
+		if _, itemsKeyFound := val["items"]; itemsKeyFound {
+			t, typeFound := val["type"]
+			if typeFound {
+				if tpe, ok := t.(string); !ok || tpe != "array" {
+					res.AddErrors(errors.InvalidType(o.Path, o.In, "array", nil))
+				}
+			} else {
+				// there is no type
+				res.AddErrors(errors.Required("type", o.Path))
+			}
+		}
+	}
+}
+func (o *objectValidator) precheck(res *Result, val map[string]interface{}) {
+	o.checkArrayMustHaveItems(res, val)
+	o.checkItemsMustBeTypeArray(res, val)
+}
 func (o *objectValidator) Validate(data interface{}) *Result {
 	val := data.(map[string]interface{})
 	numKeys := int64(len(val))
@@ -61,14 +98,8 @@ func (o *objectValidator) Validate(data interface{}) *Result {
 	}
 
 	res := new(Result)
-	if len(o.Required) > 0 {
-		for _, k := range o.Required {
-			if _, ok := val[k]; !ok {
-				res.AddErrors(errors.Required(o.Path+"."+k, o.In))
-				continue
-			}
-		}
-	}
+
+	o.precheck(res, val)
 
 	if o.AdditionalProperties != nil && !o.AdditionalProperties.Allows {
 		for k := range val {
@@ -99,6 +130,8 @@ func (o *objectValidator) Validate(data interface{}) *Result {
 		}
 	}
 
+	createdFromDefaults := map[string]bool{}
+
 	for pName, pSchema := range o.Properties {
 		rName := pName
 		if o.Path != "" {
@@ -106,7 +139,24 @@ func (o *objectValidator) Validate(data interface{}) *Result {
 		}
 
 		if v, ok := val[pName]; ok {
-			res.Merge(NewSchemaValidator(&pSchema, o.Root, rName, o.KnownFormats).Validate(v))
+			r := NewSchemaValidator(&pSchema, o.Root, rName, o.KnownFormats).Validate(v)
+			res.Merge(r)
+		} else if pSchema.Default != nil {
+			createdFromDefaults[pName] = true
+			pName := pName // shaddow
+			def := pSchema.Default
+			res.Defaulters = append(res.Defaulters, DefaulterFunc(func() {
+				val[pName] = def
+			}))
+		}
+	}
+
+	if len(o.Required) > 0 {
+		for _, k := range o.Required {
+			if _, ok := val[k]; !ok && !createdFromDefaults[k] {
+				res.AddErrors(errors.Required(o.Path+"."+k, o.In))
+				continue
+			}
 		}
 	}
 
@@ -137,9 +187,6 @@ func (o *objectValidator) validatePatternProperty(key string, value interface{},
 
 			res := validator.Validate(value)
 			result.Merge(res)
-			if res.IsValid() {
-				succeededOnce = true
-			}
 		}
 	}
 

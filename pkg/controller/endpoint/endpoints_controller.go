@@ -64,7 +64,7 @@ const (
 	// containers in the pod and marks it "Running", till the kubelet stops all
 	// containers and deletes the pod from the apiserver.
 	// This field is deprecated. v1.Service.PublishNotReadyAddresses will replace it
-	// subsequent releases.
+	// subsequent releases.  It will be removed no sooner than 1.13.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
@@ -193,7 +193,7 @@ func (e *EndpointController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	services, err := e.getPodServiceMemberships(pod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", pod.Namespace, pod.Name, err))
+		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
 		return
 	}
 	for key := range services {
@@ -269,7 +269,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 
 	podChangedFlag := podChanged(oldPod, newPod)
 
-	// Check if the pod labels have changed, indicating a possibe
+	// Check if the pod labels have changed, indicating a possible
 	// change in the service membership
 	labelsChanged := false
 	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||
@@ -328,7 +328,7 @@ func (e *EndpointController) deletePod(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", obj))
 		return
 	}
-	glog.V(4).Infof("Enqueuing services of deleted pod %s having final state unrecorded", pod.Name)
+	glog.V(4).Infof("Enqueuing services of deleted pod %s/%s having final state unrecorded", pod.Namespace, pod.Name)
 	e.addPod(pod)
 }
 
@@ -372,7 +372,7 @@ func (e *EndpointController) handleErr(err error, key interface{}) {
 	}
 
 	if e.queue.NumRequeues(key) < maxRetries {
-		glog.V(2).Infof("Error syncing endpoints for service %q: %v", key, err)
+		glog.V(2).Infof("Error syncing endpoints for service %q, retrying. Error: %v", key, err)
 		e.queue.AddRateLimited(key)
 		return
 	}
@@ -385,7 +385,7 @@ func (e *EndpointController) handleErr(err error, key interface{}) {
 func (e *EndpointController) syncService(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -394,7 +394,15 @@ func (e *EndpointController) syncService(key string) error {
 	}
 	service, err := e.serviceLister.Services(namespace).Get(name)
 	if err != nil {
-		// Service has been deleted. So no need to do any more operations.
+		// Delete the corresponding endpoint, as the service has been deleted.
+		// TODO: Please note that this will delete an endpoint when a
+		// service is deleted. However, if we're down at the time when
+		// the service is deleted, we will miss that deletion, so this
+		// doesn't completely solve the problem. See #6877.
+		err = e.client.CoreV1().Endpoints(namespace).Delete(name, nil)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
 		return nil
 	}
 
@@ -412,7 +420,8 @@ func (e *EndpointController) syncService(key string) error {
 		return err
 	}
 
-	var tolerateUnreadyEndpoints bool
+	// If the user specified the older (deprecated) annotation, we have to respect it.
+	tolerateUnreadyEndpoints := service.Spec.PublishNotReadyAddresses
 	if v, ok := service.Annotations[TolerateUnreadyEndpointsAnnotation]; ok {
 		b, err := strconv.ParseBool(v)
 		if err == nil {
@@ -446,8 +455,8 @@ func (e *EndpointController) syncService(key string) error {
 		// Allow headless service not to have ports.
 		if len(service.Spec.Ports) == 0 {
 			if service.Spec.ClusterIP == api.ClusterIPNone {
-				epp := v1.EndpointPort{Port: 0, Protocol: v1.ProtocolTCP}
-				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(subsets, pod, epa, epp, tolerateUnreadyEndpoints)
+				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(subsets, pod, epa, nil, tolerateUnreadyEndpoints)
+				// No need to repack subsets for headless service without ports.
 			}
 		} else {
 			for i := range service.Spec.Ports {
@@ -462,14 +471,14 @@ func (e *EndpointController) syncService(key string) error {
 				}
 
 				var readyEps, notReadyEps int
-				epp := v1.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
+				epp := &v1.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 				subsets, readyEps, notReadyEps = addEndpointSubset(subsets, pod, epa, epp, tolerateUnreadyEndpoints)
 				totalReadyEps = totalReadyEps + readyEps
 				totalNotReadyEps = totalNotReadyEps + notReadyEps
 			}
+			subsets = endpoints.RepackSubsets(subsets)
 		}
 	}
-	subsets = endpoints.RepackSubsets(subsets)
 
 	// See if there's actually an update here.
 	currentEndpoints, err := e.endpointsLister.Endpoints(service.Namespace).Get(service.Name)
@@ -553,20 +562,24 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 }
 
 func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
-	epp v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
+	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
 	var readyEps int = 0
 	var notReadyEps int = 0
+	ports := []v1.EndpointPort{}
+	if epp != nil {
+		ports = append(ports, *epp)
+	}
 	if tolerateUnreadyEndpoints || podutil.IsPodReady(pod) {
 		subsets = append(subsets, v1.EndpointSubset{
 			Addresses: []v1.EndpointAddress{epa},
-			Ports:     []v1.EndpointPort{epp},
+			Ports:     ports,
 		})
 		readyEps++
 	} else if shouldPodBeInEndpoints(pod) {
-		glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
+		glog.V(5).Infof("Pod is out of service: %s/%s", pod.Namespace, pod.Name)
 		subsets = append(subsets, v1.EndpointSubset{
 			NotReadyAddresses: []v1.EndpointAddress{epa},
-			Ports:             []v1.EndpointPort{epp},
+			Ports:             ports,
 		})
 		notReadyEps++
 	}

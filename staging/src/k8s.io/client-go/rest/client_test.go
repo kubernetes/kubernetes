@@ -302,7 +302,7 @@ func TestCreateBackoffManager(t *testing.T) {
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff = readExpBackoffConfig()
 	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
-		t.Errorf("Zero backoff duration, but backoff still occuring.")
+		t.Errorf("Zero backoff duration, but backoff still occurring.")
 	}
 
 	// No env -> No backoff.

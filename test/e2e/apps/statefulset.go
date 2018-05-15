@@ -23,8 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	apps "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -89,13 +88,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.DeleteAllStatefulSets(c, ns)
 		})
 
+		// This can't be Conformance yet because it depends on a default
+		// StorageClass and a dynamic provisioner.
 		It("should provide basic identity", func() {
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 3
 			sst := framework.NewStatefulSetTester(c)
 			sst.PauseNewPods(ss)
 
-			_, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Saturating stateful set " + ss.Name)
@@ -126,6 +127,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(sst.ExecInStatefulPods(ss, cmd))
 		})
 
+		// This can't be Conformance yet because it depends on a default
+		// StorageClass and a dynamic provisioner.
 		It("should adopt matching orphans and release non-matching pods", func() {
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 1
@@ -135,7 +138,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			ss.Kind = kind
 
@@ -209,13 +212,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 			)).To(Succeed(), "wait for pod %q to be readopted", pod.Name)
 		})
 
+		// This can't be Conformance yet because it depends on a default
+		// StorageClass and a dynamic provisioner.
 		It("should not deadlock when a pod's predecessor fails", func() {
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 2
 			sst := framework.NewStatefulSetTester(c)
 			sst.PauseNewPods(ss)
 
-			_, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			sst.WaitForRunning(1, 0, ss)
@@ -243,12 +248,20 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 		})
 
-		It("should perform rolling updates and roll backs of template modifications", func() {
+		/*
+			Testname: StatefulSet-RollingUpdate
+			Description: StatefulSet MUST support the RollingUpdate strategy to automatically replace Pods
+				one at a time when the Pod template changes. The StatefulSet's status MUST indicate the
+				CurrentRevision and UpdateRevision. If the template is changed to match a prior revision,
+				StatefulSet MUST detect this as a rollback instead of creating a new revision.
+				This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
+		*/
+		framework.ConformanceIt("should perform rolling updates and roll backs of template modifications", func() {
 			By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -292,7 +305,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
 			ss, pods = sst.WaitForRollingUpdate(ss)
 			Expect(ss.Status.CurrentRevision).To(Equal(updateRevision),
-				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal updste revision %s on update completion",
+				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
 					ss.Namespace,
 					ss.Name,
 					ss.Status.CurrentRevision,
@@ -325,7 +338,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss = sst.WaitForStatus(ss)
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			Expect(currentRevision).NotTo(Equal(updateRevision),
-				"Current revision should not equal update revision during roll bakc")
+				"Current revision should not equal update revision during roll back")
 			Expect(priorRevision).To(Equal(updateRevision),
 				"Prior revision should equal update revision during roll back")
 
@@ -358,7 +371,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 		})
 
-		It("should perform canary updates and phased rolling updates of template modifications", func() {
+		/*
+			Testname: StatefulSet-RollingUpdatePartition
+			Description: StatefulSet's RollingUpdate strategy MUST support the Partition parameter for
+				canaries and phased rollouts. If a Pod is deleted while a rolling update is in progress,
+				StatefulSet MUST restore the Pod without violating the Partition.
+				This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
+		*/
+		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications", func() {
 			By("Creating a new StaefulSet")
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
@@ -373,7 +393,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}()}
 				}(),
 			}
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -422,7 +442,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						currentRevision))
 			}
 
-			By("By performing a canary update")
+			By("Performing a canary update")
 			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
@@ -567,6 +587,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		})
 
+		// Do not mark this as Conformance.
+		// The legacy OnDelete strategy only exists for backward compatibility with pre-v1 APIs.
 		It("should implement legacy replacement when the update strategy is OnDelete", func() {
 			By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
@@ -575,7 +597,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -647,7 +669,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 		})
 
-		It("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
+		/*
+			Testname: StatefulSet-Scaling
+			Description: StatefulSet MUST create Pods in ascending order by ordinal index when scaling up,
+				and delete Pods in descending order when scaling down. Scaling up or down MUST pause if any
+				Pods belonging to the StatefulSet are unhealthy.
+				This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
+		*/
+		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
 			psLabels := klabels.Set(labels)
 			By("Initializing watcher for selector " + psLabels.String())
 			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
@@ -659,7 +688,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err = c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err = c.AppsV1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -723,7 +752,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("Burst scaling should run to completion even with unhealthy pods", func() {
+		/*
+			Testname: StatefulSet-BurstScaling
+			Description: StatefulSet MUST support the Parallel PodManagementPolicy for burst scaling.
+				This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
+		*/
+		framework.ConformanceIt("Burst scaling should run to completion even with unhealthy pods", func() {
 			psLabels := klabels.Set(labels)
 
 			By("Creating stateful set " + ssName + " in namespace " + ns)
@@ -731,7 +765,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PodManagementPolicy = apps.ParallelPodManagement
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -761,7 +795,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.WaitForStatusReplicas(ss, 0)
 		})
 
-		It("Should recreate evicted statefulset", func() {
+		/*
+			Testname: StatefulSet-RecreateFailedPod
+			Description: StatefulSet MUST delete and recreate Pods it owns that go into a Failed state,
+				such as when they are rejected or evicted by a Node.
+				This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
+		*/
+		framework.ConformanceIt("Should recreate evicted statefulset", func() {
 			podName := "test-pod"
 			statefulPodName := ssName + "-0"
 			By("Looking for a node to schedule stateful set and pod")
@@ -793,7 +833,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
-			_, err = f.ClientSet.AppsV1beta1().StatefulSets(f.Namespace.Name).Create(ss)
+			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(ss)
 			framework.ExpectNoError(err)
 
 			By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
@@ -844,7 +884,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				return nil
 			}, framework.StatefulPodTimeout, 2*time.Second).Should(BeNil())
 		})
-
+		/* Comment it for now until scale sub-resource is finalized in ref:pull/53679 for scale-sub resource specific comment.
 		It("should have a working scale subresource", func() {
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
@@ -858,6 +898,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("getting scale subresource")
 			scale := framework.NewStatefulSetScale(ss)
 			scaleResult := &appsv1beta2.Scale{}
+
 			err = c.AppsV1beta2().RESTClient().Get().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
@@ -881,6 +922,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 			Expect(*(ss.Spec.Replicas)).To(Equal(int32(2)))
 		})
+		*/
 	})
 
 	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
@@ -900,21 +942,29 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.DeleteAllStatefulSets(c, ns)
 		})
 
+		// Do not mark this as Conformance.
+		// StatefulSet Conformance should not be dependent on specific applications.
 		It("should creating a working zookeeper cluster", func() {
 			appTester.statefulPod = &zookeeperTester{tester: sst}
 			appTester.run()
 		})
 
+		// Do not mark this as Conformance.
+		// StatefulSet Conformance should not be dependent on specific applications.
 		It("should creating a working redis cluster", func() {
 			appTester.statefulPod = &redisTester{tester: sst}
 			appTester.run()
 		})
 
+		// Do not mark this as Conformance.
+		// StatefulSet Conformance should not be dependent on specific applications.
 		It("should creating a working mysql cluster", func() {
 			appTester.statefulPod = &mysqlGaleraTester{tester: sst}
 			appTester.run()
 		})
 
+		// Do not mark this as Conformance.
+		// StatefulSet Conformance should not be dependent on specific applications.
 		It("should creating a working CockroachDB cluster", func() {
 			appTester.statefulPod = &cockroachDBTester{tester: sst}
 			appTester.run()

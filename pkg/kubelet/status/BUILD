@@ -38,7 +38,6 @@ go_test(
         "status_manager_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/status",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",

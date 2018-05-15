@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
 
 // This is a unit test framework for persistent volume controller.
@@ -609,6 +611,7 @@ func newTestController(kubeClient clientset.Interface, informerFactory informers
 		VolumeInformer:            informerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informerFactory.Storage().V1().StorageClasses(),
+		PodInformer:               informerFactory.Core().V1().Pods(),
 		EventRecorder:             record.NewFakeRecorder(1000),
 		EnableDynamicProvisioning: enableDynamicProvisioning,
 	}
@@ -802,6 +805,13 @@ func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim)
 	return claims
 }
 
+// claimWithAccessMode saves given access into given claims.
+// Meant to be used to compose claims specified inline in a test.
+func claimWithAccessMode(modes []v1.PersistentVolumeAccessMode, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.AccessModes = modes
+	return claims
+}
+
 func testSyncClaim(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
 	return ctrl.syncClaim(test.initialClaims[0])
 }
@@ -932,7 +942,7 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *volumeReacto
 // 2. Call the tested function (syncClaim/syncVolume) via
 //    controllerTest.testCall *once*.
 // 3. Compare resulting volumes and claims with expected volumes and claims.
-func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass) {
+func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, pods []*v1.Pod) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
@@ -958,6 +968,12 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 			indexer.Add(class)
 		}
 		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
+
+		podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+		for _, pod := range pods {
+			podIndexer.Add(pod)
+		}
+		ctrl.podLister = corelisters.NewPodLister(podIndexer)
 
 		// Run the tested functions
 		err = test.test(ctrl, reactor, test)
@@ -1247,7 +1263,7 @@ func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
 
 // Recycler interfaces
 
-func (plugin *mockVolumePlugin) Recycle(pvName string, spec *vol.Spec, eventRecorder vol.RecycleEventRecorder) error {
+func (plugin *mockVolumePlugin) Recycle(pvName string, spec *vol.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	if len(plugin.recycleCalls) == 0 {
 		return fmt.Errorf("Mock plugin error: no recycleCalls configured")
 	}

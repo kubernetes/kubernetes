@@ -22,6 +22,13 @@ limitations under the License.
 package nodelifecycle
 
 import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,11 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-
-	"fmt"
-	"github.com/golang/glog"
-	"sync"
-	"time"
 )
 
 func init() {
@@ -83,6 +85,7 @@ var (
 		v1.NodeOutOfDisk:          algorithm.TaintNodeOutOfDisk,
 		v1.NodeDiskPressure:       algorithm.TaintNodeDiskPressure,
 		v1.NodeNetworkUnavailable: algorithm.TaintNodeNetworkUnavailable,
+		v1.NodePIDPressure:        algorithm.TaintNodePIDPressure,
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
@@ -90,6 +93,7 @@ var (
 		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
 		algorithm.TaintNodeDiskPressure:       v1.NodeDiskPressure,
+		algorithm.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
 )
 
@@ -104,8 +108,6 @@ const (
 )
 
 const (
-	// The amount of time the nodecontroller polls on the list nodes endpoint.
-	apiserverStartupGracePeriod = 10 * time.Minute
 	// The amount of time the nodecontroller should sleep between retrying NodeStatus updates
 	retrySleepTime = 20 * time.Millisecond
 )
@@ -150,9 +152,10 @@ type Controller struct {
 	daemonSetStore          extensionslisters.DaemonSetLister
 	daemonSetInformerSynced cache.InformerSynced
 
-	nodeLister                corelisters.NodeLister
-	nodeInformerSynced        cache.InformerSynced
-	nodeExistsInCloudProvider func(types.NodeName) (bool, error)
+	nodeLister                  corelisters.NodeLister
+	nodeInformerSynced          cache.InformerSynced
+	nodeExistsInCloudProvider   func(types.NodeName) (bool, error)
+	nodeShutdownInCloudProvider func(context.Context, *v1.Node) (bool, error)
 
 	recorder record.EventRecorder
 
@@ -237,6 +240,9 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		nodeStatusMap: make(map[string]nodeStatusData),
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
 			return nodeutil.ExistsInCloudProvider(cloud, nodeName)
+		},
+		nodeShutdownInCloudProvider: func(ctx context.Context, node *v1.Node) (bool, error) {
+			return nodeutil.ShutdownInCloudProvider(ctx, cloud, node)
 		},
 		recorder:                    recorder,
 		nodeMonitorPeriod:           nodeMonitorPeriod,
@@ -435,7 +441,21 @@ func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 			}
 		}
 	}
+	if node.Spec.Unschedulable {
+		// If unschedulable, append related taint.
+		taints = append(taints, v1.Taint{
+			Key:    algorithm.TaintNodeUnschedulable,
+			Effect: v1.TaintEffectNoSchedule,
+		})
+	}
+
+	// Get exist taints of node.
 	nodeTaints := taintutils.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool {
+		// Find unschedulable taint of node.
+		if t.Key == algorithm.TaintNodeUnschedulable {
+			return true
+		}
+		// Find node condition taints of node.
 		_, found := taintKeyToNodeConditionMap[t.Key]
 		return found
 	})
@@ -652,6 +672,11 @@ func (nc *Controller) monitorNodeStatus() error {
 						glog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
 					}
 				}
+				// remove shutdown taint this is needed always depending do we use taintbased or not
+				err := nc.markNodeAsNotShutdown(node)
+				if err != nil {
+					glog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
+				}
 			}
 
 			// Report node event.
@@ -665,6 +690,19 @@ func (nc *Controller) monitorNodeStatus() error {
 			// Check with the cloud provider to see if the node still exists. If it
 			// doesn't, delete the node immediately.
 			if currentReadyCondition.Status != v1.ConditionTrue && nc.cloud != nil {
+				// check is node shutdowned, if yes do not deleted it. Instead add taint
+				shutdown, err := nc.nodeShutdownInCloudProvider(context.TODO(), node)
+				if err != nil {
+					glog.Errorf("Error determining if node %v shutdown in cloud: %v", node.Name, err)
+				}
+				// node shutdown
+				if shutdown && err == nil {
+					err = controller.AddOrUpdateTaintOnNode(nc.kubeClient, node.Name, controller.ShutdownTaint)
+					if err != nil {
+						glog.Errorf("Error patching node taints: %v", err)
+					}
+					continue
+				}
 				exists, err := nc.nodeExistsInCloudProvider(types.NodeName(node.Name))
 				if err != nil {
 					glog.Errorf("Error determining if node %v exists in cloud: %v", node.Name, err)
@@ -813,6 +851,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 
 		// remaining node conditions should also be set to Unknown
 		remainingNodeConditionTypes := []v1.NodeConditionType{
+			v1.NodeOutOfDisk,
 			v1.NodeMemoryPressure,
 			v1.NodeDiskPressure,
 			// We don't change 'NodeNetworkUnavailable' condition, as it's managed on a control plane level.
@@ -1038,6 +1077,8 @@ func (nc *Controller) ReducedQPSFunc(nodeNum int) float32 {
 
 // addPodEvictorForNewZone checks if new zone appeared, and if so add new evictor.
 func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
 	zone := utilnode.GetZoneKey(node)
 	if _, found := nc.zoneStates[zone]; !found {
 		nc.zoneStates[zone] = stateInitial
@@ -1098,6 +1139,17 @@ func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 		return false, err
 	}
 	return nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name), nil
+}
+
+func (nc *Controller) markNodeAsNotShutdown(node *v1.Node) error {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, controller.ShutdownTaint)
+	if err != nil {
+		glog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
+		return err
+	}
+	return nil
 }
 
 // ComputeZoneState returns a slice of NodeReadyConditions for all Nodes in a given zone.

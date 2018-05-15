@@ -317,7 +317,7 @@ func (c *sioClient) IID() (string, error) {
 }
 
 // getGuid returns instance GUID, if not set using resource labels
-// it attemps to fallback to using drv_cfg binary
+// it attempts to fallback to using drv_cfg binary
 func (c *sioClient) getGuid() (string, error) {
 	if c.sdcGuid == "" {
 		glog.V(4).Info(log("sdc guid label not set, falling back to using drv_cfg"))
@@ -417,7 +417,7 @@ func (c *sioClient) WaitForAttachedDevice(token string) (string, error) {
 				return "", err
 			}
 			go func() {
-				glog.V(4).Infof(log("waiting for volume %s to be mapped/attached", token))
+				glog.V(4).Info(log("waiting for volume %s to be mapped/attached", token))
 			}()
 			if path, ok := devMap[token]; ok {
 				glog.V(4).Info(log("device %s mapped to vol %s", path, token))
@@ -451,7 +451,7 @@ func (c *sioClient) WaitForDetachedDevice(token string) error {
 				return err
 			}
 			go func() {
-				glog.V(4).Infof(log("waiting for volume %s to be unmapped/detached", token))
+				glog.V(4).Info(log("waiting for volume %s to be unmapped/detached", token))
 			}()
 			// cant find vol id, then ok.
 			if _, ok := devMap[token]; !ok {

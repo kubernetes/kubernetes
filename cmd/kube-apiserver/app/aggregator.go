@@ -32,14 +32,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
+	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
@@ -47,10 +50,26 @@ import (
 	"k8s.io/kubernetes/pkg/master/controller/crdregistration"
 )
 
-func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, commandOptions *options.ServerRunOptions, externalInformers kubeexternalinformers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, proxyTransport *http.Transport) (*aggregatorapiserver.Config, error) {
+func createAggregatorConfig(
+	kubeAPIServerConfig genericapiserver.Config,
+	commandOptions *options.ServerRunOptions,
+	externalInformers kubeexternalinformers.SharedInformerFactory,
+	serviceResolver aggregatorapiserver.ServiceResolver,
+	proxyTransport *http.Transport,
+	pluginInitializers []admission.PluginInitializer,
+) (*aggregatorapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the aggregator
 	genericConfig := kubeAPIServerConfig
+
+	// override genericConfig.AdmissionControl with kube-aggregator's scheme,
+	// because aggregator apiserver should use its own scheme to convert its own resources.
+	commandOptions.Admission.ApplyTo(
+		&genericConfig,
+		externalInformers,
+		genericConfig.LoopbackClientConfig,
+		aggregatorscheme.Scheme,
+		pluginInitializers...)
 
 	// the aggregator doesn't wire these up.  It just delegates them to the kubeapiserver
 	genericConfig.EnableSwaggerUI = false
@@ -58,8 +77,16 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
+	etcdOptions.StorageConfig.Codec = aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
+
+	// override MergedResourceConfig with aggregator defaults and registry
+	if err := commandOptions.APIEnablement.ApplyTo(
+		&genericConfig,
+		aggregatorapiserver.DefaultAPIResourceConfigSource(),
+		aggregatorscheme.Scheme); err != nil {
+		return nil, err
+	}
 
 	var err error
 	var certBytes, keyBytes []byte
@@ -112,7 +139,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		go func() {
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
 			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.
-			crdRegistrationController.WaitForInitialSync()
+			// we only need to do this if CRDs are enabled on this server.  We can't use discovery because we are the source for discovery.
+			if aggregatorConfig.GenericConfig.MergedResourceConfig.AnyVersionForGroupEnabled("apiextensions.k8s.io") {
+				crdRegistrationController.WaitForInitialSync()
+			}
 			autoRegistrationController.Run(5, context.StopCh)
 		}()
 		return nil
@@ -187,8 +217,12 @@ func makeAPIServiceAvailableHealthzCheck(name string, apiServices []*apiregistra
 	})
 }
 
+// priority defines group priority that is used in discovery. This controls
+// group position in the kubectl output.
 type priority struct {
-	group   int32
+	// group indicates the order of the group relative to other groups.
+	group int32
+	// version indicates the relative order of the version inside of its group.
 	version int32
 }
 
@@ -226,9 +260,14 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "storage.k8s.io", Version: "v1beta1"}:                {group: 16800, version: 9},
 	{Group: "storage.k8s.io", Version: "v1alpha1"}:               {group: 16800, version: 1},
 	{Group: "apiextensions.k8s.io", Version: "v1beta1"}:          {group: 16700, version: 9},
+	{Group: "admissionregistration.k8s.io", Version: "v1"}:       {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}:  {group: 16700, version: 12},
 	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
+	{Group: "scheduling.k8s.io", Version: "v1beta1"}:             {group: 16600, version: 12},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
+	// Append a new group to the end of the list if unsure.
+	// You can use min(existing group)-100 as the initial value for a group.
+	// Version can be set to 9 (to have space around) for a new group.
 }
 
 func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*apiregistration.APIService {

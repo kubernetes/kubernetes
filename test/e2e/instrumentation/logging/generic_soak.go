@@ -119,7 +119,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 		framework.PodStateVerification{
 			Selectors:   podlables,
 			ValidPhases: []v1.PodPhase{v1.PodRunning, v1.PodSucceeded},
-			// we don't validate total log data, since there is no gaurantee all logs will be stored forever.
+			// we don't validate total log data, since there is no guarantee all logs will be stored forever.
 			// instead, we just validate that some logs are being created in std out.
 			Verify: func(p v1.Pod) (bool, error) {
 				s, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "logging-soak", "logs-123", 1*time.Second)

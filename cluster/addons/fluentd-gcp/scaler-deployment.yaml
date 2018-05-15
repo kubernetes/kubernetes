@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fluentd-gcp-scaler
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-gcp-scaler
+    version: v0.3.0
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  selector:
+    matchLabels:
+      k8s-app: fluentd-gcp-scaler
+  template:
+    metadata:
+      labels:
+        k8s-app: fluentd-gcp-scaler
+    spec:
+      serviceAccountName: fluentd-gcp-scaler
+      containers:
+      - name: fluentd-gcp-scaler
+        image: k8s.gcr.io/fluentd-gcp-scaler:0.3
+        command:
+          - /scaler.sh
+          - --ds-name=fluentd-gcp-v3.0.0
+          - --scaling-policy=fluentd-gcp-scaling-policy
+        env:
+        # Defaults, used if no overrides are found in fluentd-gcp-scaling-policy
+        - name: CPU_REQUEST
+          value: 100m
+        - name: MEMORY_REQUEST
+          value: 200Mi
+        - name: CPU_LIMIT
+          value: 1000m
+        - name: MEMORY_LIMIT
+          value: 500Mi

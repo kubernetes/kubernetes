@@ -19,12 +19,13 @@ package e2e_node
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -130,18 +131,43 @@ var _ = framework.KubeDescribe("GarbageCollect [Serial]", func() {
 		},
 	}
 	for _, test := range tests {
-		// TODO (dashpole): Once the Container Runtime Interface (CRI) is complete, generalize run on other runtimes (other than docker)
-		dockerContainerGCTest(f, test)
+		containerGCTest(f, test)
 	}
 })
 
 // Tests the following:
 // 	pods are created, and all containers restart the specified number of times
-// 	while contianers are running, the number of copies of a single container does not exceed maxPerPodContainer
+// 	while containers are running, the number of copies of a single container does not exceed maxPerPodContainer
 // 	while containers are running, the total number of containers does not exceed maxTotalContainers
 // 	while containers are running, if not constrained by maxPerPodContainer or maxTotalContainers, keep an extra copy of each container
 // 	once pods are killed, all containers are eventually cleaned up
 func containerGCTest(f *framework.Framework, test testRun) {
+	var runtime internalapi.RuntimeService
+	BeforeEach(func() {
+		var err error
+		runtime, _, err = getCRIClient()
+		Expect(err).NotTo(HaveOccurred())
+	})
+	for _, pod := range test.testPods {
+		// Initialize the getContainerNames function to use CRI runtime client.
+		pod.getContainerNames = func() ([]string, error) {
+			relevantContainers := []string{}
+			containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
+				LabelSelector: map[string]string{
+					types.KubernetesPodNameLabel:      pod.podName,
+					types.KubernetesPodNamespaceLabel: f.Namespace.Name,
+				},
+			})
+			if err != nil {
+				return relevantContainers, err
+			}
+			for _, container := range containers {
+				relevantContainers = append(relevantContainers, container.Labels[types.KubernetesContainerNameLabel])
+			}
+			return relevantContainers, nil
+		}
+	}
+
 	Context(fmt.Sprintf("Garbage Collection Test: %s", test.testName), func() {
 		BeforeEach(func() {
 			realPods := getPods(test.testPods)
@@ -175,7 +201,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 					for i := 0; i < pod.numContainers; i++ {
 						containerCount := 0
 						for _, containerName := range containerNames {
-							if strings.Contains(containerName, pod.getContainerName(i)) {
+							if containerName == pod.getContainerName(i) {
 								containerCount += 1
 							}
 						}
@@ -203,7 +229,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 						for i := 0; i < pod.numContainers; i++ {
 							containerCount := 0
 							for _, containerName := range containerNames {
-								if strings.Contains(containerName, pod.getContainerName(i)) {
+								if containerName == pod.getContainerName(i) {
 									containerCount += 1
 								}
 							}
@@ -243,39 +269,6 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			}
 		})
 	})
-}
-
-// Runs containerGCTest using the docker runtime.
-func dockerContainerGCTest(f *framework.Framework, test testRun) {
-	var runtime libdocker.Interface
-	BeforeEach(func() {
-		runtime = libdocker.ConnectToDockerOrDie(
-			defaultDockerEndpoint,
-			defaultRuntimeRequestTimeoutDuration,
-			defaultImagePullProgressDeadline,
-			false,
-			false,
-		)
-	})
-	for _, pod := range test.testPods {
-		// Initialize the getContainerNames function to use the libdocker api
-		thisPrefix := pod.containerPrefix
-		pod.getContainerNames = func() ([]string, error) {
-			relevantContainers := []string{}
-			dockerContainers, err := libdocker.GetKubeletDockerContainers(runtime, true)
-			if err != nil {
-				return relevantContainers, err
-			}
-			for _, container := range dockerContainers {
-				// only look for containers from this testspec
-				if strings.Contains(container.Names[0], thisPrefix) {
-					relevantContainers = append(relevantContainers, container.Names[0])
-				}
-			}
-			return relevantContainers, nil
-		}
-	}
-	containerGCTest(f, test)
 }
 
 func getPods(specs []*testPodSpec) (pods []*v1.Pod) {

@@ -47,6 +47,10 @@ type Process struct {
 	// ExtraFiles specifies additional open files to be inherited by the container
 	ExtraFiles []*os.File
 
+	// Initial sizings for the console
+	ConsoleWidth  uint16
+	ConsoleHeight uint16
+
 	// Capabilities specify the capabilities to keep when executing the process inside the container
 	// All capabilities not specified will be dropped from the processes capability mask
 	Capabilities *configs.Capabilities

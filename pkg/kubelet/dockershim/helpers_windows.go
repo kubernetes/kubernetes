@@ -26,7 +26,9 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/golang/glog"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {
@@ -40,6 +42,17 @@ func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) 
 	return nil, nil
 }
 
+// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
+func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
+	if kubeletapis.ShouldIsolatedByHyperV(annotations) {
+		createConfig.HostConfig.Isolation = kubeletapis.HypervIsolationValue
+
+		if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" {
+			createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode("none")
+		}
+	}
+}
+
 func (ds *dockerService) updateCreateConfig(
 	createConfig *dockertypes.ContainerCreateConfig,
 	config *runtimeapi.ContainerConfig,
@@ -47,10 +60,25 @@ func (ds *dockerService) updateCreateConfig(
 	podSandboxID string, securityOptSep rune, apiVersion *semver.Version) error {
 	if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode != "" {
 		createConfig.HostConfig.NetworkMode = dockercontainer.NetworkMode(networkMode)
-	} else {
+	} else if !kubeletapis.ShouldIsolatedByHyperV(sandboxConfig.Annotations) {
 		// Todo: Refactor this call in future for calling methods directly in security_context.go
-		modifyHostNetworkOptionForContainer(false, podSandboxID, createConfig.HostConfig)
+		modifyHostOptionsForContainer(nil, podSandboxID, createConfig.HostConfig)
 	}
+
+	// Apply Windows-specific options if applicable.
+	if wc := config.GetWindows(); wc != nil {
+		rOpts := wc.GetResources()
+		if rOpts != nil {
+			createConfig.HostConfig.Resources = dockercontainer.Resources{
+				Memory:     rOpts.MemoryLimitInBytes,
+				CPUShares:  rOpts.CpuShares,
+				CPUCount:   rOpts.CpuCount,
+				CPUPercent: rOpts.CpuMaximum,
+			}
+		}
+	}
+
+	applyExperimentalCreateConfig(createConfig, sandboxConfig.Annotations)
 
 	return nil
 }
@@ -82,26 +110,36 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 		// Windows version < Windows Server 2016 is Not Supported
 
 		// Sandbox support in Windows mandates CNI Plugin.
-		// Presense of CONTAINER_NETWORK flag is considered as non-Sandbox cases here
+		// Presence of CONTAINER_NETWORK flag is considered as non-Sandbox cases here
 
 		// Todo: Add a kernel version check for more validation
 
 		if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" {
-			// Do not return any IP, so that we would continue and get the IP of the Sandbox
-			ds.getIP(sandboxID, r)
-		} else {
 			// On Windows, every container that is created in a Sandbox, needs to invoke CNI plugin again for adding the Network,
 			// with the shared container name as NetNS info,
 			// This is passed down to the platform to replicate some necessary information to the new container
 
 			//
-			// This place is chosen as a hack for now, since getContainerIP would end up calling CNI's addToNetwork
+			// This place is chosen as a hack for now, since ds.getIP would end up calling CNI's addToNetwork
 			// That is why addToNetwork is required to be idempotent
 
 			// Instead of relying on this call, an explicit call to addToNetwork should be
 			// done immediately after ContainerCreation, in case of Windows only. TBD Issue # to handle this
 
-			if containerIP := getContainerIP(r); containerIP != "" {
+			if r.HostConfig.Isolation == kubeletapis.HypervIsolationValue {
+				// Hyper-V only supports one container per Pod yet and the container will have a different
+				// IP address from sandbox. Return the first non-sandbox container IP as POD IP.
+				// TODO(feiskyer): remove this workaround after Hyper-V supports multiple containers per Pod.
+				if containerIP := ds.getIP(c.ID, r); containerIP != "" {
+					return containerIP
+				}
+			} else {
+				// Do not return any IP, so that we would continue and get the IP of the Sandbox
+				ds.getIP(sandboxID, r)
+			}
+		} else {
+			// ds.getIP will call the CNI plugin to fetch the IP
+			if containerIP := ds.getIP(c.ID, r); containerIP != "" {
 				return containerIP
 			}
 		}
@@ -115,15 +153,4 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 	// Like docker, the referenced container id is used to figure out the network namespace id internally by the platform
 	// so returning the docker networkMode (which holds container:<ref containerid> for network namespace here
 	return string(c.HostConfig.NetworkMode), nil
-}
-
-func getContainerIP(container *dockertypes.ContainerJSON) string {
-	if container.NetworkSettings != nil {
-		for _, network := range container.NetworkSettings.Networks {
-			if network.IPAddress != "" {
-				return network.IPAddress
-			}
-		}
-	}
-	return ""
 }

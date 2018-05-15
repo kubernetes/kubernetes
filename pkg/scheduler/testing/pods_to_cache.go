@@ -25,26 +25,36 @@ import (
 // PodsToCache is used for testing
 type PodsToCache []*v1.Pod
 
+// AssumePod returns nil.
 func (p PodsToCache) AssumePod(pod *v1.Pod) error { return nil }
 
+// ForgetPod returns nil.
 func (p PodsToCache) ForgetPod(pod *v1.Pod) error { return nil }
 
+// AddPod returns nil.
 func (p PodsToCache) AddPod(pod *v1.Pod) error { return nil }
 
+// UpdatePod returns nil.
 func (p PodsToCache) UpdatePod(oldPod, newPod *v1.Pod) error { return nil }
 
+// RemovePod returns nil.
 func (p PodsToCache) RemovePod(pod *v1.Pod) error { return nil }
 
+// AddNode returns nil.
 func (p PodsToCache) AddNode(node *v1.Node) error { return nil }
 
+// UpdateNode returns nil.
 func (p PodsToCache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
 
+// RemoveNode returns nil.
 func (p PodsToCache) RemoveNode(node *v1.Node) error { return nil }
 
+// UpdateNodeNameToInfoMap returns nil.
 func (p PodsToCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
 	return nil
 }
 
+// List returns pods matching the label selector.
 func (p PodsToCache) List(s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range p {
 		if s.Matches(labels.Set(pod.Labels)) {

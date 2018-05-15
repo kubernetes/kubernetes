@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.4
-PREFIX = gcr.io/google_containers
+TAG = 0.5
+PREFIX = gcr.io/kubernetes-e2e-test-images
 
 all: push
 
@@ -24,7 +24,7 @@ image:
 	docker tag $(PREFIX)/volume-gluster $(PREFIX)/volume-gluster:$(TAG)  # Add the version tag to the latest image
 
 push: image
-	gcloud docker -- push $(PREFIX)/volume-gluster # Push image tagged as latest to repository
-	gcloud docker -- push $(PREFIX)/volume-gluster:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
+	docker push $(PREFIX)/volume-gluster # Push image tagged as latest to repository
+	docker push $(PREFIX)/volume-gluster:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
 
 clean:

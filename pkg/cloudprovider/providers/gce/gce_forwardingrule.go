@@ -17,8 +17,13 @@ limitations under the License.
 package gce
 
 import (
+	"context"
+
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
 func newForwardingRuleMetricContext(request, region string) *metricContext {
@@ -31,79 +36,62 @@ func newForwardingRuleMetricContextWithVersion(request, region, version string) 
 // CreateGlobalForwardingRule creates the passed GlobalForwardingRule
 func (gce *GCECloud) CreateGlobalForwardingRule(rule *compute.ForwardingRule) error {
 	mc := newForwardingRuleMetricContext("create", "")
-	op, err := gce.service.GlobalForwardingRules.Insert(gce.projectID, rule).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.GlobalForwardingRules().Insert(context.Background(), meta.GlobalKey(rule.Name), rule))
 }
 
 // SetProxyForGlobalForwardingRule links the given TargetHttp(s)Proxy with the given GlobalForwardingRule.
 // targetProxyLink is the SelfLink of a TargetHttp(s)Proxy.
 func (gce *GCECloud) SetProxyForGlobalForwardingRule(forwardingRuleName, targetProxyLink string) error {
 	mc := newForwardingRuleMetricContext("set_proxy", "")
-	op, err := gce.service.GlobalForwardingRules.SetTarget(
-		gce.projectID, forwardingRuleName, &compute.TargetReference{Target: targetProxyLink}).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	target := &compute.TargetReference{Target: targetProxyLink}
+	return mc.Observe(gce.c.GlobalForwardingRules().SetTarget(context.Background(), meta.GlobalKey(forwardingRuleName), target))
 }
 
 // DeleteGlobalForwardingRule deletes the GlobalForwardingRule by name.
 func (gce *GCECloud) DeleteGlobalForwardingRule(name string) error {
 	mc := newForwardingRuleMetricContext("delete", "")
-	op, err := gce.service.GlobalForwardingRules.Delete(gce.projectID, name).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.GlobalForwardingRules().Delete(context.Background(), meta.GlobalKey(name)))
 }
 
 // GetGlobalForwardingRule returns the GlobalForwardingRule by name.
 func (gce *GCECloud) GetGlobalForwardingRule(name string) (*compute.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContext("get", "")
-	v, err := gce.service.GlobalForwardingRules.Get(gce.projectID, name).Do()
+	v, err := gce.c.GlobalForwardingRules().Get(context.Background(), meta.GlobalKey(name))
 	return v, mc.Observe(err)
 }
 
 // ListGlobalForwardingRules lists all GlobalForwardingRules in the project.
-func (gce *GCECloud) ListGlobalForwardingRules() (*compute.ForwardingRuleList, error) {
+func (gce *GCECloud) ListGlobalForwardingRules() ([]*compute.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContext("list", "")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.GlobalForwardingRules.List(gce.projectID).Do()
+	v, err := gce.c.GlobalForwardingRules().List(context.Background(), filter.None)
 	return v, mc.Observe(err)
 }
 
 // GetRegionForwardingRule returns the RegionalForwardingRule by name & region.
 func (gce *GCECloud) GetRegionForwardingRule(name, region string) (*compute.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContext("get", region)
-	v, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
+	v, err := gce.c.ForwardingRules().Get(context.Background(), meta.RegionalKey(name, region))
 	return v, mc.Observe(err)
 }
 
 // GetAlphaRegionForwardingRule returns the Alpha forwarding rule by name & region.
 func (gce *GCECloud) GetAlphaRegionForwardingRule(name, region string) (*computealpha.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContextWithVersion("get", region, computeAlphaVersion)
-	v, err := gce.serviceAlpha.ForwardingRules.Get(gce.projectID, region, name).Do()
+	v, err := gce.c.AlphaForwardingRules().Get(context.Background(), meta.RegionalKey(name, region))
 	return v, mc.Observe(err)
 }
 
 // ListRegionForwardingRules lists all RegionalForwardingRules in the project & region.
-func (gce *GCECloud) ListRegionForwardingRules(region string) (*compute.ForwardingRuleList, error) {
+func (gce *GCECloud) ListRegionForwardingRules(region string) ([]*compute.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContext("list", region)
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.ForwardingRules.List(gce.projectID, region).Do()
+	v, err := gce.c.ForwardingRules().List(context.Background(), region, filter.None)
 	return v, mc.Observe(err)
 }
 
-// ListRegionForwardingRules lists all RegionalForwardingRules in the project & region.
-func (gce *GCECloud) ListAlphaRegionForwardingRules(region string) (*computealpha.ForwardingRuleList, error) {
+// ListAlphaRegionForwardingRules lists all RegionalForwardingRules in the project & region.
+func (gce *GCECloud) ListAlphaRegionForwardingRules(region string) ([]*computealpha.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContextWithVersion("list", region, computeAlphaVersion)
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.serviceAlpha.ForwardingRules.List(gce.projectID, region).Do()
+	v, err := gce.c.AlphaForwardingRules().List(context.Background(), region, filter.None)
 	return v, mc.Observe(err)
 }
 
@@ -111,41 +99,26 @@ func (gce *GCECloud) ListAlphaRegionForwardingRules(region string) (*computealph
 // RegionalForwardingRule that points to the given BackendService
 func (gce *GCECloud) CreateRegionForwardingRule(rule *compute.ForwardingRule, region string) error {
 	mc := newForwardingRuleMetricContext("create", region)
-	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, rule).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForRegionOp(op, region, mc)
+	return mc.Observe(gce.c.ForwardingRules().Insert(context.Background(), meta.RegionalKey(rule.Name, region), rule))
 }
 
 // CreateAlphaRegionForwardingRule creates and returns an Alpha
 // forwarding fule in the given region.
 func (gce *GCECloud) CreateAlphaRegionForwardingRule(rule *computealpha.ForwardingRule, region string) error {
 	mc := newForwardingRuleMetricContextWithVersion("create", region, computeAlphaVersion)
-	op, err := gce.serviceAlpha.ForwardingRules.Insert(gce.projectID, region, rule).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForRegionOp(op, region, mc)
+	return mc.Observe(gce.c.AlphaForwardingRules().Insert(context.Background(), meta.RegionalKey(rule.Name, region), rule))
 }
 
 // DeleteRegionForwardingRule deletes the RegionalForwardingRule by name & region.
 func (gce *GCECloud) DeleteRegionForwardingRule(name, region string) error {
 	mc := newForwardingRuleMetricContext("delete", region)
-	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForRegionOp(op, region, mc)
+	return mc.Observe(gce.c.ForwardingRules().Delete(context.Background(), meta.RegionalKey(name, region)))
 }
 
 // TODO(#51665): retire this function once Network Tiers becomes Beta in GCP.
 func (gce *GCECloud) getNetworkTierFromForwardingRule(name, region string) (string, error) {
 	if !gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
-		return NetworkTierDefault.ToGCEValue(), nil
+		return cloud.NetworkTierDefault.ToGCEValue(), nil
 	}
 	fwdRule, err := gce.GetAlphaRegionForwardingRule(name, region)
 	if err != nil {

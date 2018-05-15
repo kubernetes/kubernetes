@@ -22,8 +22,8 @@ import (
 )
 
 var FakeMetadata = Metadata{
-	Uuid:             "83679162-1378-4288-a2d4-70e13ec132aa",
-	Name:             "test",
+	UUID:             "83679162-1378-4288-a2d4-70e13ec132aa",
+	Hostname:         "test",
 	AvailabilityZone: "nova",
 }
 
@@ -81,12 +81,12 @@ func TestParseMetadata(t *testing.T) {
 		t.Fatalf("Should succeed when provided with valid data: %s", err)
 	}
 
-	if md.Name != "test" {
-		t.Errorf("incorrect name: %s", md.Name)
+	if md.Hostname != "test.novalocal" {
+		t.Errorf("incorrect hostname: %s", md.Hostname)
 	}
 
-	if md.Uuid != "83679162-1378-4288-a2d4-70e13ec132aa" {
-		t.Errorf("incorrect uuid: %s", md.Uuid)
+	if md.UUID != "83679162-1378-4288-a2d4-70e13ec132aa" {
+		t.Errorf("incorrect uuid: %s", md.UUID)
 	}
 
 	if md.AvailabilityZone != "nova" {
@@ -107,5 +107,9 @@ func TestParseMetadata(t *testing.T) {
 
 	if md.Devices[0].Type != "disk" {
 		t.Errorf("incorrect device type: %s", md.Devices[0].Type)
+	}
+
+	if md.Devices[0].Serial != "6df1888b-f373-41cf-b960-3786e60a28ef" {
+		t.Errorf("incorrect device serial: %s", md.Devices[0].Serial)
 	}
 }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -97,7 +97,7 @@ push() {
   fi
   for arch in ${archs}; do
     TAG=$(<${IMAGE}/VERSION)
-    gcloud docker -- push ${REGISTRY}/${IMAGE}-${arch}:${TAG}
+    docker push ${REGISTRY}/${IMAGE}-${arch}:${TAG}
   done
 }
 

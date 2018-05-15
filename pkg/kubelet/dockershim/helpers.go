@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
@@ -31,7 +30,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -39,12 +38,8 @@ import (
 )
 
 const (
-	annotationPrefix = "annotation."
-
-	// Docker changed the API for specifying options in v1.11
-	securityOptSeparatorChangeVersion = "1.23.0" // Corresponds to docker 1.11.x
-	securityOptSeparatorOld           = ':'
-	securityOptSeparatorNew           = '='
+	annotationPrefix     = "annotation."
+	securityOptSeparator = '='
 )
 
 var (
@@ -53,10 +48,6 @@ var (
 	// this is hacky, but extremely common.
 	// if a container starts but the executable file is not found, runc gives a message that matches
 	startRE = regexp.MustCompile(`\\\\\\\"(.*)\\\\\\\": executable file not found`)
-
-	// Docker changes the security option separator from ':' to '=' in the 1.23
-	// API version.
-	optsSeparatorChangeVersion = semver.MustParse(securityOptSeparatorChangeVersion)
 
 	defaultSeccompOpt = []dockerOpt{{"seccomp", "unconfined", ""}}
 )
@@ -319,21 +310,6 @@ func transformStartContainerError(err error) error {
 		return fmt.Errorf("executable not found in $PATH")
 	}
 	return err
-}
-
-// getSecurityOptSeparator returns the security option separator based on the
-// docker API version.
-// TODO: Remove this function along with the relevant code when we no longer
-// need to support docker 1.10.
-func getSecurityOptSeparator(v *semver.Version) rune {
-	switch v.Compare(optsSeparatorChangeVersion) {
-	case -1:
-		// Current version is less than the API change version; use the old
-		// separator.
-		return securityOptSeparatorOld
-	default:
-		return securityOptSeparatorNew
-	}
 }
 
 // ensureSandboxImageExists pulls the sandbox image when it's not present.

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Copies any built binaries (and other generated files) out of the Docker build contianer.
+# Copies any built binaries (and other generated files) out of the Docker build container.
 set -o errexit
 set -o nounset
 set -o pipefail

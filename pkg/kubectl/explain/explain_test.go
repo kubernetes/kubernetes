@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestSplitAndParseResourceRequest(t *testing.T) {
@@ -57,7 +57,7 @@ func TestSplitAndParseResourceRequest(t *testing.T) {
 		},
 	}
 
-	mapper := getMapper()
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	for _, test := range tests {
 		gotInResource, gotFieldsPath, err := SplitAndParseResourceRequest(test.inresource, mapper)
 		if err != nil {
@@ -72,10 +72,4 @@ func TestSplitAndParseResourceRequest(t *testing.T) {
 			t.Errorf("%s: expected fieldsPath: %s, got: %s", test.name, test.expectedFieldsPath, gotFieldsPath)
 		}
 	}
-}
-
-func getMapper() meta.RESTMapper {
-	f, _, _, _ := cmdtesting.NewTestFactory()
-	mapper, _ := f.Object()
-	return mapper
 }

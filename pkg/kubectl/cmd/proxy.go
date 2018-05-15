@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/proxy"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -69,14 +70,15 @@ var (
 		kubectl proxy --api-prefix=/k8s-api`))
 )
 
-func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
+		Use: "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Run a proxy to the Kubernetes API server"),
 		Long:    proxyLong,
 		Example: proxyExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunProxy(f, out, cmd)
+			err := RunProxy(f, streams.Out, cmd)
 			cmdutil.CheckErr(err)
 		},
 	}

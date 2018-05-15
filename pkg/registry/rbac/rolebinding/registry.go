@@ -17,6 +17,8 @@ limitations under the License.
 package rolebinding
 
 import (
+	"context"
+
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -27,12 +29,12 @@ import (
 
 // Registry is an interface for things that know how to store RoleBindings.
 type Registry interface {
-	ListRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleBindingList, error)
-	CreateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc) error
-	UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
-	GetRoleBinding(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error)
-	DeleteRoleBinding(ctx genericapirequest.Context, name string) error
-	WatchRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	ListRoleBindings(ctx context.Context, options *metainternalversion.ListOptions) (*rbac.RoleBindingList, error)
+	CreateRoleBinding(ctx context.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc) error
+	UpdateRoleBinding(ctx context.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	GetRoleBinding(ctx context.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error)
+	DeleteRoleBinding(ctx context.Context, name string) error
+	WatchRoleBindings(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +48,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.RoleBindingList, error) {
+func (s *storage) ListRoleBindings(ctx context.Context, options *metainternalversion.ListOptions) (*rbac.RoleBindingList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -55,22 +57,22 @@ func (s *storage) ListRoleBindings(ctx genericapirequest.Context, options *metai
 	return obj.(*rbac.RoleBindingList), nil
 }
 
-func (s *storage) CreateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc) error {
+func (s *storage) CreateRoleBinding(ctx context.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc) error {
 	// TODO(ericchiang): add additional validation
 	_, err := s.Create(ctx, roleBinding, createValidation, false)
 	return err
 }
 
-func (s *storage) UpdateRoleBinding(ctx genericapirequest.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+func (s *storage) UpdateRoleBinding(ctx context.Context, roleBinding *rbac.RoleBinding, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
 	_, _, err := s.Update(ctx, roleBinding.Name, rest.DefaultUpdatedObjectInfo(roleBinding), createValidation, updateValidation)
 	return err
 }
 
-func (s *storage) WatchRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchRoleBindings(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetRoleBinding(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error) {
+func (s *storage) GetRoleBinding(ctx context.Context, name string, options *metav1.GetOptions) (*rbac.RoleBinding, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -78,7 +80,7 @@ func (s *storage) GetRoleBinding(ctx genericapirequest.Context, name string, opt
 	return obj.(*rbac.RoleBinding), nil
 }
 
-func (s *storage) DeleteRoleBinding(ctx genericapirequest.Context, name string) error {
+func (s *storage) DeleteRoleBinding(ctx context.Context, name string) error {
 	_, _, err := s.Delete(ctx, name, nil)
 	return err
 }

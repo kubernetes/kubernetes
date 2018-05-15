@@ -19,26 +19,24 @@ package vsphere
 import (
 	"context"
 	"errors"
-	"io/ioutil"
 	"os"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/vim25"
 
 	"fmt"
 
-	"path/filepath"
-
 	"github.com/vmware/govmomi/vim25/mo"
+	"io/ioutil"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
+	"k8s.io/kubernetes/pkg/util/version"
+	"path/filepath"
 )
 
 const (
@@ -47,63 +45,40 @@ const (
 	Folder                = "Folder"
 	VirtualMachine        = "VirtualMachine"
 	DummyDiskName         = "kube-dummyDisk.vmdk"
+	UUIDPath              = "/sys/class/dmi/id/product_serial"
+	UUIDPrefix            = "VMware-"
+	ProviderPrefix        = "vsphere://"
+	vSphereConfFileEnvVar = "VSPHERE_CONF_FILE"
 )
 
 // GetVSphere reads vSphere configuration from system environment and construct vSphere object
 func GetVSphere() (*VSphere, error) {
-	cfg := getVSphereConfig()
-	vSphereConn := getVSphereConn(cfg)
-	client, err := GetgovmomiClient(vSphereConn)
+	cfg, err := getVSphereConfig()
 	if err != nil {
 		return nil, err
 	}
-	vSphereConn.GoVmomiClient = client
-	vsphereIns := &VSphereInstance{
-		conn: vSphereConn,
-		cfg: &VirtualCenterConfig{
-			User:              cfg.Global.User,
-			Password:          cfg.Global.Password,
-			VCenterPort:       cfg.Global.VCenterPort,
-			Datacenters:       cfg.Global.Datacenters,
-			RoundTripperCount: cfg.Global.RoundTripperCount,
-		},
+	vs, err := newControllerNode(*cfg)
+	if err != nil {
+		return nil, err
 	}
-	vsphereInsMap := make(map[string]*VSphereInstance)
-	vsphereInsMap[cfg.Global.VCenterIP] = vsphereIns
-	// TODO: Initialize nodeManager and set it in VSphere.
-	vs := &VSphere{
-		vsphereInstanceMap: vsphereInsMap,
-		hostName:           "",
-		cfg:                cfg,
-		nodeManager: &NodeManager{
-			vsphereInstanceMap: vsphereInsMap,
-			nodeInfoMap:        make(map[string]*NodeInfo),
-			registeredNodes:    make(map[string]*v1.Node),
-		},
-	}
-	runtime.SetFinalizer(vs, logout)
 	return vs, nil
 }
 
-func getVSphereConfig() *VSphereConfig {
-	var cfg VSphereConfig
-	cfg.Global.VCenterIP = os.Getenv("VSPHERE_VCENTER")
-	cfg.Global.VCenterPort = os.Getenv("VSPHERE_VCENTER_PORT")
-	cfg.Global.User = os.Getenv("VSPHERE_USER")
-	cfg.Global.Password = os.Getenv("VSPHERE_PASSWORD")
-	cfg.Global.Datacenters = os.Getenv("VSPHERE_DATACENTER")
-	cfg.Global.DefaultDatastore = os.Getenv("VSPHERE_DATASTORE")
-	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
-	cfg.Global.VMName = os.Getenv("VSPHERE_VM_NAME")
-	cfg.Global.InsecureFlag = false
-	if strings.ToLower(os.Getenv("VSPHERE_INSECURE")) == "true" {
-		cfg.Global.InsecureFlag = true
+func getVSphereConfig() (*VSphereConfig, error) {
+	confFileLocation := os.Getenv(vSphereConfFileEnvVar)
+	if confFileLocation == "" {
+		return nil, fmt.Errorf("Env variable 'VSPHERE_CONF_FILE' is not set.")
 	}
-	cfg.Workspace.VCenterIP = cfg.Global.VCenterIP
-	cfg.Workspace.Datacenter = cfg.Global.Datacenters
-	cfg.Workspace.DefaultDatastore = cfg.Global.DefaultDatastore
-	cfg.Workspace.Folder = cfg.Global.WorkingDir
-	return &cfg
+	confFile, err := os.Open(confFileLocation)
+	if err != nil {
+		return nil, err
+	}
+	defer confFile.Close()
+	cfg, err := readConfig(confFile)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
 }
 
 func getVSphereConn(cfg *VSphereConfig) *vclib.VSphereConnection {
@@ -116,40 +91,6 @@ func getVSphereConn(cfg *VSphereConfig) *vclib.VSphereConnection {
 		Port:              cfg.Global.VCenterPort,
 	}
 	return vSphereConn
-}
-
-// GetgovmomiClient gets the goVMOMI client for the vsphere connection object
-func GetgovmomiClient(conn *vclib.VSphereConnection) (*govmomi.Client, error) {
-	if conn == nil {
-		cfg := getVSphereConfig()
-		conn = getVSphereConn(cfg)
-	}
-	client, err := conn.NewClient(context.TODO())
-	return client, err
-}
-
-// getvmUUID gets the BIOS UUID via the sys interface.  This UUID is known by vsphere
-func getvmUUID() (string, error) {
-	id, err := ioutil.ReadFile(UUIDPath)
-	if err != nil {
-		return "", fmt.Errorf("error retrieving vm uuid: %s", err)
-	}
-	uuidFromFile := string(id[:])
-	//strip leading and trailing white space and new line char
-	uuid := strings.TrimSpace(uuidFromFile)
-	// check the uuid starts with "VMware-"
-	if !strings.HasPrefix(uuid, UUIDPrefix) {
-		return "", fmt.Errorf("Failed to match Prefix, UUID read from the file is %v", uuidFromFile)
-	}
-	// Strip the prefix and while spaces and -
-	uuid = strings.Replace(uuid[len(UUIDPrefix):(len(uuid))], " ", "", -1)
-	uuid = strings.Replace(uuid, "-", "", -1)
-	if len(uuid) != 32 {
-		return "", fmt.Errorf("Length check failed, UUID read from the file is %v", uuidFromFile)
-	}
-	// need to add dashes, e.g. "564d395e-d807-e18a-cb25-b79f65eb2b9f"
-	uuid = fmt.Sprintf("%s-%s-%s-%s-%s", uuid[0:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:32])
-	return uuid, nil
 }
 
 // Returns the accessible datastores for the given node VM.
@@ -532,8 +473,107 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 		if err != nil {
 			return nodesToRetry, err
 		}
-		glog.V(9).Infof("Verifying volume for nodeName: %q with nodeuuid: %s", nodeName, node.Status.NodeInfo.SystemUUID, vmMoMap)
-		vclib.VerifyVolumePathsForVM(vmMoMap[strings.ToLower(node.Status.NodeInfo.SystemUUID)], nodeVolumes[nodeName], convertToString(nodeName), attached)
+		nodeUUID, err := GetNodeUUID(&node)
+		if err != nil {
+			glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, err)
+			return nodesToRetry, err
+		}
+		nodeUUID = strings.ToLower(nodeUUID)
+		glog.V(9).Infof("Verifying volume for node %s with nodeuuid %q: %s", nodeName, nodeUUID, vmMoMap)
+		vclib.VerifyVolumePathsForVM(vmMoMap[nodeUUID], nodeVolumes[nodeName], convertToString(nodeName), attached)
 	}
 	return nodesToRetry, nil
+}
+
+func (vs *VSphere) IsDummyVMPresent(vmName string) (bool, error) {
+	isDummyVMPresent := false
+
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
+	if err != nil {
+		return isDummyVMPresent, err
+	}
+
+	dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
+	if err != nil {
+		return isDummyVMPresent, err
+	}
+
+	vmFolder, err := dc.GetFolderByPath(ctx, vs.cfg.Workspace.Folder)
+	if err != nil {
+		return isDummyVMPresent, err
+	}
+
+	vms, err := vmFolder.GetVirtualMachines(ctx)
+	if err != nil {
+		return isDummyVMPresent, err
+	}
+
+	for _, vm := range vms {
+		if vm.Name() == vmName {
+			isDummyVMPresent = true
+			break
+		}
+	}
+
+	return isDummyVMPresent, nil
+}
+
+func GetVMUUID() (string, error) {
+	id, err := ioutil.ReadFile(UUIDPath)
+	if err != nil {
+		return "", fmt.Errorf("error retrieving vm uuid: %s", err)
+	}
+	uuidFromFile := string(id[:])
+	//strip leading and trailing white space and new line char
+	uuid := strings.TrimSpace(uuidFromFile)
+	// check the uuid starts with "VMware-"
+	if !strings.HasPrefix(uuid, UUIDPrefix) {
+		return "", fmt.Errorf("Failed to match Prefix, UUID read from the file is %v", uuidFromFile)
+	}
+	// Strip the prefix and white spaces and -
+	uuid = strings.Replace(uuid[len(UUIDPrefix):(len(uuid))], " ", "", -1)
+	uuid = strings.Replace(uuid, "-", "", -1)
+	if len(uuid) != 32 {
+		return "", fmt.Errorf("Length check failed, UUID read from the file is %v", uuidFromFile)
+	}
+	// need to add dashes, e.g. "564d395e-d807-e18a-cb25-b79f65eb2b9f"
+	uuid = fmt.Sprintf("%s-%s-%s-%s-%s", uuid[0:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:32])
+	return uuid, nil
+}
+
+func GetUUIDFromProviderID(providerID string) string {
+	return strings.TrimPrefix(providerID, ProviderPrefix)
+}
+
+func IsUUIDSupportedNode(node *v1.Node) (bool, error) {
+	newVersion, err := version.ParseSemantic("v1.9.4")
+	if err != nil {
+		glog.Errorf("Failed to determine whether node %+v is old with error %v", node, err)
+		return false, err
+	}
+	nodeVersion, err := version.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
+	if err != nil {
+		glog.Errorf("Failed to determine whether node %+v is old with error %v", node, err)
+		return false, err
+	}
+	if nodeVersion.LessThan(newVersion) {
+		return true, nil
+	}
+	return false, nil
+}
+
+func GetNodeUUID(node *v1.Node) (string, error) {
+	oldNode, err := IsUUIDSupportedNode(node)
+	if err != nil {
+		glog.Errorf("Failed to get node UUID for node %+v with error %v", node, err)
+		return "", err
+	}
+	if oldNode {
+		return node.Status.NodeInfo.SystemUUID, nil
+	}
+	return GetUUIDFromProviderID(node.Spec.ProviderID), nil
 }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -45,6 +45,10 @@ KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
 RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 
+# Generate a random 6-digit alphanumeric tag for the kubemark image.
+# Used to uniquify image builds across different invocations of this script.
+KUBEMARK_IMAGE_TAG=$(head /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1)
+
 # Write all environment variables that we need to pass to the kubemark master,
 # locally to the file ${RESOURCE_DIRECTORY}/kubemark-master-env.sh.
 function create-master-environment-file {
@@ -55,7 +59,7 @@ SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-}"
 EVENT_PD="${EVENT_PD:-}"
 
 # Etcd related variables.
-ETCD_IMAGE="${ETCD_IMAGE:-3.1.10}"
+ETCD_IMAGE="${ETCD_IMAGE:-3.2.18-0}"
 ETCD_VERSION="${ETCD_VERSION:-}"
 
 # Controller-manager related variables.
@@ -72,6 +76,7 @@ APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-}"
 STORAGE_MEDIA_TYPE="${STORAGE_MEDIA_TYPE:-}"
 STORAGE_BACKEND="${STORAGE_BACKEND:-etcd3}"
 ETCD_QUORUM_READ="${ETCD_QUORUM_READ:-}"
+ETCD_COMPACTION_INTERVAL_SEC="${ETCD_COMPACTION_INTERVAL_SEC:-}"
 RUNTIME_CONFIG="${RUNTIME_CONFIG:-}"
 NUM_NODES="${NUM_NODES:-}"
 CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-}"
@@ -94,6 +99,7 @@ function generate-pki-config {
   NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   HEAPSTER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   CLUSTER_AUTOSCALER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_DNS_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   echo "Generated PKI authentication data for kubemark."
 }
 
@@ -121,6 +127,7 @@ function write-pki-config-to-master {
     sudo bash -c \"echo \"${HEAPSTER_TOKEN},system:heapster,uid:heapster\" >> /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
     sudo bash -c \"echo \"${CLUSTER_AUTOSCALER_TOKEN},system:cluster-autoscaler,uid:cluster-autoscaler\" >> /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
     sudo bash -c \"echo \"${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:system:node-problem-detector\" >> /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBE_DNS_TOKEN},system:kube-dns,uid:kube-dns\" >> /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
     sudo bash -c \"echo ${KUBE_PASSWORD},admin,admin > /home/kubernetes/k8s_auth_data/basic_auth.csv\""
   execute-cmd-on-master-with-retries "${PKI_SETUP_CMD}" 3
   echo "Wrote PKI certs, keys, tokens and admin password to master."
@@ -192,14 +199,19 @@ function create-and-upload-hollow-node-image {
     echo 'Cannot find cmd/kubemark binary'
     exit 1
   fi
-  
+
+  echo "Configuring registry authentication"
+  mkdir -p "${HOME}/.docker"
+  gcloud beta auth configure-docker -q
+
   echo "Copying kubemark binary to ${MAKE_DIR}"
   cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
   CURR_DIR=`pwd`
   cd "${MAKE_DIR}"
   RETRIES=3
+  KUBEMARK_IMAGE_REGISTRY="${KUBEMARK_IMAGE_REGISTRY:-${CONTAINER_REGISTRY}/${PROJECT}}"
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! REGISTRY="${CONTAINER_REGISTRY}" PROJECT="${PROJECT}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
+    if ! REGISTRY="${KUBEMARK_IMAGE_REGISTRY}" IMAGE_TAG="${KUBEMARK_IMAGE_TAG}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Make failed. Exiting.${color_norm}"
         exit 1
@@ -218,9 +230,13 @@ function create-and-upload-hollow-node-image {
 # Use bazel rule to create a docker image for hollow-node and upload
 # it to the appropriate docker container registry for the cloud provider.
 function create-and-upload-hollow-node-image-bazel {
+  echo "Configuring registry authentication"
+  mkdir -p "${HOME}/.docker"
+  gcloud beta auth configure-docker -q
+
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! bazel run //cluster/images/kubemark:push --define PROJECT="${PROJECT}"; then
+    if ! bazel run //cluster/images/kubemark:push --define REGISTRY="${KUBEMARK_IMAGE_REGISTRY}" --define IMAGE_TAG="${KUBEMARK_IMAGE_TAG}"; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Image push failed. Exiting.${color_norm}"
         exit 1
@@ -334,6 +350,25 @@ contexts:
   name: kubemark-context
 current-context: kubemark-context")
 
+  # Create kubeconfig for Kube DNS.
+  KUBE_DNS_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+kind: Config
+users:
+- name: kube-dns
+  user:
+    token: ${KUBE_DNS_TOKEN}
+clusters:
+- name: kubemark
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://${MASTER_IP}
+contexts:
+- context:
+    cluster: kubemark
+    user: kube-dns
+  name: kubemark-context
+current-context: kubemark-context")
+
   # Create kubemark namespace.
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/kubemark-ns.json"
 
@@ -348,7 +383,8 @@ current-context: kubemark-context")
     --from-literal=kubeproxy.kubeconfig="${KUBEPROXY_KUBECONFIG_CONTENTS}" \
     --from-literal=heapster.kubeconfig="${HEAPSTER_KUBECONFIG_CONTENTS}" \
     --from-literal=cluster_autoscaler.kubeconfig="${CLUSTER_AUTOSCALER_KUBECONFIG_CONTENTS}" \
-    --from-literal=npd.kubeconfig="${NPD_KUBECONFIG_CONTENTS}"
+    --from-literal=npd.kubeconfig="${NPD_KUBECONFIG_CONTENTS}" \
+    --from-literal=dns.kubeconfig="${KUBE_DNS_KUBECONFIG_CONTENTS}"
 
   # Create addon pods.
   # Heapster.
@@ -366,7 +402,7 @@ current-context: kubemark-context")
   sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
 
   # Cluster Autoscaler.
-  if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER}" == "true" ]]; then
+  if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Setting up Cluster Autoscaler"
     KUBEMARK_AUTOSCALER_MIG_NAME="${KUBEMARK_AUTOSCALER_MIG_NAME:-${NODE_INSTANCE_PREFIX}-group}"
     KUBEMARK_AUTOSCALER_MIN_NODES="${KUBEMARK_AUTOSCALER_MIN_NODES:-0}"
@@ -378,6 +414,12 @@ current-context: kubemark-context")
     sed -i'' -e "s/{{kubemark_autoscaler_mig_name}}/${KUBEMARK_AUTOSCALER_MIG_NAME}/g" "${RESOURCE_DIRECTORY}/addons/cluster-autoscaler.json"
     sed -i'' -e "s/{{kubemark_autoscaler_min_nodes}}/${KUBEMARK_AUTOSCALER_MIN_NODES}/g" "${RESOURCE_DIRECTORY}/addons/cluster-autoscaler.json"
     sed -i'' -e "s/{{kubemark_autoscaler_max_nodes}}/${KUBEMARK_AUTOSCALER_MAX_NODES}/g" "${RESOURCE_DIRECTORY}/addons/cluster-autoscaler.json"
+  fi
+
+  # Kube DNS.
+  if [[ "${ENABLE_KUBEMARK_KUBE_DNS:-}" == "true" ]]; then
+    echo "Setting up kube-dns"
+    sed "s/{{dns_domain}}/${KUBE_DNS_DOMAIN}/g" "${RESOURCE_DIRECTORY}/kube_dns_template.yaml" > "${RESOURCE_DIRECTORY}/addons/kube_dns.yaml"
   fi
 
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
@@ -394,8 +436,8 @@ current-context: kubemark-context")
   proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES}))
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{registry}}/${CONTAINER_REGISTRY}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{project}}/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s'{{kubemark_image_registry}}'${KUBEMARK_IMAGE_REGISTRY}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s/{{kubemark_image_tag}}/${KUBEMARK_IMAGE_TAG}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubelet_verbosity_level}}/${KUBELET_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubeproxy_verbosity_level}}/${KUBEPROXY_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"

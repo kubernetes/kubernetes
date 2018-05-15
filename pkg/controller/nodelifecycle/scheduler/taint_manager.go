@@ -18,22 +18,21 @@ package scheduler
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"sync"
+	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"sync"
-	"time"
-
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
 	"github.com/golang/glog"
 )
@@ -155,7 +154,7 @@ func NewNoExecuteTaintManager(c clientset.Interface) *NoExecuteTaintManager {
 	eventBroadcaster.StartLogging(glog.Infof)
 	if c != nil {
 		glog.V(0).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(c.CoreV1().RESTClient()).Events("")})
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
 	} else {
 		glog.Fatalf("kubeClient is nil when starting NodeController")
 	}

@@ -54,9 +54,12 @@ type Router struct {
 	// ID is the unique identifier for the router.
 	ID string `json:"id"`
 
-	// TenantID is the owner of the router. Only admin users can specify a tenant
-	// identifier other than its own.
+	// TenantID is the project owner of the router. Only admin users can
+	// specify a project identifier other than its own.
 	TenantID string `json:"tenant_id"`
+
+	// ProjectID is the project owner of the router.
+	ProjectID string `json:"project_id"`
 
 	// Routes are a collection of static routes that the router will host.
 	Routes []Route `json:"routes"`

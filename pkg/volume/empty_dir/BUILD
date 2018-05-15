@@ -76,7 +76,6 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/empty_dir",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/util/mount:go_default_library",

@@ -14,41 +14,48 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package config
 
 import (
 	"fmt"
 	"io/ioutil"
 	"net"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-// SetInitDynamicDefaults checks and sets conifugration values for Master node
+// SetInitDynamicDefaults checks and sets configuration values for Master node
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
+	// validate cfg.API.AdvertiseAddress.
+	addressIP := net.ParseIP(cfg.API.AdvertiseAddress)
+	if addressIP == nil && cfg.API.AdvertiseAddress != "" {
+		return fmt.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.API.AdvertiseAddress)
+	}
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
 	// This is the same logic as the API Server uses
-	ip, err := netutil.ChooseBindAddress(net.ParseIP(cfg.API.AdvertiseAddress))
+	ip, err := netutil.ChooseBindAddress(addressIP)
 	if err != nil {
 		return err
 	}
 	cfg.API.AdvertiseAddress = ip.String()
 	ip = net.ParseIP(cfg.API.AdvertiseAddress)
 	if ip.To4() != nil {
-		cfg.KubeProxy.Config.BindAddress = kubeadmapiext.DefaultProxyBindAddressv4
+		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha1.DefaultProxyBindAddressv4
 	} else {
-		cfg.KubeProxy.Config.BindAddress = kubeadmapiext.DefaultProxyBindAddressv6
+		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha1.DefaultProxyBindAddressv6
 	}
 	// Resolve possible version labels and validate version string
 	err = NormalizeKubernetesVersion(cfg)
@@ -70,14 +77,14 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 // TryLoadMasterConfiguration tries to loads a Master configuration from the given file (if defined)
-func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiext.MasterConfiguration) error {
+func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiv1alpha1.MasterConfiguration) error {
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
 			return fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 			return fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
@@ -90,19 +97,21 @@ func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiext.MasterConfigu
 // Then the external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiext.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
+func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha1.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
+	glog.V(1).Infoln("configuring files and defaults to internal config")
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
 	// Loads configuration from config file, if provided
 	// Nb. --config overrides command line flags
+	glog.V(1).Infoln("attempting to load configuration from config file")
 	if err := TryLoadMasterConfiguration(cfgPath, defaultversionedcfg); err != nil {
 		return nil, err
 	}
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
 	// static default values to cfg only for values not provided with flags
-	legacyscheme.Scheme.Default(defaultversionedcfg)
-	legacyscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
+	kubeadmscheme.Scheme.Default(defaultversionedcfg)
+	kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(internalcfg); err != nil {
 		return nil, err

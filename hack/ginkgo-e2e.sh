@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -44,6 +44,17 @@ GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 export KUBECTL KUBE_CONFIG_FILE
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
+
+function detect-master-from-kubeconfig() {
+    export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
+
+    local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+    if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+      cc="${KUBE_CONTEXT}"
+    fi
+    local cluster=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
+    KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
+}
 
 # ---- Do cloud-provider-specific setup
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
@@ -149,6 +160,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --node-tag="${NODE_TAG:-}" \
   --master-tag="${MASTER_TAG:-}" \
   --cluster-monitoring-mode="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}" \
+  --prometheus-monitoring="${KUBE_ENABLE_PROMETHEUS_MONITORING:-false}" \
   ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \

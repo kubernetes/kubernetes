@@ -26,11 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
+// NodeLabelPrioritizer contains information to calculate node label priority.
 type NodeLabelPrioritizer struct {
 	label    string
 	presence bool
 }
 
+// NewNodeLabelPriority creates a NodeLabelPrioritizer.
 func NewNodeLabelPriority(label string, presence bool) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 	labelPrioritizer := &NodeLabelPrioritizer{
 		label:    label,
@@ -39,7 +41,7 @@ func NewNodeLabelPriority(label string, presence bool) (algorithm.PriorityMapFun
 	return labelPrioritizer.CalculateNodeLabelPriorityMap, nil
 }
 
-// CalculateNodeLabelPriority checks whether a particular label exists on a node or not, regardless of its value.
+// CalculateNodeLabelPriorityMap checks whether a particular label exists on a node or not, regardless of its value.
 // If presence is true, prioritizes nodes that have the specified label, regardless of value.
 // If presence is false, prioritizes nodes that do not have the specified label.
 func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {

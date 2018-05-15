@@ -18,7 +18,7 @@ package util
 
 import (
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"reflect"
 	"testing"
 )
@@ -41,7 +41,7 @@ func TestVolumeSourceFSTypeDrift(t *testing.T) {
 
 		fsType, err := GetVolumeFSType(api.Volume{VolumeSource: volumeSource})
 		if err != nil {
-			t.Errorf("error getting fstype for field %s.  This likely means that drift has occured between FSType and VolumeSource.  Please update the api and getVolumeFSType", fieldVal.Name)
+			t.Errorf("error getting fstype for field %s.  This likely means that drift has occurred between FSType and VolumeSource.  Please update the api and getVolumeFSType", fieldVal.Name)
 		}
 
 		if !allFSTypes.Has(string(fsType)) {
@@ -52,45 +52,45 @@ func TestVolumeSourceFSTypeDrift(t *testing.T) {
 
 func TestPSPAllowsFSType(t *testing.T) {
 	tests := map[string]struct {
-		psp    *extensions.PodSecurityPolicy
-		fsType extensions.FSType
+		psp    *policy.PodSecurityPolicy
+		fsType policy.FSType
 		allows bool
 	}{
 		"nil psp": {
 			psp:    nil,
-			fsType: extensions.HostPath,
+			fsType: policy.HostPath,
 			allows: false,
 		},
 		"empty volumes": {
-			psp:    &extensions.PodSecurityPolicy{},
-			fsType: extensions.HostPath,
+			psp:    &policy.PodSecurityPolicy{},
+			fsType: policy.HostPath,
 			allows: false,
 		},
 		"non-matching": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					Volumes: []extensions.FSType{extensions.AWSElasticBlockStore},
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					Volumes: []policy.FSType{policy.AWSElasticBlockStore},
 				},
 			},
-			fsType: extensions.HostPath,
+			fsType: policy.HostPath,
 			allows: false,
 		},
 		"match on FSTypeAll": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					Volumes: []extensions.FSType{extensions.All},
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					Volumes: []policy.FSType{policy.All},
 				},
 			},
-			fsType: extensions.HostPath,
+			fsType: policy.HostPath,
 			allows: true,
 		},
 		"match on direct match": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					Volumes: []extensions.FSType{extensions.HostPath},
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					Volumes: []policy.FSType{policy.HostPath},
 				},
 			},
-			fsType: extensions.HostPath,
+			fsType: policy.HostPath,
 			allows: true,
 		},
 	}
@@ -105,7 +105,7 @@ func TestPSPAllowsFSType(t *testing.T) {
 
 func TestAllowsHostVolumePath(t *testing.T) {
 	tests := map[string]struct {
-		psp    *extensions.PodSecurityPolicy
+		psp    *policy.PodSecurityPolicy
 		path   string
 		allows bool
 	}{
@@ -115,14 +115,14 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: false,
 		},
 		"empty allowed paths": {
-			psp:    &extensions.PodSecurityPolicy{},
+			psp:    &policy.PodSecurityPolicy{},
 			path:   "/test",
 			allows: true,
 		},
 		"non-matching": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo"},
 					},
 				},
@@ -131,9 +131,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: false,
 		},
 		"match on direct match": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo"},
 					},
 				},
@@ -142,9 +142,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: true,
 		},
 		"match with trailing slash on host path": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo"},
 					},
 				},
@@ -153,9 +153,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: true,
 		},
 		"match with trailing slash on allowed path": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo/"},
 					},
 				},
@@ -164,9 +164,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: true,
 		},
 		"match child directory": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo/"},
 					},
 				},
@@ -175,9 +175,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: true,
 		},
 		"non-matching parent directory": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo/bar"},
 					},
 				},
@@ -191,6 +191,41 @@ func TestAllowsHostVolumePath(t *testing.T) {
 		allows := AllowsHostVolumePath(v.psp, v.path)
 		if v.allows != allows {
 			t.Errorf("%s expected %t but got %t", k, v.allows, allows)
+		}
+	}
+}
+
+func TestEqualStringSlices(t *testing.T) {
+	tests := map[string]struct {
+		arg1           []string
+		arg2           []string
+		expectedResult bool
+	}{
+		"nil equals to nil": {
+			arg1:           nil,
+			arg2:           nil,
+			expectedResult: true,
+		},
+		"equal by size": {
+			arg1:           []string{"1", "1"},
+			arg2:           []string{"1", "1"},
+			expectedResult: true,
+		},
+		"not equal by size": {
+			arg1:           []string{"1"},
+			arg2:           []string{"1", "1"},
+			expectedResult: false,
+		},
+		"not equal by elements": {
+			arg1:           []string{"1", "1"},
+			arg2:           []string{"1", "2"},
+			expectedResult: false,
+		},
+	}
+
+	for k, v := range tests {
+		if result := EqualStringSlices(v.arg1, v.arg2); result != v.expectedResult {
+			t.Errorf("%s expected to return %t but got %t", k, v.expectedResult, result)
 		}
 	}
 }

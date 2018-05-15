@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "workqueue",
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/examples/workqueue",
 )
 
 go_library(

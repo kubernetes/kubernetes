@@ -43,12 +43,12 @@ spec:
     spec:
       containers:
       - name: node-problem-detector
-        image: gcr.io/google_containers/node-problem-detector:v0.4.1
+        image: k8s.gcr.io/node-problem-detector:v0.4.1
         command:
         - "/bin/sh"
         - "-c"
         # Pass both config to support both journald and syslog.
-        - "/node-problem-detector --logtostderr --system-log-monitors=/config/kernel-monitor.json,/config/kernel-monitor-filelog.json,/config/docker-monitor.json,/config/docker-monitor-filelog.json >>/var/log/node-problem-detector.log 2>&1"
+        - "exec /node-problem-detector --logtostderr --system-log-monitors=/config/kernel-monitor.json,/config/kernel-monitor-filelog.json,/config/docker-monitor.json,/config/docker-monitor-filelog.json >>/var/log/node-problem-detector.log 2>&1"
         securityContext:
           privileged: true
         resources:

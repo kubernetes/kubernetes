@@ -113,7 +113,7 @@ func TestGetNamespaceLabels(t *testing.T) {
 	}
 }
 
-func TestExemptClusterScopedResource(t *testing.T) {
+func TestNotExemptClusterScopedResource(t *testing.T) {
 	hook := &registrationv1beta1.Webhook{
 		NamespaceSelector: &metav1.LabelSelector{},
 	}
@@ -123,7 +123,7 @@ func TestExemptClusterScopedResource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if matches {
-		t.Errorf("cluster scoped resources (but not a namespace) should be exempted from all webhooks")
+	if !matches {
+		t.Errorf("cluster scoped resources (but not a namespace) should not be exempted from webhooks")
 	}
 }

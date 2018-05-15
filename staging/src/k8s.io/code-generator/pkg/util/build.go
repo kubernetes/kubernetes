@@ -18,9 +18,13 @@ package util
 
 import (
 	gobuild "go/build"
+	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 )
+
+type empty struct{}
 
 // CurrentPackage returns the go package of the current directory, or "" if it cannot
 // be derived from the GOPATH.
@@ -49,4 +53,9 @@ func hasSubdir(root, dir string) (rel string, ok bool) {
 
 	// cut off root
 	return filepath.ToSlash(dir[len(root):]), true
+}
+
+// BoilerplatePath uses the boilerplate in code-generator by calculating the relative path to it.
+func BoilerplatePath() string {
+	return path.Join(reflect.TypeOf(empty{}).PkgPath(), "/../../hack/boilerplate.go.txt")
 }

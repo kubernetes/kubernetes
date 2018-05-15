@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["etcd_util_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/storage/etcd/util",
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

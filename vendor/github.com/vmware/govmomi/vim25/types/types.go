@@ -11331,7 +11331,7 @@ func init() {
 type DVSNetworkResourcePoolAllocationInfo struct {
 	DynamicData
 
-	Limit       int64       `xml:"limit,omitempty"`
+	Limit       *int64      `xml:"limit"`
 	Shares      *SharesInfo `xml:"shares,omitempty"`
 	PriorityTag int32       `xml:"priorityTag,omitempty"`
 }
@@ -14165,9 +14165,9 @@ func init() {
 type DvsHostInfrastructureTrafficResourceAllocation struct {
 	DynamicData
 
-	Limit       int64       `xml:"limit,omitempty"`
+	Limit       *int64      `xml:"limit"`
 	Shares      *SharesInfo `xml:"shares,omitempty"`
-	Reservation int64       `xml:"reservation,omitempty"`
+	Reservation *int64      `xml:"reservation"`
 }
 
 func init() {
@@ -14846,7 +14846,7 @@ type DvsVnicAllocatedResource struct {
 
 	Vm          ManagedObjectReference `xml:"vm"`
 	VnicKey     string                 `xml:"vnicKey"`
-	Reservation int64                  `xml:"reservation,omitempty"`
+	Reservation *int64                 `xml:"reservation"`
 }
 
 func init() {
@@ -18341,9 +18341,9 @@ func init() {
 type GuestPosixFileAttributes struct {
 	GuestFileAttributes
 
-	OwnerId     int32 `xml:"ownerId,omitempty"`
-	GroupId     int32 `xml:"groupId,omitempty"`
-	Permissions int64 `xml:"permissions,omitempty"`
+	OwnerId     *int32 `xml:"ownerId"`
+	GroupId     *int32 `xml:"groupId"`
+	Permissions int64  `xml:"permissions,omitempty"`
 }
 
 func init() {
@@ -22589,7 +22589,7 @@ type HostPlacedVirtualNicIdentifier struct {
 
 	Vm          ManagedObjectReference `xml:"vm"`
 	VnicKey     string                 `xml:"vnicKey"`
-	Reservation int32                  `xml:"reservation,omitempty"`
+	Reservation *int32                 `xml:"reservation"`
 }
 
 func init() {
@@ -27456,7 +27456,7 @@ type LimitExceeded struct {
 	VimFault
 
 	Property string `xml:"property,omitempty"`
-	Limit    int32  `xml:"limit,omitempty"`
+	Limit    *int32 `xml:"limit"`
 }
 
 func init() {
@@ -27624,7 +27624,7 @@ func init() {
 
 type ListKeysRequestType struct {
 	This  ManagedObjectReference `xml:"_this"`
-	Limit int32                  `xml:"limit,omitempty"`
+	Limit *int32                 `xml:"limit"`
 }
 
 func init() {
@@ -27643,7 +27643,7 @@ func init() {
 
 type ListKmipServersRequestType struct {
 	This  ManagedObjectReference `xml:"_this"`
-	Limit int32                  `xml:"limit,omitempty"`
+	Limit *int32                 `xml:"limit"`
 }
 
 func init() {
@@ -28546,7 +28546,7 @@ func init() {
 type MethodActionArgument struct {
 	DynamicData
 
-	Value AnyType `xml:"value,omitempty,typeattr"`
+	Value AnyType `xml:"value,typeattr"`
 }
 
 func init() {
@@ -29452,7 +29452,7 @@ func init() {
 type NamespaceLimitReached struct {
 	VimFault
 
-	Limit int32 `xml:"limit,omitempty"`
+	Limit *int32 `xml:"limit"`
 }
 
 func init() {
@@ -31074,7 +31074,7 @@ type OptionValue struct {
 	DynamicData
 
 	Key   string  `xml:"key"`
-	Value AnyType `xml:"value,omitempty,typeattr"`
+	Value AnyType `xml:"value,typeattr"`
 }
 
 func init() {
@@ -34231,7 +34231,7 @@ type PropertyChange struct {
 
 	Name string           `xml:"name"`
 	Op   PropertyChangeOp `xml:"op"`
-	Val  AnyType          `xml:"val,omitempty,typeattr"`
+	Val  AnyType          `xml:"val,typeattr"`
 }
 
 func init() {
@@ -36332,7 +36332,7 @@ func init() {
 type QueryVsanObjectUuidsByFilterRequestType struct {
 	This    ManagedObjectReference `xml:"_this"`
 	Uuids   []string               `xml:"uuids,omitempty"`
-	Limit   int32                  `xml:"limit,omitempty"`
+	Limit   *int32                 `xml:"limit"`
 	Version int32                  `xml:"version,omitempty"`
 }
 
@@ -39065,11 +39065,11 @@ type ResolveMultipleUnresolvedVmfsVolumesResponse struct {
 type ResourceAllocationInfo struct {
 	DynamicData
 
-	Reservation           int64       `xml:"reservation,omitempty"`
+	Reservation           *int64      `xml:"reservation"`
 	ExpandableReservation *bool       `xml:"expandableReservation"`
-	Limit                 int64       `xml:"limit,omitempty"`
+	Limit                 *int64      `xml:"limit"`
 	Shares                *SharesInfo `xml:"shares,omitempty"`
-	OverheadLimit         int64       `xml:"overheadLimit,omitempty"`
+	OverheadLimit         *int64      `xml:"overheadLimit"`
 }
 
 func init() {
@@ -39100,11 +39100,11 @@ func init() {
 type ResourceConfigSpec struct {
 	DynamicData
 
-	Entity           *ManagedObjectReference    `xml:"entity,omitempty"`
-	ChangeVersion    string                     `xml:"changeVersion,omitempty"`
-	LastModified     *time.Time                 `xml:"lastModified"`
-	CpuAllocation    BaseResourceAllocationInfo `xml:"cpuAllocation,typeattr"`
-	MemoryAllocation BaseResourceAllocationInfo `xml:"memoryAllocation,typeattr"`
+	Entity           *ManagedObjectReference `xml:"entity,omitempty"`
+	ChangeVersion    string                  `xml:"changeVersion,omitempty"`
+	LastModified     *time.Time              `xml:"lastModified"`
+	CpuAllocation    ResourceAllocationInfo  `xml:"cpuAllocation"`
+	MemoryAllocation ResourceAllocationInfo  `xml:"memoryAllocation"`
 }
 
 func init() {
@@ -42322,9 +42322,9 @@ func init() {
 type StorageIOAllocationInfo struct {
 	DynamicData
 
-	Limit       int64       `xml:"limit,omitempty"`
+	Limit       *int64      `xml:"limit"`
 	Shares      *SharesInfo `xml:"shares,omitempty"`
-	Reservation int32       `xml:"reservation,omitempty"`
+	Reservation *int32      `xml:"reservation"`
 }
 
 func init() {
@@ -47957,9 +47957,9 @@ func init() {
 type VirtualEthernetCardResourceAllocation struct {
 	DynamicData
 
-	Reservation int64      `xml:"reservation,omitempty"`
+	Reservation *int64     `xml:"reservation"`
 	Share       SharesInfo `xml:"share"`
-	Limit       int64      `xml:"limit,omitempty"`
+	Limit       *int64     `xml:"limit"`
 }
 
 func init() {
@@ -48188,7 +48188,7 @@ func init() {
 type VirtualMachineAffinityInfo struct {
 	DynamicData
 
-	AffinitySet []int32 `xml:"affinitySet,omitempty"`
+	AffinitySet []int32 `xml:"affinitySet"`
 }
 
 func init() {
@@ -48356,8 +48356,8 @@ type VirtualMachineConfigInfo struct {
 	ConsolePreferences           *VirtualMachineConsolePreferences          `xml:"consolePreferences,omitempty"`
 	DefaultPowerOps              VirtualMachineDefaultPowerOpInfo           `xml:"defaultPowerOps"`
 	Hardware                     VirtualHardware                            `xml:"hardware"`
-	CpuAllocation                BaseResourceAllocationInfo                 `xml:"cpuAllocation,omitempty,typeattr"`
-	MemoryAllocation             BaseResourceAllocationInfo                 `xml:"memoryAllocation,omitempty,typeattr"`
+	CpuAllocation                *ResourceAllocationInfo                    `xml:"cpuAllocation,omitempty"`
+	MemoryAllocation             *ResourceAllocationInfo                    `xml:"memoryAllocation,omitempty"`
 	LatencySensitivity           *LatencySensitivity                        `xml:"latencySensitivity,omitempty"`
 	MemoryHotAddEnabled          *bool                                      `xml:"memoryHotAddEnabled"`
 	CpuHotAddEnabled             *bool                                      `xml:"cpuHotAddEnabled"`
@@ -48493,8 +48493,8 @@ type VirtualMachineConfigSpec struct {
 	VirtualICH7MPresent          *bool                             `xml:"virtualICH7MPresent"`
 	VirtualSMCPresent            *bool                             `xml:"virtualSMCPresent"`
 	DeviceChange                 []BaseVirtualDeviceConfigSpec     `xml:"deviceChange,omitempty,typeattr"`
-	CpuAllocation                BaseResourceAllocationInfo        `xml:"cpuAllocation,omitempty,typeattr"`
-	MemoryAllocation             BaseResourceAllocationInfo        `xml:"memoryAllocation,omitempty,typeattr"`
+	CpuAllocation                *ResourceAllocationInfo           `xml:"cpuAllocation,omitempty"`
+	MemoryAllocation             *ResourceAllocationInfo           `xml:"memoryAllocation,omitempty"`
 	LatencySensitivity           *LatencySensitivity               `xml:"latencySensitivity,omitempty"`
 	CpuAffinity                  *VirtualMachineAffinityInfo       `xml:"cpuAffinity,omitempty"`
 	MemoryAffinity               *VirtualMachineAffinityInfo       `xml:"memoryAffinity,omitempty"`
@@ -53154,8 +53154,8 @@ type WaitForUpdatesResponse struct {
 type WaitOptions struct {
 	DynamicData
 
-	MaxWaitSeconds   int32 `xml:"maxWaitSeconds,omitempty"`
-	MaxObjectUpdates int32 `xml:"maxObjectUpdates,omitempty"`
+	MaxWaitSeconds   *int32 `xml:"maxWaitSeconds"`
+	MaxObjectUpdates int32  `xml:"maxObjectUpdates,omitempty"`
 }
 
 func init() {

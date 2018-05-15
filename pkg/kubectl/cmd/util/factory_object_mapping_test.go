@@ -40,7 +40,7 @@ type fakeClientAccessFactory struct {
 	fakeClientset *fake.Clientset
 }
 
-func (f *fakeClientAccessFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
+func (f *fakeClientAccessFactory) ClientSet() (internalclientset.Interface, error) {
 	return f.fakeClientset, nil
 }
 

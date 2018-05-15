@@ -17,6 +17,7 @@ limitations under the License.
 package vclib
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -28,7 +29,6 @@ import (
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 // Datacenter extends the govmomi Datacenter object
@@ -39,7 +39,7 @@ type Datacenter struct {
 // GetDatacenter returns the DataCenter Object for the given datacenterPath
 // If datacenter is located in a folder, include full path to datacenter else just provide the datacenter name
 func GetDatacenter(ctx context.Context, connection *VSphereConnection, datacenterPath string) (*Datacenter, error) {
-	finder := find.NewFinder(connection.GoVmomiClient.Client, true)
+	finder := find.NewFinder(connection.Client, false)
 	datacenter, err := finder.Datacenter(ctx, datacenterPath)
 	if err != nil {
 		glog.Errorf("Failed to find the datacenter: %s. err: %+v", datacenterPath, err)
@@ -52,7 +52,7 @@ func GetDatacenter(ctx context.Context, connection *VSphereConnection, datacente
 // GetAllDatacenter returns all the DataCenter Objects
 func GetAllDatacenter(ctx context.Context, connection *VSphereConnection) ([]*Datacenter, error) {
 	var dc []*Datacenter
-	finder := find.NewFinder(connection.GoVmomiClient.Client, true)
+	finder := find.NewFinder(connection.Client, false)
 	datacenters, err := finder.DatacenterList(ctx, "*")
 	if err != nil {
 		glog.Errorf("Failed to find the datacenter. err: %+v", err)

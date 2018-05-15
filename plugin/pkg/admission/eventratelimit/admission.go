@@ -23,13 +23,15 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
-	eventratelimitapiv1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/validation"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "EventRateLimit"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("EventRateLimit",
+	plugins.Register(PluginName,
 		func(config io.Reader) (admission.Interface, error) {
 			// load the configuration provided (if any)
 			configuration, err := LoadConfiguration(config)
@@ -44,10 +46,6 @@ func Register(plugins *admission.Plugins) {
 			}
 			return newEventRateLimit(configuration, realClock{})
 		})
-
-	// add our config types
-	eventratelimitapi.AddToScheme(plugins.ConfigScheme)
-	eventratelimitapiv1alpha1.AddToScheme(plugins.ConfigScheme)
 }
 
 // Plugin implements an admission controller that can enforce event rate limits

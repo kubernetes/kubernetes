@@ -28,15 +28,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 )
@@ -115,8 +116,9 @@ const (
 // RollingUpdater provides methods for updating replicated pods in a predictable,
 // fault-tolerant way.
 type RollingUpdater struct {
-	rcClient  coreclient.ReplicationControllersGetter
-	podClient coreclient.PodsGetter
+	rcClient    coreclient.ReplicationControllersGetter
+	podClient   coreclient.PodsGetter
+	scaleClient scaleclient.ScalesGetter
 	// Namespace for resources
 	ns string
 	// scaleAndWait scales a controller and returns its updated state.
@@ -133,11 +135,12 @@ type RollingUpdater struct {
 }
 
 // NewRollingUpdater creates a RollingUpdater from a client.
-func NewRollingUpdater(namespace string, rcClient coreclient.ReplicationControllersGetter, podClient coreclient.PodsGetter) *RollingUpdater {
+func NewRollingUpdater(namespace string, rcClient coreclient.ReplicationControllersGetter, podClient coreclient.PodsGetter, sc scaleclient.ScalesGetter) *RollingUpdater {
 	updater := &RollingUpdater{
-		rcClient:  rcClient,
-		podClient: podClient,
-		ns:        namespace,
+		rcClient:    rcClient,
+		podClient:   podClient,
+		scaleClient: sc,
+		ns:          namespace,
 	}
 	// Inject real implementations.
 	updater.scaleAndWait = updater.scaleAndWaitWithScaler
@@ -397,8 +400,8 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desi
 
 // scalerScaleAndWait scales a controller using a Scaler and a real client.
 func (r *RollingUpdater) scaleAndWaitWithScaler(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
-	scaler := &ReplicationControllerScaler{r.rcClient}
-	if err := scaler.Scale(rc.Namespace, rc.Name, uint(rc.Spec.Replicas), &ScalePrecondition{-1, ""}, retry, wait); err != nil {
+	scaler := NewScaler(r.scaleClient)
+	if err := scaler.Scale(rc.Namespace, rc.Name, uint(rc.Spec.Replicas), &ScalePrecondition{-1, ""}, retry, wait, schema.GroupResource{Resource: "replicationcontrollers"}); err != nil {
 		return nil, err
 	}
 	return r.rcClient.ReplicationControllers(rc.Namespace).Get(rc.Name, metav1.GetOptions{})
@@ -513,7 +516,7 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 		return err
 	}
 
-	if err = wait.Poll(config.Interval, config.Timeout, client.ControllerHasDesiredReplicas(r.rcClient, newRc)); err != nil {
+	if err = wait.Poll(config.Interval, config.Timeout, ControllerHasDesiredReplicas(r.rcClient, newRc)); err != nil {
 		return err
 	}
 	newRc, err = r.rcClient.ReplicationControllers(r.ns).Get(newRc.Name, metav1.GetOptions{})

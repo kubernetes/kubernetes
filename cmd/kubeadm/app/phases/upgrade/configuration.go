@@ -23,22 +23,38 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // FetchConfiguration fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
-func FetchConfiguration(client clientset.Interface, w io.Writer, cfgPath string) (*kubeadmapiext.MasterConfiguration, error) {
+func FetchConfiguration(client clientset.Interface, w io.Writer, cfgPath string) (*kubeadmapiv1alpha1.MasterConfiguration, error) {
 	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
 
 	// Load the configuration from a file or the cluster
 	configBytes, err := loadConfigurationBytes(client, w, cfgPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Take the versioned configuration populated from the configmap, default it and validate
+	// Return the internal version of the API object
+	versionedcfg, err := bytesToValidatedMasterConfig(configBytes)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode configuration: %v", err)
+	}
+	return versionedcfg, nil
+}
+
+// FetchConfigurationFromFile fetch configuration from a file
+func FetchConfigurationFromFile(cfgPath string) (*kubeadmapiv1alpha1.MasterConfiguration, error) {
+	// Load the configuration from a file or the cluster
+	configBytes, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
 		return nil, err
 	}
@@ -81,17 +97,22 @@ func loadConfigurationBytes(client clientset.Interface, w io.Writer, cfgPath str
 }
 
 // bytesToValidatedMasterConfig converts a byte array to an external, defaulted and validated configuration object
-func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiext.MasterConfiguration, error) {
-	cfg := &kubeadmapiext.MasterConfiguration{}
-	finalCfg := &kubeadmapiext.MasterConfiguration{}
+func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiv1alpha1.MasterConfiguration, error) {
+	cfg := &kubeadmapiv1alpha1.MasterConfiguration{}
+	finalCfg := &kubeadmapiv1alpha1.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
+	decoded, err := kubeadmapiv1alpha1.LoadYAML(b)
+	if err != nil {
 		return nil, fmt.Errorf("unable to decode config from bytes: %v", err)
 	}
+
+	if err := kubeadmapiv1alpha1.Migrate(decoded, cfg, kubeadmscheme.Codecs); err != nil {
+		return nil, fmt.Errorf("unable to migrate config from previous version: %v", err)
+	}
 	// Default and convert to the internal version
-	legacyscheme.Scheme.Default(cfg)
-	legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
+	kubeadmscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 	// Applies dynamic defaults to settings not provided with flags
 	if err := configutil.SetInitDynamicDefaults(internalcfg); err != nil {
@@ -102,6 +123,6 @@ func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiext.MasterConfiguration,
 		return nil, err
 	}
 	// Finally converts back to the external version
-	legacyscheme.Scheme.Convert(internalcfg, finalCfg, nil)
+	kubeadmscheme.Scheme.Convert(internalcfg, finalCfg, nil)
 	return finalCfg, nil
 }

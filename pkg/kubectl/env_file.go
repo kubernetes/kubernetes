@@ -81,7 +81,7 @@ func addFromEnvFile(filePath string, addTo func(key, value string) error) error 
 	scanner := bufio.NewScanner(f)
 	currentLine := 0
 	for scanner.Scan() {
-		// Proccess the current line, retrieving a key/value pair if
+		// Process the current line, retrieving a key/value pair if
 		// possible.
 		scannedBytes := scanner.Bytes()
 		key, value, err := proccessEnvFileLine(scannedBytes, filePath, currentLine)

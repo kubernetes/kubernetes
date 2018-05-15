@@ -22,7 +22,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/kubernetes/pkg/volume"
+
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 
 	flockerapi "github.com/clusterhq/flocker-go"
 	"github.com/golang/glog"
@@ -73,7 +74,7 @@ func (util *FlockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetUUID 
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
-	volumeSizeGB = int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+	volumeSizeGB = int(volutil.RoundUpSize(requestBytes, 1024*1024*1024))
 
 	createOptions := &flockerapi.CreateDatasetOptions{
 		MaximumSize: requestBytes,

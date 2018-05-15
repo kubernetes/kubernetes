@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["azure_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/plugin/pkg/client/auth/azure",
     deps = ["//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library"],
 )
 

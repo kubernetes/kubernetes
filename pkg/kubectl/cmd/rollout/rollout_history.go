@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/spf13/cobra"
@@ -45,18 +45,17 @@ func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
-	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
-		Use:     "history (TYPE NAME | TYPE/NAME) [flags]",
+		Use: "history (TYPE NAME | TYPE/NAME) [flags]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("View rollout history"),
 		Long:    history_long,
 		Example: history_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(RunHistory(f, cmd, out, args, options))
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
+		ValidArgs: validArgs,
 	}
 
 	cmd.Flags().Int64("revision", 0, "See the details, including podTemplate of the revision specified")
@@ -80,7 +79,7 @@ func RunHistory(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 	}
 
 	r := f.NewBuilder().
-		Internal().
+		WithScheme(legacyscheme.Scheme).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(true, args...).
@@ -107,7 +106,7 @@ func RunHistory(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 			return err
 		}
 
-		header := fmt.Sprintf("%s %q", mapping.Resource, info.Name)
+		header := fmt.Sprintf("%s %q", mapping.Resource.Resource, info.Name)
 		if revision > 0 {
 			header = fmt.Sprintf("%s with revision #%d", header, revision)
 		}

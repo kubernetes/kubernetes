@@ -65,6 +65,9 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_Pointer_int32_To_int32,
 		Convert_int32_To_Pointer_int32,
 
+		Convert_Pointer_int64_To_int64,
+		Convert_int64_To_Pointer_int64,
+
 		Convert_Pointer_float64_To_float64,
 		Convert_float64_To_Pointer_float64,
 
@@ -101,6 +104,21 @@ func Convert_Pointer_int32_To_int32(in **int32, out *int32, s conversion.Scope) 
 
 func Convert_int32_To_Pointer_int32(in *int32, out **int32, s conversion.Scope) error {
 	temp := int32(*in)
+	*out = &temp
+	return nil
+}
+
+func Convert_Pointer_int64_To_int64(in **int64, out *int64, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = int64(**in)
+	return nil
+}
+
+func Convert_int64_To_Pointer_int64(in *int64, out **int64, s conversion.Scope) error {
+	temp := int64(*in)
 	*out = &temp
 	return nil
 }

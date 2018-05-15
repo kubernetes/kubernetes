@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // PluginFactoryArgs are passed to all plugin factory functions.
@@ -49,35 +49,31 @@ type PluginFactoryArgs struct {
 	HardPodAffinitySymmetricWeight int32
 }
 
-// MetadataProducerFactory produces MetadataProducer from the given args.
-// TODO: Rename this to PriorityMetadataProducerFactory.
-type MetadataProducerFactory func(PluginFactoryArgs) algorithm.MetadataProducer
+// PriorityMetadataProducerFactory produces PriorityMetadataProducer from the given args.
+type PriorityMetadataProducerFactory func(PluginFactoryArgs) algorithm.PriorityMetadataProducer
 
 // PredicateMetadataProducerFactory produces PredicateMetadataProducer from the given args.
 type PredicateMetadataProducerFactory func(PluginFactoryArgs) algorithm.PredicateMetadataProducer
 
-// A FitPredicateFactory produces a FitPredicate from the given args.
+// FitPredicateFactory produces a FitPredicate from the given args.
 type FitPredicateFactory func(PluginFactoryArgs) algorithm.FitPredicate
 
+// PriorityFunctionFactory produces a PriorityConfig from the given args.
 // DEPRECATED
 // Use Map-Reduce pattern for priority functions.
-// A PriorityFunctionFactory produces a PriorityConfig from the given args.
 type PriorityFunctionFactory func(PluginFactoryArgs) algorithm.PriorityFunction
 
-// A PriorityFunctionFactory produces map & reduce priority functions
+// PriorityFunctionFactory2 produces map & reduce priority functions
 // from a given args.
 // FIXME: Rename to PriorityFunctionFactory.
 type PriorityFunctionFactory2 func(PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction)
 
-// A PriorityConfigFactory produces a PriorityConfig from the given function and weight
+// PriorityConfigFactory produces a PriorityConfig from the given function and weight
 type PriorityConfigFactory struct {
 	Function          PriorityFunctionFactory
 	MapReduceFunction PriorityFunctionFactory2
 	Weight            int
 }
-
-// EquivalencePodFuncFactory produces a function to get equivalence class for given pod.
-type EquivalencePodFuncFactory func(PluginFactoryArgs) algorithm.GetEquivalencePodFunc
 
 var (
 	schedulerFactoryMutex sync.Mutex
@@ -89,17 +85,16 @@ var (
 	algorithmProviderMap   = make(map[string]AlgorithmProviderConfig)
 
 	// Registered metadata producers
-	priorityMetadataProducer  MetadataProducerFactory
+	priorityMetadataProducer  PriorityMetadataProducerFactory
 	predicateMetadataProducer PredicateMetadataProducerFactory
-
-	// get equivalence pod function
-	getEquivalencePodFuncFactory EquivalencePodFuncFactory
 )
 
 const (
+	// DefaultProvider defines the default algorithm provider name.
 	DefaultProvider = "DefaultProvider"
 )
 
+// AlgorithmProviderConfig is used to store the configuration of algorithm providers.
 type AlgorithmProviderConfig struct {
 	FitPredicateKeys     sets.String
 	PriorityFunctionKeys sets.String
@@ -245,22 +240,24 @@ func IsFitPredicateRegistered(name string) bool {
 	return ok
 }
 
-func RegisterPriorityMetadataProducerFactory(factory MetadataProducerFactory) {
+// RegisterPriorityMetadataProducerFactory registers a PriorityMetadataProducerFactory.
+func RegisterPriorityMetadataProducerFactory(factory PriorityMetadataProducerFactory) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	priorityMetadataProducer = factory
 }
 
+// RegisterPredicateMetadataProducerFactory registers a PredicateMetadataProducerFactory.
 func RegisterPredicateMetadataProducerFactory(factory PredicateMetadataProducerFactory) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	predicateMetadataProducer = factory
 }
 
+// RegisterPriorityFunction registers a priority function with the algorithm registry. Returns the name,
+// with which the function was registered.
 // DEPRECATED
 // Use Map-Reduce pattern for priority functions.
-// Registers a priority function with the algorithm registry. Returns the name,
-// with which the function was registered.
 func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
 	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
 		Function: func(PluginFactoryArgs) algorithm.PriorityFunction {
@@ -286,6 +283,7 @@ func RegisterPriorityFunction2(
 	})
 }
 
+// RegisterPriorityConfigFactory registers a priority config factory with its name.
 func RegisterPriorityConfigFactory(name string, pcf PriorityConfigFactory) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -340,11 +338,6 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	}
 
 	return RegisterPriorityConfigFactory(policy.Name, *pcf)
-}
-
-// RegisterGetEquivalencePodFunction registers equivalenceFuncFactory to produce equivalence class for given pod.
-func RegisterGetEquivalencePodFunction(equivalenceFuncFactory EquivalencePodFuncFactory) {
-	getEquivalencePodFuncFactory = equivalenceFuncFactory
 }
 
 // IsPriorityFunctionRegistered is useful for testing providers.
@@ -404,12 +397,12 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 	return predicates, nil
 }
 
-func getPriorityMetadataProducer(args PluginFactoryArgs) (algorithm.MetadataProducer, error) {
+func getPriorityMetadataProducer(args PluginFactoryArgs) (algorithm.PriorityMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	if priorityMetadataProducer == nil {
-		return algorithm.EmptyMetadataProducer, nil
+		return algorithm.EmptyPriorityMetadataProducer, nil
 	}
 	return priorityMetadataProducer(args), nil
 }
@@ -507,6 +500,7 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 	}
 }
 
+// ListRegisteredFitPredicates returns the registered fit predicates.
 func ListRegisteredFitPredicates() []string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -518,6 +512,7 @@ func ListRegisteredFitPredicates() []string {
 	return names
 }
 
+// ListRegisteredPriorityFunctions returns the registered priority functions.
 func ListRegisteredPriorityFunctions() []string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()

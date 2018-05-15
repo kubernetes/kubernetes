@@ -64,6 +64,13 @@ const (
 	MiB int64 = 1024 * KiB
 	GiB int64 = 1024 * MiB
 	TiB int64 = 1024 * GiB
+
+	// Waiting period for volume server (Ceph, ...) to initialize itself.
+	VolumeServerPodStartupSleep = 20 * time.Second
+
+	// Waiting period for pod to be cleaned up and unmount its volumes so we
+	// don't tear down containers with NFS/Ceph/Gluster server too early.
+	PodCleanupTimeout = 20 * time.Second
 )
 
 // Configuration of one tests. The test consist of:
@@ -190,6 +197,14 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestCo
 		},
 	}
 	pod, ip = CreateStorageServer(cs, config)
+
+	// Ceph server container needs some time to start. Tests continue working if
+	// this sleep is removed, however kubelet logs (and kubectl describe
+	// <client pod>) would be cluttered with error messages about non-existing
+	// image.
+	Logf("sleeping a bit to give ceph server time to initialize")
+	time.Sleep(VolumeServerPodStartupSleep)
+
 	return config, pod, ip
 }
 
@@ -233,7 +248,7 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 		mountName := fmt.Sprintf("path%d", i)
 		volumes[i].Name = mountName
 		if src == "" {
-			volumes[i].VolumeSource.EmptyDir = &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory}
+			volumes[i].VolumeSource.EmptyDir = &v1.EmptyDirVolumeSource{}
 		} else {
 			volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
 				Path: src,
@@ -340,8 +355,8 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 		}
 		// See issue #24100.
 		// Prevent umount errors by making sure making sure the client pod exits cleanly *before* the volume server pod exits.
-		By("sleeping a bit so client can stop and unmount")
-		time.Sleep(20 * time.Second)
+		By("sleeping a bit so kubelet can unmount and detach the volume")
+		time.Sleep(PodCleanupTimeout)
 
 		err = podClient.Delete(config.Prefix+"-server", nil)
 		if err != nil {
@@ -430,7 +445,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 	if fsGroup != nil {
 		By("Checking fsGroup is correct.")
 		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", "/opt/0"}, strconv.Itoa(int(*fsGroup)), time.Minute)
-		Expect(err).NotTo(HaveOccurred(), "failed: getting the right priviliges in the file %v", int(*fsGroup))
+		Expect(err).NotTo(HaveOccurred(), "failed: getting the right privileges in the file %v", int(*fsGroup))
 	}
 }
 

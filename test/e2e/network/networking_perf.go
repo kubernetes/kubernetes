@@ -149,9 +149,9 @@ func networkingIPerfTest(isIPv6 bool) {
 					}
 				})
 		}
-		fmt.Println("[begin] Node,Bandwith CSV")
+		fmt.Println("[begin] Node,Bandwidth CSV")
 		fmt.Println(iperfResults.ToTSV())
-		fmt.Println("[end] Node,Bandwith CSV")
+		fmt.Println("[end] Node,Bandwidth CSV")
 
 		for ipClient, bandwidth := range iperfResults.BandwidthMap {
 			framework.Logf("%v had bandwidth %v.  Ratio to expected (%v) was %f", ipClient, bandwidth, expectedBandwidth, float64(bandwidth)/float64(expectedBandwidth))

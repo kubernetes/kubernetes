@@ -96,7 +96,7 @@ func NewController(
 }
 
 // Start initializes the Controller with the existing list of nodes and
-// registers the informers for node chnages. This will start synchronization
+// registers the informers for node changes. This will start synchronization
 // of the node and cloud CIDR range allocations.
 func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 	glog.V(0).Infof("Starting IPAM controller (config=%+v)", c.config)
@@ -174,14 +174,15 @@ func (c *Controller) onAdd(node *v1.Node) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if syncer, ok := c.syncers[node.Name]; !ok {
+	syncer, ok := c.syncers[node.Name]
+	if !ok {
 		syncer = c.newSyncer(node.Name)
 		c.syncers[node.Name] = syncer
 		go syncer.Loop(nil)
 	} else {
 		glog.Warningf("Add for node %q that already exists", node.Name)
-		syncer.Update(node)
 	}
+	syncer.Update(node)
 
 	return nil
 }
@@ -193,7 +194,7 @@ func (c *Controller) onUpdate(_, node *v1.Node) error {
 	if sync, ok := c.syncers[node.Name]; ok {
 		sync.Update(node)
 	} else {
-		glog.Errorf("Received update for non-existant node %q", node.Name)
+		glog.Errorf("Received update for non-existent node %q", node.Name)
 		return fmt.Errorf("unknown node %q", node.Name)
 	}
 

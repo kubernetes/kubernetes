@@ -342,6 +342,7 @@ type ListOptions struct {
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
 	// Timeout for the list/watch call.
+	// This limits the duration of the call, regardless of any activity or inactivity.
 	// +optional
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
 
@@ -650,6 +651,18 @@ const (
 	// resource was not supported by the code - for instance, attempting to delete a resource that
 	// can only be created. API calls that return MethodNotAllowed can never succeed.
 	StatusReasonMethodNotAllowed StatusReason = "MethodNotAllowed"
+
+	// StatusReasonNotAcceptable means that the accept types indicated by the client were not acceptable
+	// to the server - for instance, attempting to receive protobuf for a resource that supports only json and yaml.
+	// API calls that return NotAcceptable can never succeed.
+	// Status code 406
+	StatusReasonNotAcceptable StatusReason = "NotAcceptable"
+
+	// StatusReasonUnsupportedMediaType means that the content type sent by the client is not acceptable
+	// to the server - for instance, attempting to send protobuf for a resource that supports only json and yaml.
+	// API calls that return UnsupportedMediaType can never succeed.
+	// Status code 415
+	StatusReasonUnsupportedMediaType StatusReason = "UnsupportedMediaType"
 
 	// StatusReasonInternalError indicates that an internal error occurred, it is unexpected
 	// and the outcome of the call is unknown.

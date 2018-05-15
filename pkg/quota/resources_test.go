@@ -102,6 +102,11 @@ func TestMax(t *testing.T) {
 			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
 			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("150m")},
 		},
+		"matching-equal": {
+			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+		},
 	}
 	for testName, testCase := range testCases {
 		sum := Max(testCase.a, testCase.b)

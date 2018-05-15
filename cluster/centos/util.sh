@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -234,7 +234,7 @@ echo "[INFO] tear-down-node on $1"
 # Generate the CA certificates for k8s components
 function make-ca-cert() {
   echo "[INFO] make-ca-cert"
-  bash "${ROOT}/../saltbase/salt/generate-cert/make-ca-cert.sh" "${MASTER_ADVERTISE_IP}" "IP:${MASTER_ADVERTISE_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local"
+  bash "${ROOT}/make-ca-cert.sh" "${MASTER_ADVERTISE_IP}" "IP:${MASTER_ADVERTISE_IP},IP:${SERVICE_CLUSTER_IP_RANGE%.*}.1,DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local"
 }
 
 # Provision master

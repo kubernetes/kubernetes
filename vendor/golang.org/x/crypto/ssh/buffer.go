@@ -51,13 +51,12 @@ func (b *buffer) write(buf []byte) {
 }
 
 // eof closes the buffer. Reads from the buffer once all
-// the data has been consumed will receive os.EOF.
-func (b *buffer) eof() error {
+// the data has been consumed will receive io.EOF.
+func (b *buffer) eof() {
 	b.Cond.L.Lock()
 	b.closed = true
 	b.Cond.Signal()
 	b.Cond.L.Unlock()
-	return nil
 }
 
 // Read reads data from the internal buffer in buf.  Reads will block

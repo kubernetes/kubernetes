@@ -23,31 +23,32 @@ data:
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: metrics-server-v0.2.0
+  name: metrics-server-v0.2.1
   namespace: kube-system
   labels:
     k8s-app: metrics-server
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v0.2.0
+    version: v0.2.1
 spec:
   selector:
     matchLabels:
       k8s-app: metrics-server
-      version: v0.2.0
+      version: v0.2.1
   template:
     metadata:
       name: metrics-server
       labels:
         k8s-app: metrics-server
-        version: v0.2.0
+        version: v0.2.1
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       serviceAccountName: metrics-server
       containers:
       - name: metrics-server
-        image: gcr.io/google_containers/metrics-server-amd64:v0.2.0
+        image: k8s.gcr.io/metrics-server-amd64:v0.2.1
         command:
         - /metrics-server
         - --source=kubernetes.summary_api:''
@@ -56,7 +57,7 @@ spec:
           name: https
           protocol: TCP
       - name: metrics-server-nanny
-        image: gcr.io/google_containers/addon-resizer:1.8.1
+        image: k8s.gcr.io/addon-resizer:1.8.1
         resources:
           limits:
             cpu: 100m
@@ -81,10 +82,10 @@ spec:
           - --config-dir=/etc/config
           - --cpu=40m
           - --extra-cpu=0.5m
-          - --memory=140Mi
+          - --memory=40Mi
           - --extra-memory=4Mi
           - --threshold=5
-          - --deployment=metrics-server-v0.2.0
+          - --deployment=metrics-server-v0.2.1
           - --container=metrics-server
           - --poll-period=300000
           - --estimator=exponential

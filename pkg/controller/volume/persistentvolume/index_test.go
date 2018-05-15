@@ -20,8 +20,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func makePVC(size string, modfn func(*v1.PersistentVolumeClaim)) *v1.PersistentVolumeClaim {
@@ -307,7 +304,7 @@ func TestAllPossibleAccessModes(t *testing.T) {
 		t.Errorf("Expected 3 arrays of modes that match RWO, but got %v", len(possibleModes))
 	}
 	for _, m := range possibleModes {
-		if !volume.AccessModesContains(m, v1.ReadWriteOnce) {
+		if !util.AccessModesContains(m, v1.ReadWriteOnce) {
 			t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 		}
 	}
@@ -316,7 +313,7 @@ func TestAllPossibleAccessModes(t *testing.T) {
 	if len(possibleModes) != 1 {
 		t.Errorf("Expected 1 array of modes that match RWX, but got %v", len(possibleModes))
 	}
-	if !volume.AccessModesContains(possibleModes[0], v1.ReadWriteMany) {
+	if !util.AccessModesContains(possibleModes[0], v1.ReadWriteMany) {
 		t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 	}
 
@@ -680,9 +677,8 @@ func createTestVolumes() []*v1.PersistentVolume {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID:         "affinity-pv",
-				Name:        "affinity001",
-				Annotations: getAnnotationWithNodeAffinity("key1", "value1"),
+				UID:  "affinity-pv",
+				Name: "affinity001",
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -696,13 +692,13 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID:         "affinity-pv2",
-				Name:        "affinity002",
-				Annotations: getAnnotationWithNodeAffinity("key1", "value1"),
+				UID:  "affinity-pv2",
+				Name: "affinity002",
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -716,13 +712,13 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID:         "affinity-prebound",
-				Name:        "affinity003",
-				Annotations: getAnnotationWithNodeAffinity("key1", "value1"),
+				UID:  "affinity-prebound",
+				Name: "affinity003",
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -737,13 +733,13 @@ func createTestVolumes() []*v1.PersistentVolume {
 				},
 				StorageClassName: classWait,
 				ClaimRef:         &v1.ObjectReference{Name: "claim02", Namespace: "myns"},
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				UID:         "affinity-pv3",
-				Name:        "affinity003",
-				Annotations: getAnnotationWithNodeAffinity("key1", "value3"),
+				UID:  "affinity-pv3",
+				Name: "affinity003",
 			},
 			Spec: v1.PersistentVolumeSpec{
 				Capacity: v1.ResourceList{
@@ -757,6 +753,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value3"),
 			},
 		},
 	}
@@ -776,9 +773,9 @@ func testVolume(name, size string) *v1.PersistentVolume {
 	}
 }
 
-func getAnnotationWithNodeAffinity(key string, value string) map[string]string {
-	affinity := &v1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+func getVolumeNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
+	return &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
@@ -792,14 +789,6 @@ func getAnnotationWithNodeAffinity(key string, value string) map[string]string {
 			},
 		},
 	}
-
-	annotations := map[string]string{}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(annotations, affinity)
-	if err != nil {
-		glog.Fatalf("Failed to get node affinity annotation: %v", err)
-	}
-
-	return annotations
 }
 
 func createVolumeModeBlockTestVolume() *v1.PersistentVolume {
@@ -854,18 +843,22 @@ func createTestVolOrderedIndex(pv *v1.PersistentVolume) persistentVolumeOrderedI
 	return volFile
 }
 
-func toggleBlockVolumeFeature(toggleFlag bool, t *testing.T) {
+func toggleFeature(toggleFlag bool, featureName string, t *testing.T) {
+	var valueStr string
 	if toggleFlag {
-		// Enable alpha feature BlockVolume
-		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+		// Enable feature
+		valueStr = featureName + "=true"
+		err := utilfeature.DefaultFeatureGate.Set(valueStr)
 		if err != nil {
-			t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
+			t.Errorf("Failed to enable feature gate for %s: %v", featureName, err)
 			return
 		}
 	} else {
-		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
+		// Disable feature
+		valueStr = featureName + "=false"
+		err := utilfeature.DefaultFeatureGate.Set(valueStr)
 		if err != nil {
-			t.Errorf("Failed to disable feature gate for BlockVolume: %v", err)
+			t.Errorf("Failed to disable feature gate for %s: %v", featureName, err)
 			return
 		}
 	}
@@ -935,7 +928,7 @@ func TestAlphaVolumeModeCheck(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		toggleBlockVolumeFeature(scenario.enableBlock, t)
+		toggleFeature(scenario.enableBlock, "BlockVolume", t)
 		expectedMisMatch, err := checkVolumeModeMisMatches(&scenario.pvc.Spec, &scenario.vol.Spec)
 		if err != nil {
 			t.Errorf("Unexpected failure for checkVolumeModeMisMatches: %v", err)
@@ -950,7 +943,7 @@ func TestAlphaVolumeModeCheck(t *testing.T) {
 	}
 
 	// make sure feature gate is turned off
-	toggleBlockVolumeFeature(false, t)
+	toggleFeature(false, "BlockVolume", t)
 }
 
 func TestAlphaFilteringVolumeModes(t *testing.T) {
@@ -1028,7 +1021,7 @@ func TestAlphaFilteringVolumeModes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		toggleBlockVolumeFeature(scenario.enableBlock, t)
+		toggleFeature(scenario.enableBlock, "BlockVolume", t)
 		pvmatch, err := scenario.vol.findBestMatchForClaim(scenario.pvc, false)
 		// expected to match but either got an error or no returned pvmatch
 		if pvmatch == nil && scenario.isExpectedMatch {
@@ -1047,7 +1040,135 @@ func TestAlphaFilteringVolumeModes(t *testing.T) {
 	}
 
 	// make sure feature gate is turned off
-	toggleBlockVolumeFeature(false, t)
+	toggleFeature(false, "BlockVolume", t)
+}
+
+func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "pv1",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G")},
+			PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{}},
+			AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+		},
+	}
+
+	pvToDelete := pv.DeepCopy()
+	now := metav1.Now()
+	pvToDelete.ObjectMeta.DeletionTimestamp = &now
+
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pvc1",
+			Namespace: "myns",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G")}},
+		},
+	}
+
+	satisfyingTestCases := map[string]struct {
+		isExpectedMatch                    bool
+		vol                                *v1.PersistentVolume
+		pvc                                *v1.PersistentVolumeClaim
+		enableStorageObjectInUseProtection bool
+	}{
+		"feature enabled - pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             pv,
+			pvc:             pvc,
+			enableStorageObjectInUseProtection: true,
+		},
+		"feature enabled - pv deletionTimeStamp set": {
+			isExpectedMatch: false,
+			vol:             pvToDelete,
+			pvc:             pvc,
+			enableStorageObjectInUseProtection: true,
+		},
+		"feature disabled - pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             pv,
+			pvc:             pvc,
+			enableStorageObjectInUseProtection: false,
+		},
+		"feature disabled - pv deletionTimeStamp set": {
+			isExpectedMatch: true,
+			vol:             pvToDelete,
+			pvc:             pvc,
+			enableStorageObjectInUseProtection: false,
+		},
+	}
+
+	for name, testCase := range satisfyingTestCases {
+		toggleFeature(testCase.enableStorageObjectInUseProtection, "StorageObjectInUseProtection", t)
+		err := checkVolumeSatisfyClaim(testCase.vol, testCase.pvc)
+		// expected to match but got an error
+		if err != nil && testCase.isExpectedMatch {
+			t.Errorf("%s: expected to match but got an error: %v", name, err)
+		}
+		// not expected to match but did
+		if err == nil && !testCase.isExpectedMatch {
+			t.Errorf("%s: not expected to match but did", name)
+		}
+
+	}
+
+	filteringTestCases := map[string]struct {
+		isExpectedMatch                    bool
+		vol                                persistentVolumeOrderedIndex
+		pvc                                *v1.PersistentVolumeClaim
+		enableStorageObjectInUseProtection bool
+	}{
+		"feature enabled - pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(pv),
+			pvc:             pvc,
+			enableStorageObjectInUseProtection: true,
+		},
+		"feature enabled - pv deletionTimeStamp set": {
+			isExpectedMatch: false,
+			vol:             createTestVolOrderedIndex(pvToDelete),
+			pvc:             pvc,
+			enableStorageObjectInUseProtection: true,
+		},
+		"feature disabled - pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(pv),
+			pvc:             pvc,
+			enableStorageObjectInUseProtection: false,
+		},
+		"feature disabled - pv deletionTimeStamp set": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(pvToDelete),
+			pvc:             pvc,
+			enableStorageObjectInUseProtection: false,
+		},
+	}
+	for name, testCase := range filteringTestCases {
+		toggleFeature(testCase.enableStorageObjectInUseProtection, "StorageObjectInUseProtection", t)
+		pvmatch, err := testCase.vol.findBestMatchForClaim(testCase.pvc, false)
+		// expected to match but either got an error or no returned pvmatch
+		if pvmatch == nil && testCase.isExpectedMatch {
+			t.Errorf("Unexpected failure for testcase, no matching volume: %s", name)
+		}
+		if err != nil && testCase.isExpectedMatch {
+			t.Errorf("Unexpected failure for testcase: %s - %+v", name, err)
+		}
+		// expected to not match but either got an error or a returned pvmatch
+		if pvmatch != nil && !testCase.isExpectedMatch {
+			t.Errorf("Unexpected failure for testcase, expected no matching volume: %s", name)
+		}
+		if err != nil && !testCase.isExpectedMatch {
+			t.Errorf("Unexpected failure for testcase: %s - %+v", name, err)
+		}
+	}
+
+	// make sure feature gate is turned off
+	toggleFeature(false, "StorageObjectInUseProtection", t)
 }
 
 func TestFindingPreboundVolumes(t *testing.T) {

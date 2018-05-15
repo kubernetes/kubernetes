@@ -17,13 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	apitest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilexec "k8s.io/utils/exec"
 )
@@ -60,7 +60,8 @@ func (f *RemoteRuntime) Start(endpoint string) error {
 		return fmt.Errorf("failed to listen on %q: %v", endpoint, err)
 	}
 
-	return f.server.Serve(l)
+	go f.server.Serve(l)
+	return nil
 }
 
 // Stop stops the fake remote runtime.
@@ -282,4 +283,14 @@ func (f *RemoteRuntime) UpdateContainerResources(ctx context.Context, req *kubea
 	}
 
 	return &kubeapi.UpdateContainerResourcesResponse{}, nil
+}
+
+// ReopenContainerLog reopens the container log file.
+func (f *RemoteRuntime) ReopenContainerLog(ctx context.Context, req *kubeapi.ReopenContainerLogRequest) (*kubeapi.ReopenContainerLogResponse, error) {
+	err := f.RuntimeService.ReopenContainerLog(req.ContainerId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.ReopenContainerLogResponse{}, nil
 }

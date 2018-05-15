@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
 const (
@@ -37,7 +38,7 @@ const (
 func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
 	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
-	scheme := schemeInternal
+	scheme := cloud.SchemeInternal
 	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
 	sharedBackend := shareBackendService(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
@@ -82,10 +83,18 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	requestedIP := determineRequestedIP(svc, existingFwdRule)
 	ipToUse := requestedIP
 
+	// If the ILB already exists, continue using the subnet that it's already using.
+	// This is to support existing ILBs that were setup using the wrong subnet.
+	subnetworkURL := gce.SubnetworkURL()
+	if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
+		// external LBs have an empty Subnetwork field.
+		subnetworkURL = existingFwdRule.Subnetwork
+	}
+
 	var addrMgr *addressManager
 	// If the network is not a legacy network, use the address manager
 	if !gce.IsLegacyNetwork() {
-		addrMgr = newAddressManager(gce, nm.String(), gce.Region(), gce.SubnetworkURL(), loadBalancerName, requestedIP, schemeInternal)
+		addrMgr = newAddressManager(gce, nm.String(), gce.Region(), subnetworkURL, loadBalancerName, requestedIP, cloud.SchemeInternal)
 		ipToUse, err = addrMgr.HoldAddress()
 		if err != nil {
 			return nil, err
@@ -108,9 +117,10 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		LoadBalancingScheme: string(scheme),
 	}
 
-	// Specify subnetwork if known
-	if len(gce.subnetworkURL) > 0 {
-		expectedFwdRule.Subnetwork = gce.subnetworkURL
+	// Given that CreateGCECloud will attempt to determine the subnet based off the network,
+	// the subnetwork should rarely be unknown.
+	if subnetworkURL != "" {
+		expectedFwdRule.Subnetwork = subnetworkURL
 	} else {
 		expectedFwdRule.Network = gce.networkURL
 	}
@@ -199,7 +209,7 @@ func (gce *GCECloud) updateInternalLoadBalancer(clusterName, clusterID string, s
 
 	// Generate the backend service name
 	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
-	scheme := schemeInternal
+	scheme := cloud.SchemeInternal
 	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, shareBackendService(svc), scheme, protocol, svc.Spec.SessionAffinity)
 	// Ensure the backend service has the proper backend/instance-group links
@@ -209,7 +219,7 @@ func (gce *GCECloud) updateInternalLoadBalancer(clusterName, clusterID string, s
 func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string, svc *v1.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
 	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
-	scheme := schemeInternal
+	scheme := cloud.SchemeInternal
 	sharedBackend := shareBackendService(svc)
 	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
 
@@ -435,7 +445,7 @@ func (gce *GCECloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.
 			return "", err
 		}
 
-		for _, ins := range instances.Items {
+		for _, ins := range instances {
 			parts := strings.Split(ins.Instance, "/")
 			gceNodes.Insert(parts[len(parts)-1])
 		}
@@ -497,7 +507,7 @@ func (gce *GCECloud) ensureInternalInstanceGroupsDeleted(name string) error {
 	return nil
 }
 
-func (gce *GCECloud) ensureInternalBackendService(name, description string, affinityType v1.ServiceAffinity, scheme lbScheme, protocol v1.Protocol, igLinks []string, hcLink string) error {
+func (gce *GCECloud) ensureInternalBackendService(name, description string, affinityType v1.ServiceAffinity, scheme cloud.LbScheme, protocol v1.Protocol, igLinks []string, hcLink string) error {
 	glog.V(2).Infof("ensureInternalBackendService(%v, %v, %v): checking existing backend service with %d groups", name, scheme, protocol, len(igLinks))
 	bs, err := gce.GetRegionBackendService(name, gce.region)
 	if err != nil && !isNotFound(err) {
@@ -553,6 +563,9 @@ func (gce *GCECloud) ensureInternalBackendServiceGroups(name string, igLinks []s
 		return nil
 	}
 
+	// Set the backend service's backends to the updated list.
+	bs.Backends = backends
+
 	glog.V(2).Infof("ensureInternalBackendServiceGroups: updating backend service %v", name)
 	if err := gce.UpdateRegionBackendService(bs, gce.region); err != nil {
 		return err
@@ -565,8 +578,7 @@ func shareBackendService(svc *v1.Service) bool {
 	return GetLoadBalancerAnnotationBackendShare(svc) && !v1_service.RequestsOnlyLocalTraffic(svc)
 }
 
-func backendsFromGroupLinks(igLinks []string) []*compute.Backend {
-	var backends []*compute.Backend
+func backendsFromGroupLinks(igLinks []string) (backends []*compute.Backend) {
 	for _, igLink := range igLinks {
 		backends = append(backends, &compute.Backend{
 			Group: igLink,

@@ -508,7 +508,7 @@ type yaml_parser_t struct {
 
 	problem string // Error description.
 
-	// The byte about which the problem occured.
+	// The byte about which the problem occurred.
 	problem_offset int
 	problem_value  int
 	problem_mark   yaml_mark_t

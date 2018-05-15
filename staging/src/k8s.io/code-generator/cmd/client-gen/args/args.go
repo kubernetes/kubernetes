@@ -27,12 +27,7 @@ import (
 	codegenutil "k8s.io/code-generator/pkg/util"
 )
 
-var DefaultInputDirs = []string{
-	"k8s.io/apimachinery/pkg/fields",
-	"k8s.io/apimachinery/pkg/labels",
-	"k8s.io/apimachinery/pkg/watch",
-	"k8s.io/apimachinery/pkg/apimachinery/registered",
-}
+var DefaultInputDirs = []string{}
 
 // ClientGenArgs is a wrapper for arguments to client-gen.
 type CustomArgs struct {

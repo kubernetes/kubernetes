@@ -23,6 +23,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -56,6 +58,7 @@ type annotatedPodSandboxInfo struct {
 
 type labeledContainerInfo struct {
 	ContainerName string
+	ContainerType kubecontainer.ContainerType
 	PodName       string
 	PodNamespace  string
 	PodUID        kubetypes.UID
@@ -94,19 +97,28 @@ func newPodAnnotations(pod *v1.Pod) map[string]string {
 }
 
 // newContainerLabels creates container labels from v1.Container and v1.Pod.
-func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string {
+func newContainerLabels(container *v1.Container, pod *v1.Pod, containerType kubecontainer.ContainerType) map[string]string {
 	labels := map[string]string{}
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
+	if utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		labels[types.KubernetesContainerTypeLabel] = string(containerType)
+	}
 
 	return labels
 }
 
 // newContainerAnnotations creates container annotations from v1.Container and v1.Pod.
-func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount int) map[string]string {
+func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount int, opts *kubecontainer.RunContainerOptions) map[string]string {
 	annotations := map[string]string{}
+
+	// Kubelet always overrides device plugin annotations if they are conflicting
+	for _, a := range opts.Annotations {
+		annotations[a.Name] = a.Value
+	}
+
 	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
@@ -120,7 +132,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
-		// Using json enconding so that the PreStop handler object is readable after writing as a label
+		// Using json encoding so that the PreStop handler object is readable after writing as a label
 		rawPreStop, err := json.Marshal(container.Lifecycle.PreStop)
 		if err != nil {
 			glog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
@@ -169,11 +181,16 @@ func getPodSandboxInfoFromAnnotations(annotations map[string]string) *annotatedP
 
 // getContainerInfoFromLabels gets labeledContainerInfo from labels.
 func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo {
+	var containerType kubecontainer.ContainerType
+	if utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+		containerType = kubecontainer.ContainerType(getStringValueFromLabel(labels, types.KubernetesContainerTypeLabel))
+	}
 	return &labeledContainerInfo{
 		PodName:       getStringValueFromLabel(labels, types.KubernetesPodNameLabel),
 		PodNamespace:  getStringValueFromLabel(labels, types.KubernetesPodNamespaceLabel),
 		PodUID:        kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
 		ContainerName: getStringValueFromLabel(labels, types.KubernetesContainerNameLabel),
+		ContainerType: containerType,
 	}
 }
 

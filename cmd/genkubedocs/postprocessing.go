@@ -27,7 +27,7 @@ import (
 // MarkdownPostProcessing goes though the generated files
 func MarkdownPostProcessing(cmd *cobra.Command, dir string, processor func(string) string) error {
 	for _, c := range cmd.Commands() {
-		if !c.IsAvailableCommand() || c.IsHelpCommand() {
+		if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
 			continue
 		}
 		if err := MarkdownPostProcessing(c, dir, processor); err != nil {

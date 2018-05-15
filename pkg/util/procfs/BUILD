@@ -70,7 +70,6 @@ go_test(
         "example_proc_cgroup",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/procfs",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",

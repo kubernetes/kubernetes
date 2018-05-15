@@ -17,13 +17,11 @@ limitations under the License.
 package scheme
 
 import (
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 )
 
-func ExtraInstall(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
+func ExtraInstall(scheme *runtime.Scheme) {
 	// componentconfig is an apigroup, but we don't have an API endpoint because its objects are just embedded in ConfigMaps.
-	componentconfig.Install(groupFactoryRegistry, registry, scheme)
+	componentconfig.Install(scheme)
 }

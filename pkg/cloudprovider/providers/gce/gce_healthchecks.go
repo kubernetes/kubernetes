@@ -17,13 +17,18 @@ limitations under the License.
 package gce
 
 import (
-	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/master/ports"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	"context"
 
 	"github.com/golang/glog"
+
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
+	"k8s.io/kubernetes/pkg/master/ports"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -54,48 +59,32 @@ func newHealthcheckMetricContextWithVersion(request, version string) *metricCont
 // GetHttpHealthCheck returns the given HttpHealthCheck by name.
 func (gce *GCECloud) GetHttpHealthCheck(name string) (*compute.HttpHealthCheck, error) {
 	mc := newHealthcheckMetricContext("get_legacy")
-	v, err := gce.service.HttpHealthChecks.Get(gce.projectID, name).Do()
+	v, err := gce.c.HttpHealthChecks().Get(context.Background(), meta.GlobalKey(name))
 	return v, mc.Observe(err)
 }
 
 // UpdateHttpHealthCheck applies the given HttpHealthCheck as an update.
 func (gce *GCECloud) UpdateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 	mc := newHealthcheckMetricContext("update_legacy")
-	op, err := gce.service.HttpHealthChecks.Update(gce.projectID, hc.Name, hc).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.HttpHealthChecks().Update(context.Background(), meta.GlobalKey(hc.Name), hc))
 }
 
 // DeleteHttpHealthCheck deletes the given HttpHealthCheck by name.
 func (gce *GCECloud) DeleteHttpHealthCheck(name string) error {
 	mc := newHealthcheckMetricContext("delete_legacy")
-	op, err := gce.service.HttpHealthChecks.Delete(gce.projectID, name).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.HttpHealthChecks().Delete(context.Background(), meta.GlobalKey(name)))
 }
 
 // CreateHttpHealthCheck creates the given HttpHealthCheck.
 func (gce *GCECloud) CreateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 	mc := newHealthcheckMetricContext("create_legacy")
-	op, err := gce.service.HttpHealthChecks.Insert(gce.projectID, hc).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.HttpHealthChecks().Insert(context.Background(), meta.GlobalKey(hc.Name), hc))
 }
 
 // ListHttpHealthChecks lists all HttpHealthChecks in the project.
-func (gce *GCECloud) ListHttpHealthChecks() (*compute.HttpHealthCheckList, error) {
+func (gce *GCECloud) ListHttpHealthChecks() ([]*compute.HttpHealthCheck, error) {
 	mc := newHealthcheckMetricContext("list_legacy")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.HttpHealthChecks.List(gce.projectID).Do()
+	v, err := gce.c.HttpHealthChecks().List(context.Background(), filter.None)
 	return v, mc.Observe(err)
 }
 
@@ -104,50 +93,32 @@ func (gce *GCECloud) ListHttpHealthChecks() (*compute.HttpHealthCheckList, error
 // GetHttpsHealthCheck returns the given HttpsHealthCheck by name.
 func (gce *GCECloud) GetHttpsHealthCheck(name string) (*compute.HttpsHealthCheck, error) {
 	mc := newHealthcheckMetricContext("get_legacy")
-	v, err := gce.service.HttpsHealthChecks.Get(gce.projectID, name).Do()
-	mc.Observe(err)
-	return v, err
+	v, err := gce.c.HttpsHealthChecks().Get(context.Background(), meta.GlobalKey(name))
+	return v, mc.Observe(err)
 }
 
 // UpdateHttpsHealthCheck applies the given HttpsHealthCheck as an update.
 func (gce *GCECloud) UpdateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error {
 	mc := newHealthcheckMetricContext("update_legacy")
-	op, err := gce.service.HttpsHealthChecks.Update(gce.projectID, hc.Name, hc).Do()
-	if err != nil {
-		mc.Observe(err)
-		return err
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.HttpsHealthChecks().Update(context.Background(), meta.GlobalKey(hc.Name), hc))
 }
 
 // DeleteHttpsHealthCheck deletes the given HttpsHealthCheck by name.
 func (gce *GCECloud) DeleteHttpsHealthCheck(name string) error {
 	mc := newHealthcheckMetricContext("delete_legacy")
-	op, err := gce.service.HttpsHealthChecks.Delete(gce.projectID, name).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.HttpsHealthChecks().Delete(context.Background(), meta.GlobalKey(name)))
 }
 
 // CreateHttpsHealthCheck creates the given HttpsHealthCheck.
 func (gce *GCECloud) CreateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error {
 	mc := newHealthcheckMetricContext("create_legacy")
-	op, err := gce.service.HttpsHealthChecks.Insert(gce.projectID, hc).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.HttpsHealthChecks().Insert(context.Background(), meta.GlobalKey(hc.Name), hc))
 }
 
 // ListHttpsHealthChecks lists all HttpsHealthChecks in the project.
-func (gce *GCECloud) ListHttpsHealthChecks() (*compute.HttpsHealthCheckList, error) {
+func (gce *GCECloud) ListHttpsHealthChecks() ([]*compute.HttpsHealthCheck, error) {
 	mc := newHealthcheckMetricContext("list_legacy")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.HttpsHealthChecks.List(gce.projectID).Do()
+	v, err := gce.c.HttpsHealthChecks().List(context.Background(), filter.None)
 	return v, mc.Observe(err)
 }
 
@@ -156,77 +127,51 @@ func (gce *GCECloud) ListHttpsHealthChecks() (*compute.HttpsHealthCheckList, err
 // GetHealthCheck returns the given HealthCheck by name.
 func (gce *GCECloud) GetHealthCheck(name string) (*compute.HealthCheck, error) {
 	mc := newHealthcheckMetricContext("get")
-	v, err := gce.service.HealthChecks.Get(gce.projectID, name).Do()
+	v, err := gce.c.HealthChecks().Get(context.Background(), meta.GlobalKey(name))
 	return v, mc.Observe(err)
 }
 
 // GetAlphaHealthCheck returns the given alpha HealthCheck by name.
 func (gce *GCECloud) GetAlphaHealthCheck(name string) (*computealpha.HealthCheck, error) {
 	mc := newHealthcheckMetricContextWithVersion("get", computeAlphaVersion)
-	v, err := gce.serviceAlpha.HealthChecks.Get(gce.projectID, name).Do()
+	v, err := gce.c.AlphaHealthChecks().Get(context.Background(), meta.GlobalKey(name))
 	return v, mc.Observe(err)
 }
 
 // UpdateHealthCheck applies the given HealthCheck as an update.
 func (gce *GCECloud) UpdateHealthCheck(hc *compute.HealthCheck) error {
 	mc := newHealthcheckMetricContext("update")
-	op, err := gce.service.HealthChecks.Update(gce.projectID, hc.Name, hc).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.HealthChecks().Update(context.Background(), meta.GlobalKey(hc.Name), hc))
 }
 
 // UpdateAlphaHealthCheck applies the given alpha HealthCheck as an update.
 func (gce *GCECloud) UpdateAlphaHealthCheck(hc *computealpha.HealthCheck) error {
 	mc := newHealthcheckMetricContextWithVersion("update", computeAlphaVersion)
-	op, err := gce.serviceAlpha.HealthChecks.Update(gce.projectID, hc.Name, hc).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.AlphaHealthChecks().Update(context.Background(), meta.GlobalKey(hc.Name), hc))
 }
 
 // DeleteHealthCheck deletes the given HealthCheck by name.
 func (gce *GCECloud) DeleteHealthCheck(name string) error {
 	mc := newHealthcheckMetricContext("delete")
-	op, err := gce.service.HealthChecks.Delete(gce.projectID, name).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.HealthChecks().Delete(context.Background(), meta.GlobalKey(name)))
 }
 
 // CreateHealthCheck creates the given HealthCheck.
 func (gce *GCECloud) CreateHealthCheck(hc *compute.HealthCheck) error {
 	mc := newHealthcheckMetricContext("create")
-	op, err := gce.service.HealthChecks.Insert(gce.projectID, hc).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.HealthChecks().Insert(context.Background(), meta.GlobalKey(hc.Name), hc))
 }
 
 // CreateAlphaHealthCheck creates the given alpha HealthCheck.
 func (gce *GCECloud) CreateAlphaHealthCheck(hc *computealpha.HealthCheck) error {
 	mc := newHealthcheckMetricContextWithVersion("create", computeAlphaVersion)
-	op, err := gce.serviceAlpha.HealthChecks.Insert(gce.projectID, hc).Do()
-	if err != nil {
-		return mc.Observe(err)
-	}
-
-	return gce.waitForGlobalOp(op, mc)
+	return mc.Observe(gce.c.AlphaHealthChecks().Insert(context.Background(), meta.GlobalKey(hc.Name), hc))
 }
 
 // ListHealthChecks lists all HealthCheck in the project.
-func (gce *GCECloud) ListHealthChecks() (*compute.HealthCheckList, error) {
+func (gce *GCECloud) ListHealthChecks() ([]*compute.HealthCheck, error) {
 	mc := newHealthcheckMetricContext("list")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.HealthChecks.List(gce.projectID).Do()
+	v, err := gce.c.HealthChecks().List(context.Background(), filter.None)
 	return v, mc.Observe(err)
 }
 

@@ -42,4 +42,8 @@ type MetricsClient interface {
 	// GetObjectMetric gets the given metric (and an associated timestamp) for the given
 	// object in the given namespace
 	GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (int64, time.Time, error)
+
+	// GetExternalMetric gets all the values of a given external metric
+	// that match the specified selector.
+	GetExternalMetric(metricName string, namespace string, selector labels.Selector) ([]int64, time.Time, error)
 }

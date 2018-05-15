@@ -23,13 +23,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
@@ -127,30 +126,6 @@ func TestParsingCreationConflictError(t *testing.T) {
 	matches := conflictRE.FindStringSubmatch(msg)
 	require.Len(t, matches, 2)
 	require.Equal(t, matches[1], "24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e")
-}
-
-func TestGetSecurityOptSeparator(t *testing.T) {
-	for c, test := range map[string]struct {
-		desc     string
-		version  *semver.Version
-		expected rune
-	}{
-		"older docker version": {
-			version:  &semver.Version{Major: 1, Minor: 22, Patch: 0},
-			expected: ':',
-		},
-		"changed docker version": {
-			version:  &semver.Version{Major: 1, Minor: 23, Patch: 0},
-			expected: '=',
-		},
-		"newer docker version": {
-			version:  &semver.Version{Major: 1, Minor: 24, Patch: 0},
-			expected: '=',
-		},
-	} {
-		actual := getSecurityOptSeparator(test.version)
-		assert.Equal(t, test.expected, actual, c)
-	}
 }
 
 // writeDockerConfig will write a config file into a temporary dir, and return that dir.
@@ -268,7 +243,7 @@ func TestMakePortsAndBindings(t *testing.T) {
 				},
 			},
 		},
-		"multipe port mappings": {
+		"multiple port mappings": {
 			pm: []*runtimeapi.PortMapping{
 				{
 					Protocol:      runtimeapi.Protocol_TCP,
@@ -367,5 +342,5 @@ func TestGenerateMountBindings(t *testing.T) {
 	}
 	result := generateMountBindings(mounts)
 
-	assert.Equal(t, result, expectedResult)
+	assert.Equal(t, expectedResult, result)
 }

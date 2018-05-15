@@ -180,14 +180,16 @@ func TestSplitVersion(t *testing.T) {
 		{"release/v1.7.0", "https://dl.k8s.io/release", "v1.7.0", true},
 		{"release/latest-1.7", "https://dl.k8s.io/release", "latest-1.7", true},
 		// CI builds area, lookup actual builds at ci-cross/*.txt
+		{"ci/latest", "https://dl.k8s.io/ci", "latest", true},
 		{"ci-cross/latest", "https://dl.k8s.io/ci-cross", "latest", true},
-		{"ci/latest-1.7", "https://dl.k8s.io/ci-cross", "latest-1.7", true},
+		{"ci/latest-1.7", "https://dl.k8s.io/ci", "latest-1.7", true},
+		{"ci-cross/latest-1.7", "https://dl.k8s.io/ci-cross", "latest-1.7", true},
 		// unknown label in default (release) area: splitVersion validate only areas.
 		{"unknown-1", "https://dl.k8s.io/release", "unknown-1", true},
 		// unknown area, not valid input.
 		{"unknown/latest-1", "", "", false},
 	}
-	// kubeReleaseBucketURL can be overriden during network tests, thus ensure
+	// kubeReleaseBucketURL can be overridden during network tests, thus ensure
 	// it will contain value corresponding to expected outcome for this unit test
 	kubeReleaseBucketURL = "https://dl.k8s.io"
 

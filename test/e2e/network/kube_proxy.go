@@ -171,19 +171,19 @@ var _ = SIGDescribe("Network", func() {
 		// If test flakes occur here, then this check should be performed
 		// in a loop as there may be a race with the client connecting.
 		framework.IssueSSHCommandWithResult(
-			fmt.Sprintf("sudo cat /proc/net/ip_conntrack | grep 'dport=%v'",
+			fmt.Sprintf("sudo cat /proc/net/nf_conntrack | grep 'dport=%v'",
 				testDaemonTcpPort),
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
 
-		// Timeout in seconds is available as the third column from
-		// /proc/net/ip_conntrack.
+		// Timeout in seconds is available as the fifth column from
+		// /proc/net/nf_conntrack.
 		result, err := framework.IssueSSHCommandWithResult(
 			fmt.Sprintf(
-				"sudo cat /proc/net/ip_conntrack "+
+				"sudo cat /proc/net/nf_conntrack "+
 					"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' "+
 					"| tail -n 1"+
-					"| awk '{print $3}' ",
+					"| awk '{print $5}' ",
 				serverNodeInfo.nodeIp,
 				testDaemonTcpPort),
 			framework.TestContext.Provider,

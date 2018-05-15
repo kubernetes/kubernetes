@@ -19,14 +19,14 @@ package user
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 type nonRoot struct{}
 
 var _ RunAsUserStrategy = &nonRoot{}
 
-func NewRunAsNonRoot(options *extensions.RunAsUserStrategyOptions) (RunAsUserStrategy, error) {
+func NewRunAsNonRoot(options *policy.RunAsUserStrategyOptions) (RunAsUserStrategy, error) {
 	return &nonRoot{}, nil
 }
 

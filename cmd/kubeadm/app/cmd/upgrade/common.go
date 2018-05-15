@@ -24,15 +24,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ghodss/yaml"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -42,7 +42,7 @@ import (
 // TODO - Restructure or rename upgradeVariables
 type upgradeVariables struct {
 	client        clientset.Interface
-	cfg           *kubeadmapiext.MasterConfiguration
+	cfg           *kubeadmapiv1alpha1.MasterConfiguration
 	versionGetter upgrade.VersionGetter
 	waiter        apiclient.Waiter
 }
@@ -70,34 +70,37 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 		cfg.KubernetesVersion = newK8sVersion
 	}
 
+	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)
+	if flags.featureGatesString != "" {
+		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
+		if err != nil {
+			return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+		}
+	}
+
 	// If the user told us to print this information out; do it!
 	if flags.printConfig {
 		printConfiguration(cfg, os.Stdout)
-	}
-
-	cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
-	if err != nil {
-		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
 	}
 
 	return &upgradeVariables{
 		client: client,
 		cfg:    cfg,
 		// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
-		versionGetter: upgrade.NewKubeVersionGetter(client, os.Stdout),
+		versionGetter: upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), newK8sVersion),
 		// Use the waiter conditionally based on the dryrunning variable
 		waiter: getWaiter(dryRun, client),
 	}, nil
 }
 
 // printConfiguration prints the external version of the API to yaml
-func printConfiguration(cfg *kubeadmapiext.MasterConfiguration, w io.Writer) {
+func printConfiguration(cfg *kubeadmapiv1alpha1.MasterConfiguration, w io.Writer) {
 	// Short-circuit if cfg is nil, so we can safely get the value of the pointer below
 	if cfg == nil {
 		return
 	}
 
-	cfgYaml, err := yaml.Marshal(*cfg)
+	cfgYaml, err := kubeadmutil.MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha1.SchemeGroupVersion, kubeadmscheme.Codecs)
 	if err == nil {
 		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
 

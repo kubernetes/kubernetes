@@ -18,8 +18,6 @@ package vsphere
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"sync"
 
 	. "github.com/onsi/ginkgo"
@@ -27,8 +25,6 @@ import (
 	"k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	k8stype "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -51,10 +47,10 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		namespace     string
 		instances     int
 		iterations    int
-		err           error
-		scNames       = []string{storageclass1, storageclass2, storageclass3, storageclass4}
 		policyName    string
 		datastoreName string
+		err           error
+		scNames       = []string{storageclass1, storageclass2, storageclass3, storageclass4}
 	)
 
 	BeforeEach(func() {
@@ -68,23 +64,16 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		// if VCP_STRESS_INSTANCES = 12 and VCP_STRESS_ITERATIONS is 10. 12 threads will run in parallel for 10 times.
 		// Resulting 120 Volumes and POD Creation. Volumes will be provisioned with each different types of Storage Class,
 		// Each iteration creates PVC, verify PV is provisioned, then creates a pod, verify volume is attached to the node, and then delete the pod and delete pvc.
-		instancesStr := os.Getenv("VCP_STRESS_INSTANCES")
-		Expect(instancesStr).NotTo(BeEmpty(), "ENV VCP_STRESS_INSTANCES is not set")
-		instances, err = strconv.Atoi(instancesStr)
-		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP-STRESS-INSTANCES")
+		instances = GetAndExpectIntEnvVar(VCPStressInstances)
 		Expect(instances <= volumesPerNode*len(nodeList.Items)).To(BeTrue(), fmt.Sprintf("Number of Instances should be less or equal: %v", volumesPerNode*len(nodeList.Items)))
 		Expect(instances > len(scNames)).To(BeTrue(), "VCP_STRESS_INSTANCES should be greater than 3 to utilize all 4 types of storage classes")
 
-		iterationStr := os.Getenv("VCP_STRESS_ITERATIONS")
-		Expect(instancesStr).NotTo(BeEmpty(), "ENV VCP_STRESS_ITERATIONS is not set")
-		iterations, err = strconv.Atoi(iterationStr)
+		iterations = GetAndExpectIntEnvVar(VCPStressIterations)
 		Expect(err).NotTo(HaveOccurred(), "Error Parsing VCP_STRESS_ITERATIONS")
 		Expect(iterations > 0).To(BeTrue(), "VCP_STRESS_ITERATIONS should be greater than 0")
 
-		policyName = os.Getenv("VSPHERE_SPBM_POLICY_NAME")
-		datastoreName = os.Getenv("VSPHERE_DATASTORE")
-		Expect(policyName).NotTo(BeEmpty(), "ENV VSPHERE_SPBM_POLICY_NAME is not set")
-		Expect(datastoreName).NotTo(BeEmpty(), "ENV VSPHERE_DATASTORE is not set")
+		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
+		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 	})
 
 	It("vsphere stress tests", func() {
@@ -135,12 +124,11 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.Interface, namespace string, instanceId string, sc *storageV1.StorageClass, iterations int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer GinkgoRecover()
-	vsp, err := getVSphere(f.ClientSet)
-	Expect(err).NotTo(HaveOccurred())
+
 	for iterationCount := 0; iterationCount < iterations; iterationCount++ {
 		logPrefix := fmt.Sprintf("Instance: [%v], Iteration: [%v] :", instanceId, iterationCount+1)
 		By(fmt.Sprintf("%v Creating PVC using the Storage Class: %v", logPrefix, sc.Name))
-		pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "1Gi", sc))
+		pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "1Gi", sc))
 		Expect(err).NotTo(HaveOccurred())
 		defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
@@ -163,19 +151,19 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Verifing the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
-		isVolumeAttached, verifyDiskAttachedError := verifyVSphereDiskAttached(client, vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, types.NodeName(pod.Spec.NodeName))
+		isVolumeAttached, verifyDiskAttachedError := diskIsAttached(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
 		Expect(isVolumeAttached).To(BeTrue())
 		Expect(verifyDiskAttachedError).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Verifing the volume: %v is accessible in the pod: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Name))
-		verifyVSphereVolumesAccessible(client, pod, persistentvolumes, vsp)
+		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 		By(fmt.Sprintf("%v Deleting pod: %v", logPrefix, pod.Name))
 		err = framework.DeletePodWithWait(f, client, pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Waiting for volume: %v to be detached from the node: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
-		err = waitForVSphereDiskToDetach(client, vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
+		err = waitForVSphereDiskToDetach(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Deleting the Claim: %v", logPrefix, pvclaim.Name))

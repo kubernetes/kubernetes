@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/printers"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 )
 
 var (

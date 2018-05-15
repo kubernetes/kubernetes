@@ -18,8 +18,9 @@ package flowcontrol
 
 import (
 	"sync"
+	"time"
 
-	"github.com/juju/ratelimit"
+	"golang.org/x/time/rate"
 )
 
 type RateLimiter interface {
@@ -30,17 +31,13 @@ type RateLimiter interface {
 	Accept()
 	// Stop stops the rate limiter, subsequent calls to CanAccept will return false
 	Stop()
-	// Saturation returns a percentage number which describes how saturated
-	// this rate limiter is.
-	// Usually we use token bucket rate limiter. In that case,
-	// 1.0 means no tokens are available; 0.0 means we have a full bucket of tokens to use.
-	Saturation() float64
 	// QPS returns QPS of this rate limiter
 	QPS() float32
 }
 
 type tokenBucketRateLimiter struct {
-	limiter *ratelimit.Bucket
+	limiter *rate.Limiter
+	clock   Clock
 	qps     float32
 }
 
@@ -50,42 +47,48 @@ type tokenBucketRateLimiter struct {
 // The bucket is initially filled with 'burst' tokens, and refills at a rate of 'qps'.
 // The maximum number of tokens in the bucket is capped at 'burst'.
 func NewTokenBucketRateLimiter(qps float32, burst int) RateLimiter {
-	limiter := ratelimit.NewBucketWithRate(float64(qps), int64(burst))
-	return newTokenBucketRateLimiter(limiter, qps)
+	limiter := rate.NewLimiter(rate.Limit(qps), burst)
+	return newTokenBucketRateLimiter(limiter, realClock{}, qps)
 }
 
 // An injectable, mockable clock interface.
 type Clock interface {
-	ratelimit.Clock
+	Now() time.Time
+	Sleep(time.Duration)
+}
+
+type realClock struct{}
+
+func (realClock) Now() time.Time {
+	return time.Now()
+}
+func (realClock) Sleep(d time.Duration) {
+	time.Sleep(d)
 }
 
 // NewTokenBucketRateLimiterWithClock is identical to NewTokenBucketRateLimiter
 // but allows an injectable clock, for testing.
-func NewTokenBucketRateLimiterWithClock(qps float32, burst int, clock Clock) RateLimiter {
-	limiter := ratelimit.NewBucketWithRateAndClock(float64(qps), int64(burst), clock)
-	return newTokenBucketRateLimiter(limiter, qps)
+func NewTokenBucketRateLimiterWithClock(qps float32, burst int, c Clock) RateLimiter {
+	limiter := rate.NewLimiter(rate.Limit(qps), burst)
+	return newTokenBucketRateLimiter(limiter, c, qps)
 }
 
-func newTokenBucketRateLimiter(limiter *ratelimit.Bucket, qps float32) RateLimiter {
+func newTokenBucketRateLimiter(limiter *rate.Limiter, c Clock, qps float32) RateLimiter {
 	return &tokenBucketRateLimiter{
 		limiter: limiter,
+		clock:   c,
 		qps:     qps,
 	}
 }
 
 func (t *tokenBucketRateLimiter) TryAccept() bool {
-	return t.limiter.TakeAvailable(1) == 1
-}
-
-func (t *tokenBucketRateLimiter) Saturation() float64 {
-	capacity := t.limiter.Capacity()
-	avail := t.limiter.Available()
-	return float64(capacity-avail) / float64(capacity)
+	return t.limiter.AllowN(t.clock.Now(), 1)
 }
 
 // Accept will block until a token becomes available
 func (t *tokenBucketRateLimiter) Accept() {
-	t.limiter.Wait(1)
+	now := t.clock.Now()
+	t.clock.Sleep(t.limiter.ReserveN(now, 1).DelayFrom(now))
 }
 
 func (t *tokenBucketRateLimiter) Stop() {
@@ -103,10 +106,6 @@ func NewFakeAlwaysRateLimiter() RateLimiter {
 
 func (t *fakeAlwaysRateLimiter) TryAccept() bool {
 	return true
-}
-
-func (t *fakeAlwaysRateLimiter) Saturation() float64 {
-	return 0
 }
 
 func (t *fakeAlwaysRateLimiter) Stop() {}
@@ -129,10 +128,6 @@ func NewFakeNeverRateLimiter() RateLimiter {
 
 func (t *fakeNeverRateLimiter) TryAccept() bool {
 	return false
-}
-
-func (t *fakeNeverRateLimiter) Saturation() float64 {
-	return 1
 }
 
 func (t *fakeNeverRateLimiter) Stop() {

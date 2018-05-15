@@ -67,6 +67,7 @@ type FakeNodeHandler struct {
 	// Synchronization
 	lock           sync.Mutex
 	DeleteWaitChan chan struct{}
+	PatchWaitChan  chan struct{}
 }
 
 // FakeLegacyHandler is a fake implemtation of CoreV1Interface.
@@ -270,6 +271,9 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
+		if m.PatchWaitChan != nil {
+			m.PatchWaitChan <- struct{}{}
+		}
 		m.lock.Unlock()
 	}()
 	var nodeCopy v1.Node
@@ -421,9 +425,6 @@ func NewFakeRecorder() *FakeRecorder {
 func NewNode(name string) *v1.Node {
 	return &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: v1.NodeSpec{
-			ExternalID: name,
-		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),

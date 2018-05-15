@@ -23,28 +23,28 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 // RetrieveValidatedClusterInfo connects to the API Server and makes sure it can talk
 // securely to the API Server using the provided CA cert and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
-func RetrieveValidatedClusterInfo(filepath string) (*clientcmdapi.Cluster, error) {
+func RetrieveValidatedClusterInfo(filepath, clustername string) (*clientcmdapi.Cluster, error) {
 	clusterinfo, err := clientcmd.LoadFromFile(filepath)
 	if err != nil {
 		return nil, err
 	}
-	return ValidateClusterInfo(clusterinfo)
+	return ValidateClusterInfo(clusterinfo, clustername)
 }
 
 // ValidateClusterInfo connects to the API Server and makes sure it can talk
 // securely to the API Server using the provided CA cert and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
-func ValidateClusterInfo(clusterinfo *clientcmdapi.Config) (*clientcmdapi.Cluster, error) {
+func ValidateClusterInfo(clusterinfo *clientcmdapi.Config, clustername string) (*clientcmdapi.Cluster, error) {
 	err := validateClusterInfoKubeConfig(clusterinfo)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func ValidateClusterInfo(clusterinfo *clientcmdapi.Config) (*clientcmdapi.Cluste
 	// We do this in order to not pick up other possible misconfigurations in the clusterinfo file
 	configFromClusterInfo := kubeconfigutil.CreateBasic(
 		defaultCluster.Server,
-		"kubernetes",
+		clustername,
 		"", // no user provided
 		defaultCluster.CertificateAuthorityData,
 	)

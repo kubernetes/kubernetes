@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // Abstract interface to disk operations.
@@ -85,7 +86,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 	if (&b).GetAttributes().ReadOnly {
 		options = append(options, "ro")
 	}
-	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+	mountOptions := util.JoinMountOptions(b.mountOptions, options)
 	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
 	if err != nil {
 		glog.Errorf("failed to bind mount:%s", globalPDPath)

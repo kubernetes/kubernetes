@@ -2360,16 +2360,6 @@ func init() {
 	t["BaseReplicationVmFault"] = reflect.TypeOf((*ReplicationVmFault)(nil)).Elem()
 }
 
-func (b *ResourceAllocationInfo) GetResourceAllocationInfo() *ResourceAllocationInfo { return b }
-
-type BaseResourceAllocationInfo interface {
-	GetResourceAllocationInfo() *ResourceAllocationInfo
-}
-
-func init() {
-	t["BaseResourceAllocationInfo"] = reflect.TypeOf((*ResourceAllocationInfo)(nil)).Elem()
-}
-
 func (b *ResourceInUse) GetResourceInUse() *ResourceInUse { return b }
 
 type BaseResourceInUse interface {

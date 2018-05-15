@@ -16,7 +16,6 @@ go_test(
         "util_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/util/net",
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 

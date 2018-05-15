@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["bootstrap_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
@@ -31,6 +30,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/transport:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
+        "//vendor/k8s.io/client-go/util/certificate:go_default_library",
         "//vendor/k8s.io/client-go/util/certificate/csr:go_default_library",
     ],
 )

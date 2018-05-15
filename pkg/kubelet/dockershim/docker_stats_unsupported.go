@@ -19,17 +19,18 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 // ContainerStats returns stats for a container stats request based on container id.
-func (ds *dockerService) ContainerStats(string) (*runtimeapi.ContainerStats, error) {
+func (ds *dockerService) ContainerStats(_ context.Context, r *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
 // ListContainerStats returns stats for a list container stats request based on a filter.
-func (ds *dockerService) ListContainerStats(*runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
+func (ds *dockerService) ListContainerStats(_ context.Context, r *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }

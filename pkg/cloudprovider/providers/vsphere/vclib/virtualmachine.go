@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
@@ -399,4 +400,11 @@ func (vm *VirtualMachine) deleteController(ctx context.Context, controllerDevice
 		return err
 	}
 	return nil
+}
+
+// RenewVM renews this virtual machine with new client connection.
+func (vm *VirtualMachine) RenewVM(client *vim25.Client) VirtualMachine {
+	dc := Datacenter{Datacenter: object.NewDatacenter(client, vm.Datacenter.Reference())}
+	newVM := object.NewVirtualMachine(client, vm.VirtualMachine.Reference())
+	return VirtualMachine{VirtualMachine: newVM, Datacenter: &dc}
 }

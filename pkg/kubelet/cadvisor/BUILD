@@ -96,16 +96,21 @@ go_test(
     srcs = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "cadvisor_linux_test.go",
+            "util_test.go",
         ],
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/apis/core/v1/helper:go_default_library",
+            "//pkg/features:go_default_library",
             "//pkg/kubelet/types:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
             "//vendor/github.com/google/cadvisor/metrics:go_default_library",
+            "//vendor/github.com/stretchr/testify/assert:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         ],
         "//conditions:default": [],
     }),

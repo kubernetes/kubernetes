@@ -22,6 +22,7 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func TestHPAGenerate(t *testing.T) {
@@ -51,14 +52,14 @@ func TestHPAGenerate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
-					TargetCPUUtilizationPercentage: newInt32(80),
+					TargetCPUUtilizationPercentage: utilpointer.Int32Ptr(80),
 					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
 						Kind:       "kind",
 						Name:       "name",
 						APIVersion: "apiVersion",
 					},
 					MaxReplicas: int32(10),
-					MinReplicas: newInt32(1),
+					MinReplicas: utilpointer.Int32Ptr(1),
 				},
 			},
 			expectErr: false,
@@ -124,9 +125,4 @@ func TestHPAGenerate(t *testing.T) {
 			t.Errorf("[%s] want:\n%#v\ngot:\n%#v", test.name, test.expected, obj.(*autoscalingv1.HorizontalPodAutoscaler))
 		}
 	}
-}
-
-func newInt32(value int) *int32 {
-	v := int32(value)
-	return &v
 }

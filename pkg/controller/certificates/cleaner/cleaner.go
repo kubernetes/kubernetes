@@ -124,7 +124,7 @@ func isIssuedExpired(csr *capi.CertificateSigningRequest) (bool, error) {
 			return false, err
 		}
 		if c.Type == capi.CertificateApproved && isIssued(csr) && isExpired {
-			glog.Infof("Cleaning CSR %q as the associated certificate is expired.", csr.Name, approvedExpiration)
+			glog.Infof("Cleaning CSR %q as the associated certificate is expired.", csr.Name)
 			return true, nil
 		}
 	}

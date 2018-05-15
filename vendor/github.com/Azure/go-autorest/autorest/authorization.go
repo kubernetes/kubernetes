@@ -24,9 +24,12 @@ import (
 )
 
 const (
-	bearerChallengeHeader = "Www-Authenticate"
-	bearer                = "Bearer"
-	tenantID              = "tenantID"
+	bearerChallengeHeader       = "Www-Authenticate"
+	bearer                      = "Bearer"
+	tenantID                    = "tenantID"
+	apiKeyAuthorizerHeader      = "Ocp-Apim-Subscription-Key"
+	bingAPISdkHeader            = "X-BingApis-SDK-Client"
+	golangBingAPISdkHeaderValue = "Go-SDK"
 )
 
 // Authorizer is the interface that provides a PrepareDecorator used to supply request
@@ -44,6 +47,53 @@ func (na NullAuthorizer) WithAuthorization() PrepareDecorator {
 	return WithNothing()
 }
 
+// APIKeyAuthorizer implements API Key authorization.
+type APIKeyAuthorizer struct {
+	headers         map[string]interface{}
+	queryParameters map[string]interface{}
+}
+
+// NewAPIKeyAuthorizerWithHeaders creates an ApiKeyAuthorizer with headers.
+func NewAPIKeyAuthorizerWithHeaders(headers map[string]interface{}) *APIKeyAuthorizer {
+	return NewAPIKeyAuthorizer(headers, nil)
+}
+
+// NewAPIKeyAuthorizerWithQueryParameters creates an ApiKeyAuthorizer with query parameters.
+func NewAPIKeyAuthorizerWithQueryParameters(queryParameters map[string]interface{}) *APIKeyAuthorizer {
+	return NewAPIKeyAuthorizer(nil, queryParameters)
+}
+
+// NewAPIKeyAuthorizer creates an ApiKeyAuthorizer with headers.
+func NewAPIKeyAuthorizer(headers map[string]interface{}, queryParameters map[string]interface{}) *APIKeyAuthorizer {
+	return &APIKeyAuthorizer{headers: headers, queryParameters: queryParameters}
+}
+
+// WithAuthorization returns a PrepareDecorator that adds an HTTP headers and Query Paramaters
+func (aka *APIKeyAuthorizer) WithAuthorization() PrepareDecorator {
+	return func(p Preparer) Preparer {
+		return DecoratePreparer(p, WithHeaders(aka.headers), WithQueryParameters(aka.queryParameters))
+	}
+}
+
+// CognitiveServicesAuthorizer implements authorization for Cognitive Services.
+type CognitiveServicesAuthorizer struct {
+	subscriptionKey string
+}
+
+// NewCognitiveServicesAuthorizer is
+func NewCognitiveServicesAuthorizer(subscriptionKey string) *CognitiveServicesAuthorizer {
+	return &CognitiveServicesAuthorizer{subscriptionKey: subscriptionKey}
+}
+
+// WithAuthorization is
+func (csa *CognitiveServicesAuthorizer) WithAuthorization() PrepareDecorator {
+	headers := make(map[string]interface{})
+	headers[apiKeyAuthorizerHeader] = csa.subscriptionKey
+	headers[bingAPISdkHeader] = golangBingAPISdkHeaderValue
+
+	return NewAPIKeyAuthorizerWithHeaders(headers).WithAuthorization()
+}
+
 // BearerAuthorizer implements the bearer authorization
 type BearerAuthorizer struct {
 	tokenProvider adal.OAuthTokenProvider
@@ -54,10 +104,6 @@ func NewBearerAuthorizer(tp adal.OAuthTokenProvider) *BearerAuthorizer {
 	return &BearerAuthorizer{tokenProvider: tp}
 }
 
-func (ba *BearerAuthorizer) withBearerAuthorization() PrepareDecorator {
-	return WithHeader(headerAuthorization, fmt.Sprintf("Bearer %s", ba.tokenProvider.OAuthToken()))
-}
-
 // WithAuthorization returns a PrepareDecorator that adds an HTTP Authorization header whose
 // value is "Bearer " followed by the token.
 //
@@ -65,15 +111,23 @@ func (ba *BearerAuthorizer) withBearerAuthorization() PrepareDecorator {
 func (ba *BearerAuthorizer) WithAuthorization() PrepareDecorator {
 	return func(p Preparer) Preparer {
 		return PreparerFunc(func(r *http.Request) (*http.Request, error) {
-			refresher, ok := ba.tokenProvider.(adal.Refresher)
-			if ok {
-				err := refresher.EnsureFresh()
-				if err != nil {
-					return r, NewErrorWithError(err, "azure.BearerAuthorizer", "WithAuthorization", nil,
-						"Failed to refresh the Token for request to %s", r.URL)
+			r, err := p.Prepare(r)
+			if err == nil {
+				refresher, ok := ba.tokenProvider.(adal.Refresher)
+				if ok {
+					err := refresher.EnsureFresh()
+					if err != nil {
+						var resp *http.Response
+						if tokError, ok := err.(adal.TokenRefreshError); ok {
+							resp = tokError.Response()
+						}
+						return r, NewErrorWithError(err, "azure.BearerAuthorizer", "WithAuthorization", resp,
+							"Failed to refresh the Token for request to %s", r.URL)
+					}
 				}
+				return Prepare(r, WithHeader(headerAuthorization, fmt.Sprintf("Bearer %s", ba.tokenProvider.OAuthToken())))
 			}
-			return (ba.withBearerAuthorization()(p)).Prepare(r)
+			return r, err
 		})
 	}
 }
@@ -103,25 +157,28 @@ func NewBearerAuthorizerCallback(sender Sender, callback BearerAuthorizerCallbac
 func (bacb *BearerAuthorizerCallback) WithAuthorization() PrepareDecorator {
 	return func(p Preparer) Preparer {
 		return PreparerFunc(func(r *http.Request) (*http.Request, error) {
-			// make a copy of the request and remove the body as it's not
-			// required and avoids us having to create a copy of it.
-			rCopy := *r
-			removeRequestBody(&rCopy)
+			r, err := p.Prepare(r)
+			if err == nil {
+				// make a copy of the request and remove the body as it's not
+				// required and avoids us having to create a copy of it.
+				rCopy := *r
+				removeRequestBody(&rCopy)
 
-			resp, err := bacb.sender.Do(&rCopy)
-			if err == nil && resp.StatusCode == 401 {
-				defer resp.Body.Close()
-				if hasBearerChallenge(resp) {
-					bc, err := newBearerChallenge(resp)
-					if err != nil {
-						return r, err
-					}
-					if bacb.callback != nil {
-						ba, err := bacb.callback(bc.values[tenantID], bc.values["resource"])
+				resp, err := bacb.sender.Do(&rCopy)
+				if err == nil && resp.StatusCode == 401 {
+					defer resp.Body.Close()
+					if hasBearerChallenge(resp) {
+						bc, err := newBearerChallenge(resp)
 						if err != nil {
 							return r, err
 						}
-						return ba.WithAuthorization()(p).Prepare(r)
+						if bacb.callback != nil {
+							ba, err := bacb.callback(bc.values[tenantID], bc.values["resource"])
+							if err != nil {
+								return r, err
+							}
+							return Prepare(r, ba.WithAuthorization())
+						}
 					}
 				}
 			}
@@ -178,4 +235,23 @@ func newBearerChallenge(resp *http.Response) (bc bearerChallenge, err error) {
 	}
 
 	return bc, err
+}
+
+// EventGridKeyAuthorizer implements authorization for event grid using key authentication.
+type EventGridKeyAuthorizer struct {
+	topicKey string
+}
+
+// NewEventGridKeyAuthorizer creates a new EventGridKeyAuthorizer
+// with the specified topic key.
+func NewEventGridKeyAuthorizer(topicKey string) EventGridKeyAuthorizer {
+	return EventGridKeyAuthorizer{topicKey: topicKey}
+}
+
+// WithAuthorization returns a PrepareDecorator that adds the aeg-sas-key authentication header.
+func (egta EventGridKeyAuthorizer) WithAuthorization() PrepareDecorator {
+	headers := map[string]interface{}{
+		"aeg-sas-key": egta.topicKey,
+	}
+	return NewAPIKeyAuthorizerWithHeaders(headers).WithAuthorization()
 }

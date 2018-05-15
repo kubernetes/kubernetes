@@ -39,9 +39,10 @@ const (
 	defaultNodeAllocatableCgroupName = "kubepods"
 )
 
+//createNodeAllocatableCgroups creates Node Allocatable Cgroup when CgroupsPerQOS flag is specified as true
 func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	cgroupConfig := &CgroupConfig{
-		Name: CgroupName(cm.cgroupRoot),
+		Name: cm.cgroupRoot,
 		// The default limits for cpu shares can be very low which can lead to CPU starvation for pods.
 		ResourceParameters: getCgroupConfig(cm.capacity),
 	}
@@ -70,7 +71,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	glog.V(4).Infof("Attempting to enforce Node Allocatable with config: %+v", nc)
 
 	cgroupConfig := &CgroupConfig{
-		Name:               CgroupName(cm.cgroupRoot),
+		Name:               cm.cgroupRoot,
 		ResourceParameters: getCgroupConfig(nodeAllocatable),
 	}
 
@@ -83,11 +84,12 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 
 	// If Node Allocatable is enforced on a node that has not been drained or is updated on an existing node to a lower value,
-	// existing memory usage across pods might be higher that current Node Allocatable Memory Limits.
+	// existing memory usage across pods might be higher than current Node Allocatable Memory Limits.
 	// Pod Evictions are expected to bring down memory usage to below Node Allocatable limits.
 	// Until evictions happen retry cgroup updates.
 	// Update limits on non root cgroup-root to be safe since the default limits for CPU can be too low.
-	if cm.cgroupRoot != "/" {
+	// Check if cgroupRoot is set to a non-empty value (empty would be the root container)
+	if len(cm.cgroupRoot) > 0 {
 		go func() {
 			for {
 				err := cm.cgroupManager.Update(cgroupConfig)
@@ -104,7 +106,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	// Now apply kube reserved and system reserved limits if required.
 	if nc.EnforceNodeAllocatable.Has(kubetypes.SystemReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing System reserved on cgroup %q with limits: %+v", nc.SystemReservedCgroupName, nc.SystemReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, nc.SystemReservedCgroupName, nc.SystemReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, ParseCgroupfsToCgroupName(nc.SystemReservedCgroupName), nc.SystemReserved); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return fmt.Errorf(message)
@@ -113,7 +115,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedEnforcementKey) {
 		glog.V(2).Infof("Enforcing kube reserved on cgroup %q with limits: %+v", nc.KubeReservedCgroupName, nc.KubeReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, nc.KubeReservedCgroupName, nc.KubeReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, ParseCgroupfsToCgroupName(nc.KubeReservedCgroupName), nc.KubeReserved); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return fmt.Errorf(message)
@@ -124,9 +126,9 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 }
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
-func enforceExistingCgroup(cgroupManager CgroupManager, cName string, rl v1.ResourceList) error {
+func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.ResourceList) error {
 	cgroupConfig := &CgroupConfig{
-		Name:               CgroupName(cName),
+		Name:               cName,
 		ResourceParameters: getCgroupConfig(rl),
 	}
 	glog.V(4).Infof("Enforcing limits on cgroup %q with %d cpu shares and %d bytes of memory", cName, cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory)

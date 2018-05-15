@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 )
 
 // TestWriteLoadDeletePods validates all combinations of write, load, and delete
@@ -70,15 +71,18 @@ func TestWriteLoadDeletePods(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	cp := NewCheckpointManager(dir)
+	cpm, err := checkpointmanager.NewCheckpointManager(dir)
+	if err != nil {
+		t.Errorf("Failed to initialize checkpoint manager error=%v", err)
+	}
 	for _, p := range testPods {
 		// Write pods should always pass unless there is an fs error
-		if err := cp.WritePod(p.pod); err != nil {
+		if err := WritePod(cpm, p.pod); err != nil {
 			t.Errorf("Failed to Write Pod: %v", err)
 		}
 	}
 	// verify the correct written files are loaded from disk
-	pods, err := cp.LoadPods()
+	pods, err := LoadPods(cpm)
 	if err != nil {
 		t.Errorf("Failed to Load Pods: %v", err)
 	}
@@ -104,7 +108,7 @@ func TestWriteLoadDeletePods(t *testing.T) {
 		} else if lpod != nil {
 			t.Errorf("Got unexpected result for %v, should not have been loaded", pname)
 		}
-		err = cp.DeletePod(p.pod)
+		err = DeletePod(cpm, p.pod)
 		if err != nil {
 			t.Errorf("Failed to delete pod %v", pname)
 		}

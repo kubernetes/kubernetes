@@ -34,7 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/utils/exec"
 )
@@ -101,15 +102,15 @@ func parseDiffArguments(args []string) (string, string, error) {
 	return from, to, nil
 }
 
-func NewCmdDiff(f cmdutil.Factory, stdout, stderr io.Writer) *cobra.Command {
+func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	var options DiffOptions
 	diff := DiffProgram{
-		Exec:   exec.New(),
-		Stdout: stdout,
-		Stderr: stderr,
+		Exec:      exec.New(),
+		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
-		Use:     "diff -f FILENAME",
+		Use: "diff -f FILENAME",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Diff different versions of configurations"),
 		Long:    diffLong,
 		Example: diffExample,
@@ -131,9 +132,8 @@ func NewCmdDiff(f cmdutil.Factory, stdout, stderr io.Writer) *cobra.Command {
 // KUBERNETES_EXTERNAL_DIFF environment variable will be used a diff
 // program. By default, `diff(1)` will be used.
 type DiffProgram struct {
-	Exec   exec.Interface
-	Stdout io.Writer
-	Stderr io.Writer
+	Exec exec.Interface
+	genericclioptions.IOStreams
 }
 
 func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
@@ -146,8 +146,8 @@ func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
 	}
 
 	cmd := d.Exec.Command(diff, args...)
-	cmd.SetStdout(d.Stdout)
-	cmd.SetStderr(d.Stderr)
+	cmd.SetStdout(d.Out)
+	cmd.SetStderr(d.ErrOut)
 
 	return cmd
 }
@@ -315,7 +315,7 @@ func (obj InfoObject) Merged() (map[string]interface{}, error) {
 	}
 
 	if live == nil || last == nil {
-		return local, nil // We probably don't have a live verison, merged is local.
+		return local, nil // We probably don't have a live version, merged is local.
 	}
 
 	elmt, err := obj.Parser.CreateElement(last, local, live)
@@ -430,7 +430,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
 			info.Object = nil
 		}
@@ -438,7 +438,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 		obj := InfoObject{
 			Info:    info,
 			Parser:  parser,
-			Encoder: f.JSONEncoder(),
+			Encoder: cmdutil.InternalVersionJSONEncoder(),
 		}
 
 		return differ.Diff(obj, printer)

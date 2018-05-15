@@ -18,6 +18,7 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = [
+        "merge_conflict_test.go",
         "merge_map_list_test.go",
         "merge_map_test.go",
         "merge_primitive_list_test.go",
@@ -33,7 +34,6 @@ go_test(
         ":swagger-spec",
         "//api/openapi-spec:swagger-spec",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/apply/strategy_test",
     deps = [
         ":go_default_library",
         "//pkg/kubectl/apply:go_default_library",

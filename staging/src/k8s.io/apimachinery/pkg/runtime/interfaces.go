@@ -234,9 +234,9 @@ type Object interface {
 // to JSON allowed.
 type Unstructured interface {
 	Object
-	// UnstructuredContent returns a non-nil, mutable map of the contents of this object. Values may be
+	// UnstructuredContent returns a non-nil map with this object's contents. Values may be
 	// []interface{}, map[string]interface{}, or any primitive type. Contents are typically serialized to
-	// and from JSON.
+	// and from JSON. SetUnstructuredContent should be used to mutate the contents.
 	UnstructuredContent() map[string]interface{}
 	// SetUnstructuredContent updates the object content to match the provided map.
 	SetUnstructuredContent(map[string]interface{})

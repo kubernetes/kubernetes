@@ -24,10 +24,13 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func init() {
@@ -36,14 +39,17 @@ func init() {
 
 const testTokenID = "abc123"
 
-func newBootstrapSigner() (*BootstrapSigner, *fake.Clientset, error) {
+func newBootstrapSigner() (*BootstrapSigner, *fake.Clientset, coreinformers.SecretInformer, coreinformers.ConfigMapInformer, error) {
 	options := DefaultBootstrapSignerOptions()
 	cl := fake.NewSimpleClientset()
-	bsc, err := NewBootstrapSigner(cl, options)
+	informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
+	secrets := informers.Core().V1().Secrets()
+	configMaps := informers.Core().V1().ConfigMaps()
+	bsc, err := NewBootstrapSigner(cl, secrets, configMaps, options)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	return bsc, cl, nil
+	return bsc, cl, secrets, configMaps, nil
 }
 
 func newConfigMap(tokenID, signature string) *v1.ConfigMap {
@@ -64,7 +70,7 @@ func newConfigMap(tokenID, signature string) *v1.ConfigMap {
 }
 
 func TestNoConfigMap(t *testing.T) {
-	signer, cl, err := newBootstrapSigner()
+	signer, cl, _, _, err := newBootstrapSigner()
 	if err != nil {
 		t.Fatalf("error creating BootstrapSigner: %v", err)
 	}
@@ -73,17 +79,17 @@ func TestNoConfigMap(t *testing.T) {
 }
 
 func TestSimpleSign(t *testing.T) {
-	signer, cl, err := newBootstrapSigner()
+	signer, cl, secrets, configMaps, err := newBootstrapSigner()
 	if err != nil {
 		t.Fatalf("error creating BootstrapSigner: %v", err)
 	}
 
 	cm := newConfigMap("", "")
-	signer.configMaps.Add(cm)
+	configMaps.Informer().GetIndexer().Add(cm)
 
 	secret := newTokenSecret(testTokenID, "tokenSecret")
 	addSecretSigningUsage(secret, "true")
-	signer.secrets.Add(secret)
+	secrets.Informer().GetIndexer().Add(secret)
 
 	signer.signConfigMap()
 
@@ -97,17 +103,17 @@ func TestSimpleSign(t *testing.T) {
 }
 
 func TestNoSignNeeded(t *testing.T) {
-	signer, cl, err := newBootstrapSigner()
+	signer, cl, secrets, configMaps, err := newBootstrapSigner()
 	if err != nil {
 		t.Fatalf("error creating BootstrapSigner: %v", err)
 	}
 
 	cm := newConfigMap(testTokenID, "eyJhbGciOiJIUzI1NiIsImtpZCI6ImFiYzEyMyJ9..QSxpUG7Q542CirTI2ECPSZjvBOJURUW5a7XqFpNI958")
-	signer.configMaps.Add(cm)
+	configMaps.Informer().GetIndexer().Add(cm)
 
 	secret := newTokenSecret(testTokenID, "tokenSecret")
 	addSecretSigningUsage(secret, "true")
-	signer.secrets.Add(secret)
+	secrets.Informer().GetIndexer().Add(secret)
 
 	signer.signConfigMap()
 
@@ -115,17 +121,17 @@ func TestNoSignNeeded(t *testing.T) {
 }
 
 func TestUpdateSignature(t *testing.T) {
-	signer, cl, err := newBootstrapSigner()
+	signer, cl, secrets, configMaps, err := newBootstrapSigner()
 	if err != nil {
 		t.Fatalf("error creating BootstrapSigner: %v", err)
 	}
 
 	cm := newConfigMap(testTokenID, "old signature")
-	signer.configMaps.Add(cm)
+	configMaps.Informer().GetIndexer().Add(cm)
 
 	secret := newTokenSecret(testTokenID, "tokenSecret")
 	addSecretSigningUsage(secret, "true")
-	signer.secrets.Add(secret)
+	secrets.Informer().GetIndexer().Add(secret)
 
 	signer.signConfigMap()
 
@@ -139,13 +145,13 @@ func TestUpdateSignature(t *testing.T) {
 }
 
 func TestRemoveSignature(t *testing.T) {
-	signer, cl, err := newBootstrapSigner()
+	signer, cl, _, configMaps, err := newBootstrapSigner()
 	if err != nil {
 		t.Fatalf("error creating BootstrapSigner: %v", err)
 	}
 
 	cm := newConfigMap(testTokenID, "old signature")
-	signer.configMaps.Add(cm)
+	configMaps.Informer().GetIndexer().Add(cm)
 
 	signer.signConfigMap()
 

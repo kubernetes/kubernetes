@@ -33,42 +33,38 @@ import (
 type RESTStorageProvider struct{}
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(admissionregistration.GroupName, legacyscheme.Registry, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(admissionregistration.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(admissionregistrationv1alpha1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(admissionregistrationv1alpha1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[admissionregistrationv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = admissionregistrationv1alpha1.SchemeGroupVersion
 	}
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(admissionregistrationv1beta1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(admissionregistrationv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[admissionregistrationv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = admissionregistrationv1beta1.SchemeGroupVersion
 	}
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	version := admissionregistrationv1alpha1.SchemeGroupVersion
 	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("initializerconfigurations")) {
-		s := initializerconfigurationstorage.NewREST(restOptionsGetter)
-		storage["initializerconfigurations"] = s
-	}
+	// initializerconfigurations
+	s := initializerconfigurationstorage.NewREST(restOptionsGetter)
+	storage["initializerconfigurations"] = s
+
 	return storage
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	version := admissionregistrationv1beta1.SchemeGroupVersion
 	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("validatingwebhookconfigurations")) {
-		s := validatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
-		storage["validatingwebhookconfigurations"] = s
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("mutatingwebhookconfigurations")) {
-		s := mutatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
-		storage["mutatingwebhookconfigurations"] = s
-	}
+	// validatingwebhookconfigurations
+	validatingStorage := validatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
+	storage["validatingwebhookconfigurations"] = validatingStorage
+
+	// mutatingwebhookconfigurations
+	mutatingStorage := mutatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
+	storage["mutatingwebhookconfigurations"] = mutatingStorage
+
 	return storage
 }
 

@@ -27,9 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 	bootstraputil "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
 	"k8s.io/kubernetes/test/integration"
@@ -125,8 +124,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		authenticator := bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret}))
 		// Set up a master
 		masterConfig := framework.NewIntegrationTestMasterConfig()
-		masterConfig.GenericConfig.Authenticator = authenticator
-		masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+		masterConfig.GenericConfig.Authentication.Authenticator = authenticator
 		_, s, closeFn := framework.RunAMaster(masterConfig)
 		defer closeFn()
 

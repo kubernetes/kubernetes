@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015 VMware, Inc. All Rights Reserved.
+Copyright (c) 2015-2017 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,50 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-// Wait waits for any of the specified properties of the specified managed
+// WaitFilter provides helpers to construct a types.CreateFilter for use with property.Wait
+type WaitFilter struct {
+	types.CreateFilter
+}
+
+// Add a new ObjectSpec and PropertySpec to the WaitFilter
+func (f *WaitFilter) Add(obj types.ManagedObjectReference, kind string, ps []string, set ...types.BaseSelectionSpec) *WaitFilter {
+	spec := types.ObjectSpec{
+		Obj:       obj,
+		SelectSet: set,
+	}
+
+	pset := types.PropertySpec{
+		Type:    kind,
+		PathSet: ps,
+	}
+
+	if len(ps) == 0 {
+		pset.All = types.NewBool(true)
+	}
+
+	f.Spec.ObjectSet = append(f.Spec.ObjectSet, spec)
+
+	f.Spec.PropSet = append(f.Spec.PropSet, pset)
+
+	return f
+}
+
+// Wait creates a new WaitFilter and calls the specified function for each ObjectUpdate via WaitForUpdates
+func Wait(ctx context.Context, c *Collector, obj types.ManagedObjectReference, ps []string, f func([]types.PropertyChange) bool) error {
+	filter := new(WaitFilter).Add(obj, obj.Type, ps)
+
+	return WaitForUpdates(ctx, c, filter, func(updates []types.ObjectUpdate) bool {
+		for _, update := range updates {
+			if f(update.ChangeSet) {
+				return true
+			}
+		}
+
+		return false
+	})
+}
+
+// WaitForUpdates waits for any of the specified properties of the specified managed
 // object to change. It calls the specified function for every update it
 // receives. If this function returns false, it continues waiting for
 // subsequent updates. If this function returns true, it stops waiting and
@@ -35,7 +78,7 @@ import (
 // The newly created collector is destroyed before this function returns (both
 // in case of success or error).
 //
-func Wait(ctx context.Context, c *Collector, obj types.ManagedObjectReference, ps []string, f func([]types.PropertyChange) bool) error {
+func WaitForUpdates(ctx context.Context, c *Collector, filter *WaitFilter, f func([]types.ObjectUpdate) bool) error {
 	p, err := c.Create(ctx)
 	if err != nil {
 		return err
@@ -45,91 +88,13 @@ func Wait(ctx context.Context, c *Collector, obj types.ManagedObjectReference, p
 	// specified context may have timed out or have been cancelled.
 	defer p.Destroy(context.Background())
 
-	req := types.CreateFilter{
-		Spec: types.PropertyFilterSpec{
-			ObjectSet: []types.ObjectSpec{
-				{
-					Obj: obj,
-				},
-			},
-			PropSet: []types.PropertySpec{
-				{
-					PathSet: ps,
-					Type:    obj.Type,
-				},
-			},
-		},
-	}
-
-	if len(ps) == 0 {
-		req.Spec.PropSet[0].All = types.NewBool(true)
-	}
-
-	err = p.CreateFilter(ctx, req)
-	if err != nil {
-		return err
-	}
-	return waitLoop(ctx, p, func(_ types.ManagedObjectReference, pc []types.PropertyChange) bool {
-		return f(pc)
-	})
-}
-
-// WaitForView waits for any of the specified properties of the managed
-// objects in the View to change. It calls the specified function for every update it
-// receives. If this function returns false, it continues waiting for
-// subsequent updates. If this function returns true, it stops waiting and
-// returns.
-//
-// To only receive updates for the View's specified managed objects, the function
-// creates a new property collector and calls CreateFilter. A new property
-// collector is required because filters can only be added, not removed.
-//
-// The newly created collector is destroyed before this function returns (both
-// in case of success or error).
-//
-// The code assumes that all objects in the View are the same type
-func WaitForView(ctx context.Context, c *Collector, view types.ManagedObjectReference, obj types.ManagedObjectReference, ps []string, f func(types.ManagedObjectReference, []types.PropertyChange) bool) error {
-	p, err := c.Create(ctx)
+	err = p.CreateFilter(ctx, filter.CreateFilter)
 	if err != nil {
 		return err
 	}
 
-	// Attempt to destroy the collector using the background context, as the
-	// specified context may have timed out or have been cancelled.
-	defer p.Destroy(context.Background())
-
-	req := types.CreateFilter{
-		Spec: types.PropertyFilterSpec{
-			ObjectSet: []types.ObjectSpec{
-				{
-					Obj: view,
-					SelectSet: []types.BaseSelectionSpec{
-						&types.TraversalSpec{
-							SelectionSpec: types.SelectionSpec{
-								Name: "traverseEntities",
-							},
-							Path: "view",
-							Type: view.Type}},
-				},
-			},
-			PropSet: []types.PropertySpec{
-				{
-					Type:    obj.Type,
-					PathSet: ps,
-				},
-			},
-		}}
-
-	err = p.CreateFilter(ctx, req)
-	if err != nil {
-		return err
-	}
-	return waitLoop(ctx, p, f)
-}
-
-func waitLoop(ctx context.Context, c *Collector, f func(types.ManagedObjectReference, []types.PropertyChange) bool) error {
 	for version := ""; ; {
-		res, err := c.WaitForUpdates(ctx, version)
+		res, err := p.WaitForUpdates(ctx, version)
 		if err != nil {
 			return err
 		}
@@ -142,12 +107,9 @@ func waitLoop(ctx context.Context, c *Collector, f func(types.ManagedObjectRefer
 		version = res.Version
 
 		for _, fs := range res.FilterSet {
-			for _, os := range fs.ObjectSet {
-				if f(os.Obj, os.ChangeSet) {
-					return nil
-				}
+			if f(fs.ObjectSet) {
+				return nil
 			}
 		}
 	}
-
 }

@@ -23,7 +23,7 @@ location within a Container's file tree for Containers that
 need access to the Kubernetes API.
 
 Having a defined format allows:
-  - clients to be implmented in multiple languages
+  - clients to be implemented in multiple languages
   - applications which link clients to be portable across
     clusters with different authentication styles (e.g.
     some may use SSL Client certs, others may not, etc)

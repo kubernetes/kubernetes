@@ -54,6 +54,36 @@ stuff: 1
 	}
 }
 
+func TestYAMLDecoderCallsAfterErrShortBufferRestOfFrame(t *testing.T) {
+	d := `---
+stuff: 1
+	test-foo: 1`
+	r := NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(d))))
+	b := make([]byte, 12)
+	n, err := r.Read(b)
+	if err != io.ErrShortBuffer || n != 12 {
+		t.Fatalf("expected ErrShortBuffer: %d / %v", n, err)
+	}
+	expected := "---\nstuff: 1"
+	if string(b) != expected {
+		t.Fatalf("expected bytes read to be: %s  got: %s", expected, string(b))
+	}
+	b = make([]byte, 13)
+	n, err = r.Read(b)
+	if err != nil || n != 13 {
+		t.Fatalf("expected nil: %d / %v", n, err)
+	}
+	expected = "\n\ttest-foo: 1"
+	if string(b) != expected {
+		t.Fatalf("expected bytes read to be: '%s'  got: '%s'", expected, string(b))
+	}
+	b = make([]byte, 15)
+	n, err = r.Read(b)
+	if err != io.EOF || n != 0 {
+		t.Fatalf("expected EOF: %d / %v", n, err)
+	}
+}
+
 func TestSplitYAMLDocument(t *testing.T) {
 	testCases := []struct {
 		input  string

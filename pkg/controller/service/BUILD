@@ -23,6 +23,7 @@ go_library(
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/informers/core/v1:go_default_library",
@@ -40,7 +41,6 @@ go_test(
     name = "go_default_test",
     srcs = ["service_controller_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/service",
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",

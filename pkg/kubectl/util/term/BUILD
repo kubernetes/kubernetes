@@ -94,7 +94,6 @@ go_test(
     name = "go_default_test",
     srcs = ["term_writer_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util/term",
 )
 
 filegroup(

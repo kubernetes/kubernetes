@@ -1,19 +1,17 @@
 // TOML lexer.
 //
-// Written using the principles developped by Rob Pike in
+// Written using the principles developed by Rob Pike in
 // http://www.youtube.com/watch?v=HxaD_trXwRE
 
 package toml
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/pelletier/go-buffruneio"
 )
 
 var dateRegexp *regexp.Regexp
@@ -23,29 +21,29 @@ type tomlLexStateFn func() tomlLexStateFn
 
 // Define lexer
 type tomlLexer struct {
-	input         *buffruneio.Reader // Textual source
-	buffer        []rune             // Runes composing the current token
-	tokens        chan token
-	depth         int
-	line          int
-	col           int
-	endbufferLine int
-	endbufferCol  int
+	inputIdx          int
+	input             []rune // Textual source
+	currentTokenStart int
+	currentTokenStop  int
+	tokens            []token
+	depth             int
+	line              int
+	col               int
+	endbufferLine     int
+	endbufferCol      int
 }
 
 // Basic read operations on input
 
 func (l *tomlLexer) read() rune {
-	r, err := l.input.ReadRune()
-	if err != nil {
-		panic(err)
-	}
+	r := l.peek()
 	if r == '\n' {
 		l.endbufferLine++
 		l.endbufferCol = 1
 	} else {
 		l.endbufferCol++
 	}
+	l.inputIdx++
 	return r
 }
 
@@ -53,13 +51,13 @@ func (l *tomlLexer) next() rune {
 	r := l.read()
 
 	if r != eof {
-		l.buffer = append(l.buffer, r)
+		l.currentTokenStop++
 	}
 	return r
 }
 
 func (l *tomlLexer) ignore() {
-	l.buffer = make([]rune, 0)
+	l.currentTokenStart = l.currentTokenStop
 	l.line = l.endbufferLine
 	l.col = l.endbufferCol
 }
@@ -76,49 +74,46 @@ func (l *tomlLexer) fastForward(n int) {
 }
 
 func (l *tomlLexer) emitWithValue(t tokenType, value string) {
-	l.tokens <- token{
+	l.tokens = append(l.tokens, token{
 		Position: Position{l.line, l.col},
 		typ:      t,
 		val:      value,
-	}
+	})
 	l.ignore()
 }
 
 func (l *tomlLexer) emit(t tokenType) {
-	l.emitWithValue(t, string(l.buffer))
+	l.emitWithValue(t, string(l.input[l.currentTokenStart:l.currentTokenStop]))
 }
 
 func (l *tomlLexer) peek() rune {
-	r, err := l.input.ReadRune()
-	if err != nil {
-		panic(err)
+	if l.inputIdx >= len(l.input) {
+		return eof
 	}
-	l.input.UnreadRune()
-	return r
+	return l.input[l.inputIdx]
+}
+
+func (l *tomlLexer) peekString(size int) string {
+	maxIdx := len(l.input)
+	upperIdx := l.inputIdx + size // FIXME: potential overflow
+	if upperIdx > maxIdx {
+		upperIdx = maxIdx
+	}
+	return string(l.input[l.inputIdx:upperIdx])
 }
 
 func (l *tomlLexer) follow(next string) bool {
-	for _, expectedRune := range next {
-		r, err := l.input.ReadRune()
-		defer l.input.UnreadRune()
-		if err != nil {
-			panic(err)
-		}
-		if expectedRune != r {
-			return false
-		}
-	}
-	return true
+	return next == l.peekString(len(next))
 }
 
 // Error management
 
 func (l *tomlLexer) errorf(format string, args ...interface{}) tomlLexStateFn {
-	l.tokens <- token{
+	l.tokens = append(l.tokens, token{
 		Position: Position{l.line, l.col},
 		typ:      tokenError,
 		val:      fmt.Sprintf(format, args...),
-	}
+	})
 	return nil
 }
 
@@ -129,9 +124,9 @@ func (l *tomlLexer) lexVoid() tomlLexStateFn {
 		next := l.peek()
 		switch next {
 		case '[':
-			return l.lexKeyGroup
+			return l.lexTableKey
 		case '#':
-			return l.lexComment
+			return l.lexComment(l.lexVoid)
 		case '=':
 			return l.lexEqual
 		case '\r':
@@ -182,7 +177,7 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 		case '}':
 			return l.lexRightCurlyBrace
 		case '#':
-			return l.lexComment
+			return l.lexComment(l.lexRvalue)
 		case '"':
 			return l.lexString
 		case '\'':
@@ -219,7 +214,7 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			break
 		}
 
-		possibleDate := string(l.input.Peek(35))
+		possibleDate := l.peekString(35)
 		dateMatch := dateRegexp.FindString(possibleDate)
 		if dateMatch != "" {
 			l.fastForward(len(dateMatch))
@@ -309,15 +304,17 @@ func (l *tomlLexer) lexKey() tomlLexStateFn {
 	return l.lexVoid
 }
 
-func (l *tomlLexer) lexComment() tomlLexStateFn {
-	for next := l.peek(); next != '\n' && next != eof; next = l.peek() {
-		if next == '\r' && l.follow("\r\n") {
-			break
+func (l *tomlLexer) lexComment(previousState tomlLexStateFn) tomlLexStateFn {
+	return func() tomlLexStateFn {
+		for next := l.peek(); next != '\n' && next != eof; next = l.peek() {
+			if next == '\r' && l.follow("\r\n") {
+				break
+			}
+			l.next()
 		}
-		l.next()
+		l.ignore()
+		return previousState
 	}
-	l.ignore()
-	return l.lexVoid
 }
 
 func (l *tomlLexer) lexLeftBracket() tomlLexStateFn {
@@ -516,25 +513,25 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 	return l.lexRvalue
 }
 
-func (l *tomlLexer) lexKeyGroup() tomlLexStateFn {
+func (l *tomlLexer) lexTableKey() tomlLexStateFn {
 	l.next()
 
 	if l.peek() == '[' {
-		// token '[[' signifies an array of anonymous key groups
+		// token '[[' signifies an array of tables
 		l.next()
 		l.emit(tokenDoubleLeftBracket)
-		return l.lexInsideKeyGroupArray
+		return l.lexInsideTableArrayKey
 	}
-	// vanilla key group
+	// vanilla table key
 	l.emit(tokenLeftBracket)
-	return l.lexInsideKeyGroup
+	return l.lexInsideTableKey
 }
 
-func (l *tomlLexer) lexInsideKeyGroupArray() tomlLexStateFn {
+func (l *tomlLexer) lexInsideTableArrayKey() tomlLexStateFn {
 	for r := l.peek(); r != eof; r = l.peek() {
 		switch r {
 		case ']':
-			if len(l.buffer) > 0 {
+			if l.currentTokenStop > l.currentTokenStart {
 				l.emit(tokenKeyGroupArray)
 			}
 			l.next()
@@ -545,31 +542,31 @@ func (l *tomlLexer) lexInsideKeyGroupArray() tomlLexStateFn {
 			l.emit(tokenDoubleRightBracket)
 			return l.lexVoid
 		case '[':
-			return l.errorf("group name cannot contain ']'")
+			return l.errorf("table array key cannot contain ']'")
 		default:
 			l.next()
 		}
 	}
-	return l.errorf("unclosed key group array")
+	return l.errorf("unclosed table array key")
 }
 
-func (l *tomlLexer) lexInsideKeyGroup() tomlLexStateFn {
+func (l *tomlLexer) lexInsideTableKey() tomlLexStateFn {
 	for r := l.peek(); r != eof; r = l.peek() {
 		switch r {
 		case ']':
-			if len(l.buffer) > 0 {
+			if l.currentTokenStop > l.currentTokenStart {
 				l.emit(tokenKeyGroup)
 			}
 			l.next()
 			l.emit(tokenRightBracket)
 			return l.lexVoid
 		case '[':
-			return l.errorf("group name cannot contain ']'")
+			return l.errorf("table key cannot contain ']'")
 		default:
 			l.next()
 		}
 	}
-	return l.errorf("unclosed key group")
+	return l.errorf("unclosed table key")
 }
 
 func (l *tomlLexer) lexRightBracket() tomlLexStateFn {
@@ -632,7 +629,6 @@ func (l *tomlLexer) run() {
 	for state := l.lexVoid; state != nil; {
 		state = state()
 	}
-	close(l.tokens)
 }
 
 func init() {
@@ -640,16 +636,16 @@ func init() {
 }
 
 // Entry point
-func lexToml(input io.Reader) chan token {
-	bufferedInput := buffruneio.NewReader(input)
+func lexToml(inputBytes []byte) []token {
+	runes := bytes.Runes(inputBytes)
 	l := &tomlLexer{
-		input:         bufferedInput,
-		tokens:        make(chan token),
+		input:         runes,
+		tokens:        make([]token, 0, 256),
 		line:          1,
 		col:           1,
 		endbufferLine: 1,
 		endbufferCol:  1,
 	}
-	go l.run()
+	l.run()
 	return l.tokens
 }

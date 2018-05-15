@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -26,14 +27,14 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
-
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/tools/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
+	utilexec "k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
@@ -76,20 +77,35 @@ func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream i
 
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
-func (ds *dockerService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
+func (ds *dockerService) ExecSync(_ context.Context, req *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
+	timeout := time.Duration(req.Timeout) * time.Second
 	var stdoutBuffer, stderrBuffer bytes.Buffer
-	err = ds.streamingRuntime.exec(containerID, cmd,
+	err := ds.streamingRuntime.exec(req.ContainerId, req.Cmd,
 		nil, // in
 		ioutils.WriteCloserWrapper(&stdoutBuffer),
 		ioutils.WriteCloserWrapper(&stderrBuffer),
 		false, // tty
 		nil,   // resize
 		timeout)
-	return stdoutBuffer.Bytes(), stderrBuffer.Bytes(), err
+
+	var exitCode int32
+	if err != nil {
+		exitError, ok := err.(utilexec.ExitError)
+		if !ok {
+			return nil, err
+		}
+
+		exitCode = int32(exitError.ExitStatus())
+	}
+	return &runtimeapi.ExecSyncResponse{
+		Stdout:   stdoutBuffer.Bytes(),
+		Stderr:   stderrBuffer.Bytes(),
+		ExitCode: exitCode,
+	}, nil
 }
 
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
-func (ds *dockerService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+func (ds *dockerService) Exec(_ context.Context, req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("exec")
 	}
@@ -101,7 +117,7 @@ func (ds *dockerService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResp
 }
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
-func (ds *dockerService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+func (ds *dockerService) Attach(_ context.Context, req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("attach")
 	}
@@ -113,7 +129,7 @@ func (ds *dockerService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.Atta
 }
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
-func (ds *dockerService) PortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
+func (ds *dockerService) PortForward(_ context.Context, req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("port forward")
 	}

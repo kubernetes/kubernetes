@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2015 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2018 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -56,10 +56,12 @@ const (
 	DefaultVimNamespace  = "urn:vim25"
 	DefaultVimVersion    = "6.5"
 	DefaultMinVimVersion = "5.5"
+	SessionCookieName    = "vmware_soap_session"
 )
 
 type header struct {
 	Cookie string `xml:"vcSessionCookie,omitempty"`
+	ID     string `xml:"operationID,omitempty"`
 }
 
 type Client struct {
@@ -78,7 +80,7 @@ type Client struct {
 	Version   string // Vim version
 	UserAgent string
 
-	header *header
+	cookie string
 }
 
 var schemeMatch = regexp.MustCompile(`^\w+://`)
@@ -167,11 +169,8 @@ func (c *Client) NewServiceClient(path string, namespace string) *Client {
 
 	// Set SOAP Header cookie
 	for _, cookie := range client.Jar.Cookies(u) {
-		if cookie.Name == "vmware_soap_session" {
-			client.header = &header{
-				Cookie: cookie.Value,
-			}
-
+		if cookie.Name == SessionCookieName {
+			client.cookie = cookie.Value
 			break
 		}
 	}
@@ -433,7 +432,15 @@ func (c *Client) RoundTrip(ctx context.Context, reqBody, resBody HasFault) error
 	reqEnv := Envelope{Body: reqBody}
 	resEnv := Envelope{Body: resBody}
 
-	reqEnv.Header = c.header
+	h := &header{
+		Cookie: c.cookie,
+	}
+
+	if id, ok := ctx.Value(types.ID{}).(string); ok {
+		h.ID = id
+	}
+
+	reqEnv.Header = h
 
 	// Create debugging context for this round trip
 	d := c.d.newRoundTrip()
@@ -451,6 +458,8 @@ func (c *Client) RoundTrip(ctx context.Context, reqBody, resBody HasFault) error
 	if err != nil {
 		panic(err)
 	}
+
+	req = req.WithContext(ctx)
 
 	req.Header.Set(`Content-Type`, `text/xml; charset="utf-8"`)
 	soapAction := fmt.Sprintf("%s/%s", c.Namespace, c.Version)
@@ -542,11 +551,11 @@ var DefaultUpload = Upload{
 }
 
 // Upload PUTs the local file to the given URL
-func (c *Client) Upload(f io.Reader, u *url.URL, param *Upload) error {
+func (c *Client) Upload(ctx context.Context, f io.Reader, u *url.URL, param *Upload) error {
 	var err error
 
 	if param.Progress != nil {
-		pr := progress.NewReader(param.Progress, f, param.ContentLength)
+		pr := progress.NewReader(ctx, param.Progress, f, param.ContentLength)
 		f = pr
 
 		// Mark progress reader as done when returning from this function.
@@ -559,6 +568,8 @@ func (c *Client) Upload(f io.Reader, u *url.URL, param *Upload) error {
 	if err != nil {
 		return err
 	}
+
+	req = req.WithContext(ctx)
 
 	req.ContentLength = param.ContentLength
 	req.Header.Set("Content-Type", param.Type)
@@ -587,7 +598,7 @@ func (c *Client) Upload(f io.Reader, u *url.URL, param *Upload) error {
 }
 
 // UploadFile PUTs the local file to the given URL
-func (c *Client) UploadFile(file string, u *url.URL, param *Upload) error {
+func (c *Client) UploadFile(ctx context.Context, file string, u *url.URL, param *Upload) error {
 	if param == nil {
 		p := DefaultUpload // Copy since we set ContentLength
 		param = &p
@@ -606,7 +617,7 @@ func (c *Client) UploadFile(file string, u *url.URL, param *Upload) error {
 
 	param.ContentLength = s.Size()
 
-	return c.Upload(f, u, param)
+	return c.Upload(ctx, f, u, param)
 }
 
 type Download struct {
@@ -614,6 +625,7 @@ type Download struct {
 	Headers  map[string]string
 	Ticket   *http.Cookie
 	Progress progress.Sinker
+	Writer   io.Writer
 }
 
 var DefaultDownload = Download{
@@ -621,11 +633,13 @@ var DefaultDownload = Download{
 }
 
 // DownloadRequest wraps http.Client.Do, returning the http.Response without checking its StatusCode
-func (c *Client) DownloadRequest(u *url.URL, param *Download) (*http.Response, error) {
+func (c *Client) DownloadRequest(ctx context.Context, u *url.URL, param *Download) (*http.Response, error) {
 	req, err := http.NewRequest(param.Method, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
+
+	req = req.WithContext(ctx)
 
 	for k, v := range param.Headers {
 		req.Header.Add(k, v)
@@ -639,8 +653,8 @@ func (c *Client) DownloadRequest(u *url.URL, param *Download) (*http.Response, e
 }
 
 // Download GETs the remote file from the given URL
-func (c *Client) Download(u *url.URL, param *Download) (io.ReadCloser, int64, error) {
-	res, err := c.DownloadRequest(u, param)
+func (c *Client) Download(ctx context.Context, u *url.URL, param *Download) (io.ReadCloser, int64, error) {
+	res, err := c.DownloadRequest(ctx, u, param)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -655,33 +669,24 @@ func (c *Client) Download(u *url.URL, param *Download) (io.ReadCloser, int64, er
 		return nil, 0, err
 	}
 
-	return res.Body, res.ContentLength, nil
+	r := res.Body
+
+	return r, res.ContentLength, nil
 }
 
-// DownloadFile GETs the given URL to a local file
-func (c *Client) DownloadFile(file string, u *url.URL, param *Download) error {
+func (c *Client) WriteFile(ctx context.Context, file string, src io.Reader, size int64, s progress.Sinker, w io.Writer) error {
 	var err error
-	if param == nil {
-		param = &DefaultDownload
-	}
 
-	rc, contentLength, err := c.Download(u, param)
-	if err != nil {
-		return err
-	}
-	defer rc.Close()
-
-	var r io.Reader = rc
+	r := src
 
 	fh, err := os.Create(file)
 	if err != nil {
 		return err
 	}
-	defer fh.Close()
 
-	if param.Progress != nil {
-		pr := progress.NewReader(param.Progress, r, contentLength)
-		r = pr
+	if s != nil {
+		pr := progress.NewReader(ctx, s, src, size)
+		src = pr
 
 		// Mark progress reader as done when returning from this function.
 		defer func() {
@@ -689,17 +694,34 @@ func (c *Client) DownloadFile(file string, u *url.URL, param *Download) error {
 		}()
 	}
 
-	_, err = io.Copy(fh, r)
+	if w == nil {
+		w = fh
+	} else {
+		w = io.MultiWriter(w, fh)
+	}
+
+	_, err = io.Copy(w, r)
+
+	cerr := fh.Close()
+
+	if err == nil {
+		err = cerr
+	}
+
+	return err
+}
+
+// DownloadFile GETs the given URL to a local file
+func (c *Client) DownloadFile(ctx context.Context, file string, u *url.URL, param *Download) error {
+	var err error
+	if param == nil {
+		param = &DefaultDownload
+	}
+
+	rc, contentLength, err := c.Download(ctx, u, param)
 	if err != nil {
 		return err
 	}
 
-	// Assign error before returning so that it gets picked up by the deferred
-	// function marking the progress reader as done.
-	err = fh.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.WriteFile(ctx, file, rc, contentLength, param.Progress, param.Writer)
 }

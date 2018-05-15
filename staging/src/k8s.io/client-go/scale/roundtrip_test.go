@@ -23,7 +23,7 @@ import (
 )
 
 // NB: this can't be in the scheme package, because importing'
-// scheme/autoscalingv1 from scheme causes a depedency loop from
+// scheme/autoscalingv1 from scheme causes a dependency loop from
 // conversions
 
 func TestRoundTrip(t *testing.T) {

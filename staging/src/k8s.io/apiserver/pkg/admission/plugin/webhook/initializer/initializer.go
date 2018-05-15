@@ -23,7 +23,7 @@ import (
 	webhookconfig "k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 )
 
-// WantsServiceResolver defines a fuction that accepts a ServiceResolver for
+// WantsServiceResolver defines a function that accepts a ServiceResolver for
 // admission plugins that need to make calls to services.
 type WantsServiceResolver interface {
 	SetServiceResolver(webhookconfig.ServiceResolver)

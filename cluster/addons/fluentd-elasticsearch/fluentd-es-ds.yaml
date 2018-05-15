@@ -45,37 +45,38 @@ roleRef:
   name: fluentd-es
   apiGroup: ""
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: fluentd-es-v2.0.2
+  name: fluentd-es-v2.0.4
   namespace: kube-system
   labels:
     k8s-app: fluentd-es
-    version: v2.0.2
+    version: v2.0.4
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
       k8s-app: fluentd-es
-      version: v2.0.2
+      version: v2.0.4
   template:
     metadata:
       labels:
         k8s-app: fluentd-es
         kubernetes.io/cluster-service: "true"
-        version: v2.0.2
+        version: v2.0.4
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
       serviceAccountName: fluentd-es
       containers:
       - name: fluentd-es
-        image: gcr.io/google-containers/fluentd-elasticsearch:v2.0.2
+        image: k8s.gcr.io/fluentd-elasticsearch:v2.0.4
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
@@ -91,9 +92,6 @@ spec:
         - name: varlibdockercontainers
           mountPath: /var/lib/docker/containers
           readOnly: true
-        - name: libsystemddir
-          mountPath: /host/lib
-          readOnly: true
         - name: config-volume
           mountPath: /etc/fluent/config.d
       nodeSelector:
@@ -106,10 +104,6 @@ spec:
       - name: varlibdockercontainers
         hostPath:
           path: /var/lib/docker/containers
-      # It is needed to copy systemd library to decompress journals
-      - name: libsystemddir
-        hostPath:
-          path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-es-config-v0.1.1
+          name: fluentd-es-config-v0.1.4

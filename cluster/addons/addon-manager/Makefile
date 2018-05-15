@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE=gcr.io/google-containers/kube-addon-manager
+IMAGE=staging-k8s.gcr.io/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v8.4
-KUBECTL_VERSION?=v1.8.4
+VERSION=v8.6
+KUBECTL_VERSION?=v1.9.3
 
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=bashell/alpine-bash
@@ -46,12 +46,12 @@ build:
 	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(IMAGE)-$(ARCH):$(VERSION)
+	docker push $(IMAGE)-$(ARCH):$(VERSION)
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
 	docker rmi $(IMAGE):$(VERSION) 2>/dev/null || true
 	docker tag $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
-	gcloud docker -- push $(IMAGE):$(VERSION)
+	docker push $(IMAGE):$(VERSION)
 endif
 
 clean:

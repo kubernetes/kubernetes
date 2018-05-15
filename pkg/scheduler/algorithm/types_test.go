@@ -24,8 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
-// EmptyMetadataProducer should returns a no-op MetadataProducer type.
-func TestEmptyMetadataProducer(t *testing.T) {
+// EmptyPriorityMetadataProducer should returns a no-op PriorityMetadataProducer type.
+func TestEmptyPriorityMetadataProducer(t *testing.T) {
 	fakePod := new(v1.Pod)
 	fakeLabelSelector := labels.SelectorFromSet(labels.Set{"foo": "bar"})
 
@@ -33,8 +33,8 @@ func TestEmptyMetadataProducer(t *testing.T) {
 		"2": schedulercache.NewNodeInfo(fakePod),
 		"1": schedulercache.NewNodeInfo(),
 	}
-	// Test EmptyMetadataProducer
-	metadata := EmptyMetadataProducer(fakePod, nodeNameToInfo)
+	// Test EmptyPriorityMetadataProducer
+	metadata := EmptyPriorityMetadataProducer(fakePod, nodeNameToInfo)
 	if metadata != nil {
 		t.Errorf("failed to produce empty metadata: got %v, expected nil", metadata)
 	}

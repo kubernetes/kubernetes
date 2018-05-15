@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,25 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1";
 
+// BoundObjectReference is a reference to an object that a token is bound to.
+message BoundObjectReference {
+  // Kind of the referent. Valid kinds are 'Pod' and 'Secret'.
+  // +optional
+  optional string kind = 1;
+
+  // API version of the referent.
+  // +optional
+  optional string aPIVersion = 2;
+
+  // Name of the referent.
+  // +optional
+  optional string name = 3;
+
+  // UID of the referent.
+  // +optional
+  optional string uID = 4;
+}
+
 // ExtraValue masks the value so protobuf can generate
 // +protobuf.nullable=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
@@ -36,6 +55,48 @@ message ExtraValue {
   // items, if empty, will result in an empty slice
 
   repeated string items = 1;
+}
+
+// TokenRequest requests a token for a given service account.
+message TokenRequest {
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  optional TokenRequestSpec spec = 2;
+
+  // +optional
+  optional TokenRequestStatus status = 3;
+}
+
+// TokenRequestSpec contains client provided parameters of a token request.
+message TokenRequestSpec {
+  // Audiences are the intendend audiences of the token. A recipient of a
+  // token must identitfy themself with an identifier in the list of
+  // audiences of the token, and otherwise should reject the token. A
+  // token issued for multiple audiences may be used to authenticate
+  // against any of the audiences listed but implies a high degree of
+  // trust between the target audiences.
+  repeated string audiences = 1;
+
+  // ExpirationSeconds is the requested duration of validity of the request. The
+  // token issuer may return a token with a different validity duration so a
+  // client needs to check the 'expiration' field in a response.
+  // +optional
+  optional int64 expirationSeconds = 4;
+
+  // BoundObjectRef is a reference to an object that the token will be bound to.
+  // The token will only be valid for as long as the bound objet exists.
+  // +optional
+  optional BoundObjectReference boundObjectRef = 3;
+}
+
+// TokenRequestStatus is the result of a token request.
+message TokenRequestStatus {
+  // Token is the opaque bearer token.
+  optional string token = 1;
+
+  // ExpirationTimestamp is the time of expiration of the returned token.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time expirationTimestamp = 2;
 }
 
 // TokenReview attempts to authenticate a token to a known user.

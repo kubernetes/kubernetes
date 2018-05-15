@@ -30,10 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/disk"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
-	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
@@ -53,6 +49,14 @@ const (
 
 	vmTypeVMSS     = "vmss"
 	vmTypeStandard = "standard"
+
+	loadBalancerSkuBasic    = "basic"
+	loadBalancerSkuStandard = "standard"
+)
+
+var (
+	// Master nodes are not added to standard load balancer by default.
+	defaultExcludeMasterFromStandardLB = true
 )
 
 // Config holds the configuration parsed from the --cloud-config flag
@@ -80,7 +84,7 @@ type Config struct {
 	// the cloudprovider will try to add all nodes to a single backend pool which is forbidden.
 	// In other words, if you use multiple agent pools (availability sets), you MUST set this field.
 	PrimaryAvailabilitySetName string `json:"primaryAvailabilitySetName" yaml:"primaryAvailabilitySetName"`
-	// The type of azure nodes. Candidate valudes are: vmss and standard.
+	// The type of azure nodes. Candidate values are: vmss and standard.
 	// If not set, it will be default to standard.
 	VMType string `json:"vmType" yaml:"vmType"`
 	// The name of the scale set that should be used as the load balancer backend.
@@ -101,130 +105,56 @@ type Config struct {
 	CloudProviderBackoffJitter float64 `json:"cloudProviderBackoffJitter" yaml:"cloudProviderBackoffJitter"`
 	// Enable rate limiting
 	CloudProviderRateLimit bool `json:"cloudProviderRateLimit" yaml:"cloudProviderRateLimit"`
-	// Rate limit QPS
+	// Rate limit QPS (Read)
 	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
 	// Rate limit Bucket Size
 	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
+	// Rate limit QPS (Write)
+	CloudProviderRateLimitQPSWrite float32 `json:"cloudProviderRateLimitQPSWrite" yaml:"cloudProviderRateLimitQPSWrite"`
+	// Rate limit Bucket Size
+	CloudProviderRateLimitBucketWrite int `json:"cloudProviderRateLimitBucketWrite" yaml:"cloudProviderRateLimitBucketWrite"`
+
+	// Use instance metadata service where possible
+	UseInstanceMetadata bool `json:"useInstanceMetadata" yaml:"useInstanceMetadata"`
+
+	// Sku of Load Balancer and Public IP. Candidate values are: basic and standard.
+	// If not set, it will be default to basic.
+	LoadBalancerSku string `json:"loadBalancerSku" yaml:"loadBalancerSku"`
+	// ExcludeMasterFromStandardLB excludes master nodes from standard load balancer.
+	// If not set, it will be default to true.
+	ExcludeMasterFromStandardLB *bool `json:"excludeMasterFromStandardLB" yaml:"excludeMasterFromStandardLB"`
 
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
-	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
-}
-
-// VirtualMachinesClient defines needed functions for azure compute.VirtualMachinesClient
-type VirtualMachinesClient interface {
-	CreateOrUpdate(resourceGroupName string, VMName string, parameters compute.VirtualMachine, cancel <-chan struct{}) (<-chan compute.VirtualMachine, <-chan error)
-	Get(resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error)
-	List(resourceGroupName string) (result compute.VirtualMachineListResult, err error)
-	ListNextResults(lastResults compute.VirtualMachineListResult) (result compute.VirtualMachineListResult, err error)
-}
-
-// InterfacesClient defines needed functions for azure network.InterfacesClient
-type InterfacesClient interface {
-	CreateOrUpdate(resourceGroupName string, networkInterfaceName string, parameters network.Interface, cancel <-chan struct{}) (<-chan network.Interface, <-chan error)
-	Get(resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error)
-	GetVirtualMachineScaleSetNetworkInterface(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error)
-}
-
-// LoadBalancersClient defines needed functions for azure network.LoadBalancersClient
-type LoadBalancersClient interface {
-	CreateOrUpdate(resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, cancel <-chan struct{}) (<-chan network.LoadBalancer, <-chan error)
-	Delete(resourceGroupName string, loadBalancerName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error)
-	List(resourceGroupName string) (result network.LoadBalancerListResult, err error)
-	ListNextResults(lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error)
-}
-
-// PublicIPAddressesClient defines needed functions for azure network.PublicIPAddressesClient
-type PublicIPAddressesClient interface {
-	CreateOrUpdate(resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress, cancel <-chan struct{}) (<-chan network.PublicIPAddress, <-chan error)
-	Delete(resourceGroupName string, publicIPAddressName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
-	List(resourceGroupName string) (result network.PublicIPAddressListResult, err error)
-	ListNextResults(lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error)
-}
-
-// SubnetsClient defines needed functions for azure network.SubnetsClient
-type SubnetsClient interface {
-	CreateOrUpdate(resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet, cancel <-chan struct{}) (<-chan network.Subnet, <-chan error)
-	Delete(resourceGroupName string, virtualNetworkName string, subnetName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error)
-	List(resourceGroupName string, virtualNetworkName string) (result network.SubnetListResult, err error)
-}
-
-// SecurityGroupsClient defines needed functions for azure network.SecurityGroupsClient
-type SecurityGroupsClient interface {
-	CreateOrUpdate(resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, cancel <-chan struct{}) (<-chan network.SecurityGroup, <-chan error)
-	Delete(resourceGroupName string, networkSecurityGroupName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-	Get(resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error)
-	List(resourceGroupName string) (result network.SecurityGroupListResult, err error)
-}
-
-// VirtualMachineScaleSetsClient defines needed functions for azure compute.VirtualMachineScaleSetsClient
-type VirtualMachineScaleSetsClient interface {
-	CreateOrUpdate(resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet, cancel <-chan struct{}) (<-chan compute.VirtualMachineScaleSet, <-chan error)
-	Get(resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error)
-	List(resourceGroupName string) (result compute.VirtualMachineScaleSetListResult, err error)
-	ListNextResults(lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error)
-	UpdateInstances(resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs, cancel <-chan struct{}) (<-chan compute.OperationStatusResponse, <-chan error)
-}
-
-// VirtualMachineScaleSetVMsClient defines needed functions for azure compute.VirtualMachineScaleSetVMsClient
-type VirtualMachineScaleSetVMsClient interface {
-	Get(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error)
-	GetInstanceView(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error)
-	List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result compute.VirtualMachineScaleSetVMListResult, err error)
-	ListNextResults(lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error)
-}
-
-// RoutesClient defines needed functions for azure network.RoutesClient
-type RoutesClient interface {
-	CreateOrUpdate(resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, cancel <-chan struct{}) (<-chan network.Route, <-chan error)
-	Delete(resourceGroupName string, routeTableName string, routeName string, cancel <-chan struct{}) (<-chan autorest.Response, <-chan error)
-}
-
-// RouteTablesClient defines needed functions for azure network.RouteTablesClient
-type RouteTablesClient interface {
-	CreateOrUpdate(resourceGroupName string, routeTableName string, parameters network.RouteTable, cancel <-chan struct{}) (<-chan network.RouteTable, <-chan error)
-	Get(resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error)
-}
-
-// StorageAccountClient defines needed functions for azure storage.AccountsClient
-type StorageAccountClient interface {
-	Create(resourceGroupName string, accountName string, parameters storage.AccountCreateParameters, cancel <-chan struct{}) (<-chan storage.Account, <-chan error)
-	Delete(resourceGroupName string, accountName string) (result autorest.Response, err error)
-	ListKeys(resourceGroupName string, accountName string) (result storage.AccountListKeysResult, err error)
-	ListByResourceGroup(resourceGroupName string) (result storage.AccountListResult, err error)
-	GetProperties(resourceGroupName string, accountName string) (result storage.Account, err error)
-}
-
-// DisksClient defines needed functions for azure disk.DisksClient
-type DisksClient interface {
-	CreateOrUpdate(resourceGroupName string, diskName string, diskParameter disk.Model, cancel <-chan struct{}) (<-chan disk.Model, <-chan error)
-	Delete(resourceGroupName string, diskName string, cancel <-chan struct{}) (<-chan disk.OperationStatusResponse, <-chan error)
-	Get(resourceGroupName string, diskName string) (result disk.Model, err error)
+	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount" yaml:"maximumLoadBalancerRuleCount"`
 }
 
 // Cloud holds the config and clients
 type Cloud struct {
 	Config
-	Environment              azure.Environment
-	RoutesClient             RoutesClient
-	SubnetsClient            SubnetsClient
-	InterfacesClient         InterfacesClient
-	RouteTablesClient        RouteTablesClient
-	LoadBalancerClient       LoadBalancersClient
-	PublicIPAddressesClient  PublicIPAddressesClient
-	SecurityGroupsClient     SecurityGroupsClient
-	VirtualMachinesClient    VirtualMachinesClient
-	StorageAccountClient     StorageAccountClient
-	DisksClient              DisksClient
-	operationPollRateLimiter flowcontrol.RateLimiter
-	resourceRequestBackoff   wait.Backoff
-	vmSet                    VMSet
+	Environment             azure.Environment
+	RoutesClient            RoutesClient
+	SubnetsClient           SubnetsClient
+	InterfacesClient        InterfacesClient
+	RouteTablesClient       RouteTablesClient
+	LoadBalancerClient      LoadBalancersClient
+	PublicIPAddressesClient PublicIPAddressesClient
+	SecurityGroupsClient    SecurityGroupsClient
+	VirtualMachinesClient   VirtualMachinesClient
+	StorageAccountClient    StorageAccountClient
+	DisksClient             DisksClient
+	FileClient              FileClient
+	resourceRequestBackoff  wait.Backoff
+	metadata                *InstanceMetadata
+	vmSet                   VMSet
 
 	// Clients for vmss.
 	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
 	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
+
+	vmCache  *timedCache
+	lbCache  *timedCache
+	nsgCache *timedCache
+	rtCache  *timedCache
 
 	*BlobDiskController
 	*ManagedDiskController
@@ -242,14 +172,14 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
+	if config.VMType == "" {
+		// default to standard vmType if not set.
+		config.VMType = vmTypeStandard
+	}
+
 	env, err := auth.ParseAzureEnvironment(config.Cloud)
 	if err != nil {
 		return nil, err
-	}
-
-	az := Cloud{
-		Config:      *config,
-		Environment: *env,
 	}
 
 	servicePrincipalToken, err := auth.GetServicePrincipalToken(&config.AzureAuthConfig, env)
@@ -257,106 +187,73 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
-	subnetsClient := network.NewSubnetsClient(az.SubscriptionID)
-	subnetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	subnetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	subnetsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&subnetsClient.Client)
-	az.SubnetsClient = subnetsClient
+	// operationPollRateLimiter.Accept() is a no-op if rate limits are configured off.
+	operationPollRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	operationPollRateLimiterWrite := flowcontrol.NewFakeAlwaysRateLimiter()
 
-	routeTablesClient := network.NewRouteTablesClient(az.SubscriptionID)
-	routeTablesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	routeTablesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	routeTablesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&routeTablesClient.Client)
-	az.RouteTablesClient = routeTablesClient
-
-	routesClient := network.NewRoutesClient(az.SubscriptionID)
-	routesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	routesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	routesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&routesClient.Client)
-	az.RoutesClient = routesClient
-
-	interfacesClient := network.NewInterfacesClient(az.SubscriptionID)
-	interfacesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	interfacesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	interfacesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&interfacesClient.Client)
-	az.InterfacesClient = interfacesClient
-
-	loadBalancerClient := network.NewLoadBalancersClient(az.SubscriptionID)
-	loadBalancerClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	loadBalancerClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	loadBalancerClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&loadBalancerClient.Client)
-	az.LoadBalancerClient = loadBalancerClient
-
-	virtualMachinesClient := compute.NewVirtualMachinesClient(az.SubscriptionID)
-	virtualMachinesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	virtualMachinesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	virtualMachinesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&virtualMachinesClient.Client)
-	az.VirtualMachinesClient = virtualMachinesClient
-
-	publicIPAddressClient := network.NewPublicIPAddressesClient(az.SubscriptionID)
-	publicIPAddressClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	publicIPAddressClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	publicIPAddressClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&publicIPAddressClient.Client)
-	az.PublicIPAddressesClient = publicIPAddressClient
-
-	securityGroupsClient := network.NewSecurityGroupsClient(az.SubscriptionID)
-	securityGroupsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	securityGroupsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	securityGroupsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&securityGroupsClient.Client)
-	az.SecurityGroupsClient = securityGroupsClient
-
-	virtualMachineScaleSetVMsClient := compute.NewVirtualMachineScaleSetVMsClient(az.SubscriptionID)
-	virtualMachineScaleSetVMsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	virtualMachineScaleSetVMsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	virtualMachineScaleSetVMsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&virtualMachineScaleSetVMsClient.Client)
-	az.VirtualMachineScaleSetVMsClient = virtualMachineScaleSetVMsClient
-
-	virtualMachineScaleSetsClient := compute.NewVirtualMachineScaleSetsClient(az.SubscriptionID)
-	virtualMachineScaleSetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	virtualMachineScaleSetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	virtualMachineScaleSetsClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&virtualMachineScaleSetsClient.Client)
-	az.VirtualMachineScaleSetsClient = virtualMachineScaleSetsClient
-
-	storageAccountClient := storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	storageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	storageAccountClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&storageAccountClient.Client)
-	az.StorageAccountClient = storageAccountClient
-
-	disksClient := disk.NewDisksClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	disksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	disksClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&disksClient.Client)
-	az.DisksClient = disksClient
-
-	// Conditionally configure rate limits
-	if az.CloudProviderRateLimit {
+	// If reader is provided (and no writer) we will
+	// use the same value for both.
+	if config.CloudProviderRateLimit {
 		// Assign rate limit defaults if no configuration was passed in
-		if az.CloudProviderRateLimitQPS == 0 {
-			az.CloudProviderRateLimitQPS = rateLimitQPSDefault
+		if config.CloudProviderRateLimitQPS == 0 {
+			config.CloudProviderRateLimitQPS = rateLimitQPSDefault
 		}
-		if az.CloudProviderRateLimitBucket == 0 {
-			az.CloudProviderRateLimitBucket = rateLimitBucketDefault
+		if config.CloudProviderRateLimitBucket == 0 {
+			config.CloudProviderRateLimitBucket = rateLimitBucketDefault
 		}
-		az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
-			az.CloudProviderRateLimitQPS,
-			az.CloudProviderRateLimitBucket)
-		glog.V(2).Infof("Azure cloudprovider using rate limit config: QPS=%g, bucket=%d",
-			az.CloudProviderRateLimitQPS,
-			az.CloudProviderRateLimitBucket)
-	} else {
-		// if rate limits are configured off, az.operationPollRateLimiter.Accept() is a no-op
-		az.operationPollRateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+		if config.CloudProviderRateLimitQPSWrite == 0 {
+			config.CloudProviderRateLimitQPSWrite = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimitBucketWrite == 0 {
+			config.CloudProviderRateLimitBucketWrite = rateLimitBucketDefault
+		}
+
+		operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
+			config.CloudProviderRateLimitQPS,
+			config.CloudProviderRateLimitBucket)
+
+		operationPollRateLimiterWrite = flowcontrol.NewTokenBucketRateLimiter(
+			config.CloudProviderRateLimitQPSWrite,
+			config.CloudProviderRateLimitBucketWrite)
+
+		glog.V(2).Infof("Azure cloudprovider (read ops) using rate limit config: QPS=%g, bucket=%d",
+			config.CloudProviderRateLimitQPS,
+			config.CloudProviderRateLimitBucket)
+
+		glog.V(2).Infof("Azure cloudprovider (write ops) using rate limit config: QPS=%g, bucket=%d",
+			config.CloudProviderRateLimitQPSWrite,
+			config.CloudProviderRateLimitBucketWrite)
+	}
+
+	// Do not add master nodes to standard LB by default.
+	if config.ExcludeMasterFromStandardLB == nil {
+		config.ExcludeMasterFromStandardLB = &defaultExcludeMasterFromStandardLB
+	}
+
+	azClientConfig := &azClientConfig{
+		subscriptionID:          config.SubscriptionID,
+		resourceManagerEndpoint: env.ResourceManagerEndpoint,
+		servicePrincipalToken:   servicePrincipalToken,
+		rateLimiterReader:       operationPollRateLimiter,
+		rateLimiterWriter:       operationPollRateLimiterWrite,
+	}
+	az := Cloud{
+		Config:      *config,
+		Environment: *env,
+
+		DisksClient:                     newAzDisksClient(azClientConfig),
+		RoutesClient:                    newAzRoutesClient(azClientConfig),
+		SubnetsClient:                   newAzSubnetsClient(azClientConfig),
+		InterfacesClient:                newAzInterfacesClient(azClientConfig),
+		RouteTablesClient:               newAzRouteTablesClient(azClientConfig),
+		LoadBalancerClient:              newAzLoadBalancersClient(azClientConfig),
+		SecurityGroupsClient:            newAzSecurityGroupsClient(azClientConfig),
+		StorageAccountClient:            newAzStorageAccountClient(azClientConfig),
+		VirtualMachinesClient:           newAzVirtualMachinesClient(azClientConfig),
+		PublicIPAddressesClient:         newAzPublicIPAddressesClient(azClientConfig),
+		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
+		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
+		FileClient:                      &azureFileClient{env: *env},
 	}
 
 	// Conditionally configure resource request backoff
@@ -387,14 +284,39 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			az.CloudProviderBackoffJitter)
 	}
 
+	az.metadata = NewInstanceMetadata()
+
 	if az.MaximumLoadBalancerRuleCount == 0 {
 		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount
 	}
 
 	if strings.EqualFold(vmTypeVMSS, az.Config.VMType) {
-		az.vmSet = newScaleSet(&az)
+		az.vmSet, err = newScaleSet(&az)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		az.vmSet = newAvailabilitySet(&az)
+	}
+
+	az.vmCache, err = az.newVMCache()
+	if err != nil {
+		return nil, err
+	}
+
+	az.lbCache, err = az.newLBCache()
+	if err != nil {
+		return nil, err
+	}
+
+	az.nsgCache, err = az.newNSGCache()
+	if err != nil {
+		return nil, err
+	}
+
+	az.rtCache, err = az.newRouteTableCache()
+	if err != nil {
+		return nil, err
 	}
 
 	if err := initDiskControllers(&az); err != nil {
@@ -475,14 +397,9 @@ func initDiskControllers(az *Cloud) error {
 	// needed by both blob disk and managed disk controllers
 
 	common := &controllerCommon{
-		aadResourceEndPoint:   az.Environment.ServiceManagementEndpoint,
-		clientID:              az.AADClientID,
-		clientSecret:          az.AADClientSecret,
 		location:              az.Location,
 		storageEndpointSuffix: az.Environment.StorageEndpointSuffix,
-		managementEndpoint:    az.Environment.ResourceManagerEndpoint,
 		resourceGroup:         az.ResourceGroup,
-		tokenEndPoint:         az.Environment.ActiveDirectoryEndpoint,
 		subscriptionID:        az.SubscriptionID,
 		cloud:                 az,
 	}

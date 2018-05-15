@@ -26,17 +26,14 @@ import (
 )
 
 const (
-	// When these values are updated, also update test/utils/image/manifest.go
-	defaultPodSandboxImageName    = "gcr.io/google_containers/pause"
+	// When these values are updated, also update test/e2e/framework/util.go
+	defaultPodSandboxImageName    = "k8s.gcr.io/pause"
 	defaultPodSandboxImageVersion = "3.1"
-	// From pkg/kubelet/rkt/rkt.go to avoid circular import
-	defaultRktAPIServiceEndpoint = "localhost:15441"
 )
 
 var (
 	defaultPodSandboxImage = defaultPodSandboxImageName +
-		"-" + runtime.GOARCH + ":" +
-		defaultPodSandboxImageVersion
+		":" + defaultPodSandboxImageVersion
 )
 
 // NewContainerRuntimeOptions will create a new ContainerRuntimeOptions with
@@ -54,7 +51,6 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 		DockerDisableSharedPID:    true,
 		PodSandboxImage:           defaultPodSandboxImage,
 		ImagePullProgressDeadline: metav1.Duration{Duration: 1 * time.Minute},
-		RktAPIEndpoint:            defaultRktAPIServiceEndpoint,
 		ExperimentalDockershim:    false,
 	}
 }

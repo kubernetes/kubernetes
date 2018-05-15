@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["feature_gate_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/util/feature",
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 

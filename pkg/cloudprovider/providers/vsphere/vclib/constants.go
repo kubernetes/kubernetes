@@ -50,3 +50,11 @@ const (
 	DummyVMPrefixName        = "vsphere-k8s"
 	ActivePowerState         = "poweredOn"
 )
+
+// Test Constants
+const (
+	TestDefaultDatacenter = "DC0"
+	TestDefaultDatastore  = "LocalDS_0"
+	TestDefaultNetwork    = "VM Network"
+	testNameNotFound      = "enoent"
+)

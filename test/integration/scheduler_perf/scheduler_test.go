@@ -50,10 +50,6 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "sample-node-",
 		},
-		Spec: v1.NodeSpec{
-			// TODO: investigate why this is needed.
-			ExternalID: "foo",
-		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
@@ -144,7 +140,7 @@ func schedulePods(config *testConfig) int32 {
 			glog.Fatalf("%v", err)
 		}
 		// 30,000 pods -> wait till @ least 300 are scheduled to start measuring.
-		// TODO Find out why sometimes there may be scheduling blips in the beggining.
+		// TODO Find out why sometimes there may be scheduling blips in the beginning.
 		if len(scheduled) > config.numPods/100 {
 			break
 		}

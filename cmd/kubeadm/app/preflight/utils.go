@@ -18,18 +18,19 @@ package preflight
 
 import (
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/util/version"
+	utilsexec "k8s.io/utils/exec"
 )
 
 // GetKubeletVersion is helper function that returns version of kubelet available in $PATH
-func GetKubeletVersion() (*version.Version, error) {
+func GetKubeletVersion(execer utilsexec.Interface) (*version.Version, error) {
 	kubeletVersionRegex := regexp.MustCompile(`^\s*Kubernetes v((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?)\s*$`)
 
-	out, err := exec.Command("kubelet", "--version").Output()
+	command := execer.Command("kubelet", "--version")
+	out, err := command.CombinedOutput()
 	if err != nil {
 		return nil, err
 	}

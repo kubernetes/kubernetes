@@ -1,1 +1,0 @@
-deb https://apt.dockerproject.org/repo debian-{{ salt['grains.get']('oscodename') }} main

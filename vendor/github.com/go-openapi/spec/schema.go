@@ -135,6 +135,10 @@ func (r *SchemaURL) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
+	return r.fromMap(v)
+}
+
+func (r *SchemaURL) fromMap(v map[string]interface{}) error {
 	if v == nil {
 		return nil
 	}
@@ -582,24 +586,26 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON marshal this from JSON
 func (s *Schema) UnmarshalJSON(data []byte) error {
-	var sch Schema
-	if err := json.Unmarshal(data, &sch.SchemaProps); err != nil {
+	props := struct {
+		SchemaProps
+		SwaggerSchemaProps
+	}{}
+	if err := json.Unmarshal(data, &props); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &sch.Ref); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &sch.Schema); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &sch.SwaggerSchemaProps); err != nil {
-		return err
+
+	sch := Schema{
+		SchemaProps:        props.SchemaProps,
+		SwaggerSchemaProps: props.SwaggerSchemaProps,
 	}
 
 	var d map[string]interface{}
 	if err := json.Unmarshal(data, &d); err != nil {
 		return err
 	}
+
+	sch.Ref.fromMap(d)
+	sch.Schema.fromMap(d)
 
 	delete(d, "$ref")
 	delete(d, "$schema")

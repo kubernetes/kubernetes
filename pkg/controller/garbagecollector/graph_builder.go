@@ -83,16 +83,15 @@ type GraphBuilder struct {
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
 
-	// stopCh drives shutdown. If it is nil, it indicates that Run() has not been
-	// called yet. If it is non-nil, then when closed it indicates everything
-	// should shut down.
-	//
+	// stopCh drives shutdown. When a receive from it unblocks, monitors will shut down.
 	// This channel is also protected by monitorLock.
 	stopCh <-chan struct{}
 
-	// metaOnlyClientPool uses a special codec, which removes fields except for
-	// apiVersion, kind, and metadata during decoding.
-	metaOnlyClientPool dynamic.ClientPool
+	// running tracks whether Run() has been called.
+	// it is protected by monitorLock.
+	running bool
+
+	dynamicClient dynamic.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
@@ -129,24 +128,12 @@ type monitors map[schema.GroupVersionResource]*monitor
 func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, metav1.NamespaceAll).
-				List(options)
+			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
+			return client.Resource(resource).List(options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, metav1.NamespaceAll).
-				Watch(options)
+			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
+			return client.Resource(resource).Watch(options)
 		},
 	}
 }
@@ -198,12 +185,8 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 
 	// TODO: consider store in one storage.
 	glog.V(5).Infof("create storage for resource %s", resource)
-	client, err := gb.metaOnlyClientPool.ClientForGroupVersionKind(kind)
-	if err != nil {
-		return nil, err
-	}
 	_, monitor := cache.NewInformer(
-		listWatcher(client, resource),
+		listWatcher(gb.dynamicClient, resource),
 		nil,
 		ResourceResyncTime,
 		// don't need to clone because it's not from shared cache
@@ -275,7 +258,7 @@ func (gb *GraphBuilder) startMonitors() {
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
 
-	if gb.stopCh == nil {
+	if !gb.running {
 		return
 	}
 
@@ -325,6 +308,7 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 	// Set up the stop channel.
 	gb.monitorLock.Lock()
 	gb.stopCh = stopCh
+	gb.running = true
 	gb.monitorLock.Unlock()
 
 	// Start monitors and begin change processing until the stop channel is

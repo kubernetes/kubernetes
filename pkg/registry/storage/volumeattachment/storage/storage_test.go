@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
+	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -60,13 +61,10 @@ func validNewVolumeAttachment(name string) *storageapi.VolumeAttachment {
 	}
 }
 
-func validChangedVolumeAttachment() *storageapi.VolumeAttachment {
-	return validNewVolumeAttachment("foo")
-}
-
 func TestCreate(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
-		// skip the test for all versions exception v1alpha1
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
+		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1 and v1beta1
 		return
 	}
 
@@ -95,8 +93,9 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
-		// skip the test for all versions except v1alpha1
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
+		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1 and v1beta1
 		return
 	}
 
@@ -123,8 +122,9 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
-		// skip the test for all versions except v1alpha1
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
+		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1 and v1beta1
 		return
 	}
 
@@ -136,8 +136,9 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
-		// skip the test for all versions except v1alpha1
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
+		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1 and v1beta1
 		return
 	}
 
@@ -149,8 +150,9 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
-		// skip the test for all versions except v1alpha1
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
+		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1 and v1beta1
 		return
 	}
 
@@ -162,8 +164,9 @@ func TestList(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
-		// skip the test for all versions except v1alpha1
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
+		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1 and v1beta1
 		return
 	}
 

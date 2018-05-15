@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/priority",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
@@ -20,6 +19,7 @@ go_test(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
@@ -36,6 +36,7 @@ go_library(
         "//pkg/client/listers/scheduling/internalversion:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",

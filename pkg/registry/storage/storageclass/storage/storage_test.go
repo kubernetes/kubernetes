@@ -45,6 +45,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewStorageClass(name string) *storageapi.StorageClass {
 	deleteReclaimPolicy := api.PersistentVolumeReclaimDelete
+	bindingMode := storageapi.VolumeBindingImmediate
 	return &storageapi.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -53,12 +54,9 @@ func validNewStorageClass(name string) *storageapi.StorageClass {
 		Parameters: map[string]string{
 			"foo": "bar",
 		},
-		ReclaimPolicy: &deleteReclaimPolicy,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &bindingMode,
 	}
-}
-
-func validChangedStorageClass() *storageapi.StorageClass {
-	return validNewStorageClass("foo")
 }
 
 func TestCreate(t *testing.T) {

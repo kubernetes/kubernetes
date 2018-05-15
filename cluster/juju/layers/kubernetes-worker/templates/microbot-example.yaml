@@ -18,7 +18,7 @@ spec:
         app: microbot
     spec:
       containers:
-      - image: dontrebootme/microbot:v1
+      - image: cdkbot/microbot-{{ arch }}:latest
         imagePullPolicy: ""
         name: microbot
         ports:

@@ -17,9 +17,10 @@ limitations under the License.
 package storageclass
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -44,7 +45,7 @@ func (storageClassStrategy) NamespaceScoped() bool {
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (storageClassStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (storageClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	class := obj.(*storage.StorageClass)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
@@ -54,7 +55,7 @@ func (storageClassStrategy) PrepareForCreate(ctx genericapirequest.Context, obj 
 	storageutil.DropDisabledAlphaFields(class)
 }
 
-func (storageClassStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (storageClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	storageClass := obj.(*storage.StorageClass)
 	return validation.ValidateStorageClass(storageClass)
 }
@@ -68,7 +69,7 @@ func (storageClassStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
-func (storageClassStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newClass := obj.(*storage.StorageClass)
 	oldClass := old.(*storage.StorageClass)
 
@@ -80,7 +81,7 @@ func (storageClassStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj,
 	storageutil.DropDisabledAlphaFields(newClass)
 }
 
-func (storageClassStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateStorageClass(obj.(*storage.StorageClass))
 	return append(errorList, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
 }

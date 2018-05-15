@@ -27,7 +27,7 @@ var (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "kubeletconfig"
+const GroupName = "kubelet.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
@@ -46,6 +46,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeletConfiguration{},
+		&SerializedNodeConfigSource{},
 	)
 	return nil
 }

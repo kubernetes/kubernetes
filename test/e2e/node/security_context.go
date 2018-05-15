@@ -81,6 +81,20 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		})
 	})
 
+	It("should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup [Feature:RunAsGroup]", func() {
+		pod := scTestPod(false, false)
+		userID := int64(1001)
+		groupID := int64(2002)
+		pod.Spec.SecurityContext.RunAsUser = &userID
+		pod.Spec.SecurityContext.RunAsGroup = &groupID
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
+
+		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+			fmt.Sprintf("uid=%v", userID),
+			fmt.Sprintf("gid=%v", groupID),
+		})
+	})
+
 	It("should support container.SecurityContext.RunAsUser", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
@@ -92,6 +106,25 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 
 		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("%v", overrideUserID),
+		})
+	})
+
+	It("should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [Feature:RunAsGroup]", func() {
+		pod := scTestPod(false, false)
+		userID := int64(1001)
+		groupID := int64(2001)
+		overrideUserID := int64(1002)
+		overrideGroupID := int64(2002)
+		pod.Spec.SecurityContext.RunAsUser = &userID
+		pod.Spec.SecurityContext.RunAsGroup = &groupID
+		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
+		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
+		pod.Spec.Containers[0].SecurityContext.RunAsGroup = &overrideGroupID
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
+
+		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+			fmt.Sprintf("uid=%v", overrideUserID),
+			fmt.Sprintf("gid=%v", overrideGroupID),
 		})
 	})
 
@@ -111,7 +144,7 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
 		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = "unconfined"
-		pod.Annotations[v1.SeccompPodAnnotationKey] = "docker/default"
+		pod.Annotations[v1.SeccompPodAnnotationKey] = v1.SeccompProfileRuntimeDefault
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
 		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
@@ -124,10 +157,10 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
 
-	It("should support seccomp alpha docker/default annotation [Feature:Seccomp]", func() {
+	It("should support seccomp alpha runtime/default annotation [Feature:Seccomp]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
-		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = "docker/default"
+		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = v1.SeccompProfileRuntimeDefault
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
 		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"2"}) // seccomp filtered
 	})

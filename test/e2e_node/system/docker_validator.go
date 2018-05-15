@@ -17,12 +17,12 @@ limitations under the License.
 package system
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"golang.org/x/net/context"
 )
 
 var _ Validator = &DockerValidator{}

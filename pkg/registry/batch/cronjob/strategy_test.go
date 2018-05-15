@@ -26,12 +26,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-func newBool(a bool) *bool {
-	r := new(bool)
-	*r = a
-	return r
-}
-
 func TestCronJobStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {

@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -61,7 +61,7 @@ func TestRemoveContainer(t *testing.T) {
 	err = m.removeContainer(containerId)
 	assert.NoError(t, err)
 	// Verify container log is removed
-	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "12345678", "foo_0.log")
+	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "12345678", "foo", "0.log")
 	expectedContainerLogSymlink := legacyLogSymlink(containerId, "foo", "bar", "new")
 	assert.Equal(t, fakeOS.Removes, []string{expectedContainerLogPath, expectedContainerLogSymlink})
 	// Verify container is removed
@@ -203,107 +203,6 @@ func TestToKubeContainerStatus(t *testing.T) {
 	}
 }
 
-func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
-	container := &pod.Spec.Containers[containerIndex]
-	podIP := ""
-	restartCount := 0
-	opts, _ := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
-	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
-	restartCountUint32 := uint32(restartCount)
-	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
-
-	expectedConfig := &runtimeapi.ContainerConfig{
-		Metadata: &runtimeapi.ContainerMetadata{
-			Name:    container.Name,
-			Attempt: restartCountUint32,
-		},
-		Image:       &runtimeapi.ImageSpec{Image: container.Image},
-		Command:     container.Command,
-		Args:        []string(nil),
-		WorkingDir:  container.WorkingDir,
-		Labels:      newContainerLabels(container, pod),
-		Annotations: newContainerAnnotations(container, pod, restartCount),
-		Devices:     makeDevices(opts),
-		Mounts:      m.makeMounts(opts, container),
-		LogPath:     containerLogsPath,
-		Stdin:       container.Stdin,
-		StdinOnce:   container.StdinOnce,
-		Tty:         container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container, pod, new(int64), ""),
-		Envs:        envs,
-	}
-	return expectedConfig
-}
-
-func TestGenerateContainerConfig(t *testing.T) {
-	_, imageService, m, err := createTestRuntimeManager()
-	assert.NoError(t, err)
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         []string{"testCommand"},
-					WorkingDir:      "testWorkingDir",
-				},
-			},
-		},
-	}
-
-	expectedConfig := makeExpectedConfig(m, pod, 0)
-	containerConfig, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
-
-	runAsUser := int64(0)
-	runAsNonRootTrue := true
-	podWithContainerSecurityContext := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         []string{"testCommand"},
-					WorkingDir:      "testWorkingDir",
-					SecurityContext: &v1.SecurityContext{
-						RunAsNonRoot: &runAsNonRootTrue,
-						RunAsUser:    &runAsUser,
-					},
-				},
-			},
-		},
-	}
-
-	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
-	assert.Error(t, err)
-
-	imageId, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil)
-	image, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageId})
-
-	image.Uid = nil
-	image.Username = "test"
-
-	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
-	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
-
-	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
-	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
-}
-
 func TestLifeCycleHook(t *testing.T) {
 
 	// Setup
@@ -424,7 +323,7 @@ func TestLifeCycleHook(t *testing.T) {
 		}
 
 		// Now try to create a container, which should in turn invoke PostStart Hook
-		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, testContainer, testPod, fakePodStatus, nil, "")
+		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, testContainer, testPod, fakePodStatus, nil, "", kubecontainer.ContainerTypeRegular)
 		if err != nil {
 			t.Errorf("startContainer erro =%v", err)
 		}

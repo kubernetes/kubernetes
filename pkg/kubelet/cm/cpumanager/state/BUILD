@@ -19,7 +19,6 @@ go_test(
     name = "go_default_test",
     srcs = ["state_file_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state",
     deps = ["//pkg/kubelet/cm/cpuset:go_default_library"],
 )
 

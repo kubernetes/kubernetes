@@ -339,11 +339,9 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 		}
 		err := cm.validateNodeAllocatable()
 		if err == nil && tc.invalidConfiguration {
-			t.Logf("Expected invalid node allocatable configuration")
-			t.FailNow()
+			t.Fatalf("Expected invalid node allocatable configuration")
 		} else if err != nil && !tc.invalidConfiguration {
-			t.Logf("Expected valid node allocatable configuration: %v", err)
-			t.FailNow()
+			t.Fatalf("Expected valid node allocatable configuration: %v", err)
 		}
 	}
 
@@ -386,11 +384,9 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 		}
 		err := cm.validateNodeAllocatable()
 		if err == nil && tc.invalidConfiguration {
-			t.Logf("Expected invalid node allocatable configuration")
-			t.FailNow()
+			t.Fatalf("Expected invalid node allocatable configuration")
 		} else if err != nil && !tc.invalidConfiguration {
-			t.Logf("Expected valid node allocatable configuration: %v", err)
-			t.FailNow()
+			t.Fatalf("Expected valid node allocatable configuration: %v", err)
 		}
 	}
 }

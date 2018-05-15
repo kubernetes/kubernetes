@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -29,24 +31,49 @@ import (
 type VersionedPrinter struct {
 	printer   ResourcePrinter
 	converter runtime.ObjectConvertor
+	typer     runtime.ObjectTyper
 	versions  []schema.GroupVersion
 }
 
 // NewVersionedPrinter wraps a printer to convert objects to a known API version prior to printing.
-func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConvertor, versions ...schema.GroupVersion) ResourcePrinter {
+func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConvertor, typer runtime.ObjectTyper, versions ...schema.GroupVersion) ResourcePrinter {
 	return &VersionedPrinter{
 		printer:   printer,
 		converter: converter,
+		typer:     typer,
 		versions:  versions,
 	}
 }
 
-func (p *VersionedPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
 // PrintObj implements ResourcePrinter
 func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	// if we're unstructured, no conversion necessary
+	if _, ok := obj.(*unstructured.Unstructured); ok {
+		return p.printer.PrintObj(obj, w)
+	}
+
+	// if we're already external, no conversion necessary
+	gvks, _, err := p.typer.ObjectKinds(obj)
+	if err != nil {
+		glog.V(1).Infof("error determining type for %T, using passed object: %v", obj, err)
+		return p.printer.PrintObj(obj, w)
+	}
+	needsConversion := false
+	for _, gvk := range gvks {
+		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+			needsConversion = true
+		}
+	}
+
+	if !needsConversion {
+		// We might be an external type, but have empty kind/apiVersion fields. Ensure they are populated before printing.
+		if obj.GetObjectKind().GroupVersionKind().Empty() {
+			obj = obj.DeepCopyObject()
+			obj.GetObjectKind().SetGroupVersionKind(gvks[0])
+		}
+		return p.printer.PrintObj(obj, w)
+	}
+
 	if len(p.versions) == 0 {
 		return fmt.Errorf("no version specified, object cannot be converted")
 	}
@@ -55,13 +82,4 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 	return p.printer.PrintObj(converted, w)
-}
-
-// TODO: implement HandledResources()
-func (p *VersionedPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (p *VersionedPrinter) IsGeneric() bool {
-	return p.printer.IsGeneric()
 }

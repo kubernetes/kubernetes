@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/local/sbin/charm-env python3
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -60,7 +60,7 @@ def main():
     if not validate_space(context['RBD_SIZE']):
         return
 
-    # Ensure our paramters match
+    # Ensure our parameters match
     param_validation = validate_parameters(context['RBD_NAME'],
                                            context['RBD_FS'],
                                            context['PV_MODE'])

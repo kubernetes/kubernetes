@@ -21,19 +21,37 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
+	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	policyapi "k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/client/listers/core/internalversion"
+	"k8s.io/kubernetes/pkg/features"
 )
+
+var (
+	trEnabledFeature  = utilfeature.NewFeatureGate()
+	trDisabledFeature = utilfeature.NewFeatureGate()
+)
+
+func init() {
+	if err := trEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
+		panic(err)
+	}
+	if err := trDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
+		panic(err)
+	}
+}
 
 func makeTestPod(namespace, name, node string, mirror bool) *api.Pod {
 	pod := &api.Pod{}
 	pod.Namespace = namespace
+	pod.UID = types.UID("pod-uid")
 	pod.Name = name
 	pod.Spec.NodeName = node
 	if mirror {
@@ -45,7 +63,25 @@ func makeTestPod(namespace, name, node string, mirror bool) *api.Pod {
 func makeTestPodEviction(name string) *policy.Eviction {
 	eviction := &policy.Eviction{}
 	eviction.Name = name
+	eviction.Namespace = "ns"
 	return eviction
+}
+
+func makeTokenRequest(podname string, poduid types.UID) *authenticationapi.TokenRequest {
+	tr := &authenticationapi.TokenRequest{
+		Spec: authenticationapi.TokenRequestSpec{
+			Audiences: []string{"foo"},
+		},
+	}
+	if podname != "" {
+		tr.Spec.BoundObjectRef = &authenticationapi.BoundObjectReference{
+			Kind:       "Pod",
+			APIVersion: "v1",
+			Name:       podname,
+			UID:        poduid,
+		}
+	}
+	return tr
 }
 
 func Test_nodePlugin_Admit(t *testing.T) {
@@ -56,9 +92,19 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode"}
 		mynodeObj        = &api.Node{ObjectMeta: mynodeObjMeta}
 		mynodeObjConfigA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
-			ConfigMapRef: &api.ObjectReference{Name: "foo", Namespace: "bar", UID: "fooUID"}}}}
+			ConfigMap: &api.ConfigMapNodeConfigSource{
+				Name:             "foo",
+				Namespace:        "bar",
+				UID:              "fooUID",
+				KubeletConfigKey: "kubelet",
+			}}}}
 		mynodeObjConfigB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
-			ConfigMapRef: &api.ObjectReference{Name: "qux", Namespace: "bar", UID: "quxUID"}}}}
+			ConfigMap: &api.ConfigMapNodeConfigSource{
+				Name:             "qux",
+				Namespace:        "bar",
+				UID:              "quxUID",
+				KubeletConfigKey: "kubelet",
+			}}}}
 		othernodeObj = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
 
 		mymirrorpod      = makeTestPod("ns", "mymirrorpod", "mynode", true)
@@ -82,14 +128,27 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 		podResource  = api.Resource("pods").WithVersion("v1")
 		podKind      = api.Kind("Pod").WithVersion("v1")
-		evictionKind = policyapi.Kind("Eviction").WithVersion("v1beta1")
+		evictionKind = policy.Kind("Eviction").WithVersion("v1beta1")
 
 		nodeResource = api.Resource("nodes").WithVersion("v1")
 		nodeKind     = api.Kind("Node").WithVersion("v1")
 
-		noExistingPods = fake.NewSimpleClientset().Core()
-		existingPods   = fake.NewSimpleClientset(mymirrorpod, othermirrorpod, unboundmirrorpod, mypod, otherpod, unboundpod).Core()
+		svcacctResource  = api.Resource("serviceaccounts").WithVersion("v1")
+		tokenrequestKind = api.Kind("TokenRequest").WithVersion("v1")
+
+		noExistingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+		noExistingPods      = internalversion.NewPodLister(noExistingPodsIndex)
+
+		existingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+		existingPods      = internalversion.NewPodLister(existingPodsIndex)
 	)
+
+	existingPodsIndex.Add(mymirrorpod)
+	existingPodsIndex.Add(othermirrorpod)
+	existingPodsIndex.Add(unboundmirrorpod)
+	existingPodsIndex.Add(mypod)
+	existingPodsIndex.Add(otherpod)
+	existingPodsIndex.Add(unboundpod)
 
 	sapod := makeTestPod("ns", "mysapod", "mynode", true)
 	sapod.Spec.ServiceAccountName = "foo"
@@ -105,8 +164,9 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		podsGetter coreinternalversion.PodsGetter
+		podsGetter internalversion.PodLister
 		attributes admission.Attributes
+		features   utilfeature.FeatureGate
 		err        string
 	}{
 		// Mirror pods bound to us
@@ -407,7 +467,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "forbidden: unexpected operation",
 		},
 		{
-			name:       "forbid create of eviction for normal pod bound to another",
+			name:       "forbid create of unnamed eviction for normal pod bound to another",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, otherpod.Namespace, otherpod.Name, podResource, "eviction", admission.Create, mynode),
 			err:        "spec.nodeName set to itself",
@@ -654,6 +714,42 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "cannot modify node",
 		},
 
+		// Service accounts
+		{
+			name:       "forbid create of unbound token",
+			podsGetter: noExistingPods,
+			features:   trEnabledFeature,
+			attributes: admission.NewAttributesRecord(makeTokenRequest("", ""), nil, tokenrequestKind, "ns", "mysa", svcacctResource, "token", admission.Create, mynode),
+			err:        "not bound to a pod",
+		},
+		{
+			name:       "forbid create of token bound to nonexistant pod",
+			podsGetter: noExistingPods,
+			features:   trEnabledFeature,
+			attributes: admission.NewAttributesRecord(makeTokenRequest("nopod", "someuid"), nil, tokenrequestKind, "ns", "mysa", svcacctResource, "token", admission.Create, mynode),
+			err:        "not found",
+		},
+		{
+			name:       "forbid create of token bound to pod without uid",
+			podsGetter: existingPods,
+			features:   trEnabledFeature,
+			attributes: admission.NewAttributesRecord(makeTokenRequest(mypod.Name, ""), nil, tokenrequestKind, "ns", "mysa", svcacctResource, "token", admission.Create, mynode),
+			err:        "pod binding without a uid",
+		},
+		{
+			name:       "forbid create of token bound to pod scheduled on another node",
+			podsGetter: existingPods,
+			features:   trEnabledFeature,
+			attributes: admission.NewAttributesRecord(makeTokenRequest(otherpod.Name, otherpod.UID), nil, tokenrequestKind, otherpod.Namespace, "mysa", svcacctResource, "token", admission.Create, mynode),
+			err:        "pod scheduled on a different node",
+		},
+		{
+			name:       "allow create of token bound to pod scheduled this node",
+			podsGetter: existingPods,
+			features:   trEnabledFeature,
+			attributes: admission.NewAttributesRecord(makeTokenRequest(mypod.Name, mypod.UID), nil, tokenrequestKind, mypod.Namespace, "mysa", svcacctResource, "token", admission.Create, mynode),
+		},
+
 		// Unrelated objects
 		{
 			name:       "allow create of unrelated object",
@@ -715,6 +811,9 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
+			if tt.features != nil {
+				c.features = tt.features
+			}
 			c.podsGetter = tt.podsGetter
 			err := c.Admit(tt.attributes)
 			if (err == nil) != (len(tt.err) == 0) {

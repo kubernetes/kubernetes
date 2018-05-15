@@ -17,24 +17,20 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/vmware/govmomi/find"
-	"golang.org/x/net/context"
-
+	"github.com/vmware/govmomi/object"
 	vimtypes "github.com/vmware/govmomi/vim25/types"
+
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -47,25 +43,19 @@ import (
 var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-poweroff")
 	var (
-		client     clientset.Interface
-		namespace  string
-		vsp        *vsphere.VSphere
-		workingDir string
-		err        error
+		client    clientset.Interface
+		namespace string
 	)
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
 		Expect(len(nodeList.Items) > 1).To(BeTrue(), "At least 2 nodes are required for this test")
-		vsp, err = getVSphere(client)
-		Expect(err).NotTo(HaveOccurred())
-		workingDir = os.Getenv("VSPHERE_WORKING_DIR")
-		Expect(workingDir).NotTo(BeEmpty())
 	})
 
 	/*
@@ -91,7 +81,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 		By("Creating PVC using the Storage Class")
-		pvclaimSpec := getVSphereClaimSpecWithStorageClassAnnotation(namespace, "1Gi", storageclass)
+		pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "1Gi", storageclass)
 		pvclaim, err := framework.CreatePVC(client, namespace, pvclaimSpec)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create PVC with err: %v", err))
 		defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
@@ -103,31 +93,26 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 
 		By("Creating a Deployment")
-		deployment, err := framework.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, namespace, pvclaims, "")
+		deployment, err := framework.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
 		defer client.ExtensionsV1beta1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		By("Get pod from the deployement")
 		podList, err := framework.GetPodsForDeployment(client, deployment)
 		Expect(podList.Items).NotTo(BeEmpty())
 		pod := podList.Items[0]
-		node1 := types.NodeName(pod.Spec.NodeName)
+		node1 := pod.Spec.NodeName
 
 		By(fmt.Sprintf("Verify disk is attached to the node: %v", node1))
-		isAttached, err := verifyVSphereDiskAttached(client, vsp, volumePath, node1)
+		isAttached, err := diskIsAttached(volumePath, node1)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(isAttached).To(BeTrue(), "Disk is not attached to the node")
 
 		By(fmt.Sprintf("Power off the node: %v", node1))
-		govMoMiClient, err := vsphere.GetgovmomiClient(nil)
-		Expect(err).NotTo(HaveOccurred())
 
-		f := find.NewFinder(govMoMiClient.Client, true)
-		ctx, _ := context.WithCancel(context.Background())
-
-		vmPath := filepath.Join(workingDir, string(node1))
-		vm, err := f.VirtualMachine(ctx, vmPath)
-		Expect(err).NotTo(HaveOccurred())
-
+		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node1)
+		vm := object.NewVirtualMachine(nodeInfo.VSphere.Client.Client, nodeInfo.VirtualMachineRef)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		_, err = vm.PowerOff(ctx)
 		Expect(err).NotTo(HaveOccurred())
 		defer vm.PowerOn(ctx)
@@ -140,11 +125,11 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		Expect(err).NotTo(HaveOccurred(), "Pod did not fail over to a different node")
 
 		By(fmt.Sprintf("Waiting for disk to be attached to the new node: %v", node2))
-		err = waitForVSphereDiskToAttach(client, vsp, volumePath, node2)
+		err = waitForVSphereDiskToAttach(volumePath, node2)
 		Expect(err).NotTo(HaveOccurred(), "Disk is not attached to the node")
 
 		By(fmt.Sprintf("Waiting for disk to be detached from the previous node: %v", node1))
-		err = waitForVSphereDiskToDetach(client, vsp, volumePath, node1)
+		err = waitForVSphereDiskToDetach(volumePath, node1)
 		Expect(err).NotTo(HaveOccurred(), "Disk is not detached from the node")
 
 		By(fmt.Sprintf("Power on the previous node: %v", node1))
@@ -155,10 +140,10 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 })
 
 // Wait until the pod failed over to a different node, or time out after 3 minutes
-func waitForPodToFailover(client clientset.Interface, deployment *extensions.Deployment, oldNode types.NodeName) (types.NodeName, error) {
+func waitForPodToFailover(client clientset.Interface, deployment *extensions.Deployment, oldNode string) (string, error) {
 	var (
 		err      error
-		newNode  types.NodeName
+		newNode  string
 		timeout  = 3 * time.Minute
 		pollTime = 10 * time.Second
 	)
@@ -189,10 +174,11 @@ func waitForPodToFailover(client clientset.Interface, deployment *extensions.Dep
 	return getNodeForDeployment(client, deployment)
 }
 
-func getNodeForDeployment(client clientset.Interface, deployment *extensions.Deployment) (types.NodeName, error) {
+// getNodeForDeployment returns node name for the Deployment
+func getNodeForDeployment(client clientset.Interface, deployment *extensions.Deployment) (string, error) {
 	podList, err := framework.GetPodsForDeployment(client, deployment)
 	if err != nil {
 		return "", err
 	}
-	return types.NodeName(podList.Items[0].Spec.NodeName), nil
+	return podList.Items[0].Spec.NodeName, nil
 }

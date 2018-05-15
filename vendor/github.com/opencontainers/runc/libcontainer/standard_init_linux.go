@@ -30,15 +30,15 @@ func (l *linuxStandardInit) getSessionRingParams() (string, uint32, uint32) {
 	var newperms uint32
 
 	if l.config.Config.Namespaces.Contains(configs.NEWUSER) {
-		// with user ns we need 'other' search permissions
+		// With user ns we need 'other' search permissions.
 		newperms = 0x8
 	} else {
-		// without user ns we need 'UID' search permissions
+		// Without user ns we need 'UID' search permissions.
 		newperms = 0x80000
 	}
 
-	// create a unique per session container name that we can
-	// join in setns; however, other containers can also join it
+	// Create a unique per session container name that we can join in setns;
+	// However, other containers can also join it.
 	return fmt.Sprintf("_ses.%s", l.config.ContainerId), 0xffffffff, newperms
 }
 
@@ -46,12 +46,12 @@ func (l *linuxStandardInit) Init() error {
 	if !l.config.Config.NoNewKeyring {
 		ringname, keepperms, newperms := l.getSessionRingParams()
 
-		// do not inherit the parent's session keyring
+		// Do not inherit the parent's session keyring.
 		sessKeyId, err := keys.JoinSessionKeyring(ringname)
 		if err != nil {
 			return err
 		}
-		// make session keyring searcheable
+		// Make session keyring searcheable.
 		if err := keys.ModKeyringPerm(sessKeyId, keepperms, newperms); err != nil {
 			return err
 		}
@@ -65,14 +65,9 @@ func (l *linuxStandardInit) Init() error {
 	}
 
 	label.Init()
-
-	// prepareRootfs() can be executed only for a new mount namespace.
-	if l.config.Config.Namespaces.Contains(configs.NEWNS) {
-		if err := prepareRootfs(l.pipe, l.config.Config); err != nil {
-			return err
-		}
+	if err := prepareRootfs(l.pipe, l.config); err != nil {
+		return err
 	}
-
 	// Set up the console. This has to be done *before* we finalize the rootfs,
 	// but *after* we've given the user the chance to set up all of the mounts
 	// they wanted.
@@ -115,7 +110,7 @@ func (l *linuxStandardInit) Init() error {
 		}
 	}
 	for _, path := range l.config.Config.MaskPaths {
-		if err := maskPath(path); err != nil {
+		if err := maskPath(path, l.config.Config.MountLabel); err != nil {
 			return err
 		}
 	}
@@ -150,19 +145,20 @@ func (l *linuxStandardInit) Init() error {
 	if err := pdeath.Restore(); err != nil {
 		return err
 	}
-	// compare the parent from the initial start of the init process and make sure that it did not change.
-	// if the parent changes that means it died and we were reparented to something else so we should
-	// just kill ourself and not cause problems for someone else.
+	// Compare the parent from the initial start of the init process and make
+	// sure that it did not change.  if the parent changes that means it died
+	// and we were reparented to something else so we should just kill ourself
+	// and not cause problems for someone else.
 	if unix.Getppid() != l.parentPid {
 		return unix.Kill(unix.Getpid(), unix.SIGKILL)
 	}
-	// check for the arg before waiting to make sure it exists and it is returned
-	// as a create time error.
+	// Check for the arg before waiting to make sure it exists and it is
+	// returned as a create time error.
 	name, err := exec.LookPath(l.config.Args[0])
 	if err != nil {
 		return err
 	}
-	// close the pipe to signal that we have completed our init.
+	// Close the pipe to signal that we have completed our init.
 	l.pipe.Close()
 	// Wait for the FIFO to be opened on the other side before exec-ing the
 	// user process. We open it through /proc/self/fd/$fd, because the fd that
@@ -170,19 +166,26 @@ func (l *linuxStandardInit) Init() error {
 	// re-open an O_PATH fd through /proc.
 	fd, err := unix.Open(fmt.Sprintf("/proc/self/fd/%d", l.fifoFd), unix.O_WRONLY|unix.O_CLOEXEC, 0)
 	if err != nil {
-		return newSystemErrorWithCause(err, "openat exec fifo")
+		return newSystemErrorWithCause(err, "open exec fifo")
 	}
 	if _, err := unix.Write(fd, []byte("0")); err != nil {
 		return newSystemErrorWithCause(err, "write 0 exec fifo")
 	}
+	// Close the O_PATH fifofd fd before exec because the kernel resets
+	// dumpable in the wrong order. This has been fixed in newer kernels, but
+	// we keep this to ensure CVE-2016-9962 doesn't re-emerge on older kernels.
+	// N.B. the core issue itself (passing dirfds to the host filesystem) has
+	// since been resolved.
+	// https://github.com/torvalds/linux/blob/v4.9/fs/exec.c#L1290-L1318
+	unix.Close(l.fifoFd)
+	// Set seccomp as close to execve as possible, so as few syscalls take
+	// place afterward (reducing the amount of syscalls that users need to
+	// enable in their seccomp profiles).
 	if l.config.Config.Seccomp != nil && l.config.NoNewPrivileges {
 		if err := seccomp.InitSeccomp(l.config.Config.Seccomp); err != nil {
 			return newSystemErrorWithCause(err, "init seccomp")
 		}
 	}
-	// close the statedir fd before exec because the kernel resets dumpable in the wrong order
-	// https://github.com/torvalds/linux/blob/v4.9/fs/exec.c#L1290-L1318
-	unix.Close(l.fifoFd)
 	if err := syscall.Exec(name, l.config.Args[0:], os.Environ()); err != nil {
 		return newSystemErrorWithCause(err, "exec user process")
 	}

@@ -26,7 +26,6 @@ go_test(
         "runner_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/async",
 )
 
 filegroup(

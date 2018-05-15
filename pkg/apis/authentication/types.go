@@ -18,6 +18,7 @@ package authentication
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -88,3 +89,57 @@ type UserInfo struct {
 
 // ExtraValue masks the value so protobuf can generate
 type ExtraValue []string
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// TokenRequest requests a token for a given service account.
+type TokenRequest struct {
+	metav1.TypeMeta
+	// ObjectMeta fulfills the metav1.ObjectMetaAccessor interface so that the stock
+	// REST handler paths work
+	metav1.ObjectMeta
+
+	Spec   TokenRequestSpec
+	Status TokenRequestStatus
+}
+
+// TokenRequestSpec contains client provided parameters of a token request.
+type TokenRequestSpec struct {
+	// Audiences are the intendend audiences of the token. A recipient of a
+	// token must identitfy themself with an identifier in the list of
+	// audiences of the token, and otherwise should reject the token. A
+	// token issued for multiple audiences may be used to authenticate
+	// against any of the audiences listed but implies a high degree of
+	// trust between the target audiences.
+	Audiences []string
+
+	// ExpirationSeconds is the requested duration of validity of the request. The
+	// token issuer may return a token with a different validity duration so a
+	// client needs to check the 'expiration' field in a response.
+	ExpirationSeconds int64
+
+	// BoundObjectRef is a reference to an object that the token will be bound to.
+	// The token will only be valid for as long as the bound objet exists.
+	BoundObjectRef *BoundObjectReference
+}
+
+// TokenRequestStatus is the result of a token request.
+type TokenRequestStatus struct {
+	// Token is the opaque bearer token.
+	Token string
+	// ExpirationTimestamp is the time of expiration of the returned token.
+	ExpirationTimestamp metav1.Time
+}
+
+// BoundObjectReference is a reference to an object that a token is bound to.
+type BoundObjectReference struct {
+	// Kind of the referent. Valid kinds are 'Pod' and 'Secret'.
+	Kind string
+	// API version of the referent.
+	APIVersion string
+
+	// Name of the referent.
+	Name string
+	// UID of the referent.
+	UID types.UID
+}

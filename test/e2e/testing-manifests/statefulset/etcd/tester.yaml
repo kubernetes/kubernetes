@@ -1,9 +1,12 @@
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: etcd-test-server
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      app: test-server
   template:
     metadata:
       labels:
@@ -11,7 +14,7 @@ spec:
     spec:
       containers:
       - name: test-server
-        image: gcr.io/google-containers/etcd-statefulset-e2e-test:0.0
+        image: k8s.gcr.io/etcd-statefulset-e2e-test:0.0
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

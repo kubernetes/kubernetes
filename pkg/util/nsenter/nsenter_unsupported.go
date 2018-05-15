@@ -30,12 +30,12 @@ type Nsenter struct {
 }
 
 // NewNsenter constructs a new instance of Nsenter
-func NewNsenter() *Nsenter {
-	return &Nsenter{}
+func NewNsenter() (*Nsenter, error) {
+	return &Nsenter{}, nil
 }
 
 // Exec executes nsenter commands in hostProcMountNsPath mount namespace
-func (ne *Nsenter) Exec(args ...string) exec.Cmd {
+func (ne *Nsenter) Exec(cmd string, args []string) exec.Cmd {
 	return nil
 }
 

@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "test",
-						Image: framework.GetPauseImageName(f.ClientSet),
+						Image: imageutils.GetPauseImageName(),
 					},
 				},
 			},
@@ -523,7 +523,13 @@ var _ = framework.KubeDescribe("Pods", func() {
 					continue
 				}
 				if msg[0] != 1 {
-					framework.Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
+					if len(msg) == 1 {
+						// skip an empty message on stream other than stdout
+						continue
+					} else {
+						framework.Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
+					}
+
 				}
 				buf.Write(msg[1:])
 			}
@@ -658,7 +664,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		time.Sleep(2 * kubelet.MaxContainerBackOff) // it takes slightly more than 2*x to get to a back-off of x
 
 		// wait for a delay == capped delay of MaxContainerBackOff
-		By("geting restart delay when capped")
+		By("getting restart delay when capped")
 		var (
 			delay1 time.Duration
 			err    error
