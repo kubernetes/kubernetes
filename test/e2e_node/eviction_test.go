@@ -412,7 +412,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 						framework.Logf("Node does NOT have %s", expectedNodeCondition)
 					}
 				}
-				logKubeletMetrics(kubeletmetrics.EvictionStatsAgeKey)
+				logKubeletLatencyMetrics(kubeletmetrics.EvictionStatsAgeKey)
 				logFunc()
 				return verifyEvictionOrdering(f, testSpecs)
 			}, pressureTimeout, evictionPollInterval).Should(BeNil())
@@ -426,7 +426,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			By(fmt.Sprintf("Waiting for NodeCondition: %s to no longer exist on the node", expectedNodeCondition))
 			Eventually(func() error {
 				logFunc()
-				logKubeletMetrics(kubeletmetrics.EvictionStatsAgeKey)
+				logKubeletLatencyMetrics(kubeletmetrics.EvictionStatsAgeKey)
 				if expectedNodeCondition != noPressure && hasNodeCondition(f, expectedNodeCondition) {
 					return fmt.Errorf("Conditions havent returned to normal, node still has %s", expectedNodeCondition)
 				}
@@ -439,7 +439,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					return fmt.Errorf("%s dissappeared and then reappeared", expectedNodeCondition)
 				}
 				logFunc()
-				logKubeletMetrics(kubeletmetrics.EvictionStatsAgeKey)
+				logKubeletLatencyMetrics(kubeletmetrics.EvictionStatsAgeKey)
 				return verifyEvictionOrdering(f, testSpecs)
 			}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(BeNil())
 		})
