@@ -25,7 +25,6 @@ import (
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
-		Convert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration,
 		Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration,
 	)
 	if err != nil {
@@ -35,21 +34,13 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func Convert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in *kubeadm.MasterConfiguration, out *MasterConfiguration, s conversion.Scope) error {
-	if err := autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in, out, s); err != nil {
-		return err
-	}
-
-	// Setting .CloudProvider is not supported from internal API not supported
-	return nil
-}
-
 func Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in *MasterConfiguration, out *kubeadm.MasterConfiguration, s conversion.Scope) error {
 	if err := autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in, out, s); err != nil {
 		return err
 	}
 
 	UpgradeCloudProvider(in, out)
+	// We don't support migrating information from the .PrivilegedPods field which was removed in v1alpha2
 
 	return nil
 }
