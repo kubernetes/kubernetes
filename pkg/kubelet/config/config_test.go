@@ -17,7 +17,9 @@ limitations under the License.
 package config
 
 import (
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -30,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -412,4 +416,30 @@ func TestPodUpdateLabels(t *testing.T) {
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, pod))
 
+}
+
+func TestPodRestore(t *testing.T) {
+	tmpDir, _ := ioutil.TempDir("", "")
+	defer os.RemoveAll(tmpDir)
+
+	pod := CreateValidPod("api-server", "kube-default")
+	pod.Annotations = make(map[string]string, 0)
+	pod.Annotations["kubernetes.io/config.source"] = kubetypes.ApiserverSource
+	pod.Annotations["node.kubernetes.io/bootstrap-checkpoint"] = "true"
+
+	// Create Checkpointer
+	checkpointManager, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to initialize checkpoint manager: %v", err)
+	}
+	if err := checkpoint.WritePod(checkpointManager, pod); err != nil {
+		t.Fatalf("Error writing checkpoint for pod: %v", pod.GetName())
+	}
+
+	// Restore checkpoint
+	channel, ch, config := createPodConfigTester(PodConfigNotificationIncremental)
+	if err := config.Restore(tmpDir, channel); err != nil {
+		t.Fatalf("Restore returned error: %v", err)
+	}
+	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.RESTORE, TestSource, pod))
 }
