@@ -136,50 +136,6 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 	}
 }
 
-func TestPrivilegedPods(t *testing.T) {
-	var staticPodNames = []string{
-		kubeadmconstants.KubeAPIServer,
-		kubeadmconstants.KubeControllerManager,
-	}
-	var assertions = []struct {
-		privilegedPods    bool
-		expectedPrivilege bool
-	}{
-		{
-			privilegedPods:    false,
-			expectedPrivilege: false,
-		},
-		{
-			privilegedPods:    true,
-			expectedPrivilege: true,
-		},
-	}
-
-	for _, assertion := range assertions {
-		cfg := &kubeadmapi.MasterConfiguration{
-			KubernetesVersion: "v1.9.0",
-			PrivilegedPods:    assertion.privilegedPods,
-		}
-
-		k8sVersion, _ := version.ParseSemantic(cfg.KubernetesVersion)
-		specs := GetStaticPodSpecs(cfg, k8sVersion)
-
-		for _, podname := range staticPodNames {
-			spec, _ := specs[podname]
-			sc := spec.Spec.Containers[0].SecurityContext
-			if assertion.expectedPrivilege == true {
-				if sc == nil || sc.Privileged == nil || *sc.Privileged == false {
-					t.Errorf("GetStaticPodSpecs did not enable privileged containers in %s pod", podname)
-				}
-			} else {
-				if sc != nil && sc.Privileged != nil && *sc.Privileged == true {
-					t.Errorf("GetStaticPodSpecs enabled privileged containers in %s pod", podname)
-				}
-			}
-		}
-	}
-}
-
 func TestGetAPIServerCommand(t *testing.T) {
 	var tests = []struct {
 		name     string
