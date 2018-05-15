@@ -1207,7 +1207,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if !proxier.loopbackSet.isEmpty() {
 		args = append(args[:0],
 			"-A", string(kubePostroutingChain),
-			"-m", "comment", "--comment", proxier.loopbackSet.Comment,
+			"-m", "comment", "--comment", `"Kubernetes endpoints dst ip:port, source ip for solving hairpin purpose"`,
 			"-m", "set", "--match-set", proxier.loopbackSet.Name,
 			"dst,dst,src",
 		)
@@ -1216,7 +1216,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if !proxier.clusterIPSet.isEmpty() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
-			"-m", "comment", "--comment", proxier.clusterIPSet.Comment,
+			"-m", "comment", "--comment", `"Kubernetes service cluster ip + port for masquerade purpose"`,
 			"-m", "set", "--match-set", proxier.clusterIPSet.Name,
 			"dst,dst",
 		)
@@ -1235,7 +1235,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Build masquerade rules for packets to external IPs.
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
-			"-m", "comment", "--comment", proxier.externalIPSet.Comment,
+			"-m", "comment", "--comment", `"Kubernetes service external ip + port for masquerade and filter purpose"`,
 			"-m", "set", "--match-set", proxier.externalIPSet.Name,
 			"dst,dst",
 		)
@@ -1257,7 +1257,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Build masquerade rules for packets which cross node visit load balancer ingress IPs.
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
-			"-m", "comment", "--comment", proxier.lbSet.Comment,
+			"-m", "comment", "--comment", `"Kubernetes service lb portal"`,
 			"-m", "set", "--match-set", proxier.lbSet.Name,
 			"dst,dst",
 		)
@@ -1267,7 +1267,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if !proxier.lbFWSet.isEmpty() {
 				args = append(args[:0],
 					"-A", string(KubeLoadBalancerChain),
-					"-m", "comment", "--comment", proxier.lbFWSet.Comment,
+					"-m", "comment", "--comment", `"Kubernetes service load balancer ip + port for load balancer with sourceRange"`,
 					"-m", "set", "--match-set", proxier.lbFWSet.Name,
 					"dst,dst",
 				)
@@ -1276,7 +1276,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if !proxier.lbWhiteListCIDRSet.isEmpty() {
 				args = append(args[:0],
 					"-A", string(KubeFireWallChain),
-					"-m", "comment", "--comment", proxier.lbWhiteListCIDRSet.Comment,
+					"-m", "comment", "--comment", `"Kubernetes service load balancer ip + port + source IP for packet filter purpose"`,
 					"-m", "set", "--match-set", proxier.lbWhiteListCIDRSet.Name,
 					"dst,dst,src",
 				)
@@ -1285,7 +1285,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if !proxier.lbWhiteListIPSet.isEmpty() {
 				args = append(args[:0],
 					"-A", string(KubeFireWallChain),
-					"-m", "comment", "--comment", proxier.lbWhiteListIPSet.Comment,
+					"-m", "comment", "--comment", `"Kubernetes service load balancer ip + port + source cidr for packet filter purpose"`,
 					"-m", "set", "--match-set", proxier.lbWhiteListIPSet.Name,
 					"dst,dst,src",
 				)
@@ -1302,7 +1302,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if !proxier.lbLocalSet.isEmpty() {
 			args = append(args[:0],
 				"-A", string(KubeLoadBalancerChain),
-				"-m", "comment", "--comment", proxier.lbLocalSet.Comment,
+				"-m", "comment", "--comment", `"Kubernetes service load balancer ip + port with externalTrafficPolicy=local"`,
 				"-m", "set", "--match-set", proxier.lbLocalSet.Name,
 				"dst,dst",
 			)
@@ -1321,7 +1321,7 @@ func (proxier *Proxier) syncProxyRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "tcp", "-p", "tcp",
-			"-m", "comment", "--comment", proxier.nodePortSetTCP.Comment,
+			"-m", "comment", "--comment", `"Kubernetes nodeport TCP port for masquerade purpose"`,
 			"-m", "set", "--match-set", proxier.nodePortSetTCP.Name,
 			"dst",
 		)
@@ -1330,7 +1330,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if !proxier.nodePortLocalSetTCP.isEmpty() {
 			args = append(args[:0],
 				"-A", string(KubeNodePortChain),
-				"-m", "comment", "--comment", proxier.nodePortLocalSetTCP.Comment,
+				"-m", "comment", "--comment", `"Kubernetes nodeport TCP port with externalTrafficPolicy=local"`,
 				"-m", "set", "--match-set", proxier.nodePortLocalSetTCP.Name,
 				"dst",
 			)
@@ -1349,7 +1349,7 @@ func (proxier *Proxier) syncProxyRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "udp", "-p", "udp",
-			"-m", "comment", "--comment", proxier.nodePortSetUDP.Comment,
+			"-m", "comment", "--comment", `"Kubernetes nodeport UDP port for masquerade purpose"`,
 			"-m", "set", "--match-set", proxier.nodePortSetUDP.Name,
 			"dst",
 		)
@@ -1357,7 +1357,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if !proxier.nodePortLocalSetUDP.isEmpty() {
 			args = append(args[:0],
 				"-A", string(KubeNodePortChain),
-				"-m", "comment", "--comment", proxier.nodePortLocalSetUDP.Comment,
+				"-m", "comment", "--comment", `"Kubernetes nodeport UDP port with externalTrafficPolicy=local"`,
 				"-m", "set", "--match-set", proxier.nodePortLocalSetUDP.Name,
 				"dst",
 			)
