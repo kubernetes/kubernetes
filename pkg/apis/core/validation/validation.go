@@ -1039,6 +1039,21 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				}
 			}
 		}
+		if projPath := fldPath.Child("serviceAccountToken"); source.ServiceAccountToken != nil {
+			numSources++
+			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+				allErrs = append(allErrs, field.Forbidden(projPath, "TokenRequestProjection feature is not enabled"))
+			}
+			if source.ServiceAccountToken.ExpirationSeconds < 10*60 {
+				allErrs = append(allErrs, field.Invalid(projPath.Child("expirationSeconds"), source.ServiceAccountToken.ExpirationSeconds, "may not specify a duration less than 10 minutes"))
+			}
+			if source.ServiceAccountToken.ExpirationSeconds > 1<<32 {
+				allErrs = append(allErrs, field.Invalid(projPath.Child("expirationSeconds"), source.ServiceAccountToken.ExpirationSeconds, "may not specify a duration larger than 2^32 seconds"))
+			}
+			if source.ServiceAccountToken.Path == "" {
+				allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+			}
+		}
 		if numSources > 1 {
 			allErrs = append(allErrs, field.Forbidden(srcPath, "may not specify more than 1 volume type"))
 		}
