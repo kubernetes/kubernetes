@@ -59,7 +59,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 		&metav1.DeleteOptions{},
 	)
 
-	typer := apiserver.UnstructuredObjectTyper{
+	typer := apiserver.unstructuredObjectTyper{
 		Delegate:          parameterScheme,
 		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(),
 	}

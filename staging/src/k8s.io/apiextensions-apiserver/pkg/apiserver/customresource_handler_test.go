@@ -19,7 +19,7 @@ package apiserver
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	conversion "k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 )
 
 func TestConvertFieldLabel(t *testing.T) {
@@ -64,10 +64,7 @@ func TestConvertFieldLabel(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			c := crdObjectConverter{
-				UnstructuredObjectConverter: unstructured.UnstructuredObjectConverter{},
-				clusterScoped:               test.clusterScoped,
-			}
+			c := conversion.NewNoConversionConverter(test.clusterScoped)
 
 			label, value, err := c.ConvertFieldLabel("", "", test.label, "value")
 			if e, a := test.expectError, err != nil; e != a {

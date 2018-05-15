@@ -126,6 +126,8 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 		EnableGarbageCollection: etcdOptions.EnableGarbageCollection,
 		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
 	}
+
+	// the codec is going to be overridden with the actual CRD converter based codec
 	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 
 	return ret
