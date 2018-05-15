@@ -1,0 +1,57 @@
+# Copyright 2018 Google Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+kind: DaemonSet
+apiVersion: extensions/v1beta1
+metadata:
+  name: netd
+  namespace: kube-system
+  labels:
+    k8s-app: netd
+    addonmanager.kubernetes.io/mode: EnsureExists
+spec:
+  selector:
+    matchLabels:
+      k8s-app: netd
+  template:
+    metadata:
+      labels:
+        k8s-app: netd
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: netd
+      terminationGracePeriodSeconds: 0
+      hostNetwork: true
+      containers:
+      - image: gcr.io/google-containers/netd:v0.1
+        name: netd
+        securityContext:
+          privileged: true
+        env:
+          - name: NETD_CNI_CONFIG_PATH
+            value: "/host/etc/cni/net.d/10-k8s-ptp.conflist"
+          - name: NETD_CNI_NETWORK_CONFIG_TEMPLATE
+            valueFrom:
+              configMapKeyRef:
+                name: netd-cni-config
+                key: cni_network_config
+        args:
+        - -logtostderr
+        volumeMounts:
+        - mountPath: /host/etc/cni/net.d
+          name: cni-net-dir
+      volumes:
+      - name: cni-net-dir
+        hostPath:
+          path: /etc/cni/net.d

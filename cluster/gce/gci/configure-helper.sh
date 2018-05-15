@@ -2397,6 +2397,9 @@ EOF
       setup-addon-manifests "addons" "istio/noauth"
     fi
   fi
+  if [[ "${ENABLE_NETD:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "netd"
+  fi
   if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
     download-extra-addons
     setup-addon-manifests "addons" "gce-extras"

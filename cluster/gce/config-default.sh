@@ -352,6 +352,12 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-}
 # Networking plugin specific settings.
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, kubenet
 
+# Optional: Enable Netd
+ENABLE_NETD="${KUBE_ENABLE_NETD:-false}"
+if [[ "${ENABLE_NETD:-}" == "true" && "${NETWORK_PROVIDER:-}" != "cni" ]]; then
+  echo "Warning: ENABLE_NETD can only work with NETWORK_PROVIDER='cni'."
+fi
+
 # Network Policy plugin specific settings.
 NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
 
