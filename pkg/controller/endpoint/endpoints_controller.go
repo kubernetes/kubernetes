@@ -428,6 +428,8 @@ func (e *EndpointController) syncService(key string) error {
 		} else {
 			utilruntime.HandleError(fmt.Errorf("Failed to parse annotation %v: %v", TolerateUnreadyEndpointsAnnotation, err))
 		}
+	} else {
+		tolerateUnreadyEndpoints = service.Spec.PublishNotReadyAddresses
 	}
 
 	subsets := []v1.EndpointSubset{}
