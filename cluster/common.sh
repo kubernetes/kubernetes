@@ -984,6 +984,11 @@ EOF
 SCHEDULING_ALGORITHM_PROVIDER: $(yaml-quote ${SCHEDULING_ALGORITHM_PROVIDER})
 EOF
   fi
+  if [ -n "${MAX_PODS_PER_NODE:-}" ]; then
+    cat >>$file <<EOF
+MAX_PODS_PER_NODE: $(yaml-quote ${MAX_PODS_PER_NODE})
+EOF
+  fi
 }
 
 function sha1sum-file() {
