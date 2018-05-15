@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"path"
 	"reflect"
 	"strings"
@@ -60,7 +61,7 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 var _ value.Context = authenticatedDataString("")
 
 type store struct {
-	client *clientv3.Client
+	clients []*clientv3.Client
 	// getOpts contains additional options that should be passed
 	// to all Get() calls.
 	getOps        []clientv3.OpOption
@@ -86,20 +87,20 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
+func New(c []*clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
 	return newStore(c, true, pagingEnabled, codec, prefix, transformer)
 }
 
 // NewWithNoQuorumRead returns etcd3 implementation of storage.Interface
 // where Get operations don't require quorum read.
-func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
+func NewWithNoQuorumRead(c []*clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
 	return newStore(c, false, pagingEnabled, codec, prefix, transformer)
 }
 
-func newStore(c *clientv3.Client, quorumRead, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
+func newStore(c []*clientv3.Client, quorumRead, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
 	versioner := etcd.APIObjectVersioner{}
 	result := &store{
-		client:        c,
+		clients:        c,
 		codec:         codec,
 		versioner:     versioner,
 		transformer:   transformer,
@@ -123,10 +124,14 @@ func (s *store) Versioner() storage.Versioner {
 	return s.versioner
 }
 
+func (s *store) client() *clientv3.Client {
+	return s.clients[rand.Int()%len(s.clients)]
+}
+
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, key string, resourceVersion string, out runtime.Object, ignoreNotFound bool) error {
 	key = path.Join(s.pathPrefix, key)
-	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+	getResp, err := s.client().KV.Get(ctx, key, s.getOps...)
 	if err != nil {
 		return err
 	}
@@ -171,7 +176,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		return storage.NewInternalError(err.Error())
 	}
 
-	txnResp, err := s.client.KV.Txn(ctx).If(
+	txnResp, err := s.client().KV.Txn(ctx).If(
 		notFound(key),
 	).Then(
 		clientv3.OpPut(key, string(newData), opts...),
@@ -206,7 +211,7 @@ func (s *store) Delete(ctx context.Context, key string, out runtime.Object, prec
 func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime.Object) error {
 	// We need to do get and delete in single transaction in order to
 	// know the value and revision before deleting it.
-	txnResp, err := s.client.KV.Txn(ctx).If().Then(
+	txnResp, err := s.client().KV.Txn(ctx).If().Then(
 		clientv3.OpGet(key),
 		clientv3.OpDelete(key),
 	).Commit()
@@ -227,7 +232,7 @@ func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime
 }
 
 func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions) error {
-	getResp, err := s.client.KV.Get(ctx, key)
+	getResp, err := s.client().KV.Get(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -239,7 +244,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		if err := checkPreconditions(key, preconditions, origState.obj); err != nil {
 			return err
 		}
-		txnResp, err := s.client.KV.Txn(ctx).If(
+		txnResp, err := s.client().KV.Txn(ctx).If(
 			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
 			clientv3.OpDelete(key),
@@ -272,7 +277,7 @@ func (s *store) GuaranteedUpdate(
 	key = path.Join(s.pathPrefix, key)
 
 	getCurrentState := func() (*objState, error) {
-		getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+		getResp, err := s.client().KV.Get(ctx, key, s.getOps...)
 		if err != nil {
 			return nil, err
 		}
@@ -354,7 +359,7 @@ func (s *store) GuaranteedUpdate(
 		}
 		trace.Step("Transaction prepared")
 
-		txnResp, err := s.client.KV.Txn(ctx).If(
+		txnResp, err := s.client().KV.Txn(ctx).If(
 			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
 			clientv3.OpPut(key, string(newData), opts...),
@@ -390,7 +395,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	}
 	key = path.Join(s.pathPrefix, key)
 
-	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+	getResp, err := s.client().KV.Get(ctx, key, s.getOps...)
 	if err != nil {
 		return err
 	}
@@ -414,7 +419,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 
 func (s *store) Count(key string) (int64, error) {
 	key = path.Join(s.pathPrefix, key)
-	getResp, err := s.client.KV.Get(context.Background(), key, clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)), clientv3.WithCountOnly())
+	getResp, err := s.client().KV.Get(context.Background(), key, clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)), clientv3.WithCountOnly())
 	if err != nil {
 		return 0, err
 	}
@@ -564,7 +569,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	var lastKey []byte
 	var hasMore bool
 	for {
-		getResp, err := s.client.KV.Get(ctx, key, options...)
+		getResp, err := s.client().KV.Get(ctx, key, options...)
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0)
 		}
@@ -760,7 +765,7 @@ func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, er
 	}
 	// TODO: one lease per ttl key is expensive. Based on current use case, we can have a long window to
 	// put keys within into same lease. We shall benchmark this and optimize the performance.
-	lcr, err := s.client.Lease.Grant(ctx, ttl)
+	lcr, err := s.client().Lease.Grant(ctx, ttl)
 	if err != nil {
 		return nil, err
 	}

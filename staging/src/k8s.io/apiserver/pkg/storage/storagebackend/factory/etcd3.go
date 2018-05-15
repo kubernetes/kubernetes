@@ -53,29 +53,41 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.CAFile) == 0 {
 		tlsConfig = nil
 	}
-	cfg := clientv3.Config{
-		DialTimeout:          dialTimeout,
-		DialKeepAliveTime:    keepaliveTime,
-		DialKeepAliveTimeout: keepaliveTimeout,
-		Endpoints:            c.ServerList,
-		TLS:                  tlsConfig,
+	numClients := 100
+	clients := make([]*clientv3.Client, 0, numClients)
+	for i := 0; i < numClients; i++ {
+		tls := tlsConfig
+		if tls != nil {
+			tls = tlsConfig.Clone()
+		}
+		cfg := clientv3.Config{
+			DialTimeout:          dialTimeout,
+			DialKeepAliveTime:    keepaliveTime,
+			DialKeepAliveTimeout: keepaliveTimeout,
+			Endpoints:            append([]string{}, c.ServerList...),
+			TLS:                  tls,
+		}
+		client, err := clientv3.New(cfg)
+		if err != nil {
+			return nil, nil, err
+		}
+		clients = append(clients, client)
 	}
-	client, err := clientv3.New(cfg)
-	if err != nil {
-		return nil, nil, err
-	}
+
 	ctx, cancel := context.WithCancel(context.Background())
-	etcd3.StartCompactor(ctx, client, c.CompactionInterval)
+	etcd3.StartCompactor(ctx, clients[0], c.CompactionInterval)
 	destroyFunc := func() {
 		cancel()
-		client.Close()
+		for i := 0; i < numClients; i++ {
+			clients[i].Close()
+		}
 	}
 	transformer := c.Transformer
 	if transformer == nil {
 		transformer = value.IdentityTransformer
 	}
 	if c.Quorum {
-		return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+		return etcd3.New(clients, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
 	}
-	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+	return etcd3.NewWithNoQuorumRead(clients, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
 }
