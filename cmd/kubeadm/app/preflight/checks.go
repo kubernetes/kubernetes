@@ -60,6 +60,8 @@ import (
 const (
 	bridgenf                    = "/proc/sys/net/bridge/bridge-nf-call-iptables"
 	bridgenf6                   = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
+	ipv4Forward                 = "/proc/sys/net/ipv4/ip_forward"
+	ipv6DefaultForwarding       = "/proc/sys/net/ipv6/conf/default/forwarding"
 	externalEtcdRequestTimeout  = time.Duration(10 * time.Second)
 	externalEtcdRequestRetries  = 3
 	externalEtcdRequestInterval = time.Duration(5 * time.Second)
@@ -901,6 +903,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		if ip.To4() == nil && ip.To16() != nil {
 			checks = append(checks,
 				FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+				FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
 			)
 		}
 	}
@@ -922,25 +925,27 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 	}
 	checks = addCommonChecks(execer, cfg, checks)
 
-	var bridgenf6Check Checker
+	addIPv6Checks := false
 	for _, server := range cfg.DiscoveryTokenAPIServers {
 		ipstr, _, err := net.SplitHostPort(server)
 		if err == nil {
 			checks = append(checks,
 				HTTPProxyCheck{Proto: "https", Host: ipstr},
 			)
-			if bridgenf6Check == nil {
+			if !addIPv6Checks {
 				if ip := net.ParseIP(ipstr); ip != nil {
 					if ip.To4() == nil && ip.To16() != nil {
-						// This check should be added only once
-						bridgenf6Check = FileContentCheck{Path: bridgenf6, Content: []byte{'1'}}
+						addIPv6Checks = true
 					}
 				}
 			}
 		}
 	}
-	if bridgenf6Check != nil {
-		checks = append(checks, bridgenf6Check)
+	if addIPv6Checks {
+		checks = append(checks,
+			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
+		)
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
@@ -969,6 +974,7 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 	if runtime.GOOS == "linux" {
 		checks = append(checks,
 			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
 			SwapCheck{},
 			InPathCheck{executable: "ip", mandatory: true, exec: execer},
 			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
