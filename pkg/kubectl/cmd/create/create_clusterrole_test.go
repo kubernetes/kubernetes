@@ -22,6 +22,7 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
@@ -47,6 +48,7 @@ func TestCreateClusterRole(t *testing.T) {
 		resources           string
 		nonResourceURL      string
 		resourceNames       string
+		aggregationRule     string
 		expectedClusterRole *rbac.ClusterRole
 	}{
 		"test-duplicate-resources": {
@@ -130,6 +132,25 @@ func TestCreateClusterRole(t *testing.T) {
 				},
 			},
 		},
+		"test-aggregation-rules": {
+			aggregationRule: "foo1=foo2,foo3=foo4",
+			expectedClusterRole: &rbac.ClusterRole{
+				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "ClusterRole"},
+				ObjectMeta: v1.ObjectMeta{
+					Name: clusterRoleName,
+				},
+				AggregationRule: &rbac.AggregationRule{
+					ClusterRoleSelectors: []metav1.LabelSelector{
+						{
+							MatchLabels: map[string]string{
+								"foo1": "foo2",
+								"foo3": "foo4",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -140,6 +161,7 @@ func TestCreateClusterRole(t *testing.T) {
 		cmd.Flags().Set("verb", test.verbs)
 		cmd.Flags().Set("resource", test.resources)
 		cmd.Flags().Set("non-resource-url", test.nonResourceURL)
+		cmd.Flags().Set("aggregation-rule", test.aggregationRule)
 		if test.resourceNames != "" {
 			cmd.Flags().Set("resource-name", test.resourceNames)
 		}
@@ -430,6 +452,50 @@ func TestClusterRoleValidate(t *testing.T) {
 					},
 				},
 				NonResourceURLs: []string{"/logs/", "/logs/*"},
+			},
+			expectErr: false,
+		},
+		"test-aggregation-rule-with-verb": {
+			clusterRoleOptions: &CreateClusterRoleOptions{
+				CreateRoleOptions: &CreateRoleOptions{
+					Name:  "my-clusterrole",
+					Verbs: []string{"get"},
+				},
+				AggregationRule: map[string]string{"foo-key": "foo-vlue"},
+			},
+			expectErr: true,
+		},
+		"test-aggregation-rule-with-resource": {
+			clusterRoleOptions: &CreateClusterRoleOptions{
+				CreateRoleOptions: &CreateRoleOptions{
+					Name: "my-clusterrole",
+					Resources: []ResourceOptions{
+						{
+							Resource:    "replicasets",
+							SubResource: "scale",
+						},
+					},
+				},
+				AggregationRule: map[string]string{"foo-key": "foo-vlue"},
+			},
+			expectErr: true,
+		},
+		"test-aggregation-rule-with-no-resource-url": {
+			clusterRoleOptions: &CreateClusterRoleOptions{
+				CreateRoleOptions: &CreateRoleOptions{
+					Name: "my-clusterrole",
+				},
+				NonResourceURLs: []string{"/logs/"},
+				AggregationRule: map[string]string{"foo-key": "foo-vlue"},
+			},
+			expectErr: true,
+		},
+		"test-aggregation-rule": {
+			clusterRoleOptions: &CreateClusterRoleOptions{
+				CreateRoleOptions: &CreateRoleOptions{
+					Name: "my-clusterrole",
+				},
+				AggregationRule: map[string]string{"foo-key": "foo-vlue"},
 			},
 			expectErr: false,
 		},
