@@ -20,7 +20,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
-        "//pkg/scheduler/schedulercache:go_default_library",
+        "//pkg/scheduler/cache:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
