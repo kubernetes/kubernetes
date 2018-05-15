@@ -216,13 +216,12 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, rootClientBuilde
 		c.Generic.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 		c.Extra.NodeStatusUpdateFrequency)
 
-	nodeController.Run()
+	nodeController.Run(stop)
 	time.Sleep(wait.Jitter(c.Generic.ComponentConfig.GenericComponent.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the PersistentVolumeLabelController
 	pvlController := cloudcontrollers.NewPersistentVolumeLabelController(client("pvl-controller"), cloud)
-	threads := 5
-	go pvlController.Run(threads, stop)
+	go pvlController.Run(5, stop)
 	time.Sleep(wait.Jitter(c.Generic.ComponentConfig.GenericComponent.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the service controller
