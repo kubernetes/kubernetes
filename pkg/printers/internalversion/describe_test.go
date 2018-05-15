@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	versionedfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -2579,6 +2580,46 @@ func TestDescribeNode(t *testing.T) {
 		}
 	}
 
+}
+
+func TestDescribeStatefulSet(t *testing.T) {
+	fake := fake.NewSimpleClientset(&apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: apps.StatefulSetSpec{
+			Replicas: 1,
+			Selector: &metav1.LabelSelector{},
+			Template: api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Image: "mytest-image:latest"},
+					},
+				},
+			},
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{
+				Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+					Partition: 2,
+				},
+			},
+		},
+	})
+	d := StatefulSetDescriber{fake}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOutputs := []string{
+		"bar", "foo", "Containers:", "mytest-image:latest", "Update Strategy", "RollingUpdate", "Partition",
+	}
+	for _, o := range expectedOutputs {
+		if !strings.Contains(out, o) {
+			t.Errorf("unexpected out: %s", out)
+			break
+		}
+	}
 }
 
 // boolPtr returns a pointer to a bool
