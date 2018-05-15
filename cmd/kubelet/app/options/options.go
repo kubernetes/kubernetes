@@ -242,8 +242,8 @@ func NewKubeletFlags() *KubeletFlags {
 		HostNetworkSources:  []string{kubetypes.AllSource},
 		HostPIDSources:      []string{kubetypes.AllSource},
 		HostIPCSources:      []string{kubetypes.AllSource},
-		// TODO(#56523): default CAdvisorPort to 0 (disabled) and deprecate it
-		CAdvisorPort: 4194,
+		// TODO(#56523:v1.12.0): Remove --cadvisor-port, it has been deprecated since v1.10
+		CAdvisorPort: 0,
 		// TODO(#58010:v1.13.0): Remove --allow-privileged, it is deprecated
 		AllowPrivileged: true,
 	}
@@ -400,7 +400,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "")
 	fs.MarkDeprecated("experimental-bootstrap-kubeconfig", "Use --bootstrap-kubeconfig")
 	fs.Int32Var(&f.CAdvisorPort, "cadvisor-port", f.CAdvisorPort, "The port of the localhost cAdvisor endpoint (set to 0 to disable)")
-	fs.MarkDeprecated("cadvisor-port", "The default will change to 0 (disabled) in 1.12, and the cadvisor port will be removed entirely in 1.13")
+	fs.MarkDeprecated("cadvisor-port", "The default will change to 0 (disabled) in 1.11, and the cadvisor port will be removed entirely in 1.12")
 	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxPerPodContainerCount, "maximum-dead-containers-per-container", f.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
