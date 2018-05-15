@@ -374,4 +374,8 @@ func AfterReadingAllFlags(t *TestContextType) {
 			t.Host = defaultHost
 		}
 	}
+	// Allow 1% of nodes to be unready (statistically) - relevant for large clusters.
+	if t.AllowedNotReadyNodes == 0 {
+		t.AllowedNotReadyNodes = t.CloudConfig.NumNodes / 100
+	}
 }
