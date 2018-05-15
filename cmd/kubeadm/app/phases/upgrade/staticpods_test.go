@@ -215,14 +215,27 @@ func (c fakeTLSEtcdClient) HasTLS() bool {
 	return c.TLS
 }
 
-func (c fakeTLSEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
-	client := &clientv3.StatusResponse{}
-	client.Version = "3.1.12"
-	return client, nil
+func (c fakeTLSEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
+
+func (c fakeTLSEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
+	return true, nil
 }
 
-func (c fakeTLSEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
-	return c.GetStatus()
+func (c fakeTLSEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+	return map[string]*clientv3.StatusResponse{
+		"foo": {
+			Version: "3.1.12",
+		}}, nil
+}
+
+func (c fakeTLSEtcdClient) GetClusterVersions() (map[string]string, error) {
+	return map[string]string{
+		"foo": "3.1.12",
+	}, nil
+}
+
+func (c fakeTLSEtcdClient) GetVersion() (string, error) {
+	return "3.1.12", nil
 }
 
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
@@ -232,7 +245,13 @@ func (c fakePodManifestEtcdClient) HasTLS() bool {
 	return hasTLS
 }
 
-func (c fakePodManifestEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
+func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
+
+func (c fakePodManifestEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
+	return true, nil
+}
+
+func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
 	// Make sure the certificates generated from the upgrade are readable from disk
 	tlsInfo := transport.TLSInfo{
 		CertFile:      filepath.Join(c.CertificatesDir, constants.EtcdCACertName),
@@ -244,13 +263,19 @@ func (c fakePodManifestEtcdClient) GetStatus() (*clientv3.StatusResponse, error)
 		return nil, err
 	}
 
-	client := &clientv3.StatusResponse{}
-	client.Version = "3.1.12"
-	return client, nil
+	return map[string]*clientv3.StatusResponse{
+		"foo": {Version: "3.1.12"},
+	}, nil
 }
 
-func (c fakePodManifestEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
-	return c.GetStatus()
+func (c fakePodManifestEtcdClient) GetClusterVersions() (map[string]string, error) {
+	return map[string]string{
+		"foo": "3.1.12",
+	}, nil
+}
+
+func (c fakePodManifestEtcdClient) GetVersion() (string, error) {
+	return "3.1.12", nil
 }
 
 func TestStaticPodControlPlane(t *testing.T) {
