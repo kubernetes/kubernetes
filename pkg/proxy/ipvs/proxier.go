@@ -19,7 +19,9 @@ package ipvs
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -440,6 +442,25 @@ func NewLinuxKernelHandler() *LinuxKernelHandler {
 
 // GetModules returns all installed kernel modules.
 func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
+	// Check whether IPVS required kernel modules are built-in
+	kernelVersionFile := "/proc/sys/kernel/osrelease"
+	b, err := ioutil.ReadFile(kernelVersionFile)
+	if err != nil {
+		glog.Errorf("Failed to read file %s with error %v", kernelVersionFile, err)
+	}
+	kernelVersion := strings.TrimSpace(string(b))
+	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
+	b, err = ioutil.ReadFile(builtinModsFilePath)
+	if err != nil {
+		glog.Errorf("Failed to read file %s with error %v", builtinModsFilePath, err)
+	}
+	var bmods []string
+	for _, module := range ipvsModules {
+		if match, _ := regexp.Match(module+".ko", b); match {
+			bmods = append(bmods, module)
+		}
+	}
+
 	// Try to load IPVS required kernel modules using modprobe first
 	for _, kmod := range ipvsModules {
 		err := handle.executor.Command("modprobe", "--", kmod).Run()
@@ -456,7 +477,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	}
 
 	mods := strings.Split(string(out), "\n")
-	return mods, nil
+	return append(mods, bmods...), nil
 }
 
 // CanUseIPVSProxier returns true if we can use the ipvs Proxier.
