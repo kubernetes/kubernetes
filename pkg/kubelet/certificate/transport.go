@@ -17,12 +17,10 @@ limitations under the License.
 package certificate
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -31,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/certificate"
+	"k8s.io/client-go/util/connrotation"
 )
 
 // UpdateTransport instruments a restconfig with a transport that dynamically uses
@@ -64,11 +63,7 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		return nil, fmt.Errorf("there is already a transport or dialer configured")
 	}
 
-	// Custom dialer that will track all connections it creates.
-	t := &connTracker{
-		dialer: &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second},
-		conns:  make(map[*closableConn]struct{}),
-	}
+	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
 
 	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
 	if err != nil {
@@ -128,7 +123,7 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 			// to reperform its TLS handshake with new cert.
 			//
 			// See: https://github.com/kubernetes-incubator/bootkube/pull/663#issuecomment-318506493
-			t.closeAllConns()
+			d.CloseAll()
 		}, period, stopCh)
 	}
 
@@ -137,7 +132,7 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: 25,
-		DialContext:         t.DialContext, // Use custom dialer.
+		DialContext:         d.DialContext, // Use custom dialer.
 	})
 
 	// Zero out all existing TLS options since our new transport enforces them.
@@ -149,60 +144,5 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	clientConfig.CAFile = ""
 	clientConfig.Insecure = false
 
-	return t.closeAllConns, nil
-}
-
-// connTracker is a dialer that tracks all open connections it creates.
-type connTracker struct {
-	dialer *net.Dialer
-
-	mu    sync.Mutex
-	conns map[*closableConn]struct{}
-}
-
-// closeAllConns forcibly closes all tracked connections.
-func (c *connTracker) closeAllConns() {
-	c.mu.Lock()
-	conns := c.conns
-	c.conns = make(map[*closableConn]struct{})
-	c.mu.Unlock()
-
-	for conn := range conns {
-		conn.Close()
-	}
-}
-
-func (c *connTracker) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	conn, err := c.dialer.DialContext(ctx, network, address)
-	if err != nil {
-		return nil, err
-	}
-
-	closable := &closableConn{Conn: conn}
-
-	// Start tracking the connection
-	c.mu.Lock()
-	c.conns[closable] = struct{}{}
-	c.mu.Unlock()
-
-	// When the connection is closed, remove it from the map. This will
-	// be no-op if the connection isn't in the map, e.g. if closeAllConns()
-	// is called.
-	closable.onClose = func() {
-		c.mu.Lock()
-		delete(c.conns, closable)
-		c.mu.Unlock()
-	}
-
-	return closable, nil
-}
-
-type closableConn struct {
-	onClose func()
-	net.Conn
-}
-
-func (c *closableConn) Close() error {
-	go c.onClose()
-	return c.Conn.Close()
+	return d.CloseAll, nil
 }
