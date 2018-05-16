@@ -40,6 +40,22 @@ type KubeCloudSharedOptions struct {
 	NodeSyncPeriod               metav1.Duration
 }
 
+// NewKubeCloudSharedOptions returns common/default configuration values for both
+// the kube-controller-manager and the cloud-contoller-manager. Any common changes should
+// be made here. Any individual changes should be made in that controller.
+func NewKubeCloudSharedOptions(cfg componentconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
+	o := &KubeCloudSharedOptions{
+		Port:                      cfg.Port,
+		Address:                   cfg.Address,
+		RouteReconciliationPeriod: cfg.RouteReconciliationPeriod,
+		NodeMonitorPeriod:         cfg.NodeMonitorPeriod,
+		ClusterName:               cfg.ClusterName,
+		ConfigureCloudRoutes:      cfg.ConfigureCloudRoutes,
+	}
+
+	return o
+}
+
 // AddFlags adds flags related to shared variable for controller manager to the specified FlagSet.
 func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
