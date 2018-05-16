@@ -172,6 +172,7 @@ func IsManagedObjectNotFoundError(err error) bool {
 	return isManagedObjectNotFoundError
 }
 
+// IsInvalidCredentialsError returns true if error is of type InvalidLogin
 func IsInvalidCredentialsError(err error) bool {
 	isInvalidCredentialsError := false
 	if soap.IsSoapFault(err) {
