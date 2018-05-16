@@ -137,14 +137,14 @@ func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.N
 	generatePatch := func(condition v1.NodeCondition) ([]byte, error) {
 		raw, err := json.Marshal(&[]v1.NodeCondition{condition})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to Marshal raw for condition %v: %v", condition, err)
 		}
 		return []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw)), nil
 	}
 	condition.LastHeartbeatTime = metav1.NewTime(time.Now())
 	patch, err := generatePatch(condition)
 	if err != nil {
-		return nil
+		return err
 	}
 	_, err = c.CoreV1().Nodes().PatchStatus(string(node), patch)
 	return err
