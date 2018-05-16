@@ -46,7 +46,7 @@ func GetDNSVersion(kubeVersion *version.Version, dns string) string {
 func GetKubeDNSManifest(kubeVersion *version.Version) string {
 	// v1.8.0+ has only one known YAML manifest spec, just return that here
 	// In the future when the kube-dns version is bumped at HEAD; add conditional logic to return the right manifest
-	return v180AndAboveKubeDNSDeployment
+	return KubeDNSDeployment
 }
 
 // GetCoreDNSManifest returns the right CoreDNS YAML manifest for a specific k8s version
