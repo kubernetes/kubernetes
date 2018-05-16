@@ -42,7 +42,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  advertiseAddress: ""
 	  bindPort: 0
 	  controlPlaneEndpoint: ""
-	apiVersion: kubeadm.k8s.io/v1alpha1
+	apiVersion: kubeadm.k8s.io/v1alpha2
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -82,7 +82,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  advertiseAddress: ""
 	  bindPort: 0
 	  controlPlaneEndpoint: ""
-	apiVersion: kubeadm.k8s.io/v1alpha1
+	apiVersion: kubeadm.k8s.io/v1alpha2
 	auditPolicy:
 	  logDir: ""
 	  path: ""
@@ -127,7 +127,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  advertiseAddress: ""
 	  bindPort: 0
 	  controlPlaneEndpoint: ""
-	apiVersion: kubeadm.k8s.io/v1alpha1
+	apiVersion: kubeadm.k8s.io/v1alpha2
 	auditPolicy:
 	  logDir: ""
 	  path: ""

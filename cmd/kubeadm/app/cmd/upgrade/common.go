@@ -29,7 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -101,10 +101,10 @@ func printConfiguration(cfg *kubeadmapi.MasterConfiguration, w io.Writer) {
 		return
 	}
 
-	externalcfg := &kubeadmapiv1alpha1.MasterConfiguration{}
+	externalcfg := &kubeadmapiv1alpha2.MasterConfiguration{}
 	kubeadmscheme.Scheme.Convert(cfg, externalcfg, nil)
 
-	cfgYaml, err := kubeadmutil.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha1.SchemeGroupVersion, kubeadmscheme.Codecs)
+	cfgYaml, err := kubeadmutil.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
 	if err == nil {
 		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
 

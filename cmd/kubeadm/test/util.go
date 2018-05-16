@@ -53,7 +53,7 @@ func SetupMasterConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.M
 	}
 
 	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(`
-		apiVersion: kubeadm.k8s.io/v1alpha1
+		apiVersion: kubeadm.k8s.io/v1alpha2
 		kind: MasterConfiguration
 		certificatesDir: {{.CertificatesDir}}
 		api:

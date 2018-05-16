@@ -26,7 +26,7 @@ import (
 	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -96,7 +96,7 @@ func TestUploadConfiguration(t *testing.T) {
 					t.Errorf("Fail to find ConfigMap key")
 				}
 
-				decodedExtCfg := &kubeadmapiv1alpha1.MasterConfiguration{}
+				decodedExtCfg := &kubeadmapiv1alpha2.MasterConfiguration{}
 				decodedCfg := &kubeadmapi.MasterConfiguration{}
 
 				if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(configData), decodedExtCfg); err != nil {
@@ -118,8 +118,8 @@ func TestUploadConfiguration(t *testing.T) {
 					t.Errorf("Expected kind MasterConfiguration, got %v", decodedExtCfg.Kind)
 				}
 
-				if decodedExtCfg.APIVersion != "kubeadm.k8s.io/v1alpha1" {
-					t.Errorf("Expected apiVersion kubeadm.k8s.io/v1alpha1, got %v", decodedExtCfg.APIVersion)
+				if decodedExtCfg.APIVersion != "kubeadm.k8s.io/v1alpha2" {
+					t.Errorf("Expected apiVersion kubeadm.k8s.io/v1alpha2, got %v", decodedExtCfg.APIVersion)
 				}
 			}
 		})
