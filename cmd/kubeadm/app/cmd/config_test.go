@@ -55,11 +55,6 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 		configContents          []byte
 	}{
 		{
-			name:               "empty config contents",
-			expectedImageCount: defaultNumberOfImages,
-			configContents:     []byte{},
-		},
-		{
 			name:               "set k8s version",
 			expectedImageCount: defaultNumberOfImages,
 			expectedImageSubstrings: []string{
@@ -80,6 +75,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			configContents: []byte(dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1alpha2
 				kind: MasterConfiguration
+				kubernetesVersion: 1.11.0
 				featureGates:
 				    CoreDNS: True
 			`)),
