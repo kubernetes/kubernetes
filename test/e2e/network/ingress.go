@@ -539,6 +539,22 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.WaitForIngress(true)
 		})
 
+		It("should be able to create a ClusterIP service [Unreleased]", func() {
+			var err error
+			By("Create a basic HTTP ingress using NEG")
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg-clusterip"), ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(true)
+			svcPorts := jig.GetServicePorts(false)
+			usingNEG, err := gceController.BackendServiceUsingNEG(svcPorts)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(usingNEG).To(BeTrue())
+
+			// ClusterIP ServicePorts have no NodePort
+			for _, sp := range svcPorts {
+				Expect(sp.NodePort).To(Equal(int32(0)))
+			}
+		})
+
 		It("should sync endpoints to NEG", func() {
 			name := "hostname"
 			scaleAndValidateNEG := func(num int) {
