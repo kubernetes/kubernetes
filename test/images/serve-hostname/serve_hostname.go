@@ -48,7 +48,7 @@ func main() {
 	}
 
 	if *doTCP {
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+		listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", *port))
 		if err != nil {
 			log.Fatalf("Error from net.Listen(): %s", err)
 		}
@@ -65,7 +65,7 @@ func main() {
 		}()
 	}
 	if *doUDP {
-		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", *port))
+		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("0.0.0.0:%d", *port))
 		if err != nil {
 			log.Fatalf("Error from net.ResolveUDPAddr(): %s", err)
 		}
@@ -92,7 +92,7 @@ func main() {
 		})
 		go func() {
 			// Run in a closure so http.ListenAndServe doesn't block
-			log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
+			log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", *port), nil))
 		}()
 	}
 	log.Printf("Serving on port %d.\n", *port)
