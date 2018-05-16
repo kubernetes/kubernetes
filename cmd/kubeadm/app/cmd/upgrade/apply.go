@@ -26,7 +26,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -87,7 +87,7 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 			// If the version is specified in config file, pick up that value.
 			if flags.parent.cfgPath != "" {
 				glog.V(1).Infof("fetching configuration from file", flags.parent.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(parentFlags.cfgPath, &kubeadmapiv1alpha1.MasterConfiguration{})
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(parentFlags.cfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {
