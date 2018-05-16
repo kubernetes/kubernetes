@@ -881,7 +881,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 		false, /* ignoreNotFound */
 		&preconditions,
 		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
-			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
+			gracefulApplied, graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
 			if err != nil {
 				return nil, err
 			}
@@ -890,7 +890,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			}
 
 			// Add/remove the orphan finalizer as the options dictates.
-			// Note that this occurs after checking pendingGraceufl, so
+			// Note that this occurs after checking pendingGraceful, so
 			// finalizers cannot be updated via DeleteOptions if deletion has
 			// started.
 			existingAccessor, err := meta.Accessor(existing)
@@ -903,7 +903,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			}
 
 			pendingFinalizers = len(existingAccessor.GetFinalizers()) != 0
-			if !graceful {
+			if !graceful && !gracefulApplied {
 				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
 				if pendingFinalizers {
 					glog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
@@ -968,7 +968,7 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 	if options.Preconditions != nil {
 		preconditions.UID = options.Preconditions.UID
 	}
-	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
+	_, graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
 	if err != nil {
 		return nil, false, err
 	}

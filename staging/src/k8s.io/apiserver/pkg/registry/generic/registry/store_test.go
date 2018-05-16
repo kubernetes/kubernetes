@@ -74,7 +74,7 @@ type testGracefulStrategy struct {
 }
 
 func (t testGracefulStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
-	return true
+	return true, true
 }
 
 var _ rest.RESTGracefulDeleteStrategy = testGracefulStrategy{}
@@ -958,7 +958,7 @@ func TestGracefulStoreCanDeleteIfExistingGracePeriodZero(t *testing.T) {
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 	defer destroyFunc()
 
-	graceful, gracefulPending, err := rest.BeforeDelete(registry.DeleteStrategy, testContext, pod, metav1.NewDeleteOptions(0))
+	_, graceful, gracefulPending, err := rest.BeforeDelete(registry.DeleteStrategy, testContext, pod, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
