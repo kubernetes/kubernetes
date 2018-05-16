@@ -52,6 +52,10 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 
+	if obj.GetObjectKind().GroupVersionKind().Empty() {
+		return fmt.Errorf("missing apiVersion or kind; try GetObjectKind().SetGroupVersionKind() if you know the type")
+	}
+
 	data, err := json.MarshalIndent(obj, "", "    ")
 	if err != nil {
 		return err
@@ -86,6 +90,10 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		}
 		_, err = w.Write(data)
 		return err
+	}
+
+	if obj.GetObjectKind().GroupVersionKind().Empty() {
+		return fmt.Errorf("missing apiVersion or kind; try GetObjectKind().SetGroupVersionKind() if you know the type")
 	}
 
 	output, err := yaml.Marshal(obj)
