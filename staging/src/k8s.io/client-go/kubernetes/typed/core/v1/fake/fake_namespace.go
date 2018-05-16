@@ -112,14 +112,6 @@ func (c *FakeNamespaces) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
-// DeleteCollection deletes a collection of objects.
-func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(namespacesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &core_v1.NamespaceList{})
-	return err
-}
-
 // Patch applies the patch and returns the patched namespace.
 func (c *FakeNamespaces) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core_v1.Namespace, err error) {
 	obj, err := c.Fake.
