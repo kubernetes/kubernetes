@@ -74,22 +74,9 @@ package_group(
 )
 
 package_group(
-    name = "pkg_kubectl_CONSUMERS_BAD",
-    includes = [
-        ":KUBEADM_BAD",
-    ],
-    packages = [
-        "//cmd/clicheck",
-        "//cmd/hyperkube",
-        "//pkg",
-    ],
-)
-
-package_group(
     name = "pkg_kubectl_CONSUMERS",
     includes = [
         ":COMMON_generators",
-        ":pkg_kubectl_CONSUMERS_BAD",
     ],
     packages = [
         "//cmd/kubectl",
@@ -219,10 +206,7 @@ package_group(
         ":KUBEADM_BAD",
     ],
     packages = [
-        "//cmd/clicheck",
-        "//cmd/hyperkube",
         "//cmd/kube-proxy/app",
-        "//cmd/kube-scheduler/app",
     ],
 )
 
@@ -275,18 +259,9 @@ package_group(
 )
 
 package_group(
-    name = "pkg_kubectl_metricsutil_CONSUMERS_BAD",
-    packages = [
-        "//cmd/clicheck",
-        "//cmd/hyperkube",
-    ],
-)
-
-package_group(
     name = "pkg_kubectl_metricsutil_CONSUMERS",
     includes = [
         ":COMMON_generators",
-        ":pkg_kubectl_metricsutil_CONSUMERS_BAD",
     ],
     packages = [
         "//cmd/kubectl",
