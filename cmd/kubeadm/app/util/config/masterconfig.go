@@ -23,10 +23,12 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -137,6 +139,15 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.MasterConfiguration, error) {
 		// Default and convert to the internal version
 		kubeadmscheme.Scheme.Default(v1alpha1cfg)
 		kubeadmscheme.Scheme.Convert(v1alpha1cfg, internalcfg, nil)
+	} else if decoded["apiVersion"] == kubeadmapiv1alpha2.SchemeGroupVersion.String() {
+		v1alpha2cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, v1alpha2cfg); err != nil {
+			return nil, fmt.Errorf("unable to decode config: %v", err)
+		}
+
+		// Default and convert to the internal version
+		kubeadmscheme.Scheme.Default(v1alpha2cfg)
+		kubeadmscheme.Scheme.Convert(v1alpha2cfg, internalcfg, nil)
 	} else {
 		// TODO: Add support for an upcoming v1alpha2 API
 		// TODO: In the future, we can unmarshal any two or more external types into the internal object directly using the following syntax.
