@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "apply.go",
         "common.go",
+        "diff.go",
         "plan.go",
         "upgrade.go",
     ],
@@ -29,7 +30,9 @@ go_library(
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/discovery/fake:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
