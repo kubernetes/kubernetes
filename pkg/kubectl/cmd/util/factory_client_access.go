@@ -81,24 +81,24 @@ func NewClientAccessFactory(clientGetter RESTClientGetter) ClientAccessFactory {
 	return f
 }
 
-func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
+func (f *ring0Factory) ToRESTConfig() (*restclient.Config, error) {
 	return f.clientGetter.ToRESTConfig()
 }
 
-func (f *ring0Factory) RESTMapper() (meta.RESTMapper, error) {
+func (f *ring0Factory) ToRESTMapper() (meta.RESTMapper, error) {
 	return f.clientGetter.ToRESTMapper()
 }
 
-func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
-	return f.clientGetter.ToRESTConfig()
-}
-
-func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (f *ring0Factory) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	return f.clientGetter.ToDiscoveryClient()
 }
 
+func (f *ring0Factory) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+	return f.clientGetter.ToRawKubeConfigLoader()
+}
+
 func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 }
 
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 }
 
 func (f *ring0Factory) DynamicClient() (dynamic.Interface, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (f *ring0Factory) NewBuilder() *resource.Builder {
 }
 
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}

@@ -83,7 +83,7 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 
 func (o *VersionOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
-	o.discoveryClient, err = f.DiscoveryClient()
+	o.discoveryClient, err = f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}

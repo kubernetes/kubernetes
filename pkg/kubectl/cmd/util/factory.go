@@ -67,8 +67,14 @@ type Factory interface {
 // Generally provides discovery, negotiation, and no-dep calls.
 // TODO The polymorphic calls probably deserve their own interface.
 type ClientAccessFactory interface {
+	// Returns a client.Config for accessing the Kubernetes server.
+	ToRESTConfig() (*restclient.Config, error)
+	// Returns interfaces for dealing with arbitrary runtime.Objects.
+	ToRESTMapper() (meta.RESTMapper, error)
 	// Returns a discovery client
-	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+	// Returns kubeconfig loader
+	ToRawKubeConfigLoader() clientcmd.ClientConfig
 
 	// ClientSet gives you back an internal, generated clientset
 	ClientSet() (internalclientset.Interface, error)
@@ -79,16 +85,8 @@ type ClientAccessFactory interface {
 	// KubernetesClientSet gives you back an external clientset
 	KubernetesClientSet() (*kubernetes.Clientset, error)
 
-	// Returns interfaces for dealing with arbitrary runtime.Objects.
-	RESTMapper() (meta.RESTMapper, error)
-
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
 	RESTClient() (*restclient.RESTClient, error)
-	// Returns a client.Config for accessing the Kubernetes server.
-	ClientConfig() (*restclient.Config, error)
-	// BareClientConfig returns a client.Config that has NOT been negotiated. It's
-	// just directions to the server. People use this to build RESTMappers on top of
-	BareClientConfig() (*restclient.Config, error)
 
 	// NewBuilder returns an object that assists in loading objects from both disk and the server
 	// and which implements the common patterns for CLI interactions with generic resources.

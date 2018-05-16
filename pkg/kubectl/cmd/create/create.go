@@ -395,7 +395,7 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 		return err
 	}
 
-	o.Mapper, err = f.RESTMapper()
+	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}

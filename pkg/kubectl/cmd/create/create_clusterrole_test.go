@@ -438,7 +438,7 @@ func TestClusterRoleValidate(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			var err error
-			test.clusterRoleOptions.Mapper, err = tf.RESTMapper()
+			test.clusterRoleOptions.Mapper, err = tf.ToRESTMapper()
 			if err != nil {
 				t.Fatal(err)
 			}

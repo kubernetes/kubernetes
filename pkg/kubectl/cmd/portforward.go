@@ -220,7 +220,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 	o.PodClient = clientset.Core()
 
-	o.Config, err = f.ClientConfig()
+	o.Config, err = f.ToRESTConfig()
 	if err != nil {
 		return err
 	}

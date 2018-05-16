@@ -113,7 +113,7 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 	w := printers.GetNewTabWriter(o.Out)
 	defer w.Flush()
 
-	discoveryclient, err := f.DiscoveryClient()
+	discoveryclient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}

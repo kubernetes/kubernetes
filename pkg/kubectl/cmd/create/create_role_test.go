@@ -340,7 +340,7 @@ func TestValidate(t *testing.T) {
 
 	for name, test := range tests {
 		var err error
-		test.roleOptions.Mapper, err = tf.RESTMapper()
+		test.roleOptions.Mapper, err = tf.ToRESTMapper()
 		if err != nil {
 			t.Fatal(err)
 		}

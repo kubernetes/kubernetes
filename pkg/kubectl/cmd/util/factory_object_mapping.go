@@ -75,7 +75,7 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-	cfg, err := f.clientAccessFactory.ClientConfig()
+	cfg, err := f.clientAccessFactory.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 }
 
 func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-	cfg, err := f.clientAccessFactory.BareClientConfig()
+	cfg, err := f.clientAccessFactory.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 }
 
 func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
-	clientConfig, err := f.clientAccessFactory.ClientConfig()
+	clientConfig, err := f.clientAccessFactory.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer,
 
 // helper function to make a generic describer, or return an error
 func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RESTMapping) (printers.Describer, error) {
-	clientConfig, err := clientAccessFactory.ClientConfig()
+	clientConfig, err := clientAccessFactory.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +421,7 @@ func (f *ring1Factory) Validator(validate bool) (validation.Schema, error) {
 
 // OpenAPISchema returns metadata and structural information about Kubernetes object definitions.
 func (f *ring1Factory) OpenAPISchema() (openapi.Resources, error) {
-	discovery, err := f.clientAccessFactory.DiscoveryClient()
+	discovery, err := f.clientAccessFactory.ToDiscoveryClient()
 	if err != nil {
 		return nil, err
 	}

@@ -92,7 +92,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 
 func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
-	o.Mapper, err = f.RESTMapper()
+	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}

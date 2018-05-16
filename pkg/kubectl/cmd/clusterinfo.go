@@ -76,7 +76,7 @@ func NewCmdClusterInfo(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 
 func (o *ClusterInfoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
-	o.Client, err = f.ClientConfig()
+	o.Client, err = f.ToRESTConfig()
 	if err != nil {
 		return err
 	}

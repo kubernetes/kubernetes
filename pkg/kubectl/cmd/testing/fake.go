@@ -287,7 +287,7 @@ func (f *TestFactory) Cleanup() {
 	os.Remove(f.tempConfigFile.Name())
 }
 
-func (f *TestFactory) ClientConfig() (*restclient.Config, error) {
+func (f *TestFactory) ToRESTConfig() (*restclient.Config, error) {
 	return f.ClientConfigVal, nil
 }
 
@@ -330,7 +330,7 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper, err := f.RESTMapper()
+	mapper, err := f.ToRESTMapper()
 
 	return resource.NewFakeBuilder(
 		func(version schema.GroupVersion) (resource.RESTClient, error) {
