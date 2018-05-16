@@ -155,30 +155,6 @@ func TestValidateNodeName(t *testing.T) {
 	}
 }
 
-func TestValidateCloudProvider(t *testing.T) {
-	var tests = []struct {
-		s        string
-		f        *field.Path
-		expected bool
-	}{
-		{"", nil, true},      // if not provided, ok, it's optional
-		{"1234", nil, false}, // not supported
-		{"awws", nil, false}, // not supported
-		{"aws", nil, true},   // supported
-		{"gce", nil, true},   // supported
-	}
-	for _, rt := range tests {
-		actual := ValidateCloudProvider(rt.s, rt.f)
-		if (len(actual) == 0) != rt.expected {
-			t.Errorf(
-				"failed ValidateCloudProvider:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(len(actual) == 0),
-			)
-		}
-	}
-}
-
 func TestValidateCertSANs(t *testing.T) {
 	var tests = []struct {
 		sans     []string

@@ -42,8 +42,6 @@ type MasterConfiguration struct {
 	Networking Networking
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string
-	// CloudProvider is the name of the cloud provider.
-	CloudProvider string
 	// NodeName is the name of the node that will host the k8s control plane.
 	// Defaults to the hostname if not provided.
 	NodeName string

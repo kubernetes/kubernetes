@@ -42,8 +42,6 @@ type MasterConfiguration struct {
 	Networking Networking `json:"networking"`
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string `json:"kubernetesVersion"`
-	// CloudProvider is the name of the cloud provider.
-	CloudProvider string `json:"cloudProvider"`
 	// NodeName is the name of the node that will host the k8s control plane.
 	// Defaults to the hostname if not provided.
 	NodeName string `json:"nodeName"`

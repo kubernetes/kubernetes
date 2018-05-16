@@ -254,12 +254,6 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha2.MasterConfiguration
 	glog.Infof("[init] using Kubernetes version: %s\n", cfg.KubernetesVersion)
 	glog.Infof("[init] using Authorization modes: %v\n", cfg.AuthorizationModes)
 
-	// Warn about the limitations with the current cloudprovider solution.
-	if cfg.CloudProvider != "" {
-		glog.Warningln("[init] for cloudprovider integrations to work --cloud-provider must be set for all kubelets in the cluster")
-		glog.Infoln("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
-	}
-
 	glog.Infoln("[preflight] running pre-flight checks")
 
 	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {

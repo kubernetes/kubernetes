@@ -42,13 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-// Static pod definitions in golang form are included below so that `kubeadm init` can get going.
-const (
-	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
-
-	deprecatedV19AdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
-	defaultV19AdmissionControl    = "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
-)
+const defaultAdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
 func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
@@ -165,7 +159,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	defaultArguments := map[string]string{
 		"advertise-address":               cfg.API.AdvertiseAddress,
 		"insecure-port":                   "0",
-		"admission-control":               defaultV19AdmissionControl,
+		"admission-control":               defaultAdmissionControl,
 		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
 		"service-account-key-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
 		"client-ca-file":                  filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
@@ -189,10 +183,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	}
 
 	command := []string{"kube-apiserver"}
-
-	if cfg.CloudProvider == "aws" || cfg.CloudProvider == "gce" {
-		defaultArguments["admission-control"] = deprecatedV19AdmissionControl
-	}
 
 	// If the user set endpoints for an external etcd cluster
 	if len(cfg.Etcd.Endpoints) > 0 {
@@ -222,15 +212,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		}
 		if cfg.Etcd.KeyFile != "" {
 			glog.Warningf("[controlplane] configuration for %s KeyFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.KeyFile, kubeadmconstants.Etcd)
-		}
-	}
-
-	if cfg.CloudProvider != "" {
-		defaultArguments["cloud-provider"] = cfg.CloudProvider
-
-		// Only append the --cloud-config option if there's a such file
-		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
-			defaultArguments["cloud-config"] = DefaultCloudConfigPath
 		}
 	}
 
@@ -321,15 +302,6 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 	if res, _ := certphase.UsingExternalCA(cfg); res {
 		defaultArguments["cluster-signing-key-file"] = ""
 		defaultArguments["cluster-signing-cert-file"] = ""
-	}
-
-	if cfg.CloudProvider != "" {
-		defaultArguments["cloud-provider"] = cfg.CloudProvider
-
-		// Only append the --cloud-config option if there's a such file
-		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
-			defaultArguments["cloud-config"] = DefaultCloudConfigPath
-		}
 	}
 
 	// Let the controller-manager allocate Node CIDRs for the Pod network.
