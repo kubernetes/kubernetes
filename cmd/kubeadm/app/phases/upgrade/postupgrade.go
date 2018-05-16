@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-var v190alpha3 = version.MustParseSemantic("v1.9.0-alpha.3")
 var expiry = 180 * 24 * time.Hour
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
@@ -74,7 +73,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	}
 
 	// Upgrade to a self-hosted control plane if possible
-	if err := upgradeToSelfHosting(client, cfg, newK8sVer, dryRun); err != nil {
+	if err := upgradeToSelfHosting(client, cfg, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -144,8 +143,8 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.MasterConfiguratio
 	}, 10)
 }
 
-func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
-	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) && newK8sVer.AtLeast(v190alpha3) {
+func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, dryRun bool) error {
+	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) {
 
 		waiter := getWaiter(dryRun, client)
 
