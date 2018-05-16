@@ -87,42 +87,52 @@ func (a customResourceStrategy) PrepareForCreate(ctx context.Context, obj runtim
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (a customResourceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) || a.status == nil {
-		return
-	}
-
 	newCustomResourceObject := obj.(*unstructured.Unstructured)
 	oldCustomResourceObject := old.(*unstructured.Unstructured)
 
-	newCustomResource := newCustomResourceObject.UnstructuredContent()
-	oldCustomResource := oldCustomResourceObject.UnstructuredContent()
-
-	// update is not allowed to set status
-	_, ok1 := newCustomResource["status"]
-	_, ok2 := oldCustomResource["status"]
-	switch {
-	case ok2:
-		newCustomResource["status"] = oldCustomResource["status"]
-	case ok1:
-		delete(newCustomResource, "status")
+	// reset grace period if it was set and we just removed the finalizers. This will make
+	// this object being deleted on update.
+	if len(oldCustomResourceObject.GetFinalizers()) > 0 && len(newCustomResourceObject.GetFinalizers()) == 0 {
+		if oldCustomResourceObject.GetDeletionGracePeriodSeconds() != nil {
+			newCustomResourceObject.SetDeletionGracePeriodSeconds(int64Ptr(0))
+			// TODO: this is dirty, shouldDeleteDuringUpdate checks for the old object. Here we mutate it. We shouldn't.
+			// If we modify the new object and change shouldDeleteDuringUpdate to check the new object as well,
+			// the update validation will forbid us the change.
+			oldCustomResourceObject.SetDeletionGracePeriodSeconds(int64Ptr(0))
+		}
 	}
 
-	// Any changes to the spec increment the generation number, any changes to the
-	// status should reflect the generation number of the corresponding object. We push
-	// the burden of managing the status onto the clients because we can't (in general)
-	// know here what version of spec the writer of the status has seen. It may seem like
-	// we can at first -- since obj contains spec -- but in the future we will probably make
-	// status its own object, and even if we don't, writes may be the result of a
-	// read-update-write loop, so the contents of spec may not actually be the spec that
-	// the CustomResource has *seen*.
-	newSpec, ok1 := newCustomResource["spec"]
-	oldSpec, ok2 := oldCustomResource["spec"]
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) || a.status == nil {
+		newCustomResource := newCustomResourceObject.UnstructuredContent()
+		oldCustomResource := oldCustomResourceObject.UnstructuredContent()
 
-	// spec is changed, created or deleted
-	if (ok1 && ok2 && !apiequality.Semantic.DeepEqual(oldSpec, newSpec)) || (ok1 && !ok2) || (!ok1 && ok2) {
-		oldAccessor, _ := meta.Accessor(oldCustomResourceObject)
-		newAccessor, _ := meta.Accessor(newCustomResourceObject)
-		newAccessor.SetGeneration(oldAccessor.GetGeneration() + 1)
+		// update is not allowed to set status
+		_, ok1 := newCustomResource["status"]
+		_, ok2 := oldCustomResource["status"]
+		switch {
+		case ok2:
+			newCustomResource["status"] = oldCustomResource["status"]
+		case ok1:
+			delete(newCustomResource, "status")
+		}
+
+		// Any changes to the spec increment the generation number, any changes to the
+		// status should reflect the generation number of the corresponding object. We push
+		// the burden of managing the status onto the clients because we can't (in general)
+		// know here what version of spec the writer of the status has seen. It may seem like
+		// we can at first -- since obj contains spec -- but in the future we will probably make
+		// status its own object, and even if we don't, writes may be the result of a
+		// read-update-write loop, so the contents of spec may not actually be the spec that
+		// the CustomResource has *seen*.
+		newSpec, ok1 := newCustomResource["spec"]
+		oldSpec, ok2 := oldCustomResource["spec"]
+
+		// spec is changed, created or deleted
+		if (ok1 && ok2 && !apiequality.Semantic.DeepEqual(oldSpec, newSpec)) || (ok1 && !ok2) || (!ok1 && ok2) {
+			oldAccessor, _ := meta.Accessor(oldCustomResourceObject)
+			newAccessor, _ := meta.Accessor(newCustomResourceObject)
+			newAccessor.SetGeneration(oldAccessor.GetGeneration() + 1)
+		}
 	}
 }
 
@@ -182,4 +192,15 @@ func (a customResourceStrategy) MatchCustomResourceDefinitionStorage(label label
 		Field:    field,
 		GetAttrs: a.GetAttrs,
 	}
+}
+
+// CheckGracefulDelete implements RESTGracefulDeleteStrategy, but disables it. This
+// means that the deletion grace period is still set, but the graceful deletion
+// flow is skippped, i.e. direct deletion is done (finalizer can delay deletion).
+func (a customResourceStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) (bool, bool) {
+	return true, false
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
 }

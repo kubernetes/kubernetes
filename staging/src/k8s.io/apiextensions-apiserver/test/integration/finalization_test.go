@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/dynamic"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 
@@ -162,4 +164,72 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	if !errors.IsNotFound(err) {
 		t.Fatalf("unable to delete crd: %v", err)
 	}
+}
+
+func TestGracefulDeletionWithFinalizers(t *testing.T) {
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	require.NoError(t, err)
+	defer close(stopCh)
+
+	// Create a CRD.
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	require.NoError(t, err)
+	defer testserver.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+
+	// Create a CR with a finalizer.
+	ns := "not-the-default"
+	name := "foo123"
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+
+	instance := testserver.NewNoxuInstance(ns, name)
+	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
+	_, err = instantiateCustomResource(t, instance, noxuResourceClient, noxuDefinition)
+	require.NoError(t, err)
+
+	t.Logf("Initialy setting grace period to 10")
+	gottenNoxuInstance := deleteWithGraceSeconds(t, noxuResourceClient, name, 10, 10)
+	t.Logf("Failing setting grace period to 20")
+	gottenNoxuInstance = deleteWithGraceSeconds(t, noxuResourceClient, name, 20, 10)
+	t.Logf("Succeeding setting grace period to 5")
+	gottenNoxuInstance = deleteWithGraceSeconds(t, noxuResourceClient, name, 5, 5)
+
+	// Update the CR to remove the finalizer.
+	for {
+		gottenNoxuInstance.SetFinalizers(nil)
+		_, err = noxuResourceClient.Update(gottenNoxuInstance)
+		if err == nil {
+			break
+		}
+		if !errors.IsConflict(err) {
+			require.NoError(t, err) // Fail on unexpected error
+		}
+		gottenNoxuInstance, err = noxuResourceClient.Get(name, metav1.GetOptions{})
+		require.NoError(t, err)
+	}
+
+	// Verify the CR is gone.
+	// It should return the NonFound error.
+	_, err = noxuResourceClient.Get(name, metav1.GetOptions{})
+	if !errors.IsNotFound(err) {
+		t.Fatalf("unable to delete cr: %v", err)
+	}
+}
+
+func deleteWithGraceSeconds(t *testing.T, client dynamic.ResourceInterface, name string, grace int64, expected int64) *unstructured.Unstructured {
+	// Delete a CR. Because there's a finalizer, it will not get deleted now.
+	err := client.Delete(name, &metav1.DeleteOptions{
+		GracePeriodSeconds: int64Ptr(grace),
+	})
+	require.NoError(t, err)
+
+	// Check is the CR scheduled for deletion.
+	obj, err := client.Get(name, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, obj.GetDeletionTimestamp())
+	graceSeconds := obj.GetDeletionGracePeriodSeconds()
+	require.NotNil(t, graceSeconds)
+	require.Equal(t, int64(expected), *graceSeconds)
+
+	return obj
 }
