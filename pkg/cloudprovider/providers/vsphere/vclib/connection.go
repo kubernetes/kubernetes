@@ -167,6 +167,8 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 	return client, nil
 }
 
+// UpdateCredentials updates username and password.
+// Note: Updated username and password will be used when there is no session active
 func (connection *VSphereConnection) UpdateCredentials(username string, password string) {
 	connection.credentialsLock.Lock()
 	defer connection.credentialsLock.Unlock()

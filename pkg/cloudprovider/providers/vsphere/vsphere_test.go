@@ -557,11 +557,11 @@ func TestSecretVSphereConfig(t *testing.T) {
 		if !testcase.expectedIsSecretProvided {
 			for _, vsInstance := range vs.vsphereInstanceMap {
 				if vsInstance.conn.Username != testcase.expectedUsername {
-					t.Fatalf("Expected username doesn't match actual username in config %s. error: %s",
+					t.Fatalf("Expected username %s doesn't match actual username %s in config %s. error: %s",
 						testcase.expectedUsername, vsInstance.conn.Username, testcase.conf, err)
 				}
 				if vsInstance.conn.Password != testcase.expectedPassword {
-					t.Fatalf("Expected password doesn't match actual password in config %s. error: %s",
+					t.Fatalf("Expected password %s doesn't match actual password %s in config %s. error: %s",
 						testcase.expectedPassword, vsInstance.conn.Password, testcase.conf, err)
 				}
 
