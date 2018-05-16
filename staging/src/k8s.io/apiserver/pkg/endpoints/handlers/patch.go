@@ -83,19 +83,23 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		patchJS, err := readBody(req)
+		patchBytes, err := readBody(req)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
 
 		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestPatch(ae, patchJS)
+		audit.LogRequestPatch(ae, patchBytes)
 		trace.Step("Recorded the audit event")
 
-		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
+		baseContentType := runtime.ContentTypeJSON
+		if patchType == types.ApplyPatchType {
+			baseContentType = runtime.ContentTypeYAML
+		}
+		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), baseContentType)
 		if !ok {
-			scope.err(fmt.Errorf("no serializer defined for JSON"), w, req)
+			scope.err(fmt.Errorf("no serializer defined for %v", baseContentType), w, req)
 			return
 		}
 		gv := scope.Kind.GroupVersion()
@@ -134,7 +138,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			restPatcher: r,
 			name:        name,
 			patchType:   patchType,
-			patchJS:     patchJS,
+			patchBytes:  patchBytes,
 
 			trace: trace,
 		}
@@ -193,7 +197,7 @@ type patcher struct {
 	restPatcher rest.Patcher
 	name        string
 	patchType   types.PatchType
-	patchJS     []byte
+	patchBytes  []byte
 
 	trace *utiltrace.Trace
 
@@ -238,18 +242,18 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	return objToUpdate, nil
 }
 
-// patchJS applies the patch. Input and output objects must both have
+// applyJSPatch applies the patch. Input and output objects must both have
 // the external version, since that is what the patch must have been constructed against.
 func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr error) {
 	switch p.patchType {
 	case types.JSONPatchType:
-		patchObj, err := jsonpatch.DecodePatch(p.patchJS)
+		patchObj, err := jsonpatch.DecodePatch(p.patchBytes)
 		if err != nil {
 			return nil, err
 		}
 		return patchObj.Apply(versionedJS)
 	case types.MergePatchType:
-		return jsonpatch.MergePatch(versionedJS, p.patchJS)
+		return jsonpatch.MergePatch(versionedJS, p.patchBytes)
 	default:
 		// only here as a safety net - go-restful filters content-type
 		return nil, fmt.Errorf("unknown Content-Type header for patch: %v", p.patchType)
@@ -271,7 +275,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	if err != nil {
 		return nil, err
 	}
-	if err := strategicPatchObject(p.codec, p.defaulter, currentVersionedObject, p.patchJS, versionedObjToUpdate, p.schemaReferenceObj); err != nil {
+	if err := strategicPatchObject(p.codec, p.defaulter, currentVersionedObject, p.patchBytes, versionedObjToUpdate, p.schemaReferenceObj); err != nil {
 		return nil, err
 	}
 	// Convert the object back to unversioned (aka internal version).
@@ -283,16 +287,16 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	return unversionedObjToUpdate, nil
 }
 
-// strategicPatchObject applies a strategic merge patch of <patchJS> to
+// strategicPatchObject applies a strategic merge patch of <patchBytes> to
 // <originalObject> and stores the result in <objToUpdate>.
 // It additionally returns the map[string]interface{} representation of the
-// <originalObject> and <patchJS>.
+// <originalObject> and <patchBytes>.
 // NOTE: Both <originalObject> and <objToUpdate> are supposed to be versioned.
 func strategicPatchObject(
 	codec runtime.Codec,
 	defaulter runtime.ObjectDefaulter,
 	originalObject runtime.Object,
-	patchJS []byte,
+	patchBytes []byte,
 	objToUpdate runtime.Object,
 	schemaReferenceObj runtime.Object,
 ) error {
@@ -302,7 +306,7 @@ func strategicPatchObject(
 	}
 
 	patchMap := make(map[string]interface{})
-	if err := json.Unmarshal(patchJS, &patchMap); err != nil {
+	if err := json.Unmarshal(patchBytes, &patchMap); err != nil {
 		return errors.NewBadRequest(err.Error())
 	}
 
@@ -310,6 +314,27 @@ func strategicPatchObject(
 		return err
 	}
 	return nil
+}
+
+type applyPatcher struct {
+	*patcher
+}
+
+func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
+	versionedObjToUpdate, err := p.creater.New(p.kind)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.DecodeInto(p.codec, p.patchBytes, versionedObjToUpdate); err != nil {
+		return nil, err
+	}
+	// For now, instead of performing a structured merge we will just attempt a PUT
+	// So we just convert the object back to unversioned (aka internal version).
+	unversionedObjToUpdate, err := p.toUnversioned(versionedObjToUpdate)
+	if err != nil {
+		return nil, err
+	}
+	return unversionedObjToUpdate, nil
 }
 
 // applyPatch is called every time GuaranteedUpdate asks for the updated object,
@@ -348,6 +373,9 @@ func (p *patcher) patchResource(ctx context.Context) (runtime.Object, error) {
 		p.mechanism = &jsonPatcher{patcher: p}
 	case types.StrategicMergePatchType:
 		p.mechanism = &smpPatcher{patcher: p}
+	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
+	case types.ApplyPatchType:
+		p.mechanism = &applyPatcher{patcher: p}
 	default:
 		return nil, fmt.Errorf("%v: unimplemented patch type", p.patchType)
 	}

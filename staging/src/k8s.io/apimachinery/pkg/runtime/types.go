@@ -42,6 +42,7 @@ type TypeMeta struct {
 
 const (
 	ContentTypeJSON string = "application/json"
+	ContentTypeYAML string = "application/yaml"
 )
 
 // RawExtension is used to hold extensions in external versions.
