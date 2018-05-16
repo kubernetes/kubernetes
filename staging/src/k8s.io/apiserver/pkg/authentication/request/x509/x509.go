@@ -31,9 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/metrics"
 )
 
-var clientCertificateExpirationHistogram = prometheus.NewHistogram(
+var clientCertificateExpirationHistogram = metrics.NewResettableHistogram(
 	prometheus.HistogramOpts{
 		Namespace: "apiserver",
 		Subsystem: "client",
@@ -55,8 +56,9 @@ var clientCertificateExpirationHistogram = prometheus.NewHistogram(
 	},
 )
 
-func init() {
-	prometheus.MustRegister(clientCertificateExpirationHistogram)
+// Metrics returns all x509 certificate metrics.
+func Metrics() metrics.Group {
+	return metrics.NewGroup(clientCertificateExpirationHistogram)
 }
 
 // UserConversion defines an interface for extracting user info from a client certificate chain

@@ -37,6 +37,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/metrics:go_default_library",
     ],
 )
 

@@ -20,11 +20,27 @@ import (
 	"io"
 	"net/http"
 
-	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/metrics"
 	"k8s.io/apiserver/pkg/server/mux"
+
+	auditmetrics "k8s.io/apiserver/pkg/audit"
+	clientcertmetrics "k8s.io/apiserver/pkg/authentication/request/x509"
+	authmetrics "k8s.io/apiserver/pkg/endpoints/filters"
+	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	etcdmetrics "k8s.io/apiserver/pkg/storage/etcd/metrics"
+	transformationmetrics "k8s.io/apiserver/pkg/storage/value"
 
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+var allMetrics = metrics.NewStore(
+	prometheus.DefaultRegisterer,
+	apimetrics.Metrics(),
+	authmetrics.Metrics(),
+	etcdmetrics.Metrics(),
+	clientcertmetrics.Metrics(),
+	auditmetrics.Metrics(),
+	transformationmetrics.Metrics(),
 )
 
 // DefaultMetrics installs the default prometheus metrics handler
@@ -32,7 +48,7 @@ type DefaultMetrics struct{}
 
 // Install adds the DefaultMetrics handler
 func (m DefaultMetrics) Install(c *mux.PathRecorderMux) {
-	register()
+	allMetrics.Register()
 	c.Handle("/metrics", prometheus.Handler())
 }
 
@@ -42,21 +58,14 @@ type MetricsWithReset struct{}
 
 // Install adds the MetricsWithReset handler
 func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
-	register()
+	allMetrics.Register()
 	defaultMetricsHandler := prometheus.Handler().ServeHTTP
 	c.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "DELETE" {
-			apimetrics.Reset()
-			etcdmetrics.Reset()
+			allMetrics.Reset()
 			io.WriteString(w, "metrics reset\n")
 			return
 		}
 		defaultMetricsHandler(w, req)
 	})
-}
-
-// register apiserver and etcd metrics
-func register() {
-	apimetrics.Register()
-	etcdmetrics.Register()
 }

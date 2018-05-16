@@ -19,7 +19,10 @@ go_library(
         "transformer.go",
     ],
     importpath = "k8s.io/apiserver/pkg/storage/value",
-    deps = ["//vendor/github.com/prometheus/client_golang/prometheus:go_default_library"],
+    deps = [
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/metrics:go_default_library",
+    ],
 )
 
 filegroup(

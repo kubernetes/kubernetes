@@ -23,22 +23,15 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/metrics"
 
 	"github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-// resettableCollector is the interface implemented by prometheus.MetricVec
-// that can be used by Prometheus to collect metrics and reset their values.
-type resettableCollector interface {
-	prometheus.Collector
-	Reset()
-}
 
 var (
 	// TODO(a-robinson): Add unit tests for the handling of these metrics once
@@ -111,17 +104,6 @@ var (
 		[]string{"requestKind"},
 	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
-
-	metrics = []resettableCollector{
-		requestCounter,
-		longRunningRequestGauge,
-		requestLatencies,
-		requestLatenciesSummary,
-		responseSizes,
-		DroppedRequests,
-		RegisteredWatchers,
-		currentInflightRequests,
-	}
 )
 
 const (
@@ -131,22 +113,18 @@ const (
 	MutatingKind = "mutating"
 )
 
-var registerMetrics sync.Once
-
-// Register all metrics.
-func Register() {
-	registerMetrics.Do(func() {
-		for _, metric := range metrics {
-			prometheus.MustRegister(metric)
-		}
-	})
-}
-
-// Reset all metrics.
-func Reset() {
-	for _, metric := range metrics {
-		metric.Reset()
-	}
+// Metrics returns all request metrics.
+func Metrics() metrics.Group {
+	return metrics.NewGroup(
+		requestCounter,
+		longRunningRequestGauge,
+		requestLatencies,
+		requestLatenciesSummary,
+		responseSizes,
+		DroppedRequests,
+		RegisteredWatchers,
+		currentInflightRequests,
+	)
 }
 
 func UpdateInflightRequestMetrics(nonmutating, mutating int) {

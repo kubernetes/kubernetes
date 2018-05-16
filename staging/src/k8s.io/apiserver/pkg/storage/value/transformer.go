@@ -24,10 +24,6 @@ import (
 	"time"
 )
 
-func init() {
-	RegisterMetrics()
-}
-
 // Context is additional information that a storage transformation may need to verify the data at rest.
 type Context interface {
 	// AuthenticatedData should return an array of bytes that describes the current value. If the value changes,

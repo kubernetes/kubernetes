@@ -17,10 +17,10 @@ limitations under the License.
 package value
 
 import (
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apiserver/pkg/metrics"
 )
 
 var (
@@ -38,12 +38,9 @@ var (
 	)
 )
 
-var registerMetrics sync.Once
-
-func RegisterMetrics() {
-	registerMetrics.Do(func() {
-		prometheus.MustRegister(transformerLatencies)
-	})
+// Metrics returns all storage transformation metrics.
+func Metrics() metrics.Group {
+	return metrics.NewGroup(transformerLatencies)
 }
 
 func RecordTransformation(transformationType string, start time.Time) {

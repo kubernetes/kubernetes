@@ -17,36 +17,33 @@ limitations under the License.
 package metrics
 
 import (
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apiserver/pkg/metrics"
 )
 
 var (
-	cacheHitCounterOpts = prometheus.CounterOpts{
+	cacheHitCounter = metrics.NewResettableCounter(prometheus.CounterOpts{
 		Name: "etcd_helper_cache_hit_count",
 		Help: "Counter of etcd helper cache hits.",
-	}
-	cacheHitCounter      = prometheus.NewCounter(cacheHitCounterOpts)
-	cacheMissCounterOpts = prometheus.CounterOpts{
+	})
+	cacheMissCounter = metrics.NewResettableCounter(prometheus.CounterOpts{
 		Name: "etcd_helper_cache_miss_count",
 		Help: "Counter of etcd helper cache miss.",
-	}
-	cacheMissCounter      = prometheus.NewCounter(cacheMissCounterOpts)
-	cacheEntryCounterOpts = prometheus.CounterOpts{
+	})
+	cacheEntryCounter = metrics.NewResettableCounter(prometheus.CounterOpts{
 		Name: "etcd_helper_cache_entry_count",
 		Help: "Counter of etcd helper cache entries. This can be different from etcd_helper_cache_miss_count " +
 			"because two concurrent threads can miss the cache and generate the same entry twice.",
-	}
-	cacheEntryCounter = prometheus.NewCounter(cacheEntryCounterOpts)
-	cacheGetLatency   = prometheus.NewSummary(
+	})
+	cacheGetLatency = metrics.NewResettableSummary(
 		prometheus.SummaryOpts{
 			Name: "etcd_request_cache_get_latencies_summary",
 			Help: "Latency in microseconds of getting an object from etcd cache",
 		},
 	)
-	cacheAddLatency = prometheus.NewSummary(
+	cacheAddLatency = metrics.NewResettableSummary(
 		prometheus.SummaryOpts{
 			Name: "etcd_request_cache_add_latencies_summary",
 			Help: "Latency in microseconds of adding an object to etcd cache",
@@ -68,20 +65,17 @@ var (
 	)
 )
 
-var registerMetrics sync.Once
-
-// Register all metrics.
-func Register() {
-	// Register the metrics.
-	registerMetrics.Do(func() {
-		prometheus.MustRegister(cacheHitCounter)
-		prometheus.MustRegister(cacheMissCounter)
-		prometheus.MustRegister(cacheEntryCounter)
-		prometheus.MustRegister(cacheAddLatency)
-		prometheus.MustRegister(cacheGetLatency)
-		prometheus.MustRegister(etcdRequestLatenciesSummary)
-		prometheus.MustRegister(objectCounts)
-	})
+// Metrics returns etcd storage metrics.
+func Metrics() metrics.Group {
+	return metrics.NewGroup(
+		cacheHitCounter,
+		cacheMissCounter,
+		cacheEntryCounter,
+		cacheAddLatency,
+		cacheGetLatency,
+		etcdRequestLatenciesSummary,
+		objectCounts,
+	)
 }
 
 func UpdateObjectCount(resourcePrefix string, count int64) {
@@ -110,13 +104,4 @@ func ObserveCacheMiss() {
 
 func ObserveNewEntry() {
 	cacheEntryCounter.Inc()
-}
-
-func Reset() {
-	cacheHitCounter = prometheus.NewCounter(cacheHitCounterOpts)
-	cacheMissCounter = prometheus.NewCounter(cacheMissCounterOpts)
-	cacheEntryCounter = prometheus.NewCounter(cacheEntryCounterOpts)
-	// TODO: Reset cacheAddLatency.
-	// TODO: Reset cacheGetLatency.
-	etcdRequestLatenciesSummary.Reset()
 }

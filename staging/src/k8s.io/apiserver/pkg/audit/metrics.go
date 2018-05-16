@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/metrics"
 )
 
 const (
@@ -29,7 +30,7 @@ const (
 )
 
 var (
-	eventCounter = prometheus.NewCounter(
+	eventCounter = metrics.NewResettableCounter(
 		prometheus.CounterOpts{
 			Subsystem: subsystem,
 			Name:      "event_total",
@@ -54,10 +55,13 @@ var (
 	)
 )
 
-func init() {
-	prometheus.MustRegister(eventCounter)
-	prometheus.MustRegister(errorCounter)
-	prometheus.MustRegister(levelCounter)
+// Metrics returns all audit metrics.
+func Metrics() metrics.Group {
+	return metrics.NewGroup(
+		eventCounter,
+		errorCounter,
+		levelCounter,
+	)
 }
 
 // ObserveEvent updates the relevant prometheus metrics for the generated audit event.

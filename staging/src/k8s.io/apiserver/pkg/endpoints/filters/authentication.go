@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/metrics"
 )
 
 var (
@@ -42,8 +43,9 @@ var (
 	)
 )
 
-func init() {
-	prometheus.MustRegister(authenticatedUserCounter)
+// Metrics returns all authentication request metrics.
+func Metrics() metrics.Group {
+	return metrics.NewGroup(authenticatedUserCounter)
 }
 
 // WithAuthentication creates an http handler that tries to authenticate the given request as a user, and then
