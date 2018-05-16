@@ -24,6 +24,7 @@ go_library(
         "tabwriter.go",
         "template.go",
         "template_flags.go",
+        "typesetter.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/printers",
     deps = [

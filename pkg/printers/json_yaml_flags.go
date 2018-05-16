@@ -20,15 +20,12 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // JSONYamlPrintFlags provides default flags necessary for json/yaml printing.
 // Given the following flag values, a printer can be requested that knows
 // how to handle printing based on these values.
 type JSONYamlPrintFlags struct {
-	Scheme runtime.ObjectConvertor
 }
 
 // ToPrinter receives an outputFormat and returns a printer capable of
@@ -57,6 +54,6 @@ func (f *JSONYamlPrintFlags) AddFlags(c *cobra.Command) {}
 
 // NewJSONYamlPrintFlags returns flags associated with
 // yaml or json printing, with default values set.
-func NewJSONYamlPrintFlags(scheme runtime.ObjectConvertor) *JSONYamlPrintFlags {
-	return &JSONYamlPrintFlags{Scheme: scheme}
+func NewJSONYamlPrintFlags() *JSONYamlPrintFlags {
+	return &JSONYamlPrintFlags{}
 }

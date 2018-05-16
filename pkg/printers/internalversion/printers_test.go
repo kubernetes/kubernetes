@@ -59,6 +59,7 @@ func init() {
 }
 
 var testData = TestStruct{
+	TypeMeta:   metav1.TypeMeta{APIVersion: "foo/bar", Kind: "TestStruct"},
 	Key:        "testValue",
 	Map:        map[string]int{"TestSubkey": 1},
 	StringList: []string{"a", "b", "c"},
@@ -232,6 +233,7 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 	}
 
 	obj := &v1.Pod{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 	}
 	buf.Reset()
@@ -253,11 +255,11 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 }
 
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, &printers.YAMLPrinter{}, yaml.Unmarshal)
+	testPrinter(t, printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.YAMLPrinter{}), yaml.Unmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, &printers.JSONPrinter{}, json.Unmarshal)
+	testPrinter(t, printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.JSONPrinter{}), json.Unmarshal)
 }
 
 func TestFormatResourceName(t *testing.T) {
@@ -363,38 +365,27 @@ func TestNamePrinter(t *testing.T) {
 			},
 			"pod/foo\n"},
 		"List": {
-			&v1.List{
-				TypeMeta: metav1.TypeMeta{
-					Kind: "List",
+			&unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
 				},
-				Items: []runtime.RawExtension{
+				Items: []unstructured.Unstructured{
 					{
-						Object: &v1.Pod{
-							TypeMeta: metav1.TypeMeta{
-								Kind: "Pod",
-							},
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "foo",
-							},
-						},
-					},
-					{
-						Object: &unstructured.Unstructured{
-							Object: map[string]interface{}{
-								"kind":       "Pod",
-								"apiVersion": "v1",
-								"metadata": map[string]interface{}{
-									"name": "bar",
-								},
+						Object: map[string]interface{}{
+							"kind":       "Pod",
+							"apiVersion": "v1",
+							"metadata": map[string]interface{}{
+								"name": "bar",
 							},
 						},
 					},
 				},
 			},
-			"pod/foo\npod/bar\n"},
+			"pod/bar\n"},
 	}
 
-	printFlags := printers.NewPrintFlags("", legacyscheme.Scheme).WithDefaultOutput("name")
+	printFlags := printers.NewPrintFlags("").WithTypeSetter(legacyscheme.Scheme).WithDefaultOutput("name")
 	printer, err := printFlags.ToPrinter()
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -557,14 +548,11 @@ func TestPrinters(t *testing.T) {
 	}
 
 	genericPrinters := map[string]printers.ResourcePrinter{
-		"json":      &printers.JSONPrinter{},
-		"yaml":      &printers.YAMLPrinter{},
+		"json":      printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.JSONPrinter{}),
+		"yaml":      printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.YAMLPrinter{}),
 		"template":  templatePrinter,
 		"template2": templatePrinter2,
 		"jsonpath":  jsonpathPrinter,
-		"name": &printers.NamePrinter{
-			Typer: legacyscheme.Scheme,
-		},
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &v1.Pod{ObjectMeta: om("pod")},

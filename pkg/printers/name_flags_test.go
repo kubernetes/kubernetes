@@ -27,7 +27,10 @@ import (
 )
 
 func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
-	testObject := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	testObject := &v1.Pod{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+	}
 
 	testCases := []struct {
 		name           string

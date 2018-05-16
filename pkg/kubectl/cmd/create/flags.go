@@ -31,6 +31,8 @@ type PrintFlags struct {
 	NamePrintFlags     *printers.NamePrintFlags
 	TemplateFlags      *printers.KubeTemplatePrintFlags
 
+	TypeSetter *printers.TypeSetterPrinter
+
 	OutputFormat *string
 }
 
@@ -45,15 +47,15 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	}
 
 	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
-		return p, err
+		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
 	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
-		return p, err
+		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
 	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
-		return p, err
+		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
 	return nil, printers.NoCompatiblePrinterError{Options: f}
@@ -69,14 +71,16 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	}
 }
 
-func NewPrintFlags(operation string, scheme runtime.ObjectConvertor) *PrintFlags {
+func NewPrintFlags(operation string, scheme runtime.ObjectTyper) *PrintFlags {
 	outputFormat := ""
 
 	return &PrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme),
-		NamePrintFlags:     printers.NewNamePrintFlags(operation, scheme),
+		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+		NamePrintFlags:     printers.NewNamePrintFlags(operation),
 		TemplateFlags:      printers.NewKubeTemplatePrintFlags(),
+
+		TypeSetter: printers.NewTypeSetter(scheme),
 	}
 }
