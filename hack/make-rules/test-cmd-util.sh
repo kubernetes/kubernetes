@@ -1185,6 +1185,39 @@ run_kubectl_apply_deployments_tests() {
   set +o errexit
 }
 
+# Runs tests for kubectl alpha diff
+run_kubectl_diff_tests() {
+    set -o nounset
+    set -o errexit
+
+    create_and_use_new_namespace
+    kube::log::status "Testing kubectl alpha diff"
+
+    kubectl apply -f hack/testdata/pod.yaml
+
+    # Ensure that selfLink has been added, and shown in the diff
+    output_message=$(kubectl alpha diff -f hack/testdata/pod.yaml)
+    kube::test::if_has_string "${output_message}" 'selfLink'
+    output_message=$(kubectl alpha diff LOCAL LIVE -f hack/testdata/pod.yaml)
+    kube::test::if_has_string "${output_message}" 'selfLink'
+    output_message=$(kubectl alpha diff LOCAL MERGED -f hack/testdata/pod.yaml)
+    kube::test::if_has_string "${output_message}" 'selfLink'
+
+    output_message=$(kubectl alpha diff MERGED MERGED -f hack/testdata/pod.yaml)
+    kube::test::if_empty_string "${output_message}"
+    output_message=$(kubectl alpha diff LIVE LIVE -f hack/testdata/pod.yaml)
+    kube::test::if_empty_string "${output_message}"
+    output_message=$(kubectl alpha diff LAST LAST -f hack/testdata/pod.yaml)
+    kube::test::if_empty_string "${output_message}"
+    output_message=$(kubectl alpha diff LOCAL LOCAL -f hack/testdata/pod.yaml)
+    kube::test::if_empty_string "${output_message}"
+
+    kubectl delete -f  hack/testdata/pod.yaml
+
+    set +o nounset
+    set +o errexit
+}
+
 # Runs tests for --save-config tests.
 run_save_config_tests() {
   set -o nounset
@@ -4982,6 +5015,11 @@ runTests() {
   if kube::test::if_supports_resource "${deployments}" ; then
     record_command run_kubectl_apply_deployments_tests
   fi
+
+  ################
+  # Kubectl diff #
+  ################
+  record_command run_kubectl_diff_tests
 
   ###############
   # Kubectl get #
