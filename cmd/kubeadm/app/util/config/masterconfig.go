@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -76,52 +75,89 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	return nil
 }
 
-// TryLoadMasterConfiguration tries to loads a Master configuration from the given file (if defined)
-func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiv1alpha1.MasterConfiguration) error {
-
-	if cfgPath != "" {
-		b, err := ioutil.ReadFile(cfgPath)
-		if err != nil {
-			return fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
-		}
-		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
-			return fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
-		}
-	}
-
-	return nil
-}
-
 // ConfigFileAndDefaultsToInternalConfig takes a path to a config file and a versioned configuration that can serve as the default config
 // If cfgPath is specified, defaultversionedcfg will always get overridden. Otherwise, the default config (often populated by flags) will be used.
 // Then the external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
 func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha1.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
-	glog.V(1).Infoln("configuring files and defaults to internal config")
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
-	// Loads configuration from config file, if provided
-	// Nb. --config overrides command line flags
-	glog.V(1).Infoln("attempting to load configuration from config file")
-	if err := TryLoadMasterConfiguration(cfgPath, defaultversionedcfg); err != nil {
-		return nil, err
+	if cfgPath != "" {
+		// Loads configuration from config file, if provided
+		// Nb. --config overrides command line flags
+		glog.V(1).Infoln("loading configuration from the given file")
+
+		b, err := ioutil.ReadFile(cfgPath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
+		}
+		return BytesToInternalConfig(b)
 	}
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
 	// static default values to cfg only for values not provided with flags
 	kubeadmscheme.Scheme.Default(defaultversionedcfg)
 	kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
-	// Applies dynamic defaults to settings not provided with flags
-	if err := SetInitDynamicDefaults(internalcfg); err != nil {
-		return nil, err
+
+	return defaultAndValidate(internalcfg)
+}
+
+// BytesToInternalConfig converts a byte array to an internal, defaulted and validated configuration object
+func BytesToInternalConfig(b []byte) (*kubeadmapi.MasterConfiguration, error) {
+	internalcfg := &kubeadmapi.MasterConfiguration{}
+
+	decoded, err := kubeadmutil.LoadYAML(b)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode config from bytes: %v", err)
 	}
 
-	// Validates cfg (flags/configs + defaults + dynamic defaults)
-	if err := validation.ValidateMasterConfiguration(internalcfg).ToAggregate(); err != nil {
+	// As there was a bug in kubeadm v1.10 and earlier that made the YAML uploaded to the cluster configmap NOT have metav1.TypeMeta information
+	// we need to populate this here manually. If kind or apiVersion is empty, we know the apiVersion is v1alpha1, as by the time kubeadm had this bug,
+	// it could only write
+	// TODO: Remove this "hack" in v1.12 when we know the ConfigMap always contains v1alpha2 content written by kubeadm v1.11. Also, we will drop support for
+	// v1alpha1 in v1.12
+	kind := decoded["kind"]
+	apiVersion := decoded["apiVersion"]
+	if kind == nil || len(kind.(string)) == 0 {
+		decoded["kind"] = "MasterConfiguration"
+	}
+	if apiVersion == nil || len(apiVersion.(string)) == 0 {
+		decoded["apiVersion"] = kubeadmapiv1alpha1.SchemeGroupVersion.String()
+	}
+
+	// Between v1.9 and v1.10 the proxy componentconfig in the v1alpha1 MasterConfiguration changed unexpectedly, which broke unmarshalling out-of-the-box
+	// Hence, we need to workaround this bug in the v1alpha1 API
+	if decoded["apiVersion"] == kubeadmapiv1alpha1.SchemeGroupVersion.String() {
+		v1alpha1cfg := &kubeadmapiv1alpha1.MasterConfiguration{}
+		if err := kubeadmapiv1alpha1.Migrate(decoded, v1alpha1cfg, kubeadmscheme.Codecs); err != nil {
+			return nil, fmt.Errorf("unable to migrate config from previous version: %v", err)
+		}
+
+		// Default and convert to the internal version
+		kubeadmscheme.Scheme.Default(v1alpha1cfg)
+		kubeadmscheme.Scheme.Convert(v1alpha1cfg, internalcfg, nil)
+	} else {
+		// TODO: Add support for an upcoming v1alpha2 API
+		// TODO: In the future, we can unmarshal any two or more external types into the internal object directly using the following syntax.
+		// Long-term we don't need this if/else clause. In the future this will do
+		// runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmapiv2alpha3.SchemeGroupVersion), b, internalcfg)
+		return nil, fmt.Errorf("unknown API version for kubeadm configuration")
+	}
+
+	return defaultAndValidate(internalcfg)
+}
+
+func defaultAndValidate(cfg *kubeadmapi.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
+	// Applies dynamic defaults to settings not provided with flags
+	if err := SetInitDynamicDefaults(cfg); err != nil {
 		return nil, err
 	}
-	return internalcfg, nil
+	// Validates cfg (flags/configs + defaults + dynamic defaults)
+	if err := validation.ValidateMasterConfiguration(cfg).ToAggregate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
 
 // NormalizeKubernetesVersion resolves version labels, sets alternative

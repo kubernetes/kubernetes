@@ -32,7 +32,6 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -115,8 +114,8 @@ var (
 
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiv1alpha1.MasterConfiguration{}
-	kubeadmscheme.Scheme.Default(cfg)
+	externalcfg := &kubeadmapiv1alpha1.MasterConfiguration{}
+	kubeadmscheme.Scheme.Default(externalcfg)
 
 	var cfgPath string
 	var skipPreFlight bool
@@ -130,26 +129,26 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		Short: "Run this command in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
 
+			kubeadmscheme.Scheme.Default(externalcfg)
+
 			var err error
-			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
+			if externalcfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
-
-			kubeadmscheme.Scheme.Default(cfg)
-			internalcfg := &kubeadmapi.MasterConfiguration{}
-			kubeadmscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
-			i, err := NewInit(cfgPath, internalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun)
+			err = validation.ValidateMixedArguments(cmd.Flags())
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(i.Validate(cmd))
+
+			i, err := NewInit(cfgPath, externalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun)
+			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
 
-	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
+	AddInitConfigFlags(cmd.PersistentFlags(), externalcfg, &featureGatesString)
 	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
 
 	return cmd
@@ -239,27 +238,15 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool) (*Init, error) {
+func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha1.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool) (*Init, error) {
 
-	if cfgPath != "" {
-		glog.V(1).Infof("[init] reading config file from: " + cfgPath)
-		b, err := ioutil.ReadFile(cfgPath)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
-		}
-		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
-			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
-		}
-	}
-
-	// Set defaults dynamically that the API group defaulting can't (by fetching information from the internet, looking up network interfaces, etc.)
-	glog.V(1).Infof("[init] setting dynamic defaults")
-	err := configutil.SetInitDynamicDefaults(cfg)
+	// Either use the config file if specified, or convert the defaults in the external to an internal cfg representation
+	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, externalcfg)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(1).Infof("[init] validating Kubernetes version")
+	glog.V(1).Infof("[init] validating feature gates")
 	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
 		return nil, err
 	}
@@ -291,14 +278,6 @@ type Init struct {
 	cfg            *kubeadmapi.MasterConfiguration
 	skipTokenPrint bool
 	dryRun         bool
-}
-
-// Validate validates configuration passed to "kubeadm init"
-func (i *Init) Validate(cmd *cobra.Command) error {
-	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
-		return err
-	}
-	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
 }
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.

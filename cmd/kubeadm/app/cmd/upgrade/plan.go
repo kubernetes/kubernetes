@@ -26,10 +26,12 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
@@ -58,7 +60,7 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 			// If the version is specified in config file, pick up that value.
 			if parentFlags.cfgPath != "" {
 				glog.V(1).Infof("fetching configuration from file", parentFlags.cfgPath)
-				cfg, err := upgrade.FetchConfigurationFromFile(parentFlags.cfgPath)
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(parentFlags.cfgPath, &kubeadmapiv1alpha1.MasterConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {
