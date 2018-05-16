@@ -44,7 +44,7 @@ var (
 // NewCmdPlugin creates the command that is the top-level for plugin commands.
 func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	// Loads plugins and create commands for each plugin identified
-	loadedPlugins, loadErr := f.PluginLoader().Load()
+	loadedPlugins, loadErr := pluginLoader().Load()
 	if loadErr != nil {
 		glog.V(1).Infof("Unable to load plugins: %v", loadErr)
 	}
@@ -63,7 +63,7 @@ func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	}
 
 	if len(loadedPlugins) > 0 {
-		pluginRunner := f.PluginRunner()
+		pluginRunner := pluginRunner()
 		for _, p := range loadedPlugins {
 			cmd.AddCommand(NewCmdForPlugin(f, p, pluginRunner, streams))
 		}
@@ -165,4 +165,23 @@ func (p *factoryAttrsPluginEnvProvider) Env() (plugins.EnvList, error) {
 	return plugins.EnvList{
 		plugins.Env{N: "KUBECTL_PLUGINS_CURRENT_NAMESPACE", V: cmdNamespace},
 	}, nil
+}
+
+// pluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.
+// If this env var is not set, it defaults to
+//   "~/.kube/plugins", plus
+//  "./kubectl/plugins" directory under the "data dir" directory specified by the XDG
+// system directory structure spec for the given platform.
+func pluginLoader() plugins.PluginLoader {
+	if len(os.Getenv("KUBECTL_PLUGINS_PATH")) > 0 {
+		return plugins.KubectlPluginsPathPluginLoader()
+	}
+	return plugins.TolerantMultiPluginLoader{
+		plugins.XDGDataDirsPluginLoader(),
+		plugins.UserDirPluginLoader(),
+	}
+}
+
+func pluginRunner() plugins.PluginRunner {
+	return &plugins.ExecPluginRunner{}
 }

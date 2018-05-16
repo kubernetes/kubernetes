@@ -168,7 +168,7 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	o.scaler, err = f.Scaler()
+	o.scaler, err = scaler(f)
 	if err != nil {
 		return err
 	}
@@ -287,4 +287,13 @@ func ScaleJob(info *resource.Info, jobsClient batchclient.JobsGetter, count uint
 	}
 
 	return scaler.Scale(info.Namespace, info.Name, count, jobPreconditions, jobRetry, jobWaitForReplicas)
+}
+
+func scaler(f cmdutil.Factory) (kubectl.Scaler, error) {
+	scalesGetter, err := f.ScaleClient()
+	if err != nil {
+		return nil, err
+	}
+
+	return kubectl.NewScaler(scalesGetter), nil
 }

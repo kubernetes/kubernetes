@@ -286,10 +286,6 @@ func (f *TestFactory) Cleanup() {
 	os.Remove(f.tempConfigFile.Name())
 }
 
-func (f *TestFactory) CategoryExpander() (restmapper.CategoryExpander, error) {
-	return resource.FakeCategoryExpander, nil
-}
-
 func (f *TestFactory) ClientConfig() (*restclient.Config, error) {
 	return f.ClientConfigVal, nil
 }
@@ -334,7 +330,6 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
 	mapper, err := f.RESTMapper()
-	categoryExpander, err2 := f.CategoryExpander()
 
 	return resource.NewFakeBuilder(
 		func(version schema.GroupVersion) (resource.RESTClient, error) {
@@ -347,8 +342,8 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 			return f.Client, nil
 		},
 		mapper,
-		categoryExpander,
-	).AddError(err).AddError(err2)
+		resource.FakeCategoryExpander,
+	).AddError(err)
 }
 
 func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
