@@ -1174,3 +1174,65 @@ def _write_gcp_snap_config(component):
         daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
         daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
         daemon_env_path.write_text(daemon_env)
+
+
+def get_first_mount(mount_relation):
+    mount_relation_list = mount_relation.mounts()
+    if mount_relation_list and len(mount_relation_list) > 0:
+        # mount relation list is a list of the mount layer relations
+        # for now we just use the first one that is nfs
+        for mount in mount_relation_list:
+            # for now we just check the first mount and use that.
+            # the nfs charm only supports one for now.
+            if ('mounts' in mount and
+                    mount['mounts'][0]['fstype'] == 'nfs'):
+                return mount['mounts'][0]
+    return None
+
+
+@when('nfs.available')
+def nfs_state_control(mount):
+    ''' Determine if we should remove the state that controls the re-render
+    and execution of the nfs-relation-changed event because there
+    are changes in the relationship data, and we should re-render any
+    configs '''
+
+    mount_data = get_first_mount(mount)
+    if mount_data:
+        nfs_relation_data = {
+            'options': mount_data['options'],
+            'host': mount_data['hostname'],
+            'mountpoint': mount_data['mountpoint'],
+            'fstype': mount_data['fstype']
+        }
+
+        # Re-execute the rendering if the data has changed.
+        if data_changed('nfs-config', nfs_relation_data):
+            hookenv.log('reconfiguring nfs')
+            remove_state('nfs.configured')
+
+
+@when('nfs.available')
+@when_not('nfs.configured')
+def nfs_storage(mount):
+    '''NFS on kubernetes requires nfs config rendered into a deployment of
+    the nfs client provisioner. That will handle the persistent volume claims
+    with no persistent volume to back them.'''
+
+    mount_data = get_first_mount(mount)
+    if not mount_data:
+        return
+
+    addon_path = '/root/cdk/addons/{}'
+    # Render the NFS deployment
+    manifest = addon_path.format('nfs-provisioner.yaml')
+    render('nfs-provisioner.yaml', manifest, mount_data)
+    hookenv.log('Creating the nfs provisioner.')
+    try:
+        kubectl('apply', '-f', manifest)
+    except CalledProcessError as e:
+        hookenv.log(e)
+        hookenv.log('Failed to create nfs provisioner. Will attempt again next update.')  # noqa
+        return
+
+    set_state('nfs.configured')
