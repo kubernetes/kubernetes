@@ -184,7 +184,7 @@ func TestRunCreateToken(t *testing.T) {
 
 			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
 			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			KubernetesVersion: "v1.9.0",
+			KubernetesVersion: "v1.10.0",
 			Token:             tc.token,
 			TokenTTL:          &metav1.Duration{Duration: 0},
 			TokenUsages:       tc.usages,

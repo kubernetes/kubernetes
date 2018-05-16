@@ -62,12 +62,12 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			name:               "set k8s version",
 			expectedImageCount: defaultNumberOfImages,
 			expectedImageSubstrings: []string{
-				":v1.9.1",
+				":v1.10.1",
 			},
 			configContents: []byte(dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1alpha2
 				kind: MasterConfiguration
-				kubernetesVersion: 1.9.1
+				kubernetesVersion: 1.10.1
 			`)),
 		},
 		{
