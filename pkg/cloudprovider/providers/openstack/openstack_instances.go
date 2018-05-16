@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
@@ -61,7 +60,7 @@ func (i *Instances) CurrentNodeName(ctx context.Context, hostname string) (types
 	if err != nil {
 		return "", err
 	}
-	return types.NodeName(strings.Split(md.Hostname, ".")[0]), nil
+	return types.NodeName(md.Hostname), nil
 }
 
 // AddSSHKeyToAllInstances is not implemented for OpenStack
