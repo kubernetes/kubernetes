@@ -61,7 +61,7 @@ func RetrieveValidatedClusterInfo(cfg *kubeadmapi.NodeConfiguration) (*clientcmd
 	// The endpoint that wins the race and completes the task first gets its kubeconfig returned below
 	baseKubeConfig, err := runForEndpointsAndReturnFirst(cfg.DiscoveryTokenAPIServers, cfg.DiscoveryTimeout.Duration, func(endpoint string) (*clientcmdapi.Config, error) {
 
-		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, cfg.ClusterName)
+		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, cfg.Metadata.ClusterName)
 		clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster
 
 		insecureClient, err := kubeconfigutil.ToClientSet(insecureBootstrapConfig)

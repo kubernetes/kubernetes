@@ -55,7 +55,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CIImageRepository = ""
 			obj.UnifiedControlPlaneImage = "foo"
 			obj.FeatureGates = map[string]bool{"foo": true}
-			obj.ClusterName = "foo"
 			obj.APIServerExtraArgs = map[string]string{"foo": "foo"}
 			obj.APIServerExtraVolumes = []kubeadm.HostPathMount{{
 				Name:      "foo",
@@ -133,7 +132,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.TLSBootstrapToken = "foo"
 			obj.Token = "foo"
 			obj.CRISocket = "foo"
-			obj.ClusterName = "foo"
 		},
 	}
 }

@@ -138,8 +138,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.Etcd.DataDir = DefaultEtcdDataDir
 	}
 
-	if obj.ClusterName == "" {
-		obj.ClusterName = DefaultClusterName
+	if obj.Metadata.ClusterName == "" {
+		obj.Metadata.ClusterName = DefaultClusterName
 	}
 
 	SetDefaultsEtcdSelfHosted(obj)
@@ -192,8 +192,8 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 			Duration: DefaultDiscoveryTimeout,
 		}
 	}
-	if obj.ClusterName == "" {
-		obj.ClusterName = DefaultClusterName
+	if obj.Metadata.ClusterName == "" {
+		obj.Metadata.ClusterName = DefaultClusterName
 	}
 }
 

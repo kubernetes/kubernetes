@@ -30,6 +30,11 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Metadata holds metadata about the this configuration object.
+	// Annotations and similar extra information can be provided by the user or other external programs
+	// .Metadata.ClusterName is used for setting the .Cluster[0].Name field in generated KubeConfig files by kubeadm
+	Metadata metav1.ObjectMeta `json:"metadata"`
+
 	// API holds configuration for the k8s apiserver.
 	API API `json:"api"`
 	// KubeProxy holds configuration for the k8s service proxy.
@@ -116,9 +121,6 @@ type MasterConfiguration struct {
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
-
-	// The cluster name
-	ClusterName string `json:"clusterName,omitempty"`
 }
 
 // API struct contains elements of API server address.
@@ -213,6 +215,11 @@ type SelfHostedEtcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Metadata holds metadata about the this configuration object.
+	// Annotations and similar extra information can be provided by the user or other external programs
+	// .Metadata.ClusterName is used for setting the .Cluster[0].Name field in generated KubeConfig files by kubeadm
+	Metadata metav1.ObjectMeta `json:"metadata"`
+
 	// CACertPath is the path to the SSL certificate authority used to
 	// secure comunications between node and master.
 	// Defaults to "/etc/kubernetes/pki/ca.crt".
@@ -239,8 +246,6 @@ type NodeConfiguration struct {
 	Token string `json:"token"`
 	// CRISocket is used to retrieve container runtime info.
 	CRISocket string `json:"criSocket,omitempty"`
-	// ClusterName is the name for the cluster in kubeconfig.
-	ClusterName string `json:"clusterName,omitempty"`
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery
