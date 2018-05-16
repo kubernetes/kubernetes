@@ -28,6 +28,7 @@ reviewers:
   - vishh
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
+  - bsalamat # for test/e2e/scheduling
   - cblecker
   - rramkumar1
   - MrHohn
