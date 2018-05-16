@@ -374,7 +374,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 			Attach: &DefaultRemoteAttach{},
 		}
-		config, err := f.ClientConfig()
+		config, err := f.ToRESTConfig()
 		if err != nil {
 			return err
 		}
@@ -638,7 +638,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		return nil, err
 	}
 
-	mapper, err := f.RESTMapper()
+	mapper, err := f.ToRESTMapper()
 	if err != nil {
 		return nil, err
 	}
