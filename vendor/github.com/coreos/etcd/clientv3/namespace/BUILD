@@ -9,6 +9,7 @@ go_library(
         "util.go",
         "watch.go",
     ],
+    importmap = "vendor/github.com/coreos/etcd/clientv3/namespace",
     importpath = "github.com/coreos/etcd/clientv3/namespace",
     visibility = ["//visibility:public"],
     deps = [

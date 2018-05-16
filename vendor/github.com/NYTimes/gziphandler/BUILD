@@ -6,6 +6,7 @@ go_library(
         "gzip.go",
         "gzip_go18.go",
     ],
+    importmap = "vendor/github.com/NYTimes/gziphandler",
     importpath = "github.com/NYTimes/gziphandler",
     visibility = ["//visibility:public"],
 )

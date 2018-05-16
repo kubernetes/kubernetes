@@ -42,6 +42,7 @@ go_library(
         "type_support.go",
         "with_transform.go",
     ],
+    importmap = "vendor/github.com/onsi/gomega/matchers",
     importpath = "github.com/onsi/gomega/matchers",
     visibility = ["//visibility:public"],
     deps = [

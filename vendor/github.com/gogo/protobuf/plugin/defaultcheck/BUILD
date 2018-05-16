@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["defaultcheck.go"],
+    importmap = "vendor/github.com/gogo/protobuf/plugin/defaultcheck",
     importpath = "github.com/gogo/protobuf/plugin/defaultcheck",
     visibility = ["//visibility:public"],
     deps = [

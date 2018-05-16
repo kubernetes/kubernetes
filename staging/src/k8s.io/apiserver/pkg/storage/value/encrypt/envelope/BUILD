@@ -26,39 +26,8 @@ go_test(
     name = "go_default_test",
     srcs = [
         "envelope_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "grpc_service_unix_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "grpc_service_unix_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "grpc_service_unix_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "grpc_service_unix_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "grpc_service_unix_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "grpc_service_unix_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "grpc_service_unix_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "grpc_service_unix_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "grpc_service_unix_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "grpc_service_unix_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "grpc_service_unix_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",

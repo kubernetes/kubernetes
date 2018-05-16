@@ -3,83 +3,24 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "cgroup_manager_linux.go",
+        "cgroup_manager_unsupported.go",
         "container_manager.go",
+        "container_manager_linux.go",
         "container_manager_stub.go",
+        "container_manager_unsupported.go",
+        "container_manager_windows.go",
         "fake_internal_container_lifecycle.go",
+        "helpers_linux.go",
+        "helpers_unsupported.go",
         "internal_container_lifecycle.go",
+        "node_container_manager.go",
+        "pod_container_manager_linux.go",
         "pod_container_manager_stub.go",
+        "pod_container_manager_unsupported.go",
+        "qos_container_manager_linux.go",
         "types.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_unsupported.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_unsupported.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_unsupported.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_unsupported.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "cgroup_manager_linux.go",
-            "container_manager_linux.go",
-            "helpers_linux.go",
-            "node_container_manager.go",
-            "pod_container_manager_linux.go",
-            "qos_container_manager_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_unsupported.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_unsupported.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_unsupported.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_unsupported.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_unsupported.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "cgroup_manager_unsupported.go",
-            "container_manager_windows.go",
-            "helpers_unsupported.go",
-            "pod_container_manager_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm",
     visibility = ["//visibility:public"],
     deps = [
@@ -181,17 +122,14 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "cgroup_manager_linux_test.go",
-            "cgroup_manager_test.go",
-            "container_manager_linux_test.go",
-            "helpers_linux_test.go",
-            "node_container_manager_test.go",
-            "pod_container_manager_linux_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "cgroup_manager_linux_test.go",
+        "cgroup_manager_test.go",
+        "container_manager_linux_test.go",
+        "helpers_linux_test.go",
+        "node_container_manager_test.go",
+        "pod_container_manager_linux_test.go",
+    ],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

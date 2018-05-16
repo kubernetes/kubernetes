@@ -45,8 +45,8 @@ type Package struct {
 	// ImportPath is the string used to import this package in Go.
 	ImportPath string
 
-	Library, Binary, Test, XTest GoTarget
-	Proto                        ProtoTarget
+	Library, Binary, Test GoTarget
+	Proto                 ProtoTarget
 
 	HasTestdata bool
 }
@@ -129,6 +129,34 @@ func (ps *PlatformStrings) IsEmpty() bool {
 	return len(ps.Generic) == 0 && len(ps.OS) == 0 && len(ps.Arch) == 0 && len(ps.Platform) == 0
 }
 
+func (ps *PlatformStrings) Flat() []string {
+	unique := make(map[string]struct{})
+	for _, s := range ps.Generic {
+		unique[s] = struct{}{}
+	}
+	for _, ss := range ps.OS {
+		for _, s := range ss {
+			unique[s] = struct{}{}
+		}
+	}
+	for _, ss := range ps.Arch {
+		for _, s := range ss {
+			unique[s] = struct{}{}
+		}
+	}
+	for _, ss := range ps.Platform {
+		for _, s := range ss {
+			unique[s] = struct{}{}
+		}
+	}
+	flat := make([]string, 0, len(unique))
+	for s := range unique {
+		flat = append(flat, s)
+	}
+	sort.Strings(flat)
+	return flat
+}
+
 func (ps *PlatformStrings) firstGoFile() string {
 	for _, f := range ps.Generic {
 		if strings.HasSuffix(f, ".go") {
@@ -160,11 +188,11 @@ func (ps *PlatformStrings) firstGoFile() string {
 }
 
 type packageBuilder struct {
-	name, dir, rel               string
-	library, binary, test, xtest goTargetBuilder
-	proto                        protoTargetBuilder
-	hasTestdata                  bool
-	importPath, importPathFile   string
+	name, dir, rel             string
+	library, binary, test      goTargetBuilder
+	proto                      protoTargetBuilder
+	hasTestdata                bool
+	importPath, importPathFile string
 }
 
 type goTargetBuilder struct {
@@ -212,11 +240,6 @@ func (pb *packageBuilder) addFile(c *config.Config, info fileInfo, cgo bool) err
 		!cgo && (info.category == cExt || info.category == csExt) ||
 		c.ProtoMode == config.DisableProtoMode && info.category == protoExt:
 		return nil
-	case info.isXTest:
-		if info.isCgo {
-			return fmt.Errorf("%s: use of cgo in test not supported", info.path)
-		}
-		pb.xtest.addFile(c, info)
 	case info.isTest:
 		if info.isCgo {
 			return fmt.Errorf("%s: use of cgo in test not supported", info.path)
@@ -258,7 +281,6 @@ func (pb *packageBuilder) firstGoFile() string {
 		pb.library.sources,
 		pb.binary.sources,
 		pb.test.sources,
-		pb.xtest.sources,
 	}
 	for _, sb := range goSrcs {
 		if sb.strs != nil {
@@ -297,7 +319,6 @@ func (pb *packageBuilder) build() *Package {
 		Library:     pb.library.build(),
 		Binary:      pb.binary.build(),
 		Test:        pb.test.build(),
-		XTest:       pb.xtest.build(),
 		Proto:       pb.proto.build(),
 		HasTestdata: pb.hasTestdata,
 	}

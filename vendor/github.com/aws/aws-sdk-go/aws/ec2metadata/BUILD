@@ -6,6 +6,7 @@ go_library(
         "api.go",
         "service.go",
     ],
+    importmap = "vendor/github.com/aws/aws-sdk-go/aws/ec2metadata",
     importpath = "github.com/aws/aws-sdk-go/aws/ec2metadata",
     visibility = ["//visibility:public"],
     deps = [

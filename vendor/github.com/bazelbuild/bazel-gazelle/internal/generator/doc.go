@@ -13,5 +13,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package rules provides Bazel rule generation for Go build targets.
-package rules
+// Package generator provides Bazel rule generation for Go build targets.
+package generator

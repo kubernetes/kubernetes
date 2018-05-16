@@ -13,43 +13,10 @@ go_library(
         "port_allocator.go",
         "proxier.go",
         "proxysocket.go",
+        "rlimit.go",
+        "rlimit_windows.go",
         "roundrobin.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "rlimit.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "rlimit_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/proxy/userspace",
     deps = [
         "//pkg/apis/core:go_default_library",

@@ -13,6 +13,7 @@ go_library(
         "transform.go",
         "trie.go",
     ],
+    importmap = "vendor/golang.org/x/text/unicode/norm",
     importpath = "golang.org/x/text/unicode/norm",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/text/transform:go_default_library"],

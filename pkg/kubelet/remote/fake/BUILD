@@ -11,44 +11,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "endpoint.go",
+        "endpoint_windows.go",
         "fake_image_service.go",
         "fake_runtime.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "endpoint.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "endpoint_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/remote/fake",
     tags = ["automanaged"],
     deps = [

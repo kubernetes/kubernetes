@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["args.go"],
+    importmap = "vendor/k8s.io/gengo/args",
     importpath = "k8s.io/gengo/args",
     visibility = ["//visibility:public"],
     deps = [

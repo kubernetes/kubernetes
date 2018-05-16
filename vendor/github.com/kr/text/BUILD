@@ -7,6 +7,7 @@ go_library(
         "indent.go",
         "wrap.go",
     ],
+    importmap = "vendor/github.com/kr/text",
     importpath = "github.com/kr/text",
     visibility = ["//visibility:public"],
 )

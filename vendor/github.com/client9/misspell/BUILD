@@ -13,6 +13,7 @@ go_library(
         "url.go",
         "words.go",
     ],
+    importmap = "vendor/github.com/client9/misspell",
     importpath = "github.com/client9/misspell",
     visibility = ["//visibility:public"],
 )

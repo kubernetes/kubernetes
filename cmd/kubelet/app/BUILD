@@ -16,55 +16,13 @@ go_library(
     name = "go_default_library",
     srcs = [
         "auth.go",
+        "init_others.go",
+        "init_windows.go",
         "plugins.go",
         "server.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "init_others.go",
-            "server_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "init_others.go",
-            "server_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "init_others.go",
-            "server_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "init_others.go",
-            "server_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "init_others.go",
-            "server_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "init_others.go",
-            "server_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "init_others.go",
-            "server_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "init_others.go",
-            "server_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "init_others.go",
-            "server_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "init_others.go",
-            "server_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "init_windows.go",
-            "server_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "server_linux.go",
+        "server_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/kubelet/app",
     deps = [
         "//cmd/kubelet/app/options:go_default_library",

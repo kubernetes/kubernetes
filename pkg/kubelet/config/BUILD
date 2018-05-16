@@ -9,45 +9,12 @@ go_library(
         "defaults.go",
         "doc.go",
         "file.go",
+        "file_linux.go",
+        "file_unsupported.go",
         "flags.go",
         "http.go",
         "sources.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "file_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "file_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "file_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "file_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "file_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "file_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "file_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "file_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "file_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "file_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "file_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/config",
     visibility = ["//visibility:public"],
     deps = [
@@ -93,14 +60,10 @@ go_test(
         "apiserver_test.go",
         "common_test.go",
         "config_test.go",
+        "file_linux_test.go",
         "file_test.go",
         "http_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "file_linux_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",

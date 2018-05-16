@@ -6,6 +6,7 @@ go_library(
         "nvidia.go",
         "types.go",
     ],
+    importmap = "vendor/github.com/google/cadvisor/accelerators",
     importpath = "github.com/google/cadvisor/accelerators",
     visibility = ["//visibility:public"],
     deps = [

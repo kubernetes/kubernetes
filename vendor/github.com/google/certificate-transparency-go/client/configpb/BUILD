@@ -6,11 +6,12 @@ go_library(
         "gen.go",
         "multilog.pb.go",
     ],
+    importmap = "vendor/github.com/google/certificate-transparency-go/client/configpb",
     importpath = "github.com/google/certificate-transparency-go/client/configpb",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
-        "//vendor/github.com/golang/protobuf/ptypes/timestamp:go_default_library",
+        "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
     ],
 )
 

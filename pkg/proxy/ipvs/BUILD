@@ -39,43 +39,10 @@ go_library(
     srcs = [
         "ipset.go",
         "netlink.go",
+        "netlink_linux.go",
+        "netlink_unsupported.go",
         "proxier.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "netlink_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "netlink_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs",
     deps = [
         "//pkg/apis/core:go_default_library",

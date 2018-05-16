@@ -8,6 +8,7 @@ go_library(
         "matchers.go",
         "patricia.go",
     ],
+    importmap = "vendor/github.com/cockroachdb/cmux",
     importpath = "github.com/cockroachdb/cmux",
     visibility = ["//visibility:public"],
     deps = [

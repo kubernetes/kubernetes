@@ -43,6 +43,7 @@ go_library(
         "zhcsshim.go",
     ],
     cgo = True,
+    importmap = "vendor/github.com/Microsoft/hcsshim",
     importpath = "github.com/Microsoft/hcsshim",
     visibility = ["//visibility:public"],
     deps = [

@@ -25,7 +25,7 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     size = "small",
     srcs = [
         "openapi_getter_test.go",
@@ -33,8 +33,8 @@ go_test(
         "openapi_test.go",
     ],
     data = ["//api/openapi-spec:swagger-spec"],
+    embed = [":go_default_library"],
     deps = [
-        ":go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

@@ -28,13 +28,14 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
-    srcs = ["policy_test.go"],
-    data = glob([
-        "testdata/*",
-    ]),
+    name = "go_default_test",
+    srcs = [
+        "controller_policy_test.go",
+        "policy_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
     deps = [
-        ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
@@ -47,17 +48,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["controller_policy_test.go"],
-    data = glob(["testdata/**"]),
-    embed = [":go_default_library"],
-    deps = [
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )

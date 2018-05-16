@@ -35,8 +35,9 @@ filegroup(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["discovery_test.go"],
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/client-go/discovery/fake:go_default_library",

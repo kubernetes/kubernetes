@@ -10,44 +10,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "resize.go",
+        "resizeevents.go",
+        "resizeevents_windows.go",
         "term.go",
         "term_writer.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "resizeevents.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "resizeevents_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/util/term",
     deps = [
         "//pkg/util/interrupt:go_default_library",

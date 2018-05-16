@@ -32,6 +32,7 @@ go_library(
         "tableserviceclient.go",
         "util.go",
     ],
+    importmap = "vendor/github.com/Azure/azure-sdk-for-go/storage",
     importpath = "github.com/Azure/azure-sdk-for-go/storage",
     visibility = ["//visibility:public"],
     deps = [

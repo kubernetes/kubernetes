@@ -9,6 +9,7 @@ go_library(
         "typeinfo.go",
         "xml.go",
     ],
+    importmap = "vendor/github.com/vmware/govmomi/vim25/xml",
     importpath = "github.com/vmware/govmomi/vim25/xml",
     visibility = ["//visibility:public"],
 )

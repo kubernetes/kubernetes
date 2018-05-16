@@ -20,8 +20,9 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["wardleinitializer_test.go"],
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",

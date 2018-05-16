@@ -40,43 +40,10 @@ go_library(
         "eviction_manager.go",
         "helpers.go",
         "memory_threshold_notifier.go",
+        "threshold_notifier_linux.go",
+        "threshold_notifier_unsupported.go",
         "types.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "threshold_notifier_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "threshold_notifier_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
     deps = [
         "//pkg/api/v1/resource:go_default_library",

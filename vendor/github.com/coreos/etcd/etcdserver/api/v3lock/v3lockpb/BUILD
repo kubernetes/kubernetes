@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["v3lock.pb.go"],
+    importmap = "vendor/github.com/coreos/etcd/etcdserver/api/v3lock/v3lockpb",
     importpath = "github.com/coreos/etcd/etcdserver/api/v3lock/v3lockpb",
     visibility = ["//visibility:public"],
     deps = [

@@ -11,6 +11,7 @@ go_library(
         "version.go",
         "webhooks.go",
     ],
+    importmap = "vendor/github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry",
     importpath = "github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry",
     visibility = ["//visibility:public"],
     deps = [

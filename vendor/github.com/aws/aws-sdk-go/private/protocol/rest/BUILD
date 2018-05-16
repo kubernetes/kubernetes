@@ -7,6 +7,7 @@ go_library(
         "payload.go",
         "unmarshal.go",
     ],
+    importmap = "vendor/github.com/aws/aws-sdk-go/private/protocol/rest",
     importpath = "github.com/aws/aws-sdk-go/private/protocol/rest",
     visibility = ["//visibility:public"],
     deps = [

@@ -7,6 +7,7 @@ go_library(
         "tls.go",
         "types.go",
     ],
+    importmap = "vendor/github.com/google/certificate-transparency-go/tls",
     importpath = "github.com/google/certificate-transparency-go/tls",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/google/certificate-transparency-go/asn1:go_default_library"],

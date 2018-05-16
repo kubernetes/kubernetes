@@ -6,6 +6,7 @@ go_library(
         "compactor.go",
         "doc.go",
     ],
+    importmap = "vendor/github.com/coreos/etcd/compactor",
     importpath = "github.com/coreos/etcd/compactor",
     visibility = ["//visibility:public"],
     deps = [

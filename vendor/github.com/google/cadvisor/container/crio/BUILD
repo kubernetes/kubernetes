@@ -7,6 +7,7 @@ go_library(
         "factory.go",
         "handler.go",
     ],
+    importmap = "vendor/github.com/google/cadvisor/container/crio",
     importpath = "github.com/google/cadvisor/container/crio",
     visibility = ["//visibility:public"],
     deps = [

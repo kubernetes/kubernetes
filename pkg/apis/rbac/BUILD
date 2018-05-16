@@ -46,10 +46,10 @@ filegroup(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["helpers_test.go"],
+    embed = [":go_default_library"],
     deps = [
-        ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/rbac/v1:go_default_library",

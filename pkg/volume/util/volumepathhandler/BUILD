@@ -4,42 +4,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "volume_path_handler.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "volume_path_handler_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "volume_path_handler_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "volume_path_handler_linux.go",
+        "volume_path_handler_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/volume/util/volumepathhandler",
     visibility = ["//visibility:public"],
     deps = [

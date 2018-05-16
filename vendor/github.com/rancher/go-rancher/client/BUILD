@@ -151,6 +151,7 @@ go_library(
         "schemas.go",
         "types.go",
     ],
+    importmap = "vendor/github.com/rancher/go-rancher/client",
     importpath = "github.com/rancher/go-rancher/client",
     visibility = ["//visibility:public"],
     deps = [

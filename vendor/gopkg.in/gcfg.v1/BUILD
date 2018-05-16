@@ -10,6 +10,7 @@ go_library(
         "read.go",
         "set.go",
     ],
+    importmap = "vendor/gopkg.in/gcfg.v1",
     importpath = "gopkg.in/gcfg.v1",
     visibility = ["//visibility:public"],
     deps = [

@@ -8,6 +8,7 @@ go_library(
         "lexer.go",
         "parse.go",
     ],
+    importmap = "vendor/github.com/mholt/caddy/caddyfile",
     importpath = "github.com/mholt/caddy/caddyfile",
     visibility = ["//visibility:public"],
 )

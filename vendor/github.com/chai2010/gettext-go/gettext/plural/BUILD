@@ -7,6 +7,7 @@ go_library(
         "formula.go",
         "table.go",
     ],
+    importmap = "vendor/github.com/chai2010/gettext-go/gettext/plural",
     importpath = "github.com/chai2010/gettext-go/gettext/plural",
     visibility = ["//visibility:public"],
 )

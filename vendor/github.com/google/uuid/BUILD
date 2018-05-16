@@ -15,6 +15,7 @@ go_library(
         "version1.go",
         "version4.go",
     ],
+    importmap = "vendor/github.com/google/uuid",
     importpath = "github.com/google/uuid",
     visibility = ["//visibility:public"],
 )

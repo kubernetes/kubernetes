@@ -8,6 +8,7 @@ go_library(
         "handler.go",
         "helpers.go",
     ],
+    importmap = "vendor/github.com/google/cadvisor/container/rkt",
     importpath = "github.com/google/cadvisor/container/rkt",
     visibility = ["//visibility:public"],
     deps = [

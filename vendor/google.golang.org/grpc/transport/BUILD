@@ -12,6 +12,7 @@ go_library(
         "log.go",
         "transport.go",
     ],
+    importmap = "vendor/google.golang.org/grpc/transport",
     importpath = "google.golang.org/grpc/transport",
     visibility = ["//visibility:public"],
     deps = [

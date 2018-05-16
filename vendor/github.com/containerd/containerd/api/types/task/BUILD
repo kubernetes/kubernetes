@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["task.pb.go"],
+    importmap = "vendor/github.com/containerd/containerd/api/types/task",
     importpath = "github.com/containerd/containerd/api/types/task",
     visibility = ["//visibility:public"],
     deps = [

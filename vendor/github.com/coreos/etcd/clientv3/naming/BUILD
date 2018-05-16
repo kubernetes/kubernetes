@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "grpc.go",
     ],
+    importmap = "vendor/github.com/coreos/etcd/clientv3/naming",
     importpath = "github.com/coreos/etcd/clientv3/naming",
     visibility = ["//visibility:public"],
     deps = [

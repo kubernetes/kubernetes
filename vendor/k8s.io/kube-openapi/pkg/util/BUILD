@@ -6,6 +6,7 @@ go_library(
         "trie.go",
         "util.go",
     ],
+    importmap = "vendor/k8s.io/kube-openapi/pkg/util",
     importpath = "k8s.io/kube-openapi/pkg/util",
     visibility = ["//visibility:public"],
 )

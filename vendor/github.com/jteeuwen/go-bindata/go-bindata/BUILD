@@ -7,6 +7,7 @@ go_library(
         "main.go",
         "version.go",
     ],
+    importmap = "vendor/github.com/jteeuwen/go-bindata/go-bindata",
     importpath = "github.com/jteeuwen/go-bindata/go-bindata",
     visibility = ["//visibility:private"],
     deps = ["//vendor/github.com/jteeuwen/go-bindata:go_default_library"],

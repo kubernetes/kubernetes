@@ -8,6 +8,7 @@ go_library(
         "finder.go",
         "recurser.go",
     ],
+    importmap = "vendor/github.com/vmware/govmomi/find",
     importpath = "github.com/vmware/govmomi/find",
     visibility = ["//visibility:public"],
     deps = [

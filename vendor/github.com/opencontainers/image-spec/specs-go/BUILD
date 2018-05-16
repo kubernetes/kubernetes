@@ -6,6 +6,7 @@ go_library(
         "version.go",
         "versioned.go",
     ],
+    importmap = "vendor/github.com/opencontainers/image-spec/specs-go",
     importpath = "github.com/opencontainers/image-spec/specs-go",
     visibility = ["//visibility:public"],
 )

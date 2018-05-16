@@ -6,6 +6,7 @@ go_library(
         "error.go",
         "wait.go",
     ],
+    importmap = "vendor/github.com/vmware/govmomi/task",
     importpath = "github.com/vmware/govmomi/task",
     visibility = ["//visibility:public"],
     deps = [

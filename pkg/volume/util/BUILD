@@ -6,6 +6,8 @@ go_library(
         "atomic_writer.go",
         "attach_limit.go",
         "device_util.go",
+        "device_util_linux.go",
+        "device_util_unsupported.go",
         "doc.go",
         "error.go",
         "finalizer.go",
@@ -14,42 +16,7 @@ go_library(
         "nested_volumes.go",
         "resize_util.go",
         "util.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "device_util_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "device_util_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "device_util_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "device_util_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "device_util_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "device_util_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "device_util_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "device_util_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "device_util_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "device_util_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "device_util_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/volume/util",
     visibility = ["//visibility:public"],
     deps = [
@@ -80,16 +47,12 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "atomic_writer_test.go",
+        "device_util_linux_test.go",
         "nested_volumes_test.go",
         "resize_util_test.go",
         "util_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "atomic_writer_test.go",
-            "device_util_linux_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core/install:go_default_library",

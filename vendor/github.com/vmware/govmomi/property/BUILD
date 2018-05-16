@@ -7,6 +7,7 @@ go_library(
         "filter.go",
         "wait.go",
     ],
+    importmap = "vendor/github.com/vmware/govmomi/property",
     importpath = "github.com/vmware/govmomi/property",
     visibility = ["//visibility:public"],
     deps = [

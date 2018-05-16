@@ -22,6 +22,7 @@ go_library(
         "stream.go",
         "trace.go",
     ],
+    importmap = "vendor/google.golang.org/grpc",
     importpath = "google.golang.org/grpc",
     visibility = ["//visibility:public"],
     deps = [

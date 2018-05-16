@@ -9,6 +9,7 @@ go_library(
         "sender.go",
         "token.go",
     ],
+    importmap = "vendor/github.com/Azure/go-autorest/autorest/adal",
     importpath = "github.com/Azure/go-autorest/autorest/adal",
     visibility = ["//visibility:public"],
     deps = [

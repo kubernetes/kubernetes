@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "tlsutil.go",
     ],
+    importmap = "vendor/github.com/coreos/etcd/pkg/tlsutil",
     importpath = "github.com/coreos/etcd/pkg/tlsutil",
     visibility = ["//visibility:public"],
 )

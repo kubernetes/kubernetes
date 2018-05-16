@@ -6,6 +6,7 @@ go_library(
         "gen.go",
         "plugin.pb.go",
     ],
+    importmap = "vendor/github.com/docker/docker/api/types/swarm/runtime",
     importpath = "github.com/docker/docker/api/types/swarm/runtime",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/gogo/protobuf/proto:go_default_library"],

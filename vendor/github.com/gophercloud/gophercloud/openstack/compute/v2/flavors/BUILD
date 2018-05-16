@@ -8,6 +8,7 @@ go_library(
         "results.go",
         "urls.go",
     ],
+    importmap = "vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/flavors",
     importpath = "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors",
     visibility = ["//visibility:public"],
     deps = [

@@ -10,43 +10,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "checks.go",
+        "checks_unix.go",
+        "checks_windows.go",
         "utils.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "checks_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "checks_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/preflight",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",

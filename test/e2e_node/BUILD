@@ -5,6 +5,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "benchmark_util.go",
         "container.go",
         "device_plugin.go",
         "doc.go",
@@ -12,15 +13,10 @@ go_library(
         "framework.go",
         "gpu_device_plugin.go",
         "image_list.go",
+        "node_problem_detector_linux.go",
+        "resource_collector.go",
         "util.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "benchmark_util.go",
-            "node_problem_detector_linux.go",
-            "resource_collector.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/test/e2e_node",
     visibility = ["//visibility:public"],
     deps = [
@@ -83,11 +79,14 @@ go_test(
     srcs = [
         "apparmor_test.go",
         "container_log_rotation_test.go",
+        "container_manager_test.go",
         "cpu_manager_test.go",
         "critical_pod_test.go",
+        "density_test.go",
         "docker_test.go",
         "dockershim_checkpoint_test.go",
         "dynamic_kubelet_config_test.go",
+        "e2e_node_suite_test.go",
         "eviction_test.go",
         "garbage_collector_test.go",
         "gke_environment_test.go",
@@ -97,22 +96,15 @@ go_test(
         "lifecycle_hook_test.go",
         "log_path_test.go",
         "mirror_pod_test.go",
+        "node_container_manager_test.go",
         "pods_container_manager_test.go",
+        "resource_usage_test.go",
+        "restart_test.go",
         "runtime_conformance_test.go",
         "security_context_test.go",
         "summary_test.go",
         "volume_manager_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "container_manager_test.go",
-            "density_test.go",
-            "e2e_node_suite_test.go",
-            "node_container_manager_test.go",
-            "resource_usage_test.go",
-            "restart_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [

@@ -10,6 +10,7 @@ go_library(
         "urls.go",
         "util.go",
     ],
+    importmap = "vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
     importpath = "github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "signer.go",
     ],
+    importmap = "vendor/github.com/vmware/govmomi/sts",
     importpath = "github.com/vmware/govmomi/sts",
     visibility = ["//visibility:public"],
     deps = [

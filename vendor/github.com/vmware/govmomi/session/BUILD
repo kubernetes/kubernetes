@@ -6,6 +6,7 @@ go_library(
         "keep_alive.go",
         "manager.go",
     ],
+    importmap = "vendor/github.com/vmware/govmomi/session",
     importpath = "github.com/vmware/govmomi/session",
     visibility = ["//visibility:public"],
     deps = [

@@ -19,6 +19,7 @@ go_library(
         "values.go",
         "xml.go",
     ],
+    importmap = "vendor/github.com/go-openapi/runtime",
     importpath = "github.com/go-openapi/runtime",
     visibility = ["//visibility:public"],
     deps = [

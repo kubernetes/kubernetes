@@ -9,58 +9,15 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cadvisor_linux.go",
+        "cadvisor_unsupported.go",
+        "cadvisor_windows.go",
         "doc.go",
+        "helpers_linux.go",
+        "helpers_unsupported.go",
         "types.go",
         "util.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "cadvisor_unsupported.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "cadvisor_unsupported.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "cadvisor_unsupported.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "cadvisor_unsupported.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "cadvisor_linux.go",
-            "cadvisor_unsupported.go",
-            "helpers_linux.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "cadvisor_unsupported.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "cadvisor_unsupported.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "cadvisor_unsupported.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "cadvisor_unsupported.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "cadvisor_unsupported.go",
-            "helpers_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "cadvisor_windows.go",
-            "helpers_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
@@ -93,13 +50,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "cadvisor_linux_test.go",
-            "util_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "cadvisor_linux_test.go",
+        "util_test.go",
+    ],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

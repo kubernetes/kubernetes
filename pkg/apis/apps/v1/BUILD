@@ -28,13 +28,13 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = [
         "conversion_test.go",
         "defaults_test.go",
     ],
+    embed = [":go_default_library"],
     deps = [
-        ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/install:go_default_library",

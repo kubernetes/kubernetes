@@ -12,6 +12,7 @@ go_library(
         "trieval.go",
     ],
     cgo = True,
+    importmap = "vendor/golang.org/x/text/cases",
     importpath = "golang.org/x/text/cases",
     visibility = ["//visibility:public"],
     deps = [

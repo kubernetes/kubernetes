@@ -8,6 +8,7 @@ go_library(
         "helpers.go",
         "inotify_watcher.go",
     ],
+    importmap = "vendor/github.com/google/cadvisor/container/common",
     importpath = "github.com/google/cadvisor/container/common",
     visibility = ["//visibility:public"],
     deps = [

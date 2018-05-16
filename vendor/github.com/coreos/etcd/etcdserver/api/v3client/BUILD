@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "v3client.go",
     ],
+    importmap = "vendor/github.com/coreos/etcd/etcdserver/api/v3client",
     importpath = "github.com/coreos/etcd/etcdserver/api/v3client",
     visibility = ["//visibility:public"],
     deps = [

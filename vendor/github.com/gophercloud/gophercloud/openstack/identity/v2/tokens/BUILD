@@ -8,6 +8,7 @@ go_library(
         "results.go",
         "urls.go",
     ],
+    importmap = "vendor/github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
     importpath = "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
     visibility = ["//visibility:public"],
     deps = [

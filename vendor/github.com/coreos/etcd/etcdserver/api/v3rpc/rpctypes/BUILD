@@ -7,6 +7,7 @@ go_library(
         "error.go",
         "md.go",
     ],
+    importmap = "vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
     importpath = "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
     visibility = ["//visibility:public"],
     deps = [

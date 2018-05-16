@@ -13,42 +13,9 @@ go_library(
         "cloudstack_instances.go",
         "cloudstack_loadbalancer.go",
         "metadata.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "metadata_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "metadata_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "metadata_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "metadata_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "metadata_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "metadata_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "metadata_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "metadata_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "metadata_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "metadata_other.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "metadata_other.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "metadata_linux.go",
+        "metadata_other.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack",
     deps = [
         "//pkg/cloudprovider:go_default_library",

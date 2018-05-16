@@ -10,6 +10,7 @@ go_library(
         "misc.go",
         "users.go",
     ],
+    importmap = "vendor/github.com/abbot/go-http-auth",
     importpath = "github.com/abbot/go-http-auth",
     visibility = ["//visibility:public"],
 )

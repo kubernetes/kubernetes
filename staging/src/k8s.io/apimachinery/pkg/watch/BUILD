@@ -29,29 +29,20 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = [
         "filter_test.go",
         "mux_test.go",
         "streamwatcher_test.go",
+        "until_test.go",
         "watch_test.go",
     ],
-    deps = [
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["until_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
     ],
 )
 

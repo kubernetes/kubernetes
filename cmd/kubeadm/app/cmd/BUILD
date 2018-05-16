@@ -80,6 +80,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "completion_test.go",
+        "config_test.go",
         "join_test.go",
         "reset_test.go",
         "token_test.go",
@@ -92,8 +93,11 @@ go_test(
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
+        "//cmd/kubeadm/app/util/config:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/github.com/renstrom/dedent:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -125,16 +129,4 @@ filegroup(
         "//cmd/kubeadm/app/cmd/util:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_xtest",
-    srcs = ["config_test.go"],
-    deps = [
-        ":go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
-        "//cmd/kubeadm/app/features:go_default_library",
-        "//cmd/kubeadm/app/util/config:go_default_library",
-        "//vendor/github.com/renstrom/dedent:go_default_library",
-    ],
 )

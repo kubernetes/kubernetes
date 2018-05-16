@@ -16,7 +16,7 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = [
         "merge_conflict_test.go",
         "merge_map_list_test.go",
@@ -34,8 +34,8 @@ go_test(
         ":swagger-spec",
         "//api/openapi-spec:swagger-spec",
     ],
+    embed = [":go_default_library"],
     deps = [
-        ":go_default_library",
         "//pkg/kubectl/apply:go_default_library",
         "//pkg/kubectl/apply/parse:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",

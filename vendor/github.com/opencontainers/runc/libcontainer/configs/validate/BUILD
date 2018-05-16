@@ -6,6 +6,7 @@ go_library(
         "rootless.go",
         "validator.go",
     ],
+    importmap = "vendor/github.com/opencontainers/runc/libcontainer/configs/validate",
     importpath = "github.com/opencontainers/runc/libcontainer/configs/validate",
     visibility = ["//visibility:public"],
     deps = [

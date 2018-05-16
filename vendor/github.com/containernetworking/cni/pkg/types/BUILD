@@ -6,6 +6,7 @@ go_library(
         "args.go",
         "types.go",
     ],
+    importmap = "vendor/github.com/containernetworking/cni/pkg/types",
     importpath = "github.com/containernetworking/cni/pkg/types",
     visibility = ["//visibility:public"],
 )

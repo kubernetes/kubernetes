@@ -11,43 +11,12 @@ go_test(
     size = "large",
     srcs = [
         "crd_test.go",
+        "kms_transformation_test.go",
         "kube_apiserver_test.go",
         "main_test.go",
         "secrets_transformation_test.go",
         "synthetic_master_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "kms_transformation_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "kms_transformation_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "kms_transformation_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "kms_transformation_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "kms_transformation_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "kms_transformation_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "kms_transformation_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "kms_transformation_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "kms_transformation_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "kms_transformation_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     embed = [":go_default_library"],
     tags = ["integration"],
     deps = [
@@ -141,40 +110,9 @@ filegroup(
 go_library(
     name = "go_default_library",
     srcs = [
+        "kms_plugin_mock.go",
         "transformation_testcase.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "kms_plugin_mock.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "kms_plugin_mock.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "kms_plugin_mock.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "kms_plugin_mock.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "kms_plugin_mock.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "kms_plugin_mock.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "kms_plugin_mock.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "kms_plugin_mock.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "kms_plugin_mock.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "kms_plugin_mock.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/test/integration/master",
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",

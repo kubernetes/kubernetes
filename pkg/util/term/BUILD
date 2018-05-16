@@ -7,42 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "setsize.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "setsize_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "setsize.go",
+        "setsize_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/term",
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [

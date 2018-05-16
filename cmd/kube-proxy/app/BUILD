@@ -10,54 +10,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "conntrack.go",
+        "init_others.go",
+        "init_windows.go",
         "server.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "init_others.go",
-            "server_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "init_windows.go",
-            "server_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "server_others.go",
+        "server_windows.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/kube-proxy/app",
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
@@ -188,40 +146,9 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "server_others_test.go",
         "server_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "server_others_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "server_others_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "server_others_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "server_others_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "server_others_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "server_others_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "server_others_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "server_others_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "server_others_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "server_others_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",

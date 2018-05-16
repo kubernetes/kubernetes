@@ -14,6 +14,7 @@ go_library(
         "type_specific_codegen.go",
         "value.go",
     ],
+    importmap = "vendor/github.com/stretchr/objx",
     importpath = "github.com/stretchr/objx",
     visibility = ["//visibility:public"],
 )

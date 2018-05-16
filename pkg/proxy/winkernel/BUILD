@@ -4,12 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "metrics.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows": [
-            "proxier.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "proxier.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/proxy/winkernel",
     visibility = ["//visibility:public"],
     deps = [

@@ -10,6 +10,7 @@ go_library(
         "tables.go",
         "trieval.go",
     ],
+    importmap = "vendor/golang.org/x/text/unicode/bidi",
     importpath = "golang.org/x/text/unicode/bidi",
     visibility = ["//visibility:public"],
 )

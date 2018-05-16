@@ -11,6 +11,7 @@ go_library(
         "topology.go",
         "volume.go",
     ],
+    importmap = "vendor/github.com/heketi/heketi/client/api/go-client",
     importpath = "github.com/heketi/heketi/client/api/go-client",
     visibility = ["//visibility:public"],
     deps = [

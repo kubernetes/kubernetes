@@ -6,6 +6,7 @@ go_library(
         "parse.go",
         "xfs.go",
     ],
+    importmap = "vendor/github.com/prometheus/procfs/xfs",
     importpath = "github.com/prometheus/procfs/xfs",
     visibility = ["//visibility:public"],
 )

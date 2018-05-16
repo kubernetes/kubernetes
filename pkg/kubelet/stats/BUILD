@@ -8,42 +8,9 @@ go_library(
         "helper.go",
         "log_metrics_provider.go",
         "stats_provider.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "stats_provider_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "stats_provider_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "stats_provider_linux.go",
+        "stats_provider_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/stats",
     visibility = ["//visibility:public"],
     deps = [

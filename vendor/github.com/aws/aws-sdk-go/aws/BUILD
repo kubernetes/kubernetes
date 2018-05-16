@@ -17,6 +17,7 @@ go_library(
         "url_1_7.go",
         "version.go",
     ],
+    importmap = "vendor/github.com/aws/aws-sdk-go/aws",
     importpath = "github.com/aws/aws-sdk-go/aws",
     visibility = ["//visibility:public"],
     deps = [

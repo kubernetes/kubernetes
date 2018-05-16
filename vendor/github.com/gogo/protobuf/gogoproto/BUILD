@@ -7,6 +7,7 @@ go_library(
         "gogo.pb.go",
         "helper.go",
     ],
+    importmap = "vendor/github.com/gogo/protobuf/gogoproto",
     importpath = "github.com/gogo/protobuf/gogoproto",
     visibility = ["//visibility:public"],
     deps = [

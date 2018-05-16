@@ -61,8 +61,12 @@ filegroup(
 )
 
 go_test(
-    name = "go_default_xtest",
-    srcs = ["etcd_test.go"],
+    name = "go_default_test",
+    srcs = [
+        "etcd_test.go",
+        "status_strategy_test.go",
+    ],
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
@@ -85,11 +89,4 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
     ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["status_strategy_test.go"],
-    embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library"],
 )

@@ -8,6 +8,7 @@ go_library(
         "factory.go",
         "handler.go",
     ],
+    importmap = "vendor/github.com/google/cadvisor/container/docker",
     importpath = "github.com/google/cadvisor/container/docker",
     visibility = ["//visibility:public"],
     deps = [

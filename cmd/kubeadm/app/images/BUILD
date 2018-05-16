@@ -25,11 +25,16 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["images_test.go"],
+    srcs = [
+        "images_test.go",
+        "interface_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
@@ -44,14 +49,4 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_xtest",
-    srcs = ["interface_test.go"],
-    deps = [
-        ":go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
-    ],
 )

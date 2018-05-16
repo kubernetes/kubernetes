@@ -14,8 +14,9 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["clientauth_test.go"],
+    embed = [":go_default_library"],
     deps = ["//vendor/k8s.io/client-go/tools/auth:go_default_library"],
 )
 

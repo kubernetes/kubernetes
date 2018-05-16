@@ -7,6 +7,7 @@ go_library(
         "timed_store.go",
         "utils.go",
     ],
+    importmap = "vendor/github.com/google/cadvisor/utils",
     importpath = "github.com/google/cadvisor/utils",
     visibility = ["//visibility:public"],
 )

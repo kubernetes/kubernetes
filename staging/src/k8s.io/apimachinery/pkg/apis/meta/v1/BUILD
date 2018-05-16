@@ -10,6 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "controller_ref_test.go",
+        "conversion_test.go",
         "duration_test.go",
         "group_version_test.go",
         "helpers_test.go",
@@ -21,6 +22,8 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
@@ -83,13 +86,4 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/validation:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_xtest",
-    srcs = ["conversion_test.go"],
-    deps = [
-        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-    ],
 )

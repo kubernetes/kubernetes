@@ -6,6 +6,7 @@ go_library(
         "bytes.go",
         "strings.go",
     ],
+    importmap = "vendor/github.com/influxdata/influxdb/pkg/escape",
     importpath = "github.com/influxdata/influxdb/pkg/escape",
     visibility = ["//visibility:public"],
 )

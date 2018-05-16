@@ -11,46 +11,14 @@ go_library(
     srcs = [
         "attacher.go",
         "azure_common.go",
+        "azure_common_linux.go",
+        "azure_common_unsupported.go",
+        "azure_common_windows.go",
         "azure_dd.go",
         "azure_dd_block.go",
         "azure_mounter.go",
         "azure_provision.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "azure_common_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "azure_common_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "azure_common_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "azure_common_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "azure_common_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "azure_common_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "azure_common_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "azure_common_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "azure_common_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "azure_common_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "azure_common_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/volume/azure_dd",
     deps = [
         "//pkg/apis/core:go_default_library",

@@ -12,42 +12,9 @@ go_library(
         "cache_comparer.go",
         "factory.go",
         "plugins.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "signal.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "signal_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "signal.go",
+        "signal_windows.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/factory",
     deps = [
         "//pkg/api/v1/pod:go_default_library",

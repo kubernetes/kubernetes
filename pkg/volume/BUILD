@@ -11,42 +11,9 @@ go_library(
         "metrics_statfs.go",
         "plugins.go",
         "volume.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "volume_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "volume_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "volume_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "volume_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "volume_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "volume_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "volume_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "volume_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "volume_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "volume_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "volume_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "volume_linux.go",
+        "volume_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/volume",
     visibility = ["//visibility:public"],
     deps = [
@@ -71,30 +38,17 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "metrics_du_test.go",
         "metrics_nil_test.go",
+        "metrics_statfs_test.go",
         "plugins_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/volume/testing:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_xtest",
-    srcs = [
-        "metrics_statfs_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "metrics_du_test.go",
-        ],
-        "//conditions:default": [],
-    }),
-    deps = [
-        ":go_default_library",
-        "//pkg/volume/testing:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [

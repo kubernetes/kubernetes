@@ -9,6 +9,7 @@ go_library(
         "parser.go",
         "spec.go",
     ],
+    importmap = "vendor/github.com/robfig/cron",
     importpath = "github.com/robfig/cron",
     visibility = ["//visibility:public"],
 )

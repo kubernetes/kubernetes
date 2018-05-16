@@ -26,19 +26,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "local_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "local_linux_test.go",
-            "local_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "local_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "local_linux_test.go",
+        "local_test.go",
+    ],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:darwin": [

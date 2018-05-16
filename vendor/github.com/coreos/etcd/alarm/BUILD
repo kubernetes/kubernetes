@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["alarms.go"],
+    importmap = "vendor/github.com/coreos/etcd/alarm",
     importpath = "github.com/coreos/etcd/alarm",
     visibility = ["//visibility:public"],
     deps = [

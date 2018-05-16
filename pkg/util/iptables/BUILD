@@ -11,43 +11,10 @@ go_library(
     srcs = [
         "doc.go",
         "iptables.go",
+        "iptables_linux.go",
+        "iptables_unsupported.go",
         "save_restore.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "iptables_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "iptables_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "iptables_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "iptables_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "iptables_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "iptables_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "iptables_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "iptables_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "iptables_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "iptables_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "iptables_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/iptables",
     deps = [
         "//pkg/util/dbus:go_default_library",
@@ -69,12 +36,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "iptables_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["iptables_test.go"],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

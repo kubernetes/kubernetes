@@ -12,6 +12,7 @@ go_library(
         "toktype_string.go",
         "util.go",
     ],
+    importmap = "vendor/github.com/jmespath/go-jmespath",
     importpath = "github.com/jmespath/go-jmespath",
     visibility = ["//visibility:public"],
 )

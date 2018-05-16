@@ -6,6 +6,7 @@ go_library(
         "filesystem.go",
         "walk.go",
     ],
+    importmap = "vendor/github.com/kr/fs",
     importpath = "github.com/kr/fs",
     visibility = ["//visibility:public"],
 )

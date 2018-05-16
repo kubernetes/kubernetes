@@ -24,11 +24,12 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["suite_test.go"],
     data = [
         "//api/openapi-spec:swagger-spec",
     ],
+    embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

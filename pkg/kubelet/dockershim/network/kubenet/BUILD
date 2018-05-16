@@ -10,42 +10,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "kubenet.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "kubenet_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "kubenet_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "kubenet_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "kubenet_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "kubenet_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "kubenet_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "kubenet_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "kubenet_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "kubenet_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "kubenet_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "kubenet_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "kubenet_linux.go",
+        "kubenet_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/network/kubenet",
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -125,12 +92,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "kubenet_linux_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["kubenet_linux_test.go"],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

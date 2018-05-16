@@ -12,8 +12,14 @@ go_library(
         "doc.go",
         "fake_kuberuntime_manager.go",
         "helpers.go",
+        "helpers_linux.go",
+        "helpers_unsupported.go",
+        "helpers_windows.go",
         "instrumented_services.go",
         "kuberuntime_container.go",
+        "kuberuntime_container_linux.go",
+        "kuberuntime_container_unsupported.go",
+        "kuberuntime_container_windows.go",
         "kuberuntime_gc.go",
         "kuberuntime_image.go",
         "kuberuntime_logs.go",
@@ -22,53 +28,7 @@ go_library(
         "labels.go",
         "legacy.go",
         "security_context.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "helpers_unsupported.go",
-            "kuberuntime_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "helpers_unsupported.go",
-            "kuberuntime_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "helpers_unsupported.go",
-            "kuberuntime_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "helpers_unsupported.go",
-            "kuberuntime_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "helpers_linux.go",
-            "kuberuntime_container_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "helpers_unsupported.go",
-            "kuberuntime_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "helpers_unsupported.go",
-            "kuberuntime_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "helpers_unsupported.go",
-            "kuberuntime_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "helpers_unsupported.go",
-            "kuberuntime_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "helpers_unsupported.go",
-            "kuberuntime_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "helpers_windows.go",
-            "kuberuntime_container_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
@@ -125,6 +85,7 @@ go_test(
     srcs = [
         "helpers_test.go",
         "instrumented_services_test.go",
+        "kuberuntime_container_linux_test.go",
         "kuberuntime_container_test.go",
         "kuberuntime_gc_test.go",
         "kuberuntime_image_test.go",
@@ -133,12 +94,7 @@ go_test(
         "labels_test.go",
         "legacy_test.go",
         "security_context_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "kuberuntime_container_linux_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/credentialprovider:go_default_library",

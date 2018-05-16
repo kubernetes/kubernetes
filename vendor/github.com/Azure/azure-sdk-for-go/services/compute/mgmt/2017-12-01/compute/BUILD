@@ -25,6 +25,7 @@ go_library(
         "virtualmachinescalesetvms.go",
         "virtualmachinesizes.go",
     ],
+    importmap = "vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute",
     importpath = "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,6 +6,7 @@ go_library(
         "container.go",
         "manager.go",
     ],
+    importmap = "vendor/github.com/google/cadvisor/manager",
     importpath = "github.com/google/cadvisor/manager",
     visibility = ["//visibility:public"],
     deps = [

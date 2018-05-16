@@ -11,42 +11,9 @@ go_library(
     srcs = [
         "doc.go",
         "empty_dir.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "empty_dir_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "empty_dir_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "empty_dir_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "empty_dir_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "empty_dir_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "empty_dir_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "empty_dir_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "empty_dir_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "empty_dir_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "empty_dir_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "empty_dir_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "empty_dir_linux.go",
+        "empty_dir_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/volume/empty_dir",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
@@ -69,12 +36,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "empty_dir_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["empty_dir_test.go"],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

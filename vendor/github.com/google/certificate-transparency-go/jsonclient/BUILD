@@ -6,6 +6,7 @@ go_library(
         "backoff.go",
         "client.go",
     ],
+    importmap = "vendor/github.com/google/certificate-transparency-go/jsonclient",
     importpath = "github.com/google/certificate-transparency-go/jsonclient",
     visibility = ["//visibility:public"],
     deps = [

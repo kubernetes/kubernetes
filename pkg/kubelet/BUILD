@@ -151,6 +151,7 @@ go_test(
         "kubelet_network_test.go",
         "kubelet_node_status_test.go",
         "kubelet_pods_test.go",
+        "kubelet_pods_windows_test.go",
         "kubelet_resources_test.go",
         "kubelet_test.go",
         "kubelet_volumes_test.go",
@@ -159,12 +160,7 @@ go_test(
         "pod_workers_test.go",
         "reason_cache_test.go",
         "runonce_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows": [
-            "kubelet_pods_windows_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core/install:go_default_library",

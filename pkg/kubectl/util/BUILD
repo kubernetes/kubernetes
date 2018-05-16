@@ -8,43 +8,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "service_port.go",
+        "umask.go",
+        "umask_windows.go",
         "util.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "umask.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "umask_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/util",
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
     deps = [

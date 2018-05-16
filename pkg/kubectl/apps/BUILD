@@ -27,13 +27,13 @@ filegroup(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = [
         "apps_suite_test.go",
         "kind_visitor_test.go",
     ],
+    embed = [":go_default_library"],
     deps = [
-        ":go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",

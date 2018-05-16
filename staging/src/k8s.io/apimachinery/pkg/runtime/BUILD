@@ -9,13 +9,27 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "conversion_test.go",
+        "converter_test.go",
+        "embedded_test.go",
+        "extension_test.go",
         "local_scheme_test.go",
+        "scheme_test.go",
         "swagger_doc_generator_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/testing:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
     ],
 )
 
@@ -52,30 +66,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_xtest",
-    srcs = [
-        "conversion_test.go",
-        "converter_test.go",
-        "embedded_test.go",
-        "extension_test.go",
-        "scheme_test.go",
-    ],
-    deps = [
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/github.com/stretchr/testify/require:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/testing:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
     ],
 )
 

@@ -8,6 +8,7 @@ go_library(
         "jsonlogbytes.go",
         "time_marshalling.go",
     ],
+    importmap = "vendor/github.com/docker/docker/pkg/jsonlog",
     importpath = "github.com/docker/docker/pkg/jsonlog",
     visibility = ["//visibility:public"],
 )

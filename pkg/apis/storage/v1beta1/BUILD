@@ -46,8 +46,9 @@ filegroup(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["defaults_test.go"],
+    embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/storage/install:go_default_library",

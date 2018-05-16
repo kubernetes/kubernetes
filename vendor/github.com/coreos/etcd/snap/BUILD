@@ -8,6 +8,7 @@ go_library(
         "metrics.go",
         "snapshotter.go",
     ],
+    importmap = "vendor/github.com/coreos/etcd/snap",
     importpath = "github.com/coreos/etcd/snap",
     visibility = ["//visibility:public"],
     deps = [

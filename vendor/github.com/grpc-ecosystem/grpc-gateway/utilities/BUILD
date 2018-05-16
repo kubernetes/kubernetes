@@ -7,6 +7,7 @@ go_library(
         "pattern.go",
         "trie.go",
     ],
+    importmap = "vendor/github.com/grpc-ecosystem/grpc-gateway/utilities",
     importpath = "github.com/grpc-ecosystem/grpc-gateway/utilities",
     visibility = ["//visibility:public"],
 )

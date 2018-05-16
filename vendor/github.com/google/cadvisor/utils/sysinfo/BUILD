@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["sysinfo.go"],
+    importmap = "vendor/github.com/google/cadvisor/utils/sysinfo",
     importpath = "github.com/google/cadvisor/utils/sysinfo",
     visibility = ["//visibility:public"],
     deps = [

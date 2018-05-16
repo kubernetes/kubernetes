@@ -4,15 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows": [
-            "perfcounter_nodestats.go",
-            "perfcounters.go",
-            "version.go",
-            "winstats.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "perfcounter_nodestats.go",
+        "perfcounters.go",
+        "version.go",
+        "winstats.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/winstats",
     visibility = ["//visibility:public"],
     deps = select({
@@ -30,12 +26,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:windows": [
-            "winstats_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["winstats_test.go"],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows": [

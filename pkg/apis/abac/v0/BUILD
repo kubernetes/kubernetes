@@ -26,10 +26,10 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["conversion_test.go"],
+    embed = [":go_default_library"],
     deps = [
-        ":go_default_library",
         "//pkg/apis/abac:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
