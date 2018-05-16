@@ -10,14 +10,11 @@ go_library(
     srcs = ["status.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/kubelet/kubeletconfig/util/equal:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/log:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )

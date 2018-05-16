@@ -54,7 +54,7 @@ type REST struct {
 	proxyTransport http.RoundTripper
 }
 
-// StatusREST implements the REST endpoint for changing the status of a pod.
+// StatusREST implements the REST endpoint for changing the status of a node.
 type StatusREST struct {
 	store *genericregistry.Store
 }

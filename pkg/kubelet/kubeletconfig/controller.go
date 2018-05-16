@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"time"
 
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -47,14 +46,11 @@ const (
 // Controller manages syncing dynamic Kubelet configurations
 // For more information, see the proposal: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/dynamic-kubelet-configuration.md
 type Controller struct {
-	// defaultConfig is the configuration to use if no initConfig is provided
-	defaultConfig *kubeletconfig.KubeletConfiguration
-
 	// pendingConfigSource; write to this channel to indicate that the config source needs to be synced from the API server
 	pendingConfigSource chan bool
 
-	// configOk manages the KubeletConfigOk condition that is reported in Node.Status.Conditions
-	configOk status.ConfigOkCondition
+	// configStatus manages the status we report on the Node object
+	configStatus status.NodeConfigStatus
 
 	// informer is the informer that watches the Node object
 	informer cache.SharedInformer
@@ -64,12 +60,11 @@ type Controller struct {
 }
 
 // NewController constructs a new Controller object and returns it. Directory paths must be absolute.
-func NewController(defaultConfig *kubeletconfig.KubeletConfiguration, dynamicConfigDir string) *Controller {
+func NewController(dynamicConfigDir string) *Controller {
 	return &Controller{
-		defaultConfig: defaultConfig,
 		// channels must have capacity at least 1, since we signal with non-blocking writes
 		pendingConfigSource: make(chan bool, 1),
-		configOk:            status.NewConfigOkCondition(),
+		configStatus:        status.NewNodeConfigStatus(),
 		checkpointStore:     store.NewFsStore(utilfs.DefaultFs{}, filepath.Join(dynamicConfigDir, storeDir)),
 	}
 }
@@ -79,26 +74,39 @@ func NewController(defaultConfig *kubeletconfig.KubeletConfiguration, dynamicCon
 func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	utillog.Infof("starting controller")
 
-	// ALWAYS validate the local config. This makes incorrectly provisioned nodes an error.
-	// It must be valid because it is the default last-known-good config.
-	utillog.Infof("validating local config")
-	if err := validation.ValidateKubeletConfiguration(cc.defaultConfig); err != nil {
-		return nil, fmt.Errorf("local config failed validation, error: %v", err)
-	}
-
 	// ensure the filesystem is initialized
 	if err := cc.initializeDynamicConfigDir(); err != nil {
 		return nil, err
 	}
 
-	assigned, curSource, reason, err := cc.loadAssignedConfig(cc.defaultConfig)
+	// determine assigned source and set status
+	assignedSource, err := cc.checkpointStore.Assigned()
+	if err != nil {
+		return nil, err
+	}
+	if assignedSource != nil {
+		cc.configStatus.SetAssigned(assignedSource.NodeConfigSource())
+	}
+
+	// determine last-known-good source and set status
+	lastKnownGoodSource, err := cc.checkpointStore.LastKnownGood()
+	if err != nil {
+		return nil, err
+	}
+	if lastKnownGoodSource != nil {
+		cc.configStatus.SetLastKnownGood(lastKnownGoodSource.NodeConfigSource())
+	}
+
+	// if the assigned source is nil, return nil to indicate local config
+	if assignedSource == nil {
+		return nil, nil
+	}
+
+	// attempt to load assigned config
+	assignedConfig, reason, err := cc.loadConfig(assignedSource)
 	if err == nil {
-		// set the status to indicate we will use the assigned config
-		if curSource != nil {
-			cc.configOk.Set(fmt.Sprintf(status.CurRemoteMessageFmt, curSource.APIPath()), reason, apiv1.ConditionTrue)
-		} else {
-			cc.configOk.Set(status.CurLocalMessage, reason, apiv1.ConditionTrue)
-		}
+		// update the active source to the non-nil assigned source
+		cc.configStatus.SetActive(assignedSource.NodeConfigSource())
 
 		// update the last-known-good config if necessary, and start a timer that
 		// periodically checks whether the last-known good needs to be updated
@@ -106,32 +114,34 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 		// wait.Forever will call the func once before starting the timer
 		go wait.Forever(func() { cc.checkTrial(configTrialDuration) }, 10*time.Second)
 
-		return assigned, nil
-	} // Assert: the assigned config failed to load, parse, or validate
+		return assignedConfig, nil
+	} // Assert: the assigned config failed to load or validate
 
 	// TODO(mtaufen): consider re-attempting download when a load/verify/parse/validate
 	// error happens outside trial period, we already made it past the trial so it's probably filesystem corruption
-	// or something else scary (unless someone is using a 0-length trial period)
-	// load from checkpoint
+	// or something else scary
 
 	// log the reason and error details for the failure to load the assigned config
 	utillog.Errorf(fmt.Sprintf("%s, error: %v", reason, err))
 
-	// load the last-known-good config
-	lkg, lkgSource, err := cc.loadLastKnownGoodConfig(cc.defaultConfig)
+	// set status to indicate the failure with the assigned config
+	cc.configStatus.SetError(reason)
+
+	// if the last-known-good source is nil, return nil to indicate local config
+	if lastKnownGoodSource == nil {
+		return nil, nil
+	}
+
+	// attempt to load the last-known-good config
+	lastKnownGoodConfig, _, err := cc.loadConfig(lastKnownGoodSource)
 	if err != nil {
+		// we failed to load the last-known-good, so something is really messed up and we just return the error
 		return nil, err
 	}
 
-	// set the status to indicate that we had to roll back to the lkg for the reason reported when we tried to load the assigned config
-	if lkgSource != nil {
-		cc.configOk.Set(fmt.Sprintf(status.LkgRemoteMessageFmt, lkgSource.APIPath()), reason, apiv1.ConditionFalse)
-	} else {
-		cc.configOk.Set(status.LkgLocalMessage, reason, apiv1.ConditionFalse)
-	}
-
-	// return the last-known-good config
-	return lkg, nil
+	// update the active source to the non-nil last-known-good source
+	cc.configStatus.SetActive(lastKnownGoodSource.NodeConfigSource())
+	return lastKnownGoodConfig, nil
 }
 
 // StartSync launches the controller's sync loops if `client` is non-nil and `nodeName` is non-empty.
@@ -146,11 +156,11 @@ func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.E
 		return
 	}
 
-	// start the ConfigOk condition sync loop
+	// start the status sync loop
 	go utilpanic.HandlePanic(func() {
-		utillog.Infof("starting ConfigOk condition sync loop")
+		utillog.Infof("starting status sync loop")
 		wait.JitterUntil(func() {
-			cc.configOk.Sync(client, nodeName)
+			cc.configStatus.Sync(client, nodeName)
 		}, 10*time.Second, 0.2, true, wait.NeverStop)
 	})()
 
@@ -176,54 +186,18 @@ func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.E
 
 }
 
-// loadAssignedConfig loads the Kubelet's currently assigned config,
-// based on the setting in the local checkpoint store.
-// It returns the loaded configuration, the checkpoint store's config source record,
-// a clean success or failure reason that can be reported in the status, and any error that occurs.
-// If the local config should be used, it will be returned. You should validate local before passing it to this function.
-func (cc *Controller) loadAssignedConfig(local *kubeletconfig.KubeletConfiguration) (*kubeletconfig.KubeletConfiguration, checkpoint.RemoteConfigSource, string, error) {
-	source, err := cc.checkpointStore.Current()
-	if err != nil {
-		return nil, nil, fmt.Sprintf(status.CurFailLoadReasonFmt, "unknown"), err
-	}
-	// nil source is the signal to use the local config
-	if source == nil {
-		return local, source, status.CurLocalOkayReason, nil
-	}
+// loadConfig loads Kubelet config from a checkpoint
+// It returns the loaded configuration or a clean failure reason (for status reporting) and an error.
+func (cc *Controller) loadConfig(source checkpoint.RemoteConfigSource) (*kubeletconfig.KubeletConfiguration, string, error) {
 	// load KubeletConfiguration from checkpoint
 	kc, err := cc.checkpointStore.Load(source)
 	if err != nil {
-		return nil, source, fmt.Sprintf(status.CurFailLoadReasonFmt, source.APIPath()), err
+		return nil, status.LoadError, err
 	}
 	if err := validation.ValidateKubeletConfiguration(kc); err != nil {
-		return nil, source, fmt.Sprintf(status.CurFailValidateReasonFmt, source.APIPath()), err
+		return nil, status.ValidateError, err
 	}
-	return kc, source, status.CurRemoteOkayReason, nil
-}
-
-// loadLastKnownGoodConfig loads the Kubelet's last-known-good config,
-// based on the setting in the local checkpoint store.
-// It returns the loaded configuration, the checkpoint store's config source record,
-// and any error that occurs.
-// If the local config should be used, it will be returned. You should validate local before passing it to this function.
-func (cc *Controller) loadLastKnownGoodConfig(local *kubeletconfig.KubeletConfiguration) (*kubeletconfig.KubeletConfiguration, checkpoint.RemoteConfigSource, error) {
-	source, err := cc.checkpointStore.LastKnownGood()
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to determine last-known-good config, error: %v", err)
-	}
-	// nil source is the signal to use the local config
-	if source == nil {
-		return local, source, nil
-	}
-	// load from checkpoint
-	kc, err := cc.checkpointStore.Load(source)
-	if err != nil {
-		return nil, source, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailLoadReasonFmt, source.APIPath()), err)
-	}
-	if err := validation.ValidateKubeletConfiguration(kc); err != nil {
-		return nil, source, fmt.Errorf("%s, error: %v", fmt.Sprintf(status.LkgFailValidateReasonFmt, source.APIPath()), err)
-	}
-	return kc, source, nil
+	return kc, "", nil
 }
 
 // initializeDynamicConfigDir makes sure that the storage layers for various controller components are set up correctly
@@ -246,10 +220,10 @@ func (cc *Controller) checkTrial(duration time.Duration) {
 	}
 }
 
-// inTrial returns true if the time elapsed since the last modification of the current config does not exceed `trialDur`, false otherwise
+// inTrial returns true if the time elapsed since the last modification of the assigned config does not exceed `trialDur`, false otherwise
 func (cc *Controller) inTrial(trialDur time.Duration) (bool, error) {
 	now := time.Now()
-	t, err := cc.checkpointStore.CurrentModified()
+	t, err := cc.checkpointStore.AssignedModified()
 	if err != nil {
 		return false, err
 	}
@@ -260,15 +234,19 @@ func (cc *Controller) inTrial(trialDur time.Duration) (bool, error) {
 }
 
 // graduateAssignedToLastKnownGood sets the last-known-good in the checkpointStore
-// to the same value as the current config maintained by the checkpointStore
+// to the same value as the assigned config maintained by the checkpointStore
 func (cc *Controller) graduateAssignedToLastKnownGood() error {
-	current, err := cc.checkpointStore.Current()
+	// get the assigned config
+	assigned, err := cc.checkpointStore.Assigned()
 	if err != nil {
 		return err
 	}
-	err = cc.checkpointStore.SetLastKnownGood(current)
+	// update the last-known-good config
+	err = cc.checkpointStore.SetLastKnownGood(assigned)
 	if err != nil {
 		return err
 	}
+	// update the status to reflect the new last-known-good config
+	cc.configStatus.SetLastKnownGood(assigned.NodeConfigSource())
 	return nil
 }
