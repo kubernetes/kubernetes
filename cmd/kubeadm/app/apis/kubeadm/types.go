@@ -30,6 +30,11 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta
 
+	// Metadata holds metadata about the this configuration object.
+	// Annotations and similar extra information can be provided by the user or other external programs
+	// .Metadata.ClusterName is used for setting the .Cluster[0].Name field in generated KubeConfig files by kubeadm
+	Metadata metav1.ObjectMeta
+
 	// API holds configuration for the k8s apiserver.
 	API API
 	// KubeProxy holds configuration for the k8s service proxy.
@@ -124,9 +129,6 @@ type MasterConfiguration struct {
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool
-
-	// The cluster name
-	ClusterName string
 }
 
 // API struct contains elements of API server address.
@@ -223,6 +225,11 @@ type SelfHostedEtcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta
 
+	// Metadata holds metadata about the this configuration object.
+	// Annotations and similar extra information can be provided by the user or other external programs
+	// .Metadata.ClusterName is used for setting the .Cluster[0].Name field in generated KubeConfig files by kubeadm
+	Metadata metav1.ObjectMeta
+
 	// CACertPath is the path to the SSL certificate authority used to
 	// secure comunications between node and master.
 	// Defaults to "/etc/kubernetes/pki/ca.crt".
@@ -249,8 +256,6 @@ type NodeConfiguration struct {
 	Token string
 	// CRISocket is used to retrieve container runtime info.
 	CRISocket string
-	// The cluster name
-	ClusterName string
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery
