@@ -26,18 +26,16 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	listersv1 "k8s.io/client-go/listers/core/v1"
-
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// findServicePort finds the service port by name or numerically.
-func findServicePort(svc *v1.Service, port intstr.IntOrString) (*v1.ServicePort, error) {
+// findServicePort finds the matching service port by port.
+func findServicePort(svc *v1.Service, port int32) (*v1.ServicePort, error) {
 	for _, svcPort := range svc.Spec.Ports {
-		if (port.Type == intstr.Int && int32(svcPort.Port) == port.IntVal) || (port.Type == intstr.String && svcPort.Name == port.StrVal) {
+		if svcPort.Port == port {
 			return &svcPort, nil
 		}
 	}
-	return nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %q found for service %q", port.String(), svc.Name))
+	return nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %q found for service %q", port, svc.Name))
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
@@ -47,8 +45,8 @@ func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.Endpo
 		return nil, err
 	}
 
-	port := intstr.FromInt(443)
-	svcPort, err := findServicePort(svc, port)
+	port := 443
+	svcPort, err := findServicePort(svc, int32(port))
 	if err != nil {
 		return nil, err
 	}
@@ -98,28 +96,25 @@ func ResolveCluster(services listersv1.ServiceLister, namespace, id string) (*ur
 		return nil, err
 	}
 
-	port := intstr.FromInt(443)
+	port := 443
 
 	switch {
 	case svc.Spec.Type == v1.ServiceTypeClusterIP && svc.Spec.ClusterIP == v1.ClusterIPNone:
 		return nil, fmt.Errorf(`cannot route to service with ClusterIP "None"`)
 	// use IP from a clusterIP for these service types
 	case svc.Spec.Type == v1.ServiceTypeClusterIP, svc.Spec.Type == v1.ServiceTypeLoadBalancer, svc.Spec.Type == v1.ServiceTypeNodePort:
-		svcPort, err := findServicePort(svc, port)
+		_, err := findServicePort(svc, int32(port))
 		if err != nil {
 			return nil, err
 		}
 		return &url.URL{
 			Scheme: "https",
-			Host:   net.JoinHostPort(svc.Spec.ClusterIP, fmt.Sprintf("%d", svcPort.Port)),
+			Host:   net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(port)),
 		}, nil
 	case svc.Spec.Type == v1.ServiceTypeExternalName:
-		if port.Type != intstr.Int {
-			return nil, fmt.Errorf("named ports not supported")
-		}
 		return &url.URL{
 			Scheme: "https",
-			Host:   net.JoinHostPort(svc.Spec.ExternalName, port.String()),
+			Host:   net.JoinHostPort(svc.Spec.ExternalName, strconv.Itoa(port)),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported service type %q", svc.Spec.Type)
