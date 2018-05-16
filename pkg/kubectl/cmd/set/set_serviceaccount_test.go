@@ -90,12 +90,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 			cmd.Flags().Set("local", "true")
 			testapi.Default = testapi.Groups[input.apiGroup]
 			saConfig := SetServiceAccountOptions{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-					NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-					OutputFormat: &outputFormat,
-				},
+				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 				fileNameOptions: resource.FilenameOptions{
 					Filenames: []string{input.yaml}},
 				local:     true,
@@ -133,12 +128,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 	opts := SetServiceAccountOptions{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-			NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-			OutputFormat: &outputFormat,
-		},
+		PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		fileNameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		local:     true,
@@ -375,12 +365,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 			cmd := NewCmdServiceAccount(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			saConfig := SetServiceAccountOptions{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-					NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-					OutputFormat: &outputFormat,
-				},
+				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
 				local:     false,
 				IOStreams: streams,
@@ -422,13 +407,8 @@ func TestServiceAccountValidation(t *testing.T) {
 			cmd := NewCmdServiceAccount(tf, streams)
 
 			saConfig := &SetServiceAccountOptions{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-					NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-					OutputFormat: &outputFormat,
-				},
-				IOStreams: streams,
+				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+				IOStreams:  streams,
 			}
 			err := saConfig.Complete(tf, cmd, input.args)
 			assert.EqualError(t, err, input.errorString)

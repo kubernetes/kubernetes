@@ -30,6 +30,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 
@@ -99,7 +100,7 @@ func (o *CertificateOptions) Validate() error {
 
 func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := CertificateOptions{
-		PrintFlags: printers.NewPrintFlags("approved", legacyscheme.Scheme),
+		PrintFlags: printers.NewPrintFlags("approved").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 	cmd := &cobra.Command{
@@ -156,7 +157,7 @@ func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 
 func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := CertificateOptions{
-		PrintFlags: printers.NewPrintFlags("denied", legacyscheme.Scheme),
+		PrintFlags: printers.NewPrintFlags("denied").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 	cmd := &cobra.Command{

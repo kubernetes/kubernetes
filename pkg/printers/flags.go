@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -75,6 +74,8 @@ type PrintFlags struct {
 	JSONYamlPrintFlags *JSONYamlPrintFlags
 	NamePrintFlags     *NamePrintFlags
 
+	TypeSetterPrinter *TypeSetterPrinter
+
 	OutputFormat *string
 }
 
@@ -90,13 +91,13 @@ func (f *PrintFlags) ToPrinter() (ResourcePrinter, error) {
 
 	if f.JSONYamlPrintFlags != nil {
 		if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
-			return p, err
+			return f.TypeSetterPrinter.WrapToPrinter(p, err)
 		}
 	}
 
 	if f.NamePrintFlags != nil {
 		if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
-			return p, err
+			return f.TypeSetterPrinter.WrapToPrinter(p, err)
 		}
 	}
 
@@ -118,14 +119,20 @@ func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
 	return f
 }
 
-func NewPrintFlags(operation string, scheme runtime.ObjectConvertor) *PrintFlags {
+// WithTypeSetter sets a wrapper than will surround the returned printer with a printer to type resources
+func (f *PrintFlags) WithTypeSetter(scheme *runtime.Scheme) *PrintFlags {
+	f.TypeSetterPrinter = NewTypeSetter(scheme)
+	return f
+}
+
+func NewPrintFlags(operation string) *PrintFlags {
 	outputFormat := ""
 
 	return &PrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: NewJSONYamlPrintFlags(scheme),
-		NamePrintFlags:     NewNamePrintFlags(operation, scheme),
+		JSONYamlPrintFlags: NewJSONYamlPrintFlags(),
+		NamePrintFlags:     NewNamePrintFlags(operation),
 	}
 }
 

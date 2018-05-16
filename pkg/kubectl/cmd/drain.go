@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -107,7 +108,7 @@ var (
 
 func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &DrainOptions{
-		PrintFlags: printers.NewPrintFlags("cordoned", legacyscheme.Scheme),
+		PrintFlags: printers.NewPrintFlags("cordoned").WithTypeSetter(scheme.Scheme),
 
 		IOStreams: ioStreams,
 	}
@@ -139,7 +140,7 @@ var (
 
 func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &DrainOptions{
-		PrintFlags: printers.NewPrintFlags("uncordoned", legacyscheme.Scheme),
+		PrintFlags: printers.NewPrintFlags("uncordoned").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 
@@ -195,7 +196,7 @@ var (
 
 func NewDrainOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainOptions {
 	return &DrainOptions{
-		PrintFlags: printers.NewPrintFlags("drained", legacyscheme.Scheme),
+		PrintFlags: printers.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 
 		IOStreams:          ioStreams,
 		backOff:            clockwork.NewRealClock(),

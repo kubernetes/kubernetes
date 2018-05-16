@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -83,7 +82,7 @@ type SubjectOptions struct {
 
 func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
 	return &SubjectOptions{
-		PrintFlags: printers.NewPrintFlags("subjects updated", legacyscheme.Scheme),
+		PrintFlags: printers.NewPrintFlags("subjects updated").WithTypeSetter(scheme.Scheme),
 
 		IOStreams: streams,
 	}

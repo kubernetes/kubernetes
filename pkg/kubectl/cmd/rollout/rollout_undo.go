@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -64,7 +65,7 @@ var (
 
 func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &UndoOptions{
-		PrintFlags: printers.NewPrintFlags("", legacyscheme.Scheme),
+		PrintFlags: printers.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
 		ToRevision: int64(0),
 	}
 

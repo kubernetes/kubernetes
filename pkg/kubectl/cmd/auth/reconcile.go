@@ -30,6 +30,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/registry/rbac/reconciliation"
 )
@@ -63,7 +64,7 @@ var (
 func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOptions {
 	return &ReconcileOptions{
 		FilenameOptions: &resource.FilenameOptions{},
-		PrintFlags:      printers.NewPrintFlags("reconciled", legacyscheme.Scheme),
+		PrintFlags:      printers.NewPrintFlags("reconciled").WithTypeSetter(scheme.Scheme),
 		IOStreams:       ioStreams,
 	}
 }

@@ -103,7 +103,7 @@ type ConvertOptions struct {
 
 func NewConvertOptions(ioStreams genericclioptions.IOStreams) *ConvertOptions {
 	return &ConvertOptions{
-		PrintFlags: printers.NewPrintFlags("converted", scheme.Scheme).WithDefaultOutput("yaml"),
+		PrintFlags: printers.NewPrintFlags("converted").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
 		local:      true,
 		IOStreams:  ioStreams,
 	}

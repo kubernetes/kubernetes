@@ -70,12 +70,7 @@ func TestImageLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetImageOptions{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-			NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-			OutputFormat: &outputFormat,
-		},
+		PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Local:     true,
@@ -97,10 +92,7 @@ func TestImageLocal(t *testing.T) {
 }
 
 func TestSetImageValidation(t *testing.T) {
-	printFlags := &printers.PrintFlags{
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-		NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-	}
+	printFlags := printers.NewPrintFlags("").WithTypeSetter(scheme.Scheme)
 
 	testCases := []struct {
 		name         string
@@ -191,12 +183,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetImageOptions{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-			NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-			OutputFormat: &outputFormat,
-		},
+		PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		Local:     true,
@@ -583,12 +570,7 @@ func TestSetImageRemote(t *testing.T) {
 			cmd := NewCmdImage(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			opts := SetImageOptions{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-					NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-					OutputFormat: &outputFormat,
-				},
+				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
 				Local:     false,
 				IOStreams: streams,

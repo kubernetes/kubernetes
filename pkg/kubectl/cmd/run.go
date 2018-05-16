@@ -127,7 +127,7 @@ type RunOptions struct {
 
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
-		PrintFlags:  printers.NewPrintFlags("created", legacyscheme.Scheme),
+		PrintFlags:  printers.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 

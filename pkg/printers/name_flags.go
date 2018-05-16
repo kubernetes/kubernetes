@@ -21,18 +21,12 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 // NamePrintFlags provides default flags necessary for printing
 // a resource's fully-qualified Kind.group/name, or a successful
 // message about that resource if an Operation is provided.
 type NamePrintFlags struct {
-	Scheme runtime.ObjectConvertor
-
 	// Operation describes the name of the action that
 	// took place on an object, to be included in the
 	// finalized "successful" message.
@@ -51,7 +45,6 @@ func (f *NamePrintFlags) Complete(successTemplate string) error {
 func (f *NamePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, error) {
 	namePrinter := &NamePrinter{
 		Operation: f.Operation,
-		Typer:     scheme.Scheme,
 	}
 
 	outputFormat = strings.ToLower(outputFormat)
@@ -72,7 +65,7 @@ func (f *NamePrintFlags) AddFlags(c *cobra.Command) {}
 
 // NewNamePrintFlags returns flags associated with
 // --name printing, with default values set.
-func NewNamePrintFlags(operation string, scheme runtime.ObjectConvertor) *NamePrintFlags {
+func NewNamePrintFlags(operation string) *NamePrintFlags {
 	return &NamePrintFlags{
 		Operation: operation,
 	}

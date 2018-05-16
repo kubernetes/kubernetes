@@ -70,12 +70,7 @@ func TestResourcesLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetResourcesOptions{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-			NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-			OutputFormat: &outputFormat,
-		},
+		PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Local:             true,
@@ -124,12 +119,7 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetResourcesOptions{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-			NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-			OutputFormat: &outputFormat,
-		},
+		PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		Local:             true,
@@ -504,12 +494,7 @@ func TestSetResourcesRemote(t *testing.T) {
 			cmd := NewCmdResources(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			opts := SetResourcesOptions{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme.Scheme),
-					NamePrintFlags:     printers.NewNamePrintFlags("", scheme.Scheme),
-
-					OutputFormat: &outputFormat,
-				},
+				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
 				Limits:            "cpu=200m,memory=512Mi",
 				ContainerSelector: "*",
