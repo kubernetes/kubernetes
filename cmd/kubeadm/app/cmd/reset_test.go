@@ -127,7 +127,7 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests",
 			},
 		},
-		"preserve cloud-config": {
+		"preserve unrelated file foo": {
 			setupDirs: []string{
 				"manifests",
 				"pki",
@@ -138,12 +138,12 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki/ca.pem",
 				kubeadmconstants.AdminKubeConfigFileName,
 				kubeadmconstants.KubeletKubeConfigFileName,
-				"cloud-config",
+				"foo",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				"cloud-config",
+				"foo",
 			},
 		},
 		"preserve hidden files and directories": {
@@ -158,13 +158,11 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki/ca.pem",
 				kubeadmconstants.AdminKubeConfigFileName,
 				kubeadmconstants.KubeletKubeConfigFileName,
-				".cloud-config",
 				".mydir/.myfile",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				".cloud-config",
 				".mydir",
 				".mydir/.myfile",
 			},

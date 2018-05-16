@@ -42,8 +42,6 @@ type MasterConfiguration struct {
 	Networking Networking `json:"networking"`
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string `json:"kubernetesVersion"`
-	// CloudProvider is the name of the cloud provider.
-	CloudProvider string `json:"cloudProvider"`
 	// NodeName is the name of the node that will host the k8s control plane.
 	// Defaults to the hostname if not provided.
 	NodeName string `json:"nodeName"`
@@ -55,11 +53,6 @@ type MasterConfiguration struct {
 	// master node allowing workloads to be run on it (e.g. in
 	// single node configurations).
 	NoTaintMaster bool `json:"noTaintMaster,omitempty"`
-
-	// Mark the controller and api server pods as privileged as some cloud
-	// controllers like openstack need escalated privileges under some conditions
-	// example - loading a config drive to fetch node information
-	PrivilegedPods bool `json:"privilegedPods"`
 
 	// Token is used for establishing bidirectional trust between nodes and masters.
 	// Used for joining nodes in the cluster.
