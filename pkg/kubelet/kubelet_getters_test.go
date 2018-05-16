@@ -24,7 +24,7 @@ import (
 )
 
 func TestKubeletDirs(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	root := kubelet.rootDirectory

@@ -32,7 +32,7 @@ import (
 )
 
 func TestListVolumesForPod(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
@@ -78,7 +78,7 @@ func TestListVolumesForPod(t *testing.T) {
 }
 
 func TestPodVolumesExist(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
@@ -155,7 +155,7 @@ func TestPodVolumesExist(t *testing.T) {
 }
 
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
@@ -199,7 +199,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 }
 
 func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
@@ -268,7 +268,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 }
 
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
-	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
@@ -334,7 +334,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 }
 
 func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
-	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
