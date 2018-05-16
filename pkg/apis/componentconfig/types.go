@@ -244,6 +244,28 @@ type KubeControllerManagerConfiguration struct {
 	ExternalCloudVolumePlugin string
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type CloudControllerManagerConfiguration struct {
+	metav1.TypeMeta
+
+	// CloudProviderConfiguration holds configuration for CloudProvider related features.
+	CloudProvider CloudProviderConfiguration
+	// DebuggingConfiguration holds configuration for Debugging related features.
+	Debugging DebuggingConfiguration
+	// GenericComponentConfiguration holds configuration for GenericComponent
+	// related features both in cloud controller manager and kube-controller manager.
+	GenericComponent GenericComponentConfiguration
+	// KubeCloudSharedConfiguration holds configuration for shared related features
+	// both in cloud controller manager and kube-controller manager.
+	KubeCloudShared KubeCloudSharedConfiguration
+	// ServiceControllerConfiguration holds configuration for ServiceController
+	// related features.
+	ServiceController ServiceControllerConfiguration
+	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
+	NodeStatusUpdateFrequency metav1.Duration
+}
+
 type CloudProviderConfiguration struct {
 	// Name is the provider for cloud services.
 	Name string
