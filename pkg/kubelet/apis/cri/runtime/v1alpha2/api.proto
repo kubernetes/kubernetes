@@ -1047,7 +1047,8 @@ message RemoveImageRequest {
 message RemoveImageResponse {}
 
 message NetworkConfig {
-    // CIDR to use for pod IP addresses.
+    // CIDR to use for pod IP addresses. If the CIDR is empty, runtimes
+    // should omit it.
     string pod_cidr = 1;
 }
 
