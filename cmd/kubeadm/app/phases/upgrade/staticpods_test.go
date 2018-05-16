@@ -55,7 +55,6 @@ authorizationModes:
 - Node
 - RBAC
 certificatesDir: %s
-cloudProvider: ""
 controllerManagerExtraArgs: null
 etcd:
   caFile: ""
