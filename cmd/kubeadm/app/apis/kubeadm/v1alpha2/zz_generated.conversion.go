@@ -220,6 +220,7 @@ func Convert_kubeadm_KubeletConfiguration_To_v1alpha2_KubeletConfiguration(in *k
 }
 
 func autoConvert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in *MasterConfiguration, out *kubeadm.MasterConfiguration, s conversion.Scope) error {
+	out.Metadata = in.Metadata
 	if err := Convert_v1alpha2_API_To_kubeadm_API(&in.API, &out.API, s); err != nil {
 		return err
 	}
@@ -261,7 +262,6 @@ func autoConvert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 		return err
 	}
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
-	out.ClusterName = in.ClusterName
 	return nil
 }
 
@@ -271,6 +271,7 @@ func Convert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 }
 
 func autoConvert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in *kubeadm.MasterConfiguration, out *MasterConfiguration, s conversion.Scope) error {
+	out.Metadata = in.Metadata
 	if err := Convert_kubeadm_API_To_v1alpha2_API(&in.API, &out.API, s); err != nil {
 		return err
 	}
@@ -313,7 +314,6 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in 
 		return err
 	}
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
-	out.ClusterName = in.ClusterName
 	return nil
 }
 
@@ -347,6 +347,7 @@ func Convert_kubeadm_Networking_To_v1alpha2_Networking(in *kubeadm.Networking, o
 }
 
 func autoConvert_v1alpha2_NodeConfiguration_To_kubeadm_NodeConfiguration(in *NodeConfiguration, out *kubeadm.NodeConfiguration, s conversion.Scope) error {
+	out.Metadata = in.Metadata
 	out.CACertPath = in.CACertPath
 	out.DiscoveryFile = in.DiscoveryFile
 	out.DiscoveryToken = in.DiscoveryToken
@@ -356,7 +357,6 @@ func autoConvert_v1alpha2_NodeConfiguration_To_kubeadm_NodeConfiguration(in *Nod
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
 	out.CRISocket = in.CRISocket
-	out.ClusterName = in.ClusterName
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))
 	out.DiscoveryTokenUnsafeSkipCAVerification = in.DiscoveryTokenUnsafeSkipCAVerification
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
@@ -369,6 +369,7 @@ func Convert_v1alpha2_NodeConfiguration_To_kubeadm_NodeConfiguration(in *NodeCon
 }
 
 func autoConvert_kubeadm_NodeConfiguration_To_v1alpha2_NodeConfiguration(in *kubeadm.NodeConfiguration, out *NodeConfiguration, s conversion.Scope) error {
+	out.Metadata = in.Metadata
 	out.CACertPath = in.CACertPath
 	out.DiscoveryFile = in.DiscoveryFile
 	out.DiscoveryToken = in.DiscoveryToken
@@ -378,7 +379,6 @@ func autoConvert_kubeadm_NodeConfiguration_To_v1alpha2_NodeConfiguration(in *kub
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
 	out.CRISocket = in.CRISocket
-	out.ClusterName = in.ClusterName
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))
 	out.DiscoveryTokenUnsafeSkipCAVerification = in.DiscoveryTokenUnsafeSkipCAVerification
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))

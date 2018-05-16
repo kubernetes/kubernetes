@@ -185,6 +185,7 @@ func (in *KubeletConfiguration) DeepCopy() *KubeletConfiguration {
 func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.Metadata.DeepCopyInto(&out.Metadata)
 	out.API = in.API
 	in.KubeProxy.DeepCopyInto(&out.KubeProxy)
 	in.Etcd.DeepCopyInto(&out.Etcd)
@@ -304,6 +305,7 @@ func (in *Networking) DeepCopy() *Networking {
 func (in *NodeConfiguration) DeepCopyInto(out *NodeConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.Metadata.DeepCopyInto(&out.Metadata)
 	if in.DiscoveryTokenAPIServers != nil {
 		in, out := &in.DiscoveryTokenAPIServers, &out.DiscoveryTokenAPIServers
 		*out = make([]string, len(*in))
