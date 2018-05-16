@@ -32,7 +32,7 @@ import (
 func TestPodResourceLimitsDefaulting(t *testing.T) {
 	cpuCores := resource.MustParse("10")
 	memoryCapacity := resource.MustParse("10Gi")
-	tk := newTestKubelet(t, true)
+	tk := newTestKubelet(t, true, false)
 	defer tk.Cleanup()
 	tk.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
 	tk.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{
