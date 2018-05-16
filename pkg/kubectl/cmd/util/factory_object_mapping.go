@@ -19,28 +19,18 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
 	"sync"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
-	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -50,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -152,186 +143,6 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 	return printersinternal.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
 }
 
-func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	clientset, err := f.clientAccessFactory.ClientSet()
-	if err != nil {
-		return nil, err
-	}
-	opts, ok := options.(*api.PodLogOptions)
-	if !ok {
-		return nil, errors.New("provided options object is not a PodLogOptions")
-	}
-
-	switch t := object.(type) {
-	case *api.Pod:
-		return clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
-	case *corev1.Pod:
-		return clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
-	}
-
-	namespace, selector, err := selectorsForObject(object)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get the logs from %T: %v", object, err)
-	}
-	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
-	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
-	if err != nil {
-		return nil, err
-	}
-	if numPods > 1 {
-		fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
-	}
-	return clientset.Core().Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
-}
-
-func selectorsForObject(object runtime.Object) (namespace string, selector labels.Selector, err error) {
-	switch t := object.(type) {
-	case *extensions.ReplicaSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *extensionsv1beta1.ReplicaSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1.ReplicaSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1beta2.ReplicaSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *api.ReplicationController:
-		namespace = t.Namespace
-		selector = labels.SelectorFromSet(t.Spec.Selector)
-	case *corev1.ReplicationController:
-		namespace = t.Namespace
-		selector = labels.SelectorFromSet(t.Spec.Selector)
-
-	case *apps.StatefulSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1.StatefulSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1beta1.StatefulSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1beta2.StatefulSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *extensions.DaemonSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *extensionsv1beta1.DaemonSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1.DaemonSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1beta2.DaemonSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *extensions.Deployment:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *extensionsv1beta1.Deployment:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1.Deployment:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1beta1.Deployment:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *appsv1beta2.Deployment:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *batch.Job:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *batchv1.Job:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *api.Service:
-		namespace = t.Namespace
-		if t.Spec.Selector == nil || len(t.Spec.Selector) == 0 {
-			return "", nil, fmt.Errorf("invalid service '%s': Service is defined without a selector", t.Name)
-		}
-		selector = labels.SelectorFromSet(t.Spec.Selector)
-	case *corev1.Service:
-		namespace = t.Namespace
-		if t.Spec.Selector == nil || len(t.Spec.Selector) == 0 {
-			return "", nil, fmt.Errorf("invalid service '%s': Service is defined without a selector", t.Name)
-		}
-		selector = labels.SelectorFromSet(t.Spec.Selector)
-
-	default:
-		return "", nil, fmt.Errorf("selector for %T not implemented", object)
-	}
-
-	return namespace, selector, nil
-}
-
 func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
 	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
@@ -394,12 +205,12 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 
 	}
 
-	namespace, selector, err := selectorsForObject(object)
+	namespace, selector, err := polymorphichelpers.SelectorsForObject(object)
 	if err != nil {
 		return nil, fmt.Errorf("cannot attach to %T: %v", object, err)
 	}
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
+	pod, _, err := polymorphichelpers.GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
 	return pod, err
 }
 

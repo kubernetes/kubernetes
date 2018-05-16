@@ -26,16 +26,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -82,13 +81,10 @@ type LogsOptions struct {
 	AllContainers bool
 	Options       runtime.Object
 
-	Mapper  meta.RESTMapper
-	Typer   runtime.ObjectTyper
-	Decoder runtime.Decoder
-
-	Object        runtime.Object
-	GetPodTimeout time.Duration
-	LogsForObject func(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
+	Object           runtime.Object
+	GetPodTimeout    time.Duration
+	RESTClientGetter genericclioptions.RESTClientGetter
+	LogsForObject    polymorphichelpers.LogsForObjectFunc
 
 	genericclioptions.IOStreams
 }
@@ -196,7 +192,8 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 	o.Options = logOptions
-	o.LogsForObject = f.LogsForObject
+	o.RESTClientGetter = f
+	o.LogsForObject = polymorphichelpers.LogsForObjectFn
 
 	if len(selector) != 0 {
 		if logOptions.Follow {
@@ -286,7 +283,7 @@ func (o LogsOptions) getPodLogs(pod *api.Pod) error {
 }
 
 func (o LogsOptions) getLogs(obj runtime.Object) error {
-	req, err := o.LogsForObject(obj, o.Options, o.GetPodTimeout)
+	req, err := o.LogsForObject(o.RESTClientGetter, obj, o.Options, o.GetPodTimeout)
 	if err != nil {
 		return err
 	}

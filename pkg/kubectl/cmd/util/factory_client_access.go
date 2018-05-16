@@ -55,21 +55,15 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
-type RESTClientGetter interface {
-	ToRESTConfig() (*restclient.Config, error)
-	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
-	ToRESTMapper() (meta.RESTMapper, error)
-	ToRawKubeConfigLoader() clientcmd.ClientConfig
-}
-
 type ring0Factory struct {
-	clientGetter RESTClientGetter
+	clientGetter genericclioptions.RESTClientGetter
 }
 
-func NewClientAccessFactory(clientGetter RESTClientGetter) ClientAccessFactory {
+func NewClientAccessFactory(clientGetter genericclioptions.RESTClientGetter) ClientAccessFactory {
 	if clientGetter == nil {
 		panic("attempt to instantiate client_access_factory with nil clientGetter")
 	}

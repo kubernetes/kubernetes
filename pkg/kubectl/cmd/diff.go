@@ -399,7 +399,7 @@ func NewDownloader(f cmdutil.Factory) (*Downloader, error) {
 	var err error
 	var d Downloader
 
-	d.mapper, err = f.RESTMapper()
+	d.mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return nil, err
 	}

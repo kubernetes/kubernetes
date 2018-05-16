@@ -44,7 +44,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -444,24 +443,6 @@ func testRESTMapper() meta.RESTMapper {
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
 	return expander
-}
-
-func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	c, err := f.ClientSet()
-	if err != nil {
-		panic(err)
-	}
-
-	switch t := object.(type) {
-	case *api.Pod:
-		opts, ok := options.(*api.PodLogOptions)
-		if !ok {
-			return nil, errors.New("provided options object is not a PodLogOptions")
-		}
-		return c.Core().Pods(f.Namespace).GetLogs(t.Name, opts), nil
-	default:
-		return nil, fmt.Errorf("cannot get the logs from %T", object)
-	}
 }
 
 func (f *TestFactory) ScaleClient() (scaleclient.ScalesGetter, error) {
