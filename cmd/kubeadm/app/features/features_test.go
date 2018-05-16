@@ -121,7 +121,7 @@ func TestNewFeatureGate(t *testing.T) {
 func TestValidateVersion(t *testing.T) {
 	var someFeatures = FeatureList{
 		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
 	}
 
 	var tests = []struct {
@@ -133,15 +133,9 @@ func TestValidateVersion(t *testing.T) {
 			requestedFeatures: map[string]bool{"feature1": true},
 			expectedError:     false,
 		},
-		{ //min version but correct value given
+		{ //no min version
 			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  "v1.9.0",
 			expectedError:     false,
-		},
-		{ //min version and incorrect value given
-			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  "v1.8.2",
-			expectedError:     true,
 		},
 	}
 
