@@ -275,6 +275,16 @@ func (f *RemoteRuntime) Status(ctx context.Context, req *kubeapi.StatusRequest) 
 	return &kubeapi.StatusResponse{Status: status}, nil
 }
 
+// GetRuntimeConfigInfo returns configuration details of the container runtime
+func (f *RemoteRuntime) GetRuntimeConfigInfo(ctx context.Context, req *kubeapi.GetRuntimeConfigInfoRequest) (*kubeapi.GetRuntimeConfigInfoResponse, error) {
+	runtimeConfig, err := f.RuntimeService.GetRuntimeConfigInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.GetRuntimeConfigInfoResponse{RuntimeConfig: runtimeConfig}, nil
+}
+
 // UpdateContainerResources updates ContainerConfig of the container.
 func (f *RemoteRuntime) UpdateContainerResources(ctx context.Context, req *kubeapi.UpdateContainerResourcesRequest) (*kubeapi.UpdateContainerResourcesResponse, error) {
 	err := f.RuntimeService.UpdateContainerResources(req.ContainerId, req.Linux)

@@ -1366,25 +1366,20 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 	}
 }
 func TestDefaultPodSpecHostUserNamespace(t *testing.T) {
-	// field should be defaulted
-	err := utilfeature.DefaultFeatureGate.Set("UserNamespaceRemapping=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for UserNamespaceRemapping: %v", err)
-	}
+	// When feature gate is disabled, field should not be defaulted
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostUserNamespace, false)()
 	in := v1.PodSpec{}
 	out := roundTrip(t, runtime.Object(&v1.Pod{Spec: in})).(*v1.Pod).Spec
 	if out.HostUserNamespace != nil {
-		t.Errorf("Expected HostUser to be nil, was made %d", out.HostUserNamespace)
+		t.Errorf("Expected HostUserNamespace unset, was made %d", out.HostUserNamespace)
 	}
-	// When feature gate is disabled, field should not be defaulted
-	err = utilfeature.DefaultFeatureGate.Set("UserNamespaceRemapping=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for UserNamespaceRemapping: %v", err)
-	}
+
+	// field should not be defaulted
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostUserNamespace, true)()
 	in = v1.PodSpec{}
 	out = roundTrip(t, runtime.Object(&v1.Pod{Spec: in})).(*v1.Pod).Spec
 	if out.HostUserNamespace != nil {
-		t.Errorf("Expected HostUserNamespace unset, was made %d", out.HostUserNamespace)
+		t.Errorf("Expected HostUser to be nil, was made %d", out.HostUserNamespace)
 	}
 
 	true_obj := true

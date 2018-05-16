@@ -214,12 +214,20 @@ func (f *FakeRuntime) GetRuntimeConfigInfo() (*RuntimeConfigInfo, error) {
 	return f.RuntimeConfigInfo, f.RuntimeConfigInfoErr
 }
 
-func (f *FakeRuntime) GetRemappedIds() (int, int) {
+func (f *FakeRuntime) GetHostUID(containerUID int) (int, error) {
 	f.Lock()
 	defer f.Unlock()
 
-	f.CalledFunctions = append(f.CalledFunctions, "GetRemappedIds")
-	return f.RemappedUID, f.RemappedGID
+	f.CalledFunctions = append(f.CalledFunctions, "GetHostUID")
+	return f.RemappedUID, f.Err
+}
+
+func (f *FakeRuntime) GetHostGID(containerGID int) (int, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetHostGID")
+	return f.RemappedGID, f.Err
 }
 
 func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {

@@ -53,10 +53,11 @@ type FakeRuntimeService struct {
 	Called []string
 	Errors map[string][]error
 
-	FakeStatus         *runtimeapi.RuntimeStatus
-	Containers         map[string]*FakeContainer
-	Sandboxes          map[string]*FakePodSandbox
-	FakeContainerStats map[string]*runtimeapi.ContainerStats
+	FakeStatus            *runtimeapi.RuntimeStatus
+	FakeRuntimeConfigInfo *runtimeapi.ActiveRuntimeConfig
+	Containers            map[string]*FakeContainer
+	Sandboxes             map[string]*FakePodSandbox
+	FakeContainerStats    map[string]*runtimeapi.ContainerStats
 }
 
 func (r *FakeRuntimeService) GetContainerID(sandboxID, name string, attempt uint32) (string, error) {
@@ -154,6 +155,15 @@ func (r *FakeRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 	r.Called = append(r.Called, "Status")
 
 	return r.FakeStatus, nil
+}
+
+func (r *FakeRuntimeService) GetRuntimeConfigInfo() (*runtimeapi.ActiveRuntimeConfig, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "GetRuntimeConfigInfo")
+
+	return r.FakeRuntimeConfigInfo, nil
 }
 
 func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {

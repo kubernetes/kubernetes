@@ -28,7 +28,7 @@ import (
 )
 
 func TestPodResourceLimitsDefaulting(t *testing.T) {
-	tk := newTestKubelet(t, true)
+	tk := newTestKubelet(t, true, false)
 	defer tk.Cleanup()
 	tk.kubelet.nodeInfo = &testNodeInfo{
 		nodes: []*v1.Node{

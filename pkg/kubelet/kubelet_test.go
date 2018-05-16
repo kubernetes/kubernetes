@@ -119,7 +119,7 @@ func (tk *TestKubelet) Cleanup() {
 }
 
 // newTestKubelet returns test kubelet with two images.
-func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
+func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool, hostUserNamespaceEnabled bool) *TestKubelet {
 	imageList := []kubecontainer.Image{
 		{
 			ID:       "abc",
@@ -132,7 +132,7 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, hostUserNamespaceEnabled)
 }
 
 func newTestKubeletWithoutFakeVolumePlugin(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
@@ -148,15 +148,15 @@ func newTestKubeletWithoutFakeVolumePlugin(t *testing.T, controllerAttachDetachE
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, false /*initFakeVolumePlugin*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, false /*initFakeVolumePlugin*/, false /*hostUserNamespaceEnabled*/)
 }
 
 func newTestKubeletWithImageList(
 	t *testing.T,
 	imageList []kubecontainer.Image,
 	controllerAttachDetachEnabled bool,
-	initFakeVolumePlugin bool) *TestKubelet {
-	fakeRuntime := &containertest.FakeRuntime{}
+	initFakeVolumePlugin bool, hostUserNamespaceEnabled bool) *TestKubelet {
+	fakeRuntime := &containertest.FakeRuntime{RuntimeConfigInfo: &kubecontainer.RuntimeConfigInfo{}}
 	fakeRuntime.RuntimeType = "test"
 	fakeRuntime.VersionInfo = "1.5.0"
 	fakeRuntime.ImageList = imageList
@@ -167,10 +167,14 @@ func newTestKubeletWithImageList(
 			{Type: "NetworkReady", Status: true},
 		},
 	}
-
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
+	if hostUserNamespaceEnabled {
+		fakeRuntime.RemappedUID = 808080
+		fakeRuntime.RemappedGID = 808080
+	}
+
 	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.heartbeatClient = fakeKubeClient
@@ -218,6 +222,7 @@ func newTestKubeletWithImageList(
 		},
 	}
 	kubelet.recorder = fakeRecorder
+	kubelet.containerRuntime = fakeRuntime
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
@@ -235,7 +240,6 @@ func newTestKubeletWithImageList(
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager, kubelet.configMapManager, podtest.NewMockCheckpointManager())
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
 
-	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
 	kubelet.reasonCache = NewReasonCache()
 	kubelet.podCache = containertest.NewFakeCache(kubelet.containerRuntime)
@@ -367,8 +371,20 @@ func newTestPods(count int) []*v1.Pod {
 	return pods
 }
 
+func TestGetIdsWithUserNSEnabled(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, true)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	uid, err := kubelet.getHostUID(0)
+	require.Nil(t, err)
+	gid, err := kubelet.getHostGID(0)
+	require.Nil(t, err)
+	require.Equal(t, uid, 808080)
+	require.Equal(t, gid, 808080)
+}
+
 func TestSyncLoopAbort(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.runtimeState.setRuntimeSync(time.Now())
@@ -388,7 +404,7 @@ func TestSyncLoopAbort(t *testing.T) {
 }
 
 func TestSyncPodsStartPod(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
@@ -407,7 +423,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	ready := false
 
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
@@ -455,7 +471,7 @@ func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
 
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
 func TestHandlePortConflicts(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
@@ -501,7 +517,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
 func TestHandleHostNameConflicts(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
@@ -544,7 +560,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 
 // Tests that we handle not matching labels selector correctly by setting the failed status in status map.
 func TestHandleNodeSelector(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	nodes := []*v1.Node{
@@ -586,7 +602,7 @@ func TestHandleNodeSelector(t *testing.T) {
 
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
 func TestHandleMemExceeded(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	nodes := []*v1.Node{
@@ -637,7 +653,7 @@ func TestHandleMemExceeded(t *testing.T) {
 // Tests that we handle result of interface UpdatePluginResources correctly
 // by setting corresponding status in status map.
 func TestHandlePluginResources(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
@@ -771,7 +787,7 @@ func TestHandlePluginResources(t *testing.T) {
 
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kl := testKubelet.kubelet
@@ -794,7 +810,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 }
 
 func TestValidateContainerLogStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	containerName := "x"
@@ -944,7 +960,7 @@ func TestValidateContainerLogStatus(t *testing.T) {
 
 func TestCreateMirrorPod(t *testing.T) {
 	for _, updateType := range []kubetypes.SyncPodType{kubetypes.SyncPodCreate, kubetypes.SyncPodUpdate} {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 		defer testKubelet.Cleanup()
 
 		kl := testKubelet.kubelet
@@ -966,7 +982,7 @@ func TestCreateMirrorPod(t *testing.T) {
 }
 
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kl := testKubelet.kubelet
@@ -1004,7 +1020,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 }
 
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kl := testKubelet.kubelet
@@ -1084,7 +1100,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 		},
 	}
 
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
@@ -1112,7 +1128,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 }
 
 func TestHostNetworkAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kubelet := testKubelet.kubelet
@@ -1140,7 +1156,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 }
 
 func TestHostNetworkDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kubelet := testKubelet.kubelet
@@ -1167,7 +1183,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 }
 
 func TestHostPIDAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kubelet := testKubelet.kubelet
@@ -1195,7 +1211,7 @@ func TestHostPIDAllowed(t *testing.T) {
 }
 
 func TestHostPIDDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kubelet := testKubelet.kubelet
@@ -1222,7 +1238,7 @@ func TestHostPIDDisallowed(t *testing.T) {
 }
 
 func TestHostIPCAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kubelet := testKubelet.kubelet
@@ -1250,7 +1266,7 @@ func TestHostIPCAllowed(t *testing.T) {
 }
 
 func TestHostIPCDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kubelet := testKubelet.kubelet
@@ -1277,7 +1293,7 @@ func TestHostIPCDisallowed(t *testing.T) {
 }
 
 func TestPrivilegeContainerAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 
 	kubelet := testKubelet.kubelet
@@ -1302,7 +1318,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 }
 
 func TestPrivilegedContainerDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
@@ -1325,7 +1341,7 @@ func TestPrivilegedContainerDisallowed(t *testing.T) {
 }
 
 func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
@@ -1363,7 +1379,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 }
 
 func TestFilterOutTerminatedPods(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	pods := newTestPods(5)
@@ -1390,7 +1406,7 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
@@ -1439,7 +1455,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
 
@@ -1504,7 +1520,7 @@ func podWithUIDNameNsSpec(uid types.UID, name, namespace string, spec v1.PodSpec
 }
 
 func TestDeletePodDirsForDeletedPods(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	pods := []*v1.Pod{
@@ -1539,7 +1555,7 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 }
 
 func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	pods := []*v1.Pod{
@@ -1557,7 +1573,7 @@ func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 }
 
 func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	runningPod := &kubecontainer.Pod{
 		ID:        "12345678",
@@ -1585,7 +1601,7 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 }
 
 func TestGetPodsToSync(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	clock := testKubelet.fakeClock
@@ -1616,7 +1632,7 @@ func TestGetPodsToSync(t *testing.T) {
 }
 
 func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	numContainers := 10
@@ -1675,7 +1691,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 	testTimestamp := time.Unix(123456789, 987654321)
 	testErrorReason := fmt.Errorf("test-error")
 	emptyContainerID := (&kubecontainer.ContainerID{}).String()
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	pod := podWithUIDNameNs("12345678", "foo", "new")
@@ -1861,7 +1877,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 	testErrorReason := fmt.Errorf("test-error")
 	emptyContainerID := (&kubecontainer.ContainerID{}).String()
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	pod := podWithUIDNameNs("12345678", "foo", "new")
@@ -2024,7 +2040,7 @@ func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecyc
 
 // Test verifies that the kubelet invokes an admission handler during HandlePodAdditions.
 func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
@@ -2085,7 +2101,7 @@ func (a *testPodSyncLoopHandler) ShouldSync(pod *v1.Pod) bool {
 
 // TestGetPodsToSyncInvokesPodSyncLoopHandlers ensures that the get pods to sync routine invokes the handler.
 func TestGetPodsToSyncInvokesPodSyncLoopHandlers(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	pods := newTestPods(5)
@@ -2121,7 +2137,7 @@ func (a *testPodSyncHandler) ShouldEvict(pod *v1.Pod) lifecycle.ShouldEvictRespo
 
 // TestGenerateAPIPodStatusInvokesPodSyncHandlers invokes the handlers and reports the proper status
 func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	pod := newTestPods(1)[0]
@@ -2139,7 +2155,7 @@ func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 }
 
 func TestSyncPodKillPod(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 	pod := &v1.Pod{
