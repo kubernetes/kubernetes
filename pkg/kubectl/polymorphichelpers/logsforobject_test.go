@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package polymorphichelpers
 
 import (
 	"reflect"
@@ -30,25 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
-
-type fakeClientAccessFactory struct {
-	ClientAccessFactory
-
-	fakeClientset *fake.Clientset
-}
-
-func (f *fakeClientAccessFactory) ClientSet() (internalclientset.Interface, error) {
-	return f.fakeClientset, nil
-}
-
-func newFakeClientAccessFactory(objs []runtime.Object) *fakeClientAccessFactory {
-	return &fakeClientAccessFactory{
-		fakeClientset: fake.NewSimpleClientset(objs...),
-	}
-}
 
 var (
 	podsResource = schema.GroupVersionResource{Resource: "pods"}
@@ -146,20 +129,19 @@ func TestLogsForObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		caf := newFakeClientAccessFactory(test.pods)
-		omf := NewObjectMappingFactory(caf)
-		_, err := omf.LogsForObject(test.obj, test.opts, 20*time.Second)
+		fakeClientset := fake.NewSimpleClientset(test.pods...)
+		_, err := logsForObjectWithClient(fakeClientset, test.obj, test.opts, 20*time.Second)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
 		}
 		for i := range test.actions {
-			if len(caf.fakeClientset.Actions()) < i {
+			if len(fakeClientset.Actions()) < i {
 				t.Errorf("%s: action %d does not exists in actual actions: %#v",
-					test.name, i, caf.fakeClientset.Actions())
+					test.name, i, fakeClientset.Actions())
 				continue
 			}
-			got := caf.fakeClientset.Actions()[i]
+			got := fakeClientset.Actions()[i]
 			want := test.actions[i]
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("%s: unexpected action: %s", test.name, diff.ObjectDiff(got, want))

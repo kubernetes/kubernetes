@@ -54,6 +54,22 @@ const (
 
 var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
 
+// RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
+// and eliminate the direct coupling to a struct type.  Users may wish to duplicate this type in their own packages
+// as per the golang type overlapping.
+type RESTClientGetter interface {
+	// ToRESTConfig returns restconfig
+	ToRESTConfig() (*rest.Config, error)
+	// ToDiscoveryClient returns discovery client
+	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+	// ToRESTMapper returns a restmapper
+	ToRESTMapper() (meta.RESTMapper, error)
+	// ToRawKubeConfigLoader return kubeconfig loader as-is
+	ToRawKubeConfigLoader() clientcmd.ClientConfig
+}
+
+var _ RESTClientGetter = &ConfigFlags{}
+
 // ConfigFlags composes the set of values necessary
 // for obtaining a REST client config
 type ConfigFlags struct {
