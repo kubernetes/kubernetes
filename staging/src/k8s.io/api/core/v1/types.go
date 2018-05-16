@@ -2916,7 +2916,7 @@ type PodSecurityContext struct {
 	// May also be set in SecurityContext.  If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
-	RunAsNonRootGroup *bool `json:"runAsNonRootGroup,omitempty" protobuf:"varint,7,opt,name=runAsNonRootGroup"`
+	RunAsNonRootGroup *bool `json:"runAsNonRootGroup,omitempty" protobuf:"varint,8,opt,name=runAsNonRootGroup"`
 	// A list of groups applied to the first process run in each container, in addition
 	// to the container's primary GID.  If unspecified, no groups will be added to
 	// any container.

@@ -2883,7 +2883,7 @@ message PodSecurityContext {
   // May also be set in SecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
   // +optional
-  optional bool runAsNonRootGroup = 7;
+  optional bool runAsNonRootGroup = 8;
 
   // A list of groups applied to the first process run in each container, in addition
   // to the container's primary GID.  If unspecified, no groups will be added to

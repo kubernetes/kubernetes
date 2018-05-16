@@ -2996,6 +2996,21 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		}
 	}
 
+	// Verify RunAsNonRootGroup
+	for _, container := range spec.InitContainers {
+		err := VerifyRunAsNonRootGroup(spec, &container)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsNonRootGroup"), spec.SecurityContext.RunAsNonRootGroup, "RunAsNonRootGroup set but Container may run as root group"))
+		}
+	}
+
+	for _, container := range spec.Containers {
+		err := VerifyRunAsNonRootGroup(spec, &container)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsNonRootGroup"), spec.SecurityContext.RunAsNonRootGroup, "RunAsNonRootGroup set but Container may run as root group"))
+		}
+	}
+
 	return allErrs
 }
 
@@ -3388,6 +3403,7 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
 			}
 		}
+
 		if securityContext.ShareProcessNamespace != nil {
 			if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "Process Namespace Sharing is disabled by PodShareProcessNamespace feature-gate"))
@@ -5315,4 +5331,127 @@ func IsDecremented(update, old *int32) bool {
 		return false
 	}
 	return *update < *old
+}
+
+func VerifyRunAsNonRootGroup(spec *core.PodSpec, container *core.Container) error {
+	effectiveSc := DetermineEffectiveSecurityContext(spec, container)
+	// If the option is not set, or if running as root is allowed, return nil.
+	if effectiveSc == nil || effectiveSc.RunAsNonRootGroup == nil || !*effectiveSc.RunAsNonRootGroup {
+		return nil
+	}
+
+	if spec.SecurityContext != nil {
+		for _, supGroupId := range spec.SecurityContext.SupplementalGroups {
+			if supGroupId == 0 {
+				return fmt.Errorf("pod has one of the supplementalGroups as 0 and will have some root permissions")
+			}
+		}
+		if spec.SecurityContext.FSGroup != nil && *spec.SecurityContext.FSGroup == 0 {
+			return fmt.Errorf("pod has fsGroup as 0 and will have some root permissions")
+		}
+	}
+
+	if effectiveSc.RunAsGroup != nil {
+		if *effectiveSc.RunAsGroup == 0 {
+			return fmt.Errorf("container's runAsGroup breaks non-root policy")
+		}
+	}
+
+	return nil
+}
+
+func DetermineEffectiveSecurityContext(spec *core.PodSpec, container *core.Container) *core.SecurityContext {
+	effectiveSc := securityContextFromPodSecurityContext(spec)
+	containerSc := container.SecurityContext
+
+	if effectiveSc == nil && containerSc == nil {
+		return nil
+	}
+	if effectiveSc != nil && containerSc == nil {
+		return effectiveSc
+	}
+	if effectiveSc == nil && containerSc != nil {
+		return containerSc
+	}
+
+	if containerSc.SELinuxOptions != nil {
+		effectiveSc.SELinuxOptions = new(core.SELinuxOptions)
+		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
+	}
+
+	if containerSc.Capabilities != nil {
+		effectiveSc.Capabilities = new(core.Capabilities)
+		*effectiveSc.Capabilities = *containerSc.Capabilities
+	}
+
+	if containerSc.Privileged != nil {
+		effectiveSc.Privileged = new(bool)
+		*effectiveSc.Privileged = *containerSc.Privileged
+	}
+
+	if containerSc.RunAsUser != nil {
+		effectiveSc.RunAsUser = new(int64)
+		*effectiveSc.RunAsUser = *containerSc.RunAsUser
+	}
+
+	if containerSc.RunAsGroup != nil {
+		effectiveSc.RunAsGroup = new(int64)
+		*effectiveSc.RunAsGroup = *containerSc.RunAsGroup
+	}
+
+	if containerSc.RunAsNonRootGroup != nil {
+		effectiveSc.RunAsNonRootGroup = new(bool)
+		*effectiveSc.RunAsNonRootGroup = *containerSc.RunAsNonRootGroup
+	}
+
+	if containerSc.RunAsNonRoot != nil {
+		effectiveSc.RunAsNonRoot = new(bool)
+		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
+	}
+
+	if containerSc.ReadOnlyRootFilesystem != nil {
+		effectiveSc.ReadOnlyRootFilesystem = new(bool)
+		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
+	}
+
+	if containerSc.AllowPrivilegeEscalation != nil {
+		effectiveSc.AllowPrivilegeEscalation = new(bool)
+		*effectiveSc.AllowPrivilegeEscalation = *containerSc.AllowPrivilegeEscalation
+	}
+
+	return effectiveSc
+}
+
+func securityContextFromPodSecurityContext(spec *core.PodSpec) *core.SecurityContext {
+	if spec.SecurityContext == nil {
+		return nil
+	}
+
+	synthesized := &core.SecurityContext{}
+
+	if spec.SecurityContext.SELinuxOptions != nil {
+		synthesized.SELinuxOptions = &core.SELinuxOptions{}
+		*synthesized.SELinuxOptions = *spec.SecurityContext.SELinuxOptions
+	}
+	if spec.SecurityContext.RunAsUser != nil {
+		synthesized.RunAsUser = new(int64)
+		*synthesized.RunAsUser = *spec.SecurityContext.RunAsUser
+	}
+
+	if spec.SecurityContext.RunAsGroup != nil {
+		synthesized.RunAsGroup = new(int64)
+		*synthesized.RunAsGroup = *spec.SecurityContext.RunAsGroup
+	}
+
+	if spec.SecurityContext.RunAsNonRoot != nil {
+		synthesized.RunAsNonRoot = new(bool)
+		*synthesized.RunAsNonRoot = *spec.SecurityContext.RunAsNonRoot
+	}
+
+	if spec.SecurityContext.RunAsNonRootGroup != nil {
+		synthesized.RunAsNonRootGroup = new(bool)
+		*synthesized.RunAsNonRootGroup = *spec.SecurityContext.RunAsNonRootGroup
+	}
+
+	return synthesized
 }

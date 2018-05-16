@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
@@ -216,7 +217,12 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	}
 
 	// Verify RunAsNonRoot. Non-root verification only supports numeric user.
-	if err := verifyRunAsNonRoot(pod, container, &uid, username, &gid, groupname); err != nil {
+	if err := verifyRunAsNonRoot(pod, container, &uid, username); err != nil {
+		return nil, cleanupAction, err
+	}
+
+	// Verify RunAsNonRootGroup. Non-root verification only supports numeric group.
+	if err := securitycontext.VerifyRunAsNonRootGroup(pod, container, &gid, groupname); err != nil {
 		return nil, cleanupAction, err
 	}
 

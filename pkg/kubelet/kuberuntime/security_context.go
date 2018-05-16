@@ -71,60 +71,28 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 }
 
 // verifyRunAsNonRoot verifies RunAsNonRoot.
-func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, username string, gid *int64, groupname string) error {
+func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, username string) error {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	// If the option is not set, or if running as root is allowed, return nil.
-	if effectiveSc == nil {
+	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil || !*effectiveSc.RunAsNonRoot {
 		return nil
 	}
 
-	checkForRootUser := effectiveSc.RunAsNonRoot != nil && *effectiveSc.RunAsNonRoot
-
-	if checkForRootUser {
-		if effectiveSc.RunAsUser != nil {
-			if *effectiveSc.RunAsUser == 0 {
-				return fmt.Errorf("container's runAsUser breaks non-root policy")
-			}
-		} else {
-			// Check for Image UID/USERNAME only when RunAsUser is not Specified
-			switch {
-			case uid != nil && *uid == 0:
-				return fmt.Errorf("container has runAsNonRoot and image will run as root user")
-			case uid == nil && len(username) > 0:
-				return fmt.Errorf("container has runAsNonRoot and image has non-numeric user (%s), cannot verify user is non-root", username)
-			default:
-				return nil
-			}
+	if effectiveSc.RunAsUser != nil {
+		if *effectiveSc.RunAsUser == 0 {
+			return fmt.Errorf("container's runAsUser breaks non-root policy")
 		}
+		return nil
 	}
 
-	checkForRootGroup := effectiveSc.RunAsNonRootGroup != nil && *effectiveSc.RunAsNonRootGroup
-	if checkForRootGroup {
-		if pod.Spec.SecurityContext != nil {
-			for _, supGroupId := range pod.Spec.SecurityContext.SupplementalGroups {
-				if supGroupId == 0 {
-					return fmt.Errorf("pod has one of the supplementalGroups as 0 and will have some root permissions")
-				}
-			}
-		}
-
-		if effectiveSc.RunAsGroup != nil {
-			if *effectiveSc.RunAsGroup == 0 {
-				return fmt.Errorf("container's runAsGroup breaks non-root policy")
-			}
-		} else {
-
-			switch {
-			case gid != nil && *gid == 0:
-				return fmt.Errorf("container has runAsNonRootGroup and image will run as root group")
-			case gid == nil && len(groupname) > 0:
-				return fmt.Errorf("container has runAsNonRootGroup and image has non-numeric group (%s), cannot verify group is non-root", groupname)
-			default:
-				return nil
-			}
-		}
+	switch {
+	case uid != nil && *uid == 0:
+		return fmt.Errorf("container has runAsNonRoot and image will run as root")
+	case uid == nil && len(username) > 0:
+		return fmt.Errorf("container has runAsNonRoot and image has non-numeric user (%s), cannot verify user is non-root", username)
+	default:
+		return nil
 	}
-	return nil
 }
 
 // convertToRuntimeSecurityContext converts v1.SecurityContext to runtimeapi.SecurityContext.

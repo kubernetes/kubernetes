@@ -3397,12 +3397,8 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 	}
 	if in.RunAsNonRootGroup != nil {
 		in, out := &in.RunAsNonRootGroup, &out.RunAsNonRootGroup
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.SupplementalGroups != nil {
 		in, out := &in.SupplementalGroups, &out.SupplementalGroups
@@ -4590,12 +4586,8 @@ func (in *SecurityContext) DeepCopyInto(out *SecurityContext) {
 	}
 	if in.RunAsNonRootGroup != nil {
 		in, out := &in.RunAsNonRootGroup, &out.RunAsNonRootGroup
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.ReadOnlyRootFilesystem != nil {
 		in, out := &in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem

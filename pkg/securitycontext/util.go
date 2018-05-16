@@ -177,3 +177,39 @@ func AddNoNewPrivileges(sc *v1.SecurityContext) bool {
 	// handle the case where defaultAllowPrivilegeEscalation is false or the user explicitly set allowPrivilegeEscalation to true/false
 	return !*sc.AllowPrivilegeEscalation
 }
+
+func VerifyRunAsNonRootGroup(pod *v1.Pod, container *v1.Container, gid *int64, groupname string) error {
+	effectiveSc := DetermineEffectiveSecurityContext(pod, container)
+	// If the option is not set, or if running as root is allowed, return nil.
+	if effectiveSc == nil || effectiveSc.RunAsNonRootGroup == nil || !*effectiveSc.RunAsNonRootGroup {
+		return nil
+	}
+
+	if pod.Spec.SecurityContext != nil {
+		for _, supGroupId := range pod.Spec.SecurityContext.SupplementalGroups {
+			if supGroupId == 0 {
+				return fmt.Errorf("pod has one of the supplementalGroups as 0 and will have some root permissions")
+			}
+		}
+		if pod.Spec.SecurityContext.FSGroup != nil && *pod.Spec.SecurityContext.FSGroup == 0 {
+			return fmt.Errorf("pod has fsGroup as 0 and will have some root permissions")
+		}
+	}
+
+	if effectiveSc.RunAsGroup != nil {
+		if *effectiveSc.RunAsGroup == 0 {
+			return fmt.Errorf("container's runAsGroup breaks non-root policy")
+		}
+	} else {
+
+		switch {
+		case gid != nil && *gid == 0:
+			return fmt.Errorf("container has runAsNonRootGroup and image will run as root group")
+		case gid == nil && len(groupname) > 0:
+			return fmt.Errorf("container has runAsNonRootGroup and image has non-numeric group (%s), cannot verify group is non-root", groupname)
+		default:
+			return nil
+		}
+	}
+	return nil
+}
