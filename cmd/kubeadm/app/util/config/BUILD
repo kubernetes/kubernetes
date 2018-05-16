@@ -14,6 +14,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
@@ -21,6 +22,7 @@ go_library(
         "//pkg/util/node:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
 )

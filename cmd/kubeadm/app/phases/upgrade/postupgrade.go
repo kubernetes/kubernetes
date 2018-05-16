@@ -28,7 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -88,7 +88,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
-	certAndKeyDir := kubeadmapiv1alpha1.DefaultCertificatesDir
+	certAndKeyDir := kubeadmapiv1alpha2.DefaultCertificatesDir
 	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
 	// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
 	if err != nil {
