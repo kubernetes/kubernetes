@@ -44,8 +44,10 @@ go_test(
     srcs = [
         "apply_test.go",
         "common_test.go",
+        "diff_test.go",
         "plan_test.go",
     ],
+    data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
