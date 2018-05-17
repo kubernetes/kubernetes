@@ -748,7 +748,7 @@ def launch_default_ingress_controller():
                 "k8s.gcr.io/nginx-ingress-controller-arm64:0.9.0-beta.15"
         else:
             context['ingress_image'] = \
-                "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15"  # noqa
+                "quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.15.0" $ noqa
     if get_version('kubelet') < (1, 9):
         context['daemonset_api_version'] = 'extensions/v1beta1'
     else:
