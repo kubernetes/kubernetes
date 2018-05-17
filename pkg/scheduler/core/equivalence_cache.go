@@ -35,7 +35,7 @@ import (
 // 1. a map of AlgorithmCache with node name as key
 // 2. function to get equivalence pod
 type EquivalenceCache struct {
-	mu             sync.Mutex
+	mu             sync.RWMutex
 	algorithmCache map[string]AlgorithmCache
 }
 
@@ -72,9 +72,6 @@ func (ec *EquivalenceCache) RunPredicate(
 	equivClassInfo *equivalenceClassInfo,
 	cache schedulercache.Cache,
 ) (bool, []algorithm.PredicateFailureReason, error) {
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
-
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen during tests.
 		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("nodeInfo is nil or node is invalid")
@@ -88,20 +85,32 @@ func (ec *EquivalenceCache) RunPredicate(
 	if err != nil {
 		return fit, reasons, err
 	}
-	// Skip update if NodeInfo is stale.
-	if cache != nil && cache.IsUpToDate(nodeInfo) {
-		ec.updateResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, fit, reasons, equivClassInfo.hash)
+	if cache != nil {
+		ec.updateResult(pod.GetName(), predicateKey, fit, reasons, equivClassInfo.hash, cache, nodeInfo)
 	}
 	return fit, reasons, nil
 }
 
 // updateResult updates the cached result of a predicate.
 func (ec *EquivalenceCache) updateResult(
-	podName, nodeName, predicateKey string,
+	podName, predicateKey string,
 	fit bool,
 	reasons []algorithm.PredicateFailureReason,
 	equivalenceHash uint64,
+	cache schedulercache.Cache,
+	nodeInfo *schedulercache.NodeInfo,
 ) {
+	ec.mu.Lock()
+	defer ec.mu.Unlock()
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		// This may happen during tests.
+		return
+	}
+	// Skip update if NodeInfo is stale.
+	if !cache.IsUpToDate(nodeInfo) {
+		return
+	}
+	nodeName := nodeInfo.Node().GetName()
 	if _, exist := ec.algorithmCache[nodeName]; !exist {
 		ec.algorithmCache[nodeName] = AlgorithmCache{}
 	}
@@ -130,6 +139,8 @@ func (ec *EquivalenceCache) lookupResult(
 	podName, nodeName, predicateKey string,
 	equivalenceHash uint64,
 ) (bool, []algorithm.PredicateFailureReason, bool) {
+	ec.mu.RLock()
+	defer ec.mu.RUnlock()
 	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache",
 		predicateKey, podName, nodeName)
 	if hostPredicate, exist := ec.algorithmCache[nodeName][predicateKey][equivalenceHash]; exist {
