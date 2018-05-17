@@ -186,27 +186,12 @@ type Etcd struct {
 	// If empty, automatically populated by kubeadm using the image
 	// repository and default etcd version.
 	Image string
-	// SelfHosted holds configuration for self-hosting etcd.
-	SelfHosted *SelfHostedEtcd
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server
 	// signing cert. This is currently used for the etcd static-pod.
 	ServerCertSANs []string
 	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer
 	// signing cert. This is currently used for the etcd static-pod.
 	PeerCertSANs []string
-}
-
-// SelfHostedEtcd describes options required to configure self-hosted etcd.
-type SelfHostedEtcd struct {
-	// CertificatesDir represents the directory where all etcd TLS assets are stored.
-	// Defaults to "/etc/kubernetes/pki/etcd".
-	CertificatesDir string
-	// ClusterServiceName is the name of the service that load balances the etcd cluster.
-	ClusterServiceName string
-	// EtcdVersion is the version of etcd running in the cluster.
-	EtcdVersion string
-	// OperatorVersion is the version of the etcd-operator to use.
-	OperatorVersion string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

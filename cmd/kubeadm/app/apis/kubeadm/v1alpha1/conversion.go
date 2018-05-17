@@ -26,6 +26,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
 		Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration,
+		Convert_v1alpha1_Etcd_To_kubeadm_Etcd,
 	)
 	if err != nil {
 		return err
@@ -42,6 +43,15 @@ func Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 	UpgradeCloudProvider(in, out)
 	// We don't support migrating information from the .PrivilegedPods field which was removed in v1alpha2
 
+	return nil
+}
+
+func Convert_v1alpha1_Etcd_To_kubeadm_Etcd(in *Etcd, out *kubeadm.Etcd, s conversion.Scope) error {
+	if err := autoConvert_v1alpha1_Etcd_To_kubeadm_Etcd(in, out, s); err != nil {
+		return err
+	}
+
+	// No need to transfer information about .Etcd.Selfhosted to v1alpha2
 	return nil
 }
 
