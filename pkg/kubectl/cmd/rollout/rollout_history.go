@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/spf13/cobra"
@@ -97,7 +98,7 @@ func RunHistory(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 			return err
 		}
 		mapping := info.ResourceMapping()
-		historyViewer, err := f.HistoryViewer(mapping)
+		historyViewer, err := polymorphichelpers.HistoryViewerFn(f, mapping)
 		if err != nil {
 			return err
 		}
