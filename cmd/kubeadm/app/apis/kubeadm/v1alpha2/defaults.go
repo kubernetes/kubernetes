@@ -57,14 +57,6 @@ const (
 
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"
-	// DefaultEtcdClusterSize defines the default cluster size when using the etcd-operator
-	DefaultEtcdClusterSize = 3
-	// DefaultEtcdOperatorVersion defines the default version of the etcd-operator to use
-	DefaultEtcdOperatorVersion = "v0.6.0"
-	// DefaultEtcdCertDir represents the directory where PKI assets are stored for self-hosted etcd
-	DefaultEtcdCertDir = "/etc/kubernetes/pki/etcd"
-	// DefaultEtcdClusterServiceName is the default name of the service backing the etcd cluster
-	DefaultEtcdClusterServiceName = "etcd-cluster"
 	// DefaultProxyBindAddressv4 is the default bind address when the advertise address is v4
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
@@ -142,7 +134,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
-	SetDefaultsEtcdSelfHosted(obj)
 	if features.Enabled(obj.FeatureGates, features.DynamicKubeletConfig) {
 		SetDefaults_KubeletConfiguration(obj)
 	}
@@ -194,27 +185,6 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	}
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
-	}
-}
-
-// SetDefaultsEtcdSelfHosted sets defaults for self-hosted etcd if used
-func SetDefaultsEtcdSelfHosted(obj *MasterConfiguration) {
-	if obj.Etcd.SelfHosted != nil {
-		if obj.Etcd.SelfHosted.ClusterServiceName == "" {
-			obj.Etcd.SelfHosted.ClusterServiceName = DefaultEtcdClusterServiceName
-		}
-
-		if obj.Etcd.SelfHosted.EtcdVersion == "" {
-			obj.Etcd.SelfHosted.EtcdVersion = constants.DefaultEtcdVersion
-		}
-
-		if obj.Etcd.SelfHosted.OperatorVersion == "" {
-			obj.Etcd.SelfHosted.OperatorVersion = DefaultEtcdOperatorVersion
-		}
-
-		if obj.Etcd.SelfHosted.CertificatesDir == "" {
-			obj.Etcd.SelfHosted.CertificatesDir = DefaultEtcdCertDir
-		}
 	}
 }
 
