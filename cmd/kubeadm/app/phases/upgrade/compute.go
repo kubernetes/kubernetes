@@ -279,7 +279,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 }
 
 func getBranchFromVersion(version string) string {
-	return strings.TrimPrefix(version, "v")[:3]
+	return strings.TrimPrefix(version, "v")[:4]
 }
 
 func patchVersionBranchExists(clusterVersion, stableVersion *version.Version) bool {
