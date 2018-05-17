@@ -99,6 +99,10 @@ func (mounter *fakeMounter) GetFSGroup(pathname string) (int64, error) {
 	return -1, errors.New("not implemented")
 }
 
+func (mounter *fakeMounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
 func (mounter *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	name := path.Base(file)
 	if strings.HasPrefix(name, "mount") {

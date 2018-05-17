@@ -228,3 +228,7 @@ func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
 func (f *FakeMounter) GetFSGroup(pathname string) (int64, error) {
 	return -1, errors.New("GetFSGroup not implemented")
 }
+
+func (f *FakeMounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, errors.New("GetSELinuxSupport not implemented")
+}

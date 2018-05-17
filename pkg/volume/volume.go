@@ -131,6 +131,7 @@ type Mounter interface {
 	// idempotent.
 	SetUpAt(dir string, fsGroup *int64) error
 	// GetAttributes returns the attributes of the mounter.
+	// This function is called after SetUp()/SetUpAt().
 	GetAttributes() Attributes
 }
 

@@ -116,6 +116,10 @@ func (mi *fakeMountInterface) GetFSGroup(pathname string) (int64, error) {
 	return -1, errors.New("not implemented")
 }
 
+func (mi *fakeMountInterface) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
 func fakeContainerMgrMountInt() mount.Interface {
 	return &fakeMountInterface{
 		[]mount.MountPoint{

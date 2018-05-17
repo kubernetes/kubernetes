@@ -591,23 +591,10 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 
 // isShared returns true, if given path is on a mount point that has shared
 // mount propagation.
-func isShared(path string, filename string) (bool, error) {
-	infos, err := parseMountInfo(filename)
+func isShared(mount string, mountInfoPath string) (bool, error) {
+	info, err := findMountInfo(mount, mountInfoPath)
 	if err != nil {
 		return false, err
-	}
-
-	// process /proc/xxx/mountinfo in backward order and find the first mount
-	// point that is prefix of 'path' - that's the mount where path resides
-	var info *mountInfo
-	for i := len(infos) - 1; i >= 0; i-- {
-		if strings.HasPrefix(path, infos[i].mountPoint) {
-			info = &infos[i]
-			break
-		}
-	}
-	if info == nil {
-		return false, fmt.Errorf("cannot find mount point for %q", path)
 	}
 
 	// parse optional parameters
@@ -624,6 +611,10 @@ type mountInfo struct {
 	mountPoint string
 	// list of "optional parameters", mount propagation is one of them
 	optional []string
+	// mount options
+	mountOptions []string
+	// super options: per-superblock options.
+	superOptions []string
 }
 
 // parseMountInfo parses /proc/xxx/mountinfo.
@@ -642,20 +633,44 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 		}
 		// See `man proc` for authoritative description of format of the file.
 		fields := strings.Fields(line)
-		if len(fields) < 7 {
-			return nil, fmt.Errorf("wrong number of fields in (expected %d, got %d): %s", 8, len(fields), line)
+		if len(fields) < 10 {
+			return nil, fmt.Errorf("wrong number of fields in (expected %d, got %d): %s", 10, len(fields), line)
 		}
 		info := mountInfo{
-			mountPoint: fields[4],
-			optional:   []string{},
+			mountPoint:   fields[4],
+			mountOptions: strings.Split(fields[5], ","),
+			optional:     []string{},
 		}
 		// All fields until "-" are "optional fields".
 		for i := 6; i < len(fields) && fields[i] != "-"; i++ {
 			info.optional = append(info.optional, fields[i])
 		}
+		superOpts := fields[len(fields)-1]
+		info.superOptions = strings.Split(superOpts, ",")
 		infos = append(infos, info)
 	}
 	return infos, nil
+}
+
+func findMountInfo(path, mountInfoPath string) (mountInfo, error) {
+	infos, err := parseMountInfo(mountInfoPath)
+	if err != nil {
+		return mountInfo{}, err
+	}
+
+	// process /proc/xxx/mountinfo in backward order and find the first mount
+	// point that is prefix of 'path' - that's the mount where path resides
+	var info *mountInfo
+	for i := len(infos) - 1; i >= 0; i-- {
+		if pathWithinBase(path, infos[i].mountPoint) {
+			info = &infos[i]
+			break
+		}
+	}
+	if info == nil {
+		return mountInfo{}, fmt.Errorf("cannot find mount point for %q", path)
+	}
+	return *info, nil
 }
 
 // doMakeRShared is common implementation of MakeRShared on Linux. It checks if
@@ -684,6 +699,27 @@ func doMakeRShared(path string, mountInfoFilename string) error {
 	}
 
 	return nil
+}
+
+// getSELinuxSupport is common implementation of GetSELinuxSupport on Linux.
+func getSELinuxSupport(path string, mountInfoFilename string) (bool, error) {
+	info, err := findMountInfo(path, mountInfoFilename)
+	if err != nil {
+		return false, err
+	}
+
+	// "seclabel" can be both in mount options and super options.
+	for _, opt := range info.superOptions {
+		if opt == "seclabel" {
+			return true, nil
+		}
+	}
+	for _, opt := range info.mountOptions {
+		if opt == "seclabel" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
@@ -932,6 +968,10 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 		return nil, err
 	}
 	return getMountRefsByDev(mounter, realpath)
+}
+
+func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return getSELinuxSupport(pathname, procMountInfoPath)
 }
 
 func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {

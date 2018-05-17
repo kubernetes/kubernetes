@@ -1399,8 +1399,10 @@ func TestParseMountInfo(t *testing.T) {
 			"simple bind mount",
 			"/var/lib/kubelet",
 			mountInfo{
-				mountPoint: "/var/lib/kubelet",
-				optional:   []string{"shared:30"},
+				mountPoint:   "/var/lib/kubelet",
+				optional:     []string{"shared:30"},
+				mountOptions: []string{"rw", "relatime"},
+				superOptions: []string{"rw", "commit=30", "data=ordered"},
 			},
 		},
 	}
@@ -1423,6 +1425,53 @@ func TestParseMountInfo(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("Test case %q: mountPoint %s not found", test.name, test.mountPoint)
+		}
+	}
+}
+
+func TestGetSELinuxSupport(t *testing.T) {
+	info :=
+		`62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+78 62 0:41 / /tmp rw,nosuid,nodev shared:30 - tmpfs tmpfs rw,seclabel
+83 63 0:44 / /var/lib/bar rw,relatime - tmpfs tmpfs rw
+227 62 253:0 /var/lib/docker/devicemapper /var/lib/docker/devicemapper rw,relatime - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+150 23 1:58 / /media/nfs_vol rw,relatime shared:89 - nfs4 172.18.4.223:/srv/nfs rw,vers=4.0,rsize=524288,wsize=524288,namlen=255,hard,proto=tcp,port=0,timeo=600,retrans=2,sec=sys,clientaddr=172.18.4.223,local_lock=none,addr=172.18.4.223
+`
+	tempDir, filename, err := writeFile(info)
+	if err != nil {
+		t.Fatalf("cannot create temporary file: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	tests := []struct {
+		name           string
+		mountPoint     string
+		expectedResult bool
+	}{
+		{
+			"ext4 on /",
+			"/",
+			true,
+		},
+		{
+			"tmpfs on /var/lib/bar",
+			"/var/lib/bar",
+			false,
+		},
+		{
+			"nfsv4",
+			"/media/nfs_vol",
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		out, err := getSELinuxSupport(test.mountPoint, filename)
+		if err != nil {
+			t.Errorf("Test %s failed with error: %s", test.name, err)
+		}
+		if test.expectedResult != out {
+			t.Errorf("Test %s failed: expected %v, got %v", test.name, test.expectedResult, out)
 		}
 	}
 }

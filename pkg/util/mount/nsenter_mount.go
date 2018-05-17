@@ -343,3 +343,7 @@ func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {
 	}
 	return getFSGroup(kubeletpath)
 }
+
+func (mounter *NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return getSELinuxSupport(pathname, procMountInfoPath)
+}
