@@ -503,6 +503,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		jobFailed = true
 		failureReason = "BackoffLimitExceeded"
 		failureMessage = "Job has reached the specified backoff limit"
+		glog.V(2).Infof("Job %q/%q deadline exceeded. jobHaveNewFailure = %v; previousRetry = %v", job.Namespace, job.Name, jobHaveNewFailure, previousRetry)
 	} else if pastActiveDeadline(&job) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
