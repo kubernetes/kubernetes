@@ -592,9 +592,9 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMetad
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
 				if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-					scName := pvc.Spec.StorageClassName
-					if scName != nil && len(*scName) > 0 {
-						class, _ := c.classInfo.GetStorageClassInfo(*scName)
+					scName := v1helper.GetPersistentVolumeClaimClass(pvc)
+					if len(scName) > 0 {
+						class, _ := c.classInfo.GetStorageClassInfo(scName)
 						if class != nil {
 							if class.VolumeBindingMode == nil {
 								return false, nil, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", scName)
