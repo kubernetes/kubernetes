@@ -179,6 +179,8 @@ func TestBackendServicesGroup(t *testing.T) {
 	var key *meta.Key
 	keyAlpha := meta.GlobalKey("key-alpha")
 	key = keyAlpha
+	keyBeta := meta.GlobalKey("key-beta")
+	key = keyBeta
 	keyGA := meta.GlobalKey("key-ga")
 	key = keyGA
 	// Ignore unused variables.
@@ -187,6 +189,9 @@ func TestBackendServicesGroup(t *testing.T) {
 	// Get not found.
 	if _, err := mock.AlphaBackendServices().Get(ctx, key); err == nil {
 		t.Errorf("AlphaBackendServices().Get(%v, %v) = _, nil; want error", ctx, key)
+	}
+	if _, err := mock.BetaBackendServices().Get(ctx, key); err == nil {
+		t.Errorf("BetaBackendServices().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 	if _, err := mock.BackendServices().Get(ctx, key); err == nil {
 		t.Errorf("BackendServices().Get(%v, %v) = _, nil; want error", ctx, key)
@@ -200,6 +205,12 @@ func TestBackendServicesGroup(t *testing.T) {
 		}
 	}
 	{
+		obj := &beta.BackendService{}
+		if err := mock.BetaBackendServices().Insert(ctx, keyBeta, obj); err != nil {
+			t.Errorf("BetaBackendServices().Insert(%v, %v, %v) = %v; want nil", ctx, keyBeta, obj, err)
+		}
+	}
+	{
 		obj := &ga.BackendService{}
 		if err := mock.BackendServices().Insert(ctx, keyGA, obj); err != nil {
 			t.Errorf("BackendServices().Insert(%v, %v, %v) = %v; want nil", ctx, keyGA, obj, err)
@@ -210,15 +221,20 @@ func TestBackendServicesGroup(t *testing.T) {
 	if obj, err := mock.AlphaBackendServices().Get(ctx, key); err != nil {
 		t.Errorf("AlphaBackendServices().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
+	if obj, err := mock.BetaBackendServices().Get(ctx, key); err != nil {
+		t.Errorf("BetaBackendServices().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
+	}
 	if obj, err := mock.BackendServices().Get(ctx, key); err != nil {
 		t.Errorf("BackendServices().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
 	// List.
 	mock.MockAlphaBackendServices.Objects[*keyAlpha] = mock.MockAlphaBackendServices.Obj(&alpha.BackendService{Name: keyAlpha.Name})
+	mock.MockBetaBackendServices.Objects[*keyBeta] = mock.MockBetaBackendServices.Obj(&beta.BackendService{Name: keyBeta.Name})
 	mock.MockBackendServices.Objects[*keyGA] = mock.MockBackendServices.Obj(&ga.BackendService{Name: keyGA.Name})
 	want := map[string]bool{
 		"key-alpha": true,
+		"key-beta":  true,
 		"key-ga":    true,
 	}
 	_ = want // ignore unused variables.
@@ -226,6 +242,20 @@ func TestBackendServicesGroup(t *testing.T) {
 		objs, err := mock.AlphaBackendServices().List(ctx, filter.None)
 		if err != nil {
 			t.Errorf("AlphaBackendServices().List(%v, %v, %v) = %v, %v; want _, nil", ctx, location, filter.None, objs, err)
+		} else {
+			got := map[string]bool{}
+			for _, obj := range objs {
+				got[obj.Name] = true
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("AlphaBackendServices().List(); got %+v, want %+v", got, want)
+			}
+		}
+	}
+	{
+		objs, err := mock.BetaBackendServices().List(ctx, filter.None)
+		if err != nil {
+			t.Errorf("BetaBackendServices().List(%v, %v, %v) = %v, %v; want _, nil", ctx, location, filter.None, objs, err)
 		} else {
 			got := map[string]bool{}
 			for _, obj := range objs {
@@ -255,6 +285,9 @@ func TestBackendServicesGroup(t *testing.T) {
 	if err := mock.AlphaBackendServices().Delete(ctx, keyAlpha); err != nil {
 		t.Errorf("AlphaBackendServices().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
 	}
+	if err := mock.BetaBackendServices().Delete(ctx, keyBeta); err != nil {
+		t.Errorf("BetaBackendServices().Delete(%v, %v) = %v; want nil", ctx, keyBeta, err)
+	}
 	if err := mock.BackendServices().Delete(ctx, keyGA); err != nil {
 		t.Errorf("BackendServices().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
@@ -262,6 +295,9 @@ func TestBackendServicesGroup(t *testing.T) {
 	// Delete not found.
 	if err := mock.AlphaBackendServices().Delete(ctx, keyAlpha); err == nil {
 		t.Errorf("AlphaBackendServices().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
+	}
+	if err := mock.BetaBackendServices().Delete(ctx, keyBeta); err == nil {
+		t.Errorf("BetaBackendServices().Delete(%v, %v) = nil; want error", ctx, keyBeta)
 	}
 	if err := mock.BackendServices().Delete(ctx, keyGA); err == nil {
 		t.Errorf("BackendServices().Delete(%v, %v) = nil; want error", ctx, keyGA)
@@ -1445,6 +1481,69 @@ func TestRoutesGroup(t *testing.T) {
 	}
 }
 
+func TestSecurityPoliciesGroup(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
+
+	var key *meta.Key
+	keyBeta := meta.GlobalKey("key-beta")
+	key = keyBeta
+	// Ignore unused variables.
+	_, _, _ = ctx, mock, key
+
+	// Get not found.
+	if _, err := mock.BetaSecurityPolicies().Get(ctx, key); err == nil {
+		t.Errorf("BetaSecurityPolicies().Get(%v, %v) = _, nil; want error", ctx, key)
+	}
+
+	// Insert.
+	{
+		obj := &beta.SecurityPolicy{}
+		if err := mock.BetaSecurityPolicies().Insert(ctx, keyBeta, obj); err != nil {
+			t.Errorf("BetaSecurityPolicies().Insert(%v, %v, %v) = %v; want nil", ctx, keyBeta, obj, err)
+		}
+	}
+
+	// Get across versions.
+	if obj, err := mock.BetaSecurityPolicies().Get(ctx, key); err != nil {
+		t.Errorf("BetaSecurityPolicies().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
+	}
+
+	// List.
+	mock.MockBetaSecurityPolicies.Objects[*keyBeta] = mock.MockBetaSecurityPolicies.Obj(&beta.SecurityPolicy{Name: keyBeta.Name})
+	want := map[string]bool{
+		"key-beta": true,
+	}
+	_ = want // ignore unused variables.
+	{
+		objs, err := mock.BetaSecurityPolicies().List(ctx, filter.None)
+		if err != nil {
+			t.Errorf("BetaSecurityPolicies().List(%v, %v, %v) = %v, %v; want _, nil", ctx, location, filter.None, objs, err)
+		} else {
+			got := map[string]bool{}
+			for _, obj := range objs {
+				got[obj.Name] = true
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("AlphaSecurityPolicies().List(); got %+v, want %+v", got, want)
+			}
+		}
+	}
+
+	// Delete across versions.
+	if err := mock.BetaSecurityPolicies().Delete(ctx, keyBeta); err != nil {
+		t.Errorf("BetaSecurityPolicies().Delete(%v, %v) = %v; want nil", ctx, keyBeta, err)
+	}
+
+	// Delete not found.
+	if err := mock.BetaSecurityPolicies().Delete(ctx, keyBeta); err == nil {
+		t.Errorf("BetaSecurityPolicies().Delete(%v, %v) = nil; want error", ctx, keyBeta)
+	}
+}
+
 func TestSslCertificatesGroup(t *testing.T) {
 	t.Parallel()
 
@@ -1830,6 +1929,7 @@ func TestResourceIDConversion(t *testing.T) {
 		NewRegionDisksResourceID("some-project", "us-central1", "my-disks-resource"),
 		NewRegionsResourceID("some-project", "my-regions-resource"),
 		NewRoutesResourceID("some-project", "my-routes-resource"),
+		NewSecurityPoliciesResourceID("some-project", "my-securityPolicies-resource"),
 		NewSslCertificatesResourceID("some-project", "my-sslCertificates-resource"),
 		NewTargetHttpProxiesResourceID("some-project", "my-targetHttpProxies-resource"),
 		NewTargetHttpsProxiesResourceID("some-project", "my-targetHttpsProxies-resource"),
