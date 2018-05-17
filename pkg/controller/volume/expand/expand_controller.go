@@ -21,13 +21,9 @@ package expand
 
 import (
 	"fmt"
-	"net"
 	"time"
 
-	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,11 +35,11 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/cache"
-	"k8s.io/kubernetes/pkg/util/io"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -59,10 +55,7 @@ type ExpandController interface {
 }
 
 type expandController struct {
-	// kubeClient is the kube API client used by volumehost to communicate with
-	// the API server.
-	kubeClient clientset.Interface
-
+	volume.UnimplementedVolumeHost
 	// pvcLister is the shared PVC lister used to fetch and store PVC
 	// objects from the API server. It is shared with other controllers and
 	// therefore the PVC objects in its store should be treated as immutable.
@@ -72,14 +65,8 @@ type expandController struct {
 	pvLister corelisters.PersistentVolumeLister
 	pvSynced kcache.InformerSynced
 
-	// cloud provider used by volume host
-	cloud cloudprovider.Interface
-
 	// volumePluginMgr used to initialize and fetch volume plugins
 	volumePluginMgr volume.VolumePluginMgr
-
-	// recorder is used to record events in the API server
-	recorder record.EventRecorder
 
 	// Volume resize map of volumes that needs resizing
 	resizeMap cache.VolumeResizeMap
@@ -102,8 +89,6 @@ func NewExpandController(
 	plugins []volume.VolumePlugin) (ExpandController, error) {
 
 	expc := &expandController{
-		kubeClient: kubeClient,
-		cloud:      cloud,
 		pvcLister:  pvcInformer.Lister(),
 		pvcsSynced: pvcInformer.Informer().HasSynced,
 		pvLister:   pvInformer.Lister(),
@@ -127,7 +112,7 @@ func NewExpandController(
 		false,
 		blkutil))
 
-	expc.resizeMap = cache.NewVolumeResizeMap(expc.kubeClient)
+	expc.resizeMap = cache.NewVolumeResizeMap(kubeClient)
 
 	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		UpdateFunc: expc.pvcUpdate,
@@ -216,93 +201,4 @@ func getPersistentVolume(pvc *v1.PersistentVolumeClaim, pvLister corelisters.Per
 	}
 
 	return pv.DeepCopy(), nil
-}
-
-// Implementing VolumeHost interface
-func (expc *expandController) GetPluginDir(pluginName string) string {
-	return ""
-}
-
-func (expc *expandController) GetVolumeDevicePluginDir(pluginName string) string {
-	return ""
-}
-
-func (expc *expandController) GetPodsDir() string {
-	return ""
-}
-
-func (expc *expandController) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
-	return ""
-}
-
-func (expc *expandController) GetPodVolumeDeviceDir(podUID types.UID, pluginName string) string {
-	return ""
-}
-
-func (expc *expandController) GetPodPluginDir(podUID types.UID, pluginName string) string {
-	return ""
-}
-
-func (expc *expandController) GetKubeClient() clientset.Interface {
-	return expc.kubeClient
-}
-
-func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
-	return nil, fmt.Errorf("NewWrapperMounter not supported by expand controller's VolumeHost implementation")
-}
-
-func (expc *expandController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
-	return nil, fmt.Errorf("NewWrapperUnmounter not supported by expand controller's VolumeHost implementation")
-}
-
-func (expc *expandController) GetCloudProvider() cloudprovider.Interface {
-	return expc.cloud
-}
-
-func (expc *expandController) GetMounter(pluginName string) mount.Interface {
-	return nil
-}
-
-func (expc *expandController) GetExec(pluginName string) mount.Exec {
-	return mount.NewOsExec()
-}
-
-func (expc *expandController) GetWriter() io.Writer {
-	return nil
-}
-
-func (expc *expandController) GetHostName() string {
-	return ""
-}
-
-func (expc *expandController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP not supported by expand controller's VolumeHost implementation")
-}
-
-func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {
-	return v1.ResourceList{}, nil
-}
-
-func (expc *expandController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
-		return nil, fmt.Errorf("GetSecret unsupported in expandController")
-	}
-}
-
-func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
-		return nil, fmt.Errorf("GetConfigMap unsupported in expandController")
-	}
-}
-
-func (expc *expandController) GetNodeLabels() (map[string]string, error) {
-	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
-}
-
-func (expc *expandController) GetNodeName() types.NodeName {
-	return ""
-}
-
-func (expc *expandController) GetEventRecorder() record.EventRecorder {
-	return expc.recorder
 }

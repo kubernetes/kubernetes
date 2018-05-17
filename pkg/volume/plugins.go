@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -826,3 +827,98 @@ type dummyPluginProber struct{}
 
 func (*dummyPluginProber) Init() error                  { return nil }
 func (*dummyPluginProber) Probe() ([]ProbeEvent, error) { return nil, nil }
+
+// UnimplementedVolumeHost is a fully unimplemented implementation of
+// VolumeHost interface. This is useful for embedding in many partial
+// implementations of VolumeHost we have.
+type UnimplementedVolumeHost struct{}
+
+var _ = VolumeHost(UnimplementedVolumeHost{})
+
+func (UnimplementedVolumeHost) GetPluginDir(pluginName string) string {
+	return ""
+}
+
+func (UnimplementedVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
+	return ""
+}
+
+func (UnimplementedVolumeHost) GetPodsDir() string {
+	return ""
+}
+
+func (UnimplementedVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
+	return ""
+}
+
+func (UnimplementedVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
+	return ""
+}
+
+func (UnimplementedVolumeHost) GetPodVolumeDeviceDir(podUID types.UID, pluginName string) string {
+	return ""
+}
+
+func (UnimplementedVolumeHost) GetKubeClient() clientset.Interface {
+	return nil
+}
+
+func (UnimplementedVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
+	return nil, errors.New("NewWrapperMounter() unimplemented")
+}
+
+func (UnimplementedVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error) {
+	return nil, errors.New("NewWrapperUnmounter() unimplemented")
+}
+
+func (UnimplementedVolumeHost) GetCloudProvider() cloudprovider.Interface {
+	return nil
+}
+
+func (UnimplementedVolumeHost) GetMounter(pluginName string) mount.Interface {
+	return nil
+}
+
+func (UnimplementedVolumeHost) GetWriter() io.Writer {
+	return nil
+}
+
+func (UnimplementedVolumeHost) GetHostName() string {
+	return ""
+}
+
+func (UnimplementedVolumeHost) GetHostIP() (net.IP, error) {
+	return nil, errors.New("GetHostIP() unimplemented")
+}
+
+func (UnimplementedVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
+	return v1.ResourceList{}, errors.New("GetNodeAllocatable() unimplemented")
+}
+
+func (UnimplementedVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+	return func(namespace, name string) (*v1.Secret, error) {
+		return nil, errors.New("GetSecretFunc() unimplemented")
+	}
+}
+
+func (UnimplementedVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(namespace, name string) (*v1.ConfigMap, error) {
+		return nil, errors.New("GetConfigMapFunc() unimplemented")
+	}
+}
+
+func (UnimplementedVolumeHost) GetExec(pluginName string) mount.Exec {
+	return nil
+}
+
+func (UnimplementedVolumeHost) GetNodeLabels() (map[string]string, error) {
+	return nil, errors.New("GetNodeLabels() unimplemented")
+}
+
+func (UnimplementedVolumeHost) GetNodeName() types.NodeName {
+	return types.NodeName("")
+}
+
+func (UnimplementedVolumeHost) GetEventRecorder() record.EventRecorder {
+	return nil
+}

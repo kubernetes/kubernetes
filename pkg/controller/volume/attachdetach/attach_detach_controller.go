@@ -20,10 +20,8 @@ package attachdetach
 
 import (
 	"fmt"
-	"net"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,12 +40,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
-	"k8s.io/kubernetes/pkg/util/io"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+
+	"github.com/golang/glog"
 )
 
 // TimerConfig contains configuration of internal attach/detach timers and
@@ -117,7 +115,6 @@ func NewAttachDetachController(
 	// dropped pods so they are continuously processed until it is accepted or
 	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
-		kubeClient:  kubeClient,
 		pvcLister:   pvcInformer.Lister(),
 		pvcsSynced:  pvcInformer.Informer().HasSynced,
 		pvLister:    pvInformer.Lister(),
@@ -126,7 +123,6 @@ func NewAttachDetachController(
 		podsSynced:  podInformer.Informer().HasSynced,
 		nodeLister:  nodeInformer.Lister(),
 		nodesSynced: nodeInformer.Informer().HasSynced,
-		cloud:       cloud,
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
@@ -188,9 +184,7 @@ func NewAttachDetachController(
 }
 
 type attachDetachController struct {
-	// kubeClient is the kube API client used by volumehost to communicate with
-	// the API server.
-	kubeClient clientset.Interface
+	volume.UnimplementedVolumeHost
 
 	// pvcLister is the shared PVC lister used to fetch and store PVC
 	// objects from the API server. It is shared with other controllers and
@@ -209,9 +203,6 @@ type attachDetachController struct {
 
 	nodeLister  corelisters.NodeLister
 	nodesSynced kcache.InformerSynced
-
-	// cloud provider used by volume host
-	cloud cloudprovider.Interface
 
 	// volumePluginMgr used to initialize and fetch volume plugins
 	volumePluginMgr volume.VolumePluginMgr
@@ -247,9 +238,6 @@ type attachDetachController struct {
 	// desiredStateOfWorldPopulator runs an asynchronous periodic loop to
 	// populate the current pods using podInformer.
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
-
-	// recorder is used to record events in the API server
-	recorder record.EventRecorder
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -508,88 +496,6 @@ func (adc *attachDetachController) processVolumesInUse(
 	}
 }
 
-// VolumeHost implementation
-// This is an unfortunate requirement of the current factoring of volume plugin
-// initializing code. It requires kubelet specific methods used by the mounting
-// code to be implemented by all initializers even if the initializer does not
-// do mounting (like this attach/detach controller).
-// Issue kubernetes/kubernetes/issues/14217 to fix this.
-func (adc *attachDetachController) GetPluginDir(podUID string) string {
-	return ""
-}
-
-func (adc *attachDetachController) GetVolumeDevicePluginDir(podUID string) string {
-	return ""
-}
-
-func (adc *attachDetachController) GetPodsDir() string {
-	return ""
-}
-
-func (adc *attachDetachController) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
-	return ""
-}
-
-func (adc *attachDetachController) GetPodPluginDir(podUID types.UID, pluginName string) string {
-	return ""
-}
-
-func (adc *attachDetachController) GetPodVolumeDeviceDir(podUID types.UID, pluginName string) string {
-	return ""
-}
-
-func (adc *attachDetachController) GetKubeClient() clientset.Interface {
-	return adc.kubeClient
-}
-
-func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
-	return nil, fmt.Errorf("NewWrapperMounter not supported by Attach/Detach controller's VolumeHost implementation")
-}
-
-func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
-	return nil, fmt.Errorf("NewWrapperUnmounter not supported by Attach/Detach controller's VolumeHost implementation")
-}
-
-func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
-	return adc.cloud
-}
-
-func (adc *attachDetachController) GetMounter(pluginName string) mount.Interface {
-	return nil
-}
-
-func (adc *attachDetachController) GetWriter() io.Writer {
-	return nil
-}
-
-func (adc *attachDetachController) GetHostName() string {
-	return ""
-}
-
-func (adc *attachDetachController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
-}
-
-func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
-	return v1.ResourceList{}, nil
-}
-
-func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
-		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
-	}
-}
-
-func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
-		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
-	}
-}
-
-func (adc *attachDetachController) GetExec(pluginName string) mount.Exec {
-	return mount.NewOsExec()
-}
-
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
 	if _, exists := node.Annotations[volumeutil.ControllerManagedAttachAnnotation]; exists {
 		keepTerminatedPodVolumes := false
@@ -602,16 +508,4 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 		// detach controller. Add it to desired state of world.
 		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
 	}
-}
-
-func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
-	return nil, fmt.Errorf("GetNodeLabels() unsupported in Attach/Detach controller")
-}
-
-func (adc *attachDetachController) GetNodeName() types.NodeName {
-	return ""
-}
-
-func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
-	return adc.recorder
 }
