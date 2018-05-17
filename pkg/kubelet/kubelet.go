@@ -547,7 +547,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.secretManager = secretManager
 
 	configMapManager := configmap.NewCachingConfigMapManager(
-		kubeDeps.KubeClient, configmap.GetObjectTTLFromNodeFunc(klet.GetNode))
+		kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
 	klet.configMapManager = configMapManager
 
 	if klet.experimentalHostUserNamespaceDefaulting {
