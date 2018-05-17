@@ -13,7 +13,6 @@ go_test(
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/example:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
     ],
