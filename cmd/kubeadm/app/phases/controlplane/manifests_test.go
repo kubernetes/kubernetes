@@ -28,7 +28,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/util/version"
 
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -335,7 +334,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--etcd-cafile=fuz",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
-				fmt.Sprintf("--endpoint-reconciler-type=%s", reconcilers.LeaseEndpointReconcilerType),
+				fmt.Sprintf("--endpoint-reconciler-type=%s", kubeadmconstants.LeaseEndpointReconcilerType),
 			},
 		},
 		{
@@ -412,7 +411,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--etcd-cafile=" + testCertsDir + "/etcd/ca.crt",
 				"--etcd-certfile=" + testCertsDir + "/apiserver-etcd-client.crt",
 				"--etcd-keyfile=" + testCertsDir + "/apiserver-etcd-client.key",
-				fmt.Sprintf("--endpoint-reconciler-type=%s", reconcilers.LeaseEndpointReconcilerType),
+				fmt.Sprintf("--endpoint-reconciler-type=%s", kubeadmconstants.LeaseEndpointReconcilerType),
 				"--audit-policy-file=/etc/kubernetes/audit/audit.yaml",
 				"--audit-log-path=/var/log/kubernetes/audit/audit.log",
 				"--audit-log-maxage=0",
