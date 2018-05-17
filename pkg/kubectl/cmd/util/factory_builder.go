@@ -40,7 +40,7 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 }
 
 func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
-	discoClient, err := f.clientAccessFactory.DiscoveryClient()
+	discoClient, err := f.clientAccessFactory.ToDiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
 		return nil, err
 	}
 	resolver := scaleclient.NewDiscoveryScaleKindResolver(discoClient)
-	mapper, err := f.clientAccessFactory.RESTMapper()
+	mapper, err := f.clientAccessFactory.ToRESTMapper()
 	if err != nil {
 		return nil, err
 	}
