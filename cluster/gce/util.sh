@@ -1045,6 +1045,11 @@ EOF
 ETCD_QUOTA_BACKEND_BYTES: $(yaml-quote ${ETCD_QUOTA_BACKEND_BYTES})
 EOF
     fi
+    if [ -n "${ETCD_EXTRA_ARGS:-}" ]; then
+    cat >>$file <<EOF
+ETCD_EXTRA_ARGS: $(yaml-quote ${ETCD_EXTRA_ARGS})
+EOF
+    fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
