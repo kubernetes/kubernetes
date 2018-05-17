@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	_ "k8s.io/apimachinery/pkg/api/meta"
 )
 
 // Scheme defines methods for serializing and deserializing API objects, a type
