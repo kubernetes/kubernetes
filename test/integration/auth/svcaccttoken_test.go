@@ -24,17 +24,20 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/square/go-jose.v2/jwt"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	externalclientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -118,7 +121,6 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			},
 		}
 
-		one      = int64(1)
 		wrongUID = types.UID("wrong")
 		noUID    = types.UID("")
 	)
@@ -126,8 +128,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("bound to service account", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 			},
 		}
 
@@ -157,8 +158,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("bound to service account and pod", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Pod",
 					APIVersion: "v1",
@@ -211,8 +211,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("bound to service account and secret", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Secret",
 					APIVersion: "v1",
@@ -266,8 +265,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("bound to service account and pod running as different service account", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Pod",
 					APIVersion: "v1",
@@ -289,8 +287,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("expired token", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 			},
 		}
 
@@ -303,7 +300,26 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		}
 
 		doTokenReview(t, cs, treq, false)
-		time.Sleep(63 * time.Second)
+
+		// backdate the token
+		then := time.Now().Add(-2 * time.Hour)
+		sc := &jwt.Claims{
+			Subject:   apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name),
+			Audience:  jwt.Audience([]string{"api"}),
+			IssuedAt:  jwt.NewNumericDate(then),
+			NotBefore: jwt.NewNumericDate(then),
+			Expiry:    jwt.NewNumericDate(then.Add(time.Duration(60*60) * time.Second)),
+		}
+		coresa := core.ServiceAccount{
+			ObjectMeta: sa.ObjectMeta,
+		}
+		_, pc := serviceaccount.Claims(coresa, nil, nil, 0, nil)
+		tok, err := masterConfig.ExtraConfig.ServiceAccountIssuer.GenerateToken(sc, pc)
+		if err != nil {
+			t.Fatalf("err signing expired token: %v", err)
+		}
+
+		treq.Status.Token = tok
 		doTokenReview(t, cs, treq, true)
 	})
 
@@ -346,8 +362,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("a token should be invalid after recreating same name pod", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Pod",
 					APIVersion: "v1",
@@ -386,8 +401,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("a token should be invalid after recreating same name secret", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
-				Audiences:         []string{"api"},
-				ExpirationSeconds: &one,
+				Audiences: []string{"api"},
 				BoundObjectRef: &authenticationv1.BoundObjectReference{
 					Kind:       "Secret",
 					APIVersion: "v1",
