@@ -160,7 +160,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	}
 
 	// Check for a new cert every 10 milliseconds
-	if err := updateTransport(stop, 10*time.Millisecond, c, m); err != nil {
+	if _, err := updateTransport(stop, 10*time.Millisecond, c, m); err != nil {
 		t.Fatal(err)
 	}
 
