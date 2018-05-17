@@ -66,16 +66,16 @@ func (s *simpleSecretManager) RegisterPod(pod *v1.Pod) {
 func (s *simpleSecretManager) UnregisterPod(pod *v1.Pod) {
 }
 
-// cachingSecretManager keeps a store with secrets necessary
+// secretManager keeps a store with secrets necessary
 // for registered pods. Different implementations of the store
 // may result in different semantics for freshness of secrets
 // (e.g. ttl-based implementation vs watch-based implementation).
-type cachingSecretManager struct {
+type secretManager struct {
 	manager manager.Manager
 }
 
-func (c *cachingSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
-	object, err := c.manager.GetObject(namespace, name)
+func (s *secretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
+	object, err := s.manager.GetObject(namespace, name)
 	if err != nil {
 		return nil, err
 	}
@@ -85,12 +85,12 @@ func (c *cachingSecretManager) GetSecret(namespace, name string) (*v1.Secret, er
 	return nil, fmt.Errorf("unexpected object type: %v", object)
 }
 
-func (c *cachingSecretManager) RegisterPod(pod *v1.Pod) {
-	c.manager.RegisterPod(pod)
+func (s *secretManager) RegisterPod(pod *v1.Pod) {
+	s.manager.RegisterPod(pod)
 }
 
-func (c *cachingSecretManager) UnregisterPod(pod *v1.Pod) {
-	c.manager.UnregisterPod(pod)
+func (s *secretManager) UnregisterPod(pod *v1.Pod) {
+	s.manager.UnregisterPod(pod)
 }
 
 func getSecretNames(pod *v1.Pod) sets.String {
@@ -106,7 +106,7 @@ const (
 	defaultTTL = time.Minute
 )
 
-// NewCacheBasedManager creates a manager that keeps a cache of all secrets
+// NewCachingSecretManager creates a manager that keeps a cache of all secrets
 // necessary for registered pods.
 // It implements the following logic:
 // - whenever a pod is created or updated, the cached versions of all secrets
@@ -119,7 +119,7 @@ func NewCachingSecretManager(kubeClient clientset.Interface, getTTL manager.GetO
 		return kubeClient.CoreV1().Secrets(namespace).Get(name, opts)
 	}
 	secretStore := manager.NewObjectStore(getSecret, clock.RealClock{}, getTTL, defaultTTL)
-	return &cachingSecretManager{
+	return &secretManager{
 		manager: manager.NewCacheBasedManager(secretStore, getSecretNames),
 	}
 }
