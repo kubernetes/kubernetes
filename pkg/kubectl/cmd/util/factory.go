@@ -105,8 +105,6 @@ type ObjectMappingFactory interface {
 type BuilderFactory interface {
 	// ScaleClient gives you back scale getter
 	ScaleClient() (scaleclient.ScalesGetter, error)
-	// Returns a Reaper for gracefully shutting down resources.
-	Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 }
 
 type factory struct {

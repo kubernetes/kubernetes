@@ -227,7 +227,6 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	deleteOpts.IgnoreNotFound = true
 	deleteOpts.WaitForDeletion = false
 	deleteOpts.GracePeriod = -1
-	deleteOpts.Reaper = f.Reaper
 
 	o.DeleteOptions = deleteOpts
 
@@ -459,14 +458,7 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 			ResourceNames(obj.Mapping.Resource.Resource+"."+obj.Mapping.Resource.Group, name).
 			Flatten().
 			Do()
-		// Note: we pass in "true" for the "quiet" parameter because
-		// ReadResult will only print one thing based on the "quiet"
-		// flag, and that's the "pod xxx deleted" message. If they
-		// asked for us to remove the pod (via --rm) then telling them
-		// its been deleted is unnecessary since that's what they asked
-		// for. We should only print something if the "rm" fails.
-		err = o.DeleteOptions.ReapResult(r, true, true)
-		if err != nil {
+		if err := o.DeleteOptions.DeleteResult(r); err != nil {
 			return err
 		}
 	}

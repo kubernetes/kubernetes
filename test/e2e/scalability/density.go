@@ -116,10 +116,8 @@ func (dtc *DensityTestConfig) deleteConfigMaps(testPhase *timer.Phase) {
 func (dtc *DensityTestConfig) deleteDaemonSets(numberOfClients int, testPhase *timer.Phase) {
 	defer testPhase.End()
 	for i := range dtc.DaemonConfigs {
-		framework.ExpectNoError(framework.DeleteResourceAndPods(
+		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(
 			dtc.ClientSets[i%numberOfClients],
-			dtc.InternalClientsets[i%numberOfClients],
-			dtc.ScaleClients[i%numberOfClients],
 			extensions.Kind("DaemonSet"),
 			dtc.DaemonConfigs[i].Namespace,
 			dtc.DaemonConfigs[i].Name,
@@ -320,15 +318,9 @@ func cleanupDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPha
 		name := dtc.Configs[i].GetName()
 		namespace := dtc.Configs[i].GetNamespace()
 		kind := dtc.Configs[i].GetKind()
-		if framework.TestContext.GarbageCollectorEnabled && kindSupportsGarbageCollector(kind) {
-			By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
-			err := framework.DeleteResourceAndWaitForGC(dtc.ClientSets[i%numberOfClients], kind, namespace, name)
-			framework.ExpectNoError(err)
-		} else {
-			By(fmt.Sprintf("Cleaning up the %v and pods", kind))
-			err := framework.DeleteResourceAndPods(dtc.ClientSets[i%numberOfClients], dtc.InternalClientsets[i%numberOfClients], dtc.ScaleClients[i%numberOfClients], kind, namespace, name)
-			framework.ExpectNoError(err)
-		}
+		By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
+		err := framework.DeleteResourceAndWaitForGC(dtc.ClientSets[i%numberOfClients], kind, namespace, name)
+		framework.ExpectNoError(err)
 	}
 	podCleanupPhase.End()
 
@@ -921,8 +913,4 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 	framework.ExpectNoError(testutils.CreateRCWithRetries(c, ns, rc))
 	framework.ExpectNoError(framework.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
 	framework.Logf("Found pod '%s' running", name)
-}
-
-func kindSupportsGarbageCollector(kind schema.GroupKind) bool {
-	return kind != extensions.Kind("Deployment") && kind != batch.Kind("Job")
 }
