@@ -37,10 +37,11 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestPortsForObject(t *testing.T) {
-	f := NewFactory(NewTestConfigFlags())
+	f := NewFactory(genericclioptions.NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -71,7 +72,7 @@ func TestPortsForObject(t *testing.T) {
 }
 
 func TestProtocolsForObject(t *testing.T) {
-	f := NewFactory(NewTestConfigFlags())
+	f := NewFactory(genericclioptions.NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -109,7 +110,7 @@ func TestProtocolsForObject(t *testing.T) {
 }
 
 func TestLabelsForObject(t *testing.T) {
-	f := NewFactory(NewTestConfigFlags())
+	f := NewFactory(genericclioptions.NewTestConfigFlags())
 
 	tests := []struct {
 		name     string
@@ -160,7 +161,7 @@ func TestLabelsForObject(t *testing.T) {
 }
 
 func TestCanBeExposed(t *testing.T) {
-	factory := NewFactory(NewTestConfigFlags())
+	factory := NewFactory(genericclioptions.NewTestConfigFlags())
 	tests := []struct {
 		kind      schema.GroupKind
 		expectErr bool
