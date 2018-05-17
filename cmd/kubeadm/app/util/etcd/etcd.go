@@ -133,14 +133,10 @@ func (c Client) GetVersion() (string, error) {
 		return "", err
 	}
 	for _, v := range versions {
-		if clusterVersion == "" {
-			// This is the first version we've seen
-			clusterVersion = v
-		} else if v != clusterVersion {
+		if clusterVersion != "" && clusterVersion != v {
 			return "", fmt.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
-		} else {
-			clusterVersion = v
 		}
+		clusterVersion = v
 	}
 	if clusterVersion == "" {
 		return "", fmt.Errorf("could not determine cluster etcd version")
