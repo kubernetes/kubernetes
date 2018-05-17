@@ -42,6 +42,14 @@ import (
 	utilsexec "k8s.io/utils/exec"
 )
 
+const (
+	masterConfig = "MasterConfiguration"
+	nodeConfig   = "NodeConfiguration"
+	sillyToken   = "abcdef.0123456789abcdef"
+)
+
+var availableAPIObjects = []string{masterConfig, nodeConfig}
+
 // NewCmdConfig returns cobra.Command for "kubeadm config" command
 func NewCmdConfig(out io.Writer) *cobra.Command {
 
@@ -65,10 +73,69 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster.")
 
+	cmd.AddCommand(NewCmdConfigPrintDefault(out))
 	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigImages(out))
 	return cmd
+}
+
+// NewCmdConfigPrintDefault returns cobra.Command for "kubeadm config print-default" command
+func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
+	apiObjects := []string{}
+	cmd := &cobra.Command{
+		Use:     "print-default",
+		Aliases: []string{"print-defaults"},
+		Short:   "Print the default values for a kubeadm configuration object.",
+		Long: fmt.Sprintf(dedent.Dedent(`
+			This command prints the default MasterConfiguration object that is used for 'kubeadm init' and 'kubeadm upgrade',
+			and the default NodeConfiguration object that is used for 'kubeadm join'.
+
+			Note that sensitive values like the Bootstrap Token fields are replaced with silly values like %q in order to pass validation but
+			not perform the real computation for creating a token.
+		`), sillyToken),
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(apiObjects) == 0 {
+				apiObjects = availableAPIObjects
+			}
+			for i, apiObject := range apiObjects {
+				if i > 0 {
+					fmt.Fprintln(out, "---")
+				}
+
+				cfgBytes, err := getDefaultAPIObjectBytes(apiObject)
+				kubeadmutil.CheckErr(err)
+				// Print the API object byte array
+				fmt.Fprintf(out, "%s", cfgBytes)
+			}
+		},
+	}
+	cmd.Flags().StringSliceVar(&apiObjects, "api-objects", apiObjects,
+		fmt.Sprintf("A comma-separated list for API objects to print the default values for. Available values: %v. This flag unset means 'print all known objects'", availableAPIObjects))
+	return cmd
+}
+
+func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
+	if apiObject == masterConfig {
+
+		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha2.MasterConfiguration{
+			Token: sillyToken,
+		})
+		kubeadmutil.CheckErr(err)
+
+		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
+	}
+	if apiObject == nodeConfig {
+		internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha2.NodeConfiguration{
+			Token: sillyToken,
+			DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
+			DiscoveryTokenUnsafeSkipCAVerification: true,
+		})
+		kubeadmutil.CheckErr(err)
+
+		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
+	}
+	return []byte{}, fmt.Errorf("--api-object needs to be one of %v", availableAPIObjects)
 }
 
 // NewCmdConfigUpload returns cobra.Command for "kubeadm config upload" command
