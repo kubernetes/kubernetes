@@ -53,13 +53,13 @@ func noObjectTTL() (time.Duration, bool) {
 func TestConfigMapStore(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	store := newConfigMapStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	store.Add("ns1", "name1")
-	store.Add("ns2", "name2")
-	store.Add("ns1", "name1")
-	store.Add("ns1", "name1")
-	store.Delete("ns1", "name1")
-	store.Delete("ns2", "name2")
-	store.Add("ns3", "name3")
+	store.AddReference("ns1", "name1")
+	store.AddReference("ns2", "name2")
+	store.AddReference("ns1", "name1")
+	store.AddReference("ns1", "name1")
+	store.DeleteReference("ns1", "name1")
+	store.DeleteReference("ns2", "name2")
+	store.AddReference("ns3", "name3")
 
 	// Adds don't issue Get requests.
 	actions := fakeClient.Actions()
@@ -87,7 +87,7 @@ func TestConfigMapStore(t *testing.T) {
 func TestConfigMapStoreDeletingConfigMap(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	store := newConfigMapStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	store.Add("ns", "name")
+	store.AddReference("ns", "name")
 
 	result := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "name", ResourceVersion: "10"}}
 	fakeClient.AddReactor("get", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
@@ -119,7 +119,7 @@ func TestConfigMapStoreGetAlwaysRefresh(t *testing.T) {
 	store := newConfigMapStore(fakeClient, fakeClock, noObjectTTL, 0)
 
 	for i := 0; i < 10; i++ {
-		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
 	}
 	fakeClient.ClearActions()
 
@@ -146,7 +146,7 @@ func TestConfigMapStoreGetNeverRefresh(t *testing.T) {
 	store := newConfigMapStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 
 	for i := 0; i < 10; i++ {
-		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
 	}
 	fakeClient.ClearActions()
 
@@ -175,7 +175,7 @@ func TestCustomTTL(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Time{})
 	store := newConfigMapStore(fakeClient, fakeClock, customTTL, time.Minute)
 
-	store.Add("ns", "name")
+	store.AddReference("ns", "name")
 	store.Get("ns", "name")
 	fakeClient.ClearActions()
 
@@ -352,10 +352,7 @@ func TestCacheInvalidation(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newConfigMapStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
-	manager := &cachingConfigMapManager{
-		configMapStore: store,
-		registeredPods: make(map[objectKey]*v1.Pod),
-	}
+	manager := newCacheBasedConfigMapManager(store)
 
 	// Create a pod with some configMaps.
 	s1 := configMapsToAttach{
@@ -408,10 +405,7 @@ func TestCacheRefcounts(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newConfigMapStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
-	manager := &cachingConfigMapManager{
-		configMapStore: store,
-		registeredPods: make(map[objectKey]*v1.Pod),
-	}
+	manager := newCacheBasedConfigMapManager(store)
 
 	s1 := configMapsToAttach{
 		containerEnvConfigMaps: []envConfigMaps{
@@ -491,10 +485,7 @@ func TestCacheRefcounts(t *testing.T) {
 func TestCachingConfigMapManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	configMapStore := newConfigMapStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	manager := &cachingConfigMapManager{
-		configMapStore: configMapStore,
-		registeredPods: make(map[objectKey]*v1.Pod),
-	}
+	manager := newCacheBasedConfigMapManager(configMapStore)
 
 	// Create a pod with some configMaps.
 	s1 := configMapsToAttach{
