@@ -42,16 +42,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -124,6 +128,18 @@ func applyNodeStatusPatch(originalNode *v1.Node, patch []byte) (*v1.Node, error)
 		return nil, fmt.Errorf("failed to unmarshal updated node %q: %v", updated, err)
 	}
 	return updatedNode, nil
+}
+
+func notImplemented(action core.Action) (bool, runtime.Object, error) {
+	return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+}
+
+func addNotImplatedReaction(kubeClient *fake.Clientset) {
+	if kubeClient == nil {
+		return
+	}
+
+	kubeClient.AddReactor("*", "*", notImplemented)
 }
 
 type localCM struct {
@@ -835,9 +851,9 @@ func TestRegisterWithApiServer(t *testing.T) {
 			},
 		}, nil
 	})
-	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
-	})
+
+	addNotImplatedReaction(kubeClient)
+
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -964,10 +980,6 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		},
 	}
 
-	notImplemented := func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
-	}
-
 	for _, tc := range cases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
 		defer testKubelet.Cleanup()
@@ -990,9 +1002,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		kubeClient.AddReactor("delete", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 			return true, nil, tc.deleteError
 		})
-		kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-			return notImplemented(action)
-		})
+		addNotImplatedReaction(kubeClient)
 
 		result := kubelet.tryRegisterWithAPIServer(tc.newNode)
 		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
@@ -1500,4 +1510,54 @@ func TestValidateNodeIPParam(t *testing.T) {
 			assert.Error(t, err, fmt.Sprintf("test %s", test.testName))
 		}
 	}
+}
+
+func TestRegisterWithApiServerWithTaint(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
+	}
+	kubelet.machineInfo = machineInfo
+
+	var gotNode runtime.Object
+	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		createAction := action.(core.CreateAction)
+		gotNode = createAction.GetObject()
+		return true, gotNode, nil
+	})
+
+	addNotImplatedReaction(kubeClient)
+
+	// Make node to be unschedulable.
+	kubelet.registerSchedulable = false
+
+	forEachFeatureGate(t, []utilfeature.Feature{features.TaintNodesByCondition}, func(t *testing.T) {
+		// Reset kubelet status for each test.
+		kubelet.registrationCompleted = false
+
+		// Register node to apiserver.
+		kubelet.registerWithAPIServer()
+
+		// Check the unschedulable taint.
+		got := gotNode.(*v1.Node)
+		unschedulableTaint := &v1.Taint{
+			Key:    algorithm.TaintNodeUnschedulable,
+			Effect: v1.TaintEffectNoSchedule,
+		}
+
+		require.Equal(t,
+			utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
+			taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
+			"test unschedulable taint for TaintNodesByCondition")
+
+		return
+	})
 }
