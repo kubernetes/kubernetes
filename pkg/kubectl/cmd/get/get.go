@@ -241,6 +241,8 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		if err != nil {
 			return nil, err
 		}
+
+		printer = maybeWrapSortingPrinter(printer, isSorting)
 		return printer.PrintObj, nil
 	}
 
@@ -731,4 +733,14 @@ func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping
 
 func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 	return cmdutil.GetFlagString(cmd, "output") != ""
+}
+
+func maybeWrapSortingPrinter(printer printers.ResourcePrinter, sortBy string) printers.ResourcePrinter {
+	if len(sortBy) != 0 {
+		return &kubectl.SortingPrinter{
+			Delegate:  printer,
+			SortField: fmt.Sprintf("%s", sortBy),
+		}
+	}
+	return printer
 }
