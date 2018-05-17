@@ -61,7 +61,10 @@ func EthernetCardTypes() VirtualDeviceList {
 	return VirtualDeviceList([]types.BaseVirtualDevice{
 		&types.VirtualE1000{},
 		&types.VirtualE1000e{},
+		&types.VirtualVmxnet2{},
 		&types.VirtualVmxnet3{},
+		&types.VirtualPCNet32{},
+		&types.VirtualSriovEthernetCard{},
 	}).Select(func(device types.BaseVirtualDevice) bool {
 		c := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
 		c.GetVirtualDevice().Key = -1
@@ -834,7 +837,7 @@ func (l VirtualDeviceList) TypeName(device types.BaseVirtualDevice) string {
 	return dtype.Elem().Name()
 }
 
-var deviceNameRegexp = regexp.MustCompile(`(?:Virtual)?(?:Machine)?(\w+?)(?:Card|Device|Controller)?$`)
+var deviceNameRegexp = regexp.MustCompile(`(?:Virtual)?(?:Machine)?(\w+?)(?:Card|EthernetCard|Device|Controller)?$`)
 
 func (l VirtualDeviceList) deviceName(device types.BaseVirtualDevice) string {
 	name := "device"
