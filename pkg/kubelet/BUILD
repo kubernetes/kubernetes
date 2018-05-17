@@ -83,6 +83,7 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
+        "//pkg/kubelet/util/manager:go_default_library",
         "//pkg/kubelet/util/queue:go_default_library",
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//pkg/kubelet/volumemanager:go_default_library",
