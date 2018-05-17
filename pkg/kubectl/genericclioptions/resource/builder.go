@@ -1022,12 +1022,12 @@ func (b *Builder) visitByPaths() *Result {
 		visitors = VisitorList(b.paths)
 	}
 
+	if b.flatten {
+		visitors = NewFlattenListVisitor(visitors, b.objectTyper, b.mapper)
+	}
+
 	// only items from disk can be refetched
 	if b.latest {
-		// must flatten lists prior to fetching
-		if b.flatten {
-			visitors = NewFlattenListVisitor(visitors, b.objectTyper, b.mapper)
-		}
 		// must set namespace prior to fetching
 		if b.defaultNamespace {
 			visitors = NewDecoratedVisitor(visitors, SetNamespace(b.namespace))
