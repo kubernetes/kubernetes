@@ -1370,3 +1370,29 @@ func TestSetDefaultHostPathVolumeSource(t *testing.T) {
 		t.Errorf("Expected v1.HostPathVolumeSource default type %v, got %v", expectedType, defaultType)
 	}
 }
+
+func TestSetDefaultPodSpecHostUserNamespace(t *testing.T) {
+	in := v1.PodSpec{}
+	out := roundTrip(t, runtime.Object(&v1.Pod{Spec: in})).(*v1.Pod).Spec
+	if out.HostUserNamespace != nil {
+		t.Errorf("Expected HostUserNamespace unset, was made %d", out.HostUserNamespace)
+	}
+
+	true_obj := true
+	in = v1.PodSpec{
+		HostUserNamespace: &true_obj,
+	}
+	out = roundTrip(t, runtime.Object(&v1.Pod{Spec: in})).(*v1.Pod).Spec
+	if out.HostUserNamespace == nil || !*out.HostUserNamespace {
+		t.Errorf("Expected HostUserNamespace true, was made %d", out.HostUserNamespace)
+	}
+
+	false_obj := false
+	in = v1.PodSpec{
+		HostUserNamespace: &false_obj,
+	}
+	out = roundTrip(t, runtime.Object(&v1.Pod{Spec: in})).(*v1.Pod).Spec
+	if out.HostUserNamespace == nil || *out.HostUserNamespace {
+		t.Errorf("Expected HostUserNamespace false, was made %d", out.HostUserNamespace)
+	}
+}

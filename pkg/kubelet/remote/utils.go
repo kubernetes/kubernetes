@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 )
 
 // getContextWithTimeout returns a context with timeout.

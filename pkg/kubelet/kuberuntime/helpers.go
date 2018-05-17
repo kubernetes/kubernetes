@@ -28,7 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -191,6 +191,22 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
+// toKubeRuntimeConfig converts the runtimeapi.RuntimeConfig to kubecontainer.RuntimeConfigInfo
+func toKubeRuntimeConfig(config *runtimeapi.GetRuntimeConfig) *kubecontainer.RuntimeConfigInfo {
+	userNSConfig := kubecontainer.UserNamespaceConfigInfo{
+		Enabled: config.UserNamespaceConfig.IsEnabled,
+		UidMapping: kubecontainer.UserNSMapping{
+			ContainerID: config.UserNamespaceConfig.UidMappings[0].ContainerId,
+			HostID:      config.UserNamespaceConfig.UidMappings[0].HostId,
+			Size:        config.UserNamespaceConfig.UidMappings[0].Size_},
+		GidMapping: kubecontainer.UserNSMapping{
+			ContainerID: config.UserNamespaceConfig.GidMappings[0].ContainerId,
+			HostID:      config.UserNamespaceConfig.GidMappings[0].HostId,
+			Size:        config.UserNamespaceConfig.GidMappings[0].Size_},
+	}
+	return &kubecontainer.RuntimeConfigInfo{UserNamespaceConfig: userNSConfig}
+}
+
 // getSysctlsFromAnnotations gets sysctls and unsafeSysctls from annotations.
 func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string, error) {
 	apiSysctls, apiUnsafeSysctls, err := v1helper.SysctlsFromPodAnnotations(annotations)
@@ -263,6 +279,15 @@ func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 	return runtimeapi.NamespaceMode_CONTAINER
 }
 
+func userNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
+	if pod != nil && pod.Spec.HostUserNamespace != nil {
+		if *pod.Spec.HostUserNamespace {
+			return runtimeapi.NamespaceMode_NODE
+		}
+	}
+	return runtimeapi.NamespaceMode_POD
+}
+
 // namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
 // An empty or nil pod can be used to get the namespace defaults for v1.Pod.
 func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
@@ -270,5 +295,6 @@ func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
 		Ipc:     ipcNamespaceForPod(pod),
 		Network: networkNamespaceForPod(pod),
 		Pid:     pidNamespaceForPod(pod),
+		User:    userNamespaceForPod(pod),
 	}
 }

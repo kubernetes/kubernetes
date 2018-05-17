@@ -42,7 +42,7 @@ import (
 	// to "v1"?
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
@@ -368,7 +368,7 @@ func TestDisabledSubpath(t *testing.T) {
 }
 
 func TestMakeBlockVolumes(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	testCases := map[string]struct {
@@ -735,7 +735,7 @@ fe00::2	ip6-allrouters
 }
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
@@ -755,7 +755,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 
 func TestRunInContainer(t *testing.T) {
 	for _, testError := range []error{nil, errors.New("bar")} {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		fakeRuntime := testKubelet.fakeRuntime
@@ -1645,7 +1645,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 
 	for _, tc := range testCases {
 		fakeRecorder := record.NewFakeRecorder(1)
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 		testKubelet.kubelet.recorder = fakeRecorder
 		defer testKubelet.Cleanup()
 		kl := testKubelet.kubelet
@@ -2133,7 +2133,7 @@ func TestExec(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
@@ -2224,7 +2224,7 @@ func TestPortForward(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */, false)
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
@@ -2320,7 +2320,7 @@ func TestHasHostMountPVC(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		testKubelet := newTestKubelet(t, false)
+		testKubelet := newTestKubelet(t, false, false)
 		defer testKubelet.Cleanup()
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{},

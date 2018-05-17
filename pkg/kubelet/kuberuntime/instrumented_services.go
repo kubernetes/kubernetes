@@ -20,7 +20,7 @@ import (
 	"time"
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -255,6 +255,15 @@ func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimea
 	err := in.service.UpdateRuntimeConfig(runtimeConfig)
 	recordError(operation, err)
 	return err
+}
+
+func (in instrumentedRuntimeService) GetRuntimeConfigInfo() (*runtimeapi.GetRuntimeConfig, error) {
+	const operation = "get_runtime_config"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.GetRuntimeConfigInfo()
+	recordError(operation, err)
+	return out, err
 }
 
 func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {

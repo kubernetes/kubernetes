@@ -3864,6 +3864,15 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			**out = **in
 		}
 	}
+	if in.HostUserNamespace != nil {
+		in, out := &in.HostUserNamespace, &out.HostUserNamespace
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	if in.ShareProcessNamespace != nil {
 		in, out := &in.ShareProcessNamespace, &out.ShareProcessNamespace
 		if *in == nil {

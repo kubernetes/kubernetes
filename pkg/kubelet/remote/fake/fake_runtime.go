@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	apitest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilexec "k8s.io/utils/exec"
@@ -273,6 +273,16 @@ func (f *RemoteRuntime) Status(ctx context.Context, req *kubeapi.StatusRequest) 
 	}
 
 	return &kubeapi.StatusResponse{Status: status}, nil
+}
+
+// GetRuntimeConfigInfo returns configuration details of the container runtime
+func (f *RemoteRuntime) GetRuntimeConfigInfo(ctx context.Context, req *kubeapi.GetRuntimeConfigInfoRequest) (*kubeapi.GetRuntimeConfigInfoResponse, error) {
+	runtimeConfig, err := f.RuntimeService.GetRuntimeConfigInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.GetRuntimeConfigInfoResponse{RuntimeConfig: runtimeConfig}, nil
 }
 
 // UpdateContainerResources updates ContainerConfig of the container.

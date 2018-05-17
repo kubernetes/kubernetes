@@ -60,6 +60,11 @@ func (r *Mock) Status() (*RuntimeStatus, error) {
 	return args.Get(0).(*RuntimeStatus), args.Error(0)
 }
 
+func (r *Mock) GetRuntimeConfigInfo() (*RuntimeConfigInfo, error) {
+	args := r.Called()
+	return args.Get(0).(*RuntimeConfigInfo), args.Error(0)
+}
+
 func (r *Mock) GetPods(all bool) ([]*Pod, error) {
 	args := r.Called(all)
 	return args.Get(0).([]*Pod), args.Error(1)

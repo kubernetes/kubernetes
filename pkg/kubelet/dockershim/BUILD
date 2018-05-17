@@ -80,7 +80,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha3:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/checkpointmanager/checksum:go_default_library",
@@ -148,7 +148,7 @@ go_test(
     }),
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha3:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",

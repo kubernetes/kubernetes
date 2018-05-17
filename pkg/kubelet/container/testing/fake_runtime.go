@@ -40,23 +40,25 @@ type FakePod struct {
 // FakeRuntime is a fake container runtime for testing.
 type FakeRuntime struct {
 	sync.Mutex
-	CalledFunctions   []string
-	PodList           []*FakePod
-	AllPodList        []*FakePod
-	ImageList         []Image
-	APIPodStatus      v1.PodStatus
-	PodStatus         PodStatus
-	StartedPods       []string
-	KilledPods        []string
-	StartedContainers []string
-	KilledContainers  []string
-	RuntimeStatus     *RuntimeStatus
-	VersionInfo       string
-	APIVersionInfo    string
-	RuntimeType       string
-	Err               error
-	InspectErr        error
-	StatusErr         error
+	CalledFunctions      []string
+	PodList              []*FakePod
+	AllPodList           []*FakePod
+	ImageList            []Image
+	APIPodStatus         v1.PodStatus
+	PodStatus            PodStatus
+	StartedPods          []string
+	KilledPods           []string
+	StartedContainers    []string
+	KilledContainers     []string
+	RuntimeStatus        *RuntimeStatus
+	RuntimeConfigInfo    *RuntimeConfigInfo
+	VersionInfo          string
+	APIVersionInfo       string
+	RuntimeType          string
+	Err                  error
+	InspectErr           error
+	StatusErr            error
+	RuntimeConfigInfoErr error
 }
 
 type FakeDirectStreamingRuntime struct {
@@ -143,11 +145,13 @@ func (f *FakeRuntime) ClearCalls() {
 	f.StartedContainers = []string{}
 	f.KilledContainers = []string{}
 	f.RuntimeStatus = nil
+	f.RuntimeConfigInfo = nil
 	f.VersionInfo = ""
 	f.RuntimeType = ""
 	f.Err = nil
 	f.InspectErr = nil
 	f.StatusErr = nil
+	f.RuntimeConfigInfoErr = nil
 }
 
 // UpdatePodCIDR fulfills the cri interface.
@@ -219,6 +223,14 @@ func (f *FakeRuntime) Status() (*RuntimeStatus, error) {
 
 	f.CalledFunctions = append(f.CalledFunctions, "Status")
 	return f.RuntimeStatus, f.StatusErr
+}
+
+func (f *FakeRuntime) GetRuntimeConfigInfo() (*RuntimeConfigInfo, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetRuntimeConfigInfo")
+	return f.RuntimeConfigInfo, f.RuntimeConfigInfoErr
 }
 
 func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {

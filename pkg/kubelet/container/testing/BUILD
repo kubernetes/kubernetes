@@ -14,7 +14,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/container/testing",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha3:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",

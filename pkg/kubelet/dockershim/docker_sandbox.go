@@ -29,7 +29,7 @@ import (
 	"github.com/golang/glog"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -434,6 +434,7 @@ func (ds *dockerService) PodSandboxStatus(ctx context.Context, req *runtimeapi.P
 					Network: networkNamespaceMode(r),
 					Pid:     pidNamespaceMode(r),
 					Ipc:     ipcNamespaceMode(r),
+					User:    userNamespaceMode(r),
 				},
 			},
 		},
@@ -646,6 +647,17 @@ func pidNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.Namespace
 func ipcNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {
 	if container != nil && container.HostConfig != nil && string(container.HostConfig.IpcMode) == namespaceModeHost {
 		return runtimeapi.NamespaceMode_NODE
+	}
+	return runtimeapi.NamespaceMode_POD
+}
+
+// userNamespaceMode returns the user runtimeapi.NamespaceMode for this container.
+// Supports: POD, NODE
+func userNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {
+	if container != nil && container.HostConfig != nil {
+		if string(container.HostConfig.UsernsMode) == namespaceModeHost {
+			return runtimeapi.NamespaceMode_NODE
+		}
 	}
 	return runtimeapi.NamespaceMode_POD
 }

@@ -25,7 +25,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 )
 
 func TestModifyContainerConfig(t *testing.T) {
@@ -301,6 +301,16 @@ func TestModifySandboxNamespaceOptions(t *testing.T) {
 				NetworkMode: "default",
 			},
 		},
+		{
+			name: "Host User NamespaceOption",
+			nsOpt: &runtimeapi.NamespaceOption{
+				User: runtimeapi.NamespaceMode_NODE,
+			},
+			expected: &dockercontainer.HostConfig{
+				NetworkMode: "default",
+				UsernsMode:  namespaceModeHost,
+			},
+		},
 	}
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
@@ -349,6 +359,18 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
 				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
 				PidMode:     namespaceModeHost,
+			},
+		},
+		{
+			name: "Host User NamespaceOption",
+			nsOpt: &runtimeapi.NamespaceOption{
+				User: runtimeapi.NamespaceMode_NODE,
+			},
+			expected: &dockercontainer.HostConfig{
+				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
+				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
+				PidMode:     dockercontainer.PidMode(sandboxNSMode),
+				UsernsMode:  namespaceModeHost,
 			},
 		},
 	}

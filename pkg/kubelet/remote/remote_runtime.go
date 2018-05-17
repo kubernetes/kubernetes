@@ -27,7 +27,7 @@ import (
 	"google.golang.org/grpc"
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilexec "k8s.io/utils/exec"
 )
@@ -422,6 +422,20 @@ func (r *RemoteRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.Run
 	}
 
 	return nil
+}
+
+func (r *RemoteRuntimeService) GetRuntimeConfigInfo() (*runtimeapi.GetRuntimeConfig, error) {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.GetRuntimeConfigInfo(ctx, &runtimeapi.GetRuntimeConfigInfoRequest{})
+	if err != nil {
+		errorMessage := "Failed to get runtime configuration details"
+		glog.Errorf("GetRuntimeConfigInfo failed: %s", errorMessage)
+		return nil, errors.New(errorMessage)
+	}
+
+	return resp.RuntimeConfig, nil
 }
 
 // Status returns the status of the runtime.

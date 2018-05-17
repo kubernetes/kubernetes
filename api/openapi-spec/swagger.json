@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Kubernetes",
-   "version": "v1.12.0"
+   "version": "v1.11.0"
   },
   "paths": {
    "/api/": {
@@ -79132,6 +79132,10 @@
      },
      "hostPID": {
       "description": "Use the host's pid namespace. Optional: Default to false.",
+      "type": "boolean"
+     },
+     "hostUserNamespace": {
+      "description": "Use the host's user namespace. Optional: Default to false.",
       "type": "boolean"
      },
      "hostname": {

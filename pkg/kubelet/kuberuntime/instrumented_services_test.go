@@ -24,7 +24,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -88,4 +88,23 @@ func TestStatus(t *testing.T) {
 		},
 	}
 	assert.Equal(t, expected, actural)
+}
+
+func TestGetRuntimeConfigInfo(t *testing.T) {
+	fakeRuntime, _, _, _ := createTestRuntimeManager()
+
+	uidMapping := &runtimeapi.LinuxIDMapping{ContainerId: uint32(0)}
+	gidMapping := &runtimeapi.LinuxIDMapping{ContainerId: uint32(0)}
+	linuxConfig := &runtimeapi.LinuxUserNamespaceConfig{
+		IsEnabled:   true,
+		UidMappings: []*runtimeapi.LinuxIDMapping{uidMapping},
+		GidMappings: []*runtimeapi.LinuxIDMapping{gidMapping},
+	}
+	getRuntimeConfig := &runtimeapi.GetRuntimeConfig{UserNamespaceConfig: linuxConfig}
+	fakeRuntime.FakeRuntimeConfigInfo = getRuntimeConfig
+
+	irs := newInstrumentedRuntimeService(fakeRuntime)
+	actual, err := irs.GetRuntimeConfigInfo()
+	assert.NoError(t, err)
+	assert.Equal(t, getRuntimeConfig, actual)
 }

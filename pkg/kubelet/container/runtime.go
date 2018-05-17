@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -122,6 +122,7 @@ type Runtime interface {
 	// This method just proxies a new runtimeConfig with the updated
 	// CIDR value down to the runtime shim.
 	UpdatePodCIDR(podCIDR string) error
+	GetRuntimeConfigInfo() (*RuntimeConfigInfo, error)
 }
 
 // DirectStreamingRuntime is the interface implemented by runtimes for which the streaming calls
@@ -489,6 +490,34 @@ const (
 type RuntimeStatus struct {
 	// Conditions is an array of current observed runtime conditions.
 	Conditions []RuntimeCondition
+}
+
+type RuntimeConfigInfo struct {
+	UserNamespaceConfig UserNamespaceConfigInfo
+}
+
+type UserNamespaceConfigInfo struct {
+	Enabled    bool
+	UidMapping UserNSMapping
+	GidMapping UserNSMapping
+}
+
+type UserNSMapping struct {
+	ContainerID uint32
+	HostID      uint32
+	Size        uint32
+}
+
+func (c *RuntimeConfigInfo) IsUserNamespaceEnabled() bool {
+	return c.UserNamespaceConfig.Enabled
+}
+
+func (c *RuntimeConfigInfo) GetHostUserNamespaceRemappedHostIds() (uid uint32, gid uint32) {
+	return c.UserNamespaceConfig.UidMapping.HostID, c.UserNamespaceConfig.GidMapping.HostID
+}
+
+func (c *RuntimeConfigInfo) GetContainerUserNamespaceIds() (uid uint32, gid uint32) {
+	return c.UserNamespaceConfig.UidMapping.ContainerID, c.UserNamespaceConfig.GidMapping.ContainerID
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.

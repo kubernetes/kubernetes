@@ -14,7 +14,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/core/v1/helper/qos:go_default_library",
-        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha3:go_default_library",
         "//pkg/kubelet/cm/cpumanager/state:go_default_library",
         "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
@@ -38,7 +38,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha3:go_default_library",
         "//pkg/kubelet/cm/cpumanager/state:go_default_library",
         "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",

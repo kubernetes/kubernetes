@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha3"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -270,6 +270,15 @@ func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, erro
 		return nil, err
 	}
 	return toKubeRuntimeStatus(status), nil
+}
+
+func (m *kubeGenericRuntimeManager) GetRuntimeConfigInfo() (*kubecontainer.RuntimeConfigInfo, error) {
+	runtimeConfig, err := m.runtimeService.GetRuntimeConfigInfo()
+	if err != nil {
+		glog.Errorf("Get runtime config failed: %v", err)
+		return nil, err
+	}
+	return toKubeRuntimeConfig(runtimeConfig), nil
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter
