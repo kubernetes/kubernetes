@@ -100,3 +100,6 @@ func (f *FakeCache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil
 func (f *FakeCache) FilteredList(filter schedulercache.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	return nil, nil
 }
+
+// IsUpToDate is a fake mthod for testing
+func (f *FakeCache) IsUpToDate(*schedulercache.NodeInfo) bool { return true }
