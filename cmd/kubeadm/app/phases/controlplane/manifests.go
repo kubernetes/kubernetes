@@ -37,7 +37,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -202,7 +201,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
-		defaultArguments["endpoint-reconciler-type"] = reconcilers.LeaseEndpointReconcilerType
+		defaultArguments["endpoint-reconciler-type"] = kubeadmconstants.LeaseEndpointReconcilerType
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.DynamicKubeletConfig) {

@@ -255,6 +255,11 @@ const (
 	KubeAuditPolicyLogVolumeName = "audit-log"
 	// StaticPodAuditPolicyLogDir is the name of the directory in the static pod that will have the audit logs
 	StaticPodAuditPolicyLogDir = "/var/log/kubernetes/audit"
+
+	// LeaseEndpointReconcilerType will select a storage based reconciler
+	// Copied from pkg/master/reconcilers to avoid pulling extra dependencies
+	// TODO: Import this constant from a consts only package, that does not pull any further dependencies.
+	LeaseEndpointReconcilerType = "lease"
 )
 
 var (
