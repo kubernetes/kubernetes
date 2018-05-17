@@ -169,7 +169,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	// setup command defaults
 	all := false
 	force := false
-	wait := false
+	wait := true
 	ignoreNotFound := false
 	now := false
 	output := ""
