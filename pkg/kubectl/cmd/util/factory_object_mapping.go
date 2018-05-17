@@ -20,27 +20,16 @@ package util
 
 import (
 	"fmt"
-	"reflect"
-	"sort"
 	"sync"
-	"time"
 
-	"k8s.io/api/core/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -143,75 +132,12 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 	return printersinternal.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
 }
 
-func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
-	external, err := f.clientAccessFactory.KubernetesClientSet()
-	if err != nil {
-		return nil, err
-	}
-	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), external)
-}
-
 func (f *ring1Factory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
 	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
 	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), external)
-}
-
-func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
-	clientset, err := f.clientAccessFactory.KubernetesClientSet()
-	if err != nil {
-		return nil, err
-	}
-	return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
-}
-
-func (f *ring1Factory) ApproximatePodTemplateForObject(object runtime.Object) (*api.PodTemplateSpec, error) {
-	switch t := object.(type) {
-	case *api.Pod:
-		return &api.PodTemplateSpec{
-			ObjectMeta: t.ObjectMeta,
-			Spec:       t.Spec,
-		}, nil
-	case *api.ReplicationController:
-		return t.Spec.Template, nil
-	case *extensions.ReplicaSet:
-		return &t.Spec.Template, nil
-	case *extensions.DaemonSet:
-		return &t.Spec.Template, nil
-	case *extensions.Deployment:
-		return &t.Spec.Template, nil
-	case *batch.Job:
-		return &t.Spec.Template, nil
-	}
-
-	return nil, fmt.Errorf("unable to extract pod template from type %v", reflect.TypeOf(object))
-}
-
-func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
-	clientset, err := f.clientAccessFactory.ClientSet()
-	if err != nil {
-		return nil, err
-	}
-
-	switch t := object.(type) {
-	case *api.Pod:
-		return t, nil
-	case *corev1.Pod:
-		internalPod := &api.Pod{}
-		err := apiv1.Convert_v1_Pod_To_core_Pod(t, internalPod, nil)
-		return internalPod, err
-
-	}
-
-	namespace, selector, err := polymorphichelpers.SelectorsForObject(object)
-	if err != nil {
-		return nil, fmt.Errorf("cannot attach to %T: %v", object, err)
-	}
-	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-	pod, _, err := polymorphichelpers.GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
-	return pod, err
 }
 
 func (f *ring1Factory) Validator(validate bool) (validation.Schema, error) {

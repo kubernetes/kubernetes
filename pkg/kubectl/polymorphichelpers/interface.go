@@ -19,8 +19,11 @@ package polymorphichelpers
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
@@ -29,3 +32,21 @@ type LogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter,
 
 // LogsForObjectFn gives a way to easily override the function for unit testing if needed.
 var LogsForObjectFn LogsForObjectFunc = logsForObject
+
+// AttachableLogsForObjectFunc is a function type that can tell you how to get the pod for which to attach a given object
+type AttachableLogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*api.Pod, error)
+
+// AttachablePodForObjectFn gives a way to easily override the function for unit testing if needed.
+var AttachablePodForObjectFn AttachableLogsForObjectFunc = attachablePodForObject
+
+// HistoryViewerFunc is a function type that can tell you how to view change history
+type HistoryViewerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
+
+// HistoryViewerFn gives a way to easily override the function for unit testing if needed
+var HistoryViewerFn HistoryViewerFunc = historyViewer
+
+// StatusViewerFunc is a function type that can tell you how to print rollout status
+type StatusViewerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
+
+// StatusViewerFn gives a way to easily override the function for unit testing if needed
+var StatusViewerFn StatusViewerFunc = statusViewer

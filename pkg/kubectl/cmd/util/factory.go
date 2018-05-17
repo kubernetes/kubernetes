@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -139,20 +138,8 @@ type ObjectMappingFactory interface {
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer(mapping *meta.RESTMapping) (printers.Describer, error)
 
-	// Returns a HistoryViewer for viewing change history
-	HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
 	// Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
 	Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
-	// Returns a StatusViewer for printing rollout status.
-	StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
-
-	// AttachablePodForObject returns the pod to which to attach given an object.
-	AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error)
-
-	// ApproximatePodTemplateForObject returns a pod template object for the provided source.
-	// It may return both an error and a object. It attempt to return the best possible template
-	// available at the current time.
-	ApproximatePodTemplateForObject(runtime.Object) (*api.PodTemplateSpec, error)
 
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool) (validation.Schema, error)
