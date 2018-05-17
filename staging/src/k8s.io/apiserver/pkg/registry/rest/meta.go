@@ -25,15 +25,9 @@ import (
 )
 
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
-func FillObjectMetaSystemFields(ctx context.Context, meta metav1.Object) {
+func FillObjectMetaSystemFields(meta metav1.Object) {
 	meta.SetCreationTimestamp(metav1.Now())
-	// allows admission controllers to assign a UID earlier in the request processing
-	// to support tracking resources pending creation.
-	uid, found := genericapirequest.UIDFrom(ctx)
-	if !found {
-		uid = uuid.NewUUID()
-	}
-	meta.SetUID(uid)
+	meta.SetUID(uuid.NewUUID())
 	meta.SetSelfLink("")
 }
 
