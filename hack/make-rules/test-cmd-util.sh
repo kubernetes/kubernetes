@@ -4861,6 +4861,10 @@ runTests() {
     kube::log::status "Creating namespace ${ns_name}"
     kubectl create namespace "${ns_name}"
     kubectl config set-context "${CONTEXT}" --namespace="${ns_name}"
+
+    # convenient spot to check for namespace kinds being set.
+    # TODO before merge, I'll make a real test
+    kubectl get --raw /api/v1/namespaces | sed 's/,/\'$'\n/g' | grep '"kind":"Namespace"'
   }
 
   kube_flags=(

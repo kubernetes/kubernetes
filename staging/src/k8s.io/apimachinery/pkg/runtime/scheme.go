@@ -550,9 +550,9 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		// TODO: when we move to server API versions, we should completely remove the unversioned concept
 		if unversionedKind, ok := s.unversionedTypes[t]; ok {
 			if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
-				return copyAndSetTargetKind(copy, in, gvk)
+				return s.copyAndSetTargetKind(copy, in, gvk)
 			}
-			return copyAndSetTargetKind(copy, in, unversionedKind)
+			return s.copyAndSetTargetKind(copy, in, unversionedKind)
 		}
 		return nil, NewNotRegisteredErrForTarget(t, target)
 	}
@@ -560,16 +560,16 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	// target wants to use the existing type, set kind and return (no conversion necessary)
 	for _, kind := range kinds {
 		if gvk == kind {
-			return copyAndSetTargetKind(copy, in, gvk)
+			return s.copyAndSetTargetKind(copy, in, gvk)
 		}
 	}
 
 	// type is unversioned, no conversion necessary
 	if unversionedKind, ok := s.unversionedTypes[t]; ok {
 		if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
-			return copyAndSetTargetKind(copy, in, gvk)
+			return s.copyAndSetTargetKind(copy, in, gvk)
 		}
-		return copyAndSetTargetKind(copy, in, unversionedKind)
+		return s.copyAndSetTargetKind(copy, in, unversionedKind)
 	}
 
 	out, err := s.New(gvk)
@@ -587,8 +587,8 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		return nil, err
 	}
 
-	setTargetKind(out, gvk)
-	return out, nil
+	err = s.setTargetKind(out, gvk)
+	return out, err
 }
 
 // unstructuredToTyped attempts to transform an unstructured object to a typed
@@ -616,23 +616,67 @@ func (s *Scheme) generateConvertMeta(in interface{}) (conversion.FieldMatchingFl
 }
 
 // copyAndSetTargetKind performs a conditional copy before returning the object, or an error if copy was not successful.
-func copyAndSetTargetKind(copy bool, obj Object, kind schema.GroupVersionKind) (Object, error) {
+func (s *Scheme) copyAndSetTargetKind(copy bool, obj Object, kind schema.GroupVersionKind) (Object, error) {
 	if copy {
 		obj = obj.DeepCopyObject()
 	}
-	setTargetKind(obj, kind)
-	return obj, nil
+	err := s.setTargetKind(obj, kind)
+	return obj, err
 }
 
 // setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.
-func setTargetKind(obj Object, kind schema.GroupVersionKind) {
+func (s *Scheme) setTargetKind(obj Object, kind schema.GroupVersionKind) error {
+	// set underlying object types when we're a list that is not generic
+	if _, isList := obj.(listInterface); isList &&
+		kind.GroupKind() != (schema.GroupKind{Group: "meta.k8s.io", Kind: "List"}) &&
+		kind.GroupKind() != (schema.GroupKind{Group: "", Kind: "List"}) {
+
+		// we are doing this on non-generic lists.  The groupversion of the thing that it returns must match the GroupVersion of
+		// the specific list.  Otherwise the implication of GVK is really weird.  Not impossible, but no one will have done that.
+		// If someone has, they should be clear cross register.
+
+		err := eachListItem(obj, func(listItem Object) error {
+			var t reflect.Type
+			// determine the incoming kinds with as few allocations as possible.
+			t = reflect.TypeOf(listItem)
+			if t.Kind() != reflect.Ptr {
+				return fmt.Errorf("only pointer types may be converted: %v", t)
+			}
+			t = t.Elem()
+			if t.Kind() != reflect.Struct {
+				return fmt.Errorf("only pointers to struct types may be converted: %v", t)
+			}
+
+			itemKinds, ok := s.typeToGVK[t]
+			if !ok || len(itemKinds) == 0 {
+				return NewNotRegisteredErrForType(t)
+			}
+			chosenKind := schema.GroupVersionKind{}
+			for _, itemKind := range itemKinds {
+				if itemKind.GroupVersion() == kind.GroupVersion() {
+					chosenKind = itemKind
+					break
+				}
+			}
+			if chosenKind.Empty() {
+				return fmt.Errorf("no matching kind found for %T contained in %v amongst: %v", listItem, kind, itemKinds)
+			}
+
+			return s.setTargetKind(listItem, chosenKind)
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	if kind.Version == APIVersionInternal {
 		// internal is a special case
 		// TODO: look at removing the need to special case this
 		obj.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-		return
+		return nil
 	}
 	obj.GetObjectKind().SetGroupVersionKind(kind)
+	return nil
 }
 
 // SetVersionPriority allows specifying a precise order of priority. All specified versions must be in the same group,
@@ -763,4 +807,97 @@ func (s *Scheme) addObservedVersion(version schema.GroupVersion) {
 	}
 
 	s.observedVersions = append(s.observedVersions, version)
+}
+
+// GetItemsPtr returns a pointer to the list object's Items member.
+// If 'list' doesn't have an Items member, it's not really a list type
+// and an error will be returned.
+// This function will either return a pointer to a slice, or an error, but not both.
+func getItemsPtr(list Object) (interface{}, error) {
+	v, err := conversion.EnforcePtr(list)
+	if err != nil {
+		return nil, err
+	}
+
+	items := v.FieldByName("Items")
+	if !items.IsValid() {
+		return nil, fmt.Errorf("no Items field in %#v", list)
+	}
+	switch items.Kind() {
+	case reflect.Interface, reflect.Ptr:
+		target := reflect.TypeOf(items.Interface()).Elem()
+		if target.Kind() != reflect.Slice {
+			return nil, fmt.Errorf("items: Expected slice, got %s", target.Kind())
+		}
+		return items.Interface(), nil
+	case reflect.Slice:
+		return items.Addr().Interface(), nil
+	default:
+		return nil, fmt.Errorf("items: Expected slice, got %s", items.Kind())
+	}
+}
+
+// eachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
+// the loop.
+func eachListItem(obj Object, fn func(Object) error) error {
+	if unstructured, ok := obj.(Unstructured); ok {
+		return unstructured.EachListItem(fn)
+	}
+	// TODO: Change to an interface call?
+	itemsPtr, err := getItemsPtr(obj)
+	if err != nil {
+		return err
+	}
+	items, err := conversion.EnforcePtr(itemsPtr)
+	if err != nil {
+		return err
+	}
+	len := items.Len()
+	if len == 0 {
+		return nil
+	}
+	takeAddr := false
+	if elemType := items.Type().Elem(); elemType.Kind() != reflect.Ptr && elemType.Kind() != reflect.Interface {
+		if !items.Index(0).CanAddr() {
+			return fmt.Errorf("unable to take address of items in %T for EachListItem", obj)
+		}
+		takeAddr = true
+	}
+
+	for i := 0; i < len; i++ {
+		raw := items.Index(i)
+		if takeAddr {
+			raw = raw.Addr()
+		}
+		switch item := raw.Interface().(type) {
+		case *RawExtension:
+			if err := fn(item.Object); err != nil {
+				return err
+			}
+		case Object:
+			if err := fn(item); err != nil {
+				return err
+			}
+		default:
+			obj, ok := item.(Object)
+			if !ok {
+				return fmt.Errorf("%v: item[%v]: Expected object, got %#v(%s)", obj, i, raw.Interface(), raw.Kind())
+			}
+			if err := fn(obj); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// listInterface overlaps with metav1.ListInterface.  ListMeta implements it.  `GetContinue` is the critical bit
+// ObjectMeta doesn't implement that because we don't page it.
+type listInterface interface {
+	GetResourceVersion() string
+	SetResourceVersion(version string)
+	GetSelfLink() string
+	SetSelfLink(selfLink string)
+	GetContinue() string
+	SetContinue(c string)
 }
