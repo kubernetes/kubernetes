@@ -252,10 +252,18 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
+	mounter := c.plugin.host.GetMounter(c.plugin.GetPluginName())
+	path := c.GetPath()
+	supportSelinux, err := mounter.GetSELinuxSupport(path)
+	if err != nil {
+		glog.V(2).Info(log("error checking for SELinux support: %s", err))
+		// Best guess
+		supportSelinux = false
+	}
 	return volume.Attributes{
 		ReadOnly:        c.readOnly,
 		Managed:         !c.readOnly,
-		SupportsSELinux: false,
+		SupportsSELinux: supportSelinux,
 	}
 }
 
