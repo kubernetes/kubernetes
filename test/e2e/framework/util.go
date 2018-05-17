@@ -3042,50 +3042,6 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 	}
 }
 
-// DeleteResourceAndPods deletes a given resource and all pods it spawned
-func DeleteResourceAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, scaleClient scaleclient.ScalesGetter, kind schema.GroupKind, ns, name string) error {
-	By(fmt.Sprintf("deleting %v %s in namespace %s", kind, name, ns))
-
-	rtObject, err := getRuntimeObjectForKind(clientset, kind, ns, name)
-	if err != nil {
-		if apierrs.IsNotFound(err) {
-			Logf("%v %s not found: %v", kind, name, err)
-			return nil
-		}
-		return err
-	}
-	selector, err := getSelectorFromRuntimeObject(rtObject)
-	if err != nil {
-		return err
-	}
-	ps, err := testutils.NewPodStore(clientset, ns, selector, fields.Everything())
-	if err != nil {
-		return err
-	}
-	defer ps.Stop()
-	startTime := time.Now()
-	if err := testutils.DeleteResourceUsingReaperWithRetries(internalClientset, kind, ns, name, nil, scaleClient); err != nil {
-		return fmt.Errorf("error while stopping %v: %s: %v", kind, name, err)
-	}
-	deleteTime := time.Since(startTime)
-	Logf("Deleting %v %s took: %v", kind, name, deleteTime)
-	err = waitForPodsInactive(ps, 100*time.Millisecond, 10*time.Minute)
-	if err != nil {
-		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
-	}
-	terminatePodTime := time.Since(startTime) - deleteTime
-	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
-	// this is to relieve namespace controller's pressure when deleting the
-	// namespace after a test.
-	err = waitForPodsGone(ps, 100*time.Millisecond, 10*time.Minute)
-	if err != nil {
-		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
-	}
-	gcPodTime := time.Since(startTime) - terminatePodTime
-	Logf("Garbage collecting %v %s pods took: %v", kind, name, gcPodTime)
-	return nil
-}
-
 // DeleteResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
 func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns, name string) error {
 	By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", kind, name, ns))

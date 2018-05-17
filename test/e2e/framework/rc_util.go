@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -151,10 +150,6 @@ func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 // DeleteRCAndWaitForGC deletes only the Replication Controller and waits for GC to delete the pods.
 func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 	return DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
-}
-
-func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, scaleClient scaleclient.ScalesGetter, ns, name string) error {
-	return DeleteResourceAndPods(clientset, internalClientset, scaleClient, api.Kind("ReplicationController"), ns, name)
 }
 
 func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {

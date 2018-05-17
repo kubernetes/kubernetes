@@ -214,11 +214,11 @@ func (o *ScaleOptions) RunScale() error {
 	}
 
 	precondition := &kubectl.ScalePrecondition{Size: o.CurrentReplicas, ResourceVersion: o.ResourceVersion}
-	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
+	retry := kubectl.NewRetryParams(1*time.Second, 5*time.Minute)
 
 	var waitForReplicas *kubectl.RetryParams
 	if o.Timeout != 0 {
-		waitForReplicas = kubectl.NewRetryParams(kubectl.Interval, timeout)
+		waitForReplicas = kubectl.NewRetryParams(1*time.Second, timeout)
 	}
 
 	counter := 0

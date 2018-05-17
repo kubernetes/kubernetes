@@ -339,7 +339,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// Stop service 1 and make sure it is gone.
 		By("stopping service1")
-		framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, "service1"))
+		framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, "service1"))
 
 		By("verifying service1 is not up")
 		framework.ExpectNoError(framework.VerifyServeHostnameServiceDown(cs, host, svc1IP, servicePort))
@@ -373,13 +373,13 @@ var _ = SIGDescribe("Services", func() {
 		svc2 := "service2"
 
 		defer func() {
-			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, svc1))
+			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, svc1))
 		}()
 		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService(svc1), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		defer func() {
-			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, svc2))
+			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, svc2))
 		}()
 		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService(svc2), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
@@ -426,7 +426,7 @@ var _ = SIGDescribe("Services", func() {
 		numPods, servicePort := 3, 80
 
 		defer func() {
-			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, "service1"))
+			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, "service1"))
 		}()
 		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service1"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
@@ -453,7 +453,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// Create a new service and check if it's not reusing IP.
 		defer func() {
-			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, "service2"))
+			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, "service2"))
 		}()
 		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service2"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred())
@@ -1753,7 +1753,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				framework.Logf("Health checking %s, http://%s%s, expectedSuccess %v", nodes.Items[n].Name, ipPort, path, expectedSuccess)
 				Expect(jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, framework.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)).NotTo(HaveOccurred())
 			}
-			framework.ExpectNoError(framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, namespace, serviceName))
+			framework.ExpectNoError(framework.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
 		}
 	})
 
@@ -1968,7 +1968,7 @@ func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interf
 	_, _, err := framework.StartServeHostnameService(cs, f.InternalClientset, svc, ns, numPods)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
-		framework.StopServeHostnameService(cs, f.InternalClientset, f.ScalesGetter, ns, serviceName)
+		framework.StopServeHostnameService(cs, ns, serviceName)
 	}()
 	jig := framework.NewServiceTestJig(cs, serviceName)
 	svc, err = jig.Client.CoreV1().Services(ns).Get(serviceName, metav1.GetOptions{})
@@ -2023,7 +2023,7 @@ func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface
 	svc = jig.WaitForLoadBalancerOrFail(ns, serviceName, framework.LoadBalancerCreateTimeoutDefault)
 	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	defer func() {
-		framework.StopServeHostnameService(cs, f.InternalClientset, f.ScalesGetter, ns, serviceName)
+		framework.StopServeHostnameService(cs, ns, serviceName)
 		lb := cloudprovider.GetLoadBalancerName(svc)
 		framework.Logf("cleaning gce resource for %s", lb)
 		framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)

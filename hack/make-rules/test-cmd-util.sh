@@ -1468,7 +1468,7 @@ __EOF__
   # Test that we can list this new CustomResource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
   # Compare "old" output with experimental output and ensure both are the same
-  expected_output=$(kubectl get foos "${kube_flags[@]}")
+  expected_output=$(kubectl get foos "${kube_flags[@]}" | awk 'NF{NF--};1')
   actual_output=$(kubectl get foos --server-print=false "${kube_flags[@]}" | awk 'NF{NF--};1')
   kube::test::if_has_string "${actual_output}" "${expected_output}"
 
@@ -1480,6 +1480,9 @@ __EOF__
   kubectl delete rc frontend "${kube_flags[@]}"
   kubectl delete ds bind "${kube_flags[@]}"
   kubectl delete pod valid-pod "${kube_flags[@]}"
+
+  set +o nounset
+  set +o errexit
 }
 
 run_kubectl_get_tests() {

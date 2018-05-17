@@ -43,7 +43,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -594,7 +593,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 				}
 			}
 			podArray := []corev1.Pod{pod}
-			_, err = o.waitForDelete(podArray, kubectl.Interval, time.Duration(math.MaxInt64), true, getPodFn)
+			_, err = o.waitForDelete(podArray, 1*time.Second, time.Duration(math.MaxInt64), true, getPodFn)
 			if err == nil {
 				doneCh <- true
 			} else {
@@ -640,7 +639,7 @@ func (o *DrainOptions) deletePods(pods []corev1.Pod, getPodFn func(namespace, na
 			return err
 		}
 	}
-	_, err := o.waitForDelete(pods, kubectl.Interval, globalTimeout, false, getPodFn)
+	_, err := o.waitForDelete(pods, 1*time.Second, globalTimeout, false, getPodFn)
 	return err
 }
 

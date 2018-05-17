@@ -36,11 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	scaleclient "k8s.io/client-go/scale"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/kubectl"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutil "k8s.io/kubernetes/test/utils"
@@ -160,17 +157,12 @@ func newDeploymentRollback(name string, annotations map[string]string, revision 
 	}
 }
 
-func stopDeployment(c clientset.Interface, internalClient internalclientset.Interface, scaleClient scaleclient.ScalesGetter, ns, deploymentName string) {
+func stopDeployment(c clientset.Interface, ns, deploymentName string) {
 	deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Deleting deployment %s", deploymentName)
-	reaper, err := kubectl.ReaperFor(appsinternal.Kind("Deployment"), internalClient, scaleClient)
-	Expect(err).NotTo(HaveOccurred())
-	timeout := 1 * time.Minute
-
-	err = reaper.Stop(ns, deployment.Name, timeout, metav1.NewDeleteOptions(0))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(c, appsinternal.Kind("Deployment"), ns, deployment.Name))
 
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
 	_, err = c.AppsV1().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
@@ -203,7 +195,6 @@ func stopDeployment(c clientset.Interface, internalClient internalclientset.Inte
 func testDeleteDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
-	internalClient := f.InternalClientset
 
 	deploymentName := "test-new-deployment"
 	podLabels := map[string]string{"name": NginxImageName}
@@ -226,7 +217,7 @@ func testDeleteDeployment(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nilRs))
-	stopDeployment(c, internalClient, f.ScalesGetter, ns, deploymentName)
+	stopDeployment(c, ns, deploymentName)
 }
 
 func testRollingUpdateDeployment(f *framework.Framework) {
