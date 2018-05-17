@@ -533,13 +533,13 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 			if err != nil {
 				return err
 			}
-
-			// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
-			// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
-			// or the bootstrapping credentials to potentially lay down new initial config.
-			if err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, 5*time.Minute); err != nil {
-				return err
-			}
+		}
+		// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
+		// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
+		// or the bootstrapping credentials to potentially lay down new initial config.
+		closeAllConns, err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, 5*time.Minute)
+		if err != nil {
+			return err
 		}
 
 		kubeClient, err = clientset.NewForConfig(clientConfig)
@@ -577,6 +577,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		kubeDeps.ExternalKubeClient = externalKubeClient
 		if heartbeatClient != nil {
 			kubeDeps.HeartbeatClient = heartbeatClient
+			kubeDeps.OnHeartbeatFailure = closeAllConns
 		}
 		if eventClient != nil {
 			kubeDeps.EventClient = eventClient
