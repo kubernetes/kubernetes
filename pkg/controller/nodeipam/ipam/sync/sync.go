@@ -240,7 +240,7 @@ func (op *updateOp) validateRange(ctx context.Context, sync *NodeSync, node *v1.
 	return nil
 }
 
-// updateNodeFromAlias updates the the node from the cloud allocated
+// updateNodeFromAlias updates the node from the cloud allocated
 // alias.
 func (op *updateOp) updateNodeFromAlias(ctx context.Context, sync *NodeSync, node *v1.Node, aliasRange *net.IPNet) error {
 	if sync.mode != SyncFromCloud {

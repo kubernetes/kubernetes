@@ -128,10 +128,10 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*Resou
 				// We are only interested in observing updates to quota.spec to drive updates to quota.status.
 				// We ignore all updates to quota.Status because they are all driven by this controller.
 				// IMPORTANT:
-				// We do not use this function to queue up a full quota recalculation.  To do so, would require
+				// We do not use this function to queue up a full quota recalculation. To do so, would require
 				// us to enqueue all quota.Status updates, and since quota.Status updates involve additional queries
 				// that cannot be backed by a cache and result in a full query of a namespace's content, we do not
-				// want to pay the price on spurious status updates.  As a result, we have a separate routine that is
+				// want to pay the price on spurious status updates. As a result, we have a separate routine that is
 				// responsible for enqueue of all resource quotas when doing a full resync (enqueueAll)
 				oldResourceQuota := old.(*v1.ResourceQuota)
 				curResourceQuota := cur.(*v1.ResourceQuota)
@@ -366,7 +366,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 
 	dirty = dirty || !quota.Equals(usage.Status.Used, resourceQuota.Status.Used)
 
-	// there was a change observed by this controller that requires we update quota
+	// there was a change observed by this controller that requires to update quota
 	if dirty {
 		v1Usage := &v1.ResourceQuota{}
 		if err := k8s_api_v1.Convert_core_ResourceQuota_To_v1_ResourceQuota(&usage, v1Usage, nil); err != nil {
