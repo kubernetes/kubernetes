@@ -39,6 +39,10 @@ func (v *VirtualMachineSnapshot) RemoveSnapshotTask(req *types.RemoveSnapshot_Ta
 			}
 
 			vm.Snapshot.RootSnapshotList = removeSnapshotInTree(vm.Snapshot.RootSnapshotList, req.This, req.RemoveChildren)
+
+			if len(vm.Snapshot.RootSnapshotList) == 0 {
+				vm.Snapshot = nil
+			}
 		})
 
 		return nil, nil

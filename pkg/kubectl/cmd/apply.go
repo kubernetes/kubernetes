@@ -219,7 +219,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ClientSetFunc = f.ClientSet
 	o.Validator, err = f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	o.Builder = f.NewBuilder()
-	o.Mapper, err = f.RESTMapper()
+	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}

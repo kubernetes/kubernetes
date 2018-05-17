@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package secret
+package manager
 
 import (
 	"fmt"
@@ -25,29 +25,62 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/fake"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/sets"
+
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func checkSecret(t *testing.T, store *secretStore, ns, name string, shouldExist bool) {
+func checkObject(t *testing.T, store *objectStore, ns, name string, shouldExist bool) {
 	_, err := store.Get(ns, name)
 	if shouldExist && err != nil {
 		t.Errorf("unexpected actions: %#v", err)
 	}
-	if !shouldExist && (err == nil || !strings.Contains(err.Error(), fmt.Sprintf("secret %q/%q not registered", ns, name))) {
+	if !shouldExist && (err == nil || !strings.Contains(err.Error(), fmt.Sprintf("object %q/%q not registered", ns, name))) {
 		t.Errorf("unexpected actions: %#v", err)
 	}
 }
 
 func noObjectTTL() (time.Duration, bool) {
 	return time.Duration(0), false
+}
+
+func getSecret(fakeClient clientset.Interface) GetObjectFunc {
+	return func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
+		return fakeClient.CoreV1().Secrets(namespace).Get(name, opts)
+	}
+}
+
+func newSecretStore(fakeClient clientset.Interface, clock clock.Clock, getTTL GetObjectTTLFunc, ttl time.Duration) *objectStore {
+	return &objectStore{
+		getObject:  getSecret(fakeClient),
+		clock:      clock,
+		items:      make(map[objectKey]*objectStoreItem),
+		defaultTTL: ttl,
+		getTTL:     getTTL,
+	}
+}
+
+func getSecretNames(pod *v1.Pod) sets.String {
+	result := sets.NewString()
+	podutil.VisitPodSecretNames(pod, func(name string) bool {
+		result.Insert(name)
+		return true
+	})
+	return result
+}
+
+func newCacheBasedSecretManager(store Store) Manager {
+	return NewCacheBasedManager(store, getSecretNames)
 }
 
 func TestSecretStore(t *testing.T) {
@@ -78,10 +111,10 @@ func TestSecretStore(t *testing.T) {
 		assert.True(t, a.Matches("get", "secrets"), "unexpected actions: %#v", a)
 	}
 
-	checkSecret(t, store, "ns1", "name1", true)
-	checkSecret(t, store, "ns2", "name2", false)
-	checkSecret(t, store, "ns3", "name3", true)
-	checkSecret(t, store, "ns4", "name4", false)
+	checkObject(t, store, "ns1", "name1", true)
+	checkObject(t, store, "ns2", "name2", false)
+	checkObject(t, store, "ns3", "name3", true)
+	checkObject(t, store, "ns4", "name4", false)
 }
 
 func TestSecretStoreDeletingSecret(t *testing.T) {
@@ -481,10 +514,10 @@ func TestCacheRefcounts(t *testing.T) {
 	assert.Equal(t, 1, refs("ns1", "s70"))
 }
 
-func TestCachingSecretManager(t *testing.T) {
+func TestCacheBasedSecretManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	secretStore := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
-	manager := newCacheBasedSecretManager(secretStore)
+	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
+	manager := newCacheBasedSecretManager(store)
 
 	// Create a pod with some secrets.
 	s1 := secretsToAttach{
@@ -524,7 +557,7 @@ func TestCachingSecretManager(t *testing.T) {
 		for _, secret := range []string{"s1", "s2", "s3", "s4", "s5", "s6", "s20", "s40", "s50"} {
 			shouldExist :=
 				(secret == "s1" || secret == "s3" || secret == "s4" || secret == "s40") && (ns == "ns1" || ns == "ns2")
-			checkSecret(t, secretStore, ns, secret, shouldExist)
+			checkObject(t, store, ns, secret, shouldExist)
 		}
 	}
 }

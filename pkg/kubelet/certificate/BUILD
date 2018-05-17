@@ -26,6 +26,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes/typed/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/util/certificate:go_default_library",
+        "//vendor/k8s.io/client-go/util/connrotation:go_default_library",
     ],
 )
 

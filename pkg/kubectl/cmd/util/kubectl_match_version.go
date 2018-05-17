@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -37,14 +38,14 @@ const (
 
 // MatchVersionFlags is for setting the "match server version" function.
 type MatchVersionFlags struct {
-	Delegate RESTClientGetter
+	Delegate genericclioptions.RESTClientGetter
 
 	RequireMatchedServerVersion bool
 	checkServerVersion          sync.Once
 	matchesServerVersionErr     error
 }
 
-var _ RESTClientGetter = &MatchVersionFlags{}
+var _ genericclioptions.RESTClientGetter = &MatchVersionFlags{}
 
 func (f *MatchVersionFlags) checkMatchingServerVersion() error {
 	f.checkServerVersion.Do(func() {
@@ -102,7 +103,7 @@ func (f *MatchVersionFlags) AddFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&f.RequireMatchedServerVersion, flagMatchBinaryVersion, f.RequireMatchedServerVersion, "Require server version to match client version")
 }
 
-func NewMatchVersionFlags(delegate RESTClientGetter) *MatchVersionFlags {
+func NewMatchVersionFlags(delegate genericclioptions.RESTClientGetter) *MatchVersionFlags {
 	return &MatchVersionFlags{
 		Delegate: delegate,
 	}

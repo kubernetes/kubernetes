@@ -154,7 +154,7 @@ func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.ClientConfig, err = f.ClientConfig()
+	o.ClientConfig, err = f.ToRESTConfig()
 	if err != nil {
 		return err
 	}

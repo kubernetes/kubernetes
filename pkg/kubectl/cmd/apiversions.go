@@ -65,7 +65,7 @@ func NewCmdApiVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 
 func (o *ApiVersionsOptions) Complete(f cmdutil.Factory) error {
 	var err error
-	o.discoveryClient, err = f.DiscoveryClient()
+	o.discoveryClient, err = f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}

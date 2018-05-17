@@ -92,6 +92,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
@@ -542,7 +543,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	secretManager := secret.NewCachingSecretManager(
-		kubeDeps.KubeClient, secret.GetObjectTTLFromNodeFunc(klet.GetNode))
+		kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
 	klet.secretManager = secretManager
 
 	configMapManager := configmap.NewCachingConfigMapManager(

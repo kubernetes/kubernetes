@@ -195,7 +195,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	o.MapBasedSelectorForObject = f.MapBasedSelectorForObject
 	o.PortsForObject = f.PortsForObject
 	o.ProtocolsForObject = f.ProtocolsForObject
-	o.Mapper, err = f.RESTMapper()
+	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}
