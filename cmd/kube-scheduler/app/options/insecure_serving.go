@@ -153,7 +153,7 @@ func (o *CombinedInsecureServingOptions) Validate() []error {
 	errors := []error{}
 
 	if o.BindPort <= 0 || o.BindPort > 32767 {
-		errors = append(errors, fmt.Errorf("--insecure-port %v must be between 0 and 32767, inclusive. 0 for turning off insecure (HTTP) port", o.BindPort))
+		errors = append(errors, fmt.Errorf("--port %v must be between 0 and 32767, inclusive. 0 for turning off insecure (HTTP) port", o.BindPort))
 	}
 
 	if len(o.BindAddress) > 0 && net.ParseIP(o.BindAddress) == nil {
