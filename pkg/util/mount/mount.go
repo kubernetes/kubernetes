@@ -114,6 +114,9 @@ type Interface interface {
 	GetMountRefs(pathname string) ([]string, error)
 	// GetFSGroup returns FSGroup of the path.
 	GetFSGroup(pathname string) (int64, error)
+	// GetSELinuxSupport returns true if given path is on a mount that supports
+	// SELinux.
+	GetSELinuxSupport(pathname string) (bool, error)
 }
 
 type Subpath struct {
