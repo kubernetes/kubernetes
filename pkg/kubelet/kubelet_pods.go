@@ -30,7 +30,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -41,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/remotecommand"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
@@ -1587,27 +1585,6 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 	}
 	// TODO(tallclair): Pass a proper timeout value.
 	return kl.runner.RunInContainer(container.ID, cmd, 0)
-}
-
-// ExecInContainer executes a command in a container, connecting the supplied
-// stdin/stdout/stderr to the command's IO streams.
-func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
-	// TODO(random-liu): Remove this.
-	return fmt.Errorf("unimplemented")
-}
-
-// AttachContainer uses the container runtime to attach the given streams to
-// the given container.
-func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, containerName string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-	// TODO(random-liu): Remove this.
-	return fmt.Errorf("unimplemented")
-}
-
-// PortForward connects to the pod's port and copies data between the port
-// and the stream.
-func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
-	// TODO(random-liu): Remove this.
-	return fmt.Errorf("unimplemented")
 }
 
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.

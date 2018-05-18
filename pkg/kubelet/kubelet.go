@@ -512,21 +512,22 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeRef:                   nodeRef,
 		nodeLabels:                nodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
-		os:                   kubeDeps.OSInterface,
-		oomWatcher:           oomWatcher,
-		cgroupsPerQOS:        kubeCfg.CgroupsPerQOS,
-		cgroupRoot:           kubeCfg.CgroupRoot,
-		mounter:              kubeDeps.Mounter,
-		writer:               kubeDeps.Writer,
-		maxPods:              int(kubeCfg.MaxPods),
-		podsPerCore:          int(kubeCfg.PodsPerCore),
-		syncLoopMonitor:      atomic.Value{},
-		daemonEndpoints:      daemonEndpoints,
-		containerManager:     kubeDeps.ContainerManager,
-		containerRuntimeName: containerRuntime,
-		nodeIP:               parsedNodeIP,
-		nodeIPValidator:      validateNodeIP,
-		clock:                clock.RealClock{},
+		os:                         kubeDeps.OSInterface,
+		oomWatcher:                 oomWatcher,
+		cgroupsPerQOS:              kubeCfg.CgroupsPerQOS,
+		cgroupRoot:                 kubeCfg.CgroupRoot,
+		mounter:                    kubeDeps.Mounter,
+		writer:                     kubeDeps.Writer,
+		maxPods:                    int(kubeCfg.MaxPods),
+		podsPerCore:                int(kubeCfg.PodsPerCore),
+		syncLoopMonitor:            atomic.Value{},
+		daemonEndpoints:            daemonEndpoints,
+		containerManager:           kubeDeps.ContainerManager,
+		containerRuntimeName:       containerRuntime,
+		redirectContainerStreaming: crOptions.RedirectContainerStreaming,
+		nodeIP:          parsedNodeIP,
+		nodeIPValidator: validateNodeIP,
+		clock:           clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
@@ -605,16 +606,16 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	switch containerRuntime {
 	case kubetypes.DockerContainerRuntime:
 		// Create and start the CRI shim running as a grpc server.
-		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
+		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps, crOptions)
 		ds, err := dockershim.NewDockerService(kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
 			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory,
-			crOptions.DockerDisableSharedPID)
+			crOptions.DockerDisableSharedPID, !crOptions.RedirectContainerStreaming)
 		if err != nil {
 			return nil, err
 		}
-		// For now, the CRI shim redirects the streaming requests to the
-		// kubelet, which handles the requests using DockerService..
-		klet.criHandler = ds
+		if crOptions.RedirectContainerStreaming {
+			klet.criHandler = ds
+		}
 
 		// The unix socket for kubelet <-> dockershim communication.
 		glog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
@@ -999,6 +1000,9 @@ type Kubelet struct {
 
 	// The name of the container runtime
 	containerRuntimeName string
+
+	// redirectContainerStreaming enables container streaming redirect.
+	redirectContainerStreaming bool
 
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
@@ -2097,11 +2101,6 @@ func (kl *Kubelet) BirthCry() {
 	kl.recorder.Eventf(kl.nodeRef, v1.EventTypeNormal, events.StartingKubelet, "Starting kubelet.")
 }
 
-// StreamingConnectionIdleTimeout returns the timeout for streaming connections to the HTTP server.
-func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
-	return kl.streamingConnectionIdleTimeout
-}
-
 // ResyncInterval returns the interval used for periodic syncs.
 func (kl *Kubelet) ResyncInterval() time.Duration {
 	return kl.resyncInterval
@@ -2109,12 +2108,12 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, enableContentionProfiling, kl.containerRuntime, kl.criHandler)
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, enableContentionProfiling, kl.redirectContainerStreaming, kl.criHandler)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
-	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, kl.containerRuntime)
+	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
@@ -2138,19 +2137,23 @@ func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 }
 
 // Gets the streaming server configuration to use with in-process CRI shims.
-func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies) *streaming.Config {
+func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, crOptions *config.ContainerRuntimeOptions) *streaming.Config {
 	config := &streaming.Config{
-		// Use a relative redirect (no scheme or host).
-		BaseURL: &url.URL{
-			Path: "/cri/",
-		},
 		StreamIdleTimeout:               kubeCfg.StreamingConnectionIdleTimeout.Duration,
 		StreamCreationTimeout:           streaming.DefaultConfig.StreamCreationTimeout,
 		SupportedRemoteCommandProtocols: streaming.DefaultConfig.SupportedRemoteCommandProtocols,
 		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
-	if kubeDeps.TLSOptions != nil {
-		config.TLSConfig = kubeDeps.TLSOptions.Config
+	if !crOptions.RedirectContainerStreaming {
+		config.Addr = net.JoinHostPort("localhost", "0")
+	} else {
+		// Use a relative redirect (no scheme or host).
+		config.BaseURL = &url.URL{
+			Path: "/cri/",
+		}
+		if kubeDeps.TLSOptions != nil {
+			config.TLSConfig = kubeDeps.TLSOptions.Config
+		}
 	}
 	return config
 }
