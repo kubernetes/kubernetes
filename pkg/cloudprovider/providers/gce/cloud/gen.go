@@ -43,6 +43,7 @@ type Cloud interface {
 	BetaAddresses() BetaAddresses
 	GlobalAddresses() GlobalAddresses
 	BackendServices() BackendServices
+	BetaBackendServices() BetaBackendServices
 	AlphaBackendServices() AlphaBackendServices
 	RegionBackendServices() RegionBackendServices
 	AlphaRegionBackendServices() AlphaRegionBackendServices
@@ -65,6 +66,7 @@ type Cloud interface {
 	Projects() Projects
 	Regions() Regions
 	Routes() Routes
+	BetaSecurityPolicies() BetaSecurityPolicies
 	SslCertificates() SslCertificates
 	TargetHttpProxies() TargetHttpProxies
 	TargetHttpsProxies() TargetHttpsProxies
@@ -81,6 +83,7 @@ func NewGCE(s *Service) *GCE {
 		gceBetaAddresses:              &GCEBetaAddresses{s},
 		gceGlobalAddresses:            &GCEGlobalAddresses{s},
 		gceBackendServices:            &GCEBackendServices{s},
+		gceBetaBackendServices:        &GCEBetaBackendServices{s},
 		gceAlphaBackendServices:       &GCEAlphaBackendServices{s},
 		gceRegionBackendServices:      &GCERegionBackendServices{s},
 		gceAlphaRegionBackendServices: &GCEAlphaRegionBackendServices{s},
@@ -103,6 +106,7 @@ func NewGCE(s *Service) *GCE {
 		gceProjects:                   &GCEProjects{s},
 		gceRegions:                    &GCERegions{s},
 		gceRoutes:                     &GCERoutes{s},
+		gceBetaSecurityPolicies:       &GCEBetaSecurityPolicies{s},
 		gceSslCertificates:            &GCESslCertificates{s},
 		gceTargetHttpProxies:          &GCETargetHttpProxies{s},
 		gceTargetHttpsProxies:         &GCETargetHttpsProxies{s},
@@ -123,6 +127,7 @@ type GCE struct {
 	gceBetaAddresses              *GCEBetaAddresses
 	gceGlobalAddresses            *GCEGlobalAddresses
 	gceBackendServices            *GCEBackendServices
+	gceBetaBackendServices        *GCEBetaBackendServices
 	gceAlphaBackendServices       *GCEAlphaBackendServices
 	gceRegionBackendServices      *GCERegionBackendServices
 	gceAlphaRegionBackendServices *GCEAlphaRegionBackendServices
@@ -145,6 +150,7 @@ type GCE struct {
 	gceProjects                   *GCEProjects
 	gceRegions                    *GCERegions
 	gceRoutes                     *GCERoutes
+	gceBetaSecurityPolicies       *GCEBetaSecurityPolicies
 	gceSslCertificates            *GCESslCertificates
 	gceTargetHttpProxies          *GCETargetHttpProxies
 	gceTargetHttpsProxies         *GCETargetHttpsProxies
@@ -176,6 +182,11 @@ func (gce *GCE) GlobalAddresses() GlobalAddresses {
 // BackendServices returns the interface for the ga BackendServices.
 func (gce *GCE) BackendServices() BackendServices {
 	return gce.gceBackendServices
+}
+
+// BetaBackendServices returns the interface for the beta BackendServices.
+func (gce *GCE) BetaBackendServices() BetaBackendServices {
+	return gce.gceBetaBackendServices
 }
 
 // AlphaBackendServices returns the interface for the alpha BackendServices.
@@ -288,6 +299,11 @@ func (gce *GCE) Routes() Routes {
 	return gce.gceRoutes
 }
 
+// BetaSecurityPolicies returns the interface for the beta SecurityPolicies.
+func (gce *GCE) BetaSecurityPolicies() BetaSecurityPolicies {
+	return gce.gceBetaSecurityPolicies
+}
+
 // SslCertificates returns the interface for the ga SslCertificates.
 func (gce *GCE) SslCertificates() SslCertificates {
 	return gce.gceSslCertificates
@@ -338,6 +354,7 @@ func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 	mockRegionDisksObjs := map[meta.Key]*MockRegionDisksObj{}
 	mockRegionsObjs := map[meta.Key]*MockRegionsObj{}
 	mockRoutesObjs := map[meta.Key]*MockRoutesObj{}
+	mockSecurityPoliciesObjs := map[meta.Key]*MockSecurityPoliciesObj{}
 	mockSslCertificatesObjs := map[meta.Key]*MockSslCertificatesObj{}
 	mockTargetHttpProxiesObjs := map[meta.Key]*MockTargetHttpProxiesObj{}
 	mockTargetHttpsProxiesObjs := map[meta.Key]*MockTargetHttpsProxiesObj{}
@@ -351,6 +368,7 @@ func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 		MockBetaAddresses:              NewMockBetaAddresses(projectRouter, mockAddressesObjs),
 		MockGlobalAddresses:            NewMockGlobalAddresses(projectRouter, mockGlobalAddressesObjs),
 		MockBackendServices:            NewMockBackendServices(projectRouter, mockBackendServicesObjs),
+		MockBetaBackendServices:        NewMockBetaBackendServices(projectRouter, mockBackendServicesObjs),
 		MockAlphaBackendServices:       NewMockAlphaBackendServices(projectRouter, mockBackendServicesObjs),
 		MockRegionBackendServices:      NewMockRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
 		MockAlphaRegionBackendServices: NewMockAlphaRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
@@ -373,6 +391,7 @@ func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 		MockProjects:                   NewMockProjects(projectRouter, mockProjectsObjs),
 		MockRegions:                    NewMockRegions(projectRouter, mockRegionsObjs),
 		MockRoutes:                     NewMockRoutes(projectRouter, mockRoutesObjs),
+		MockBetaSecurityPolicies:       NewMockBetaSecurityPolicies(projectRouter, mockSecurityPoliciesObjs),
 		MockSslCertificates:            NewMockSslCertificates(projectRouter, mockSslCertificatesObjs),
 		MockTargetHttpProxies:          NewMockTargetHttpProxies(projectRouter, mockTargetHttpProxiesObjs),
 		MockTargetHttpsProxies:         NewMockTargetHttpsProxies(projectRouter, mockTargetHttpsProxiesObjs),
@@ -393,6 +412,7 @@ type MockGCE struct {
 	MockBetaAddresses              *MockBetaAddresses
 	MockGlobalAddresses            *MockGlobalAddresses
 	MockBackendServices            *MockBackendServices
+	MockBetaBackendServices        *MockBetaBackendServices
 	MockAlphaBackendServices       *MockAlphaBackendServices
 	MockRegionBackendServices      *MockRegionBackendServices
 	MockAlphaRegionBackendServices *MockAlphaRegionBackendServices
@@ -415,6 +435,7 @@ type MockGCE struct {
 	MockProjects                   *MockProjects
 	MockRegions                    *MockRegions
 	MockRoutes                     *MockRoutes
+	MockBetaSecurityPolicies       *MockBetaSecurityPolicies
 	MockSslCertificates            *MockSslCertificates
 	MockTargetHttpProxies          *MockTargetHttpProxies
 	MockTargetHttpsProxies         *MockTargetHttpsProxies
@@ -446,6 +467,11 @@ func (mock *MockGCE) GlobalAddresses() GlobalAddresses {
 // BackendServices returns the interface for the ga BackendServices.
 func (mock *MockGCE) BackendServices() BackendServices {
 	return mock.MockBackendServices
+}
+
+// BetaBackendServices returns the interface for the beta BackendServices.
+func (mock *MockGCE) BetaBackendServices() BetaBackendServices {
+	return mock.MockBetaBackendServices
 }
 
 // AlphaBackendServices returns the interface for the alpha BackendServices.
@@ -558,6 +584,11 @@ func (mock *MockGCE) Routes() Routes {
 	return mock.MockRoutes
 }
 
+// BetaSecurityPolicies returns the interface for the beta SecurityPolicies.
+func (mock *MockGCE) BetaSecurityPolicies() BetaSecurityPolicies {
+	return mock.MockBetaSecurityPolicies
+}
+
 // SslCertificates returns the interface for the ga SslCertificates.
 func (mock *MockGCE) SslCertificates() SslCertificates {
 	return mock.MockSslCertificates
@@ -650,6 +681,19 @@ func (m *MockBackendServicesObj) ToAlpha() *alpha.BackendService {
 	ret := &alpha.BackendService{}
 	if err := copyViaJSON(ret, m.Obj); err != nil {
 		glog.Errorf("Could not convert %T to *alpha.BackendService via JSON: %v", m.Obj, err)
+	}
+	return ret
+}
+
+// ToBeta retrieves the given version of the object.
+func (m *MockBackendServicesObj) ToBeta() *beta.BackendService {
+	if ret, ok := m.Obj.(*beta.BackendService); ok {
+		return ret
+	}
+	// Convert the object via JSON copying to the type that was requested.
+	ret := &beta.BackendService{}
+	if err := copyViaJSON(ret, m.Obj); err != nil {
+		glog.Errorf("Could not convert %T to *beta.BackendService via JSON: %v", m.Obj, err)
 	}
 	return ret
 }
@@ -1061,6 +1105,26 @@ func (m *MockRoutesObj) ToGA() *ga.Route {
 	ret := &ga.Route{}
 	if err := copyViaJSON(ret, m.Obj); err != nil {
 		glog.Errorf("Could not convert %T to *ga.Route via JSON: %v", m.Obj, err)
+	}
+	return ret
+}
+
+// MockSecurityPoliciesObj is used to store the various object versions in the shared
+// map of mocked objects. This allows for multiple API versions to co-exist and
+// share the same "view" of the objects in the backend.
+type MockSecurityPoliciesObj struct {
+	Obj interface{}
+}
+
+// ToBeta retrieves the given version of the object.
+func (m *MockSecurityPoliciesObj) ToBeta() *beta.SecurityPolicy {
+	if ret, ok := m.Obj.(*beta.SecurityPolicy); ok {
+		return ret
+	}
+	// Convert the object via JSON copying to the type that was requested.
+	ret := &beta.SecurityPolicy{}
+	if err := copyViaJSON(ret, m.Obj); err != nil {
+		glog.Errorf("Could not convert %T to *beta.SecurityPolicy via JSON: %v", m.Obj, err)
 	}
 	return ret
 }
@@ -2972,6 +3036,381 @@ func (g *GCEBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *ga
 	}
 	err = g.s.WaitForCompletion(ctx, op)
 	glog.V(4).Infof("GCEBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// BetaBackendServices is an interface that allows for mocking of BackendServices.
+type BetaBackendServices interface {
+	Get(ctx context.Context, key *meta.Key) (*beta.BackendService, error)
+	List(ctx context.Context, fl *filter.F) ([]*beta.BackendService, error)
+	Insert(ctx context.Context, key *meta.Key, obj *beta.BackendService) error
+	Delete(ctx context.Context, key *meta.Key) error
+	SetSecurityPolicy(context.Context, *meta.Key, *beta.SecurityPolicyReference) error
+}
+
+// NewMockBetaBackendServices returns a new mock for BackendServices.
+func NewMockBetaBackendServices(pr ProjectRouter, objs map[meta.Key]*MockBackendServicesObj) *MockBetaBackendServices {
+	mock := &MockBetaBackendServices{
+		ProjectRouter: pr,
+
+		Objects:     objs,
+		GetError:    map[meta.Key]error{},
+		InsertError: map[meta.Key]error{},
+		DeleteError: map[meta.Key]error{},
+	}
+	return mock
+}
+
+// MockBetaBackendServices is the mock for BackendServices.
+type MockBetaBackendServices struct {
+	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
+
+	// Objects maintained by the mock.
+	Objects map[meta.Key]*MockBackendServicesObj
+
+	// If an entry exists for the given key and operation, then the error
+	// will be returned instead of the operation.
+	GetError    map[meta.Key]error
+	ListError   *error
+	InsertError map[meta.Key]error
+	DeleteError map[meta.Key]error
+
+	// xxxHook allow you to intercept the standard processing of the mock in
+	// order to add your own logic. Return (true, _, _) to prevent the normal
+	// execution flow of the mock. Return (false, nil, nil) to continue with
+	// normal mock behavior/ after the hook function executes.
+	GetHook               func(ctx context.Context, key *meta.Key, m *MockBetaBackendServices) (bool, *beta.BackendService, error)
+	ListHook              func(ctx context.Context, fl *filter.F, m *MockBetaBackendServices) (bool, []*beta.BackendService, error)
+	InsertHook            func(ctx context.Context, key *meta.Key, obj *beta.BackendService, m *MockBetaBackendServices) (bool, error)
+	DeleteHook            func(ctx context.Context, key *meta.Key, m *MockBetaBackendServices) (bool, error)
+	SetSecurityPolicyHook func(context.Context, *meta.Key, *beta.SecurityPolicyReference, *MockBetaBackendServices) error
+
+	// X is extra state that can be used as part of the mock. Generated code
+	// will not use this field.
+	X interface{}
+}
+
+// Get returns the object from the mock.
+func (m *MockBetaBackendServices) Get(ctx context.Context, key *meta.Key) (*beta.BackendService, error) {
+	if m.GetHook != nil {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
+			glog.V(5).Infof("MockBetaBackendServices.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
+			return obj, err
+		}
+	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.GetError[*key]; ok {
+		glog.V(5).Infof("MockBetaBackendServices.Get(%v, %s) = nil, %v", ctx, key, err)
+		return nil, err
+	}
+	if obj, ok := m.Objects[*key]; ok {
+		typedObj := obj.ToBeta()
+		glog.V(5).Infof("MockBetaBackendServices.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
+		return typedObj, nil
+	}
+
+	err := &googleapi.Error{
+		Code:    http.StatusNotFound,
+		Message: fmt.Sprintf("MockBetaBackendServices %v not found", key),
+	}
+	glog.V(5).Infof("MockBetaBackendServices.Get(%v, %s) = nil, %v", ctx, key, err)
+	return nil, err
+}
+
+// List all of the objects in the mock.
+func (m *MockBetaBackendServices) List(ctx context.Context, fl *filter.F) ([]*beta.BackendService, error) {
+	if m.ListHook != nil {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
+			glog.V(5).Infof("MockBetaBackendServices.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
+			return objs, err
+		}
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if m.ListError != nil {
+		err := *m.ListError
+		glog.V(5).Infof("MockBetaBackendServices.List(%v, %v) = nil, %v", ctx, fl, err)
+
+		return nil, *m.ListError
+	}
+
+	var objs []*beta.BackendService
+	for _, obj := range m.Objects {
+		if !fl.Match(obj.ToBeta()) {
+			continue
+		}
+		objs = append(objs, obj.ToBeta())
+	}
+
+	glog.V(5).Infof("MockBetaBackendServices.List(%v, %v) = [%v items], nil", ctx, fl, len(objs))
+	return objs, nil
+}
+
+// Insert is a mock for inserting/creating a new object.
+func (m *MockBetaBackendServices) Insert(ctx context.Context, key *meta.Key, obj *beta.BackendService) error {
+	if m.InsertHook != nil {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
+			glog.V(5).Infof("MockBetaBackendServices.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+			return err
+		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.InsertError[*key]; ok {
+		glog.V(5).Infof("MockBetaBackendServices.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		return err
+	}
+	if _, ok := m.Objects[*key]; ok {
+		err := &googleapi.Error{
+			Code:    http.StatusConflict,
+			Message: fmt.Sprintf("MockBetaBackendServices %v exists", key),
+		}
+		glog.V(5).Infof("MockBetaBackendServices.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		return err
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "backendServices")
+	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "backendServices", key)
+
+	m.Objects[*key] = &MockBackendServicesObj{obj}
+	glog.V(5).Infof("MockBetaBackendServices.Insert(%v, %v, %+v) = nil", ctx, key, obj)
+	return nil
+}
+
+// Delete is a mock for deleting the object.
+func (m *MockBetaBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	if m.DeleteHook != nil {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
+			glog.V(5).Infof("MockBetaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+			return err
+		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.DeleteError[*key]; ok {
+		glog.V(5).Infof("MockBetaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+	if _, ok := m.Objects[*key]; !ok {
+		err := &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("MockBetaBackendServices %v not found", key),
+		}
+		glog.V(5).Infof("MockBetaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+
+	delete(m.Objects, *key)
+	glog.V(5).Infof("MockBetaBackendServices.Delete(%v, %v) = nil", ctx, key)
+	return nil
+}
+
+// Obj wraps the object for use in the mock.
+func (m *MockBetaBackendServices) Obj(o *beta.BackendService) *MockBackendServicesObj {
+	return &MockBackendServicesObj{o}
+}
+
+// SetSecurityPolicy is a mock for the corresponding method.
+func (m *MockBetaBackendServices) SetSecurityPolicy(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicyReference) error {
+	if m.SetSecurityPolicyHook != nil {
+		return m.SetSecurityPolicyHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// GCEBetaBackendServices is a simplifying adapter for the GCE BackendServices.
+type GCEBetaBackendServices struct {
+	s *Service
+}
+
+// Get the BackendService named by key.
+func (g *GCEBetaBackendServices) Get(ctx context.Context, key *meta.Key) (*beta.BackendService, error) {
+	glog.V(5).Infof("GCEBetaBackendServices.Get(%v, %v): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaBackendServices.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "BackendServices")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Get",
+		Version:   meta.Version("beta"),
+		Service:   "BackendServices",
+	}
+	glog.V(5).Infof("GCEBetaBackendServices.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
+		return nil, err
+	}
+	call := g.s.Beta.BackendServices.Get(projectID, key.Name)
+	call.Context(ctx)
+	v, err := call.Do()
+	glog.V(4).Infof("GCEBetaBackendServices.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
+}
+
+// List all BackendService objects.
+func (g *GCEBetaBackendServices) List(ctx context.Context, fl *filter.F) ([]*beta.BackendService, error) {
+	glog.V(5).Infof("GCEBetaBackendServices.List(%v, %v) called", ctx, fl)
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "BackendServices")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "List",
+		Version:   meta.Version("beta"),
+		Service:   "BackendServices",
+	}
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		return nil, err
+	}
+	glog.V(5).Infof("GCEBetaBackendServices.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
+	call := g.s.Beta.BackendServices.List(projectID)
+	if fl != filter.None {
+		call.Filter(fl.String())
+	}
+	var all []*beta.BackendService
+	f := func(l *beta.BackendServiceList) error {
+		glog.V(5).Infof("GCEBetaBackendServices.List(%v, ..., %v): page %+v", ctx, fl, l)
+		all = append(all, l.Items...)
+		return nil
+	}
+	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
+		return nil, err
+	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEBetaBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEBetaBackendServices.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
+	return all, nil
+}
+
+// Insert BackendService with key of value obj.
+func (g *GCEBetaBackendServices) Insert(ctx context.Context, key *meta.Key, obj *beta.BackendService) error {
+	glog.V(5).Infof("GCEBetaBackendServices.Insert(%v, %v, %+v): called", ctx, key, obj)
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaBackendServices.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "BackendServices")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Insert",
+		Version:   meta.Version("beta"),
+		Service:   "BackendServices",
+	}
+	glog.V(5).Infof("GCEBetaBackendServices.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	obj.Name = key.Name
+	call := g.s.Beta.BackendServices.Insert(projectID, obj)
+	call.Context(ctx)
+
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.Insert(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaBackendServices.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
+}
+
+// Delete the BackendService referenced by key.
+func (g *GCEBetaBackendServices) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEBetaBackendServices.Delete(%v, %v): called", ctx, key)
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaBackendServices.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "BackendServices")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Delete",
+		Version:   meta.Version("beta"),
+		Service:   "BackendServices",
+	}
+	glog.V(5).Infof("GCEBetaBackendServices.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.BackendServices.Delete(projectID, key.Name)
+
+	call.Context(ctx)
+
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+	return err
+}
+
+// SetSecurityPolicy is a method on GCEBetaBackendServices.
+func (g *GCEBetaBackendServices) SetSecurityPolicy(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicyReference) error {
+	glog.V(5).Infof("GCEBetaBackendServices.SetSecurityPolicy(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaBackendServices.SetSecurityPolicy(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "BackendServices")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "SetSecurityPolicy",
+		Version:   meta.Version("beta"),
+		Service:   "BackendServices",
+	}
+	glog.V(5).Infof("GCEBetaBackendServices.SetSecurityPolicy(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.SetSecurityPolicy(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.BackendServices.SetSecurityPolicy(projectID, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.SetSecurityPolicy(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaBackendServices.SetSecurityPolicy(%v, %v, ...) = %+v", ctx, key, err)
 	return err
 }
 
@@ -11090,6 +11529,338 @@ func (g *GCERoutes) Delete(ctx context.Context, key *meta.Key) error {
 	return err
 }
 
+// BetaSecurityPolicies is an interface that allows for mocking of SecurityPolicies.
+type BetaSecurityPolicies interface {
+	Get(ctx context.Context, key *meta.Key) (*beta.SecurityPolicy, error)
+	List(ctx context.Context, fl *filter.F) ([]*beta.SecurityPolicy, error)
+	Insert(ctx context.Context, key *meta.Key, obj *beta.SecurityPolicy) error
+	Delete(ctx context.Context, key *meta.Key) error
+}
+
+// NewMockBetaSecurityPolicies returns a new mock for SecurityPolicies.
+func NewMockBetaSecurityPolicies(pr ProjectRouter, objs map[meta.Key]*MockSecurityPoliciesObj) *MockBetaSecurityPolicies {
+	mock := &MockBetaSecurityPolicies{
+		ProjectRouter: pr,
+
+		Objects:     objs,
+		GetError:    map[meta.Key]error{},
+		InsertError: map[meta.Key]error{},
+		DeleteError: map[meta.Key]error{},
+	}
+	return mock
+}
+
+// MockBetaSecurityPolicies is the mock for SecurityPolicies.
+type MockBetaSecurityPolicies struct {
+	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
+
+	// Objects maintained by the mock.
+	Objects map[meta.Key]*MockSecurityPoliciesObj
+
+	// If an entry exists for the given key and operation, then the error
+	// will be returned instead of the operation.
+	GetError    map[meta.Key]error
+	ListError   *error
+	InsertError map[meta.Key]error
+	DeleteError map[meta.Key]error
+
+	// xxxHook allow you to intercept the standard processing of the mock in
+	// order to add your own logic. Return (true, _, _) to prevent the normal
+	// execution flow of the mock. Return (false, nil, nil) to continue with
+	// normal mock behavior/ after the hook function executes.
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockBetaSecurityPolicies) (bool, *beta.SecurityPolicy, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockBetaSecurityPolicies) (bool, []*beta.SecurityPolicy, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *beta.SecurityPolicy, m *MockBetaSecurityPolicies) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockBetaSecurityPolicies) (bool, error)
+
+	// X is extra state that can be used as part of the mock. Generated code
+	// will not use this field.
+	X interface{}
+}
+
+// Get returns the object from the mock.
+func (m *MockBetaSecurityPolicies) Get(ctx context.Context, key *meta.Key) (*beta.SecurityPolicy, error) {
+	if m.GetHook != nil {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
+			glog.V(5).Infof("MockBetaSecurityPolicies.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
+			return obj, err
+		}
+	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.GetError[*key]; ok {
+		glog.V(5).Infof("MockBetaSecurityPolicies.Get(%v, %s) = nil, %v", ctx, key, err)
+		return nil, err
+	}
+	if obj, ok := m.Objects[*key]; ok {
+		typedObj := obj.ToBeta()
+		glog.V(5).Infof("MockBetaSecurityPolicies.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
+		return typedObj, nil
+	}
+
+	err := &googleapi.Error{
+		Code:    http.StatusNotFound,
+		Message: fmt.Sprintf("MockBetaSecurityPolicies %v not found", key),
+	}
+	glog.V(5).Infof("MockBetaSecurityPolicies.Get(%v, %s) = nil, %v", ctx, key, err)
+	return nil, err
+}
+
+// List all of the objects in the mock.
+func (m *MockBetaSecurityPolicies) List(ctx context.Context, fl *filter.F) ([]*beta.SecurityPolicy, error) {
+	if m.ListHook != nil {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
+			glog.V(5).Infof("MockBetaSecurityPolicies.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
+			return objs, err
+		}
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if m.ListError != nil {
+		err := *m.ListError
+		glog.V(5).Infof("MockBetaSecurityPolicies.List(%v, %v) = nil, %v", ctx, fl, err)
+
+		return nil, *m.ListError
+	}
+
+	var objs []*beta.SecurityPolicy
+	for _, obj := range m.Objects {
+		if !fl.Match(obj.ToBeta()) {
+			continue
+		}
+		objs = append(objs, obj.ToBeta())
+	}
+
+	glog.V(5).Infof("MockBetaSecurityPolicies.List(%v, %v) = [%v items], nil", ctx, fl, len(objs))
+	return objs, nil
+}
+
+// Insert is a mock for inserting/creating a new object.
+func (m *MockBetaSecurityPolicies) Insert(ctx context.Context, key *meta.Key, obj *beta.SecurityPolicy) error {
+	if m.InsertHook != nil {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
+			glog.V(5).Infof("MockBetaSecurityPolicies.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+			return err
+		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.InsertError[*key]; ok {
+		glog.V(5).Infof("MockBetaSecurityPolicies.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		return err
+	}
+	if _, ok := m.Objects[*key]; ok {
+		err := &googleapi.Error{
+			Code:    http.StatusConflict,
+			Message: fmt.Sprintf("MockBetaSecurityPolicies %v exists", key),
+		}
+		glog.V(5).Infof("MockBetaSecurityPolicies.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		return err
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "securityPolicies")
+	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "securityPolicies", key)
+
+	m.Objects[*key] = &MockSecurityPoliciesObj{obj}
+	glog.V(5).Infof("MockBetaSecurityPolicies.Insert(%v, %v, %+v) = nil", ctx, key, obj)
+	return nil
+}
+
+// Delete is a mock for deleting the object.
+func (m *MockBetaSecurityPolicies) Delete(ctx context.Context, key *meta.Key) error {
+	if m.DeleteHook != nil {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
+			glog.V(5).Infof("MockBetaSecurityPolicies.Delete(%v, %v) = %v", ctx, key, err)
+			return err
+		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.DeleteError[*key]; ok {
+		glog.V(5).Infof("MockBetaSecurityPolicies.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+	if _, ok := m.Objects[*key]; !ok {
+		err := &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("MockBetaSecurityPolicies %v not found", key),
+		}
+		glog.V(5).Infof("MockBetaSecurityPolicies.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+
+	delete(m.Objects, *key)
+	glog.V(5).Infof("MockBetaSecurityPolicies.Delete(%v, %v) = nil", ctx, key)
+	return nil
+}
+
+// Obj wraps the object for use in the mock.
+func (m *MockBetaSecurityPolicies) Obj(o *beta.SecurityPolicy) *MockSecurityPoliciesObj {
+	return &MockSecurityPoliciesObj{o}
+}
+
+// GCEBetaSecurityPolicies is a simplifying adapter for the GCE SecurityPolicies.
+type GCEBetaSecurityPolicies struct {
+	s *Service
+}
+
+// Get the SecurityPolicy named by key.
+func (g *GCEBetaSecurityPolicies) Get(ctx context.Context, key *meta.Key) (*beta.SecurityPolicy, error) {
+	glog.V(5).Infof("GCEBetaSecurityPolicies.Get(%v, %v): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaSecurityPolicies.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "SecurityPolicies")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Get",
+		Version:   meta.Version("beta"),
+		Service:   "SecurityPolicies",
+	}
+	glog.V(5).Infof("GCEBetaSecurityPolicies.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
+		return nil, err
+	}
+	call := g.s.Beta.SecurityPolicies.Get(projectID, key.Name)
+	call.Context(ctx)
+	v, err := call.Do()
+	glog.V(4).Infof("GCEBetaSecurityPolicies.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
+}
+
+// List all SecurityPolicy objects.
+func (g *GCEBetaSecurityPolicies) List(ctx context.Context, fl *filter.F) ([]*beta.SecurityPolicy, error) {
+	glog.V(5).Infof("GCEBetaSecurityPolicies.List(%v, %v) called", ctx, fl)
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "SecurityPolicies")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "List",
+		Version:   meta.Version("beta"),
+		Service:   "SecurityPolicies",
+	}
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		return nil, err
+	}
+	glog.V(5).Infof("GCEBetaSecurityPolicies.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
+	call := g.s.Beta.SecurityPolicies.List(projectID)
+	if fl != filter.None {
+		call.Filter(fl.String())
+	}
+	var all []*beta.SecurityPolicy
+	f := func(l *beta.SecurityPolicyList) error {
+		glog.V(5).Infof("GCEBetaSecurityPolicies.List(%v, ..., %v): page %+v", ctx, fl, l)
+		all = append(all, l.Items...)
+		return nil
+	}
+	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
+		return nil, err
+	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEBetaSecurityPolicies.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
+	return all, nil
+}
+
+// Insert SecurityPolicy with key of value obj.
+func (g *GCEBetaSecurityPolicies) Insert(ctx context.Context, key *meta.Key, obj *beta.SecurityPolicy) error {
+	glog.V(5).Infof("GCEBetaSecurityPolicies.Insert(%v, %v, %+v): called", ctx, key, obj)
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaSecurityPolicies.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "SecurityPolicies")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Insert",
+		Version:   meta.Version("beta"),
+		Service:   "SecurityPolicies",
+	}
+	glog.V(5).Infof("GCEBetaSecurityPolicies.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	obj.Name = key.Name
+	call := g.s.Beta.SecurityPolicies.Insert(projectID, obj)
+	call.Context(ctx)
+
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.Insert(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaSecurityPolicies.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
+}
+
+// Delete the SecurityPolicy referenced by key.
+func (g *GCEBetaSecurityPolicies) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEBetaSecurityPolicies.Delete(%v, %v): called", ctx, key)
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaSecurityPolicies.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "SecurityPolicies")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Delete",
+		Version:   meta.Version("beta"),
+		Service:   "SecurityPolicies",
+	}
+	glog.V(5).Infof("GCEBetaSecurityPolicies.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.SecurityPolicies.Delete(projectID, key.Name)
+
+	call.Context(ctx)
+
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaSecurityPolicies.Delete(%v, %v) = %v", ctx, key, err)
+	return err
+}
+
 // SslCertificates is an interface that allows for mocking of SslCertificates.
 type SslCertificates interface {
 	Get(ctx context.Context, key *meta.Key) (*ga.SslCertificate, error)
@@ -13302,6 +14073,12 @@ func NewRegionsResourceID(project, name string) *ResourceID {
 func NewRoutesResourceID(project, name string) *ResourceID {
 	key := meta.GlobalKey(name)
 	return &ResourceID{project, "routes", key}
+}
+
+// NewSecurityPoliciesResourceID creates a ResourceID for the SecurityPolicies resource.
+func NewSecurityPoliciesResourceID(project, name string) *ResourceID {
+	key := meta.GlobalKey(name)
+	return &ResourceID{project, "securityPolicies", key}
 }
 
 // NewSslCertificatesResourceID creates a ResourceID for the SslCertificates resource.
