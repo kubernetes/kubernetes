@@ -144,7 +144,7 @@ func jobHasDesiredParallelism(jobClient batchclient.JobsGetter, job *batch.Job) 
 
 		// otherwise count successful
 		progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
-		return progress == 0, nil
+		return progress <= 0, nil
 	}
 }
 
