@@ -38,6 +38,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
@@ -114,7 +115,7 @@ type RollingUpdateOptions struct {
 
 func NewRollingUpdateOptions(streams genericclioptions.IOStreams) *RollingUpdateOptions {
 	return &RollingUpdateOptions{
-		PrintFlags:      printers.NewPrintFlags("rolling updated", legacyscheme.Scheme),
+		PrintFlags:      printers.NewPrintFlags("rolling updated").WithTypeSetter(scheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
 		DeploymentKey:   "deployment",
 		Timeout:         timeout,

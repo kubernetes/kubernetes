@@ -161,8 +161,8 @@ func NewGetPrintFlags(scheme runtime.ObjectConvertor) *PrintFlags {
 		OutputFormat: &outputFormat,
 		NoHeaders:    &noHeaders,
 
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme),
-		NamePrintFlags:     printers.NewNamePrintFlags("", scheme),
+		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+		NamePrintFlags:     printers.NewNamePrintFlags(""),
 		TemplateFlags:      printers.NewKubeTemplatePrintFlags(),
 		HumanReadableFlags: NewHumanPrintFlags(),
 		CustomColumnsFlags: printers.NewCustomColumnsPrintFlags(),

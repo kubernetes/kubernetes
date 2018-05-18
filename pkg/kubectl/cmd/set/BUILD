@@ -19,7 +19,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/set",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_set_CONSUMERS"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
