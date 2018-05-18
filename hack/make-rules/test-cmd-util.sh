@@ -2382,7 +2382,11 @@ run_namespace_tests() {
   # Post-condition: namespace 'my-namespace' is created.
   kube::test::get_object_assert 'namespaces/my-namespace' "{{$id_field}}" 'my-namespace'
   # Clean up
-  kubectl delete namespace my-namespace
+  kubectl delete namespace my-namespace --wait=false
+  # make sure that wait properly waits for finalization
+  kubectl wait --for=delete ns/my-namespace
+  output_message=$(! kubectl get ns/my-namespace 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" ' not found'
 
   ######################
   # Pods in Namespaces #
