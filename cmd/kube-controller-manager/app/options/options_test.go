@@ -34,7 +34,7 @@ import (
 
 func TestAddFlags(t *testing.T) {
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s := NewKubeControllerManagerOptions()
+	s, _ := NewKubeControllerManagerOptions()
 	s.AddFlags(f, []string{""}, []string{""})
 
 	args := []string{
