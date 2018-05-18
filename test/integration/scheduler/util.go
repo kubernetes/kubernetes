@@ -137,7 +137,8 @@ func initTestScheduler(
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
 	// feature gate is enabled at the same time.
-	return initTestSchedulerWithOptions(t, context, controllerCh, setPodInformer, policy, false)
+	// As of now, disabling equivalence cache. Re-enable when moving to beta.
+	return initTestSchedulerWithOptions(t, context, controllerCh, setPodInformer, policy, false, false)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -149,12 +150,15 @@ func initTestSchedulerWithOptions(
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 	disablePreemption bool,
+	enableEcache bool,
 ) *TestContext {
-	// Enable EnableEquivalenceClassCache for all integration tests.
+	// Disable EnableEquivalenceClassCache for all integration tests till it promotes to beta
+	// as it is causing some tests to fail.
+	// https://github.com/kubernetes/kubernetes/issues/63427
 	defer utilfeaturetesting.SetFeatureGateDuringTest(
 		t,
 		utilfeature.DefaultFeatureGate,
-		features.EnableEquivalenceClassCache, true)()
+		features.EnableEquivalenceClassCache, enableEcache)()
 
 	// 1. Create scheduler
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, time.Second)
@@ -228,7 +232,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	return initTestSchedulerWithOptions(
-		t, initTestMaster(t, nsPrefix, nil), nil, true, nil, true)
+		t, initTestMaster(t, nsPrefix, nil), nil, true, nil, true, false)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called
