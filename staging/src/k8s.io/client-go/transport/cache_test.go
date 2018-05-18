@@ -17,6 +17,7 @@ limitations under the License.
 package transport
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"testing"
@@ -52,10 +53,11 @@ func TestTLSConfigKey(t *testing.T) {
 	}
 
 	// Make sure config fields that affect the tls config affect the cache key
+	dialer := net.Dialer{}
 	uniqueConfigurations := map[string]*Config{
 		"no tls":   {},
-		"dialer":   {Dial: net.Dial},
-		"dialer2":  {Dial: func(network, address string) (net.Conn, error) { return nil, nil }},
+		"dialer":   {Dial: dialer.DialContext},
+		"dialer2":  {Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil }},
 		"insecure": {TLS: TLSConfig{Insecure: true}},
 		"cadata 1": {TLS: TLSConfig{CAData: []byte{1}}},
 		"cadata 2": {TLS: TLSConfig{CAData: []byte{2}}},
