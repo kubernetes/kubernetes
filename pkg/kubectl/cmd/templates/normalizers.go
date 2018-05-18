@@ -18,6 +18,7 @@ package templates
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/russross/blackfriday"
@@ -39,7 +40,7 @@ func Examples(s string) string {
 	if len(s) == 0 {
 		return s
 	}
-	return normalizer{s}.trim().indent().string
+	return normalizer{s}.indent().string
 }
 
 // Normalize perform all required normalizations on a given command.
@@ -85,13 +86,31 @@ func (s normalizer) trim() normalizer {
 	return s
 }
 
+// indent() normalizes indentation in a (possibly multi-line) string so that
+// the base indentation level is replaced with normalizers.Indentation,
+// while internal indentation is preserved.
+// For example, given the input string:
+//       First line with base indentation of six spaces
+//         Second line is additionally indented
+// The indent() method returns:
+//   First line with base indentation of six spaces
+//     Second line is additionally indented
 func (s normalizer) indent() normalizer {
 	indentedLines := []string{}
+	var baseIndentation *string
 	for _, line := range strings.Split(s.string, "\n") {
-		trimmed := strings.TrimSpace(line)
+		if baseIndentation == nil {
+			if len(strings.TrimSpace(line)) == 0 {
+				continue // skip initial lines that only contain whitespace
+			}
+			whitespaceAtFront := line[:strings.Index(line, strings.TrimSpace(line))]
+			baseIndentation = &whitespaceAtFront
+		}
+		trimmed := strings.TrimPrefix(line, *baseIndentation)
 		indented := Indentation + trimmed
 		indentedLines = append(indentedLines, indented)
 	}
-	s.string = strings.Join(indentedLines, "\n")
+	indentedString := strings.Join(indentedLines, "\n")
+	s.string = strings.TrimRightFunc(indentedString, unicode.IsSpace)
 	return s
 }
