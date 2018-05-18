@@ -23,12 +23,14 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestPrinterSupportsExpectedJSONYamlFormats(t *testing.T) {
-	testObject := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	testObject := &v1.Pod{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+	}
 
 	testCases := []struct {
 		name           string
@@ -60,7 +62,7 @@ func TestPrinterSupportsExpectedJSONYamlFormats(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := printers.JSONYamlPrintFlags{Scheme: legacyscheme.Scheme}
+			printFlags := printers.JSONYamlPrintFlags{}
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {

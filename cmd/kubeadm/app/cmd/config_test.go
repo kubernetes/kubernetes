@@ -26,7 +26,7 @@ import (
 
 	"github.com/renstrom/dedent"
 
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
@@ -35,7 +35,7 @@ const (
 	defaultNumberOfImages = 8
 )
 
-func TestNewCmdConfigListImages(t *testing.T) {
+func TestNewCmdConfigImagesList(t *testing.T) {
 	var output bytes.Buffer
 	images := cmd.NewCmdConfigImagesList(&output)
 	images.Run(nil, nil)
@@ -62,12 +62,12 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			name:               "set k8s version",
 			expectedImageCount: defaultNumberOfImages,
 			expectedImageSubstrings: []string{
-				":v1.9.1",
+				":v1.10.1",
 			},
 			configContents: []byte(dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1alpha1
+				apiVersion: kubeadm.k8s.io/v1alpha2
 				kind: MasterConfiguration
-				kubernetesVersion: 1.9.1
+				kubernetesVersion: 1.10.1
 			`)),
 		},
 		{
@@ -77,7 +77,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				"coredns",
 			},
 			configContents: []byte(dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1alpha1
+				apiVersion: kubeadm.k8s.io/v1alpha2
 				kind: MasterConfiguration
 				featureGates:
 				    CoreDNS: True
@@ -99,7 +99,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := cmd.NewImagesList(configFilePath, &kubeadmapiv1alpha1.MasterConfiguration{})
+			i, err := cmd.NewImagesList(configFilePath, &kubeadmapiv1alpha2.MasterConfiguration{})
 			if err != nil {
 				t.Fatalf("Failed getting the kubeadm images command: %v", err)
 			}
@@ -124,7 +124,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1alpha1.MasterConfiguration
+		cfg            kubeadmapiv1alpha2.MasterConfiguration
 		expectedImages int
 	}{
 		{
@@ -133,8 +133,8 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiv1alpha1.MasterConfiguration{
-				Etcd: kubeadmapiv1alpha1.Etcd{
+			cfg: kubeadmapiv1alpha2.MasterConfiguration{
+				Etcd: kubeadmapiv1alpha2.Etcd{
 					Endpoints: []string{"hi"},
 				},
 			},
@@ -142,7 +142,7 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiv1alpha1.MasterConfiguration{
+			cfg: kubeadmapiv1alpha2.MasterConfiguration{
 				FeatureGates: map[string]bool{
 					features.CoreDNS: true,
 				},
@@ -168,5 +168,29 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 				t.Fatalf("expected %v images but got %v", tc.expectedImages, actual)
 			}
 		})
+	}
+}
+
+type fakePuller struct {
+	count map[string]int
+}
+
+func (f *fakePuller) Pull(image string) error {
+	f.count[image]++
+	return nil
+}
+
+func TestImagesPull(t *testing.T) {
+	puller := &fakePuller{
+		count: make(map[string]int),
+	}
+	images := []string{"a", "b", "c", "d", "a"}
+	ip := cmd.NewImagesPull(puller, images)
+	err := ip.PullAll()
+	if err != nil {
+		t.Fatalf("expected nil but found %v", err)
+	}
+	if puller.count["a"] != 2 {
+		t.Fatalf("expected 2 but found %v", puller.count["a"])
 	}
 }

@@ -24,7 +24,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -56,21 +55,15 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
-type RESTClientGetter interface {
-	ToRESTConfig() (*restclient.Config, error)
-	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
-	ToRESTMapper() (meta.RESTMapper, error)
-	ToRawKubeConfigLoader() clientcmd.ClientConfig
-}
-
 type ring0Factory struct {
-	clientGetter RESTClientGetter
+	clientGetter genericclioptions.RESTClientGetter
 }
 
-func NewClientAccessFactory(clientGetter RESTClientGetter) ClientAccessFactory {
+func NewClientAccessFactory(clientGetter genericclioptions.RESTClientGetter) ClientAccessFactory {
 	if clientGetter == nil {
 		panic("attempt to instantiate client_access_factory with nil clientGetter")
 	}
@@ -82,24 +75,24 @@ func NewClientAccessFactory(clientGetter RESTClientGetter) ClientAccessFactory {
 	return f
 }
 
-func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
+func (f *ring0Factory) ToRESTConfig() (*restclient.Config, error) {
 	return f.clientGetter.ToRESTConfig()
 }
 
-func (f *ring0Factory) RESTMapper() (meta.RESTMapper, error) {
+func (f *ring0Factory) ToRESTMapper() (meta.RESTMapper, error) {
 	return f.clientGetter.ToRESTMapper()
 }
 
-func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
-	return f.clientGetter.ToRESTConfig()
-}
-
-func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (f *ring0Factory) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	return f.clientGetter.ToDiscoveryClient()
 }
 
+func (f *ring0Factory) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+	return f.clientGetter.ToRawKubeConfigLoader()
+}
+
 func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +100,7 @@ func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 }
 
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +108,7 @@ func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 }
 
 func (f *ring0Factory) DynamicClient() (dynamic.Interface, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +121,7 @@ func (f *ring0Factory) NewBuilder() *resource.Builder {
 }
 
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -576,23 +569,6 @@ func (f *ring0Factory) CanBeAutoscaled(kind schema.GroupKind) error {
 		return fmt.Errorf("cannot autoscale a %v", kind)
 	}
 	return nil
-}
-
-func (f *ring0Factory) EditorEnvs() []string {
-	return []string{"KUBE_EDITOR", "EDITOR"}
-}
-
-// overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
-var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
-
-// computeDiscoverCacheDir takes the parentDir and the host and comes up with a "usually non-colliding" name.
-func computeDiscoverCacheDir(parentDir, host string) string {
-	// strip the optional scheme from host if its there:
-	schemelessHost := strings.Replace(strings.Replace(host, "https://", "", 1), "http://", "", 1)
-	// now do a simple collapse of non-AZ09 characters.  Collisions are possible but unlikely.  Even if we do collide the problem is short lived
-	safeHost := overlyCautiousIllegalFileCharacters.ReplaceAllString(schemelessHost, "_")
-
-	return filepath.Join(parentDir, safeHost)
 }
 
 // this method exists to help us find the points still relying on internal types.

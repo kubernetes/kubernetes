@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
@@ -91,7 +91,7 @@ func NewCmdKubeletWriteInitConfig() *cobra.Command {
 		Long:    kubeletWriteInitConfigLongDesc,
 		Example: kubeletWriteInitConfigExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := &kubeadmapiv1alpha1.MasterConfiguration{
+			cfg := &kubeadmapiv1alpha2.MasterConfiguration{
 				// KubernetesVersion is not used by kubelet init, but we set this explicitly to avoid
 				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 				KubernetesVersion: "v1.9.0",
@@ -125,7 +125,7 @@ func NewCmdKubeletUploadDynamicConfig() *cobra.Command {
 		Long:    kubeletUploadDynamicConfigLongDesc,
 		Example: kubeletUploadDynamicConfigExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := &kubeadmapiv1alpha1.MasterConfiguration{
+			cfg := &kubeadmapiv1alpha2.MasterConfiguration{
 				// KubernetesVersion is not used by kubelet upload, but we set this explicitly to avoid
 				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 				KubernetesVersion: "v1.9.0",
@@ -154,7 +154,7 @@ func NewCmdKubeletUploadDynamicConfig() *cobra.Command {
 
 // NewCmdKubeletEnableDynamicConfig calls cobra.Command for enabling dynamic kubelet configuration on node
 func NewCmdKubeletEnableDynamicConfig() *cobra.Command {
-	cfg := &kubeadmapiv1alpha1.NodeConfiguration{}
+	cfg := &kubeadmapiv1alpha2.NodeConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath string
@@ -182,7 +182,7 @@ func NewCmdKubeletEnableDynamicConfig() *cobra.Command {
 	return cmd
 }
 
-func getNodeName(cfgPath string, cfg *kubeadmapiv1alpha1.NodeConfiguration) (string, error) {
+func getNodeName(cfgPath string, cfg *kubeadmapiv1alpha2.NodeConfiguration) (string, error) {
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {

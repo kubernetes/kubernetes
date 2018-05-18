@@ -24,9 +24,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 type CreateOptions struct {
@@ -350,7 +351,7 @@ type CreateSubcommandOptions struct {
 	Mapper        meta.RESTMapper
 	DynamicClient dynamic.Interface
 
-	PrintObj func(obj kruntime.Object) error
+	PrintObj printers.ResourcePrinterFunc
 
 	genericclioptions.IOStreams
 }
@@ -381,8 +382,8 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 		return err
 	}
 
-	o.PrintObj = func(obj kruntime.Object) error {
-		return printer.PrintObj(obj, o.Out)
+	o.PrintObj = func(obj kruntime.Object, out io.Writer) error {
+		return printer.PrintObj(obj, out)
 	}
 
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
@@ -395,7 +396,7 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 		return err
 	}
 
-	o.Mapper, err = f.RESTMapper()
+	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}
@@ -426,6 +427,7 @@ func (o *CreateSubcommandOptions) Run() error {
 		}
 
 		asUnstructured := &unstructured.Unstructured{}
+
 		if err := legacyscheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
 			return err
 		}
@@ -445,5 +447,5 @@ func (o *CreateSubcommandOptions) Run() error {
 		}
 	}
 
-	return o.PrintObj(obj)
+	return o.PrintObj(obj, o.Out)
 }

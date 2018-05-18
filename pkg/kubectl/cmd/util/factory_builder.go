@@ -19,13 +19,10 @@ limitations under the License.
 package util
 
 import (
-	"os"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/plugins"
 )
 
 type ring2Factory struct {
@@ -42,27 +39,8 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-// PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.
-// If this env var is not set, it defaults to
-//   "~/.kube/plugins", plus
-//  "./kubectl/plugins" directory under the "data dir" directory specified by the XDG
-// system directory structure spec for the given platform.
-func (f *ring2Factory) PluginLoader() plugins.PluginLoader {
-	if len(os.Getenv("KUBECTL_PLUGINS_PATH")) > 0 {
-		return plugins.KubectlPluginsPathPluginLoader()
-	}
-	return plugins.TolerantMultiPluginLoader{
-		plugins.XDGDataDirsPluginLoader(),
-		plugins.UserDirPluginLoader(),
-	}
-}
-
-func (f *ring2Factory) PluginRunner() plugins.PluginRunner {
-	return &plugins.ExecPluginRunner{}
-}
-
 func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
-	discoClient, err := f.clientAccessFactory.DiscoveryClient()
+	discoClient, err := f.clientAccessFactory.ToDiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
@@ -71,21 +49,12 @@ func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
 		return nil, err
 	}
 	resolver := scaleclient.NewDiscoveryScaleKindResolver(discoClient)
-	mapper, err := f.clientAccessFactory.RESTMapper()
+	mapper, err := f.clientAccessFactory.ToRESTMapper()
 	if err != nil {
 		return nil, err
 	}
 
 	return scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
-}
-
-func (f *ring2Factory) Scaler() (kubectl.Scaler, error) {
-	scalesGetter, err := f.ScaleClient()
-	if err != nil {
-		return nil, err
-	}
-
-	return kubectl.NewScaler(scalesGetter), nil
 }
 
 func (f *ring2Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {

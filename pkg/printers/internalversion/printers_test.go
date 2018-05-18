@@ -59,6 +59,7 @@ func init() {
 }
 
 var testData = TestStruct{
+	TypeMeta:   metav1.TypeMeta{APIVersion: "foo/bar", Kind: "TestStruct"},
 	Key:        "testValue",
 	Map:        map[string]int{"TestSubkey": 1},
 	StringList: []string{"a", "b", "c"},
@@ -76,27 +77,6 @@ type TestStruct struct {
 
 func (in *TestStruct) DeepCopyObject() runtime.Object {
 	panic("never called")
-}
-
-func TestVersionedPrinter(t *testing.T) {
-	original := &TestPrintType{Data: "value"}
-	p := printers.NewVersionedPrinter(
-		printers.ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
-			if obj == original {
-				t.Fatalf("object should not be identical: %#v", obj)
-			}
-			if obj.(*TestPrintType).Data != "value" {
-				t.Fatalf("object was not converted: %#v", obj)
-			}
-			return nil
-		}),
-		legacyscheme.Scheme,
-		legacyscheme.Scheme,
-		schema.GroupVersion{Group: "", Version: "v1"},
-	)
-	if err := p.PrintObj(original, nil); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
 }
 
 func TestPrintUnstructuredObject(t *testing.T) {
@@ -253,6 +233,7 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 	}
 
 	obj := &v1.Pod{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 	}
 	buf.Reset()
@@ -274,11 +255,11 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 }
 
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, &printers.YAMLPrinter{}, yaml.Unmarshal)
+	testPrinter(t, printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.YAMLPrinter{}), yaml.Unmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, &printers.JSONPrinter{}, json.Unmarshal)
+	testPrinter(t, printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.JSONPrinter{}), json.Unmarshal)
 }
 
 func TestFormatResourceName(t *testing.T) {
@@ -384,38 +365,27 @@ func TestNamePrinter(t *testing.T) {
 			},
 			"pod/foo\n"},
 		"List": {
-			&v1.List{
-				TypeMeta: metav1.TypeMeta{
-					Kind: "List",
+			&unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
 				},
-				Items: []runtime.RawExtension{
+				Items: []unstructured.Unstructured{
 					{
-						Object: &v1.Pod{
-							TypeMeta: metav1.TypeMeta{
-								Kind: "Pod",
-							},
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "foo",
-							},
-						},
-					},
-					{
-						Object: &unstructured.Unstructured{
-							Object: map[string]interface{}{
-								"kind":       "Pod",
-								"apiVersion": "v1",
-								"metadata": map[string]interface{}{
-									"name": "bar",
-								},
+						Object: map[string]interface{}{
+							"kind":       "Pod",
+							"apiVersion": "v1",
+							"metadata": map[string]interface{}{
+								"name": "bar",
 							},
 						},
 					},
 				},
 			},
-			"pod/foo\npod/bar\n"},
+			"pod/bar\n"},
 	}
 
-	printFlags := printers.NewPrintFlags("", legacyscheme.Scheme).WithDefaultOutput("name")
+	printFlags := printers.NewPrintFlags("").WithTypeSetter(legacyscheme.Scheme).WithDefaultOutput("name")
 	printer, err := printFlags.ToPrinter()
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -438,15 +408,15 @@ func TestNamePrinter(t *testing.T) {
 func TestTemplateStrings(t *testing.T) {
 	// This unit tests the "exists" function as well as the template from update.sh
 	table := map[string]struct {
-		pod    api.Pod
+		pod    v1.Pod
 		expect string
 	}{
-		"nilInfo":   {api.Pod{}, "false"},
-		"emptyInfo": {api.Pod{Status: api.PodStatus{ContainerStatuses: []api.ContainerStatus{}}}, "false"},
+		"nilInfo":   {v1.Pod{}, "false"},
+		"emptyInfo": {v1.Pod{Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{}}}, "false"},
 		"fooExists": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "foo",
 						},
@@ -456,9 +426,9 @@ func TestTemplateStrings(t *testing.T) {
 			"false",
 		},
 		"barExists": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "bar",
 						},
@@ -468,9 +438,9 @@ func TestTemplateStrings(t *testing.T) {
 			"false",
 		},
 		"bothExist": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "foo",
 						},
@@ -483,16 +453,16 @@ func TestTemplateStrings(t *testing.T) {
 			"false",
 		},
 		"barValid": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "foo",
 						},
 						{
 							Name: "bar",
-							State: api.ContainerState{
-								Running: &api.ContainerStateRunning{
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{
 									StartedAt: metav1.Time{},
 								},
 							},
@@ -503,21 +473,21 @@ func TestTemplateStrings(t *testing.T) {
 			"false",
 		},
 		"bothValid": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "foo",
-							State: api.ContainerState{
-								Running: &api.ContainerStateRunning{
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{
 									StartedAt: metav1.Time{},
 								},
 							},
 						},
 						{
 							Name: "bar",
-							State: api.ContainerState{
-								Running: &api.ContainerStateRunning{
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{
 									StartedAt: metav1.Time{},
 								},
 							},
@@ -530,12 +500,10 @@ func TestTemplateStrings(t *testing.T) {
 	}
 	// The point of this test is to verify that the below template works.
 	tmpl := `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
-	p, err := printers.NewGoTemplatePrinter([]byte(tmpl))
+	printer, err := printers.NewGoTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
-
-	printer := printers.NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, schema.GroupVersion{Group: "", Version: "v1"})
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}
@@ -568,29 +536,23 @@ func TestPrinters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatePrinter = printers.NewVersionedPrinter(templatePrinter, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
 	templatePrinter2, err = printers.NewGoTemplatePrinter([]byte("{{len .items}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatePrinter2 = printers.NewVersionedPrinter(templatePrinter2, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
 	jsonpathPrinter, err = printers.NewJSONPathPrinter("{.metadata.name}")
 	if err != nil {
 		t.Fatal(err)
 	}
-	jsonpathPrinter = printers.NewVersionedPrinter(jsonpathPrinter, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
 	genericPrinters := map[string]printers.ResourcePrinter{
-		"json":      &printers.JSONPrinter{},
-		"yaml":      &printers.YAMLPrinter{},
+		"json":      printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.JSONPrinter{}),
+		"yaml":      printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.YAMLPrinter{}),
 		"template":  templatePrinter,
 		"template2": templatePrinter2,
 		"jsonpath":  jsonpathPrinter,
-		"name": &printers.NamePrinter{
-			Typer: legacyscheme.Scheme,
-		},
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &v1.Pod{ObjectMeta: om("pod")},

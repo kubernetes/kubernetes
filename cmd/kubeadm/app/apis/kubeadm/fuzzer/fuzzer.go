@@ -64,12 +64,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				Writable:  false,
 			}}
 			obj.Etcd.ExtraArgs = map[string]string{"foo": "foo"}
-			obj.Etcd.SelfHosted = &kubeadm.SelfHostedEtcd{
-				CertificatesDir:    "/etc/kubernetes/pki/etcd",
-				ClusterServiceName: "etcd-cluster",
-				EtcdVersion:        "v0.1.0",
-				OperatorVersion:    "v0.1.0",
-			}
 			obj.KubeletConfiguration = kubeadm.KubeletConfiguration{
 				BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 					StaticPodPath: "foo",

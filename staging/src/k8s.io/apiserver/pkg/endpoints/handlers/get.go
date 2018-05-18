@@ -208,19 +208,25 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 		if hasName {
 			// metadata.name is the canonical internal name.
-			// SelectionPredicate will notice that this is
-			// a request for a single object and optimize the
-			// storage query accordingly.
+			// SelectionPredicate will notice that this is a request for
+			// a single object and optimize the storage query accordingly.
 			nameSelector := fields.OneTermEqualSelector("metadata.name", name)
+
+			// Note that fieldSelector setting explicitly the "metadata.name"
+			// will result in reaching this branch (as the value of that field
+			// is propagated to requestInfo as the name parameter.
+			// That said, the allowed field selectors in this branch are:
+			// nil, fields.Everything and field selector matching metadata.name
+			// for our name.
 			if opts.FieldSelector != nil && !opts.FieldSelector.Empty() {
-				// It doesn't make sense to ask for both a name
-				// and a field selector, since just the name is
-				// sufficient to narrow down the request to a
-				// single object.
-				scope.err(errors.NewBadRequest("both a name and a field selector provided; please provide one or the other."), w, req)
-				return
+				selectedName, ok := opts.FieldSelector.RequiresExactMatch("metadata.name")
+				if !ok || name != selectedName {
+					scope.err(errors.NewBadRequest("fieldSelector metadata.name doesn't match requested name"), w, req)
+					return
+				}
+			} else {
+				opts.FieldSelector = nameSelector
 			}
-			opts.FieldSelector = nameSelector
 		}
 
 		if opts.Watch || forceWatch {

@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -101,7 +100,7 @@ func NewScaleOptions(ioStreams genericclioptions.IOStreams) *ScaleOptions {
 		// we only support "-o name" for this command, so only register the name printer
 		PrintFlags: &printers.PrintFlags{
 			OutputFormat:   &outputFormat,
-			NamePrintFlags: printers.NewNamePrintFlags("scaled", legacyscheme.Scheme),
+			NamePrintFlags: printers.NewNamePrintFlags("scaled"),
 		},
 		RecordFlags:     genericclioptions.NewRecordFlags(),
 		CurrentReplicas: -1,
@@ -168,7 +167,7 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	o.scaler, err = f.Scaler()
+	o.scaler, err = scaler(f)
 	if err != nil {
 		return err
 	}
@@ -287,4 +286,13 @@ func ScaleJob(info *resource.Info, jobsClient batchclient.JobsGetter, count uint
 	}
 
 	return scaler.Scale(info.Namespace, info.Name, count, jobPreconditions, jobRetry, jobWaitForReplicas)
+}
+
+func scaler(f cmdutil.Factory) (kubectl.Scaler, error) {
+	scalesGetter, err := f.ScaleClient()
+	if err != nil {
+		return nil, err
+	}
+
+	return kubectl.NewScaler(scalesGetter), nil
 }

@@ -274,8 +274,15 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		BashCompletionFunction: bashCompletionFunc,
 	}
 
-	kubeConfigFlags := cmdutil.NewConfigFlags()
-	kubeConfigFlags.AddFlags(cmds.PersistentFlags())
+	flags := cmds.PersistentFlags()
+	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
+
+	// Normalize all flags that are coming from other packages or pre-configurations
+	// a.k.a. change all "_" to "-". e.g. glog package
+	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+
+	kubeConfigFlags := genericclioptions.NewConfigFlags()
+	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
 

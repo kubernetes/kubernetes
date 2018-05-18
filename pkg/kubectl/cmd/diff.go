@@ -26,9 +26,11 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/apply/parse"
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
@@ -263,6 +265,7 @@ type Object interface {
 // InfoObject is an implementation of the Object interface. It gets all
 // the information from the Info object.
 type InfoObject struct {
+	Remote  runtime.Unstructured
 	Info    *resource.Info
 	Encoder runtime.Encoder
 	Parser  *parse.Factory
@@ -288,14 +291,10 @@ func (obj InfoObject) Local() (map[string]interface{}, error) {
 }
 
 func (obj InfoObject) Live() (map[string]interface{}, error) {
-	if obj.Info.Object == nil {
+	if obj.Remote == nil {
 		return nil, nil // Object doesn't exist on cluster.
 	}
-	data, err := runtime.Encode(obj.Encoder, obj.Info.Object)
-	if err != nil {
-		return nil, err
-	}
-	return obj.toMap(data)
+	return obj.Remote.UnstructuredContent(), nil
 }
 
 func (obj InfoObject) Merged() (map[string]interface{}, error) {
@@ -327,10 +326,10 @@ func (obj InfoObject) Merged() (map[string]interface{}, error) {
 }
 
 func (obj InfoObject) Last() (map[string]interface{}, error) {
-	if obj.Info.Object == nil {
+	if obj.Remote == nil {
 		return nil, nil // No object is live, return empty
 	}
-	accessor, err := meta.Accessor(obj.Info.Object)
+	accessor, err := meta.Accessor(obj.Remote)
 	if err != nil {
 		return nil, err
 	}
@@ -390,6 +389,50 @@ func (d *Differ) TearDown() {
 	d.To.Dir.Delete()   // Ignore error
 }
 
+type Downloader struct {
+	mapper  meta.RESTMapper
+	dclient dynamic.Interface
+	ns      string
+}
+
+func NewDownloader(f cmdutil.Factory) (*Downloader, error) {
+	var err error
+	var d Downloader
+
+	d.mapper, err = f.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
+	d.dclient, err = f.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	d.ns, _, _ = f.DefaultNamespace()
+
+	return &d, nil
+}
+
+func (d *Downloader) Download(info *resource.Info) (*unstructured.Unstructured, error) {
+	gvk := info.Object.GetObjectKind().GroupVersionKind()
+	mapping, err := d.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	var resource dynamic.ResourceInterface
+	switch mapping.Scope.Name() {
+	case meta.RESTScopeNameNamespace:
+		if info.Namespace == "" {
+			info.Namespace = d.ns
+		}
+		resource = d.dclient.Resource(mapping.Resource).Namespace(info.Namespace)
+	case meta.RESTScopeNameRoot:
+		resource = d.dclient.Resource(mapping.Resource)
+	}
+
+	return resource.Get(info.Name, metav1.GetOptions{})
+}
+
 // RunDiff uses the factory to parse file arguments, find the version to
 // diff, and find each Info object for each files, and runs against the
 // differ.
@@ -417,9 +460,15 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 		Unstructured().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		Local().
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
+		return err
+	}
+
+	dl, err := NewDownloader(f)
+	if err != nil {
 		return err
 	}
 
@@ -428,14 +477,9 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 			return err
 		}
 
-		if err := info.Get(); err != nil {
-			if !errors.IsNotFound(err) {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
-			}
-			info.Object = nil
-		}
-
+		remote, _ := dl.Download(info)
 		obj := InfoObject{
+			Remote:  remote,
 			Info:    info,
 			Parser:  parser,
 			Encoder: cmdutil.InternalVersionJSONEncoder(),

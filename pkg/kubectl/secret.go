@@ -130,6 +130,7 @@ func (s SecretGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		return nil, err
 	}
 	secret := &v1.Secret{}
+	secret.SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Secret"))
 	secret.Name = s.Name
 	secret.Data = map[string][]byte{}
 	if len(s.Type) > 0 {

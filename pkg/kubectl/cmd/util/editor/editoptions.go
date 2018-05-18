@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -89,7 +88,7 @@ func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *E
 
 		EditMode: editMode,
 
-		PrintFlags: printers.NewPrintFlags("edited", legacyscheme.Scheme),
+		PrintFlags: printers.NewPrintFlags("edited").WithTypeSetter(scheme.Scheme),
 
 		WindowsLineEndings: goruntime.GOOS == "windows",
 
@@ -185,7 +184,7 @@ func (o *EditOptions) Validate() error {
 }
 
 func (o *EditOptions) Run() error {
-	edit := NewDefaultEditor(o.f.EditorEnvs())
+	edit := NewDefaultEditor(editorEnvs())
 	// editFn is invoked for each edit session (once with a list for normal edit, once for each individual resource in a edit-on-create invocation)
 	editFn := func(infos []*resource.Info) error {
 		var (
@@ -810,4 +809,12 @@ func hashOnLineBreak(s string) string {
 		}
 	}
 	return r
+}
+
+// editorEnvs returns an ordered list of env vars to check for editor preferences.
+func editorEnvs() []string {
+	return []string{
+		"KUBE_EDITOR",
+		"EDITOR",
+	}
 }

@@ -18,34 +18,26 @@ package util
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -66,20 +58,11 @@ type Factory interface {
 	BuilderFactory
 }
 
-type DiscoveryClientFactory interface {
-	// Returns a discovery client
-	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
-
-	// BindFlags adds any discovery flags that are common to all kubectl sub commands.
-	BindFlags(flags *pflag.FlagSet)
-}
-
 // ClientAccessFactory holds the first level of factory methods.
 // Generally provides discovery, negotiation, and no-dep calls.
 // TODO The polymorphic calls probably deserve their own interface.
 type ClientAccessFactory interface {
-	// Returns a discovery client
-	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+	genericclioptions.RESTClientGetter
 
 	// ClientSet gives you back an internal, generated clientset
 	ClientSet() (internalclientset.Interface, error)
@@ -90,16 +73,8 @@ type ClientAccessFactory interface {
 	// KubernetesClientSet gives you back an external clientset
 	KubernetesClientSet() (*kubernetes.Clientset, error)
 
-	// Returns interfaces for dealing with arbitrary runtime.Objects.
-	RESTMapper() (meta.RESTMapper, error)
-
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
 	RESTClient() (*restclient.RESTClient, error)
-	// Returns a client.Config for accessing the Kubernetes server.
-	ClientConfig() (*restclient.Config, error)
-	// BareClientConfig returns a client.Config that has NOT been negotiated. It's
-	// just directions to the server. People use this to build RESTMappers on top of
-	BareClientConfig() (*restclient.Config, error)
 
 	// NewBuilder returns an object that assists in loading objects from both disk and the server
 	// and which implements the common patterns for CLI interactions with generic resources.
@@ -151,18 +126,11 @@ type ClientAccessFactory interface {
 	CanBeExposed(kind schema.GroupKind) error
 	// Check whether the kind of resources could be autoscaled
 	CanBeAutoscaled(kind schema.GroupKind) error
-
-	// EditorEnvs returns a group of environment variables that the edit command
-	// can range over in order to determine if the user has specified an editor
-	// of their choice.
-	EditorEnvs() []string
 }
 
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
 // Generally they provide object typing and functions that build requests based on the negotiated clients.
 type ObjectMappingFactory interface {
-	// Returns interface for expanding categories like `all`.
-	CategoryExpander() (restmapper.CategoryExpander, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -171,8 +139,6 @@ type ObjectMappingFactory interface {
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer(mapping *meta.RESTMapping) (printers.Describer, error)
 
-	// LogsForObject returns a request for the logs associated with the provided object
-	LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
 	// Returns a HistoryViewer for viewing change history
 	HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
 	// Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
@@ -197,12 +163,6 @@ type ObjectMappingFactory interface {
 // BuilderFactory holds the third level of factory methods. These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
-	// PluginLoader provides the implementation to be used to load cli plugins.
-	PluginLoader() plugins.PluginLoader
-	// PluginRunner provides the implementation to be used to run cli plugins.
-	PluginRunner() plugins.PluginRunner
-	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
-	Scaler() (kubectl.Scaler, error)
 	// ScaleClient gives you back scale getter
 	ScaleClient() (scaleclient.ScalesGetter, error)
 	// Returns a Reaper for gracefully shutting down resources.
@@ -217,7 +177,7 @@ type factory struct {
 
 // NewFactory creates a factory with the default Kubernetes resources defined
 // Receives a clientGetter capable of providing a discovery client and a REST client configuration.
-func NewFactory(clientGetter RESTClientGetter) Factory {
+func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
 	clientAccessFactory := NewClientAccessFactory(clientGetter)
 	objectMappingFactory := NewObjectMappingFactory(clientAccessFactory)
 	builderFactory := NewBuilderFactory(clientAccessFactory, objectMappingFactory)
@@ -227,51 +187,6 @@ func NewFactory(clientGetter RESTClientGetter) Factory {
 		ObjectMappingFactory: objectMappingFactory,
 		BuilderFactory:       builderFactory,
 	}
-}
-
-// GetFirstPod returns a pod matching the namespace and label selector
-// and the number of all pods that match the label selector.
-func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
-	options := metav1.ListOptions{LabelSelector: selector}
-
-	podList, err := client.Pods(namespace).List(options)
-	if err != nil {
-		return nil, 0, err
-	}
-	pods := []*v1.Pod{}
-	for i := range podList.Items {
-		pod := podList.Items[i]
-		externalPod := &v1.Pod{}
-		apiv1.Convert_core_Pod_To_v1_Pod(&pod, externalPod, nil)
-		pods = append(pods, externalPod)
-	}
-	if len(pods) > 0 {
-		sort.Sort(sortBy(pods))
-		internalPod := &api.Pod{}
-		apiv1.Convert_v1_Pod_To_core_Pod(pods[0], internalPod, nil)
-		return internalPod, len(podList.Items), nil
-	}
-
-	// Watch until we observe a pod
-	options.ResourceVersion = podList.ResourceVersion
-	w, err := client.Pods(namespace).Watch(options)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer w.Stop()
-
-	condition := func(event watch.Event) (bool, error) {
-		return event.Type == watch.Added || event.Type == watch.Modified, nil
-	}
-	event, err := watch.Until(timeout, w, condition)
-	if err != nil {
-		return nil, 0, err
-	}
-	pod, ok := event.Object.(*api.Pod)
-	if !ok {
-		return nil, 0, fmt.Errorf("%#v is not a pod event", event)
-	}
-	return pod, 1, nil
 }
 
 func makePortsString(ports []api.ServicePort, useNodePort bool) string {

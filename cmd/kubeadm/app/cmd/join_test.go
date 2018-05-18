@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 )
 
 const (
@@ -146,7 +146,7 @@ func TestNewValidJoin(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	cfg := &kubeadmapiv1alpha1.NodeConfiguration{}
+	cfg := &kubeadmapiv1alpha2.NodeConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
 	errorFormat := "Test case %q: NewValidJoin expected error: %v, saw: %v, error: %v"

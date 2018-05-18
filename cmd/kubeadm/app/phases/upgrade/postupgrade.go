@@ -28,7 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-var v190alpha3 = version.MustParseSemantic("v1.9.0-alpha.3")
 var expiry = 180 * 24 * time.Hour
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
@@ -74,7 +73,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	}
 
 	// Upgrade to a self-hosted control plane if possible
-	if err := upgradeToSelfHosting(client, cfg, newK8sVer, dryRun); err != nil {
+	if err := upgradeToSelfHosting(client, cfg, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -88,7 +87,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
-	certAndKeyDir := kubeadmapiv1alpha1.DefaultCertificatesDir
+	certAndKeyDir := kubeadmapiv1alpha2.DefaultCertificatesDir
 	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
 	// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
 	if err != nil {
@@ -144,8 +143,8 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.MasterConfiguratio
 	}, 10)
 }
 
-func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
-	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) && newK8sVer.AtLeast(v190alpha3) {
+func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, dryRun bool) error {
+	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) {
 
 		waiter := getWaiter(dryRun, client)
 

@@ -252,7 +252,7 @@ func TestNodeShutdown(t *testing.T) {
 			}
 			eventBroadcaster.StartLogging(glog.Infof)
 
-			cloudNodeController.Run()
+			cloudNodeController.Run(wait.NeverStop)
 
 			select {
 			case <-fnh.PatchWaitChan:
@@ -351,7 +351,7 @@ func TestNodeDeleted(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
-	cloudNodeController.Run()
+	cloudNodeController.Run(wait.NeverStop)
 
 	select {
 	case <-fnh.DeleteWaitChan:
@@ -768,7 +768,7 @@ func TestNodeAddresses(t *testing.T) {
 		},
 	}
 
-	cloudNodeController.Run()
+	cloudNodeController.Run(wait.NeverStop)
 
 	<-time.After(2 * time.Second)
 
@@ -872,7 +872,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
 	assert.Equal(t, 3, len(fnh.UpdatedNodes[0].Status.Addresses), "Node status unexpectedly updated")
 
-	cloudNodeController.Run()
+	cloudNodeController.Run(wait.NeverStop)
 
 	<-time.After(2 * time.Second)
 

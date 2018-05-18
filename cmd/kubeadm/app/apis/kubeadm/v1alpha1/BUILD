@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
         "defaults.go",
         "doc.go",
         "register.go",
@@ -59,7 +60,6 @@ go_library(
         "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
         "//vendor/github.com/json-iterator/go:go_default_library",
         "//vendor/github.com/ugorji/go/codec:go_default_library",
-        "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
@@ -89,9 +89,5 @@ go_test(
     srcs = ["upgrade_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-    ],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library"],
 )

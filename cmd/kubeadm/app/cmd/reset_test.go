@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -57,7 +57,7 @@ func assertDirEmpty(t *testing.T, path string) {
 
 func TestNewReset(t *testing.T) {
 	var in io.Reader
-	certsDir := kubeadmapiv1alpha1.DefaultCertificatesDir
+	certsDir := kubeadmapiv1alpha2.DefaultCertificatesDir
 	criSocketPath := "/var/run/dockershim.sock"
 	skipPreFlight := false
 	forceReset := true
@@ -127,7 +127,7 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests",
 			},
 		},
-		"preserve cloud-config": {
+		"preserve unrelated file foo": {
 			setupDirs: []string{
 				"manifests",
 				"pki",
@@ -138,12 +138,12 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki/ca.pem",
 				kubeadmconstants.AdminKubeConfigFileName,
 				kubeadmconstants.KubeletKubeConfigFileName,
-				"cloud-config",
+				"foo",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				"cloud-config",
+				"foo",
 			},
 		},
 		"preserve hidden files and directories": {
@@ -158,13 +158,11 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki/ca.pem",
 				kubeadmconstants.AdminKubeConfigFileName,
 				kubeadmconstants.KubeletKubeConfigFileName,
-				".cloud-config",
 				".mydir/.myfile",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				".cloud-config",
 				".mydir",
 				".mydir/.myfile",
 			},

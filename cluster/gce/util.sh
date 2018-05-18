@@ -673,7 +673,6 @@ function construct-kubelet-flags {
   if [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
     flags+=" --container-runtime=${CONTAINER_RUNTIME}"
   fi
-  # TODO(mtaufen): CONTAINER_RUNTIME_ENDPOINT seems unused; delete it?
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
     flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
   fi
@@ -1044,6 +1043,11 @@ EOF
     if [ -n "${ETCD_QUOTA_BACKEND_BYTES:-}" ]; then
       cat >>$file <<EOF
 ETCD_QUOTA_BACKEND_BYTES: $(yaml-quote ${ETCD_QUOTA_BACKEND_BYTES})
+EOF
+    fi
+    if [ -n "${ETCD_EXTRA_ARGS:-}" ]; then
+    cat >>$file <<EOF
+ETCD_EXTRA_ARGS: $(yaml-quote ${ETCD_EXTRA_ARGS})
 EOF
     fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then

@@ -41,6 +41,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -126,7 +127,7 @@ type RunOptions struct {
 
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
-		PrintFlags:  printers.NewPrintFlags("created", legacyscheme.Scheme),
+		PrintFlags:  printers.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
@@ -374,7 +375,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 			Attach: &DefaultRemoteAttach{},
 		}
-		config, err := f.ClientConfig()
+		config, err := f.ToRESTConfig()
 		if err != nil {
 			return err
 		}
@@ -525,13 +526,13 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 }
 
 // logOpts logs output from opts to the pods log.
-func logOpts(f cmdutil.Factory, pod *api.Pod, opts *AttachOptions) error {
+func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *api.Pod, opts *AttachOptions) error {
 	ctrName, err := opts.GetContainerName(pod)
 	if err != nil {
 		return err
 	}
 
-	req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
+	req, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
 	if err != nil {
 		return err
 	}
@@ -638,7 +639,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		return nil, err
 	}
 
-	mapper, err := f.RESTMapper()
+	mapper, err := f.ToRESTMapper()
 	if err != nil {
 		return nil, err
 	}

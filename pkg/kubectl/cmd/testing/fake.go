@@ -44,12 +44,12 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
@@ -267,7 +267,7 @@ func NewTestFactory() *TestFactory {
 	fallbackReader := bytes.NewBuffer([]byte{})
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
 
-	configFlags := cmdutil.NewTestConfigFlags().
+	configFlags := genericclioptions.NewTestConfigFlags().
 		WithClientConfig(clientConfig).
 		WithRESTMapper(testRESTMapper())
 
@@ -286,11 +286,7 @@ func (f *TestFactory) Cleanup() {
 	os.Remove(f.tempConfigFile.Name())
 }
 
-func (f *TestFactory) CategoryExpander() (restmapper.CategoryExpander, error) {
-	return resource.FakeCategoryExpander, nil
-}
-
-func (f *TestFactory) ClientConfig() (*restclient.Config, error) {
+func (f *TestFactory) ToRESTConfig() (*restclient.Config, error) {
 	return f.ClientConfigVal, nil
 }
 
@@ -333,8 +329,7 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper, err := f.RESTMapper()
-	categoryExpander, err2 := f.CategoryExpander()
+	mapper, err := f.ToRESTMapper()
 
 	return resource.NewFakeBuilder(
 		func(version schema.GroupVersion) (resource.RESTClient, error) {
@@ -347,8 +342,8 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 			return f.Client, nil
 		},
 		mapper,
-		categoryExpander,
-	).AddError(err).AddError(err2)
+		resource.FakeCategoryExpander,
+	).AddError(err)
 }
 
 func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
@@ -448,24 +443,6 @@ func testRESTMapper() meta.RESTMapper {
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
 	return expander
-}
-
-func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	c, err := f.ClientSet()
-	if err != nil {
-		panic(err)
-	}
-
-	switch t := object.(type) {
-	case *api.Pod:
-		opts, ok := options.(*api.PodLogOptions)
-		if !ok {
-			return nil, errors.New("provided options object is not a PodLogOptions")
-		}
-		return c.Core().Pods(f.Namespace).GetLogs(t.Name, opts), nil
-	default:
-		return nil, fmt.Errorf("cannot get the logs from %T", object)
-	}
 }
 
 func (f *TestFactory) ScaleClient() (scaleclient.ScalesGetter, error) {

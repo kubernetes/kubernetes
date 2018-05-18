@@ -21,6 +21,7 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
+	"fmt"
 	"github.com/golang/glog"
 )
 
@@ -107,6 +108,10 @@ func (set *IPSet) isEmpty() bool {
 	return len(set.activeEntries.UnsortedList()) == 0
 }
 
+func (set *IPSet) getComment() string {
+	return fmt.Sprintf("\"%s\"", set.Comment)
+}
+
 func (set *IPSet) resetEntries() {
 	set.activeEntries = sets.NewString()
 }
@@ -146,12 +151,10 @@ func (set *IPSet) syncIPSetEntries() {
 	}
 }
 
-func ensureIPSets(ipSets ...*IPSet) error {
-	for _, set := range ipSets {
-		if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
-			glog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
-			return err
-		}
+func ensureIPSet(set *IPSet) error {
+	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
+		glog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
+		return err
 	}
 	return nil
 }
