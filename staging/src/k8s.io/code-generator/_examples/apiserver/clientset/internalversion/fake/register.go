@@ -23,8 +23,6 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	exampleinternalversion "k8s.io/code-generator/_examples/apiserver/apis/example"
-	secondexampleinternalversion "k8s.io/code-generator/_examples/apiserver/apis/example2"
 )
 
 var scheme = runtime.NewScheme()
