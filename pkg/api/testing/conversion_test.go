@@ -116,3 +116,33 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 		b.Fatalf("Incorrect conversion: expected %v, got %v", replicationController, *result)
 	}
 }
+
+func BenchmarkReplicationControllerListConversion(b *testing.B) {
+	data, err := ioutil.ReadFile("replication_controller_list_example.json")
+	if err != nil {
+		b.Fatalf("Unexpected error while reading file: %v", err)
+	}
+	var replicationController api.ReplicationControllerList
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &replicationController); err != nil {
+		b.Fatalf("Unexpected error decoding node: %v", err)
+	}
+
+	scheme := legacyscheme.Scheme
+	var result *api.ReplicationControllerList
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		versionedObj, err := scheme.UnsafeConvertToVersion(&replicationController, schema.GroupVersion{Group: "", Version: "v1"})
+		if err != nil {
+			b.Fatalf("Conversion error: %v", err)
+		}
+		obj, err := scheme.UnsafeConvertToVersion(versionedObj, schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal})
+		if err != nil {
+			b.Fatalf("Conversion error: %v", err)
+		}
+		result = obj.(*api.ReplicationControllerList)
+	}
+	b.StopTimer()
+	if !apiequality.Semantic.DeepDerivative(replicationController, *result) {
+		b.Fatalf("Incorrect conversion: expected %v, got %v", replicationController, *result)
+	}
+}
