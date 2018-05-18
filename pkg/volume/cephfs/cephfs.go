@@ -407,6 +407,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	mountArgs = append(mountArgs, cephfsVolume.path)
 	mountArgs = append(mountArgs, "--id")
 	mountArgs = append(mountArgs, cephfsVolume.id)
+	mountArgs = append(mountArgs, "--client-quota")
 
 	// build option array
 	opt := []string{}
