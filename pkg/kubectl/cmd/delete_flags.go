@@ -65,6 +65,7 @@ type DeleteFlags struct {
 	All            *bool
 	Cascade        *bool
 	Force          *bool
+	Wait           *bool
 	GracePeriod    *int
 	IgnoreNotFound *bool
 	Now            *bool
@@ -102,6 +103,9 @@ func (f *DeleteFlags) ToOptions(streams genericclioptions.IOStreams) *DeleteOpti
 	if f.Force != nil {
 		options.ForceDeletion = *f.Force
 	}
+	if f.Wait != nil {
+		options.WaitForDeletion = *f.Wait
+	}
 	if f.GracePeriod != nil {
 		options.GracePeriod = *f.GracePeriod
 	}
@@ -131,6 +135,9 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	}
 	if f.Force != nil {
 		cmd.Flags().BoolVar(f.Force, "force", *f.Force, "Only used when grace-period=0. If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
+	}
+	if f.Wait != nil {
+		cmd.Flags().BoolVar(f.Wait, "wait", *f.Wait, "If true, waits for the resource to be deleted before returning.")
 	}
 	if f.Cascade != nil {
 		cmd.Flags().BoolVar(f.Cascade, "cascade", *f.Cascade, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
@@ -162,6 +169,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	// setup command defaults
 	all := false
 	force := false
+	wait := true
 	ignoreNotFound := false
 	now := false
 	output := ""
@@ -182,6 +190,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 
 		All:            &all,
 		Force:          &force,
+		Wait:           &wait,
 		IgnoreNotFound: &ignoreNotFound,
 		Now:            &now,
 		Timeout:        &timeout,
@@ -195,6 +204,7 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	gracePeriod := -1
 
 	force := false
+	wait := false
 	timeout := time.Duration(0)
 
 	filenames := []string{}
@@ -208,6 +218,7 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 
 		// add non-defaults
 		Force:   &force,
+		Wait:    &wait,
 		Timeout: &timeout,
 	}
 }

@@ -226,7 +226,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	deleteOpts := o.DeleteFlags.ToOptions(o.IOStreams)
 	deleteOpts.IgnoreNotFound = true
-	deleteOpts.WaitForDeletion = false
+	deleteOpts.WaitForGracefulDeletion = false
 	deleteOpts.GracePeriod = -1
 	deleteOpts.Reaper = f.Reaper
 
