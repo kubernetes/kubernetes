@@ -597,11 +597,21 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
+// WindowsContainerSecurityContext holds windows security configuration that will be applied to a container.
+message WindowsContainerSecurityContext {
+    // User name to run the container process as. If specified, the user MUST
+    // exist in the container image and be resolved there by the runtime;
+    // otherwise, the runtime MUST return error.
+    string run_as_username = 1;
+}
+
 // WindowsContainerConfig contains platform-specific configuration for
 // Windows-based containers.
 message WindowsContainerConfig {
     // Resources specification for the container.
     WindowsContainerResources resources = 1;
+    // WindowsContainerSecurityContext configuration for the container.
+    WindowsContainerSecurityContext security_context = 2;
 }
 
 // WindowsContainerResources specifies Windows specific configuration for
