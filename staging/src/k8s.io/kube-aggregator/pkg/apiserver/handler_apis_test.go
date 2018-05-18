@@ -220,17 +220,17 @@ func TestAPIs(t *testing.T) {
 						Name: "bar",
 						Versions: []metav1.GroupVersionForDiscovery{
 							{
-								GroupVersion: "bar/v1",
-								Version:      "v1",
-							},
-							{
 								GroupVersion: "bar/v2",
 								Version:      "v2",
 							},
+							{
+								GroupVersion: "bar/v1",
+								Version:      "v1",
+							},
 						},
 						PreferredVersion: metav1.GroupVersionForDiscovery{
-							GroupVersion: "bar/v1",
-							Version:      "v1",
+							GroupVersion: "bar/v2",
+							Version:      "v2",
 						},
 					},
 				},
