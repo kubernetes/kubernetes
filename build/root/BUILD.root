@@ -10,10 +10,7 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
 load("@io_kubernetes_build//defs:build.bzl", "gcs_upload")
-
-go_prefix("k8s.io/kubernetes")
 
 filegroup(
     name = "_binary-artifacts-and-hashes",
