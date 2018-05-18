@@ -409,7 +409,6 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
-		nodes        []string
 		rcs          []*v1.ReplicationController
 		rss          []*extensions.ReplicaSet
 		services     []*v1.Service

@@ -517,7 +517,6 @@ func TestUpdatePod(t *testing.T) {
 		makeBasePod(t, nodeName, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
 	tests := []struct {
-		podsToAssume []*v1.Pod
 		podsToAdd    []*v1.Pod
 		podsToUpdate []*v1.Pod
 
