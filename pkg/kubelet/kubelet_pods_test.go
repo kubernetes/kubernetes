@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -2095,7 +2094,7 @@ func (f *fakeReadWriteCloser) Close() error {
 	return nil
 }
 
-func TestExec(t *testing.T) {
+func TestGetExec(t *testing.T) {
 	const (
 		podName                = "podFoo"
 		podNamespace           = "nsFoo"
@@ -2106,9 +2105,6 @@ func TestExec(t *testing.T) {
 	var (
 		podFullName = kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, podName, podNamespace))
 		command     = []string{"ls"}
-		stdin       = &bytes.Buffer{}
-		stdout      = &fakeReadWriteCloser{}
-		stderr      = &fakeReadWriteCloser{}
 	)
 
 	testcases := []struct {
@@ -2161,21 +2157,15 @@ func TestExec(t *testing.T) {
 			assert.NoError(t, err, description)
 			assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
 		}
-
-		err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
-		assert.Error(t, err, description)
 	}
 }
 
-func TestPortForward(t *testing.T) {
+func TestGetPortForward(t *testing.T) {
 	const (
 		podName                = "podFoo"
 		podNamespace           = "nsFoo"
 		podUID       types.UID = "12345678"
 		port         int32     = 5000
-	)
-	var (
-		stream = &fakeReadWriteCloser{}
 	)
 
 	testcases := []struct {
@@ -2208,7 +2198,6 @@ func TestPortForward(t *testing.T) {
 			}},
 		}
 
-		podFullName := kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, tc.podName, podNamespace))
 		description := "streaming - " + tc.description
 		fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
 		kubelet.containerRuntime = fakeRuntime
@@ -2221,9 +2210,6 @@ func TestPortForward(t *testing.T) {
 			assert.NoError(t, err, description)
 			assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
 		}
-
-		err = kubelet.PortForward(podFullName, podUID, port, stream)
-		assert.Error(t, err, description)
 	}
 }
 
