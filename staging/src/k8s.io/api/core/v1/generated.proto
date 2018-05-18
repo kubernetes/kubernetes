@@ -2631,7 +2631,6 @@ message PodAttachOptions {
 // PodCondition contains details for the current condition of this pod.
 message PodCondition {
   // Type is the type of the condition.
-  // Currently only Ready.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
   optional string type = 1;
 
@@ -2798,6 +2797,12 @@ message PodProxyOptions {
   // Path is the URL path to use for the current proxy request to pod.
   // +optional
   optional string path = 1;
+}
+
+// PodReadinessGate contains the reference to a pod condition
+message PodReadinessGate {
+  // ConditionType refers to a condition in the pod's condition list with matching type.
+  optional string conditionType = 1;
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -3052,6 +3057,13 @@ message PodSpec {
   // configuration based on DNSPolicy.
   // +optional
   optional PodDNSConfig dnsConfig = 26;
+
+  // If specified, all readiness gates will be evaluated for pod readiness.
+  // A pod is ready when all its containers are ready AND
+  // all conditions specified in the readiness gates have status equal to "True"
+  // More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
+  // +optional
+  repeated PodReadinessGate readinessGates = 28;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
