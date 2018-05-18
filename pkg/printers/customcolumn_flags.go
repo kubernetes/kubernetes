@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -84,7 +83,7 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrin
 	}
 
 	p, err := NewCustomColumnsPrinterFromSpec(templateValue, decoder, f.NoHeaders)
-	return NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...), err
+	return p, err
 }
 
 // AddFlags receives a *cobra.Command reference and binds

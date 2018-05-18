@@ -23,7 +23,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
@@ -56,21 +55,33 @@ func TestIllegalPackageSourceCheckerThroughPrintFlags(t *testing.T) {
 			obj:                  internalPod(),
 		},
 		{
-			name:                 "json printer: json printer is wrapped in a versioned printer - internal obj should be converted with no error",
-			expectInternalObjErr: false,
+			name:                 "json printer: object containing package path beginning with forbidden prefix is rejected",
+			expectInternalObjErr: true,
 			output:               "json",
 			obj:                  internalPod(),
 		},
 		{
-			name:                 "yaml printer: yaml printer is wrapped in a versioned printer - internal obj should be converted with no error",
+			name:                 "json printer: object containing package path with no forbidden prefix returns no error",
 			expectInternalObjErr: false,
+			obj:                  externalPod(),
+			output:               "json",
+		},
+		{
+			name:                 "yaml printer: object containing package path beginning with forbidden prefix is rejected",
+			expectInternalObjErr: true,
 			output:               "yaml",
 			obj:                  internalPod(),
+		},
+		{
+			name:                 "yaml printer: object containing package path with no forbidden prefix returns no error",
+			expectInternalObjErr: false,
+			obj:                  externalPod(),
+			output:               "yaml",
 		},
 	}
 
 	for _, tc := range testCases {
-		printFlags := printers.NewPrintFlags("succeeded", legacyscheme.Scheme)
+		printFlags := printers.NewPrintFlags("succeeded").WithTypeSetter(scheme.Scheme)
 		printFlags.OutputFormat = &tc.output
 
 		printer, err := printFlags.ToPrinter()

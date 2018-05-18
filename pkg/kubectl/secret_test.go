@@ -37,6 +37,8 @@ func TestSecretGenerate(t *testing.T) {
 				"name": "foo",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -50,6 +52,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash": true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-949tdgdkgg",
 				},
@@ -63,6 +67,8 @@ func TestSecretGenerate(t *testing.T) {
 				"type": "my-type",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -78,6 +84,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash": true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-dg474f9t76",
 				},
@@ -92,6 +100,8 @@ func TestSecretGenerate(t *testing.T) {
 				"from-literal": []string{"key1=value1", "key2=value2"},
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -109,6 +119,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash":  true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-tf72c228m4",
 				},
@@ -146,6 +158,8 @@ func TestSecretGenerate(t *testing.T) {
 				"from-literal": []string{"key1==value1"},
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -162,6 +176,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash":  true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-fdcc8tkhh5",
 				},
@@ -178,6 +194,8 @@ func TestSecretGenerate(t *testing.T) {
 				"from-env-file": "file.env",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "valid_env",
 				},
@@ -196,6 +214,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash":   true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "valid_env-bkb2m2965h",
 				},
@@ -217,6 +237,8 @@ func TestSecretGenerate(t *testing.T) {
 				"from-env-file": "file.env",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "getenv",
 				},
@@ -239,6 +261,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash":   true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "getenv-m7kg2khdb4",
 				},
@@ -272,6 +296,8 @@ func TestSecretGenerate(t *testing.T) {
 				"from-env-file": "file.env",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "with_spaces",
 				},
@@ -289,6 +315,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash":   true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "with_spaces-4488d5b57d",
 				},

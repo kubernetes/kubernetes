@@ -384,6 +384,11 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 	volID := parts[1]
 	attachID := getAttachmentName(volID, driverName, string(nodeName))
 	if err := c.k8s.StorageV1beta1().VolumeAttachments().Delete(attachID, nil); err != nil {
+		if apierrs.IsNotFound(err) {
+			// object deleted or never existed, done
+			glog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volID))
+			return nil
+		}
 		glog.Error(log("detacher.Detach failed to delete VolumeAttachment [%s]: %v", attachID, err))
 		return err
 	}

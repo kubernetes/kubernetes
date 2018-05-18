@@ -100,7 +100,6 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
-        "//pkg/kubelet/util/store:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//vendor/github.com/armon/circbuf:go_default_library",

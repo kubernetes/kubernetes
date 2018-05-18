@@ -834,7 +834,7 @@ func TestDeletePods(t *testing.T) {
 			defer tf.Cleanup()
 
 			o := DrainOptions{
-				PrintFlags: printers.NewPrintFlags("drained", legacyscheme.Scheme),
+				PrintFlags: printers.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 			}
 			o.Out = os.Stdout
 

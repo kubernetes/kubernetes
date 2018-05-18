@@ -31,6 +31,8 @@ type kubectlConfigPrintFlags struct {
 	NamePrintFlags     *printers.NamePrintFlags
 	TemplateFlags      *printers.KubeTemplatePrintFlags
 
+	TypeSetter *printers.TypeSetterPrinter
+
 	OutputFormat *string
 }
 
@@ -45,15 +47,15 @@ func (f *kubectlConfigPrintFlags) ToPrinter() (printers.ResourcePrinter, error) 
 	}
 
 	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
-		return p, err
+		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
 	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
-		return p, err
+		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
 	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
-		return p, err
+		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
 	return nil, printers.NoCompatiblePrinterError{Options: f}
@@ -75,14 +77,16 @@ func (f *kubectlConfigPrintFlags) WithDefaultOutput(output string) *kubectlConfi
 	return f
 }
 
-func newKubeConfigPrintFlags(scheme runtime.ObjectConvertor) *kubectlConfigPrintFlags {
+func newKubeConfigPrintFlags(scheme runtime.ObjectTyper) *kubectlConfigPrintFlags {
 	outputFormat := ""
 
 	return &kubectlConfigPrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(scheme),
-		NamePrintFlags:     printers.NewNamePrintFlags("", scheme),
+		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+		NamePrintFlags:     printers.NewNamePrintFlags(""),
 		TemplateFlags:      printers.NewKubeTemplatePrintFlags(),
+
+		TypeSetter: printers.NewTypeSetter(scheme),
 	}
 }
