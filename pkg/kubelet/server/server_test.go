@@ -46,7 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/remotecommand"
-	utiltesting "k8s.io/client-go/util/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	// Do some initialization to decode the query parameters correctly.
@@ -203,7 +202,6 @@ type serverTestFramework struct {
 	fakeKubelet     *fakeKubelet
 	fakeAuth        *fakeAuth
 	testHTTPServer  *httptest.Server
-	criHandler      *utiltesting.FakeHandler
 }
 
 func newServerTest() *serverTestFramework {
@@ -238,17 +236,13 @@ func newServerTestWithDebug(enableDebugging bool) *serverTestFramework {
 			return authorizer.DecisionAllow, "", nil
 		},
 	}
-	fw.criHandler = &utiltesting.FakeHandler{
-		StatusCode: http.StatusOK,
-	}
 	server := NewServer(
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
 		fw.fakeAuth,
 		enableDebugging,
 		false,
-		&kubecontainertesting.Mock{},
-		fw.criHandler)
+		&kubecontainertesting.Mock{})
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -1597,22 +1591,6 @@ func TestServePortForward(t *testing.T) {
 
 		<-portForwardFuncDone
 	}
-}
-
-func TestCRIHandler(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-
-	const (
-		path  = "/cri/exec/123456abcdef"
-		query = "cmd=echo+foo"
-	)
-	resp, err := http.Get(fw.testHTTPServer.URL + path + "?" + query)
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "GET", fw.criHandler.RequestReceived.Method)
-	assert.Equal(t, path, fw.criHandler.RequestReceived.URL.Path)
-	assert.Equal(t, query, fw.criHandler.RequestReceived.URL.RawQuery)
 }
 
 func TestDebuggingDisabledHandlers(t *testing.T) {

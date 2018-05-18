@@ -51,7 +51,7 @@ func NewDockerServer(endpoint string, s dockershim.CRIService) *DockerServer {
 // Start starts the dockershim grpc server.
 func (s *DockerServer) Start(stopCh <-chan struct{}) error {
 	// Start the internal service.
-	if err := s.service.Start(); err != nil {
+	if err := s.service.Start(stopCh); err != nil {
 		glog.Errorf("Unable to start docker service")
 		return err
 	}
