@@ -38,6 +38,12 @@ import (
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
 
+	/*
+		Release : v1.9
+		Testname: Replication Controller, run basic image
+		Description: Replication Controller MUST create a Pod with Basic Image and MUST run the service with the provided image. Image MUST be tested by dialing into the service listening through TCP, UDP and HTTP.
+	*/
+
 	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
 		TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
