@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-// SetInitDynamicDefaults checks and sets configuration values for Master node
+// SetInitDynamicDefaults checks and sets configuration values for the MasterConfiguration object
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// validate cfg.API.AdvertiseAddress.
