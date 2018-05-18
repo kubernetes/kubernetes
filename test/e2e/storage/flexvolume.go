@@ -216,8 +216,8 @@ var _ = utils.SIGDescribe("Flexvolumes [Disruptive]", func() {
 		testFlexVolume(driverInstallAs, cs, config, f)
 
 		By("waiting for flex client pod to terminate")
-		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
-			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		if err := f.WaitForPodNotFound(config.Prefix+"-client", framework.PodDeleteTimeout); !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to wait for client pod deletion: %v", err)
 		}
 
 		By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
@@ -236,8 +236,8 @@ var _ = utils.SIGDescribe("Flexvolumes [Disruptive]", func() {
 		testFlexVolume(driverInstallAs, cs, config, f)
 
 		By("waiting for flex client pod to terminate")
-		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
-			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		if err := f.WaitForPodNotFound(config.Prefix+"-client", framework.PodDeleteTimeout); !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to wait for client pod deletion: %v", err)
 		}
 
 		By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
@@ -255,9 +255,10 @@ var _ = utils.SIGDescribe("Flexvolumes [Disruptive]", func() {
 
 		testFlexVolume(driverInstallAs, cs, config, f)
 
-		By("waiting for flex client pod to terminate")
-		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
-			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		By("waiting for flex client pod to not be found")
+		err := f.WaitForPodNotFound(config.Prefix+"-client", framework.PodDeleteTimeout)
+		if err != nil {
+			framework.ExpectNoError(err, "Failed to wait for client pod deletion: %v", err)
 		}
 
 		By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))

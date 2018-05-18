@@ -350,8 +350,9 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 	}
 
 	if config.ServerImage != "" {
-		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
-			ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		err := f.WaitForPodNotFound(config.Prefix+"-client", PodDeleteTimeout)
+		if err != nil {
+			ExpectNoError(err, "Failed to wait for client pod deletion: %v", err)
 		}
 		// See issue #24100.
 		// Prevent umount errors by making sure making sure the client pod exits cleanly *before* the volume server pod exits.
