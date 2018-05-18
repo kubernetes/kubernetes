@@ -49,5 +49,5 @@ else
 fi
 
 # smoke test
-echo "Smoke testing _example by compiling..."
-go build ${SCRIPT_ROOT}/_example/...
+echo "Smoke testing _examples by compiling..."
+go build ${SCRIPT_ROOT}/_examples/...
