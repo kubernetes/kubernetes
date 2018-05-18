@@ -23,14 +23,15 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
-func AddJsonFilenameFlag(cmd *cobra.Command, value *[]string, usage string) {
-	cmd.Flags().StringSliceVarP(value, "filename", "f", *value, usage)
+func AddJsonFilenameFlag(fs *pflag.FlagSet, value *[]string, usage string) {
+	fs.StringSliceVarP(value, "filename", "f", *value, usage)
 	annotations := make([]string, 0, len(resource.FileExtensions))
 	for _, ext := range resource.FileExtensions {
 		annotations = append(annotations, strings.TrimLeft(ext, "."))
 	}
-	cmd.Flags().SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
+	fs.SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
 }

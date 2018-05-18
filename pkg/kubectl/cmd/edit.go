@@ -88,11 +88,11 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	}
 
 	// bind flag structs
-	o.RecordFlags.AddFlags(cmd)
-	o.PrintFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd.Flags())
+	o.PrintFlags.AddFlags(cmd.Flags())
 
 	usage := "to use to edit the resource"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &o.FilenameOptions, usage)
 	cmdutil.AddValidateOptionFlags(cmd, &o.ValidateOptions)
 	cmd.Flags().BoolVarP(&o.OutputPatch, "output-patch", "", o.OutputPatch, "Output the patch if the resource is edited.")
 	cmd.Flags().BoolVar(&o.WindowsLineEndings, "windows-line-endings", o.WindowsLineEndings,

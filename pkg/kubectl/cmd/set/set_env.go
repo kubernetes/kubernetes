@@ -151,7 +151,7 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 		},
 	}
 	usage := "the resource to update the env"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &o.FilenameOptions, usage)
 	cmd.Flags().StringVarP(&o.ContainerSelector, "containers", "c", o.ContainerSelector, "The names of containers in the selected pod templates to change - may use wildcards")
 	cmd.Flags().StringVarP(&o.From, "from", "", "", "The name of a resource from which to inject environment variables")
 	cmd.Flags().StringVarP(&o.Prefix, "prefix", "", "", "Prefix to append to variable names")
@@ -163,7 +163,7 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "If true, select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 
-	o.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd.Flags())
 
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd

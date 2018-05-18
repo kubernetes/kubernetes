@@ -120,9 +120,9 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
-	o.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd.Flags())
 	o.DeleteFlags.AddFlags(cmd)
-	o.RecordFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd.Flags())
 
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)

@@ -110,10 +110,10 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	}
 
 	// bind flag structs
-	o.RecordFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd.Flags())
 
 	usage := "to use to create the resource"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &o.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")

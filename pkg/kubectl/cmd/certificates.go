@@ -126,10 +126,10 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 		},
 	}
 
-	options.PrintFlags.AddFlags(cmd)
+	options.PrintFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().Bool("force", false, "Update the CSR even if it is already approved.")
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, "identifying the resource to update")
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &options.FilenameOptions, "identifying the resource to update")
 
 	return cmd
 }
@@ -178,10 +178,10 @@ func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		},
 	}
 
-	options.PrintFlags.AddFlags(cmd)
+	options.PrintFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().Bool("force", false, "Update the CSR even if it is already denied.")
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, "identifying the resource to update")
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &options.FilenameOptions, "identifying the resource to update")
 
 	return cmd
 }

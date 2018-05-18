@@ -136,8 +136,8 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 	}
 
 	// bind flag structs
-	o.RecordFlags.AddFlags(cmd)
-	o.PrintFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd.Flags())
+	o.PrintFlags.AddFlags(cmd.Flags())
 
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
@@ -147,7 +147,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the annotation"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 
 	return cmd

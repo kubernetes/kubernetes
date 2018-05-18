@@ -103,11 +103,11 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IO
 		},
 	}
 
-	o.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd.Flags())
 
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().BoolVar(&o.CreateAnnotation, "create-annotation", o.CreateAnnotation, "Will create 'last-applied-configuration' annotations if current objects doesn't have one")
-	kubectl.AddJsonFilenameFlag(cmd, &o.FilenameOptions.Filenames, "Filename, directory, or URL to files that contains the last-applied-configuration annotations")
+	kubectl.AddJsonFilenameFlag(cmd.Flags(), &o.FilenameOptions.Filenames, "Filename, directory, or URL to files that contains the last-applied-configuration annotations")
 
 	return cmd
 }

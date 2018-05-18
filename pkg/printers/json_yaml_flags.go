@@ -19,7 +19,7 @@ package printers
 import (
 	"strings"
 
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // JSONYamlPrintFlags provides default flags necessary for json/yaml printing.
@@ -50,7 +50,7 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, er
 
 // AddFlags receives a *cobra.Command reference and binds
 // flags related to JSON or Yaml printing to it
-func (f *JSONYamlPrintFlags) AddFlags(c *cobra.Command) {}
+func (f *JSONYamlPrintFlags) AddFlags(fs *pflag.FlagSet) {}
 
 // NewJSONYamlPrintFlags returns flags associated with
 // yaml or json printing, with default values set.

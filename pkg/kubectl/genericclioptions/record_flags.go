@@ -18,8 +18,8 @@ package genericclioptions
 
 import (
 	"github.com/evanphx/json-patch"
-	"github.com/spf13/cobra"
 
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -71,13 +71,13 @@ func (f *RecordFlags) Complete(changeCause string) error {
 
 // AddFlags binds the requested flags to the provided flagset
 // TODO have this only take a flagset
-func (f *RecordFlags) AddFlags(cmd *cobra.Command) {
+func (f *RecordFlags) AddFlags(fs *pflag.FlagSet) {
 	if f == nil {
 		return
 	}
 
 	if f.Record != nil {
-		cmd.Flags().BoolVar(f.Record, "record", *f.Record, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
+		fs.BoolVar(f.Record, "record", *f.Record, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
 	}
 }
 

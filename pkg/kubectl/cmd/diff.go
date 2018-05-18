@@ -124,7 +124,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	usage := "contains the configuration to diff"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &options.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 
 	return cmd
