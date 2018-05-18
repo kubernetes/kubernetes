@@ -525,7 +525,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 	tc.verifyResults(t)
 }
 
-func LegacyTestScaleUp(t *testing.T) {
+func TestLegacyScaleUp(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:         2,
 		maxReplicas:         6,
@@ -540,7 +540,7 @@ func LegacyTestScaleUp(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleUpUnreadyLessScale(t *testing.T) {
+func TestLegacyScaleUpUnreadyLessScale(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:          2,
 		maxReplicas:          6,
@@ -557,7 +557,7 @@ func LegacyTestScaleUpUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleUpUnreadyNoScale(t *testing.T) {
+func TestLegacyScaleUpUnreadyNoScale(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:          2,
 		maxReplicas:          6,
@@ -574,7 +574,7 @@ func LegacyTestScaleUpUnreadyNoScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleUpDeployment(t *testing.T) {
+func TestLegacyScaleUpDeployment(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:         2,
 		maxReplicas:         6,
@@ -594,7 +594,7 @@ func LegacyTestScaleUpDeployment(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleUpReplicaSet(t *testing.T) {
+func TestLegacyScaleUpReplicaSet(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:         2,
 		maxReplicas:         6,
@@ -614,7 +614,7 @@ func LegacyTestScaleUpReplicaSet(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleUpCM(t *testing.T) {
+func TestLegacyScaleUpCM(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:     2,
 		maxReplicas:     6,
@@ -636,7 +636,7 @@ func LegacyTestScaleUpCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleUpCMUnreadyLessScale(t *testing.T) {
+func TestLegacyScaleUpCMUnreadyLessScale(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:     2,
 		maxReplicas:     6,
@@ -659,7 +659,7 @@ func LegacyTestScaleUpCMUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
+func TestLegacyScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:     2,
 		maxReplicas:     6,
@@ -682,7 +682,7 @@ func LegacyTestScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleDown(t *testing.T) {
+func TestLegacyScaleDown(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:         2,
 		maxReplicas:         6,
@@ -697,7 +697,7 @@ func LegacyTestScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleDownCM(t *testing.T) {
+func TestLegacyScaleDownCM(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:     2,
 		maxReplicas:     6,
@@ -719,7 +719,7 @@ func LegacyTestScaleDownCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleDownIgnoresUnreadyPods(t *testing.T) {
+func TestLegacyScaleDownIgnoresUnreadyPods(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:          2,
 		maxReplicas:          6,
@@ -841,7 +841,7 @@ func LegacyTestMaxReplicas(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestSuperfluousMetrics(t *testing.T) {
+func TestLegacySuperfluousMetrics(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:         2,
 		maxReplicas:         6,
@@ -1023,7 +1023,7 @@ func LegacyTestComputedToleranceAlgImplementation(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleUpRCImmediately(t *testing.T) {
+func TestLegacyScaleUpRCImmediately(t *testing.T) {
 	time := metav1.Time{Time: time.Now()}
 	tc := legacyTestCase{
 		minReplicas:         2,
@@ -1039,7 +1039,7 @@ func LegacyTestScaleUpRCImmediately(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestScaleDownRCImmediately(t *testing.T) {
+func TestLegacyScaleDownRCImmediately(t *testing.T) {
 	time := metav1.Time{Time: time.Now()}
 	tc := legacyTestCase{
 		minReplicas:         2,

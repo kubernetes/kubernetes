@@ -503,7 +503,6 @@ func TestFindOldReplicaSets(t *testing.T) {
 		Name            string
 		deployment      extensions.Deployment
 		rsList          []*extensions.ReplicaSet
-		podList         *v1.PodList
 		expected        []*extensions.ReplicaSet
 		expectedRequire []*extensions.ReplicaSet
 	}{
