@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "credentialmanager.go",
         "nodemanager.go",
         "vsphere.go",
         "vsphere_util.go",
@@ -26,25 +27,36 @@ go_library(
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
+        "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["vsphere_test.go"],
+    srcs = [
+        "credentialmanager_test.go",
+        "vsphere_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
+        "//pkg/controller:go_default_library",
         "//vendor/github.com/vmware/govmomi/lookup/simulator:go_default_library",
         "//vendor/github.com/vmware/govmomi/simulator:go_default_library",
         "//vendor/github.com/vmware/govmomi/simulator/vpx:go_default_library",
         "//vendor/github.com/vmware/govmomi/sts/simulator:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
+        "//vendor/k8s.io/client-go/informers:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
     ],
 )
 
