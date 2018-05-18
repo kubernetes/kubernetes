@@ -90,8 +90,12 @@ type KubeControllerManagerOptions struct {
 }
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
-func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
-	componentConfig := NewDefaultComponentConfig(ports.InsecureKubeControllerManagerPort)
+func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
+	componentConfig, err := NewDefaultComponentConfig(ports.InsecureKubeControllerManagerPort)
+	if err != nil {
+		return nil, err
+	}
+
 	s := KubeControllerManagerOptions{
 		CloudProvider:    &cmoptions.CloudProviderOptions{},
 		Debugging:        &cmoptions.DebuggingOptions{},
@@ -193,11 +197,11 @@ func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
 
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
 
-	return &s
+	return &s, nil
 }
 
 // NewDefaultComponentConfig returns kube-controller manager configuration object.
-func NewDefaultComponentConfig(insecurePort int32) componentconfig.KubeControllerManagerConfiguration {
+func NewDefaultComponentConfig(insecurePort int32) (componentconfig.KubeControllerManagerConfiguration, error) {
 	scheme := runtime.NewScheme()
 	componentconfigv1alpha1.AddToScheme(scheme)
 	componentconfig.AddToScheme(scheme)
@@ -206,9 +210,11 @@ func NewDefaultComponentConfig(insecurePort int32) componentconfig.KubeControlle
 	scheme.Default(&versioned)
 
 	internal := componentconfig.KubeControllerManagerConfiguration{}
-	scheme.Convert(&versioned, &internal, nil)
+	if err := scheme.Convert(&versioned, &internal, nil); err != nil {
+		return internal, err
+	}
 	internal.KubeCloudShared.Port = insecurePort
-	return internal
+	return internal, nil
 }
 
 // AddFlags adds flags for a specific KubeControllerManagerOptions to the specified FlagSet
