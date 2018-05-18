@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/util/version"
+	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
 // Upgrade defines an upgrade possibility to upgrade from a current version to a new one
@@ -279,22 +279,23 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 }
 
 func getBranchFromVersion(version string) string {
-	return strings.TrimPrefix(version, "v")[:4]
+	v := versionutil.MustParseGeneric(version)
+	return fmt.Sprintf("%d.%d", v.Major(), v.Minor())
 }
 
-func patchVersionBranchExists(clusterVersion, stableVersion *version.Version) bool {
+func patchVersionBranchExists(clusterVersion, stableVersion *versionutil.Version) bool {
 	return stableVersion.AtLeast(clusterVersion)
 }
 
-func patchUpgradePossible(clusterVersion, patchVersion *version.Version) bool {
+func patchUpgradePossible(clusterVersion, patchVersion *versionutil.Version) bool {
 	return clusterVersion.LessThan(patchVersion)
 }
 
-func rcUpgradePossible(clusterVersion, previousBranchLatestVersion *version.Version) bool {
+func rcUpgradePossible(clusterVersion, previousBranchLatestVersion *versionutil.Version) bool {
 	return strings.HasPrefix(previousBranchLatestVersion.PreRelease(), "rc") && clusterVersion.LessThan(previousBranchLatestVersion)
 }
 
-func minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion *version.Version) bool {
+func minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion *versionutil.Version) bool {
 	return patchVersion.LessThan(stableVersion)
 }
 
