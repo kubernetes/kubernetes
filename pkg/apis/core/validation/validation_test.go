@@ -5865,6 +5865,149 @@ func TestValidatePodDNSConfig(t *testing.T) {
 	}
 }
 
+func TestValidatePodReadinessGates(t *testing.T) {
+	podReadinessGatesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodReadinessGates)
+	defer func() {
+		// Restoring the old value.
+		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%v", features.PodReadinessGates, podReadinessGatesEnabled)); err != nil {
+			t.Errorf("Failed to restore PodReadinessGates feature gate: %v", err)
+		}
+	}()
+	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodReadinessGates)); err != nil {
+		t.Errorf("Failed to enable PodReadinessGates feature gate: %v", err)
+	}
+
+	successCases := []struct {
+		desc           string
+		readinessGates []core.PodReadinessGate
+	}{
+		{
+			"no gate",
+			[]core.PodReadinessGate{},
+		},
+		{
+			"one readiness gate",
+			[]core.PodReadinessGate{
+				{
+					ConditionType: core.PodConditionType("example.com/condition"),
+				},
+			},
+		},
+		{
+			"two readiness gates",
+			[]core.PodReadinessGate{
+				{
+					ConditionType: core.PodConditionType("example.com/condition1"),
+				},
+				{
+					ConditionType: core.PodConditionType("example.com/condition2"),
+				},
+			},
+		},
+	}
+	for _, tc := range successCases {
+		if errs := validateReadinessGates(tc.readinessGates, field.NewPath("field")); len(errs) != 0 {
+			t.Errorf("expect tc %q to success: %v", tc.desc, errs)
+		}
+	}
+
+	errorCases := []struct {
+		desc           string
+		readinessGates []core.PodReadinessGate
+	}{
+		{
+			"invalid condition type",
+			[]core.PodReadinessGate{
+				{
+					ConditionType: core.PodConditionType("invalid/condition/type"),
+				},
+			},
+		},
+	}
+	for _, tc := range errorCases {
+		if errs := validateReadinessGates(tc.readinessGates, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected tc %q to fail", tc.desc)
+		}
+	}
+}
+
+func TestValidatePodConditions(t *testing.T) {
+	successCases := []struct {
+		desc          string
+		podConditions []core.PodCondition
+	}{
+		{
+			"no condition",
+			[]core.PodCondition{},
+		},
+		{
+			"one system condition",
+			[]core.PodCondition{
+				{
+					Type:   core.PodReady,
+					Status: core.ConditionTrue,
+				},
+			},
+		},
+		{
+			"one system condition and one custom condition",
+			[]core.PodCondition{
+				{
+					Type:   core.PodReady,
+					Status: core.ConditionTrue,
+				},
+				{
+					Type:   core.PodConditionType("example.com/condition"),
+					Status: core.ConditionFalse,
+				},
+			},
+		},
+		{
+			"two custom condition",
+			[]core.PodCondition{
+				{
+					Type:   core.PodConditionType("foobar"),
+					Status: core.ConditionTrue,
+				},
+				{
+					Type:   core.PodConditionType("example.com/condition"),
+					Status: core.ConditionFalse,
+				},
+			},
+		},
+	}
+
+	for _, tc := range successCases {
+		if errs := validatePodConditions(tc.podConditions, field.NewPath("field")); len(errs) != 0 {
+			t.Errorf("expected tc %q to success, but got: %v", tc.desc, errs)
+		}
+	}
+
+	errorCases := []struct {
+		desc          string
+		podConditions []core.PodCondition
+	}{
+		{
+			"one system condition and a invalid custom condition",
+			[]core.PodCondition{
+				{
+					Type:   core.PodReady,
+					Status: core.ConditionStatus("True"),
+				},
+				{
+					Type:   core.PodConditionType("invalid/custom/condition"),
+					Status: core.ConditionStatus("True"),
+				},
+			},
+		},
+	}
+	for _, tc := range errorCases {
+		if errs := validatePodConditions(tc.podConditions, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected tc %q to fail", tc.desc)
+		}
+	}
+}
+
 func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
 	activeDeadlineSecondsMax := int64(math.MaxInt32)
