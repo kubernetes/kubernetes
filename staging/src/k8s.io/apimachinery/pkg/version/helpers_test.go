@@ -36,7 +36,7 @@ func TestCompareKubeAwareVersionStrings(t *testing.T) {
 		{"v1beta10", "v1beta2", true},
 		{"foo", "v1beta2", false},
 		{"bar", "foo", true},
-		{"version1", "version2", true}, // Non kube-like versions are sorted alphabetically
+		{"version1", "version2", true},  // Non kube-like versions are sorted alphabetically
 		{"version1", "version10", true}, // Non kube-like versions are sorted alphabetically
 	}
 
