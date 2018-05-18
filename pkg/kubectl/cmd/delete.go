@@ -21,15 +21,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	kubectlwait "k8s.io/kubernetes/pkg/kubectl/cmd/wait"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -106,8 +109,9 @@ type DeleteOptions struct {
 
 	Output string
 
-	Mapper meta.RESTMapper
-	Result *resource.Result
+	DynamicClient dynamic.Interface
+	Mapper        meta.RESTMapper
+	Result        *resource.Result
 
 	genericclioptions.IOStreams
 }
@@ -122,7 +126,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Long:    delete_long,
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			o := deleteFlags.ToOptions(streams)
+			o := deleteFlags.ToOptions(nil, streams)
 			if err := o.Complete(f, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
@@ -137,6 +141,8 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	}
 
 	deleteFlags.AddFlags(cmd)
+
+	cmd.Flags().Bool("wait", true, `If true, wait for resources to be gone before returning.  This waits for finalizers.`)
 
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
@@ -167,6 +173,9 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		o.WaitForDeletion = true
 		o.GracePeriod = 1
 	}
+	if b, err := cmd.Flags().GetBool("wait"); err == nil {
+		o.WaitForDeletion = b
+	}
 
 	o.Reaper = f.Reaper
 
@@ -190,6 +199,11 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	o.Result = r
 
 	o.Mapper, err = f.ToRESTMapper()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
@@ -300,8 +314,38 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	}
 	if found == 0 {
 		fmt.Fprintf(o.Out, "No resources found\n")
+		return nil
 	}
-	return nil
+	if !o.WaitForDeletion {
+		return nil
+	}
+	// if we don't have a dynamic client, we don't want to wait.  Eventually when delete is cleaned up, this will likely
+	// drop out.
+	if o.DynamicClient == nil {
+		return nil
+	}
+
+	effectiveTimeout := o.Timeout
+	if effectiveTimeout == 0 {
+		// if we requested to wait forever, set it to a week.
+		effectiveTimeout = 168 * time.Hour
+	}
+	waitOptions := kubectlwait.WaitOptions{
+		ResourceFinder: kubectlwait.ResourceFinderForResult(o.Result),
+		DynamicClient:  o.DynamicClient,
+		Timeout:        effectiveTimeout,
+
+		Printer:     kubectlwait.NewDiscardingPrinter(),
+		ConditionFn: kubectlwait.IsDeleted,
+		IOStreams:   o.IOStreams,
+	}
+	err = waitOptions.RunWait()
+	if errors.IsForbidden(err) {
+		// if we're forbidden from waiting, we shouldn't fail.
+		glog.V(1).Info(err)
+		return nil
+	}
+	return err
 }
 
 func (o *DeleteOptions) cascadingDeleteResource(info *resource.Info) error {
