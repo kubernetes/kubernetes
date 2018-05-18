@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -147,9 +148,10 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 
 		delegateDialer := cfg.Dial
 		if delegateDialer == nil {
-			delegateDialer = net.Dial
+			var d net.Dialer
+			delegateDialer = d.DialContext
 		}
-		cfg.Dial = func(network, addr string) (net.Conn, error) {
+		cfg.Dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if addr == host {
 				u, err := cm.serviceResolver.ResolveEndpoint(svc.Namespace, svc.Name)
 				if err != nil {
@@ -157,7 +159,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 				}
 				addr = u.Host
 			}
-			return delegateDialer(network, addr)
+			return delegateDialer(ctx, network, addr)
 		}
 
 		return complete(cfg)

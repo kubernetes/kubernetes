@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
@@ -108,7 +109,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedI
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
-		Dial:            func(network, addr string) (net.Conn, error) { return nil, nil },
+		DialContext:     func(ctx context.Context, network, addr string) (net.Conn, error) { return nil, nil },
 		TLSClientConfig: &tls.Config{},
 	})
 

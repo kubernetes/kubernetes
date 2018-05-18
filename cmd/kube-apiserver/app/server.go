@@ -261,7 +261,7 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
 	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
-		Dial:            proxyDialerFn,
+		DialContext:     proxyDialerFn,
 		TLSClientConfig: proxyTLSClientConfig,
 	})
 	return nodeTunneler, proxyTransport, nil
@@ -522,8 +522,8 @@ func BuildGenericConfig(
 				if err != nil {
 					return nil, err
 				}
-				if proxyTransport != nil && proxyTransport.Dial != nil {
-					ret.Dial = proxyTransport.Dial
+				if proxyTransport != nil && proxyTransport.DialContext != nil {
+					ret.Dial = proxyTransport.DialContext
 				}
 				return ret, err
 			},

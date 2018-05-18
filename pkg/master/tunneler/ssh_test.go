@@ -17,6 +17,7 @@ limitations under the License.
 package tunneler
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -111,11 +112,11 @@ type FakeTunneler struct {
 	SecondsSinceSSHKeySyncValue int64
 }
 
-func (t *FakeTunneler) Run(AddressFunc)                         {}
-func (t *FakeTunneler) Stop()                                   {}
-func (t *FakeTunneler) Dial(net, addr string) (net.Conn, error) { return nil, nil }
-func (t *FakeTunneler) SecondsSinceSync() int64                 { return t.SecondsSinceSyncValue }
-func (t *FakeTunneler) SecondsSinceSSHKeySync() int64           { return t.SecondsSinceSSHKeySyncValue }
+func (t *FakeTunneler) Run(AddressFunc)                                              {}
+func (t *FakeTunneler) Stop()                                                        {}
+func (t *FakeTunneler) Dial(ctx context.Context, net, addr string) (net.Conn, error) { return nil, nil }
+func (t *FakeTunneler) SecondsSinceSync() int64                                      { return t.SecondsSinceSyncValue }
+func (t *FakeTunneler) SecondsSinceSSHKeySync() int64                                { return t.SecondsSinceSSHKeySyncValue }
 
 // TestIsTunnelSyncHealthy verifies that the 600 second lag test
 // is honored.

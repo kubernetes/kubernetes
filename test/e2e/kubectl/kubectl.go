@@ -1868,11 +1868,12 @@ func startProxyServer() (int, *exec.Cmd, error) {
 }
 
 func curlUnix(url string, path string) (string, error) {
-	dial := func(proto, addr string) (net.Conn, error) {
-		return net.Dial("unix", path)
+	dial := func(ctx context.Context, proto, addr string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, "unix", path)
 	}
 	transport := utilnet.SetTransportDefaults(&http.Transport{
-		Dial: dial,
+		DialContext: dial,
 	})
 	return curlTransport(url, transport)
 }
