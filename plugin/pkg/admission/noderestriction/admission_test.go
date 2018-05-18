@@ -17,11 +17,14 @@ limitations under the License.
 package noderestriction
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -32,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 var (
@@ -46,6 +50,27 @@ func init() {
 	if err := trDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
 		panic(err)
 	}
+}
+
+func label(node *api.Node, labels ...map[string]string) *api.Node {
+	// don't disrupt original
+	node = node.DeepCopy()
+	node.Labels = map[string]string{}
+	for _, l := range labels {
+		for k, v := range l {
+			node.Labels[k] = v
+		}
+	}
+	return node
+}
+func annotate(node *api.Node, annotations map[string]string) *api.Node {
+	// don't disrupt original
+	node = node.DeepCopy()
+	node.Annotations = map[string]string{}
+	for k, v := range annotations {
+		node.Annotations[k] = v
+	}
+	return node
 }
 
 func makeTestPod(namespace, name, node string, mirror bool) *api.Pod {
@@ -88,6 +113,38 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	var (
 		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 		bob    = &user.DefaultInfo{Name: "bob"}
+
+		allowedLabels = map[string]string{
+			apis.LabelArch:              "value",
+			apis.LabelOS:                "value",
+			apis.LabelHostname:          "value",
+			apis.LabelInstanceType:      "value",
+			apis.LabelZoneFailureDomain: "value",
+			apis.LabelZoneRegion:        "value",
+		}
+		allowedChangedLabels = map[string]string{
+			apis.LabelArch:              "newvalue",
+			apis.LabelOS:                "newvalue",
+			apis.LabelHostname:          "newvalue",
+			apis.LabelInstanceType:      "newvalue",
+			apis.LabelZoneFailureDomain: "newvalue",
+			apis.LabelZoneRegion:        "newvalue",
+		}
+		disallowedLabels = map[string]string{
+			"custom": "value",
+		}
+		disallowedChangedLabels = map[string]string{
+			"custom": "newvalue",
+		}
+		disallowedAdditionAnnotation = map[string]string{
+			DisallowedLabelsAnnotationKey: `{"custom":"value"}`,
+		}
+		disallowedChangeAnnotation = map[string]string{
+			DisallowedLabelsAnnotationKey: `{"custom":"newvalue"}`,
+		}
+		disallowedRemovalAnnotation = map[string]string{
+			DisallowedLabelsAnnotationKey: `{"custom":""}`,
+		}
 
 		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode"}
 		mynodeObj        = &api.Node{ObjectMeta: mynodeObjMeta}
@@ -170,6 +227,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		attributes admission.Attributes
 		features   utilfeature.FeatureGate
 		err        string
+		expected   runtime.Object
 	}{
 		// Mirror pods bound to us
 		{
@@ -713,6 +771,58 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObjTaintB, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
 			err:        "cannot modify taints",
 		},
+		{
+			name:       "allow create to add allowed labels",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedLabels), nil, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Create, mynode),
+		},
+		{
+			name:       "allow update to add allowed labels",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedLabels), mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+		},
+		{
+			name:       "allow update status to add allowed labels",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedLabels), mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "status", admission.Update, mynode),
+		},
+		{
+			name:       "allow update to add allowed labels and move disallowed labels",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedLabels, disallowedLabels), nil, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Create, mynode),
+			expected:   annotate(label(mynodeObj, allowedLabels), disallowedAdditionAnnotation),
+		},
+		{
+			name:       "allow update status to add allowed labels and move disallowed labels",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedLabels, disallowedLabels), nil, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "status", admission.Create, mynode),
+			expected:   annotate(label(mynodeObj, allowedLabels), disallowedAdditionAnnotation),
+		},
+		{
+			name:       "allow update to add allowed labels and move disallowed labels",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedLabels, disallowedLabels), mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			expected:   annotate(label(mynodeObj, allowedLabels), disallowedAdditionAnnotation),
+		},
+		{
+			name:       "allow update status to add allowed labels and move disallowed labels",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedLabels, disallowedLabels), mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "status", admission.Update, mynode),
+			expected:   annotate(label(mynodeObj, allowedLabels), disallowedAdditionAnnotation),
+		},
+		{
+			name:       "allow update to change allowed labels and move disallowed changes",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedChangedLabels, disallowedChangedLabels), label(mynodeObj, allowedLabels, disallowedLabels), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			expected:   annotate(label(mynodeObj, allowedChangedLabels, disallowedLabels), disallowedChangeAnnotation),
+		},
+		{
+			name:       "allow update status to change allowed labels and move disallowed changes",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedChangedLabels, disallowedChangedLabels), label(mynodeObj, allowedLabels, disallowedLabels), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "status", admission.Update, mynode),
+			expected:   annotate(label(mynodeObj, allowedChangedLabels, disallowedLabels), disallowedChangeAnnotation),
+		},
+		{
+			name:       "allow update to change allowed labels and move disallowed changes",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedChangedLabels), label(mynodeObj, allowedLabels, disallowedLabels), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			expected:   annotate(label(mynodeObj, allowedChangedLabels, disallowedLabels), disallowedRemovalAnnotation),
+		},
+		{
+			name:       "allow update status to change allowed labels and move disallowed changes",
+			attributes: admission.NewAttributesRecord(label(mynodeObj, allowedChangedLabels), label(mynodeObj, allowedLabels, disallowedLabels), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "status", admission.Update, mynode),
+			expected:   annotate(label(mynodeObj, allowedChangedLabels, disallowedLabels), disallowedRemovalAnnotation),
+		},
 
 		// Other node object
 		{
@@ -842,6 +952,22 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// record our starting object
+			startingObj := tt.attributes.GetObject()
+			if startingObj != nil {
+				startingObj = startingObj.DeepCopyObject()
+			}
+			defer func() {
+				// make sure any mutations are expected
+				expectedObject := tt.expected
+				if expectedObject == nil {
+					expectedObject = startingObj
+				}
+				if !reflect.DeepEqual(expectedObject, tt.attributes.GetObject()) {
+					t.Errorf("unexpected result:\n%s", diff.ObjectReflectDiff(expectedObject, tt.attributes.GetObject()))
+				}
+			}()
+
 			c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
 			if tt.features != nil {
 				c.features = tt.features
