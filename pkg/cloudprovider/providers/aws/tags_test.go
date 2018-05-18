@@ -17,9 +17,10 @@ limitations under the License.
 package aws
 
 import (
+	"testing"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"testing"
 )
 
 func TestFilterTags(t *testing.T) {

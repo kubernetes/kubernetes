@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/spf13/cobra"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,15 +31,12 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
-
-	"github.com/golang/glog"
-	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 type TopPodOptions struct {

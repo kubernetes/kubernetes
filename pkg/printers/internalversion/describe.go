@@ -30,9 +30,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/golang/glog"
-
 	"github.com/fatih/camelcase"
+	"github.com/golang/glog"
 
 	appsv1 "k8s.io/api/apps/v1"
 	rbacv1 "k8s.io/api/rbac/v1"

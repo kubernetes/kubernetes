@@ -22,12 +22,12 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/util/flowcontrol"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/googleapi"
+
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 const (

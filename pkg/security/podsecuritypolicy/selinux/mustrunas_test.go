@@ -17,11 +17,12 @@ limitations under the License.
 package selinux
 
 import (
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	"reflect"
 	"strings"
 	"testing"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 func TestMustRunAsOptions(t *testing.T) {

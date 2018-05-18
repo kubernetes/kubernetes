@@ -17,13 +17,13 @@ limitations under the License.
 package gce
 
 import (
-	"testing"
-
 	"fmt"
+	"testing"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
+
 	"google.golang.org/api/googleapi"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider"

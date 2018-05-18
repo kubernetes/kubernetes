@@ -17,13 +17,13 @@ limitations under the License.
 package pod
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
-	"fmt"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"reflect"
 )
 
 func TestPatchPodStatus(t *testing.T) {

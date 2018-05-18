@@ -17,11 +17,12 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"testing"
+
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestVerifyRunAsNonRoot(t *testing.T) {

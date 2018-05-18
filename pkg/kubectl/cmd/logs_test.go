@@ -19,6 +19,7 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -26,8 +27,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-
-	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 )
 

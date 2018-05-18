@@ -17,20 +17,19 @@ limitations under the License.
 package flexvolume
 
 import (
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/volume"
-
-	"os"
-
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
-	"strings"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 type flexVolumeProber struct {

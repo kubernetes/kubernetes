@@ -24,9 +24,10 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"github.com/golang/glog"
 	"reflect"
 	"time"
+
+	"github.com/golang/glog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"

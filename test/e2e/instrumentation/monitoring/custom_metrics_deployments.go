@@ -18,6 +18,7 @@ package monitoring
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
 
 	gcm "google.golang.org/api/monitoring/v3"
@@ -26,7 +27,6 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"os/exec"
 )
 
 var (

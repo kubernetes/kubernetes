@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 

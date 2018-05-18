@@ -21,11 +21,11 @@ import (
 	"os"
 	"strings"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-
 	"github.com/golang/glog"
+
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 // NodeAddresses returns the addresses of the specified instance.

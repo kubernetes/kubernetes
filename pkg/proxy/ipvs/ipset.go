@@ -17,12 +17,13 @@ limitations under the License.
 package ipvs
 
 import (
+	"fmt"
+
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-
-	"fmt"
-	"github.com/golang/glog"
 )
 
 const (

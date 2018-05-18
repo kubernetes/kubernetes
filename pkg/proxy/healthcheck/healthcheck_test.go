@@ -24,11 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 type fakeListener struct {

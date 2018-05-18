@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -27,8 +29,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-
-	"github.com/golang/glog"
 )
 
 const (

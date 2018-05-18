@@ -22,10 +22,10 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
-
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 func TestDeleteRoute(t *testing.T) {

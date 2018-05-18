@@ -47,7 +47,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	utiltesting "k8s.io/client-go/util/testing"
-
 	// TODO we need to remove this linkage and create our own scheme
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"

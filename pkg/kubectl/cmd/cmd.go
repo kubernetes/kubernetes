@@ -22,6 +22,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
@@ -34,10 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/wait"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-
-	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 const (

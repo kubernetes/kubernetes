@@ -17,14 +17,13 @@ limitations under the License.
 package timer
 
 import (
-	"time"
-
 	"bytes"
 	"fmt"
+	"sync"
+	"time"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/perftype"
-	"sync"
 )
 
 var now = time.Now

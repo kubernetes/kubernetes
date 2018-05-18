@@ -25,17 +25,17 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
+
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 const (

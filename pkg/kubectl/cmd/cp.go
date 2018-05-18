@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"archive/tar"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -27,17 +28,15 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/renstrom/dedent"
+	"github.com/spf13/cobra"
+
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-
-	"bytes"
-
-	"github.com/renstrom/dedent"
-	"github.com/spf13/cobra"
 )
 
 var (

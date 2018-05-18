@@ -22,7 +22,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/pbm"
-
 	pbmtypes "github.com/vmware/govmomi/pbm/types"
 	"github.com/vmware/govmomi/vim25"
 )

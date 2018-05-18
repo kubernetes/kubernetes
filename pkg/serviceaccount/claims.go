@@ -22,10 +22,10 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"gopkg.in/square/go-jose.v2/jwt"
+
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/apis/core"
-
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // time.Now stubbed out to allow testing

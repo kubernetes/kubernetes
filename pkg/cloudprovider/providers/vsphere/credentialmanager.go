@@ -19,13 +19,15 @@ package vsphere
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/listers/core/v1"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/golang/glog"
+
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/listers/core/v1"
 )
 
 // Error Messages

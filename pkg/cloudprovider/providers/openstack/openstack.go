@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
@@ -40,7 +41,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/gcfg.v1"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"

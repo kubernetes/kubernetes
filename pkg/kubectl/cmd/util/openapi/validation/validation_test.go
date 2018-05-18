@@ -102,7 +102,7 @@ spec:
     "containers": [
       {
         "name": "master",
-	"image": "gcr.io/fake_project/fake_image:fake_tag",
+  "image": "gcr.io/fake_project/fake_image:fake_tag",
         "args": "this is a bad command"
       }
     ]
@@ -191,7 +191,7 @@ spec:
     "containers": [
       {
         "name": "apache-php",
-	"image": "gcr.io/fake_project/fake_image:fake_tag",
+  "image": "gcr.io/fake_project/fake_image:fake_tag",
         "ports": [
           {
             "name": "apache",

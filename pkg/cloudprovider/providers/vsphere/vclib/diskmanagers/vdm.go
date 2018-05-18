@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
+
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 )
 

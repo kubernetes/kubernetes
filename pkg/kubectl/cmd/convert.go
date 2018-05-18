@@ -19,6 +19,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/golang/glog"
+	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,9 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-
-	"github.com/golang/glog"
-	"github.com/spf13/cobra"
 )
 
 var (

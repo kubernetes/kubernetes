@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,6 +31,7 @@ import (
 	internalauthorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of

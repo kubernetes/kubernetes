@@ -26,14 +26,14 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	"google.golang.org/api/googleapi"
-
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 
 	alpha "google.golang.org/api/compute/v0.alpha"
 	beta "google.golang.org/api/compute/v0.beta"
 	ga "google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
+
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
 // Cloud is an interface for the GCE compute API.

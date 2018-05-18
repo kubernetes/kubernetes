@@ -28,6 +28,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,8 +62,6 @@ import (
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	kubeversion "k8s.io/kubernetes/pkg/version"
-
-	"github.com/stretchr/testify/assert"
 )
 
 // setUp is a convience function for setting up for (most) tests.

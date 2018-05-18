@@ -23,6 +23,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 

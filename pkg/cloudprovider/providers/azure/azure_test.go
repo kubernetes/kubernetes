@@ -28,17 +28,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
-	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/stretchr/testify/assert"
 )
 
 var testClusterName = "testCluster"

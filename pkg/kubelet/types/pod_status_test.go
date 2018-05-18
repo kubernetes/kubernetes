@@ -17,8 +17,9 @@ limitations under the License.
 package types
 
 import (
-	"k8s.io/api/core/v1"
 	"testing"
+
+	"k8s.io/api/core/v1"
 )
 
 func TestPodConditionByKubelet(t *testing.T) {

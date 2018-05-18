@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type netlinkHandle struct {

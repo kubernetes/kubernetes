@@ -17,9 +17,10 @@ limitations under the License.
 package vsphere
 
 import (
-	. "github.com/onsi/gomega"
 	"os"
 	"strconv"
+
+	. "github.com/onsi/gomega"
 )
 
 const (

@@ -18,6 +18,7 @@ package strategy
 
 import (
 	"fmt"
+
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 )
 

@@ -27,13 +27,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/ssh"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
-
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type InstallSSHKey func(ctx context.Context, user string, data []byte) error

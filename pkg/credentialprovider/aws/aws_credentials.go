@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 

@@ -19,18 +19,17 @@ package gce_pd
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-
-	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"strings"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {

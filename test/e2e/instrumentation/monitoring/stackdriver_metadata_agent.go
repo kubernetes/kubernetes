@@ -17,21 +17,20 @@ limitations under the License.
 package monitoring
 
 import (
-	"time"
-
-	"golang.org/x/oauth2/google"
-	clientset "k8s.io/client-go/kubernetes"
-
 	"context"
 	"encoding/json"
 	"fmt"
-	. "github.com/onsi/ginkgo"
 	"io/ioutil"
+	"reflect"
+	"time"
+
+	. "github.com/onsi/ginkgo"
+	"golang.org/x/oauth2/google"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
-	"reflect"
 )
 
 const (

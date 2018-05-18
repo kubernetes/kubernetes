@@ -21,6 +21,9 @@ import (
 	"io"
 	"strconv"
 
+	ct "github.com/daviddengcn/go-colortext"
+	"github.com/spf13/cobra"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
@@ -31,9 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-
-	ct "github.com/daviddengcn/go-colortext"
-	"github.com/spf13/cobra"
 )
 
 var (

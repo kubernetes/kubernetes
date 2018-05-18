@@ -23,17 +23,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
-
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
 )
 
 const (

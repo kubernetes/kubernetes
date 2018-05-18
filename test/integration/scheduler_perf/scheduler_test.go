@@ -18,17 +18,19 @@ package benchmark
 
 import (
 	"fmt"
+	"math"
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler"
 	testutils "k8s.io/kubernetes/test/utils"
-	"math"
-	"strconv"
-	"testing"
-	"time"
 )
 
 const (

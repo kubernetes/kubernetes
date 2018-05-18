@@ -17,13 +17,12 @@ limitations under the License.
 package strategy_test
 
 import (
-	. "github.com/onsi/gomega"
-
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/ghodss/yaml"
+	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/kubectl/apply"

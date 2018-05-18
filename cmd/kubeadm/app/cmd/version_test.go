@@ -20,8 +20,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/ghodss/yaml"
 	"testing"
+
+	"github.com/ghodss/yaml"
 )
 
 func TestNewCmdVersion(t *testing.T) {

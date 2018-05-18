@@ -25,13 +25,13 @@ import (
 	"fmt"
 	"strings"
 
+	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
+
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-
-	jose "gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret

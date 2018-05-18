@@ -18,13 +18,14 @@ package cpumanager
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"io/ioutil"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,6 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	"os"
 )
 
 type mockState struct {

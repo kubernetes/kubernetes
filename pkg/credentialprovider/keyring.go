@@ -23,9 +23,9 @@ import (
 	"sort"
 	"strings"
 
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
 
-	dockertypes "github.com/docker/docker/api/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 

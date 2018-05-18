@@ -18,12 +18,13 @@ package services
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 // terminationSignals are signals that cause the program to exit in the

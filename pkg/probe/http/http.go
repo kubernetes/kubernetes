@@ -24,11 +24,11 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/golang/glog"
+
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/version"
-
-	"github.com/golang/glog"
 )
 
 func New() HTTPProber {

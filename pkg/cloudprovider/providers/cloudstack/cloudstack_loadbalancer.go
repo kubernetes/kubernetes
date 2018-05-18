@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/xanzy/go-cloudstack/cloudstack"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )

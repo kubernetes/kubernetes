@@ -25,14 +25,14 @@ import (
 	"sort"
 	"strings"
 
+	"cloud.google.com/go/compute/metadata"
+	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-
-	"cloud.google.com/go/compute/metadata"
-	compute "google.golang.org/api/compute/v1"
-	"google.golang.org/api/googleapi"
 )
 
 type gceInstance struct {

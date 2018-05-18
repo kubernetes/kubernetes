@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/probe"
-
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/probe"
 )
 
 func New() TCPProber {

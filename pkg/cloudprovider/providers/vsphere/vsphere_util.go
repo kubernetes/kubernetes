@@ -19,24 +19,23 @@ package vsphere
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/vim25"
-
-	"fmt"
-
 	"github.com/vmware/govmomi/vim25/mo"
-	"io/ioutil"
+
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
 	"k8s.io/kubernetes/pkg/util/version"
-	"path/filepath"
 )
 
 const (

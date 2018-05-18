@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/rancher/go-rancher/client"
+
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 

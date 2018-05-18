@@ -26,14 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	k8s_volume "k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
+	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
 	volumes_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
@@ -42,7 +35,13 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	k8s_volume "k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type volumeService interface {

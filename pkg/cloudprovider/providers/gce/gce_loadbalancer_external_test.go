@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/require"
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
-
 	ga "google.golang.org/api/compute/v1"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"

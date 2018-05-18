@@ -19,6 +19,8 @@ package kubemark
 import (
 	"time"
 
+	"github.com/golang/glog"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
@@ -36,8 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/test/utils"
-
-	"github.com/golang/glog"
 )
 
 type HollowKubelet struct {

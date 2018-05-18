@@ -18,6 +18,7 @@ package aws
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 

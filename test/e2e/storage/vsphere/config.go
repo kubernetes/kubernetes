@@ -19,10 +19,11 @@ package vsphere
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/gcfg.v1"
 	"io"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"os"
+
+	"gopkg.in/gcfg.v1"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
