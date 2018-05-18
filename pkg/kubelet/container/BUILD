@@ -21,7 +21,6 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
-        "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/volume:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
