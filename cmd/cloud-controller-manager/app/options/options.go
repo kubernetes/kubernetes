@@ -116,6 +116,9 @@ func NewDefaultComponentConfig(insecurePort int32) componentconfig.CloudControll
 
 // AddFlags adds flags for a specific ExternalCMServer to the specified FlagSet
 func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
 	o.CloudProvider.AddFlags(fs)
 	o.Debugging.AddFlags(fs)
 	o.GenericComponent.AddFlags(fs)
@@ -136,6 +139,9 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ApplyTo fills up cloud controller manager config with options.
 func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config, userAgent string) error {
+	if o == nil {
+		return nil
+	}
 	if err := o.CloudProvider.ApplyTo(&c.ComponentConfig.CloudProvider); err != nil {
 		return err
 	}
@@ -193,6 +199,10 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 
 // Validate is used to validate config before launching the cloud controller manager
 func (o *CloudControllerManagerOptions) Validate() error {
+	if o == nil {
+		return nil
+	}
+
 	errors := []error{}
 
 	errors = append(errors, o.CloudProvider.Validate()...)
