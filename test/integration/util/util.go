@@ -58,7 +58,7 @@ func StartApiserver() (string, ShutdownFunc) {
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns a handle to the configurator for the running scheduler
 // and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface, enableEquivalenceCache bool) (scheduler.Configurator, ShutdownFunc) {
+func StartScheduler(clientSet clientset.Interface) (scheduler.Configurator, ShutdownFunc) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	evtBroadcaster := record.NewBroadcaster()
