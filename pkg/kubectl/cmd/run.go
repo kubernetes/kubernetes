@@ -387,7 +387,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 		opts.PodClient = clientset.Core()
 
-		attachablePod, err := f.AttachablePodForObject(runObject.Object, opts.GetPodTimeout)
+		attachablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, runObject.Object, opts.GetPodTimeout)
 		if err != nil {
 			return err
 		}
