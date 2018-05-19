@@ -2,16 +2,12 @@ api:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
   controlPlaneEndpoint: ""
-apiVersion: kubeadm.k8s.io/v1alpha1
+apiVersion: kubeadm.k8s.io/v1alpha2
 auditPolicy:
   logDir: /var/log/kubernetes/audit
   logMaxAge: 2
   path: ""
-authorizationModes:
-- Node
-- RBAC
 certificatesDir: /var/lib/kubernetes/pki
-cloudProvider: ""
 clusterName: kubernetes
 criSocket: /var/run/criruntime.sock
 etcd:
@@ -67,7 +63,6 @@ networking:
   podSubnet: ""
   serviceSubnet: 10.196.0.0/12
 nodeName: master-1
-privilegedPods: false
 token: s73ybu.6tw6wnqgp5z0wb77
 tokenGroups:
 - system:bootstrappers:kubeadm:default-node-token
