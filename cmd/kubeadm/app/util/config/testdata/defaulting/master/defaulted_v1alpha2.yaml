@@ -1,0 +1,76 @@
+api:
+  advertiseAddress: 192.168.2.2
+  bindPort: 6443
+  controlPlaneEndpoint: ""
+apiVersion: kubeadm.k8s.io/v1alpha2
+auditPolicy:
+  logDir: /var/log/kubernetes/audit
+  logMaxAge: 2
+  path: ""
+authorizationModes:
+- Node
+- RBAC
+certificatesDir: /var/lib/kubernetes/pki
+clusterName: kubernetes
+criSocket: /var/run/criruntime.sock
+etcd:
+  caFile: ""
+  certFile: ""
+  dataDir: /var/lib/etcd
+  endpoints: null
+  image: ""
+  keyFile: ""
+imageRepository: my-company.com
+kind: MasterConfiguration
+kubeProxy:
+  config:
+    bindAddress: 0.0.0.0
+    clientConnection:
+      acceptContentTypes: ""
+      burst: 10
+      contentType: application/vnd.kubernetes.protobuf
+      kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
+      qps: 5
+    clusterCIDR: ""
+    configSyncPeriod: 15m0s
+    conntrack:
+      max: null
+      maxPerCore: 32768
+      min: 131072
+      tcpCloseWaitTimeout: 1h0m0s
+      tcpEstablishedTimeout: 24h0m0s
+    enableProfiling: false
+    healthzBindAddress: 0.0.0.0:10256
+    hostnameOverride: ""
+    iptables:
+      masqueradeAll: false
+      masqueradeBit: 14
+      minSyncPeriod: 0s
+      syncPeriod: 30s
+    ipvs:
+      ExcludeCIDRs: null
+      minSyncPeriod: 0s
+      scheduler: ""
+      syncPeriod: 30s
+    metricsBindAddress: 127.0.0.1:10249
+    mode: ""
+    nodePortAddresses: null
+    oomScoreAdj: -999
+    portRange: ""
+    resourceContainer: /kube-proxy
+    udpIdleTimeout: 250ms
+kubeletConfiguration: {}
+kubernetesVersion: v1.10.2
+networking:
+  dnsDomain: cluster.global
+  podSubnet: ""
+  serviceSubnet: 10.196.0.0/12
+nodeName: master-1
+token: s73ybu.6tw6wnqgp5z0wb77
+tokenGroups:
+- system:bootstrappers:kubeadm:default-node-token
+tokenTTL: 24h0m0s
+tokenUsages:
+- signing
+- authentication
+unifiedControlPlaneImage: ""

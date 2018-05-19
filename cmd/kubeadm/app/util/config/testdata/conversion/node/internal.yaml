@@ -1,0 +1,14 @@
+CACertPath: /etc/kubernetes/pki/ca.crt
+CRISocket: /var/run/dockershim.sock
+ClusterName: kubernetes
+DiscoveryFile: ""
+DiscoveryTimeout: 5m0s
+DiscoveryToken: abcdef.0123456789abcdef
+DiscoveryTokenAPIServers:
+- kube-apiserver:6443
+DiscoveryTokenCACertHashes: null
+DiscoveryTokenUnsafeSkipCAVerification: true
+FeatureGates: null
+NodeName: master-1
+TLSBootstrapToken: abcdef.0123456789abcdef
+Token: abcdef.0123456789abcdef

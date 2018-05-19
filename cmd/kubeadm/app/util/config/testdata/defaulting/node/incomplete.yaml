@@ -1,0 +1,7 @@
+apiVersion: kubeadm.k8s.io/v1alpha1
+kind: NodeConfiguration
+discoveryTokenAPIServers:
+- kube-apiserver:6443
+discoveryTokenUnsafeSkipCAVerification: true
+nodeName: thegopher
+token: abcdef.0123456789abcdef

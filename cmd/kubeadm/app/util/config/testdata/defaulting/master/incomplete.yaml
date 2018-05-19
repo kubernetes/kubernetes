@@ -1,0 +1,13 @@
+api:
+  advertiseAddress: 192.168.2.2
+  bindPort: 6443
+certificatesDir: /var/lib/kubernetes/pki
+clusterName: kubernetes
+criSocket: /var/run/criruntime.sock
+imageRepository: my-company.com
+kubernetesVersion: v1.10.2
+networking:
+  dnsDomain: cluster.global
+  serviceSubnet: 10.196.0.0/12
+nodeName: master-1
+token: s73ybu.6tw6wnqgp5z0wb77

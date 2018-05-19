@@ -1,6 +1,11 @@
 api:
   advertiseAddress: 172.31.93.180
   bindPort: 6443
+  controlPlaneEndpoint: ""
+apiVersion: kubeadm.k8s.io/v1alpha1
+auditPolicy:
+  logDir: ""
+  path: ""
 authorizationModes:
 - Node
 - RBAC
@@ -14,6 +19,7 @@ etcd:
   image: ""
   keyFile: ""
 imageRepository: gcr.io/google_containers
+kind: MasterConfiguration
 kubeProxy:
   config:
     bindAddress: 0.0.0.0
@@ -32,7 +38,9 @@ kubeProxy:
       tcpCloseWaitTimeout: 1h0m0s
       tcpEstablishedTimeout: 24h0m0s
     enableProfiling: false
-    featureGates: ""
+    featureGates:
+      ServiceNodeExclusion: true
+      SupportIPVSProxyMode: true
     healthzBindAddress: 0.0.0.0:10256
     hostnameOverride: ""
     iptables:
@@ -41,15 +49,17 @@ kubeProxy:
       minSyncPeriod: 0s
       syncPeriod: 30s
     ipvs:
+      ExcludeCIDRs: null
       minSyncPeriod: 0s
       scheduler: ""
       syncPeriod: 30s
     metricsBindAddress: 127.0.0.1:10249
     mode: ""
+    nodePortAddresses: null
     oomScoreAdj: -999
     portRange: ""
     resourceContainer: /kube-proxy
-    udpTimeoutMilliseconds: 250ms
+    udpIdleTimeout: 0s
 kubeletConfiguration: {}
 kubernetesVersion: v1.9.6
 networking:
@@ -57,6 +67,7 @@ networking:
   podSubnet: 192.168.0.0/16
   serviceSubnet: 10.96.0.0/12
 nodeName: ip-172-31-93-180.ec2.internal
+privilegedPods: false
 token: 8d69af.cd3e1c58f6228dfc
 tokenTTL: 24h0m0s
 unifiedControlPlaneImage: ""
