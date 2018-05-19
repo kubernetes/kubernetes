@@ -1096,6 +1096,12 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			// Memory and storage are measured in bytes and size cannot be 0 < size < 1
+			if (v1.ResourceName(k) == v1.ResourceMemory || v1.ResourceName(k) == v1.ResourceEphemeralStorage) && q.CmpInt64(1) == -1 && q.CmpInt64(0) == 1 {
+				return nil, fmt.Errorf("invalid size format for %q: %v", k, v)
+			}
+
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
 			}
