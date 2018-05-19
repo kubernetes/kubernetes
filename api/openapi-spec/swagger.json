@@ -20984,6 +20984,41 @@
     ]
    },
    "/apis/apiregistration.k8s.io/v1/apiservices/{name}/status": {
+    "get": {
+     "description": "read status of the specified APIService",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiregistration_v1"
+     ],
+     "operationId": "readApiregistrationV1APIServiceStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1"
+     }
+    },
     "put": {
      "description": "replace status of the specified APIService",
      "consumes": [
@@ -21029,6 +21064,53 @@
       }
      },
      "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1"
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified APIService",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiregistration_v1"
+     ],
+     "operationId": "patchApiregistrationV1APIServiceStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
       "group": "apiregistration.k8s.io",
       "kind": "APIService",
@@ -21793,6 +21875,41 @@
     ]
    },
    "/apis/apiregistration.k8s.io/v1beta1/apiservices/{name}/status": {
+    "get": {
+     "description": "read status of the specified APIService",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiregistration_v1beta1"
+     ],
+     "operationId": "readApiregistrationV1beta1APIServiceStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1beta1"
+     }
+    },
     "put": {
      "description": "replace status of the specified APIService",
      "consumes": [
@@ -21838,6 +21955,53 @@
       }
      },
      "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1beta1"
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified APIService",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiregistration_v1beta1"
+     ],
+     "operationId": "patchApiregistrationV1beta1APIServiceStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
       "group": "apiregistration.k8s.io",
       "kind": "APIService",
@@ -44754,6 +44918,41 @@
     ]
    },
    "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/{name}/status": {
+    "get": {
+     "description": "read status of the specified CertificateSigningRequest",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "certificates_v1beta1"
+     ],
+     "operationId": "readCertificatesV1beta1CertificateSigningRequestStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "certificates.k8s.io",
+      "kind": "CertificateSigningRequest",
+      "version": "v1beta1"
+     }
+    },
     "put": {
      "description": "replace status of the specified CertificateSigningRequest",
      "consumes": [
@@ -44799,6 +44998,53 @@
       }
      },
      "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "certificates.k8s.io",
+      "kind": "CertificateSigningRequest",
+      "version": "v1beta1"
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified CertificateSigningRequest",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "certificates_v1beta1"
+     ],
+     "operationId": "patchCertificatesV1beta1CertificateSigningRequestStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
       "group": "certificates.k8s.io",
       "kind": "CertificateSigningRequest",
