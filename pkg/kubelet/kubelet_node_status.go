@@ -41,7 +41,6 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/version"
@@ -370,13 +369,25 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// apiserver cache (the data might be slightly delayed but it doesn't
 	// seem to cause more conflict - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
-	opts := metav1.GetOptions{}
+	var node *v1.Node
+	var err error
 	if tryNumber == 0 {
-		util.FromApiserverCache(&opts)
+		cachedNode, err := kl.nodeInfo.GetNodeInfo(string(kl.nodeName))
+		switch {
+		case err != nil:
+			glog.Warningf("error getting node from cache %q: %v", kl.nodeName, err)
+		case !kl.getNodeReadyLastHeartbeatTime(cachedNode).Equal(&kl.lastHeartbeatTime):
+			glog.Infof("cached node heartbeat time does not match last submitted time")
+		default:
+			node = cachedNode
+		}
 	}
-	node, err := kl.heartbeatClient.Nodes().Get(string(kl.nodeName), opts)
-	if err != nil {
-		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
+
+	if node == nil {
+		node, err = kl.heartbeatClient.Nodes().Get(string(kl.nodeName), metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
+		}
 	}
 
 	originalNode := node.DeepCopy()
@@ -394,6 +405,11 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	if err != nil {
 		return err
 	}
+
+	if lastHeartBeatTime := kl.getNodeReadyLastHeartbeatTime(updatedNode); lastHeartBeatTime != nil {
+		kl.lastHeartbeatTime = *lastHeartBeatTime
+	}
+
 	// If update finishes successfully, mark the volumeInUse as reportedInUse to indicate
 	// those volumes are already updated in the node's status
 	kl.volumeManager.MarkVolumesAsReportedInUse(updatedNode.Status.VolumesInUse)
@@ -1098,6 +1114,17 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		withoutError(kl.setNodeVolumesInUseStatus),
 		withoutError(kl.recordNodeSchedulableEvent),
 	}
+}
+
+// getNodeReadyLastHeartbeatTime get the LastHeartbeatTime on NodeReady condition,
+// and returns nil if the NodeReady condition doesn't exist.
+func (kl *Kubelet) getNodeReadyLastHeartbeatTime(node *v1.Node) *metav1.Time {
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == v1.NodeReady {
+			return &node.Status.Conditions[i].LastHeartbeatTime
+		}
+	}
+	return nil
 }
 
 // Validate given node IP belongs to the current host

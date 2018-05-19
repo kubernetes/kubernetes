@@ -185,10 +185,11 @@ func newTestKubeletWithImageList(
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
-							Type:    v1.NodeReady,
-							Status:  v1.ConditionTrue,
-							Reason:  "Ready",
-							Message: "Node ready",
+							Type:              v1.NodeReady,
+							Status:            v1.ConditionTrue,
+							Reason:            "Ready",
+							Message:           "Node ready",
+							LastHeartbeatTime: metav1.Now(),
 						},
 					},
 					Addresses: []v1.NodeAddress{

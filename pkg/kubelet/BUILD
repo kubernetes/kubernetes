@@ -81,7 +81,6 @@ go_library(
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/kubelet/util:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/util/manager:go_default_library",
         "//pkg/kubelet/util/queue:go_default_library",

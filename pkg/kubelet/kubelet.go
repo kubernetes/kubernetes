@@ -1023,6 +1023,9 @@ type Kubelet struct {
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
 
+	// Last time update node status.
+	lastHeartbeatTime metav1.Time
+
 	// Generates pod events.
 	pleg pleg.PodLifecycleEventGenerator
 
