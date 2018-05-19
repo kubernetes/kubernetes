@@ -19,6 +19,7 @@ package spdy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
@@ -118,7 +119,7 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	}
 
 	if proxyURL == nil {
-		return s.dialWithoutProxy(req.URL)
+		return s.dialWithoutProxy(req.Context(), req.URL)
 	}
 
 	// ensure we use a canonical host with proxyReq
@@ -136,7 +137,7 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
-	proxyDialConn, err := s.dialWithoutProxy(proxyURL)
+	proxyDialConn, err := s.dialWithoutProxy(req.Context(), proxyURL)
 	if err != nil {
 		return nil, err
 	}
@@ -187,14 +188,15 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 }
 
 // dialWithoutProxy dials the host specified by url, using TLS if appropriate.
-func (s *SpdyRoundTripper) dialWithoutProxy(url *url.URL) (net.Conn, error) {
+func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
 
 	if url.Scheme == "http" {
 		if s.Dialer == nil {
-			return net.Dial("tcp", dialAddr)
+			var d net.Dialer
+			return d.DialContext(ctx, "tcp", dialAddr)
 		} else {
-			return s.Dialer.Dial("tcp", dialAddr)
+			return s.Dialer.DialContext(ctx, "tcp", dialAddr)
 		}
 	}
 
