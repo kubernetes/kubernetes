@@ -72,7 +72,7 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *componentconfig.Kub
 
 // Validate validates the deprecated scheduler options.
 func (o *DeprecatedOptions) Validate() []error {
-	if o != nil {
+	if o == nil {
 		return nil
 	}
 	return nil
