@@ -90,9 +90,11 @@ func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
 		t.Proxy = NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
-	if t.Dial == nil {
-		t.Dial = defaultTransport.Dial
+	// TODO: refactor this once Dial is stopped using.
+	if t.Dial == nil && t.DialContext == nil {
+		t.DialContext = defaultTransport.DialContext
 	}
+
 	if t.TLSHandshakeTimeout == 0 {
 		t.TLSHandshakeTimeout = defaultTransport.TLSHandshakeTimeout
 	}
