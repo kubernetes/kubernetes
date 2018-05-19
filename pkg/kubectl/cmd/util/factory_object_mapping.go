@@ -184,6 +184,8 @@ func (f *ring1Factory) ApproximatePodTemplateForObject(object runtime.Object) (*
 		return &t.Spec.Template, nil
 	case *batch.Job:
 		return &t.Spec.Template, nil
+	case *batch.CronJob:
+		return &t.Spec.JobTemplate.Spec.Template, nil
 	}
 
 	return nil, fmt.Errorf("unable to extract pod template from type %v", reflect.TypeOf(object))
