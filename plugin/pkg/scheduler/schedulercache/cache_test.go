@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
@@ -721,6 +722,7 @@ func TestNodeOperators(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod1",
+						UID:  types.UID("pod1"),
 					},
 					Spec: v1.PodSpec{
 						NodeName: nodeName,
@@ -771,6 +773,7 @@ func TestNodeOperators(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod1",
+						UID:  types.UID("pod1"),
 					},
 					Spec: v1.PodSpec{
 						NodeName: nodeName,
@@ -789,6 +792,7 @@ func TestNodeOperators(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod2",
+						UID:  types.UID("pod2"),
 					},
 					Spec: v1.PodSpec{
 						NodeName: nodeName,
@@ -912,6 +916,7 @@ func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, po
 	}
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
+			UID:       types.UID(objName),
 			Namespace: "node_info_cache_test",
 			Name:      objName,
 		},
