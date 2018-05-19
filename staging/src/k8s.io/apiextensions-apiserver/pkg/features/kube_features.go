@@ -36,6 +36,7 @@ const (
 
 	// owner: @sttts, @nikhita
 	// alpha: v1.10
+	// beta: v1.11
 	//
 	// CustomResourceSubresources defines the subresources for CustomResources
 	CustomResourceSubresources utilfeature.Feature = "CustomResourceSubresources"
@@ -50,5 +51,5 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	CustomResourceValidation:   {Default: true, PreRelease: utilfeature.Beta},
-	CustomResourceSubresources: {Default: false, PreRelease: utilfeature.Alpha},
+	CustomResourceSubresources: {Default: true, PreRelease: utilfeature.Beta},
 }
