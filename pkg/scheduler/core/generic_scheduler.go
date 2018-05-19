@@ -430,10 +430,6 @@ func podFitsOnNode(
 	var (
 		eCacheAvailable  bool
 		failedPredicates []algorithm.PredicateFailureReason
-		invalid          bool
-		fit              bool
-		reasons          []algorithm.PredicateFailureReason
-		err              error
 	)
 	predicateResults := make(map[string]HostPredicate)
 
@@ -469,38 +465,54 @@ func podFitsOnNode(
 		// when pods are nominated or their nominations change.
 		eCacheAvailable = equivCacheInfo != nil && !podsAdded
 		for _, predicateKey := range predicates.Ordering() {
+			var (
+				fit     bool
+				reasons []algorithm.PredicateFailureReason
+				err     error
+			)
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
-				if eCacheAvailable {
-					// Lock ecache here to avoid a race condition against cache invalidation invoked
-					// in event handlers. This race has existed despite locks in eCache implementation.
-					ecache.Lock()
-					// PredicateWithECache will return its cached predicate results.
-					fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivCacheInfo.hash, false)
-				}
-
-				if !eCacheAvailable || invalid {
-					// we need to execute predicate functions since equivalence cache does not work
-					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
-					if err != nil {
-						return false, []algorithm.PredicateFailureReason{}, err
-					}
+				// Use an in-line function to guarantee invocation of ecache.Unlock()
+				// when the in-line function returns.
+				func() {
+					var invalid bool
 					if eCacheAvailable {
-						// Store data to update eCache after this loop.
-						if res, exists := predicateResults[predicateKey]; exists {
-							res.Fit = res.Fit && fit
-							res.FailReasons = append(res.FailReasons, reasons...)
-							predicateResults[predicateKey] = res
-						} else {
-							predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
-						}
-						result := predicateResults[predicateKey]
-						ecache.UpdateCachedPredicateItem(pod.GetName(), info.Node().GetName(), predicateKey, result.Fit, result.FailReasons, equivCacheInfo.hash, false)
+						// Lock ecache here to avoid a race condition against cache invalidation invoked
+						// in event handlers. This race has existed despite locks in equivClassCacheimplementation.
+						ecache.Lock()
+						defer ecache.Unlock()
+						// PredicateWithECache will return its cached predicate results.
+						fit, reasons, invalid = ecache.PredicateWithECache(
+							pod.GetName(), info.Node().GetName(),
+							predicateKey, equivCacheInfo.hash, false)
 					}
-				}
 
-				if eCacheAvailable {
-					ecache.Unlock()
+					if !eCacheAvailable || invalid {
+						// we need to execute predicate functions since equivalence cache does not work
+						fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
+						if err != nil {
+							return
+						}
+
+						if eCacheAvailable {
+							// Store data to update equivClassCacheafter this loop.
+							if res, exists := predicateResults[predicateKey]; exists {
+								res.Fit = res.Fit && fit
+								res.FailReasons = append(res.FailReasons, reasons...)
+								predicateResults[predicateKey] = res
+							} else {
+								predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
+							}
+							result := predicateResults[predicateKey]
+							ecache.UpdateCachedPredicateItem(
+								pod.GetName(), info.Node().GetName(),
+								predicateKey, result.Fit, result.FailReasons, equivCacheInfo.hash, false)
+						}
+					}
+				}()
+
+				if err != nil {
+					return false, []algorithm.PredicateFailureReason{}, err
 				}
 
 				if !fit {
@@ -508,7 +520,9 @@ func podFitsOnNode(
 					failedPredicates = append(failedPredicates, reasons...)
 					// if alwaysCheckAllPredicates is false, short circuit all predicates when one predicate fails.
 					if !alwaysCheckAllPredicates {
-						glog.V(5).Infoln("since alwaysCheckAllPredicates has not been set, the predicate evaluation is short circuited and there are chances of other predicates failing as well.")
+						glog.V(5).Infoln("since alwaysCheckAllPredicates has not been set, the predicate" +
+							"evaluation is short circuited and there are chances" +
+							"of other predicates failing as well.")
 						break
 					}
 				}
