@@ -305,3 +305,14 @@ func TestDumpReaderToFile(t *testing.T) {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
 	}
 }
+
+func TestIsFilenameSliceEmpty(t *testing.T) {
+	var filenames []string
+	if !IsFilenameSliceEmpty(filenames) {
+		t.Errorf("filenames isn't empty %v", filenames)
+	}
+	filenames = append(filenames, "pod.yaml")
+	if IsFilenameSliceEmpty(filenames) {
+		t.Errorf("filenames is empty %v", filenames)
+	}
+}
