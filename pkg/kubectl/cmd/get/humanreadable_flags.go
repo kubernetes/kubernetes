@@ -43,13 +43,14 @@ type HumanPrintFlags struct {
 	WithNamespace      bool
 }
 
-// EnsureWithKind sets the provided GroupKind humanreadable value.
-// If the kind received is non-empty, the "showKind" humanreadable
-// printer option is set to true.
-func (f *HumanPrintFlags) EnsureWithKind(kind schema.GroupKind) error {
-	showKind := !kind.Empty()
-
+// SetKind sets the Kind option
+func (f *HumanPrintFlags) SetKind(kind schema.GroupKind) {
 	f.Kind = kind
+}
+
+// EnsureWithKind sets the "Showkind" humanreadable option to true.
+func (f *HumanPrintFlags) EnsureWithKind() error {
+	showKind := true
 	f.ShowKind = &showKind
 	return nil
 }

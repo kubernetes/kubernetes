@@ -41,6 +41,11 @@ type PrintFlags struct {
 	OutputFormat *string
 }
 
+// SetKind sets the Kind option of humanreadable flags
+func (f *PrintFlags) SetKind(kind schema.GroupKind) {
+	f.HumanReadableFlags.SetKind(kind)
+}
+
 // EnsureWithNamespace ensures that humanreadable flags return
 // a printer capable of printing with a "namespace" column.
 func (f *PrintFlags) EnsureWithNamespace() error {
@@ -49,8 +54,8 @@ func (f *PrintFlags) EnsureWithNamespace() error {
 
 // EnsureWithKind ensures that humanreadable flags return
 // a printer capable of including resource kinds.
-func (f *PrintFlags) EnsureWithKind(kind schema.GroupKind) error {
-	return f.HumanReadableFlags.EnsureWithKind(kind)
+func (f *PrintFlags) EnsureWithKind() error {
+	return f.HumanReadableFlags.EnsureWithKind()
 }
 
 // Copy returns a copy of PrintFlags for mutation
