@@ -21,8 +21,8 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 const compatibilityTestingCheckpoint = "cpumanager_state_compatibility_test"

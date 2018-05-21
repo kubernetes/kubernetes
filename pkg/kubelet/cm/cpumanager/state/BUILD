@@ -24,6 +24,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "state_checkpoint_test.go",
+        "state_compatibility_test.go",
         "state_file_test.go",
     ],
     embed = [":go_default_library"],
