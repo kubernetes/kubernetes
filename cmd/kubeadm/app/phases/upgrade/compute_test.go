@@ -826,3 +826,56 @@ func TestKubeletUpgrade(t *testing.T) {
 		}
 	}
 }
+
+func TestGetBranchFromVersion(t *testing.T) {
+	testCases := []struct {
+		version         string
+		expectedVersion string
+	}{
+		{
+			version:         "v1.9.5",
+			expectedVersion: "1.9",
+		},
+		{
+			version:         "v1.9.0-alpha.2",
+			expectedVersion: "1.9",
+		},
+		{
+			version:         "v1.9.0-beta.0",
+			expectedVersion: "1.9",
+		},
+		{
+			version:         "v1.9.0-rc.1",
+			expectedVersion: "1.9",
+		},
+		{
+			version:         "v1.12.5",
+			expectedVersion: "1.12",
+		},
+		{
+			version:         "v1.11.0-alpha.0",
+			expectedVersion: "1.11",
+		},
+
+		{
+			version:         "v1.11.0-beta.1",
+			expectedVersion: "1.11",
+		},
+		{
+			version:         "v1.11.0-rc.0",
+			expectedVersion: "1.11",
+		},
+		{
+			version:         "1.12.5",
+			expectedVersion: "1.12",
+		},
+	}
+
+	for _, tc := range testCases {
+		v := getBranchFromVersion(tc.version)
+		if v != tc.expectedVersion {
+			t.Errorf("expected version %s, got %s", tc.expectedVersion, v)
+		}
+	}
+
+}

@@ -1555,6 +1555,10 @@ function start-kube-apiserver {
       if [[ -n "${ADVANCED_AUDIT_LOG_INITIAL_BACKOFF:-}" ]]; then
         params+=" --audit-log-initial-backoff=${ADVANCED_AUDIT_LOG_INITIAL_BACKOFF}"
       fi
+      # Truncating backend parameters
+      if [[ -n "${ADVANCED_AUDIT_TRUNCATING_BACKEND:-}" ]]; then
+        params+=" --audit-log-truncate-enabled=${ADVANCED_AUDIT_TRUNCATING_BACKEND}"
+      fi
     fi
     if [[ "${ADVANCED_AUDIT_BACKEND:-}" == *"webhook"* ]]; then
       params+=" --audit-webhook-mode=batch"
@@ -1588,14 +1592,18 @@ function start-kube-apiserver {
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-}" ]]; then
         params+=" --audit-webhook-initial-backoff=${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF}"
       fi
+      # Truncating backend parameters
+      if [[ -n "${ADVANCED_AUDIT_TRUNCATING_BACKEND:-}" ]]; then
+        params+=" --audit-webhook-truncate-enabled=${ADVANCED_AUDIT_TRUNCATING_BACKEND}"
+      fi
     fi
   fi
 
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
     params+=" --enable-logs-handler=false"
   fi
-  if [[ -n "${APISERVER_KUBELET_CA:-}" ]]; then
-    params+=" --kubelet-certificate-authority=${APISERVER_KUBELET_CA}"
+  if [[ "${APISERVER_SET_KUBELET_CA:-false}" == "true" ]]; then
+    params+=" --kubelet-certificate-authority=${CA_CERT_BUNDLE_PATH}"
   fi
 
   local admission_controller_config_mount=""
@@ -2155,12 +2163,8 @@ function update-prometheus-to-sd-parameters {
 
 # Updates parameters in yaml file for event-exporter configuration
 function update-event-exporter {
-  if [[ "${MULTIMASTER:-}" == "true" ]]; then
-    local -r location=${REGION:-}
-  else
-    local -r location=${ZONE:-}
-  fi
-  sed -i -e "s@{{ *event_exporter_location *}}@${location}@g" "$1"
+    local -r stackdriver_resource_model="${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}"
+    sed -i -e "s@{{ exporter_sd_resource_model }}@${stackdriver_resource_model}@g" "$1"
 }
 
 function update-dashboard-controller {

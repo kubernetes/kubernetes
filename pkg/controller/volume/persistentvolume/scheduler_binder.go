@@ -174,7 +174,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	glog.V(4).Infof("AssumePodVolumes for pod %q, node %q", podName, nodeName)
 
 	if allBound := b.arePodVolumesBound(assumedPod); allBound {
-		glog.V(4).Infof("AssumePodVolumes: all PVCs bound and nothing to do")
+		glog.V(4).Infof("AssumePodVolumes for pod %q, node %q: all PVCs bound and nothing to do", podName, nodeName)
 		return true, false, nil
 	}
 
@@ -184,7 +184,8 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 
 	for _, binding := range claimsToBind {
 		newPV, dirty, err := b.ctrl.getBindVolumeToClaim(binding.pv, binding.pvc)
-		glog.V(5).Infof("AssumePodVolumes: getBindVolumeToClaim for PV %q, PVC %q.  newPV %p, dirty %v, err: %v",
+		glog.V(5).Infof("AssumePodVolumes: getBindVolumeToClaim for pod %q, PV %q, PVC %q.  newPV %p, dirty %v, err: %v",
+			podName,
 			binding.pv.Name,
 			binding.pvc.Name,
 			newPV,
@@ -208,7 +209,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	if len(newBindings) == 0 {
 		// Don't update cached bindings if no API updates are needed.  This can happen if we
 		// previously updated the PV object and are waiting for the PV controller to finish binding.
-		glog.V(4).Infof("AssumePodVolumes: PVs already assumed")
+		glog.V(4).Infof("AssumePodVolumes for pod %q, node %q: PVs already assumed", podName, nodeName)
 		return false, false, nil
 	}
 	b.podBindingCache.UpdateBindings(assumedPod, nodeName, newBindings)
@@ -218,13 +219,15 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 
 // BindPodVolumes gets the cached bindings in podBindingCache and makes the API update for those PVs.
 func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod) error {
-	glog.V(4).Infof("BindPodVolumes for pod %q", getPodName(assumedPod))
+	podName := getPodName(assumedPod)
+	glog.V(4).Infof("BindPodVolumes for pod %q", podName)
 
 	bindings := b.podBindingCache.GetBindings(assumedPod, assumedPod.Spec.NodeName)
 
 	// Do the actual prebinding. Let the PV controller take care of the rest
 	// There is no API rollback if the actual binding fails
 	for i, bindingInfo := range bindings {
+		glog.V(5).Infof("BindPodVolumes: Pod %q, binding PV %q to PVC %q", podName, bindingInfo.pv.Name, bindingInfo.pvc.Name)
 		_, err := b.ctrl.updateBindVolumeToClaim(bindingInfo.pv, bindingInfo.pvc, false)
 		if err != nil {
 			// only revert assumed cached updates for volumes we haven't successfully bound
@@ -335,11 +338,13 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 		glog.V(5).Infof("PersistentVolume %q, Node %q matches for Pod %q", pvName, node.Name, podName)
 	}
 
-	glog.V(4).Infof("All volumes for Pod %q match with Node %q", podName, node.Name)
+	glog.V(4).Infof("All bound volumes for Pod %q match with Node %q", podName, node.Name)
 	return true, nil
 }
 
 func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*bindingInfo, node *v1.Node) (foundMatches bool, err error) {
+	podName := getPodName(pod)
+
 	// Sort all the claims by increasing size request to get the smallest fits
 	sort.Sort(byPVCSize(claimsToBind))
 
@@ -360,17 +365,18 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*bindingI
 			return false, err
 		}
 		if bindingInfo.pv == nil {
-			glog.V(4).Infof("No matching volumes for PVC %q on node %q", getPVCName(bindingInfo.pvc), node.Name)
+			glog.V(4).Infof("No matching volumes for Pod %q, PVC %q on node %q", podName, getPVCName(bindingInfo.pvc), node.Name)
 			return false, nil
 		}
 
 		// matching PV needs to be excluded so we don't select it again
 		chosenPVs[bindingInfo.pv.Name] = bindingInfo.pv
+		glog.V(5).Infof("Found matching PV %q for PVC %q on node %q for pod %q", bindingInfo.pv.Name, getPVCName(bindingInfo.pvc), node.Name, podName)
 	}
 
 	// Mark cache with all the matches for each PVC for this node
 	b.podBindingCache.UpdateBindings(pod, node.Name, claimsToBind)
-	glog.V(4).Infof("Found matching volumes on node %q", node.Name)
+	glog.V(4).Infof("Found matching volumes for pod %q on node %q", podName, node.Name)
 
 	return true, nil
 }
