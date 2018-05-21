@@ -121,6 +121,7 @@ func (sc *stateCheckpoint) storeState() {
 	}
 }
 
+// GetCPUSet returns current CPU set
 func (sc *stateCheckpoint) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {
 	sc.mux.RLock()
 	defer sc.mux.RUnlock()
@@ -129,6 +130,7 @@ func (sc *stateCheckpoint) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {
 	return res, ok
 }
 
+// GetDefaultCPUSet returns default CPU set
 func (sc *stateCheckpoint) GetDefaultCPUSet() cpuset.CPUSet {
 	sc.mux.RLock()
 	defer sc.mux.RUnlock()
@@ -136,6 +138,7 @@ func (sc *stateCheckpoint) GetDefaultCPUSet() cpuset.CPUSet {
 	return sc.cache.GetDefaultCPUSet()
 }
 
+// GetCPUSetOrDefault returns current CPU set, or default one if it wasn't changed
 func (sc *stateCheckpoint) GetCPUSetOrDefault(containerID string) cpuset.CPUSet {
 	sc.mux.RLock()
 	defer sc.mux.RUnlock()
@@ -143,6 +146,7 @@ func (sc *stateCheckpoint) GetCPUSetOrDefault(containerID string) cpuset.CPUSet 
 	return sc.cache.GetCPUSetOrDefault(containerID)
 }
 
+// GetCPUAssignments returns current CPU to pod assignments
 func (sc *stateCheckpoint) GetCPUAssignments() ContainerCPUAssignments {
 	sc.mux.RLock()
 	defer sc.mux.RUnlock()
@@ -150,6 +154,7 @@ func (sc *stateCheckpoint) GetCPUAssignments() ContainerCPUAssignments {
 	return sc.cache.GetCPUAssignments()
 }
 
+// SetCPUSet sets CPU set
 func (sc *stateCheckpoint) SetCPUSet(containerID string, cset cpuset.CPUSet) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
@@ -157,6 +162,7 @@ func (sc *stateCheckpoint) SetCPUSet(containerID string, cset cpuset.CPUSet) {
 	sc.storeState()
 }
 
+// SetDefaultCPUSet sets default CPU set
 func (sc *stateCheckpoint) SetDefaultCPUSet(cset cpuset.CPUSet) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
@@ -164,6 +170,7 @@ func (sc *stateCheckpoint) SetDefaultCPUSet(cset cpuset.CPUSet) {
 	sc.storeState()
 }
 
+// SetCPUAssignments sets CPU to pod assignments
 func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
@@ -171,6 +178,7 @@ func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments) {
 	sc.storeState()
 }
 
+// Delete deletes assignment for specified pod
 func (sc *stateCheckpoint) Delete(containerID string) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
@@ -178,6 +186,7 @@ func (sc *stateCheckpoint) Delete(containerID string) {
 	sc.storeState()
 }
 
+// ClearState clears the state and saves it in a checkpoint
 func (sc *stateCheckpoint) ClearState() {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
