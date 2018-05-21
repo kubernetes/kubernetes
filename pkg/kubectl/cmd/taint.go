@@ -113,7 +113,7 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		ValidArgs: validArgs,
 	}
 
-	options.PrintFlags.AddFlags(cmd)
+	options.PrintFlags.AddFlags(cmd.Flags())
 
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")

@@ -103,9 +103,9 @@ func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
-	o.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd.Flags())
 
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "the resource to update the subjects")
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &o.FilenameOptions, "the resource to update the subjects")
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set subject will NOT contact api-server but run locally.")

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // NamePrintFlags provides default flags necessary for printing
@@ -61,7 +61,7 @@ func (f *NamePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, error)
 
 // AddFlags receives a *cobra.Command reference and binds
 // flags related to name printing to it
-func (f *NamePrintFlags) AddFlags(c *cobra.Command) {}
+func (f *NamePrintFlags) AddFlags(fs *pflag.FlagSet) {}
 
 // NewNamePrintFlags returns flags associated with
 // --name printing, with default values set.

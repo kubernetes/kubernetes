@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
@@ -46,12 +47,12 @@ func (o *FileNameFlags) ToOptions() resource.FilenameOptions {
 	return options
 }
 
-func (o *FileNameFlags) AddFlags(cmd *cobra.Command) {
+func (o *FileNameFlags) AddFlags(fs *pflag.FlagSet) {
 	if o.Recursive != nil {
-		cmd.Flags().BoolVarP(o.Recursive, "recursive", "R", *o.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
+		fs.BoolVarP(o.Recursive, "recursive", "R", *o.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 	}
 	if o.Filenames != nil {
-		kubectl.AddJsonFilenameFlag(cmd, o.Filenames, "Filename, directory, or URL to files "+o.Usage)
+		kubectl.AddJsonFilenameFlag(fs, o.Filenames, "Filename, directory, or URL to files "+o.Usage)
 	}
 }
 
@@ -119,7 +120,7 @@ func (f *DeleteFlags) ToOptions(streams genericclioptions.IOStreams) *DeleteOpti
 }
 
 func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
-	f.FileNameFlags.AddFlags(cmd)
+	f.FileNameFlags.AddFlags(cmd.Flags())
 	if f.LabelSelector != nil {
 		cmd.Flags().StringVarP(f.LabelSelector, "selector", "l", *f.LabelSelector, "Selector (label query) to filter on, not including uninitialized ones.")
 	}

@@ -126,13 +126,13 @@ func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		},
 	}
 
-	o.PrintFlags.AddFlags(cmd)
-	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd.Flags())
+	o.RecordFlags.AddFlags(cmd.Flags())
 
 	//usage := "Filename, directory, or URL to a file identifying the resource to get from the server"
 	//kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &o.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, not including uninitialized ones,supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVarP(&o.ContainerSelector, "containers", "c", o.ContainerSelector, "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")

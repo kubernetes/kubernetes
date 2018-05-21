@@ -61,7 +61,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd.Flags().Int64("revision", 0, "See the details, including podTemplate of the revision specified")
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), options, usage)
 	return cmd
 }
 

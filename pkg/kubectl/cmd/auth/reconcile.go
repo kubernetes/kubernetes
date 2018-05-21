@@ -85,9 +85,9 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		},
 	}
 
-	o.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd.Flags())
 
-	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to reconcile.")
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), o.FilenameOptions, "identifying the resource to reconcile.")
 	cmd.MarkFlagRequired("filename")
 
 	return cmd

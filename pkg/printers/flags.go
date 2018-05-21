@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -104,12 +104,12 @@ func (f *PrintFlags) ToPrinter() (ResourcePrinter, error) {
 	return nil, NoCompatiblePrinterError{Options: f, OutputFormat: f.OutputFormat}
 }
 
-func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
-	f.JSONYamlPrintFlags.AddFlags(cmd)
-	f.NamePrintFlags.AddFlags(cmd)
+func (f *PrintFlags) AddFlags(fs *pflag.FlagSet) {
+	f.JSONYamlPrintFlags.AddFlags(fs)
+	f.NamePrintFlags.AddFlags(fs)
 
 	if f.OutputFormat != nil {
-		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
+		fs.StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
 	}
 }
 

@@ -165,8 +165,8 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 
 	// bind flag structs
 	o.DeleteFlags.AddFlags(cmd)
-	o.RecordFlags.AddFlags(cmd)
-	o.PrintFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd.Flags())
+	o.PrintFlags.AddFlags(cmd.Flags())
 
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")

@@ -105,11 +105,11 @@ func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams
 		},
 	}
 
-	o.PrintFlags.AddFlags(cmd)
-	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd.Flags())
+	o.RecordFlags.AddFlags(cmd.Flags())
 
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, &o.fileNameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd.Flags(), &o.fileNameOptions, usage)
 	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, set serviceaccount will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)

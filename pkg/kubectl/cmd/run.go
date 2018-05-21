@@ -153,8 +153,8 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	}
 
 	o.DeleteFlags.AddFlags(cmd)
-	o.PrintFlags.AddFlags(cmd)
-	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd.Flags())
+	o.RecordFlags.AddFlags(cmd.Flags())
 
 	addRunFlags(cmd, o)
 	cmdutil.AddApplyAnnotationFlags(cmd)

@@ -62,8 +62,8 @@ func (f *kubectlConfigPrintFlags) ToPrinter() (printers.ResourcePrinter, error) 
 }
 
 func (f *kubectlConfigPrintFlags) AddFlags(cmd *cobra.Command) {
-	f.JSONYamlPrintFlags.AddFlags(cmd)
-	f.NamePrintFlags.AddFlags(cmd)
+	f.JSONYamlPrintFlags.AddFlags(cmd.Flags())
+	f.NamePrintFlags.AddFlags(cmd.Flags())
 	f.TemplateFlags.AddFlags(cmd)
 
 	if f.OutputFormat != nil {
