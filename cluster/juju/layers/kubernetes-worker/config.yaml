@@ -13,7 +13,7 @@ options:
       cluster. Declare node labels in key=value format, separated by spaces.
   allow-privileged:
     type: string
-    default: "auto"
+    default: true
     description: |
       Allow privileged containers to run on worker nodes. Supported values are
       "true", "false", and "auto". If "true", kubelet will run in privileged
