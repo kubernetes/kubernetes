@@ -79,3 +79,29 @@ func TestIsControllerEnabled(t *testing.T) {
 	}
 
 }
+
+func TestNewControllerInitializers(t *testing.T) {
+	cs := NewControllerInitializers()
+	tcs := []struct {
+		name           string
+		controllerName string
+		expected       bool
+	}{
+		{
+			name:           "exist",
+			controllerName: "job",
+			expected:       true,
+		},
+		{
+			name:           "not exist",
+			controllerName: "abc",
+			expected:       false,
+		},
+	}
+	for _, tc := range tcs {
+		_, actual := cs[tc.controllerName]
+		if actual != tc.expected {
+			t.Errorf("%v: expected %v, got %v", tc.name, tc.expected, actual)
+		}
+	}
+}
