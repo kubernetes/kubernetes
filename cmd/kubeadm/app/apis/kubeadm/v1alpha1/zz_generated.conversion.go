@@ -230,7 +230,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.KubernetesVersion = in.KubernetesVersion
 	// WARNING: in.CloudProvider requires manual conversion: does not exist in peer-type
 	out.NodeName = in.NodeName
-	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
+	// WARNING: in.AuthorizationModes requires manual conversion: does not exist in peer-type
 	out.NoTaintMaster = in.NoTaintMaster
 	// WARNING: in.PrivilegedPods requires manual conversion: does not exist in peer-type
 	out.Token = in.Token
@@ -275,7 +275,6 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	}
 	out.KubernetesVersion = in.KubernetesVersion
 	out.NodeName = in.NodeName
-	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
 	out.NoTaintMaster = in.NoTaintMaster
 	out.Token = in.Token
 	out.TokenTTL = (*meta_v1.Duration)(unsafe.Pointer(in.TokenTTL))

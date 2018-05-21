@@ -233,7 +233,6 @@ func autoConvert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	}
 	out.KubernetesVersion = in.KubernetesVersion
 	out.NodeName = in.NodeName
-	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
 	out.NoTaintMaster = in.NoTaintMaster
 	out.Token = in.Token
 	out.TokenTTL = (*meta_v1.Duration)(unsafe.Pointer(in.TokenTTL))
@@ -282,7 +281,6 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in 
 	}
 	out.KubernetesVersion = in.KubernetesVersion
 	out.NodeName = in.NodeName
-	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
 	out.NoTaintMaster = in.NoTaintMaster
 	out.Token = in.Token
 	out.TokenTTL = (*meta_v1.Duration)(unsafe.Pointer(in.TokenTTL))
