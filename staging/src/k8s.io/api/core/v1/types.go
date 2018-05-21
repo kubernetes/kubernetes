@@ -19,6 +19,7 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -5090,3 +5091,20 @@ const (
 	// and data streams for a single forwarded connection
 	PortForwardRequestIDHeader = "requestID"
 )
+
+func (l *ReplicationControllerList) EachListItem(fn func(runtime.Object) error) error {
+	for i := range l.Items {
+		if err := fn(&l.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *ReplicationControllerList) AssignTypes() error {
+	return l.EachListItem(func(obj runtime.Object) error {
+		rc := obj.(*ReplicationController)
+		rc.TypeMeta = metav1.TypeMeta{APIVersion: SchemeGroupVersion.String(), Kind: "ReplicationController"}
+		return nil
+	})
+}

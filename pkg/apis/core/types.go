@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -4507,3 +4508,20 @@ const (
 	// DefaultHardPodAffinityWeight defines the weight of the implicit PreferredDuringScheduling affinity rule.
 	DefaultHardPodAffinitySymmetricWeight int32 = 1
 )
+
+func (l *ReplicationControllerList) EachListItem(fn func(runtime.Object) error) error {
+	for i := range l.Items {
+		if err := fn(&l.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *ReplicationControllerList) AssignTypes() error {
+	return l.EachListItem(func(obj runtime.Object) error {
+		rc := obj.(*ReplicationController)
+		rc.TypeMeta = metav1.TypeMeta{}
+		return nil
+	})
+}

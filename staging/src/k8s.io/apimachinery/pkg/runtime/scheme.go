@@ -643,7 +643,11 @@ func (s *Scheme) copyAndSetTargetKind(copy bool, obj Object, kind schema.GroupVe
 // setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.
 func (s *Scheme) setTargetKind(obj Object, kind schema.GroupVersionKind) error {
 	// set underlying object types when we're a list that is not generic
-	if _, isList := obj.(listInterface); isList &&
+	if typeAssigner, ok := obj.(TypeAssigner); ok {
+		if err := typeAssigner.AssignTypes(); err != nil {
+			return err
+		}
+	} else if _, isList := obj.(listInterface); isList &&
 		kind.GroupKind() != (schema.GroupKind{Group: "meta.k8s.io", Kind: "List"}) &&
 		kind.GroupKind() != (schema.GroupKind{Group: "", Kind: "List"}) {
 
@@ -856,9 +860,14 @@ func GetItemsPtr(list Object) (interface{}, error) {
 // EachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
 // the loop.
 func EachListItem(obj Object, fn func(Object) error) error {
+	if forEach, ok := obj.(ForEach); ok {
+		return forEach.EachListItem(fn)
+	}
 	if unstructured, ok := obj.(Unstructured); ok {
+
 		return unstructured.EachListItem(fn)
 	}
+
 	// TODO: Change to an interface call?
 	itemsPtr, err := GetItemsPtr(obj)
 	if err != nil {
@@ -916,4 +925,12 @@ type listInterface interface {
 	SetSelfLink(selfLink string)
 	GetContinue() string
 	SetContinue(c string)
+}
+
+type ForEach interface {
+	EachListItem(fn func(Object) error) error
+}
+
+type TypeAssigner interface {
+	AssignTypes() error
 }
