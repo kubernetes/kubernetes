@@ -278,6 +278,9 @@ type KubeletConfiguration struct {
 	ContainerLogMaxFiles int32
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
+	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	// +optional
+	AllowedUnsafeSysctls []string
 
 	/* the following fields are meant for Node Allocatable */
 

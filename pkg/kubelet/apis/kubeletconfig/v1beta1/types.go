@@ -634,6 +634,9 @@ type KubeletConfiguration struct {
 	// Default: "Watching"
 	// +optional
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy `json:"configMapAndSecretChangeDetectionStrategy,omitempty"`
+	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	// +optional
+	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
 
 	/* the following fields are meant for Node Allocatable */
 
