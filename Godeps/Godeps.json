@@ -9,6 +9,7 @@
 		"github.com/client9/misspell/cmd/misspell",
 		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
 		"github.com/kubernetes/repo-infra/kazel",
+		"golang.org/x/tools/cmd/goimports",
 		"./..."
 	],
 	"Deps": [
@@ -3063,6 +3064,10 @@
 		},
 		{
 			"ImportPath": "golang.org/x/tools/benchmark/parse",
+			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/cmd/goimports",
 			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
 		},
 		{
