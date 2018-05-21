@@ -31,7 +31,6 @@ import (
 	"testing"
 	"time"
 
-	// "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,6 +49,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 )
 
 const (
@@ -77,6 +77,12 @@ func init() {
 	examplev1.AddToScheme(scheme)
 }
 
+func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeopenapi.OpenAPIDefinition {
+	return map[string]kubeopenapi.OpenAPIDefinition{
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList": {},
+	}
+}
+
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
@@ -89,14 +95,8 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 		t.Fatal("unable to create fake client set")
 	}
 
-	// TODO restore this test, but right now, eliminate our cycle
-	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
-	// config.OpenAPIConfig.Info = &spec.Info{
-	// 	InfoProps: spec.InfoProps{
-	// 		Title:   "Kubernetes",
-	// 		Version: "unversioned",
-	// 	},
-	// }
+	config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
+	config.OpenAPIConfig.Info.Version = "unversioned"
 	config.SwaggerConfig = DefaultSwaggerConfig()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
 	config.Complete(sharedInformers)
