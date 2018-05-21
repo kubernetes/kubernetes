@@ -17,6 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"reflect"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -41,6 +44,7 @@ func Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 	}
 
 	UpgradeCloudProvider(in, out)
+	UpgradeAuthorizationModes(in, out)
 	// We don't support migrating information from the .PrivilegedPods field which was removed in v1alpha2
 
 	return nil
@@ -67,5 +71,16 @@ func UpgradeCloudProvider(in *MasterConfiguration, out *kubeadm.MasterConfigurat
 
 		out.APIServerExtraArgs["cloud-provider"] = in.CloudProvider
 		out.ControllerManagerExtraArgs["cloud-provider"] = in.CloudProvider
+	}
+}
+
+func UpgradeAuthorizationModes(in *MasterConfiguration, out *kubeadm.MasterConfiguration) {
+	// If .AuthorizationModes was set to something else than the default, preserve the information via extraargs
+	if !reflect.DeepEqual(in.AuthorizationModes, strings.Split(DefaultAuthorizationModes, ",")) {
+
+		if out.APIServerExtraArgs == nil {
+			out.APIServerExtraArgs = map[string]string{}
+		}
+		out.APIServerExtraArgs["authorization-mode"] = strings.Join(in.AuthorizationModes, ",")
 	}
 }

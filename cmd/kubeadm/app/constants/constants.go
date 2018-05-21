@@ -275,11 +275,6 @@ var (
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// AuthorizationPolicyPath defines the supported location of authorization policy file
-	AuthorizationPolicyPath = filepath.Join(KubernetesDir, "abac_policy.json")
-	// AuthorizationWebhookConfigPath defines the supported location of webhook config file
-	AuthorizationWebhookConfigPath = filepath.Join(KubernetesDir, "webhook_authz.conf")
-
 	// DefaultTokenUsages specifies the default functions a token will get
 	DefaultTokenUsages = bootstrapapi.KnownTokenUsages
 
