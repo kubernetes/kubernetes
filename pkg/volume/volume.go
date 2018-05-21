@@ -162,6 +162,9 @@ type BlockVolumeMapper interface {
 	// at attacher.Attach() and attacher.WaitForAttach().
 	// This may be called more than once, so implementations must be idempotent.
 	SetUpDevice() (string, error)
+
+	// Map maps the block device path for the specified spec and pod.
+	MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error
 }
 
 // BlockVolumeUnmapper interface provides methods to cleanup/unmap the volumes.
