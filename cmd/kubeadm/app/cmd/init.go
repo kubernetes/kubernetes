@@ -31,7 +31,6 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -92,12 +91,13 @@ var (
 		This error is likely caused by:
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-			- Either there is no internet connection, or imagePullPolicy is set to "Never",
-			  so the kubelet cannot pull or find the following control plane images:
+			- No internet connection is available so the kubelet cannot pull or find the following control plane images:
 				- {{ .APIServerImage }}
 				- {{ .ControllerManagerImage }}
 				- {{ .SchedulerImage }}
 				- {{ .EtcdImage }} (only if no external etcd endpoints are configured)
+				- You can check or miligate this in beforehand with "kubeadm config images pull" to make sure the images
+				  are downloaded locally and cached.
 
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
@@ -537,12 +537,9 @@ func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
 		return dryrunutil.NewWaiter()
 	}
 
+	// TODO: List images locally using `crictl` and pull in preflight checks if not available
+	// When we do that, we can always assume the images exist at this point and have a shorter timeout.
 	timeout := 30 * time.Minute
-
-	// No need for a large timeout if we don't expect downloads
-	if i.cfg.ImagePullPolicy == v1.PullNever {
-		timeout = 60 * time.Second
-	}
 	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 

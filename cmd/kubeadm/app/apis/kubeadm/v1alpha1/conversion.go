@@ -46,6 +46,7 @@ func Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 	UpgradeCloudProvider(in, out)
 	UpgradeAuthorizationModes(in, out)
 	// We don't support migrating information from the .PrivilegedPods field which was removed in v1alpha2
+	// We don't support migrating information from the .ImagePullPolicy field which was removed in v1alpha2
 
 	return nil
 }

@@ -94,8 +94,6 @@ type MasterConfiguration struct {
 
 	// ImageRepository what container registry to pull control plane images from
 	ImageRepository string `json:"imageRepository"`
-	// ImagePullPolicy that control plane images. Can be Always, IfNotPresent or Never.
-	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
 	// UnifiedControlPlaneImage specifies if a specific container image should
 	// be used for all control plane components.
 	UnifiedControlPlaneImage string `json:"unifiedControlPlaneImage"`

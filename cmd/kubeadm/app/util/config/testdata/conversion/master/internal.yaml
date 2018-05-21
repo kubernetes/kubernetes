@@ -27,7 +27,6 @@ Etcd:
   PeerCertSANs: null
   ServerCertSANs: null
 FeatureGates: null
-ImagePullPolicy: ""
 ImageRepository: k8s.gcr.io
 KubeProxy:
   Config:

@@ -93,9 +93,6 @@ type MasterConfiguration struct {
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string
 
-	// ImagePullPolicy for control plane images. Can be Always, IfNotPresent or Never.
-	ImagePullPolicy v1.PullPolicy
-
 	// ImageRepository is the container registry to pull control plane images from.
 	ImageRepository string
 

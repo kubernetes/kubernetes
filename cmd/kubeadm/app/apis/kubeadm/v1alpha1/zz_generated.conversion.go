@@ -247,7 +247,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.APIServerCertSANs))
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
-	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
+	// WARNING: in.ImagePullPolicy requires manual conversion: does not exist in peer-type
 	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
 	if err := Convert_v1alpha1_AuditPolicyConfiguration_To_kubeadm_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
 		return err
@@ -289,7 +289,6 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.SchedulerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.SchedulerExtraVolumes))
 	out.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.APIServerCertSANs))
 	out.CertificatesDir = in.CertificatesDir
-	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
 	out.ImageRepository = in.ImageRepository
 	// INFO: in.CIImageRepository opted out of conversion generation
 	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
