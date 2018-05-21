@@ -39,7 +39,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.API.AdvertiseAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
-			obj.AuthorizationModes = []string{"foo"}
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
 			obj.Etcd.ServerCertSANs = []string{"foo"}

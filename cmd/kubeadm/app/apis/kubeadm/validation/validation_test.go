@@ -104,34 +104,6 @@ func TestValidateTokenGroups(t *testing.T) {
 	}
 }
 
-func TestValidateAuthorizationModes(t *testing.T) {
-	var tests = []struct {
-		s        []string
-		f        *field.Path
-		expected bool
-	}{
-		{[]string{""}, nil, false},
-		{[]string{"rBAC"}, nil, false},                               // mode not supported
-		{[]string{"rBAC", "Webhook"}, nil, false},                    // mode not supported
-		{[]string{"RBAC", "Webhook"}, nil, false},                    // mode Node required
-		{[]string{"Node", "RBAC", "Webhook", "Webhook"}, nil, false}, // no duplicates allowed
-		{[]string{"not valid"}, nil, false},                          // invalid mode
-		{[]string{"Node", "RBAC"}, nil, true},                        // supported
-		{[]string{"RBAC", "Node"}, nil, true},                        // supported
-		{[]string{"Node", "RBAC", "Webhook", "ABAC"}, nil, true},     // supported
-	}
-	for _, rt := range tests {
-		actual := ValidateAuthorizationModes(rt.s, rt.f)
-		if (len(actual) == 0) != rt.expected {
-			t.Errorf(
-				"failed ValidateAuthorizationModes:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(len(actual) == 0),
-			)
-		}
-	}
-}
-
 func TestValidateNodeName(t *testing.T) {
 	var tests = []struct {
 		s        string
@@ -431,7 +403,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
@@ -445,7 +416,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "2001:db8::1/98",
 					DNSDomain:     "cluster.local",
@@ -459,7 +429,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
@@ -473,7 +442,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
@@ -515,7 +483,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 						},
 					},
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
@@ -557,7 +524,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 						},
 					},
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "2001:db8::1/98",
 					DNSDomain:     "cluster.local",

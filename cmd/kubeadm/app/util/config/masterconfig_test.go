@@ -39,7 +39,7 @@ const (
 	master_v1alpha2YAML                = "testdata/conversion/master/v1alpha2.yaml"
 	master_internalYAML                = "testdata/conversion/master/internal.yaml"
 	master_incompleteYAML              = "testdata/defaulting/master/incomplete.yaml"
-	master_defaultedYAML       = "testdata/defaulting/master/defaulted.yaml"
+	master_defaultedYAML               = "testdata/defaulting/master/defaulted.yaml"
 	master_invalidYAML                 = "testdata/validation/invalid_mastercfg.yaml"
 	master_beforeUpgradeYAML           = "testdata/v1alpha1_upgrade/before.yaml"
 	master_afterUpgradeYAML            = "testdata/v1alpha1_upgrade/after.yaml"

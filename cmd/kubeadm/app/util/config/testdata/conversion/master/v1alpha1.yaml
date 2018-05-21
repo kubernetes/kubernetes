@@ -10,6 +10,7 @@ auditPolicy:
 authorizationModes:
 - Node
 - RBAC
+- Webhook
 certificatesDir: /etc/kubernetes/pki
 cloudProvider: ""
 clusterName: kubernetes

@@ -252,7 +252,6 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha2.MasterConfiguration
 	}
 
 	glog.Infof("[init] using Kubernetes version: %s\n", cfg.KubernetesVersion)
-	glog.Infof("[init] using Authorization modes: %v\n", cfg.AuthorizationModes)
 
 	glog.Infoln("[preflight] running pre-flight checks")
 

@@ -3,15 +3,13 @@ API:
   BindPort: 6443
   ControlPlaneEndpoint: ""
 APIServerCertSANs: null
-APIServerExtraArgs: null
+APIServerExtraArgs:
+  authorization-mode: Node,RBAC,Webhook
 APIServerExtraVolumes: null
 AuditPolicyConfiguration:
   LogDir: /var/log/kubernetes/audit
   LogMaxAge: 2
   Path: ""
-AuthorizationModes:
-- Node
-- RBAC
 CIImageRepository: ""
 CRISocket: /var/run/dockershim.sock
 CertificatesDir: /etc/kubernetes/pki
