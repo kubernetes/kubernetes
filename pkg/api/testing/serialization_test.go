@@ -137,7 +137,7 @@ func TestSetControllerConversion(t *testing.T) {
 func TestSpecificKind(t *testing.T) {
 	// Uncomment the following line to enable logging of which conversions
 	// legacyscheme.Scheme.Log(t)
-	internalGVK := schema.GroupVersionKind{Group: "extensions", Version: runtime.APIVersionInternal, Kind: "DaemonSet"}
+	internalGVK := schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: runtime.APIVersionInternal, Kind: "ClusterRoleList"}
 
 	seed := rand.Int63()
 	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)

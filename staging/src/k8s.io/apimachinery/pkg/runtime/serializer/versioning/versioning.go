@@ -206,6 +206,20 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	// Perform a conversion if necessary
 	objectKind := obj.GetObjectKind()
 	old := objectKind.GroupVersionKind()
+	oldSubGVKs := []schema.GroupVersionKind{}
+	if _, isList := obj.(listInterface); isList &&
+		gvks[0].GroupKind() != (schema.GroupKind{Group: "meta.k8s.io", Kind: "List"}) &&
+		gvks[0].GroupKind() != (schema.GroupKind{Group: "", Kind: "List"}) {
+
+		err := runtime.EachListItem(obj, func(listItem runtime.Object) error {
+			oldSubGVKs = append(oldSubGVKs, listItem.GetObjectKind().GroupVersionKind())
+			return nil
+		})
+		if err != nil && !runtime.IsNotAList(err) {
+			return err
+		}
+	}
+
 	out, err := c.convertor.ConvertToVersion(obj, c.encodeVersion)
 	if err != nil {
 		return err
@@ -219,8 +233,21 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 
 	// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
 	err = c.encoder.Encode(out, w)
+
 	// restore the old GVK, in case conversion returned the same object
 	objectKind.SetGroupVersionKind(old)
+	if len(oldSubGVKs) > 0 {
+		count := 0
+		err := runtime.EachListItem(obj, func(listItem runtime.Object) error {
+			listItem.GetObjectKind().SetGroupVersionKind(oldSubGVKs[count])
+			count++
+			return nil
+		})
+		if err != nil && !runtime.IsNotAList(err) {
+			return err
+		}
+	}
+
 	return err
 }
 
@@ -249,9 +276,36 @@ func (e DirectEncoder) Encode(obj runtime.Object, stream io.Writer) error {
 			gvk = preferredGVK
 		}
 	}
+	// set the root GVK and track the sub-item GVKs to restore both
 	kind.SetGroupVersionKind(gvk)
+	oldSubGVKs := []schema.GroupVersionKind{}
+	if _, isList := obj.(listInterface); isList &&
+		gvk.GroupKind() != (schema.GroupKind{Group: "meta.k8s.io", Kind: "List"}) &&
+		gvk.GroupKind() != (schema.GroupKind{Group: "", Kind: "List"}) {
+
+		err := runtime.EachListItem(obj, func(listItem runtime.Object) error {
+			oldSubGVKs = append(oldSubGVKs, listItem.GetObjectKind().GroupVersionKind())
+			return nil
+		})
+		if err != nil && !runtime.IsNotAList(err) {
+			return err
+		}
+	}
+
 	err = e.Encoder.Encode(obj, stream)
+
 	kind.SetGroupVersionKind(oldGVK)
+	if len(oldSubGVKs) > 0 {
+		count := 0
+		err := runtime.EachListItem(obj, func(listItem runtime.Object) error {
+			listItem.GetObjectKind().SetGroupVersionKind(oldSubGVKs[count])
+			count++
+			return nil
+		})
+		if err != nil && !runtime.IsNotAList(err) {
+			return err
+		}
+	}
 	return err
 }
 
@@ -269,4 +323,15 @@ func (d DirectDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, in
 		kind.SetGroupVersionKind(schema.GroupVersionKind{})
 	}
 	return obj, gvk, err
+}
+
+// listInterface overlaps with metav1.ListInterface.  ListMeta implements it.  `GetContinue` is the critical bit
+// ObjectMeta doesn't implement that because we don't page it.
+type listInterface interface {
+	GetResourceVersion() string
+	SetResourceVersion(version string)
+	GetSelfLink() string
+	SetSelfLink(selfLink string)
+	GetContinue() string
+	SetContinue(c string)
 }

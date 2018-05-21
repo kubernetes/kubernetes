@@ -481,7 +481,20 @@ func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 	if flags == 0 {
 		flags = conversion.AllowDifferentFieldTypeNames
 	}
-	return s.converter.Convert(in, out, flags, meta)
+	err := s.converter.Convert(in, out, flags, meta)
+	if err != nil {
+		return err
+	}
+
+	gvks, _, err := s.ObjectKinds(out.(Object))
+	if err != nil {
+		return err
+	}
+	if gvks[0].Version != APIVersionInternal {
+		return nil
+	}
+
+	return s.setTargetKind(out.(Object), gvks[0])
 }
 
 // ConvertFieldLabel alters the given field label and value for an kind field selector from
@@ -638,7 +651,7 @@ func (s *Scheme) setTargetKind(obj Object, kind schema.GroupVersionKind) error {
 		// the specific list.  Otherwise the implication of GVK is really weird.  Not impossible, but no one will have done that.
 		// If someone has, they should be clear cross register.
 
-		err := eachListItem(obj, func(listItem Object) error {
+		err := EachListItem(obj, func(listItem Object) error {
 			var t reflect.Type
 			// determine the incoming kinds with as few allocations as possible.
 			t = reflect.TypeOf(listItem)
@@ -667,7 +680,7 @@ func (s *Scheme) setTargetKind(obj Object, kind schema.GroupVersionKind) error {
 
 			return s.setTargetKind(listItem, chosenKind)
 		})
-		if err != nil {
+		if err != nil && !IsNotAList(err) {
 			return err
 		}
 	}
@@ -816,7 +829,7 @@ func (s *Scheme) addObservedVersion(version schema.GroupVersion) {
 // If 'list' doesn't have an Items member, it's not really a list type
 // and an error will be returned.
 // This function will either return a pointer to a slice, or an error, but not both.
-func getItemsPtr(list Object) (interface{}, error) {
+func GetItemsPtr(list Object) (interface{}, error) {
 	v, err := conversion.EnforcePtr(list)
 	if err != nil {
 		return nil, err
@@ -824,30 +837,30 @@ func getItemsPtr(list Object) (interface{}, error) {
 
 	items := v.FieldByName("Items")
 	if !items.IsValid() {
-		return nil, fmt.Errorf("no Items field in %#v", list)
+		return nil, NewNotAList(list, fmt.Sprintf("no Items field in %#v", list))
 	}
 	switch items.Kind() {
 	case reflect.Interface, reflect.Ptr:
 		target := reflect.TypeOf(items.Interface()).Elem()
 		if target.Kind() != reflect.Slice {
-			return nil, fmt.Errorf("items: Expected slice, got %s", target.Kind())
+			return nil, NewNotAList(list, fmt.Sprintf("items: Expected slice, got %s", target.Kind()))
 		}
 		return items.Interface(), nil
 	case reflect.Slice:
 		return items.Addr().Interface(), nil
 	default:
-		return nil, fmt.Errorf("items: Expected slice, got %s", items.Kind())
+		return nil, NewNotAList(list, fmt.Sprintf("items: Expected slice, got %s", items.Kind()))
 	}
 }
 
-// eachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
+// EachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
 // the loop.
-func eachListItem(obj Object, fn func(Object) error) error {
+func EachListItem(obj Object, fn func(Object) error) error {
 	if unstructured, ok := obj.(Unstructured); ok {
 		return unstructured.EachListItem(fn)
 	}
 	// TODO: Change to an interface call?
-	itemsPtr, err := getItemsPtr(obj)
+	itemsPtr, err := GetItemsPtr(obj)
 	if err != nil {
 		return err
 	}

@@ -119,3 +119,28 @@ func IsMissingVersion(err error) bool {
 	_, ok := err.(*missingVersionErr)
 	return ok
 }
+
+type notAListErr struct {
+	obj    Object
+	reason string
+}
+
+func NewNotAList(obj Object, reason string) error {
+	return &notAListErr{
+		obj:    obj,
+		reason: reason,
+	}
+}
+
+func (k *notAListErr) Error() string {
+	return fmt.Sprintf("%T is not a list: %q", k.obj, k.reason)
+}
+
+// IsNotAList returns true if the error indicates the type isn't a list
+func IsNotAList(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*notAListErr)
+	return ok
+}
