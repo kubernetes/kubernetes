@@ -181,11 +181,6 @@ func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 	in.Etcd.DeepCopyInto(&out.Etcd)
 	in.KubeletConfiguration.DeepCopyInto(&out.KubeletConfiguration)
 	out.Networking = in.Networking
-	if in.AuthorizationModes != nil {
-		in, out := &in.AuthorizationModes, &out.AuthorizationModes
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.TokenTTL != nil {
 		in, out := &in.TokenTTL, &out.TokenTTL
 		if *in == nil {
