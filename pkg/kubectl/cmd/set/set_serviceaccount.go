@@ -173,8 +173,8 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 // Run creates and applies the patch either locally or calling apiserver.
 func (o *SetServiceAccountOptions) Run() error {
 	patchErrs := []error{}
-	patchFn := func(info *resource.Info) ([]byte, error) {
-		_, err := o.updatePodSpecForObject(info.Object, func(podSpec *v1.PodSpec) error {
+	patchFn := func(obj runtime.Object) ([]byte, error) {
+		_, err := o.updatePodSpecForObject(obj, func(podSpec *v1.PodSpec) error {
 			podSpec.ServiceAccountName = o.serviceAccountName
 			return nil
 		})
@@ -182,11 +182,11 @@ func (o *SetServiceAccountOptions) Run() error {
 			return nil, err
 		}
 		// record this change (for rollout history)
-		if err := o.Recorder.Record(info.Object); err != nil {
+		if err := o.Recorder.Record(obj); err != nil {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
+		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 	}
 
 	patches := CalculatePatches(o.infos, scheme.DefaultJSONEncoder(), patchFn)

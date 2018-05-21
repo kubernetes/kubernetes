@@ -194,7 +194,7 @@ func (o *SubjectOptions) Validate() error {
 }
 
 func (o *SubjectOptions) Run(fn updateSubjects) error {
-	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
 		subjects := []rbacv1.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
 			subject := rbacv1.Subject{
@@ -227,10 +227,10 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			subjects = append(subjects, subject)
 		}
 
-		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
+		transformed, err := updateSubjectForObject(obj, subjects, fn)
 		if transformed && err == nil {
 			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
-			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
+			return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 		}
 		return nil, err
 	})

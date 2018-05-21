@@ -77,3 +77,19 @@ type CanBeExposedFunc func(kind schema.GroupKind) error
 
 // CanBeExposedFn gives a way to easily override the function for unit testing if needed
 var CanBeExposedFn CanBeExposedFunc = canBeExposed
+
+// ObjectPauserFunc is a function type that marks the object in a given info as paused.
+type ObjectPauserFunc func(runtime.Object) ([]byte, error)
+
+// ObjectPauserFn gives a way to easily override the function for unit testing if needed.
+// Returns the patched object in bytes and any error that occurred during the encoding or
+// in case the object is already paused.
+var ObjectPauserFn ObjectPauserFunc = defaultObjectPauser
+
+// ObjectResumerFunc is a function type that marks the object in a given info as resumed.
+type ObjectResumerFunc func(runtime.Object) ([]byte, error)
+
+// ObjectResumerFn gives a way to easily override the function for unit testing if needed.
+// Returns the patched object in bytes and any error that occurred during the encoding or
+// in case the object is already resumed.
+var ObjectResumerFn ObjectResumerFunc = defaultObjectResumer
