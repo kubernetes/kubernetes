@@ -59,6 +59,16 @@ func TestPlugin(t *testing.T) {
 			plugin: &Plugin{
 				Description: Description{
 					Name:      "test",
+					Use:       "test spaces",
+					ShortDesc: "The test",
+					Command:   "echo 1",
+				},
+			},
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:      "test",
 					ShortDesc: "The test",
 					Command:   "echo 1",
 					Flags: []Flag{
