@@ -100,10 +100,6 @@ func init() {
 	factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	factory.RegisterPriorityFunction2("MostRequestedPriority", priorities.MostRequestedPriorityMap, nil, 1)
-
-	// TODO use RequestedToCapacityRatioResourceAllocationPriority(scoringFunctionShape functionShape)
-	// and build scoringFunctionShape based on configuration passed to scheduler on startup.
-	// What is proper way of passing configuration here? config file? startup flag?
 	factory.RegisterPriorityFunction2(
 		"RequestedToCapacityRatioPriority",
 		priorities.RequestedToCapacityRatioResourceAllocationPriorityDefault().PriorityMap,

@@ -322,6 +322,15 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 				},
 				Weight: policy.Weight,
 			}
+		} else if policy.Argument.RequestedToCapacityRatioArguments != nil {
+			pcf = &PriorityConfigFactory{
+				MapReduceFunction: func(args PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+					scoringFunctionShape := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
+					p := priorities.RequestedToCapacityRatioResourceAllocationPriority(scoringFunctionShape)
+					return p.PriorityMap, nil
+				},
+				Weight: policy.Weight,
+			}
 		}
 	} else if existingPcf, ok := priorityFunctionMap[policy.Name]; ok {
 		glog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
@@ -338,6 +347,19 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	}
 
 	return RegisterPriorityConfigFactory(policy.Name, *pcf)
+}
+
+func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *schedulerapi.RequestedToCapacityRatioArguments) priorities.FunctionShape {
+	n := len(arguments.UtilizationShape)
+	points := make([]priorities.FunctionShapePoint, 0, n)
+	for _, point := range arguments.UtilizationShape {
+		points = append(points, priorities.FunctionShapePoint{Utilization: int64(point.Utilization), Score: int64(point.Score)})
+	}
+	shape, err := priorities.NewFunctionShape(points)
+	if err != nil {
+		glog.Fatalf("invalid RequestedToCapacityRatioPriority arguments: %s", err.Error())
+	}
+	return shape
 }
 
 // IsPriorityFunctionRegistered is useful for testing providers.
@@ -492,6 +514,9 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 			numArgs++
 		}
 		if priority.Argument.LabelPreference != nil {
+			numArgs++
+		}
+		if priority.Argument.RequestedToCapacityRatioArguments != nil {
 			numArgs++
 		}
 		if numArgs != 1 {
