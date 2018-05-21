@@ -621,7 +621,10 @@ func (s *Scheme) copyAndSetTargetKind(copy bool, obj Object, kind schema.GroupVe
 		obj = obj.DeepCopyObject()
 	}
 	err := s.setTargetKind(obj, kind)
-	return obj, err
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
 }
 
 // setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.

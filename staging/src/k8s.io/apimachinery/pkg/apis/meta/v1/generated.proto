@@ -652,10 +652,10 @@ message ServerAddressByClientCIDR {
 
 // Status is a return value for calls that don't return other objects.
 message Status {
-  // Standard list metadata.
+  // minimal metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
-  optional ListMeta metadata = 1;
+  optional StatusMeta metadata = 1;
 
   // Status of the operation.
   // One of: "Success" or "Failure".
@@ -750,6 +750,24 @@ message StatusDetails {
   // before taking the alternate action.
   // +optional
   optional int32 retryAfterSeconds = 5;
+}
+
+// StatusMeta gives status a selflink and resource version.  It's not a list and its not an object.
+message StatusMeta {
+  // selfLink is a URL representing this object.
+  // Populated by the system.
+  // Read-only.
+  // +optional
+  optional string selfLink = 1;
+
+  // String that identifies the server's internal version of this object that
+  // can be used by clients to determine when objects have changed.
+  // Value must be treated as opaque by clients and passed unmodified back to the server.
+  // Populated by the system.
+  // Read-only.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+  // +optional
+  optional string resourceVersion = 2;
 }
 
 // Time is a wrapper around time.Time which supports correct
