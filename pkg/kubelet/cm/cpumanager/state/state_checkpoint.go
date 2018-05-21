@@ -27,9 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
-// cpuManagerCheckpointName is the name of checkpoint file
-const cpuManagerCheckpointName = "cpu_manager_state"
-
 var _ State = &stateCheckpoint{}
 
 type stateCheckpoint struct {
@@ -37,10 +34,11 @@ type stateCheckpoint struct {
 	policyName        string
 	cache             State
 	checkpointManager checkpointmanager.CheckpointManager
+	checkpointName    string
 }
 
 // NewCheckpointState creates new State for keeping track of cpu/pod assignment with checkpoint backend
-func NewCheckpointState(stateDir string, policyName string) (State, error) {
+func NewCheckpointState(stateDir, checkpointName, policyName string) (State, error) {
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
@@ -49,12 +47,13 @@ func NewCheckpointState(stateDir string, policyName string) (State, error) {
 		cache:             NewMemoryState(),
 		policyName:        policyName,
 		checkpointManager: checkpointManager,
+		checkpointName:    checkpointName,
 	}
 
 	if err := stateCheckpoint.restoreState(); err != nil {
 		return nil, fmt.Errorf("could not restore state from checkpoint: %v\n"+
 			"Please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet.",
-			err, path.Join(stateDir, cpuManagerCheckpointName))
+			err, path.Join(stateDir, checkpointName))
 	}
 
 	return stateCheckpoint, nil
@@ -72,7 +71,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	tmpContainerCPUSet := cpuset.NewCPUSet()
 
 	checkpoint := NewCPUManagerCheckpoint()
-	if err = sc.checkpointManager.GetCheckpoint(cpuManagerCheckpointName, checkpoint); err != nil {
+	if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpoint); err != nil {
 		if err == errors.ErrCheckpointNotFound {
 			sc.storeState()
 			return nil
@@ -114,7 +113,7 @@ func (sc *stateCheckpoint) storeState() {
 		checkpoint.Entries[containerID] = cset.String()
 	}
 
-	err := sc.checkpointManager.CreateCheckpoint(cpuManagerCheckpointName, checkpoint)
+	err := sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 
 	if err != nil {
 		panic("[cpumanager] could not save checkpoint: " + err.Error())

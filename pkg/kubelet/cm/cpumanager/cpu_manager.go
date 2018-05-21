@@ -44,8 +44,8 @@ type runtimeService interface {
 
 type policyName string
 
-// CPUManagerStateFileName is the name file name where cpu manager stores it's state
-const CPUManagerStateFileName = "cpu_manager_state"
+// cpuManagerStateFileName is the name file name where cpu manager stores it's state
+const cpuManagerStateFileName = "cpu_manager_state"
 
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
@@ -136,7 +136,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		policy = NewNonePolicy()
 	}
 
-	stateImpl, err := state.NewCheckpointState(stateFileDirecory, policy.Name())
+	stateImpl, err := state.NewCheckpointState(stateFileDirecory, cpuManagerStateFileName, policy.Name())
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize checkpoint manager: %v", err)
 	}

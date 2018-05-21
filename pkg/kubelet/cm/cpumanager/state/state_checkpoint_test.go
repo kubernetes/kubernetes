@@ -17,6 +17,7 @@ limitations under the License.
 package state
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -25,7 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
-const testingDir = "/tmp"
+const testingCheckpoint = "cpumanager_checkpoint_test"
+
+var testingDir = os.TempDir()
 
 func TestCheckpointStateRestore(t *testing.T) {
 	testCases := []struct {
@@ -146,17 +149,17 @@ func TestCheckpointStateRestore(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(cpuManagerCheckpointName)
+			cpm.RemoveCheckpoint(testingCheckpoint)
 
 			// prepare checkpoint for testing
 			if strings.TrimSpace(tc.checkpointContent) != "" {
 				checkpoint := &testutil.MockCheckpoint{Content: tc.checkpointContent}
-				if err := cpm.CreateCheckpoint(cpuManagerCheckpointName, checkpoint); err != nil {
+				if err := cpm.CreateCheckpoint(testingCheckpoint, checkpoint); err != nil {
 					t.Fatalf("could not create testing checkpoint: %v", err)
 				}
 			}
 
-			restoredState, err := NewCheckpointState(testingDir, tc.policyName)
+			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, tc.policyName)
 			if err != nil {
 				if strings.TrimSpace(tc.expectedError) != "" {
 					tc.expectedError = "could not restore state from checkpoint: " + tc.expectedError
@@ -201,9 +204,9 @@ func TestCheckpointStateStore(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(cpuManagerCheckpointName)
+			cpm.RemoveCheckpoint(testingCheckpoint)
 
-			cs1, err := NewCheckpointState(testingDir, "none")
+			cs1, err := NewCheckpointState(testingDir, testingCheckpoint, "none")
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
@@ -213,7 +216,7 @@ func TestCheckpointStateStore(t *testing.T) {
 			cs1.SetCPUAssignments(tc.expectedState.assignments)
 
 			// restore checkpoint with previously stored values
-			cs2, err := NewCheckpointState(testingDir, "none")
+			cs2, err := NewCheckpointState(testingDir, testingCheckpoint, "none")
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
@@ -261,9 +264,9 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(cpuManagerCheckpointName)
+			cpm.RemoveCheckpoint(testingCheckpoint)
 
-			state, err := NewCheckpointState(testingDir, "none")
+			state, err := NewCheckpointState(testingDir, testingCheckpoint, "none")
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
@@ -301,7 +304,7 @@ func TestCheckpointStateClear(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			state, err := NewCheckpointState(testingDir, "none")
+			state, err := NewCheckpointState(testingDir, testingCheckpoint, "none")
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
