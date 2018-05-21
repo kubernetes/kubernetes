@@ -20,7 +20,6 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/preflight:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -47,7 +46,6 @@ go_test(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
-        "//cmd/kubeadm/app/preflight:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],

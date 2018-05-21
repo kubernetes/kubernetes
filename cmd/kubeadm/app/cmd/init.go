@@ -258,6 +258,9 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha2.MasterConfiguration
 	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
+	if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
+		return nil, err
+	}
 
 	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun, ignorePreflightErrors: ignorePreflightErrors}, nil
 }

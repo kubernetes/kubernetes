@@ -46,6 +46,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
@@ -76,8 +77,14 @@ type Error struct {
 	Msg string
 }
 
+// Error implements the standard error interface
 func (e *Error) Error() string {
 	return fmt.Sprintf("[preflight] Some fatal errors occurred:\n%s%s", e.Msg, "[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`")
+}
+
+// Preflight identifies this error as a preflight error
+func (e *Error) Preflight() bool {
+	return true
 }
 
 // Checker validates the state of the system to ensure kubeadm will be
@@ -850,6 +857,30 @@ func (ResolveCheck) Check() (warnings, errors []error) {
 	return warnings, errors
 }
 
+// ImagePullCheck will pull container images used by kubeadm
+type ImagePullCheck struct {
+	Images    images.Images
+	ImageList []string
+}
+
+// Name returns the label for ImagePullCheck
+func (ImagePullCheck) Name() string {
+	return "ImagePull"
+}
+
+// Check pulls images required by kubeadm. This is a mutating check
+func (i ImagePullCheck) Check() (warnings, errors []error) {
+	for _, image := range i.ImageList {
+		if err := i.Images.Exists(image); err == nil {
+			continue
+		}
+		if err := i.Images.Pull(image); err != nil {
+			errors = append(errors, fmt.Errorf("failed to pull image [%s]: %v", image, err))
+		}
+	}
+	return warnings, errors
+}
+
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
 func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
@@ -1009,6 +1040,19 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 		IsPrivilegedUserCheck{},
 	}
 
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
+
+// RunPullImagesCheck will pull images kubeadm needs if the are not found on the system
+func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
+	criInterfacer, err := images.NewCRInterfacer(execer, cfg.GetCRISocket())
+	if err != nil {
+		return err
+	}
+
+	checks := []Checker{
+		ImagePullCheck{Images: criInterfacer, ImageList: images.GetAllImages(cfg)},
+	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
