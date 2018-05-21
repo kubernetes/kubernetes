@@ -103,7 +103,6 @@ pkg/controller/deployment/util
 pkg/controller/disruption
 pkg/controller/endpoint
 pkg/controller/garbagecollector
-pkg/controller/garbagecollector/metaonly
 pkg/controller/job
 pkg/controller/namespace
 pkg/controller/namespace/deletion
