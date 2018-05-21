@@ -134,7 +134,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.builder = f.NewBuilder()
 	o.canBeAutoscaled = f.CanBeAutoscaled
 	o.args = args
-	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.RecordFlags.Complete(cmd)
 
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
