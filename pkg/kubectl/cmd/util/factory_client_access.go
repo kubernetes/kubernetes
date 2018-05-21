@@ -260,10 +260,6 @@ func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]str
 	}
 }
 
-func (f *ring0Factory) LabelsForObject(object runtime.Object) (map[string]string, error) {
-	return meta.NewAccessor().Labels(object)
-}
-
 // Set showSecrets false to filter out stuff like secrets.
 func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
 	if len(os.Args) == 0 {
@@ -316,10 +312,6 @@ func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("pausing is not supported")
 	}
-}
-
-func (f *ring0Factory) ResolveImage(name string) (string, error) {
-	return name, nil
 }
 
 func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
