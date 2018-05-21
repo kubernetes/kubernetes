@@ -21,8 +21,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -84,10 +82,6 @@ type ClientAccessFactory interface {
 	MapBasedSelectorForObject(object runtime.Object) (string, error)
 	// ProtocolsForObject returns the <port, protocol> mapping associated with the provided object
 	ProtocolsForObject(object runtime.Object) (map[string]string, error)
-
-	// Command will stringify and return all environment arguments ie. a command run by a client
-	// using the factory.
-	Command(cmd *cobra.Command, showSecrets bool) string
 
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
