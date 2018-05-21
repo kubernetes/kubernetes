@@ -443,6 +443,10 @@ func (b *fcDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
 }
 
+func (b *fcDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+}
+
 type fcDiskUnmapper struct {
 	*fcDisk
 	deviceUtil util.DeviceUtil
