@@ -34,6 +34,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -84,7 +85,7 @@ type SetResourcesOptions struct {
 	Requests             string
 	ResourceRequirements v1.ResourceRequirements
 
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
 
 	genericclioptions.IOStreams
@@ -153,7 +154,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 		return err
 	}
 
-	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
+	o.UpdatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 

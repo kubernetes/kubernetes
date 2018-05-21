@@ -19,6 +19,7 @@ package polymorphichelpers
 import (
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -50,3 +51,10 @@ type StatusViewerFunc func(restClientGetter genericclioptions.RESTClientGetter, 
 
 // StatusViewerFn gives a way to easily override the function for unit testing if needed
 var StatusViewerFn StatusViewerFunc = statusViewer
+
+// UpdatePodSpecForObjectFunc will call the provided function on the pod spec this object supports,
+// return false if no pod spec is supported, or return an error.
+type UpdatePodSpecForObjectFunc func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+
+// UpdatePodSpecForObjectFn gives a way to easily override the function for unit testing if needed
+var UpdatePodSpecForObjectFn UpdatePodSpecForObjectFunc = updatePodSpecForObject
