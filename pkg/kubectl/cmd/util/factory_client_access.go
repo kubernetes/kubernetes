@@ -160,24 +160,6 @@ func (f *ring0Factory) MapBasedSelectorForObject(object runtime.Object) (string,
 	}
 }
 
-func (f *ring0Factory) PortsForObject(object runtime.Object) ([]string, error) {
-	// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
-	switch t := object.(type) {
-	case *api.ReplicationController:
-		return getPorts(t.Spec.Template.Spec), nil
-	case *api.Pod:
-		return getPorts(t.Spec), nil
-	case *api.Service:
-		return getServicePorts(t.Spec), nil
-	case *extensions.Deployment:
-		return getPorts(t.Spec.Template.Spec), nil
-	case *extensions.ReplicaSet:
-		return getPorts(t.Spec.Template.Spec), nil
-	default:
-		return nil, fmt.Errorf("cannot extract ports from %T", object)
-	}
-}
-
 func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]string, error) {
 	// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
 	switch t := object.(type) {
@@ -484,17 +466,6 @@ func (f *ring0Factory) CanBeExposed(kind schema.GroupKind) error {
 		// nothing to do here
 	default:
 		return fmt.Errorf("cannot expose a %s", kind)
-	}
-	return nil
-}
-
-func (f *ring0Factory) CanBeAutoscaled(kind schema.GroupKind) error {
-	switch kind {
-	case api.Kind("ReplicationController"), extensions.Kind("ReplicaSet"),
-		extensions.Kind("Deployment"), apps.Kind("Deployment"), apps.Kind("ReplicaSet"):
-		// nothing to do here
-	default:
-		return fmt.Errorf("cannot autoscale a %v", kind)
 	}
 	return nil
 }

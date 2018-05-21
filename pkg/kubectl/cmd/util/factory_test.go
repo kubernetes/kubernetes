@@ -28,37 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
-func TestPortsForObject(t *testing.T) {
-	f := NewFactory(genericclioptions.NewTestConfigFlags())
-
-	pod := &api.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Ports: []api.ContainerPort{
-						{
-							ContainerPort: 101,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	expected := sets.NewString("101")
-	ports, err := f.PortsForObject(pod)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	got := sets.NewString(ports...)
-
-	if !expected.Equal(got) {
-		t.Fatalf("Ports mismatch! Expected %v, got %v", expected, got)
-	}
-}
-
 func TestProtocolsForObject(t *testing.T) {
 	f := NewFactory(genericclioptions.NewTestConfigFlags())
 
