@@ -34,8 +34,6 @@ type CustomResourceDefinitionSpec struct {
 	// +optional
 	Validation *CustomResourceValidation `json:"validation,omitempty" protobuf:"bytes,5,opt,name=validation"`
 	// Subresources describes the subresources for CustomResources
-	// This field is alpha-level and should only be sent to servers that enable
-	// subresources via the CustomResourceSubresources feature gate.
 	// +optional
 	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,6,opt,name=subresources"`
 }

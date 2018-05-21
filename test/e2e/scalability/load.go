@@ -373,10 +373,10 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 			TLSHandshakeTimeout: 10 * time.Second,
 			TLSClientConfig:     tlsConfig,
 			MaxIdleConnsPerHost: 100,
-			Dial: (&net.Dialer{
+			DialContext: (&net.Dialer{
 				Timeout:   30 * time.Second,
 				KeepAlive: 30 * time.Second,
-			}).Dial,
+			}).DialContext,
 		})
 		// Overwrite TLS-related fields from config to avoid collision with
 		// Transport field.

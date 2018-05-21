@@ -108,7 +108,7 @@ func podWithSecrets(ns, podName string, toAttach secretsToAttach) *v1.Pod {
 func TestCacheBasedSecretManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	store := manager.NewObjectStore(getSecret(fakeClient), clock.RealClock{}, noObjectTTL, 0)
-	manager := &cachingSecretManager{
+	manager := &secretManager{
 		manager: manager.NewCacheBasedManager(store, getSecretNames),
 	}
 

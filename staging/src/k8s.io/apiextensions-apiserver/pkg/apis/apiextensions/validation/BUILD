@@ -27,11 +27,8 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
     ],
 )
 

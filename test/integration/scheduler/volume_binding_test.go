@@ -241,8 +241,6 @@ func TestVolumeBinding(t *testing.T) {
 			validatePVPhase(t, config.client, pv.name, v1.VolumeAvailable)
 		}
 
-		// TODO: validate events on Pods and PVCs
-
 		// Force delete objects, but they still may not be immediately removed
 		deleteTestObjects(config.client, config.ns, deleteOption)
 	}
@@ -288,7 +286,9 @@ func TestVolumeBindingStress(t *testing.T) {
 
 	// Validate Pods scheduled
 	for _, pod := range pods {
-		if err := waitForPodToSchedule(config.client, pod); err != nil {
+		// Use increased timeout for stress test because there is a higher chance of
+		// PV sync error
+		if err := waitForPodToScheduleWithTimeout(config.client, pod, 60*time.Second); err != nil {
 			t.Errorf("Failed to schedule Pod %q: %v", pod.Name, err)
 		}
 	}
@@ -300,8 +300,6 @@ func TestVolumeBindingStress(t *testing.T) {
 	for _, pv := range pvs {
 		validatePVPhase(t, config.client, pv.Name, v1.VolumeBound)
 	}
-
-	// TODO: validate events on Pods and PVCs
 }
 
 func TestPVAffinityConflict(t *testing.T) {
