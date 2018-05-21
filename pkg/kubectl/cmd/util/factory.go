@@ -107,8 +107,6 @@ type ClientAccessFactory interface {
 	DefaultNamespace() (string, bool, error)
 	// Generators returns the generators for the provided command
 	Generators(cmdName string) map[string]kubectl.Generator
-	// Check whether the kind of resources could be exposed
-	CanBeExposed(kind schema.GroupKind) error
 }
 
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.

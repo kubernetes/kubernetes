@@ -71,3 +71,9 @@ type CanBeAutoscaledFunc func(kind schema.GroupKind) error
 
 // CanBeAutoscaledFn gives a way to easily override the function for unit testing if needed
 var CanBeAutoscaledFn CanBeAutoscaledFunc = canBeAutoscaled
+
+// CanBeExposedFunc is a function type that can tell you whether a given GroupKind is capable of being exposed
+type CanBeExposedFunc func(kind schema.GroupKind) error
+
+// CanBeExposedFn gives a way to easily override the function for unit testing if needed
+var CanBeExposedFn CanBeExposedFunc = canBeExposed
