@@ -40,6 +40,9 @@ func NewMapStringBool(m *map[string]bool) *MapStringBool {
 // String implements github.com/spf13/pflag.Value
 func (m *MapStringBool) String() string {
 	pairs := []string{}
+	if m.Map == nil {
+		return ""
+	}
 	for k, v := range *m.Map {
 		pairs = append(pairs, fmt.Sprintf("%s=%t", k, v))
 	}
@@ -83,5 +86,5 @@ func (*MapStringBool) Type() string {
 
 // Empty implements OmitEmpty
 func (m *MapStringBool) Empty() bool {
-	return len(*m.Map) == 0
+	return m.Map == nil || len(*m.Map) == 0
 }

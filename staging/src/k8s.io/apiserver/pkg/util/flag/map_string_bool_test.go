@@ -32,6 +32,7 @@ func TestStringMapStringBool(t *testing.T) {
 		{"empty", NewMapStringBool(&map[string]bool{}), ""},
 		{"one key", NewMapStringBool(&map[string]bool{"one": true}), "one=true"},
 		{"two keys", NewMapStringBool(&map[string]bool{"one": true, "two": false}), "one=true,two=false"},
+		{"uninitialized", NewMapStringBool(nil), ""},
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
@@ -151,6 +152,7 @@ func TestEmptyMapStringBool(t *testing.T) {
 		{"nil", NewMapStringBool(&nilMap), true},
 		{"empty", NewMapStringBool(&map[string]bool{}), true},
 		{"populated", NewMapStringBool(&map[string]bool{"foo": true}), false},
+		{"uninitialized", NewMapStringBool(nil), true},
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
