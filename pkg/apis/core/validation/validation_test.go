@@ -2820,8 +2820,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeNotSupported,
-			errfield: "rbd.monitorSRVRecord.protocol",
+			errs: []verr{{
+				etype:  field.ErrorTypeNotSupported,
+				field:  "rbd.monitorSRVRecord.protocol",
+			}},
 		},
 		{
 			name: "empty rbd monitors, invalid srv record name",
@@ -2838,8 +2840,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "rbd.monitorSRVRecord.name",
+			errs: []verr{{
+				etype:  field.ErrorTypeRequired,
+				field:  "rbd.monitorSRVRecord.name",
+			}},
 		},
 		{
 			name: "empty rbd monitors, invalid srv record domain",
@@ -2856,8 +2860,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "rbd.monitorSRVRecord.domain",
+			errs: []verr{{
+				etype:  field.ErrorTypeRequired,
+				field:  "rbd.monitorSRVRecord.domain",
+			}},
 		},
 		{
 			name: "empty rbd monitors, empty srv record",
@@ -2982,8 +2988,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeNotSupported,
-			errfield: "cephfs.monitorSRVRecord.protocol",
+			errs: []verr{{
+				etype:  field.ErrorTypeNotSupported,
+				field:  "cephfs.monitorSRVRecord.protocol",
+			}},
 		},
 		{
 			name: "empty cephfs monitors, invalid srv record name",
@@ -2998,8 +3006,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "cephfs.monitorSRVRecord.name",
+			errs: []verr{{
+				etype:  field.ErrorTypeRequired,
+				field:  "cephfs.monitorSRVRecord.name",
+			}},
 		},
 		{
 			name: "empty cephfs monitors, invalid srv record domain",
@@ -3014,8 +3024,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "cephfs.monitorSRVRecord.domain",
+			errs: []verr{{
+				etype:  field.ErrorTypeRequired,
+				field:  "cephfs.monitorSRVRecord.domain",
+			}},
 		},
 
 		{
