@@ -15,6 +15,7 @@
 package validate
 
 import (
+	"log"
 	"reflect"
 
 	"github.com/go-openapi/spec"
@@ -51,7 +52,9 @@ func (f *formatValidator) Applies(source interface{}, kind reflect.Kind) bool {
 		return false
 	}
 	r := doit()
-	// fmt.Printf("schema props validator for %q applies %t for %T (kind: %v)\n", f.Path, r, source, kind)
+	if Debug {
+		log.Printf("format validator for %q applies %t for %T (kind: %v)\n", f.Path, r, source, kind)
+	}
 	return r
 }
 
