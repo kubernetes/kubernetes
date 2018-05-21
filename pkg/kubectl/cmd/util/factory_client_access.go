@@ -19,7 +19,6 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -215,32 +214,6 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 		{Resource: "daemonset"},
 		{Resource: "job"},
 		{Resource: "replicaset"},
-	}
-}
-
-func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
-	switch obj := info.Object.(type) {
-	case *extensions.Deployment:
-		if obj.Spec.Paused {
-			return nil, errors.New("is already paused")
-		}
-		obj.Spec.Paused = true
-		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
-	default:
-		return nil, fmt.Errorf("pausing is not supported")
-	}
-}
-
-func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
-	switch obj := info.Object.(type) {
-	case *extensions.Deployment:
-		if !obj.Spec.Paused {
-			return nil, errors.New("is not paused")
-		}
-		obj.Spec.Paused = false
-		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
-	default:
-		return nil, fmt.Errorf("resuming is not supported")
 	}
 }
 

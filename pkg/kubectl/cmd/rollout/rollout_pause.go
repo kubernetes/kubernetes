@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -41,7 +42,7 @@ type PauseConfig struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	Pauser func(info *resource.Info) ([]byte, error)
+	Pauser polymorphichelpers.ObjectPauserFunc
 	Infos  []*resource.Info
 
 	genericclioptions.IOStreams
@@ -101,7 +102,7 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, args 
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
-	o.Pauser = f.Pauser
+	o.Pauser = polymorphichelpers.ObjectPauserFn
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -136,7 +137,7 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, args 
 
 func (o PauseConfig) RunPause() error {
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), o.Pauser) {
+	for _, patch := range set.CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), set.PatchFn(o.Pauser)) {
 		info := patch.Info
 		if patch.Err != nil {
 			resourceString := info.Mapping.Resource.Resource
