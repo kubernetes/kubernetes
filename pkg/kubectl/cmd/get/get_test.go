@@ -480,33 +480,6 @@ bar       0/0                 0          <unknown>
 	}
 }
 
-func TestGetAllListObjects(t *testing.T) {
-	pods, _, _ := testData()
-
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
-	}
-	tf.Namespace = "test"
-
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
-	cmd.Run(cmd, []string{"pods"})
-
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
-`
-	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
 func TestGetListComponentStatus(t *testing.T) {
 	statuses := testComponentStatusData()
 
