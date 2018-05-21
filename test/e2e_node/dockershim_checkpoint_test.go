@@ -43,7 +43,7 @@ const (
 	testCheckpointContent = `{"version":"v1","name":"fluentd-gcp-v2.0-vmnqx","namespace":"kube-system","data":{},"checksum":1799154314}`
 )
 
-var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker]", func() {
+var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Docker]", func() {
 	f := framework.NewDefaultFramework("dockerhism-checkpoint-test")
 
 	BeforeEach(func() {

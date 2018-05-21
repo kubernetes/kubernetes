@@ -41,7 +41,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		podClient = f.PodClient()
 	})
 
-	Context("when pod PID namespace is configurable [Feature:ShareProcessNamespace]", func() {
+	Context("when pod PID namespace is configurable [Feature:ShareProcessNamespace][NodeAlphaFeature:ShareProcessNamespace]", func() {
 		It("containers in pods using isolated PID namespaces should all receive PID 1", func() {
 			By("Create a pod with isolated PID namespaces.")
 			f.PodClient().CreateSync(&v1.Pod{

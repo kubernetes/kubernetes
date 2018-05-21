@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Docker features [Feature:Docker]", func() {
+var _ = framework.KubeDescribe("Docker features [Feature:Docker][Legacy:Docker]", func() {
 	f := framework.NewDefaultFramework("docker-feature-test")
 
 	BeforeEach(func() {
