@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -114,7 +115,7 @@ type EnvOptions struct {
 	output                 string
 	dryRun                 bool
 	builder                func() *resource.Builder
-	updatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
 	enforceNamespace       bool
 	clientset              *kubernetes.Clientset
@@ -192,7 +193,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return fmt.Errorf("all resources must be specified before environment changes: %s", strings.Join(args, " "))
 	}
 
-	o.updatePodSpecForObject = f.UpdatePodSpecForObject
+	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.dryRun = cmdutil.GetDryRunFlag(cmd)
 
