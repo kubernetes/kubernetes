@@ -18,6 +18,7 @@ package preflight
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -694,5 +695,34 @@ func TestSetHasItemOrAll(t *testing.T) {
 				rt.testString,
 			)
 		}
+	}
+}
+
+type imgs struct{}
+
+func (i *imgs) Pull(image string) error {
+	if image == "bad pull" {
+		return errors.New("pull error")
+	}
+	return nil
+}
+func (i *imgs) Exists(image string) error {
+	if image == "found" {
+		return nil
+	}
+	return errors.New("error")
+}
+
+func TestImagePullCheck(t *testing.T) {
+	i := ImagePullCheck{
+		Images:    &imgs{},
+		ImageList: []string{"found", "not found", "bad pull"},
+	}
+	warnings, errors := i.Check()
+	if len(warnings) != 0 {
+		t.Fatalf("did not expect any warnings but got %q", warnings)
+	}
+	if len(errors) != 1 {
+		t.Fatalf("expected 1 errors but got %d: %q", len(errors), errors)
 	}
 }

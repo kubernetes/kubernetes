@@ -301,7 +301,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
-			puller, err := images.NewImagePuller(utilsexec.New(), internalcfg.GetCRISocket())
+			puller, err := images.NewCRInterfacer(utilsexec.New(), internalcfg.GetCRISocket())
 			kubeadmutil.CheckErr(err)
 			imagesPull := NewImagesPull(puller, images.GetAllImages(internalcfg))
 			kubeadmutil.CheckErr(imagesPull.PullAll())
