@@ -467,10 +467,10 @@ type Preconditions struct {
 // Status is a return value for calls that don't return other objects.
 type Status struct {
 	TypeMeta `json:",inline"`
-	// Standard list metadata.
+	// minimal metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
-	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	StatusMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Status of the operation.
 	// One of: "Success" or "Failure".
@@ -495,6 +495,24 @@ type Status struct {
 	// Suggested HTTP return code for this status, 0 if not set.
 	// +optional
 	Code int32 `json:"code,omitempty" protobuf:"varint,6,opt,name=code"`
+}
+
+// StatusMeta gives status a selflink and resource version.  It's not a list and its not an object.
+type StatusMeta struct {
+	// selfLink is a URL representing this object.
+	// Populated by the system.
+	// Read-only.
+	// +optional
+	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,1,opt,name=selfLink"`
+
+	// String that identifies the server's internal version of this object that
+	// can be used by clients to determine when objects have changed.
+	// Value must be treated as opaque by clients and passed unmodified back to the server.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+	// +optional
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 }
 
 // StatusDetails is a set of additional properties that MAY be set by the
