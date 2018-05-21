@@ -96,7 +96,6 @@ type ExposeServiceOptions struct {
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
 	PortsForObject            func(runtime.Object) ([]string, error)
 	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
-	LabelsForObject           func(runtime.Object) (map[string]string, error)
 
 	Namespace string
 	Mapper    meta.RESTMapper
@@ -200,7 +199,6 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	if err != nil {
 		return err
 	}
-	o.LabelsForObject = f.LabelsForObject
 
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
 	if err != nil {
@@ -294,7 +292,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		if kubectl.IsZero(params["labels"]) {
-			labels, err := o.LabelsForObject(info.Object)
+			labels, err := meta.NewAccessor().Labels(info.Object)
 			if err != nil {
 				return err
 			}

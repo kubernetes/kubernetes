@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -95,57 +94,6 @@ func TestProtocolsForObject(t *testing.T) {
 
 	if !expected.Equal(got) {
 		t.Fatalf("Protocols mismatch! Expected %v, got %v", expected, got)
-	}
-}
-
-func TestLabelsForObject(t *testing.T) {
-	f := NewFactory(genericclioptions.NewTestConfigFlags())
-
-	tests := []struct {
-		name     string
-		object   runtime.Object
-		expected string
-		err      error
-	}{
-		{
-			name: "successful re-use of labels",
-			object: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
-				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
-			},
-			expected: "svc=test",
-			err:      nil,
-		},
-		{
-			name: "empty labels",
-			object: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
-				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
-			},
-			expected: "",
-			err:      nil,
-		},
-		{
-			name: "nil labels",
-			object: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
-				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
-			},
-			expected: "",
-			err:      nil,
-		},
-	}
-
-	for _, test := range tests {
-		gotLabels, err := f.LabelsForObject(test.object)
-		if err != test.err {
-			t.Fatalf("%s: Error mismatch: Expected %v, got %v", test.name, test.err, err)
-		}
-		got := kubectl.MakeLabels(gotLabels)
-		if test.expected != got {
-			t.Fatalf("%s: Labels mismatch! Expected %s, got %s", test.name, test.expected, got)
-		}
-
 	}
 }
 
