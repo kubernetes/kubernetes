@@ -258,6 +258,7 @@ docs/man/man1/kubectl-top-pod.1
 docs/man/man1/kubectl-top.1
 docs/man/man1/kubectl-uncordon.1
 docs/man/man1/kubectl-version.1
+docs/man/man1/kubectl-wait.1
 docs/man/man1/kubectl.1
 docs/man/man1/kubelet.1
 docs/user-guide/kubectl/kubectl.md
@@ -357,6 +358,7 @@ docs/user-guide/kubectl/kubectl_top_node.md
 docs/user-guide/kubectl/kubectl_top_pod.md
 docs/user-guide/kubectl/kubectl_uncordon.md
 docs/user-guide/kubectl/kubectl_version.md
+docs/user-guide/kubectl/kubectl_wait.md
 docs/yaml/kubectl/kubectl.yaml
 docs/yaml/kubectl/kubectl_alpha.yaml
 docs/yaml/kubectl/kubectl_annotate.yaml
@@ -400,3 +402,4 @@ docs/yaml/kubectl/kubectl_taint.yaml
 docs/yaml/kubectl/kubectl_top.yaml
 docs/yaml/kubectl/kubectl_uncordon.yaml
 docs/yaml/kubectl/kubectl_version.yaml
+docs/yaml/kubectl/kubectl_wait.yaml
