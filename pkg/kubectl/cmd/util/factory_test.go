@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -63,33 +62,6 @@ func TestProtocolsForObject(t *testing.T) {
 
 	if !expected.Equal(got) {
 		t.Fatalf("Protocols mismatch! Expected %v, got %v", expected, got)
-	}
-}
-
-func TestCanBeExposed(t *testing.T) {
-	factory := NewFactory(genericclioptions.NewTestConfigFlags())
-	tests := []struct {
-		kind      schema.GroupKind
-		expectErr bool
-	}{
-		{
-			kind:      api.Kind("ReplicationController"),
-			expectErr: false,
-		},
-		{
-			kind:      api.Kind("Node"),
-			expectErr: true,
-		},
-	}
-
-	for _, test := range tests {
-		err := factory.CanBeExposed(test.kind)
-		if test.expectErr && err == nil {
-			t.Error("unexpected non-error")
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
 	}
 }
 
