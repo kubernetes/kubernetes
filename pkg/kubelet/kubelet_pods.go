@@ -174,10 +174,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
 			}
 
-			volumePath, err := filepath.EvalSymlinks(hostPath)
-			if err != nil {
-				return nil, cleanupAction, err
-			}
+			volumePath := hostPath
 			hostPath = filepath.Join(volumePath, mount.SubPath)
 
 			if subPathExists, err := mounter.ExistsPath(hostPath); err != nil {
@@ -192,10 +189,10 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				if err != nil {
 					return nil, cleanupAction, err
 				}
-
-				if err := mounter.SafeMakeDir(hostPath, volumePath, perm); err != nil {
-					glog.Errorf("failed to mkdir %q: %v", hostPath, err)
-					return nil, cleanupAction, err
+				if err := mounter.SafeMakeDir(mount.SubPath, volumePath, perm); err != nil {
+					// Don't pass detailed error back to the user because it could give information about host filesystem
+					glog.Errorf("failed to create subPath directory for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
+					return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)
 				}
 			}
 			hostPath, cleanupAction, err = mounter.PrepareSafeSubpath(mountutil.Subpath{
