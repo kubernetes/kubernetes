@@ -535,7 +535,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain},
-				Options:  []string{"ndots:5"},
+				Options:  []string{"ndots:5", "single-request-reopen"},
 			},
 		},
 		{
@@ -577,7 +577,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "debug", "single-request-reopen"},
 			},
 		},
 		{
@@ -596,7 +596,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "debug", "single-request-reopen"},
 			},
 		},
 		{
