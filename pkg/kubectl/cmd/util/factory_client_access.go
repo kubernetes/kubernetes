@@ -116,16 +116,6 @@ func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
 	return restclient.RESTClientFor(clientConfig)
 }
 
-func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
-	return []schema.GroupResource{
-		{Resource: "replicationcontroller"},
-		{Resource: "deployment"},
-		{Resource: "daemonset"},
-		{Resource: "job"},
-		{Resource: "replicaset"},
-	}
-}
-
 func (f *ring0Factory) DefaultNamespace() (string, bool, error) {
 	return f.clientGetter.ToRawKubeConfigLoader().Namespace()
 }

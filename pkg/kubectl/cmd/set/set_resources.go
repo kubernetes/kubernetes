@@ -18,11 +18,10 @@ package set
 
 import (
 	"fmt"
-	"strings"
-
-	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -108,16 +107,11 @@ func NewResourcesOptions(streams genericclioptions.IOStreams) *SetResourcesOptio
 func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewResourcesOptions(streams)
 
-	resourceTypesWithPodTemplate := []string{}
-	for _, resource := range f.SuggestedPodTemplateResources() {
-		resourceTypesWithPodTemplate = append(resourceTypesWithPodTemplate, resource.Resource)
-	}
-
 	cmd := &cobra.Command{
 		Use: "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Update resource requests/limits on objects with pod templates"),
-		Long:    fmt.Sprintf(resources_long, strings.Join(resourceTypesWithPodTemplate, ", ")),
+		Long:    fmt.Sprintf(resources_long, cmdutil.SuggestApiResources("kubectl")),
 		Example: resources_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
