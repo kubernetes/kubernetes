@@ -289,6 +289,15 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 			},
 		},
 	}
+	volMap[kubeadmconstants.KubeAPIServer]["audit"] = v1.Volume{
+		Name: "audit-webhook",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/foo/bar/buzz.yaml",
+				Type: &hostPathFile,
+			},
+		},
+	}
 	volMap[kubeadmconstants.KubeAPIServer]["audit-log"] = v1.Volume{
 		Name: "audit-log",
 		VolumeSource: v1.VolumeSource{
@@ -351,6 +360,11 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	volMountMap[kubeadmconstants.KubeAPIServer]["audit"] = v1.VolumeMount{
 		Name:      "audit",
 		MountPath: "/etc/kubernetes/audit/audit.yaml",
+		ReadOnly:  true,
+	}
+	volMountMap[kubeadmconstants.KubeAPIServer]["audit"] = v1.VolumeMount{
+		Name:      "audit-webhook",
+		MountPath: "/etc/kubernetes/audit/webhook.yaml",
 		ReadOnly:  true,
 	}
 	volMountMap[kubeadmconstants.KubeAPIServer]["audit-log"] = v1.VolumeMount{
@@ -513,8 +527,9 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 				Etcd:            kubeadmapi.Etcd{},
 				FeatureGates:    map[string]bool{features.Auditing: true},
 				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
-					Path:   "/foo/bar/baz.yaml",
-					LogDir: "/bar/foo",
+					Path:              "/foo/bar/baz.yaml",
+					LogDir:            "/bar/foo",
+					WebhookConfigPath: "/bar/foo/buzz.yaml",
 				},
 			},
 			vol:      volMap,

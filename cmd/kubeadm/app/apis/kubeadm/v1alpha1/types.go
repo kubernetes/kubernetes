@@ -295,5 +295,9 @@ type AuditPolicyConfiguration struct {
 	LogDir string `json:"logDir"`
 	// LogMaxAge is the number of days logs will be stored for. 0 indicates forever.
 	LogMaxAge *int32 `json:"logMaxAge,omitempty"`
+	// WebhookConfigPath is the local path to webhook policy.
+	WebhookConfigPath string `json:"webhookConfigPath,omitempty"`
+	// WebhookInitialBackoff is the time to wait (in seconds) before retrying the first failed request.
+	WebhookInitialBackoff string `json:"webhookInitialBackoff,omitempty"`
 	//TODO(chuckha) add other options for audit policy.
 }

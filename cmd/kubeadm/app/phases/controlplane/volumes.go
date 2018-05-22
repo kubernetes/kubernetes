@@ -58,6 +58,10 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 	if features.Enabled(cfg.FeatureGates, features.Auditing) {
 		// Read-only mount for the audit policy file.
 		mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeAuditPolicyVolumeName, cfg.AuditPolicyConfiguration.Path, kubeadmconstants.GetStaticPodAuditPolicyFile(), true, &hostPathFile)
+		// Read-only mount for the audit webhook config file.
+		if cfg.AuditPolicyConfiguration.WebhookConfigPath != "" {
+			mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeAuditWebhookConfigVolumeName, cfg.AuditPolicyConfiguration.WebhookConfigPath, kubeadmconstants.GetStaticPodAuditWebhookConfigFile(), true, &hostPathFile)
+		}
 		// Write mount for the audit logs.
 		mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeAuditPolicyLogVolumeName, cfg.AuditPolicyConfiguration.LogDir, kubeadmconstants.StaticPodAuditPolicyLogDir, false, &hostPathDirectoryOrCreate)
 	}

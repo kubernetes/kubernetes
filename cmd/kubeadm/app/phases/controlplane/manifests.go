@@ -215,6 +215,12 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		} else {
 			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", *cfg.AuditPolicyConfiguration.LogMaxAge)
 		}
+		if cfg.AuditPolicyConfiguration.WebhookConfigPath != "" {
+			command = append(command, "--audit-webhook-config-file="+kubeadmconstants.GetStaticPodAuditWebhookConfigFile())
+		}
+		if cfg.AuditPolicyConfiguration.WebhookInitialBackoff != "" {
+			command = append(command, fmt.Sprintf("--audit-webhook-initial-backoff=%s", cfg.AuditPolicyConfiguration.WebhookInitialBackoff))
+		}
 	}
 	if cfg.APIServerExtraArgs == nil {
 		cfg.APIServerExtraArgs = map[string]string{}

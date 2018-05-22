@@ -249,6 +249,10 @@ const (
 	AuditPolicyDir = "audit"
 	// AuditPolicyFile is the name of the audit policy file itself
 	AuditPolicyFile = "audit.yaml"
+	// KubeAuditWebhookConfigVolumeName is the name of the volume that will contain the audit webhook config
+	KubeAuditWebhookConfigVolumeName = "audit-webhook-config"
+	// AuditWebhookConfigFile is the name of the audit webhook config file itself
+	AuditWebhookConfigFile = "webhook.yaml"
 	// AuditPolicyLogFile is the name of the file audit logs get written to
 	AuditPolicyLogFile = "audit.log"
 	// KubeAuditPolicyLogVolumeName is the name of the volume that will contain the audit logs
@@ -370,4 +374,9 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 // GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod
 func GetStaticPodAuditPolicyFile() string {
 	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditPolicyFile)
+}
+
+// GetStaticPodAuditWebhookConfigFile returns the path to the audit webhook config file within a static pod
+func GetStaticPodAuditWebhookConfigFile() string {
+	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditWebhookConfigFile)
 }

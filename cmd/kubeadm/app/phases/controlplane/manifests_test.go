@@ -227,10 +227,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Etcd:            kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir: testCertsDir,
 				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
-					Path:      "/foo/bar",
-					LogDir:    "/foo/baz",
-					LogMaxAge: utilpointer.Int32Ptr(10),
-				},
+					Path:                  "/foo/bar",
+					LogDir:                "/foo/baz",
+					LogMaxAge:             utilpointer.Int32Ptr(10),
+					WebhookConfigPath:     "/foo/bar/baz",
+					WebhookInitialBackoff: "30s",
+				}, // ignored without the feature gate
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -418,6 +420,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--audit-policy-file=/etc/kubernetes/audit/audit.yaml",
 				"--audit-log-path=/var/log/kubernetes/audit/audit.log",
 				"--audit-log-maxage=0",
+				"--audit-webhook-config-file=/etc/kubernetes/audit/webhook.yaml",
+				"--audit-webhook-initial-backoff=30s",
 			},
 		},
 		{
