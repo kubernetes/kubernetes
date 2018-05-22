@@ -327,8 +327,21 @@ func (mounter *NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath 
 	return newHostPath, cleanupAction, err
 }
 
-func (mounter *NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return doSafeMakeDir(pathname, base, perm)
+func (mounter *NsenterMounter) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
+	fullSubdirPath := filepath.Join(base, subdir)
+	evaluatedSubdirPath, err := mounter.ne.EvalSymlinks(fullSubdirPath, false /* mustExist */)
+	if err != nil {
+		return fmt.Errorf("error resolving symlinks in %s: %s", fullSubdirPath, err)
+	}
+	kubeletSubdirPath := mounter.ne.KubeletPath(evaluatedSubdirPath)
+
+	evaluatedBase, err := mounter.ne.EvalSymlinks(base, true /* mustExist */)
+	if err != nil {
+		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
+	}
+	kubeletBase := mounter.ne.KubeletPath(evaluatedBase)
+
+	return doSafeMakeDir(kubeletSubdirPath, kubeletBase, perm)
 }
 
 func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {

@@ -955,8 +955,15 @@ func removeEmptyDirs(baseDir, endDir string) error {
 	return nil
 }
 
-func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return doSafeMakeDir(pathname, base, perm)
+func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
+	realBase, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
+	}
+
+	realFullPath := filepath.Join(realBase, subdir)
+
+	return doSafeMakeDir(realFullPath, realBase, perm)
 }
 
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
@@ -1001,7 +1008,9 @@ func getMode(pathname string) (os.FileMode, error) {
 	return info.Mode(), nil
 }
 
-// This implementation is shared between Linux and NsEnterMounter
+// This implementation is shared between Linux and NsEnterMounter. Both pathname
+// and base must be either already resolved symlinks or thet will be resolved in
+// kubelet's mount namespace (in case it runs containerized).
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	glog.V(4).Infof("Creating directory %q within base %q", pathname, base)
 

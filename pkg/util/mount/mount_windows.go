@@ -472,8 +472,14 @@ func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
 }
 
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
-func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return doSafeMakeDir(pathname, base, perm)
+func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
+	realBase, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
+	}
+
+	realFullPath := filepath.Join(realBase, subdir)
+	return doSafeMakeDir(realFullPath, realBase, perm)
 }
 
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
