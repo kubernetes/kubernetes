@@ -386,16 +386,7 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	data, err := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", mimePb).Do().Raw()
 	if err != nil {
-		if errors.IsForbidden(err) || errors.IsNotFound(err) || errors.IsNotAcceptable(err) {
-			// single endpoint not found/registered in old server, try to fetch old endpoint
-			// TODO(roycaihw): remove this in 1.11
-			data, err = d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do().Raw()
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 	document := &openapi_v2.Document{}
 	err = proto.Unmarshal(data, document)
