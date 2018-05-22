@@ -382,11 +382,11 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
 		}
 
-		It("should run the container with uid 65534", func() {
+		It("should run the container with uid 65534 [NodeConformance]", func() {
 			createAndWaitUserPod(65534)
 		})
 
-		It("should run the container with uid 0", func() {
+		It("should run the container with uid 0 [NodeConformance]", func() {
 			createAndWaitUserPod(0)
 		})
 	})
@@ -429,11 +429,11 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			return podName
 		}
 
-		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true", func() {
+		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [NodeConformance]", func() {
 			createAndWaitUserPod(true)
 		})
 
-		It("should run the container with writable rootfs when readOnlyRootFilesystem=false", func() {
+		It("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func() {
 			createAndWaitUserPod(false)
 		})
 	})
@@ -497,14 +497,14 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			return nil
 		}
 
-		It("should allow privilege escalation when not explicitly set and uid != 0", func() {
+		It("should allow privilege escalation when not explicitly set and uid != 0 [NodeConformance]", func() {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, 1000); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 
-		It("should not allow privilege escalation when false", func() {
+		It("should not allow privilege escalation when false [NodeConformance]", func() {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(podName, "Effective uid: 1000", &apeFalse, 1000); err != nil {
@@ -512,7 +512,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		})
 
-		It("should allow privilege escalation when true", func() {
+		It("should allow privilege escalation when true [NodeConformance]", func() {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, 1000); err != nil {
@@ -568,7 +568,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		})
 
-		It("should run the container as unprivileged when false", func() {
+		It("should run the container as unprivileged when false [NodeConformance]", func() {
 			podName := createAndWaitUserPod(false)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {

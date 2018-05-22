@@ -185,7 +185,7 @@ while true; do sleep 1; done
 				},
 
 				{
-					name: "as empty when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set",
+					name: "as empty when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
 					container: v1.Container{
 						Image:   busyboxImage,
 						Command: []string{"/bin/sh", "-c"},
