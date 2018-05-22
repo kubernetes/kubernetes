@@ -29,3 +29,14 @@ install -p -m 755 -t %{buildroot}%{_sysconfdir}/systemd/system/ {kubelet.service
 %{_bindir}/kubelet
 %{_sysconfdir}/systemd/system/kubelet.service
 %{_sysconfdir}/kubernetes/manifests/
+
+%post
+if [ -x /bin/systemctl ] && systemctl is-active systemd-resolved --quiet ; then
+  mkdir -p /etc/systemd/system/kubelet.service.d
+  cat <<EOF > /etc/systemd/system/kubelet.service.d/09-systemd-resolved.conf
+[Service]
+Environment="KUBELET_RESOLVER_ARGS=--resolv-conf=/run/systemd/resolve/resolv.conf"
+ExecStart=
+ExecStart=/usr/bin/kubelet $KUBELET_RESOLVER_ARGS
+EOF
+fi
