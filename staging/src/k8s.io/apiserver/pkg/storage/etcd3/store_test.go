@@ -326,6 +326,9 @@ func TestGetToList(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetToList failed: %v", err)
 		}
+		if len(out.ResourceVersion) == 0 {
+			t.Errorf("#%d: unset resourceVersion", i)
+		}
 		if len(out.Items) != len(tt.expectedOut) {
 			t.Errorf("#%d: length of list want=%d, get=%d", i, len(tt.expectedOut), len(out.Items))
 			continue
