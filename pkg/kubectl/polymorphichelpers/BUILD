@@ -9,6 +9,7 @@ go_library(
         "interface.go",
         "logsforobject.go",
         "protocolsforobject.go",
+        "rollbacker.go",
         "statusviewer.go",
         "updatepodspec.go",
     ],
