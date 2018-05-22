@@ -45,10 +45,6 @@ type MasterConfiguration struct {
 	// NodeName is the name of the node that will host the k8s control plane.
 	// Defaults to the hostname if not provided.
 	NodeName string `json:"nodeName"`
-	// AuthorizationModes is a set of authorization modes used inside the cluster.
-	// If not specified, defaults to Node and RBAC, meaning both the node
-	// authorizer and RBAC are enabled.
-	AuthorizationModes []string `json:"authorizationModes,omitempty"`
 	// NoTaintMaster will, if set, suppress the tainting of the
 	// master node allowing workloads to be run on it (e.g. in
 	// single node configurations).

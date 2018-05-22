@@ -47,7 +47,6 @@ import (
 	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -887,16 +886,6 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		checks = append(checks,
 			ExternalEtcdVersionCheck{Etcd: cfg.Etcd},
 		)
-	}
-
-	// Check the config for authorization mode
-	for _, authzMode := range cfg.AuthorizationModes {
-		switch authzMode {
-		case authzmodes.ModeABAC:
-			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationPolicyPath})
-		case authzmodes.ModeWebhook:
-			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationWebhookConfigPath})
-		}
 	}
 
 	if ip := net.ParseIP(cfg.API.AdvertiseAddress); ip != nil {

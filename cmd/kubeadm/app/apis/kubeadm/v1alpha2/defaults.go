@@ -18,7 +18,6 @@ package v1alpha2
 
 import (
 	"net/url"
-	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,8 +41,6 @@ const (
 	DefaultKubernetesVersion = "stable-1.10"
 	// DefaultAPIBindPort defines default API port
 	DefaultAPIBindPort = 6443
-	// DefaultAuthorizationModes defines default authorization modes
-	DefaultAuthorizationModes = "Node,RBAC"
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
@@ -94,10 +91,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.Networking.DNSDomain == "" {
 		obj.Networking.DNSDomain = DefaultServiceDNSDomain
-	}
-
-	if len(obj.AuthorizationModes) == 0 {
-		obj.AuthorizationModes = strings.Split(DefaultAuthorizationModes, ",")
 	}
 
 	if obj.CertificatesDir == "" {
