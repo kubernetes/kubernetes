@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestSetEnvLocal(t *testing.T) {
@@ -63,7 +62,7 @@ func TestSetEnvLocal(t *testing.T) {
 
 	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
-	opts.PrintFlags = printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
 		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"},
 	}
@@ -101,7 +100,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	outputFormat := "name"
 	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
-	opts.PrintFlags = printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
 		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"},
 	}
@@ -483,7 +482,7 @@ func TestSetEnvRemote(t *testing.T) {
 			outputFormat := "yaml"
 			streams := genericclioptions.NewTestIOStreamsDiscard()
 			opts := NewEnvOptions(streams)
-			opts.PrintFlags = printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+			opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 			opts.Local = false
 			opts.IOStreams = streams
 			err := opts.Complete(tf, NewCmdEnv(tf, streams), input.args)

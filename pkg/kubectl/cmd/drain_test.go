@@ -50,8 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 const (
@@ -834,7 +834,7 @@ func TestDeletePods(t *testing.T) {
 			defer tf.Cleanup()
 
 			o := DrainOptions{
-				PrintFlags: printers.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 			}
 			o.Out = os.Stdout
 

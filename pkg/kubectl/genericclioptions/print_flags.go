@@ -14,27 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package genericclioptions
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
-
-var (
-	internalObjectPrinterErr = "a versioned object must be passed to a printer"
-
-	// disallowedPackagePrefixes contains regular expression templates
-	// for object package paths that are not allowed by printers.
-	disallowedPackagePrefixes = []string{
-		"k8s.io/kubernetes/pkg/apis/",
-	}
-)
-
-var internalObjectPreventer = &illegalPackageSourceChecker{disallowedPackagePrefixes}
 
 type NoCompatiblePrinterError struct {
 	OutputFormat *string
@@ -59,14 +47,6 @@ func IsNoCompatiblePrinterError(err error) bool {
 	return ok
 }
 
-func IsInternalObjectError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	return err.Error() == internalObjectPrinterErr
-}
-
 // PrintFlags composes common printer flag structs
 // used across all commands, and provides a method
 // of retrieving a known printer based on flag values provided.
@@ -74,7 +54,7 @@ type PrintFlags struct {
 	JSONYamlPrintFlags *JSONYamlPrintFlags
 	NamePrintFlags     *NamePrintFlags
 
-	TypeSetterPrinter *TypeSetterPrinter
+	TypeSetterPrinter *printers.TypeSetterPrinter
 
 	OutputFormat *string
 }
@@ -83,7 +63,7 @@ func (f *PrintFlags) Complete(successTemplate string) error {
 	return f.NamePrintFlags.Complete(successTemplate)
 }
 
-func (f *PrintFlags) ToPrinter() (ResourcePrinter, error) {
+func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	outputFormat := ""
 	if f.OutputFormat != nil {
 		outputFormat = *f.OutputFormat
@@ -121,7 +101,7 @@ func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
 
 // WithTypeSetter sets a wrapper than will surround the returned printer with a printer to type resources
 func (f *PrintFlags) WithTypeSetter(scheme *runtime.Scheme) *PrintFlags {
-	f.TypeSetterPrinter = NewTypeSetter(scheme)
+	f.TypeSetterPrinter = printers.NewTypeSetter(scheme)
 	return f
 }
 
@@ -134,23 +114,4 @@ func NewPrintFlags(operation string) *PrintFlags {
 		JSONYamlPrintFlags: NewJSONYamlPrintFlags(),
 		NamePrintFlags:     NewNamePrintFlags(operation),
 	}
-}
-
-// illegalPackageSourceChecker compares a given
-// object's package path, and determines if the
-// object originates from a disallowed source.
-type illegalPackageSourceChecker struct {
-	// disallowedPrefixes is a slice of disallowed package path
-	// prefixes for a given runtime.Object that we are printing.
-	disallowedPrefixes []string
-}
-
-func (c *illegalPackageSourceChecker) IsForbidden(pkgPath string) bool {
-	for _, forbiddenPrefix := range c.disallowedPrefixes {
-		if strings.HasPrefix(pkgPath, forbiddenPrefix) {
-			return true
-		}
-	}
-
-	return false
 }

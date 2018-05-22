@@ -18,6 +18,7 @@ package get
 
 import (
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -63,7 +64,7 @@ func (f *HumanPrintFlags) EnsureWithNamespace() error {
 // handling human-readable output.
 func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
 	if len(outputFormat) > 0 && outputFormat != "wide" {
-		return nil, printers.NoCompatiblePrinterError{Options: f}
+		return nil, genericclioptions.NoCompatiblePrinterError{Options: f}
 	}
 
 	decoder := scheme.Codecs.UniversalDecoder()

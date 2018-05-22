@@ -151,6 +151,7 @@ pkg/kubectl/cmd/util/editor
 pkg/kubectl/cmd/util/jsonmerge
 pkg/kubectl/cmd/util/sanity
 pkg/kubectl/genericclioptions
+pkg/kubectl/genericclioptions/printers
 pkg/kubectl/genericclioptions/resource
 pkg/kubectl/metricsutil
 pkg/kubectl/util
@@ -221,6 +222,7 @@ pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
 pkg/master/tunneler
+pkg/printers
 pkg/printers/internalversion
 pkg/printers/storage
 pkg/probe

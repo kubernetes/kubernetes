@@ -22,17 +22,17 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
 // PrintFlags composes common printer flag structs
 // used in the Get command.
 type PrintFlags struct {
-	JSONYamlPrintFlags *printers.JSONYamlPrintFlags
-	NamePrintFlags     *printers.NamePrintFlags
+	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
+	NamePrintFlags     *genericclioptions.NamePrintFlags
 	TemplateFlags      *printers.KubeTemplatePrintFlags
 	CustomColumnsFlags *printers.CustomColumnsPrintFlags
 	HumanReadableFlags *HumanPrintFlags
@@ -107,27 +107,27 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 		f.CustomColumnsFlags.TemplateArgument = *f.TemplateFlags.TemplateArgument
 	}
 
-	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
+	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return p, err
 	}
 
-	if p, err := f.HumanReadableFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
+	if p, err := f.HumanReadableFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return p, err
 	}
 
-	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
+	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return p, err
 	}
 
-	if p, err := f.CustomColumnsFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
+	if p, err := f.CustomColumnsFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return p, err
 	}
 
-	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
+	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return p, err
 	}
 
-	return nil, printers.NoCompatiblePrinterError{Options: f}
+	return nil, genericclioptions.NoCompatiblePrinterError{Options: f}
 }
 
 // AddFlags receives a *cobra.Command reference and binds
@@ -153,7 +153,7 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 
 // NewGetPrintFlags returns flags associated with humanreadable,
 // template, and "name" printing, with default values set.
-func NewGetPrintFlags(scheme runtime.ObjectConvertor) *PrintFlags {
+func NewGetPrintFlags() *PrintFlags {
 	outputFormat := ""
 	noHeaders := false
 
@@ -161,9 +161,10 @@ func NewGetPrintFlags(scheme runtime.ObjectConvertor) *PrintFlags {
 		OutputFormat: &outputFormat,
 		NoHeaders:    &noHeaders,
 
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-		NamePrintFlags:     printers.NewNamePrintFlags(""),
+		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
+		NamePrintFlags:     genericclioptions.NewNamePrintFlags(""),
 		TemplateFlags:      printers.NewKubeTemplatePrintFlags(),
+
 		HumanReadableFlags: NewHumanPrintFlags(),
 		CustomColumnsFlags: printers.NewCustomColumnsPrintFlags(),
 	}

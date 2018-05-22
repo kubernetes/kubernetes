@@ -25,8 +25,6 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/printers"
-
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -90,7 +88,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 			cmd.Flags().Set("local", "true")
 			testapi.Default = testapi.Groups[input.apiGroup]
 			saConfig := SetServiceAccountOptions{
-				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 				fileNameOptions: resource.FilenameOptions{
 					Filenames: []string{input.yaml}},
 				local:     true,
@@ -128,7 +126,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 	opts := SetServiceAccountOptions{
-		PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		fileNameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		local:     true,
@@ -365,7 +363,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 			cmd := NewCmdServiceAccount(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			saConfig := SetServiceAccountOptions{
-				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
 				local:     false,
 				IOStreams: streams,
@@ -407,7 +405,7 @@ func TestServiceAccountValidation(t *testing.T) {
 			cmd := NewCmdServiceAccount(tf, streams)
 
 			saConfig := &SetServiceAccountOptions{
-				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 				IOStreams:  streams,
 			}
 			err := saConfig.Complete(tf, cmd, input.args)
