@@ -188,6 +188,7 @@ var (
 		"KubeReserved[*]",
 		"KubeletCgroups",
 		"MakeIPTablesUtilChains",
+		"RotateCertificates",
 		"ServerTLSBootstrap",
 		"StaticPodURL",
 		"StaticPodURLHeader[*][*]",
