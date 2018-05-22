@@ -113,6 +113,9 @@ const (
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	PodStartTimeout = 5 * time.Minute
 
+	// How long to wait for a pod to be deleted
+	PodDeleteTimeout = 5 * time.Minute
+
 	// If there are any orphaned namespaces to clean up, this test is running
 	// on a long lived cluster. A long wait here is preferably to spurious test
 	// failures caused by leaked resources from a previous test run.
