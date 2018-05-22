@@ -55,6 +55,7 @@ go_library(
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/initsystem:go_default_library",
+        "//pkg/util/ipvs:go_default_library",
         "//pkg/util/procfs:go_default_library",
         "//pkg/util/version:go_default_library",
         "//pkg/version:go_default_library",
