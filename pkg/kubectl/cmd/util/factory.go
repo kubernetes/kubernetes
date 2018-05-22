@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -74,9 +73,6 @@ type ClientAccessFactory interface {
 	// NewBuilder returns an object that assists in loading objects from both disk and the server
 	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
-
-	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
-	SuggestedPodTemplateResources() []schema.GroupResource
 
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
