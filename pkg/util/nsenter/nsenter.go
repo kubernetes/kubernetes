@@ -128,8 +128,23 @@ func (ne *Nsenter) SupportsSystemd() (string, bool) {
 
 // EvalSymlinks returns the path name on the host after evaluating symlinks on the
 // host.
-func (ne *Nsenter) EvalSymlinks(pathname string) (string, error) {
-	args := []string{"-m", pathname}
+// mustExist makes EvalSymlinks to return error when the path does not
+// exist. When it's false, it evaluates symlinks of the existing part and
+// blindly adds the non-existing part:
+// pathname: /mnt/volume/non/existing/directory
+//     /mnt/volume exists
+//                non/existing/directory does not exist
+// -> It resolves symlinks in /mnt/volume to say /mnt/foo and returns
+//    /mnt/foo/non/existing/directory.
+func (ne *Nsenter) EvalSymlinks(pathname string, mustExist bool) (string, error) {
+	var args []string
+	if mustExist {
+		// "realpath -e: all components of the path must exist"
+		args = []string{"-e", pathname}
+	} else {
+		// "realpath -m: no path components need exist or be a directory"
+		args = []string{"-m", pathname}
+	}
 	outBytes, err := ne.Exec("realpath", args).CombinedOutput()
 	if err != nil {
 		glog.Infof("failed to resolve symbolic links on %s: %v", pathname, err)
@@ -139,11 +154,8 @@ func (ne *Nsenter) EvalSymlinks(pathname string) (string, error) {
 }
 
 // KubeletPath returns the path name that can be accessed by containerized
-// kubelet, after evaluating symlinks on the host.
-func (ne *Nsenter) KubeletPath(pathname string) (string, error) {
-	hostpath, err := ne.EvalSymlinks(pathname)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(hostRootFsPath, hostpath), nil
+// kubelet. It is recommended to resolve symlinks on the host by EvalSymlinks
+// before calling this function
+func (ne *Nsenter) KubeletPath(pathname string) string {
+	return filepath.Join(hostRootFsPath, pathname)
 }
