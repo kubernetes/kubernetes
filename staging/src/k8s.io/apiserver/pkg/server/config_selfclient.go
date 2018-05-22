@@ -63,6 +63,8 @@ func LoopbackHostPort(bindAddress string) (string, string, error) {
 		return "", "", fmt.Errorf("invalid server bind address: %q", bindAddress)
 	}
 
+	isIPv6 := net.ParseIP(host).To4() == nil
+
 	// Value is expected to be an IP or DNS name, not "0.0.0.0".
 	if host == "0.0.0.0" || host == "::" {
 		host = "localhost"
@@ -72,7 +74,7 @@ func LoopbackHostPort(bindAddress string) (string, string, error) {
 		addrs, err := net.InterfaceAddrs()
 		if err == nil {
 			for _, address := range addrs {
-				if ipnet, ok := address.(*net.IPNet); ok && ipnet.IP.IsLoopback() {
+				if ipnet, ok := address.(*net.IPNet); ok && ipnet.IP.IsLoopback() && isIPv6 == (ipnet.IP.To4() == nil) {
 					host = ipnet.IP.String()
 					break
 				}
