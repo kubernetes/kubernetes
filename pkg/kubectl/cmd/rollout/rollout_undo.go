@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -139,7 +140,7 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		if err != nil {
 			return err
 		}
-		rollbacker, err := f.Rollbacker(info.ResourceMapping())
+		rollbacker, err := polymorphichelpers.RollbackerFn(f, info.ResourceMapping())
 		if err != nil {
 			return err
 		}

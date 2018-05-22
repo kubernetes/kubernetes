@@ -8,6 +8,8 @@ go_library(
         "historyviewer.go",
         "interface.go",
         "logsforobject.go",
+        "protocolsforobject.go",
+        "rollbacker.go",
         "statusviewer.go",
         "updatepodspec.go",
     ],
@@ -47,6 +49,7 @@ go_test(
     srcs = [
         "helpers_test.go",
         "logsforobject_test.go",
+        "protocolsforobject_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -56,6 +59,7 @@ go_test(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/kubectl:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -63,6 +67,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
     ],

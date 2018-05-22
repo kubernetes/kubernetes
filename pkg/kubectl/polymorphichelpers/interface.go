@@ -58,3 +58,15 @@ type UpdatePodSpecForObjectFunc func(obj runtime.Object, fn func(*v1.PodSpec) er
 
 // UpdatePodSpecForObjectFn gives a way to easily override the function for unit testing if needed
 var UpdatePodSpecForObjectFn UpdatePodSpecForObjectFunc = updatePodSpecForObject
+
+// ProtocolsForObjectFunc returns the protocols associated with the provided object
+type ProtocolsForObjectFunc func(object runtime.Object) (map[string]string, error)
+
+// ProtocolsForObjectFn gives a way to easily override the function for unit testing if needed
+var ProtocolsForObjectFn ProtocolsForObjectFunc = protocolsForObject
+
+// RollbackerFunc gives a way to change the rollback version of the specified RESTMapping type
+type RollbackerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
+
+// RollbackerFn gives a way to easily override the function for unit testing if needed
+var RollbackerFn RollbackerFunc = rollbacker

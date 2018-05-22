@@ -26,7 +26,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
@@ -130,14 +129,6 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 	eventsClient := clientSet.Core()
 
 	return printersinternal.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
-}
-
-func (f *ring1Factory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
-	external, err := f.clientAccessFactory.KubernetesClientSet()
-	if err != nil {
-		return nil, err
-	}
-	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), external)
 }
 
 func (f *ring1Factory) Validator(validate bool) (validation.Schema, error) {
