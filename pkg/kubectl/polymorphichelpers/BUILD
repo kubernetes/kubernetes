@@ -13,6 +13,7 @@ go_library(
         "objectpauser.go",
         "objectresumer.go",
         "portsforobject.go",
+        "rollbacker.go",
         "statusviewer.go",
         "updatepodspec.go",
     ],
