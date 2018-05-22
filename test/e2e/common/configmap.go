@@ -34,7 +34,7 @@ var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 		    Description: Make sure config map value can be used as an environment
 			variable in the container (on container.env field)
 	*/
-	framework.ConformanceIt("should be consumable via environment variable ", func() {
+	framework.ConformanceIt("should be consumable via environment variable [NodeConformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -82,7 +82,7 @@ var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 		    Description: Make sure config map value can be used as an source for
 			environment variables in the container (on container.envFrom field)
 	*/
-	framework.ConformanceIt("should be consumable via the environment ", func() {
+	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newEnvFromConfigMap(f, name)
 		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
