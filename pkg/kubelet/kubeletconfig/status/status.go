@@ -80,9 +80,12 @@ type nodeConfigStatus struct {
 
 // NewNodeConfigStatus returns a new NodeConfigStatus interface
 func NewNodeConfigStatus() NodeConfigStatus {
+	// channels must have capacity at least 1, since we signal with non-blocking writes
+	syncCh := make(chan bool, 1)
+	// prime new status managers to sync with the API server on the first call to Sync
+	syncCh <- true
 	return &nodeConfigStatus{
-		// channels must have capacity at least 1, since we signal with non-blocking writes
-		syncCh: make(chan bool, 1),
+		syncCh: syncCh,
 	}
 }
 
@@ -141,6 +144,8 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 		// no work to be done, return
 		return
 	}
+
+	utillog.Infof("updating Node.Status.Config")
 
 	// grab the lock
 	s.mux.Lock()
