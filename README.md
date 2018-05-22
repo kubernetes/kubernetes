@@ -21,7 +21,7 @@ read the CNCF [announcement].
 
 ----
 
-## To start using Kubernetes
+## Getting started with Kubernetes as a User
 
 See our documentation on [kubernetes.io].
 
@@ -29,7 +29,7 @@ Try our [interactive tutorial].
 
 Take a free course on [Scalable Microservices with Kubernetes].
 
-## To start developing Kubernetes
+## Getting started with Kubernetes as a Developer
 
 The [community repository] hosts all information about
 building Kubernetes from source, contributing code
@@ -38,7 +38,7 @@ questions.
 
 If you want to build Kubernetes right away there are two options:
 
-##### If you have a working [Go environment]:
+### If you have a working [Go environment]:
 
 ```
 $ go get -d k8s.io/kubernetes
@@ -46,7 +46,7 @@ $ cd $GOPATH/src/k8s.io/kubernetes
 $ make
 ```
 
-##### If you have a working [Docker environment]:
+## If you have a working [Docker environment]:
 
 ```
 $ git clone https://github.com/kubernetes/kubernetes
