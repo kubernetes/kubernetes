@@ -21,12 +21,14 @@ package mount
 import (
 	"errors"
 	"os"
+
+	"k8s.io/kubernetes/pkg/util/nsenter"
 )
 
 type NsenterMounter struct{}
 
-func NewNsenterMounter(rootDir string) (*NsenterMounter, error) {
-	return &NsenterMounter{}, nil
+func NewNsenterMounter(rootDir string, ne *nsenter.Nsenter) *NsenterMounter {
+	return &NsenterMounter{}
 }
 
 var _ = Interface(&NsenterMounter{})
