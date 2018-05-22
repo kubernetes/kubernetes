@@ -2821,8 +2821,8 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 			errs: []verr{{
-				etype:  field.ErrorTypeNotSupported,
-				field:  "rbd.monitorSRVRecord.protocol",
+				etype: field.ErrorTypeNotSupported,
+				field: "rbd.monitorSRVRecord.protocol",
 			}},
 		},
 		{
@@ -2841,8 +2841,8 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 			errs: []verr{{
-				etype:  field.ErrorTypeRequired,
-				field:  "rbd.monitorSRVRecord.name",
+				etype: field.ErrorTypeRequired,
+				field: "rbd.monitorSRVRecord.name",
 			}},
 		},
 		{
@@ -2861,8 +2861,8 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 			errs: []verr{{
-				etype:  field.ErrorTypeRequired,
-				field:  "rbd.monitorSRVRecord.domain",
+				etype: field.ErrorTypeRequired,
+				field: "rbd.monitorSRVRecord.domain",
 			}},
 		},
 		{
@@ -2989,8 +2989,8 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 			errs: []verr{{
-				etype:  field.ErrorTypeNotSupported,
-				field:  "cephfs.monitorSRVRecord.protocol",
+				etype: field.ErrorTypeNotSupported,
+				field: "cephfs.monitorSRVRecord.protocol",
 			}},
 		},
 		{
@@ -3007,8 +3007,8 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 			errs: []verr{{
-				etype:  field.ErrorTypeRequired,
-				field:  "cephfs.monitorSRVRecord.name",
+				etype: field.ErrorTypeRequired,
+				field: "cephfs.monitorSRVRecord.name",
 			}},
 		},
 		{
@@ -3025,8 +3025,8 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 			errs: []verr{{
-				etype:  field.ErrorTypeRequired,
-				field:  "cephfs.monitorSRVRecord.domain",
+				etype: field.ErrorTypeRequired,
+				field: "cephfs.monitorSRVRecord.domain",
 			}},
 		},
 
