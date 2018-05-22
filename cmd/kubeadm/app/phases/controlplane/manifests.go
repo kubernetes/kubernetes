@@ -39,8 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-const defaultAdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
-
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
 func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
 	glog.V(1).Infoln("[controlplane] creating static pod files")
@@ -141,9 +139,14 @@ func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguratio
 // getAPIServerCommand builds the right API server command from the given config object and version
 func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	defaultArguments := map[string]string{
-		"advertise-address":               cfg.API.AdvertiseAddress,
-		"insecure-port":                   "0",
-		"admission-control":               defaultAdmissionControl,
+		"advertise-address":        cfg.API.AdvertiseAddress,
+		"insecure-port":            "0",
+		"enable-admission-plugins": "NodeRestriction",
+		// TODO: remove `PersistentVolumeLabel` in kubeadm v1.11, as it's automatically disabled in v1.11.
+		// ref: https://github.com/kubernetes/kubernetes/pull/64326
+		// we can't skip it now as we support v1.10 clusters still.
+		// remove it from the unit tests too.
+		"disable-admission-plugins":       "PersistentVolumeLabel",
 		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
 		"service-account-key-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
 		"client-ca-file":                  filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
