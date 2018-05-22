@@ -237,6 +237,9 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	if obj.KubeletConfiguration.BaseConfig.ClusterDomain == "" {
 		obj.KubeletConfiguration.BaseConfig.ClusterDomain = DefaultServiceDNSDomain
 	}
+	if obj.KubeletConfiguration.BaseConfig.Authentication.Webhook.Enabled == nil {
+		obj.KubeletConfiguration.BaseConfig.Authentication.Webhook.Enabled = utilpointer.BoolPtr(true)
+	}
 	if obj.KubeletConfiguration.BaseConfig.Authorization.Mode == "" {
 		obj.KubeletConfiguration.BaseConfig.Authorization.Mode = kubeletconfigv1beta1.KubeletAuthorizationModeWebhook
 	}
