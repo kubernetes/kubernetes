@@ -133,7 +133,7 @@ const (
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
 	return &GetOptions{
-		PrintFlags: NewGetPrintFlags(legacyscheme.Scheme),
+		PrintFlags: NewGetPrintFlags(),
 		CmdParent:  parent,
 
 		IOStreams:   streams,
