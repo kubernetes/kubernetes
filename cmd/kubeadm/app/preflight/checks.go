@@ -1043,10 +1043,11 @@ func TryStartKubelet(ignorePreflightErrors sets.String) {
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		glog.Infoln("[preflight] no supported init system detected, won't ensure kubelet is running.")
-	} else if initSystem.ServiceExists("kubelet") && !initSystem.ServiceIsActive("kubelet") {
+	} else if initSystem.ServiceExists("kubelet") {
 
-		glog.Infoln("[preflight] starting the kubelet service")
-		if err := initSystem.ServiceStart("kubelet"); err != nil {
+		glog.Infoln("[preflight] Activating the kubelet service")
+		// This runs "systemctl daemon-reload && systemctl restart kubelet"
+		if err := initSystem.ServiceRestart("kubelet"); err != nil {
 			glog.Warningf("[preflight] unable to start the kubelet service: [%v]\n", err)
 			glog.Warningf("[preflight] please ensure kubelet is running manually.")
 		}
