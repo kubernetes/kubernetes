@@ -25,7 +25,7 @@ import (
 
 type NsenterMounter struct{}
 
-func NewNsenterMounter() (*NsenterMounter, error) {
+func NewNsenterMounter(rootDir string) (*NsenterMounter, error) {
 	return &NsenterMounter{}, nil
 }
 

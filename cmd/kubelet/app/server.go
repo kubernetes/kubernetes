@@ -360,7 +360,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode")
-		mounter, err = mount.NewNsenterMounter()
+		mounter, err = mount.NewNsenterMounter(s.RootDirectory)
 		if err != nil {
 			return nil, err
 		}
