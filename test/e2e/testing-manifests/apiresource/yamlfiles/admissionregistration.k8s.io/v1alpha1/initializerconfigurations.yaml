@@ -1,0 +1,13 @@
+kind: InitializerConfiguration
+apiVersion: admissionregistration.k8s.io/v1alpha1
+metadata:
+  name: pvlabel.kubernetes.io
+initializers:
+  - name: pvlabel.kubernetes.io
+    rules:
+    - apiGroups:
+      - ""
+      apiVersions:
+      - "*"
+      resources:
+      - persistentvolumes
