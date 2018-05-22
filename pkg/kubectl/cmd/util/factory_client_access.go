@@ -178,24 +178,6 @@ func (f *ring0Factory) PortsForObject(object runtime.Object) ([]string, error) {
 	}
 }
 
-func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]string, error) {
-	// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
-	switch t := object.(type) {
-	case *api.ReplicationController:
-		return getProtocols(t.Spec.Template.Spec), nil
-	case *api.Pod:
-		return getProtocols(t.Spec), nil
-	case *api.Service:
-		return getServiceProtocols(t.Spec), nil
-	case *extensions.Deployment:
-		return getProtocols(t.Spec.Template.Spec), nil
-	case *extensions.ReplicaSet:
-		return getProtocols(t.Spec.Template.Spec), nil
-	default:
-		return nil, fmt.Errorf("cannot extract protocols from %T", object)
-	}
-}
-
 // Set showSecrets false to filter out stuff like secrets.
 func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
 	if len(os.Args) == 0 {

@@ -84,8 +84,6 @@ type ClientAccessFactory interface {
 	MapBasedSelectorForObject(object runtime.Object) (string, error)
 	// PortsForObject returns the ports associated with the provided object
 	PortsForObject(object runtime.Object) ([]string, error)
-	// ProtocolsForObject returns the <port, protocol> mapping associated with the provided object
-	ProtocolsForObject(object runtime.Object) (map[string]string, error)
 
 	// Command will stringify and return all environment arguments ie. a command run by a client
 	// using the factory.
@@ -188,30 +186,11 @@ func getPorts(spec api.PodSpec) []string {
 	return result
 }
 
-func getProtocols(spec api.PodSpec) map[string]string {
-	result := make(map[string]string)
-	for _, container := range spec.Containers {
-		for _, port := range container.Ports {
-			result[strconv.Itoa(int(port.ContainerPort))] = string(port.Protocol)
-		}
-	}
-	return result
-}
-
 // Extracts the ports exposed by a service from the given service spec.
 func getServicePorts(spec api.ServiceSpec) []string {
 	result := []string{}
 	for _, servicePort := range spec.Ports {
 		result = append(result, strconv.Itoa(int(servicePort.Port)))
-	}
-	return result
-}
-
-// Extracts the protocols exposed by a service from the given service spec.
-func getServiceProtocols(spec api.ServiceSpec) map[string]string {
-	result := make(map[string]string)
-	for _, servicePort := range spec.Ports {
-		result[strconv.Itoa(int(servicePort.Port))] = string(servicePort.Protocol)
 	}
 	return result
 }

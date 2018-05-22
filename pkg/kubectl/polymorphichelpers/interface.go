@@ -58,3 +58,9 @@ type UpdatePodSpecForObjectFunc func(obj runtime.Object, fn func(*v1.PodSpec) er
 
 // UpdatePodSpecForObjectFn gives a way to easily override the function for unit testing if needed
 var UpdatePodSpecForObjectFn UpdatePodSpecForObjectFunc = updatePodSpecForObject
+
+// ProtocolsForObjectFunc returns the protocols associated with the provided object
+type ProtocolsForObjectFunc func(object runtime.Object) (map[string]string, error)
+
+// ProtocolsForObjectFn gives a way to easily override the function for unit testing if needed
+var ProtocolsForObjectFn ProtocolsForObjectFunc = protocolsForObject
