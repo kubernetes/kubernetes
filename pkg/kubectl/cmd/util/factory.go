@@ -86,8 +86,6 @@ type ClientAccessFactory interface {
 	PortsForObject(object runtime.Object) ([]string, error)
 	// ProtocolsForObject returns the <port, protocol> mapping associated with the provided object
 	ProtocolsForObject(object runtime.Object) (map[string]string, error)
-	// LabelsForObject returns the labels associated with the provided object
-	LabelsForObject(object runtime.Object) (map[string]string, error)
 
 	// Command will stringify and return all environment arguments ie. a command run by a client
 	// using the factory.
@@ -104,11 +102,6 @@ type ClientAccessFactory interface {
 	// Returns the patched object in bytes and any error that occurred during the encoding or
 	// in case the object is already resumed.
 	Resumer(info *resource.Info) ([]byte, error)
-
-	// ResolveImage resolves the image names. For kubernetes this function is just
-	// passthrough but it allows to perform more sophisticated image name resolving for
-	// third-party vendors.
-	ResolveImage(imageName string) (string, error)
 
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
