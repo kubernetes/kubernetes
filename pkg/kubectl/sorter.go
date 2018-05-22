@@ -264,12 +264,15 @@ func (r *RuntimeSort) Less(i, j int) bool {
 	iObj := r.objs[i]
 	jObj := r.objs[j]
 
-	parser := jsonpath.New("sorting").AllowMissingKeys(true)
-	parser.Parse(r.field)
-
 	var iValues [][]reflect.Value
 	var jValues [][]reflect.Value
 	var err error
+
+	parser := jsonpath.New("sorting").AllowMissingKeys(true)
+	err = parser.Parse(r.field)
+	if err != nil {
+		panic(err)
+	}
 
 	if unstructured, ok := iObj.(*unstructured.Unstructured); ok {
 		iValues, err = parser.FindResults(unstructured.Object)
