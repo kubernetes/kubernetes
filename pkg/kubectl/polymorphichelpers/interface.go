@@ -93,3 +93,9 @@ type ObjectResumerFunc func(runtime.Object) ([]byte, error)
 // Returns the patched object in bytes and any error that occurred during the encoding or
 // in case the object is already resumed.
 var ObjectResumerFn ObjectResumerFunc = defaultObjectResumer
+
+// RollbackerFunc gives a way to change the rollback version of the specified RESTMapping type
+type RollbackerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
+
+// RollbackerFn gives a way to easily override the function for unit testing if needed
+var RollbackerFn RollbackerFunc = rollbacker

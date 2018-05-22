@@ -111,9 +111,6 @@ type ObjectMappingFactory interface {
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer(mapping *meta.RESTMapping) (printers.Describer, error)
 
-	// Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
-	Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
-
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool) (validation.Schema, error)
 	// OpenAPISchema returns the schema openapi schema definition
