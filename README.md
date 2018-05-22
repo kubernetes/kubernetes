@@ -6,11 +6,9 @@
 
 ----
 
-Kubernetes is an open source system for managing [containerized applications]
-across multiple hosts; providing basic mechanisms for deployment, maintenance,
-and scaling of applications.
+Kubernetes is an open source container orchestration system for running microservices (i.e. [containerized applications]) across multiple hosts; providing basic mechanisms for end to end deployment, scheduling, scaling, and networking of microservices, with examples of similar systems, you can check out Mesos, Docker Swarm, Nomad.
 
-Kubernetes builds upon a decade and a half of experience at Google running
+Kubernetes builds upon 17 years of experience at Google running
 production workloads at scale using a system called [Borg],
 combined with best-of-breed ideas and practices from the community.
 
@@ -34,12 +32,13 @@ Take a free course on [Scalable Microservices with Kubernetes].
 ## To start developing Kubernetes
 
 The [community repository] hosts all information about
-building Kubernetes from source, how to contribute code
-and documentation, who to contact about what, etc.
+building Kubernetes from source, contributing code
+and documentation, what individuals/SIG's contact for specific
+questions.
 
 If you want to build Kubernetes right away there are two options:
 
-##### You have a working [Go environment].
+##### If you have a working [Go environment]:
 
 ```
 $ go get -d k8s.io/kubernetes
@@ -47,7 +46,7 @@ $ cd $GOPATH/src/k8s.io/kubernetes
 $ make
 ```
 
-##### You have a working [Docker environment].
+##### If you have a working [Docker environment]:
 
 ```
 $ git clone https://github.com/kubernetes/kubernetes
