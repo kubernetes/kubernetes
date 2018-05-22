@@ -958,6 +958,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.NodeLabels,
 		kubeFlags.SeccompProfileRoot,
 		kubeFlags.BootstrapCheckpointPath,
+		kubeFlags.NodeStatusMaxImages,
 		stopCh)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
@@ -1043,6 +1044,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
 	bootstrapCheckpointPath string,
+	nodeStatusMaxImages int32,
 	stopCh <-chan struct{}) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
@@ -1077,6 +1079,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeLabels,
 		seccompProfileRoot,
 		bootstrapCheckpointPath,
+		nodeStatusMaxImages,
 		stopCh)
 	if err != nil {
 		return nil, err

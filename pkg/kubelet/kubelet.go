@@ -219,7 +219,9 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	bootstrapCheckpointPath string) (Bootstrap, error)
+	bootstrapCheckpointPath string,
+	nodeStatusMaxImages int32,
+	stopCh <-chan struct{}) (Bootstrap, error)
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -345,6 +347,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
 	bootstrapCheckpointPath string,
+	nodeStatusMaxImages int32,
 	stopCh <-chan struct{}) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -535,6 +538,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
+		nodeStatusMaxImages:                     nodeStatusMaxImages,
 	}
 
 	if klet.cloud != nil {
@@ -1157,6 +1161,9 @@ type Kubelet struct {
 	// such as device plugins or CSI plugins. It discovers plugins by monitoring inotify events under the
 	// directory returned by kubelet.getPluginsDir()
 	pluginWatcher pluginwatcher.Watcher
+
+	// This flag sets a maximum number of images to report in the node status.
+	nodeStatusMaxImages int32
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
