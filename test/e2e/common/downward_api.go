@@ -240,7 +240,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage]", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	Context("Downward API tests for local ephemeral storage", func() {
