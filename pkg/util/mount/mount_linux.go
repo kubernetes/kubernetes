@@ -33,6 +33,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 	utilio "k8s.io/kubernetes/pkg/util/io"
 	utilexec "k8s.io/utils/exec"
 )
@@ -447,12 +448,8 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 	return nil
 }
 
-func (mounter *Mounter) ExistsPath(pathname string) bool {
-	_, err := os.Stat(pathname)
-	if err != nil {
-		return false
-	}
-	return true
+func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
+	return utilfile.FileExists(pathname)
 }
 
 // formatAndMount uses unix utils to format and mount the given disk

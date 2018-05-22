@@ -72,10 +72,14 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/util/file:go_default_library",
             "//pkg/util/io:go_default_library",
             "//pkg/util/nsenter:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//pkg/util/file:go_default_library",
         ],
         "//conditions:default": [],
     }),

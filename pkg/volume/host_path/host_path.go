@@ -350,7 +350,8 @@ type fileTypeChecker struct {
 }
 
 func (ftc *fileTypeChecker) Exists() bool {
-	return ftc.mounter.ExistsPath(ftc.path)
+	exists, err := ftc.mounter.ExistsPath(ftc.path)
+	return exists && err == nil
 }
 
 func (ftc *fileTypeChecker) IsFile() bool {

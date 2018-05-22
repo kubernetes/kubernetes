@@ -92,8 +92,8 @@ func (mi *fakeMountInterface) MakeFile(pathname string) error {
 	return nil
 }
 
-func (mi *fakeMountInterface) ExistsPath(pathname string) bool {
-	return true
+func (mi *fakeMountInterface) ExistsPath(pathname string) (bool, error) {
+	return true, errors.New("not implemented")
 }
 
 func (mi *fakeMountInterface) PrepareSafeSubpath(subPath mount.Subpath) (newHostPath string, cleanupAction func(), err error) {

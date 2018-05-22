@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 	utilio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/nsenter"
 )
@@ -281,13 +282,15 @@ func (mounter *NsenterMounter) MakeFile(pathname string) error {
 	return nil
 }
 
-func (mounter *NsenterMounter) ExistsPath(pathname string) bool {
-	args := []string{pathname}
-	_, err := mounter.ne.Exec("ls", args).CombinedOutput()
-	if err == nil {
-		return true
+func (mounter *NsenterMounter) ExistsPath(pathname string) (bool, error) {
+	// Resolve the symlinks but allow the target not to exist. EvalSymlinks
+	// would return an generic error when the target does not exist.
+	hostPath, err := mounter.ne.EvalSymlinks(pathname, false /* mustExist */)
+	if err != nil {
+		return false, err
 	}
-	return false
+	kubeletpath := mounter.ne.KubeletPath(hostPath)
+	return utilfile.FileExists(kubeletpath)
 }
 
 func (mounter *NsenterMounter) CleanSubPaths(podDir string, volumeName string) error {

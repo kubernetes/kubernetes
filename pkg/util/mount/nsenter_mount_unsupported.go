@@ -83,8 +83,8 @@ func (*NsenterMounter) MakeFile(pathname string) error {
 	return nil
 }
 
-func (*NsenterMounter) ExistsPath(pathname string) bool {
-	return true
+func (*NsenterMounter) ExistsPath(pathname string) (bool, error) {
+	return true, errors.New("not implemented")
 }
 
 func (*NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
