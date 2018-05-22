@@ -40,7 +40,7 @@ var (
 var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
-	Context("when FSGroup is specified", func() {
+	Context("when FSGroup is specified [NodeFeature:FSGroup]", func() {
 		It("new files should be created with FSGroup ownership when container is root", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})

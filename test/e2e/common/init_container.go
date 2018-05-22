@@ -35,7 +35,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("InitContainer", func() {
+var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("init-container")
 	var podClient *framework.PodClient
 	BeforeEach(func() {

@@ -467,7 +467,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}, maxRetries, "Container should have service environment variables set")
 	})
 
-	It("should support remote command execution over websockets", func() {
+	It("should support remote command execution over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred(), "unable to get base config")
 
@@ -543,7 +543,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}, time.Minute, 10*time.Second).Should(BeNil())
 	})
 
-	It("should support retrieving logs from the container over websockets", func() {
+	It("should support retrieving logs from the container over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred(), "unable to get base config")
 
@@ -600,7 +600,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 	})
 
-	It("should have their auto-restart back-off timer reset on image update [Slow]", func() {
+	It("should have their auto-restart back-off timer reset on image update [Slow][NodeConformance]", func() {
 		podName := "pod-back-off-image"
 		containerName := "back-off"
 		pod := &v1.Pod{
@@ -641,7 +641,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	// Slow issue #19027 (20 mins)
-	It("should cap back-off at MaxContainerBackOff [Slow]", func() {
+	It("should cap back-off at MaxContainerBackOff [Slow][NodeConformance]", func() {
 		podName := "back-off-cap"
 		containerName := "back-off-cap"
 		pod := &v1.Pod{
