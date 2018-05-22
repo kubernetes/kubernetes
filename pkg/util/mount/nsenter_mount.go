@@ -48,15 +48,11 @@ type NsenterMounter struct {
 }
 
 // NewNsenterMounter creates a new mounter for kubelet that runs as a container.
-// rootDir is location of /var/lib/kubelet directory (in case it's not on the
-// default place). This directory must be available in the container
-// on the same place as it's on the host.
-func NewNsenterMounter(rootDir string) (*NsenterMounter, error) {
-	ne, err := nsenter.NewNsenter()
-	if err != nil {
-		return nil, err
+func NewNsenterMounter(rootDir string, ne *nsenter.Nsenter) *NsenterMounter {
+	return &NsenterMounter{
+		rootDir: rootDir,
+		ne:      ne,
 	}
-	return &NsenterMounter{ne: ne}, nil
 }
 
 // NsenterMounter implements mount.Interface
