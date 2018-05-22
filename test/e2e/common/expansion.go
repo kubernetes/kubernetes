@@ -34,7 +34,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		    Description: Make sure environment variables can be set using an
 			expansion of previously defined environment variables
 	*/
-	framework.ConformanceIt("should allow composing env vars into new env vars ", func() {
+	framework.ConformanceIt("should allow composing env vars into new env vars [NodeConformance]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		    Description: Make sure a container's commands can be set using an
 			expansion of environment variables.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's command ", func() {
+	framework.ConformanceIt("should allow substituting values in a container's command [NodeConformance]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -114,7 +114,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		    Description: Make sure a container's args can be set using an
 			expansion of environment variables.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's args ", func() {
+	framework.ConformanceIt("should allow substituting values in a container's args [NodeConformance]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
