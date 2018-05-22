@@ -125,6 +125,12 @@ function create-master-instance-internal() {
   disk="${disk},boot=no"
   disk="${disk},auto-delete=no"
 
+  local logs_disk="name=${master_name}-logs-pd"
+  logs_disk="${logs_disk},device-name=master-logs-pd"
+  logs_disk="${logs_disk},mode=rw"
+  logs_disk="${logs_disk},boot=no"
+  logs_disk="${logs_disk},auto-delete=no"
+
   for attempt in $(seq 1 ${retries}); do
     if result=$(${gcloud} compute instances create "${master_name}" \
       --project "${PROJECT}" \
@@ -136,6 +142,7 @@ function create-master-instance-internal() {
       --scopes "storage-ro,compute-rw,monitoring,logging-write" \
       --metadata-from-file "${metadata}" \
       --disk "${disk}" \
+      --disk "${logs_disk}" \
       --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
       ${MASTER_MIN_CPU_ARCHITECTURE:+"--min-cpu-platform=${MASTER_MIN_CPU_ARCHITECTURE}"} \
       ${preemptible_master} \
