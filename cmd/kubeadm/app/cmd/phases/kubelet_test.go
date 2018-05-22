@@ -25,33 +25,37 @@ import (
 )
 
 func TestKubeletSubCommandsHasFlags(t *testing.T) {
+	kubeConfigFile := "foo"
 	subCmds := []*cobra.Command{
-		NewCmdKubeletWriteInitConfig(),
-		NewCmdKubeletUploadDynamicConfig(),
-		NewCmdKubeletEnableDynamicConfig(),
+		NewCmdKubeletUploadConfig(&kubeConfigFile),
+		NewCmdKubeletWriteConfigToDisk(&kubeConfigFile),
+		NewCmdKubeletEnableDynamicConfig(&kubeConfigFile),
 	}
 
-	commonFlags := []string{
-		"config",
-	}
+	commonFlags := []string{}
 
 	var tests = []struct {
 		command         string
 		additionalFlags []string
 	}{
 		{
-			command: "init",
-		},
-		{
-			command: "upload",
+			command: "upload-config",
 			additionalFlags: []string{
-				"kubeconfig",
+				"config",
 			},
 		},
 		{
-			command: "enable",
+			command: "write-config-to-disk",
+			additionalFlags: []string{
+				"kubelet-version",
+				"config",
+			},
+		},
+		{
+			command: "enable-dynamic-config",
 			additionalFlags: []string{
 				"node-name",
+				"kubelet-version",
 			},
 		},
 	}
