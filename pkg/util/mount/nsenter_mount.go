@@ -329,7 +329,7 @@ func (mounter *NsenterMounter) SafeMakeDir(pathname string, base string, perm os
 }
 
 func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
-	hostpath, err := mounter.ne.EvalSymlinks(pathname)
+	hostpath, err := mounter.ne.EvalSymlinks(pathname, true /* mustExist */)
 	if err != nil {
 		return nil, err
 	}
@@ -337,10 +337,11 @@ func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
 }
 
 func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {
-	kubeletpath, err := mounter.ne.KubeletPath(pathname)
+	hostPath, err := mounter.ne.EvalSymlinks(pathname, true /* mustExist */)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
+	kubeletpath := mounter.ne.KubeletPath(hostPath)
 	return getFSGroup(kubeletpath)
 }
 
@@ -349,9 +350,10 @@ func (mounter *NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) 
 }
 
 func (mounter *NsenterMounter) GetMode(pathname string) (os.FileMode, error) {
-	kubeletpath, err := mounter.ne.KubeletPath(pathname)
+	hostPath, err := mounter.ne.EvalSymlinks(pathname, true /* mustExist */)
 	if err != nil {
 		return 0, err
 	}
+	kubeletpath := mounter.ne.KubeletPath(hostPath)
 	return getMode(kubeletpath)
 }
