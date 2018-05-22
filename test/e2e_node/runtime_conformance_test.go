@@ -210,7 +210,7 @@ while true; do sleep 1; done
 					message: Equal("OK"),
 				},
 			} {
-				It(fmt.Sprintf("should report termination message %s", testCase.name), func() {
+				framework.ConformanceIt(fmt.Sprintf("should report termination message %s", testCase.name), func() {
 					testCase.container.Name = "termination-message-container"
 					c := ConformanceContainer{
 						PodClient:     f.PodClient(),

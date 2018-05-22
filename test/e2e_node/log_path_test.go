@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 					}
 				}
 			})
-			It("should print log to correct log path", func() {
+			framework.ConformanceIt("should print log to correct log path", func() {
 				podClient := f.PodClient()
 				ns := f.Namespace.Name
 
