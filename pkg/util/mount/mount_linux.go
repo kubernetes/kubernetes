@@ -721,6 +721,7 @@ func getSELinuxSupport(path string, mountInfoFilename string) (bool, error) {
 
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
 	newHostPath, err = doBindSubPath(mounter, subPath, os.Getpid())
+
 	// There is no action when the container starts. Bind-mount will be cleaned
 	// when container stops by CleanSubPaths.
 	cleanupAction = nil
@@ -728,30 +729,101 @@ func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string,
 }
 
 // This implementation is shared between Linux and NsEnterMounter
+func safeOpenSubPath(mounter Interface, subpath Subpath) (int, error) {
+	if !pathWithinBase(subpath.Path, subpath.VolumePath) {
+		return -1, fmt.Errorf("subpath %q not within volume path %q", subpath.Path, subpath.VolumePath)
+	}
+	fd, err := doSafeOpen(subpath.Path, subpath.VolumePath)
+	if err != nil {
+		return -1, fmt.Errorf("error opening subpath %v: %v", subpath.Path, err)
+	}
+	return fd, nil
+}
+
+// prepareSubpathTarget creates target for bind-mount of subpath. It returns
+// "true" when the target already exists and something is mounted there.
+func prepareSubpathTarget(mounter Interface, subpath Subpath) (bool, string, error) {
+	// Early check for already bind-mounted subpath.
+	bindPathTarget := getSubpathBindTarget(subpath)
+	notMount, err := IsNotMountPoint(mounter, bindPathTarget)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
+		}
+		// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
+		notMount = true
+	}
+	if !notMount {
+		// It's already mounted
+		glog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
+		return true, bindPathTarget, nil
+	}
+
+	// bindPathTarget is in /var/lib/kubelet and thus reachable without any
+	// translation even to containerized kubelet.
+	bindParent := filepath.Dir(bindPathTarget)
+	err = os.MkdirAll(bindParent, 0750)
+	if err != nil && !os.IsExist(err) {
+		return false, "", fmt.Errorf("error creating directory %s: %s", bindParent, err)
+	}
+
+	t, err := os.Lstat(subpath.Path)
+	if err != nil {
+		return false, "", fmt.Errorf("lstat %s failed: %s", subpath.Path, err)
+	}
+
+	if t.Mode()&os.ModeDir > 0 {
+		if err = os.Mkdir(bindPathTarget, 0750); err != nil && !os.IsExist(err) {
+			return false, "", fmt.Errorf("error creating directory %s: %s", bindPathTarget, err)
+		}
+	} else {
+		// "/bin/touch <bindPathTarget>".
+		// A file is enough for all possible targets (symlink, device, pipe,
+		// socket, ...), bind-mounting them into a file correctly changes type
+		// of the target file.
+		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
+			return false, "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
+		}
+	}
+	return false, bindPathTarget, nil
+}
+
+func getSubpathBindTarget(subpath Subpath) string {
+	// containerName is DNS label, i.e. safe as a directory name.
+	return filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName, strconv.Itoa(subpath.VolumeMountIndex))
+}
+
+// This implementation is shared between Linux and NsEnterMounter
 // kubeletPid is PID of kubelet in the PID namespace where bind-mount is done,
 // i.e. pid on the *host* if kubelet runs in a container.
 func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath string, err error) {
-	// Check early for symlink. This is just a pre-check to avoid bind-mount
-	// before the final check.
-	evalSubPath, err := filepath.EvalSymlinks(subpath.Path)
+	// Evaluate all symlinks here once for all subsequent functions.
+	newVolumePath, err := filepath.EvalSymlinks(subpath.VolumePath)
 	if err != nil {
-		return "", fmt.Errorf("evalSymlinks %q failed: %v", subpath.Path, err)
+		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.VolumePath, err)
 	}
-	glog.V(5).Infof("doBindSubPath %q, full subpath %q for volumepath %q", subpath.Path, evalSubPath, subpath.VolumePath)
+	newPath, err := filepath.EvalSymlinks(subpath.Path)
+	if err != nil {
+		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.Path, err)
+	}
+	glog.V(5).Infof("doBindSubPath %q (%q) for volumepath %q", subpath.Path, newPath, subpath.VolumePath)
+	subpath.VolumePath = newVolumePath
+	subpath.Path = newPath
 
-	evalSubPath = filepath.Clean(evalSubPath)
-	if !pathWithinBase(evalSubPath, subpath.VolumePath) {
-		return "", fmt.Errorf("subpath %q not within volume path %q", evalSubPath, subpath.VolumePath)
+	// Check the subpath is correct and open it
+	fd, err := safeOpenSubPath(mounter, subpath)
+	if err != nil {
+		return "", err
 	}
+	defer syscall.Close(fd)
 
-	// Prepare directory for bind mounts
-	// containerName is DNS label, i.e. safe as a directory name.
-	bindDir := filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName)
-	err = os.MkdirAll(bindDir, 0750)
-	if err != nil && !os.IsExist(err) {
-		return "", fmt.Errorf("error creating directory %s: %s", bindDir, err)
+	alreadyMounted, bindPathTarget, err := prepareSubpathTarget(mounter, subpath)
+	if err != nil {
+		return "", err
 	}
-	bindPathTarget := filepath.Join(bindDir, strconv.Itoa(subpath.VolumeMountIndex))
+	if alreadyMounted {
+		return bindPathTarget, nil
+	}
 
 	success := false
 	defer func() {
@@ -763,49 +835,6 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 			}
 		}
 	}()
-
-	// Check it's not already bind-mounted
-	notMount, err := IsNotMountPoint(mounter, bindPathTarget)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
-		}
-		// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
-		notMount = true
-	}
-	if !notMount {
-		// It's already mounted
-		glog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
-		success = true
-		return bindPathTarget, nil
-	}
-
-	// Create target of the bind mount. A directory for directories, empty file
-	// for everything else.
-	t, err := os.Lstat(subpath.Path)
-	if err != nil {
-		return "", fmt.Errorf("lstat %s failed: %s", subpath.Path, err)
-	}
-	if t.Mode()&os.ModeDir > 0 {
-		if err = os.Mkdir(bindPathTarget, 0750); err != nil && !os.IsExist(err) {
-			return "", fmt.Errorf("error creating directory %s: %s", bindPathTarget, err)
-		}
-	} else {
-		// "/bin/touch <bindDir>".
-		// A file is enough for all possible targets (symlink, device, pipe,
-		// socket, ...), bind-mounting them into a file correctly changes type
-		// of the target file.
-		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
-			return "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
-		}
-	}
-
-	// Safe open subpath and get the fd
-	fd, err := doSafeOpen(evalSubPath, subpath.VolumePath)
-	if err != nil {
-		return "", fmt.Errorf("error opening subpath %v: %v", evalSubPath, err)
-	}
-	defer syscall.Close(fd)
 
 	mountSource := fmt.Sprintf("/proc/%d/fd/%v", kubeletPid, fd)
 
@@ -819,8 +848,8 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
-
 	success = true
+
 	glog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
 	return bindPathTarget, nil
 }
