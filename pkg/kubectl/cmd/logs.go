@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"time"
 
@@ -184,7 +183,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	}
 	if sinceSeconds := cmdutil.GetFlagDuration(cmd, "since"); sinceSeconds != 0 {
 		// round up to the nearest second
-		sec := int64(math.Ceil(float64(sinceSeconds) / float64(time.Second)))
+		sec := int64(sinceSeconds.Round(time.Second).Seconds())
 		logOptions.SinceSeconds = &sec
 	}
 	o.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
