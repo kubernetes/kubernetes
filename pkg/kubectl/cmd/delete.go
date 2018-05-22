@@ -34,6 +34,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	kubectlwait "k8s.io/kubernetes/pkg/kubectl/cmd/wait"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -335,7 +336,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		DynamicClient:  o.DynamicClient,
 		Timeout:        effectiveTimeout,
 
-		Printer:     kubectlwait.NewDiscardingPrinter(),
+		Printer:     printers.NewDiscardingPrinter(),
 		ConditionFn: kubectlwait.IsDeleted,
 		IOStreams:   o.IOStreams,
 	}

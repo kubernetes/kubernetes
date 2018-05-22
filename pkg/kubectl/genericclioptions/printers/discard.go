@@ -22,16 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// ResourcePrinterFunc is a function that can print objects
-type ResourcePrinterFunc func(runtime.Object, io.Writer) error
-
-// PrintObj implements ResourcePrinter
-func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
-	return fn(obj, w)
-}
-
-// ResourcePrinter is an interface that knows how to print runtime objects.
-type ResourcePrinter interface {
-	// Print receives a runtime object, formats it and prints it to a writer.
-	PrintObj(runtime.Object, io.Writer) error
+// NewDiscardingPrinter is a printer that discards all objects
+func NewDiscardingPrinter() ResourcePrinterFunc {
+	return ResourcePrinterFunc(func(runtime.Object, io.Writer) error {
+		return nil
+	})
 }

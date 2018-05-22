@@ -18,7 +18,6 @@ package wait
 
 import (
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -319,12 +318,4 @@ func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
 	}
 	obj := event.Object.(*unstructured.Unstructured)
 	return w.checkCondition(obj)
-}
-
-// NewDiscardingPrinter is a printer that discards all objects
-// TODO use the real discarding printer from a different pull I just opened.
-func NewDiscardingPrinter() printers.ResourcePrinterFunc {
-	return printers.ResourcePrinterFunc(func(runtime.Object, io.Writer) error {
-		return nil
-	})
 }
