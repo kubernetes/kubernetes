@@ -34,6 +34,7 @@ import (
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
@@ -222,7 +223,7 @@ func TestWaitForDeletion(t *testing.T) {
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 
-				Printer:     NewDiscardingPrinter(),
+				Printer:     printers.NewDiscardingPrinter(),
 				ConditionFn: IsDeleted,
 				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
 			}
@@ -454,7 +455,7 @@ func TestWaitForCondition(t *testing.T) {
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 
-				Printer:     NewDiscardingPrinter(),
+				Printer:     printers.NewDiscardingPrinter(),
 				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value"}.IsConditionMet,
 				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
 			}
