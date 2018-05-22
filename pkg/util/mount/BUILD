@@ -133,6 +133,7 @@ go_test(
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/util/nsenter:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
