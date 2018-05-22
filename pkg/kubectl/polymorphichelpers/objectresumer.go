@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func defaultObjectResumer(obj runtime.Object) ([]byte, error) {
@@ -32,7 +31,7 @@ func defaultObjectResumer(obj runtime.Object) ([]byte, error) {
 			return nil, errors.New("is not paused")
 		}
 		obj.Spec.Paused = false
-		return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), obj)
+		return runtime.Encode(internalVersionJSONEncoder(), obj)
 	default:
 		return nil, fmt.Errorf("resuming is not supported")
 	}

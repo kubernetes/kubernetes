@@ -20,9 +20,10 @@ import (
 	"errors"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 // Currently only supports Deployments.
@@ -33,8 +34,13 @@ func defaultObjectPauser(obj runtime.Object) ([]byte, error) {
 			return nil, errors.New("is already paused")
 		}
 		obj.Spec.Paused = true
-		return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), obj)
+		return runtime.Encode(internalVersionJSONEncoder(), obj)
 	default:
 		return nil, fmt.Errorf("pausing is not supported")
 	}
+}
+
+func internalVersionJSONEncoder() runtime.Encoder {
+	encoder := legacyscheme.Codecs.LegacyCodec(legacyscheme.Scheme.PrioritizedVersionsAllGroups()...)
+	return unstructured.JSONFallbackEncoder{Encoder: encoder}
 }
