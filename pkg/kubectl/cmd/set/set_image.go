@@ -210,9 +210,9 @@ func (o *SetImageOptions) Validate() error {
 func (o *SetImageOptions) Run() error {
 	allErrs := []error{}
 
-	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
 		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
+		_, err := o.UpdatePodSpecForObject(obj, func(spec *v1.PodSpec) error {
 			for name, image := range o.ContainerImages {
 				var (
 					containerFound bool
@@ -255,11 +255,11 @@ func (o *SetImageOptions) Run() error {
 			return nil, nil
 		}
 		// record this change (for rollout history)
-		if err := o.Recorder.Record(info.Object); err != nil {
+		if err := o.Recorder.Record(obj); err != nil {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
+		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 	})
 
 	for _, patch := range patches {
