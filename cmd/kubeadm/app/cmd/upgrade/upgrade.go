@@ -37,6 +37,7 @@ type cmdUpgradeFlags struct {
 	skipPreFlight             bool
 	ignorePreflightErrors     []string
 	ignorePreflightErrorsSet  sets.String
+	out                       io.Writer
 }
 
 // NewCmdUpgrade returns the cobra command for `kubeadm upgrade`
@@ -50,6 +51,7 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 		printConfig:               false,
 		skipPreFlight:             false,
 		ignorePreflightErrorsSet:  sets.NewString(),
+		out: out,
 	}
 
 	cmd := &cobra.Command{
