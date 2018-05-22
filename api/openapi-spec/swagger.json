@@ -84843,7 +84843,14 @@
       "description": "Status indicates the actual state of the CustomResourceDefinition",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionStatus"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinition",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionCondition": {
     "description": "CustomResourceDefinitionCondition contains details for the current condition of this pod.",
@@ -84898,7 +84905,14 @@
      "metadata": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinitionList",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionNames": {
     "description": "CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition",
@@ -85524,6 +85538,21 @@
       "version": "v1beta1"
      },
      {
+      "group": "apiextensions.k8s.io",
+      "kind": "DeleteOptions",
+      "version": "v1beta1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "DeleteOptions",
+      "version": "v1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "DeleteOptions",
+      "version": "v1beta1"
+     },
+     {
       "group": "apps",
       "kind": "DeleteOptions",
       "version": "v1"
@@ -86062,6 +86091,21 @@
       "version": "v1beta1"
      },
      {
+      "group": "apiextensions.k8s.io",
+      "kind": "WatchEvent",
+      "version": "v1beta1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "WatchEvent",
+      "version": "v1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "WatchEvent",
+      "version": "v1beta1"
+     },
+     {
       "group": "apps",
       "kind": "WatchEvent",
       "version": "v1"
@@ -86280,7 +86324,14 @@
       "description": "Status contains derived information about an API server",
       "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceStatus"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceCondition": {
     "required": [
@@ -86333,7 +86384,14 @@
      "metadata": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIServiceList",
+      "version": "v1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec": {
     "description": "APIServiceSpec contains information for locating and communicating with a server. Only https is supported, though you are able to disable certificate verification.",
@@ -86425,7 +86483,14 @@
       "description": "Status contains derived information about an API server",
       "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceStatus"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceCondition": {
     "required": [
@@ -86478,7 +86543,14 @@
      "metadata": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIServiceList",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceSpec": {
     "description": "APIServiceSpec contains information for locating and communicating with a server. Only https is supported, though you are able to disable certificate verification.",

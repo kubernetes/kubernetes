@@ -1453,6 +1453,7 @@ run_kubectl_old_print_tests() {
   "spec": {
     "group": "company.com",
     "version": "v1",
+    "scope": "Namespaced",
     "names": {
       "plural": "foos",
       "kind": "Foo"
@@ -1712,6 +1713,7 @@ run_crd_tests() {
   "spec": {
     "group": "company.com",
     "version": "v1",
+    "scope": "Namespaced",
     "names": {
       "plural": "foos",
       "kind": "Foo"
@@ -1733,6 +1735,7 @@ __EOF__
   "spec": {
     "group": "company.com",
     "version": "v1",
+    "scope": "Namespaced",
     "names": {
       "plural": "bars",
       "kind": "Bar"
