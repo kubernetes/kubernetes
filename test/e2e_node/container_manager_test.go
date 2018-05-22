@@ -75,7 +75,7 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 
 var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
-	Describe("Validate OOM score adjustments", func() {
+	Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
 		Context("once the node is setup", func() {
 			It("container runtime's oom-score-adj should be -999", func() {
 				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
