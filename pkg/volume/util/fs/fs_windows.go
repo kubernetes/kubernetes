@@ -56,7 +56,8 @@ func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	return freeBytesAvailable, totalNumberOfBytes, totalNumberOfBytes - freeBytesAvailable, 0, 0, 0, nil
 }
 
-func Du(path string) (*resource.Quantity, error) {
+// DiskUsage gets disk usage of specified path.
+func DiskUsage(path string) (*resource.Quantity, error) {
 	_, _, usage, _, _, _, err := FsInfo(path)
 	if err != nil {
 		return nil, err

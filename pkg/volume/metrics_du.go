@@ -25,7 +25,7 @@ import (
 var _ MetricsProvider = &metricsDu{}
 
 // metricsDu represents a MetricsProvider that calculates the used and
-// available Volume space by executing the "du" command and gathering
+// available Volume space by calling fs.DiskUsage() and gathering
 // filesystem info for the Volume path.
 type metricsDu struct {
 	// the directory path the volume is mounted to.
@@ -46,7 +46,7 @@ func (md *metricsDu) GetMetrics() (*Metrics, error) {
 		return metrics, NewNoPathDefinedError()
 	}
 
-	err := md.runDu(metrics)
+	err := md.runDiskUsage(metrics)
 	if err != nil {
 		return metrics, err
 	}
@@ -64,9 +64,9 @@ func (md *metricsDu) GetMetrics() (*Metrics, error) {
 	return metrics, nil
 }
 
-// runDu executes the "du" command and writes the results to metrics.Used
-func (md *metricsDu) runDu(metrics *Metrics) error {
-	used, err := fs.Du(md.path)
+// runDiskUsage gets disk usage of md.path and writes the results to metrics.Used
+func (md *metricsDu) runDiskUsage(metrics *Metrics) error {
+	used, err := fs.DiskUsage(md.path)
 	if err != nil {
 		return err
 	}
