@@ -43,9 +43,15 @@ const (
 // the host's mount namespace.
 type NsenterMounter struct {
 	ne *nsenter.Nsenter
+	// rootDir is location of /var/lib/kubelet directory.
+	rootDir string
 }
 
-func NewNsenterMounter() (*NsenterMounter, error) {
+// NewNsenterMounter creates a new mounter for kubelet that runs as a container.
+// rootDir is location of /var/lib/kubelet directory (in case it's not on the
+// default place). This directory must be available in the container
+// on the same place as it's on the host.
+func NewNsenterMounter(rootDir string) (*NsenterMounter, error) {
 	ne, err := nsenter.NewNsenter()
 	if err != nil {
 		return nil, err
@@ -305,14 +311,28 @@ func (mounter *NsenterMounter) SafeMakeDir(subdir string, base string, perm os.F
 	if err != nil {
 		return fmt.Errorf("error resolving symlinks in %s: %s", fullSubdirPath, err)
 	}
-	kubeletSubdirPath := mounter.ne.KubeletPath(evaluatedSubdirPath)
+	evaluatedSubdirPath = filepath.Clean(evaluatedSubdirPath)
 
 	evaluatedBase, err := mounter.ne.EvalSymlinks(base, true /* mustExist */)
 	if err != nil {
 		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
 	}
-	kubeletBase := mounter.ne.KubeletPath(evaluatedBase)
+	evaluatedBase = filepath.Clean(evaluatedBase)
 
+	rootDir := filepath.Clean(mounter.rootDir)
+	if pathWithinBase(evaluatedBase, rootDir) {
+		// Base is in /var/lib/kubelet. This directory is shared between the
+		// container with kubelet and the host. We don't need to add '/rootfs'.
+		// This is useful when /rootfs is mounted as read-only - we can still
+		// create subpaths for paths in /var/lib/kubelet.
+		return doSafeMakeDir(evaluatedSubdirPath, evaluatedBase, perm)
+	}
+
+	// Base is somewhere on the host's filesystem. Add /rootfs and try to make
+	// the directory there.
+	// This requires /rootfs to be writable.
+	kubeletSubdirPath := mounter.ne.KubeletPath(evaluatedSubdirPath)
+	kubeletBase := mounter.ne.KubeletPath(evaluatedBase)
 	return doSafeMakeDir(kubeletSubdirPath, kubeletBase, perm)
 }
 
