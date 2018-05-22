@@ -450,15 +450,12 @@ message ConfigMapNodeConfigSource {
   optional string name = 2;
 
   // UID is the metadata.UID of the referenced ConfigMap.
-  // This field is currently reqired in Node.Spec.
-  // TODO(#61643): This field will be forbidden in Node.Spec when #61643 is resolved.
-  // TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
+  // This field is forbidden in Node.Spec, and required in Node.Status.
   // +optional
   optional string uid = 3;
 
   // ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap.
-  // This field is forbidden in Node.Spec.
-  // TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
+  // This field is forbidden in Node.Spec, and required in Node.Status.
   // +optional
   optional string resourceVersion = 4;
 

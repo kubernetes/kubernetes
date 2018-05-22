@@ -3666,15 +3666,12 @@ type ConfigMapNodeConfigSource struct {
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 
 	// UID is the metadata.UID of the referenced ConfigMap.
-	// This field is currently reqired in Node.Spec.
-	// TODO(#61643): This field will be forbidden in Node.Spec when #61643 is resolved.
-	// TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
 	// +optional
 	UID types.UID `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
 
 	// ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap.
-	// This field is forbidden in Node.Spec.
-	// TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
 
