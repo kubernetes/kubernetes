@@ -50,13 +50,13 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
 	//Bad Path
-	badspec, err := getVolumeSpecFromGlobalMapPath("")
+	badspec, err := getVolumeSpecFromGlobalMapPath("", "")
 	if badspec != nil || err == nil {
 		t.Errorf("Expected not to get spec from GlobalMapPath but did")
 	}
 
 	// Good Path
-	spec, err := getVolumeSpecFromGlobalMapPath(expectedGlobalPath)
+	spec, err := getVolumeSpecFromGlobalMapPath(expectedGlobalPath, "")
 	if spec == nil || err != nil {
 		t.Fatalf("Failed to get spec from GlobalMapPath: %v", err)
 	}

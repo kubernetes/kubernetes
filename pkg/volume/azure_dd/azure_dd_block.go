@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -49,10 +50,10 @@ func (plugin *azureDataDiskPlugin) ConstructBlockVolumeSpec(podUID types.UID, vo
 		return nil, fmt.Errorf("failed to get volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
 	}
 
-	return getVolumeSpecFromGlobalMapPath(globalMapPath)
+	return getVolumeSpecFromGlobalMapPath(globalMapPath, volumeName)
 }
 
-func getVolumeSpecFromGlobalMapPath(globalMapPath string) (*volume.Spec, error) {
+func getVolumeSpecFromGlobalMapPath(globalMapPath, volumeName string) (*volume.Spec, error) {
 	// Get volume spec information from globalMapPath
 	// globalMapPath example:
 	//   plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumeID}
@@ -64,6 +65,9 @@ func getVolumeSpecFromGlobalMapPath(globalMapPath string) (*volume.Spec, error) 
 	glog.V(5).Infof("got diskName(%s) from globalMapPath: %s", globalMapPath, diskName)
 	block := v1.PersistentVolumeBlock
 	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volumeName,
+		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AzureDisk: &v1.AzureDiskVolumeSource{
