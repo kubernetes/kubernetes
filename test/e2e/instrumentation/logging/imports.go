@@ -18,5 +18,5 @@ package logging
 
 import (
 	_ "k8s.io/kubernetes/test/e2e/instrumentation/logging/elasticsearch"
-	_ "k8s.io/kubernetes/test/e2e/instrumentation/logging/stackdrvier"
+	_ "k8s.io/kubernetes/test/e2e/instrumentation/logging/stackdriver"
 )
