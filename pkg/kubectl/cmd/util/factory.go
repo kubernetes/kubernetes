@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -78,10 +77,6 @@ type ClientAccessFactory interface {
 	// NewBuilder returns an object that assists in loading objects from both disk and the server
 	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
-
-	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
-	// return false if no pod spec is supported, or return an error.
-	UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 
 	// MapBasedSelectorForObject returns the map-based selector associated with the provided object. If a
 	// new set-based selector is provided, an error is returned if the selector cannot be converted to a
