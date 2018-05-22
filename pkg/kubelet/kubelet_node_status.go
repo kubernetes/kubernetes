@@ -49,9 +49,6 @@ import (
 )
 
 const (
-	// maxImagesInNodeStatus is the number of max images we store in image status.
-	maxImagesInNodeStatus = 50
-
 	// maxNamesPerImageInNodeStatus is max number of names per image stored in
 	// the node status.
 	maxNamesPerImageInNodeStatus = 5
@@ -721,8 +718,9 @@ func (kl *Kubelet) setNodeStatusImages(node *v1.Node) {
 		return
 	}
 	// sort the images from max to min, and only set top N images into the node status.
-	if maxImagesInNodeStatus < len(containerImages) {
-		containerImages = containerImages[0:maxImagesInNodeStatus]
+	if int(kl.nodeStatusMaxImages) > -1 &&
+		int(kl.nodeStatusMaxImages) < len(containerImages) {
+		containerImages = containerImages[0:kl.nodeStatusMaxImages]
 	}
 
 	for _, image := range containerImages {
