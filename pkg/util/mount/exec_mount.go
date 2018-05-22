@@ -136,7 +136,7 @@ func (m *execMounter) MakeDir(pathname string) error {
 	return m.wrappedMounter.MakeDir(pathname)
 }
 
-func (m *execMounter) ExistsPath(pathname string) bool {
+func (m *execMounter) ExistsPath(pathname string) (bool, error) {
 	return m.wrappedMounter.ExistsPath(pathname)
 }
 

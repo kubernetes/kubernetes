@@ -91,9 +91,9 @@ type Interface interface {
 	// else. E.g. if the directory already exists, it may exists outside of the
 	// base due to symlinks.
 	SafeMakeDir(pathname string, base string, perm os.FileMode) error
-	// ExistsPath checks whether the path exists.
-	// Will operate in the host mount namespace if kubelet is running in a container
-	ExistsPath(pathname string) bool
+	// Will operate in the host mount namespace if kubelet is running in a container.
+	// Error is returned on any other error than "file not found".
+	ExistsPath(pathname string) (bool, error)
 	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
 	// pod volume directory.
 	CleanSubPaths(podDir string, volumeName string) error

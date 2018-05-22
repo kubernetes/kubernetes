@@ -201,8 +201,8 @@ func (f *FakeMounter) MakeFile(pathname string) error {
 	return nil
 }
 
-func (f *FakeMounter) ExistsPath(pathname string) bool {
-	return false
+func (f *FakeMounter) ExistsPath(pathname string) (bool, error) {
+	return false, errors.New("not implemented")
 }
 
 func (f *FakeMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {

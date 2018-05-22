@@ -369,8 +369,8 @@ func (fftc *fakeFileTypeChecker) MakeDir(pathname string) error {
 	return nil
 }
 
-func (fftc *fakeFileTypeChecker) ExistsPath(pathname string) bool {
-	return true
+func (fftc *fakeFileTypeChecker) ExistsPath(pathname string) (bool, error) {
+	return true, nil
 }
 
 func (fftc *fakeFileTypeChecker) GetFileType(_ string) (utilmount.FileType, error) {

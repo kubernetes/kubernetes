@@ -60,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
 	mountutil "k8s.io/kubernetes/pkg/util/mount"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -181,7 +180,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			}
 			hostPath = filepath.Join(volumePath, mount.SubPath)
 
-			if subPathExists, err := utilfile.FileOrSymlinkExists(hostPath); err != nil {
+			if subPathExists, err := mounter.ExistsPath(hostPath); err != nil {
 				glog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
 			} else if !subPathExists {
 				// Create the sub path now because if it's auto-created later when referenced, it may have an

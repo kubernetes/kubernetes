@@ -83,8 +83,8 @@ func (mounter *execMounter) MakeFile(pathname string) error {
 	return nil
 }
 
-func (mounter *execMounter) ExistsPath(pathname string) bool {
-	return true
+func (mounter *execMounter) ExistsPath(pathname string) (bool, error) {
+	return true, errors.New("not implemented")
 }
 
 func (mounter *execMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {

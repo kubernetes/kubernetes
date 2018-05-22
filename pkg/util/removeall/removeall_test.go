@@ -75,8 +75,8 @@ func (mounter *fakeMounter) MakeFile(pathname string) error {
 	return nil
 }
 
-func (mounter *fakeMounter) ExistsPath(pathname string) bool {
-	return true
+func (mounter *fakeMounter) ExistsPath(pathname string) (bool, error) {
+	return true, errors.New("not implemented")
 }
 
 func (mounter *fakeMounter) PrepareSafeSubpath(subPath mount.Subpath) (newHostPath string, cleanupAction func(), err error) {

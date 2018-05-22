@@ -29,6 +29,8 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
+
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -147,9 +149,13 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	if stat.Mode()&os.ModeSymlink != 0 {
 		target, err := os.Readlink(file)
 		if err != nil {
-			return true, fmt.Errorf("Readlink error: %v", err)
+			return true, fmt.Errorf("readlink error: %v", err)
 		}
-		return !mounter.ExistsPath(target), nil
+		exists, err := mounter.ExistsPath(target)
+		if err != nil {
+			return true, err
+		}
+		return !exists, nil
 	}
 
 	return true, nil
@@ -232,12 +238,8 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 }
 
 // ExistsPath checks whether the path exists
-func (mounter *Mounter) ExistsPath(pathname string) bool {
-	_, err := os.Stat(pathname)
-	if err != nil {
-		return false
-	}
-	return true
+func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
+	return utilfile.FileExists(pathname)
 }
 
 // check whether hostPath is within volume path
