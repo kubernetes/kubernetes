@@ -61,10 +61,11 @@ func init() {
 }
 
 type watcher struct {
-	clients     []*clientv3.Client
-	codec       runtime.Codec
-	versioner   storage.Versioner
-	transformer value.Transformer
+	clients       []*clientv3.Client
+	currentClient int64
+	codec         runtime.Codec
+	versioner     storage.Versioner
+	transformer   value.Transformer
 }
 
 // watchChan implements watch.Interface.
@@ -91,7 +92,8 @@ func newWatcher(clients []*clientv3.Client, codec runtime.Codec, versioner stora
 }
 
 func (w *watcher) client() *clientv3.Client {
-	return w.clients[atomic.AddInt64(&c.currentClient, 1)%len(w.clients)]
+	num := atomic.AddInt64(&w.currentClient, 1)%int64(len(w.clients))
+	return w.clients[num]
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.

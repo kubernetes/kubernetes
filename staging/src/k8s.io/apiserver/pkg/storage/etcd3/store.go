@@ -126,7 +126,8 @@ func (s *store) Versioner() storage.Versioner {
 }
 
 func (s *store) client() *clientv3.Client {
-	return s.clients[atomic.AddInt64(&c.currentClient, 1)%len(s.clients)]
+	num := atomic.AddInt64(&s.currentClient, 1)%int64(len(s.clients))
+	return s.clients[num]
 }
 
 // Get implements storage.Interface.Get.
