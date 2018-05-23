@@ -259,22 +259,29 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha2.MasterConfiguration
 		return nil, err
 	}
 
-	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infof("Starting kubelet")
-	preflight.TryStartKubelet(ignorePreflightErrors)
-
-	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun}, nil
+	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun, ignorePreflightErrors: ignorePreflightErrors}, nil
 }
 
 // Init defines struct used by "kubeadm init" command
 type Init struct {
-	cfg            *kubeadmapi.MasterConfiguration
-	skipTokenPrint bool
-	dryRun         bool
+	cfg                   *kubeadmapi.MasterConfiguration
+	skipTokenPrint        bool
+	dryRun                bool
+	ignorePreflightErrors sets.String
 }
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
+
+	// Write env file with flags for the kubelet to use
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(i.cfg); err != nil {
+		return err
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	glog.V(1).Infof("Starting kubelet")
+	preflight.TryStartKubelet(i.ignorePreflightErrors)
+
 	// Get directories to write files to; can be faked if we're dry-running
 	glog.V(1).Infof("[init] Getting certificates directory from configuration")
 	realCertsDir := i.cfg.CertificatesDir
@@ -346,14 +353,14 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		glog.V(1).Infof("[init] feature --dynamic-config-dir is enabled")
-		glog.V(1).Infof("[init] writing base kubelet configuration to disk on master")
-		// Write base kubelet configuration for dynamic kubelet configuration feature.
-		if err := kubeletphase.WriteInitKubeletConfigToDiskOnMaster(i.cfg); err != nil {
-			return fmt.Errorf("error writing base kubelet configuration to disk: %v", err)
-		}
+	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
+	if err != nil {
+		return err
+	}
+
+	// Write the kubelet configuration to disk.
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig, kubeletVersion); err != nil {
+		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
 	}
 
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
@@ -381,15 +388,6 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		// Create base kubelet configuration for dynamic kubelet configuration feature.
-		glog.V(1).Infof("[init] creating base kubelet configuration")
-		if err := kubeletphase.CreateBaseKubeletConfiguration(i.cfg, client); err != nil {
-			return fmt.Errorf("error creating base kubelet configuration: %v", err)
-		}
-	}
-
 	// Upload currently used configuration to the cluster
 	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
 	// depend on centralized information from this source in the future
@@ -398,10 +396,24 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error uploading configuration: %v", err)
 	}
 
+	glog.V(1).Infof("[init] creating kubelet configuration configmap")
+	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
+		return fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err)
+	}
+
 	// PHASE 4: Mark the master with the right label/taint
 	glog.V(1).Infof("[init] marking the master with right label")
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName, !i.cfg.NoTaintMaster); err != nil {
 		return fmt.Errorf("error marking master: %v", err)
+	}
+
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+	// This feature is disabled by default, as it is alpha still
+	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		// Enable dynamic kubelet configuration for the node.
+		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeName, kubeletVersion); err != nil {
+			return fmt.Errorf("error enabling dynamic kubelet configuration: %v", err)
+		}
 	}
 
 	// PHASE 5: Set up the node bootstrap tokens

@@ -252,10 +252,28 @@ func (j *Join) Run(out io.Writer) error {
 		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	glog.V(1).Infoln("[join] consuming base kubelet configuration")
+	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
+	if err != nil {
+		return err
+	}
+
+	// Write the configuration for the kubelet down to disk so the kubelet can start
+	if err := kubeletphase.DownloadConfig(kubeconfigFile, kubeletVersion); err != nil {
+		return err
+	}
+
+	// Now the kubelet will perform the TLS Bootstrap, transforming bootstrap-kubeconfig.conf to kubeconfig.conf in /etc/kubernetes
+
+	// NOTE: the "--dynamic-config-dir" flag should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf for this to work
+	// This feature is disabled by default, as it is alpha still
+	glog.V(1).Infoln("[join] enabling dynamic kubelet configuration")
 	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		if err := kubeletphase.ConsumeBaseKubeletConfiguration(j.cfg.NodeName); err != nil {
+		client, err := kubeletphase.GetLocalNodeTLSBootstrappedClient()
+		if err != nil {
+			return err
+		}
+
+		if err := kubeletphase.EnableDynamicConfigForNode(client, j.cfg.NodeName, kubeletVersion); err != nil {
 			return fmt.Errorf("error consuming base kubelet configuration: %v", err)
 		}
 	}

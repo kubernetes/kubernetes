@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -100,6 +101,11 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		if err := certsphase.CreateAPIServerCertAndKeyFiles(cfg); err != nil {
 			errs = append(errs, err)
 		}
+	}
+
+	// Create the new, version-branched kubelet ComponentConfig ConfigMap
+	if err := kubeletphase.CreateConfigMap(cfg, client); err != nil {
+		errs = append(errs, fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err))
 	}
 
 	// Upgrade kube-dns/CoreDNS and kube-proxy
