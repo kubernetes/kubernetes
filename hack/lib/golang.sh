@@ -226,6 +226,9 @@ readonly KUBE_STATIC_OVERRIDES
 
 kube::golang::is_statically_linked_library() {
   local e
+  # Explicitly enable cgo when building kubectl for darwin from darwin.
+  [[ "$(go env GOHOSTOS)" == "darwin" && "$(go env GOOS)" == "darwin" &&
+    "$1" == *"/kubectl" ]] && return 1
   if [[ -n "${KUBE_CGO_OVERRIDES:+x}" ]]; then
     for e in "${KUBE_CGO_OVERRIDES[@]}"; do [[ "$1" == *"/$e" ]] && return 1; done;
   fi
