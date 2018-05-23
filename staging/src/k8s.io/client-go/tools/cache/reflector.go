@@ -414,8 +414,12 @@ loop:
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 			}
-			*resourceVersion = newResourceVersion
-			r.setLastSyncResourceVersion(newResourceVersion)
+			newVer, newErr := strconv.ParseInt(newResourceVersion, 10, 64)
+			oldVer, oldErr := strconv.ParseInt(*resourceVersion, 10, 64)
+			if newErr == nil && oldErr == nil && newVer > oldVer {
+				*resourceVersion = newResourceVersion
+				r.setLastSyncResourceVersion(newResourceVersion)
+			}
 			eventCount++
 		}
 	}
