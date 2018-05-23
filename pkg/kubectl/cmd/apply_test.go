@@ -523,6 +523,7 @@ func TestApplyObject(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -587,6 +588,7 @@ func TestApplyObjectOutput(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -648,6 +650,7 @@ func TestApplyRetry(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -697,6 +700,7 @@ func TestApplyNonExistObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -749,6 +753,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 
 	// 1. apply non exist object
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -823,6 +828,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -923,6 +929,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -989,6 +996,7 @@ func TestUnstructuredApply(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -1054,6 +1062,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -1223,6 +1232,7 @@ func TestForceApply(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
+			tf.ClientConfigVal = defaultClientConfig()
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

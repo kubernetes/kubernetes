@@ -177,6 +177,7 @@ package_group(
         "//pkg/kubectl/cmd/templates",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/cmd/util/sanity",
+        "//pkg/kubectl/cmd/wait",
     ],
 )
 
@@ -196,6 +197,7 @@ package_group(
         "//pkg/kubectl/cmd/get",
         "//pkg/kubectl/cmd/rollout",
         "//pkg/kubectl/cmd/set",
+        "//pkg/kubectl/cmd/wait",
         "//pkg/kubectl/explain",
     ],
 )
@@ -230,6 +232,7 @@ package_group(
         "//pkg/kubectl/cmd/testing",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/cmd/util/editor",
+        "//pkg/kubectl/cmd/wait",
     ],
 )
 

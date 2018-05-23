@@ -77,6 +77,7 @@ go_library(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/editor:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        "//pkg/kubectl/cmd/wait:go_default_library",
         "//pkg/kubectl/explain:go_default_library",
         "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/genericclioptions/printers:go_default_library",
@@ -264,6 +265,7 @@ filegroup(
         "//pkg/kubectl/cmd/testdata/edit:all-srcs",
         "//pkg/kubectl/cmd/testing:all-srcs",
         "//pkg/kubectl/cmd/util:all-srcs",
+        "//pkg/kubectl/cmd/wait:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = [
