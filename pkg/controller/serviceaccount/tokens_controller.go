@@ -19,6 +19,7 @@ package serviceaccount
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -258,6 +259,10 @@ func (e *TokensController) syncServiceAccount() {
 		// ensure a token exists and is referenced by this service account
 		retry, err = e.ensureReferencedToken(sa)
 		if err != nil {
+			// do not retry when the error suggests the namespace is being terminated
+			if apierrors.IsForbidden(err) && strings.Contains(err.Error(), "because it is being terminated") {
+				retry = false
+			}
 			glog.Errorf("error synchronizing serviceaccount %s/%s: %v", saInfo.namespace, saInfo.name, err)
 		}
 	}
