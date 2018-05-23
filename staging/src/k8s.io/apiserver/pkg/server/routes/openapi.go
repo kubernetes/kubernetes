@@ -17,6 +17,8 @@ limitations under the License.
 package routes
 
 import (
+	"net/http"
+
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 
@@ -32,15 +34,28 @@ type OpenAPI struct {
 
 // Install adds the SwaggerUI webservice to the given mux.
 func (oa OpenAPI) Install(c *restful.Container, mux *mux.PathRecorderMux) {
-	// NOTE: [DEPRECATION] We will announce deprecation for format-separated endpoints for OpenAPI spec,
-	// and switch to a single /openapi/v2 endpoint in Kubernetes 1.10. The design doc and deprecation process
-	// are tracked at: https://docs.google.com/document/d/19lEqE9lc4yHJ3WJAJxS_G7TcORIJXGHyq3wpwcH28nU.
-	_, err := handler.BuildAndRegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, mux)
-	if err != nil {
-		glog.Fatalf("Failed to register open api spec for root: %v", err)
-	}
-	_, err = handler.BuildAndRegisterOpenAPIVersionedService("/openapi/v2", c.RegisteredWebServices(), oa.Config, mux)
-	if err != nil {
+	// NOTE: [DEPRECATION] The format-separated endpoints for OpenAPI spec are deprecated in 1.10. You should
+	// switch to the single /openapi/v2 endpoint. The design doc and deprecation process are tracked at:
+	// https://docs.google.com/document/d/19lEqE9lc4yHJ3WJAJxS_G7TcORIJXGHyq3wpwcH28nU.
+	// In 1.11 we redirect the old endpoints to the new one. In 1.14 we will remove the old endpoints.
+	mux.Handle("/swagger.json", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/openapi/v2", 301)
+		}))
+	mux.Handle("/swagger-2.0.0.json", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/openapi/v2", 301)
+		}))
+	mux.Handle("/swagger-2.0.0.pb-v1", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/openapi/v2", 301)
+		}))
+	mux.Handle("/swagger-2.0.0.pb-v1.gz", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/openapi/v2", 301)
+		}))
+
+	if _, err := handler.BuildAndRegisterOpenAPIVersionedService("/openapi/v2", c.RegisteredWebServices(), oa.Config, mux); err != nil {
 		glog.Fatalf("Failed to register versioned open api spec for root: %v", err)
 	}
 }

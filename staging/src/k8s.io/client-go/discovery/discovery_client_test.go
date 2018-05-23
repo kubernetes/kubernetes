@@ -344,34 +344,6 @@ var returnedOpenAPI = openapi_v2.Document{
 	},
 }
 
-func openapiSchemaDeprecatedFakeServer(status int) (*httptest.Server, error) {
-	var sErr error
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == "/openapi/v2" {
-			// write the error status for the new endpoint request
-			w.WriteHeader(status)
-			return
-		}
-		if req.URL.Path != "/swagger-2.0.0.pb-v1" {
-			sErr = fmt.Errorf("Unexpected url %v", req.URL)
-		}
-		if req.Method != "GET" {
-			sErr = fmt.Errorf("Unexpected method %v", req.Method)
-		}
-
-		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
-
-		output, err := proto.Marshal(&returnedOpenAPI)
-		if err != nil {
-			sErr = err
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write(output)
-	}))
-	return server, sErr
-}
-
 func openapiSchemaFakeServer() (*httptest.Server, error) {
 	var sErr error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -401,57 +373,6 @@ func openapiSchemaFakeServer() (*httptest.Server, error) {
 
 func TestGetOpenAPISchema(t *testing.T) {
 	server, err := openapiSchemaFakeServer()
-	if err != nil {
-		t.Errorf("unexpected error starting fake server: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("unexpected error getting openapi: %v", err)
-	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusForbidden)
-	if err != nil {
-		t.Errorf("unexpected error starting fake server: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("unexpected error getting openapi: %v", err)
-	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotFound)
-	if err != nil {
-		t.Errorf("unexpected error starting fake server: %v", err)
-	}
-	defer server.Close()
-
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	got, err := client.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("unexpected error getting openapi: %v", err)
-	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetOpenAPISchemaNotAcceptableFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotAcceptable)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}

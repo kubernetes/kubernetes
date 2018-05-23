@@ -51,8 +51,7 @@ type specAggregator struct {
 	openAPISpecs map[string]*openAPISpecInfo
 
 	// provided for dynamic OpenAPI spec
-	openAPIService          *handler.OpenAPIService
-	openAPIVersionedService *handler.OpenAPIService
+	openAPIService *handler.OpenAPIService
 }
 
 var _ AggregationManager = &specAggregator{}
@@ -110,15 +109,28 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Install handler
-	// NOTE: [DEPRECATION] We will announce deprecation for format-separated endpoints for OpenAPI spec,
-	// and switch to a single /openapi/v2 endpoint in Kubernetes 1.10. The design doc and deprecation process
-	// are tracked at: https://docs.google.com/document/d/19lEqE9lc4yHJ3WJAJxS_G7TcORIJXGHyq3wpwcH28nU.
-	s.openAPIService, err = handler.RegisterOpenAPIService(
-		specToServe, "/swagger.json", pathHandler)
-	if err != nil {
-		return nil, err
-	}
-	s.openAPIVersionedService, err = handler.RegisterOpenAPIVersionedService(
+	// NOTE: [DEPRECATION] The format-separated endpoints for OpenAPI spec are deprecated in 1.10. You should
+	// switch to the single /openapi/v2 endpoint. The design doc and deprecation process are tracked at:
+	// https://docs.google.com/document/d/19lEqE9lc4yHJ3WJAJxS_G7TcORIJXGHyq3wpwcH28nU.
+	// In 1.11 we redirect the old endpoints to the new one. In 1.14 we will remove the old endpoints.
+	pathHandler.Handle("/swagger.json", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/openapi/v2", 301)
+		}))
+	pathHandler.Handle("/swagger-2.0.0.json", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/openapi/v2", 301)
+		}))
+	pathHandler.Handle("/swagger-2.0.0.pb-v1", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/openapi/v2", 301)
+		}))
+	pathHandler.Handle("/swagger-2.0.0.pb-v1.gz", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/openapi/v2", 301)
+		}))
+
+	s.openAPIService, err = handler.RegisterOpenAPIVersionedService(
 		specToServe, "/openapi/v2", pathHandler)
 	if err != nil {
 		return nil, err
@@ -216,25 +228,14 @@ func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err err
 
 // updateOpenAPISpec aggregates all OpenAPI specs.  It is not thread-safe. The caller is responsible to hold proper locks.
 func (s *specAggregator) updateOpenAPISpec() error {
-	if s.openAPIService == nil || s.openAPIVersionedService == nil {
-		// openAPIVersionedService and deprecated openAPIService should be initialized together
-		if !(s.openAPIService == nil && s.openAPIVersionedService == nil) {
-			return fmt.Errorf("unexpected openapi service initialization error")
-		}
+	if s.openAPIService == nil {
 		return nil
 	}
 	specToServe, err := s.buildOpenAPISpec()
 	if err != nil {
 		return err
 	}
-	// openAPIService.UpdateSpec and openAPIVersionedService.UpdateSpec read the same swagger spec
-	// serially and update their local caches separately. Both endpoints will have same spec in
-	// their caches if the caller is holding proper locks.
-	err = s.openAPIService.UpdateSpec(specToServe)
-	if err != nil {
-		return err
-	}
-	return s.openAPIVersionedService.UpdateSpec(specToServe)
+	return s.openAPIService.UpdateSpec(specToServe)
 }
 
 // tryUpdatingServiceSpecs tries updating openAPISpecs map with specified specInfo, and keeps the map intact
