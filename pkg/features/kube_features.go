@@ -272,6 +272,13 @@ const (
 	// Do not remove this feature gate even though it's GA
 	VolumeSubpath utilfeature.Feature = "VolumeSubpath"
 
+	// owner: @gnufied
+	// alpha
+	//
+	// Add support for volume plugins to report node specific
+	// volume limits
+	DynamicVolumeThreshold utilfeature.Feature = "DynamicVolumeThreshold"
+
 	// owner: @ravig
 	// alpha: v1.11
 	//
@@ -313,6 +320,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
+	DynamicVolumeThreshold:                      {Default: false, PreRelease: utilfeature.Alpha},
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
