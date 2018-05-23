@@ -354,10 +354,6 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 		if err != nil {
 			ExpectNoError(err, "Failed to wait for client pod deletion: %v", err)
 		}
-		// See issue #24100.
-		// Prevent umount errors by making sure making sure the client pod exits cleanly *before* the volume server pod exits.
-		By("sleeping a bit so kubelet can unmount and detach the volume")
-		time.Sleep(PodCleanupTimeout)
 
 		err = podClient.Delete(config.Prefix+"-server", nil)
 		if err != nil {
