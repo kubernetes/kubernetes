@@ -567,7 +567,7 @@ func TestSyncPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(pod, &kubecontainer.PodStatus{}, v1.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 2, len(fakeImage.Images))
@@ -656,7 +656,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 1. should only create the init container.
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(pod, podStatus, v1.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected := []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
@@ -666,7 +666,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 2. should not create app container because init container is still running.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(pod, podStatus, v1.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
 
@@ -681,7 +681,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(pod, podStatus, v1.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
@@ -696,7 +696,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(pod, podStatus, v1.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		// The first init container instance is purged and no longer visible.
@@ -785,6 +785,7 @@ func TestComputePodActions(t *testing.T) {
 		mutatePodFn    func(*v1.Pod)
 		mutateStatusFn func(*kubecontainer.PodStatus)
 		actions        podActions
+		oldPodIP       string
 	}{
 		"everying is good; do nothing": {
 			actions: noAction,
@@ -878,7 +879,7 @@ func TestComputePodActions(t *testing.T) {
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
 		},
-		"Kill pod and recreate all containers if the PodSandbox does not have an IP": {
+		"Kill pod and recreate all containers if the PodSandbox loses its IP": {
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
 				status.SandboxStatuses[0].Network.Ip = ""
 			},
@@ -890,6 +891,7 @@ func TestComputePodActions(t *testing.T) {
 				ContainersToStart: []int{0, 1, 2},
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
+			oldPodIP: "192.168.1.10",
 		},
 		"Kill and recreate the container if the container's spec changed": {
 			mutatePodFn: func(pod *v1.Pod) {
@@ -914,7 +916,7 @@ func TestComputePodActions(t *testing.T) {
 		if test.mutateStatusFn != nil {
 			test.mutateStatusFn(status)
 		}
-		actions := m.computePodActions(pod, status)
+		actions := m.computePodActions(pod, status, &v1.PodStatus{PodIP: test.oldPodIP})
 		verifyActions(t, &test.actions, &actions, desc)
 	}
 }
@@ -1032,7 +1034,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 		if test.mutateStatusFn != nil {
 			test.mutateStatusFn(status)
 		}
-		actions := m.computePodActions(pod, status)
+		actions := m.computePodActions(pod, status, &v1.PodStatus{})
 		verifyActions(t, &test.actions, &actions, desc)
 	}
 }
