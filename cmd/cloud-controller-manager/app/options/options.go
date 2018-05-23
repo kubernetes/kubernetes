@@ -45,6 +45,11 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	// CloudControllerManagerUserAgent is the userAgent name when starting cloud-controller managers.
+	CloudControllerManagerUserAgent = "cloud-controller-manager"
+)
+
 // CloudControllerManagerOptions is the main context object for the controller manager.
 type CloudControllerManagerOptions struct {
 	CloudProvider     *cmoptions.CloudProviderOptions
@@ -165,7 +170,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	}
 
 	// sync back to component config
-	// TODO: find more elegant way than synching back the values.
+	// TODO: find more elegant way than syncing back the values.
 	c.ComponentConfig.KubeCloudShared.Port = int32(o.InsecureServing.BindPort)
 	c.ComponentConfig.KubeCloudShared.Address = o.InsecureServing.BindAddress.String()
 
@@ -213,13 +218,13 @@ func (o *CloudControllerManagerOptions) Validate() error {
 }
 
 // Config return a cloud controller manager config objective
-func (o CloudControllerManagerOptions) Config() (*cloudcontrollerconfig.Config, error) {
+func (o *CloudControllerManagerOptions) Config() (*cloudcontrollerconfig.Config, error) {
 	if err := o.Validate(); err != nil {
 		return nil, err
 	}
 
 	c := &cloudcontrollerconfig.Config{}
-	if err := o.ApplyTo(c, "cloud-controller-manager"); err != nil {
+	if err := o.ApplyTo(c, CloudControllerManagerUserAgent); err != nil {
 		return nil, err
 	}
 
@@ -230,5 +235,6 @@ func createRecorder(kubeClient kubernetes.Interface, userAgent string) record.Ev
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	// TODO: remove dependence on the legacyscheme
 	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: userAgent})
 }

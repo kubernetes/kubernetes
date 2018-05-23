@@ -111,7 +111,6 @@ func TestAddFlags(t *testing.T) {
 		"--contention-profiling=true",
 		"--controller-start-interval=2m",
 		"--http2-max-streams-per-connection=47",
-		"--min-resync-period=5m",
 		"--kube-api-burst=100",
 		"--kube-api-content-type=application/vnd.kubernetes.protobuf",
 		"--kube-api-qps=50.0",
@@ -122,13 +121,12 @@ func TestAddFlags(t *testing.T) {
 		"--leader-elect-resource-lock=configmap",
 		"--leader-elect-retry-period=5s",
 		"--master=192.168.4.20",
-		"--min-resync-period=8h",
+		"--min-resync-period=100m",
+		"--node-status-update-frequency=10m",
 		"--port=10000",
 		"--profiling=false",
-		"--node-status-update-frequency=10m",
 		"--route-reconciliation-period=30s",
 		"--secure-port=10001",
-		"--min-resync-period=100m",
 		"--use-service-account-credentials=false",
 	}
 	f.Parse(args)
