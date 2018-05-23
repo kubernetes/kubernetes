@@ -22,13 +22,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/golang/glog"
+	"golang.org/x/sys/unix"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
-	utilio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/nsenter"
 )
 
@@ -37,13 +36,6 @@ const (
 	hostProcMountsPath = "/rootfs/proc/1/mounts"
 	// hostProcMountinfoPath is the default mount info path for rootfs
 	hostProcMountinfoPath = "/rootfs/proc/1/mountinfo"
-	// hostProcSelfStatusPath is the default path to /proc/self/status on the host
-	hostProcSelfStatusPath = "/rootfs/proc/self/status"
-)
-
-var (
-	// pidRegExp matches "Pid:	<pid>" in /proc/self/status
-	pidRegExp = regexp.MustCompile(`\nPid:\t([0-9]*)\n`)
 )
 
 // Currently, all docker containers receive their own mount namespaces.
@@ -297,29 +289,9 @@ func (mounter *NsenterMounter) CleanSubPaths(podDir string, volumeName string) e
 	return doCleanSubPaths(mounter, podDir, volumeName)
 }
 
-// getPidOnHost returns kubelet's pid in the host pid namespace
-func (mounter *NsenterMounter) getPidOnHost(procStatusPath string) (int, error) {
-	// Get the PID from /rootfs/proc/self/status
-	statusBytes, err := utilio.ConsistentRead(procStatusPath, maxListTries)
-	if err != nil {
-		return 0, fmt.Errorf("error reading %s: %s", procStatusPath, err)
-	}
-	matches := pidRegExp.FindSubmatch(statusBytes)
-	if len(matches) < 2 {
-		return 0, fmt.Errorf("cannot parse %s: no Pid:", procStatusPath)
-	}
-	return strconv.Atoi(string(matches[1]))
-}
-
 func (mounter *NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	hostPid, err := mounter.getPidOnHost(hostProcSelfStatusPath)
-	if err != nil {
-		return "", nil, err
-	}
-	glog.V(4).Infof("Kubelet's PID on the host is %d", hostPid)
-
 	// Bind-mount the subpath to avoid using symlinks in subpaths.
-	newHostPath, err = doBindSubPath(mounter, subPath, hostPid)
+	newHostPath, err = doNsEnterBindSubPath(mounter, subPath)
 
 	// There is no action when the container starts. Bind-mount will be cleaned
 	// when container stops by CleanSubPaths.
@@ -350,6 +322,95 @@ func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
 		return nil, err
 	}
 	return getMountRefsByDev(mounter, hostpath)
+}
+
+func doNsEnterBindSubPath(mounter *NsenterMounter, subpath Subpath) (hostPath string, err error) {
+	// Linux, kubelet runs in a container:
+	// - safely open the subpath
+	// - bind-mount the subpath to target (this can be unsafe)
+	// - check that we mounted the right thing by comparing device ID and inode
+	//   of the subpath (via safely opened fd) and the target (that's under our
+	//   control)
+
+	// Evaluate all symlinks here once for all subsequent functions.
+	evaluatedHostVolumePath, err := mounter.ne.EvalSymlinks(subpath.VolumePath, true /*mustExist*/)
+	if err != nil {
+		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.VolumePath, err)
+	}
+	evaluatedHostSubpath, err := mounter.ne.EvalSymlinks(subpath.Path, true /*mustExist*/)
+	if err != nil {
+		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.Path, err)
+	}
+	glog.V(5).Infof("doBindSubPath %q (%q) for volumepath %q", subpath.Path, evaluatedHostSubpath, subpath.VolumePath)
+	subpath.VolumePath = mounter.ne.KubeletPath(evaluatedHostVolumePath)
+	subpath.Path = mounter.ne.KubeletPath(evaluatedHostSubpath)
+
+	// Check the subpath is correct and open it
+	fd, err := safeOpenSubPath(mounter, subpath)
+	if err != nil {
+		return "", err
+	}
+	defer syscall.Close(fd)
+
+	alreadyMounted, bindPathTarget, err := prepareSubpathTarget(mounter, subpath)
+	if err != nil {
+		return "", err
+	}
+	if alreadyMounted {
+		return bindPathTarget, nil
+	}
+
+	success := false
+	defer func() {
+		// Cleanup subpath on error
+		if !success {
+			glog.V(4).Infof("doNsEnterBindSubPath() failed for %q, cleaning up subpath", bindPathTarget)
+			if cleanErr := cleanSubPath(mounter, subpath); cleanErr != nil {
+				glog.Errorf("Failed to clean subpath %q: %v", bindPathTarget, cleanErr)
+			}
+		}
+	}()
+
+	// Leap of faith: optimistically expect that nobody has modified previously
+	// expanded evalSubPath with evil symlinks and bind-mount it.
+	// Mount is done on the host! don't use kubelet path!
+	glog.V(5).Infof("bind mounting %q at %q", evaluatedHostSubpath, bindPathTarget)
+	if err = mounter.Mount(evaluatedHostSubpath, bindPathTarget, "" /*fstype*/, []string{"bind"}); err != nil {
+		return "", fmt.Errorf("error mounting %s: %s", evaluatedHostSubpath, err)
+	}
+
+	// Check that the bind-mount target is the same inode and device as the
+	// source that we keept open, i.e. we mounted the right thing.
+	err = checkDeviceInode(fd, bindPathTarget)
+	if err != nil {
+		return "", fmt.Errorf("error checking bind mount for subpath %s: %s", subpath.VolumePath, err)
+	}
+
+	success = true
+	glog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
+	return bindPathTarget, nil
+}
+
+// checkDeviceInode checks that opened file and path represent the same file.
+func checkDeviceInode(fd int, path string) error {
+	var srcStat, dstStat unix.Stat_t
+	err := unix.Fstat(fd, &srcStat)
+	if err != nil {
+		return fmt.Errorf("error running fstat on subpath FD: %v", err)
+	}
+
+	err = unix.Stat(path, &dstStat)
+	if err != nil {
+		return fmt.Errorf("error running fstat on %s: %v", path, err)
+	}
+
+	if srcStat.Dev != dstStat.Dev {
+		return fmt.Errorf("different device number")
+	}
+	if srcStat.Ino != dstStat.Ino {
+		return fmt.Errorf("different inode")
+	}
+	return nil
 }
 
 func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {

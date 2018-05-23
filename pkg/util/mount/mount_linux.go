@@ -720,7 +720,7 @@ func getSELinuxSupport(path string, mountInfoFilename string) (bool, error) {
 }
 
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	newHostPath, err = doBindSubPath(mounter, subPath, os.Getpid())
+	newHostPath, err = doBindSubPath(mounter, subPath)
 
 	// There is no action when the container starts. Bind-mount will be cleaned
 	// when container stops by CleanSubPaths.
@@ -742,6 +742,11 @@ func safeOpenSubPath(mounter Interface, subpath Subpath) (int, error) {
 
 // prepareSubpathTarget creates target for bind-mount of subpath. It returns
 // "true" when the target already exists and something is mounted there.
+// Given Subpath must have all paths with already resolved symlinks and with
+// paths relevant to kubelet (when it runs in a container).
+// This function is called also by NsEnterMounter. It works because
+// /var/lib/kubelet is mounted from the host into the container with Kubelet as
+// /var/lib/kubelet too.
 func prepareSubpathTarget(mounter Interface, subpath Subpath) (bool, string, error) {
 	// Early check for already bind-mounted subpath.
 	bindPathTarget := getSubpathBindTarget(subpath)
@@ -793,10 +798,12 @@ func getSubpathBindTarget(subpath Subpath) string {
 	return filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName, strconv.Itoa(subpath.VolumeMountIndex))
 }
 
-// This implementation is shared between Linux and NsEnterMounter
-// kubeletPid is PID of kubelet in the PID namespace where bind-mount is done,
-// i.e. pid on the *host* if kubelet runs in a container.
-func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath string, err error) {
+func doBindSubPath(mounter Interface, subpath Subpath) (hostPath string, err error) {
+	// Linux, kubelet runs on the host:
+	// - safely open the subpath
+	// - bind-mount /proc/<pid of kubelet>/fd/<fd> to subpath target
+	// User can't change /proc/<pid of kubelet>/fd/<fd> to point to a bad place.
+
 	// Evaluate all symlinks here once for all subsequent functions.
 	newVolumePath, err := filepath.EvalSymlinks(subpath.VolumePath)
 	if err != nil {
@@ -810,7 +817,6 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 	subpath.VolumePath = newVolumePath
 	subpath.Path = newPath
 
-	// Check the subpath is correct and open it
 	fd, err := safeOpenSubPath(mounter, subpath)
 	if err != nil {
 		return "", err
@@ -836,6 +842,7 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 		}
 	}()
 
+	kubeletPid := os.Getpid()
 	mountSource := fmt.Sprintf("/proc/%d/fd/%v", kubeletPid, fd)
 
 	// Do the bind mount
@@ -1193,6 +1200,9 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 // Symlinks are disallowed (pathname must already resolve symlinks),
 // and the path must be within the base directory.
 func doSafeOpen(pathname string, base string) (int, error) {
+	pathname = filepath.Clean(pathname)
+	base = filepath.Clean(base)
+
 	// Calculate segments to follow
 	subpath, err := filepath.Rel(base, pathname)
 	if err != nil {
