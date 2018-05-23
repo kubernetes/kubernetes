@@ -17,13 +17,17 @@ limitations under the License.
 package azure_dd
 
 import (
+	"fmt"
+
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // interface exposed by the cloud provider implementing Disk functionality
@@ -62,6 +66,7 @@ var _ volume.PersistentVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.DeletableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.ProvisionableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.AttachableVolumePlugin = &azureDataDiskPlugin{}
+var _ volume.VolumePluginWithAttachLimits = &azureDataDiskPlugin{}
 
 const (
 	azureDataDiskPluginName = "kubernetes.io/azure-disk"
@@ -104,6 +109,22 @@ func (plugin *azureDataDiskPlugin) SupportsMountOption() bool {
 
 func (plugin *azureDataDiskPlugin) SupportsBulkVolumeVerification() bool {
 	return false
+}
+
+func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
+	cloud := plugin.host.GetCloudProvider()
+	if cloud.ProviderName() != azure.CloudProviderName {
+		return nil, fmt.Errorf("Expected Azure cloudprovider, got %s", cloud.ProviderName())
+	}
+
+	volumeLimits := map[string]int64{
+		util.AzureVolumeLimitKey: 16,
+	}
+	return volumeLimits, nil
+}
+
+func (plugin *azureDataDiskPlugin) VolumeLimitKey(spec *volume.Spec) string {
+	return util.AzureVolumeLimitKey
 }
 
 func (plugin *azureDataDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
