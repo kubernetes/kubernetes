@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,7 +61,7 @@ func init() {
 }
 
 type watcher struct {
-	client      *clientv3.Client
+	clients     []*clientv3.Client
 	codec       runtime.Codec
 	versioner   storage.Versioner
 	transformer value.Transformer
@@ -80,13 +81,17 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer value.Transformer) *watcher {
+func newWatcher(clients []*clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer value.Transformer) *watcher {
 	return &watcher{
-		client:      client,
+		clients:     clients,
 		codec:       codec,
 		versioner:   versioner,
 		transformer: transformer,
 	}
+}
+
+func (w *watcher) client() *clientv3.Client {
+	return w.clients[atomic.AddInt64(&c.currentClient, 1)%len(w.clients)]
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
@@ -174,7 +179,7 @@ func (wc *watchChan) sync() error {
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
-	getResp, err := wc.watcher.client.Get(wc.ctx, wc.key, opts...)
+	getResp, err := wc.watcher.client().Get(wc.ctx, wc.key, opts...)
 	if err != nil {
 		return err
 	}
@@ -200,7 +205,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
-	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
+	wch := wc.watcher.client().Watch(wc.ctx, wc.key, opts...)
 	for wres := range wch {
 		if wres.Err() != nil {
 			err := wres.Err()
