@@ -46,9 +46,9 @@ docs/admin/kubeadm_alpha_phase_kubeconfig_kubelet.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_scheduler.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_user.md
 docs/admin/kubeadm_alpha_phase_kubelet.md
-docs/admin/kubeadm_alpha_phase_kubelet_enable.md
-docs/admin/kubeadm_alpha_phase_kubelet_init.md
-docs/admin/kubeadm_alpha_phase_kubelet_upload.md
+docs/admin/kubeadm_alpha_phase_kubelet_enable-dynamic-config.md
+docs/admin/kubeadm_alpha_phase_kubelet_upload-config.md
+docs/admin/kubeadm_alpha_phase_kubelet_write-config-to-disk.md
 docs/admin/kubeadm_alpha_phase_mark-master.md
 docs/admin/kubeadm_alpha_phase_preflight.md
 docs/admin/kubeadm_alpha_phase_preflight_master.md
@@ -123,9 +123,9 @@ docs/man/man1/kubeadm-alpha-phase-kubeconfig-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-user.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig.1
-docs/man/man1/kubeadm-alpha-phase-kubelet-enable.1
-docs/man/man1/kubeadm-alpha-phase-kubelet-init.1
-docs/man/man1/kubeadm-alpha-phase-kubelet-upload.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-enable-dynamic-config.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-upload-config.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-write-config-to-disk.1
 docs/man/man1/kubeadm-alpha-phase-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-mark-master.1
 docs/man/man1/kubeadm-alpha-phase-preflight-master.1
@@ -258,6 +258,7 @@ docs/man/man1/kubectl-top-pod.1
 docs/man/man1/kubectl-top.1
 docs/man/man1/kubectl-uncordon.1
 docs/man/man1/kubectl-version.1
+docs/man/man1/kubectl-wait.1
 docs/man/man1/kubectl.1
 docs/man/man1/kubelet.1
 docs/user-guide/kubectl/kubectl.md
@@ -357,6 +358,7 @@ docs/user-guide/kubectl/kubectl_top_node.md
 docs/user-guide/kubectl/kubectl_top_pod.md
 docs/user-guide/kubectl/kubectl_uncordon.md
 docs/user-guide/kubectl/kubectl_version.md
+docs/user-guide/kubectl/kubectl_wait.md
 docs/yaml/kubectl/kubectl.yaml
 docs/yaml/kubectl/kubectl_alpha.yaml
 docs/yaml/kubectl/kubectl_annotate.yaml
@@ -400,3 +402,4 @@ docs/yaml/kubectl/kubectl_taint.yaml
 docs/yaml/kubectl/kubectl_top.yaml
 docs/yaml/kubectl/kubectl_uncordon.yaml
 docs/yaml/kubectl/kubectl_version.yaml
+docs/yaml/kubectl/kubectl_wait.yaml

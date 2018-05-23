@@ -108,7 +108,7 @@ controller, and serviceaccounts controller.`,
 func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
-		return time.Duration(float64(c.Generic.ComponentConfig.GenericComponent.MinResyncPeriod.Nanoseconds()) * factor)
+		return time.Duration(float64(c.ComponentConfig.GenericComponent.MinResyncPeriod.Nanoseconds()) * factor)
 	}
 }
 
@@ -118,43 +118,43 @@ func Run(c *config.CompletedConfig) error {
 	glog.Infof("Version: %+v", version.Get())
 
 	if cfgz, err := configz.New("componentconfig"); err == nil {
-		cfgz.Set(c.Generic.ComponentConfig)
+		cfgz.Set(c.ComponentConfig)
 	} else {
 		glog.Errorf("unable to register configz: %c", err)
 	}
 
 	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
-	if c.Generic.SecureServing != nil {
-		handler := genericcontrollermanager.NewBaseHandler(&c.Generic)
-		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Generic)
-		if err := c.Generic.SecureServing.Serve(handler, 0, stopCh); err != nil {
+	if c.SecureServing != nil {
+		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
+		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Authorization, &c.Authentication)
+		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
-	if c.Generic.InsecureServing != nil {
-		handler := genericcontrollermanager.NewBaseHandler(&c.Generic)
-		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Generic)
-		if err := c.Generic.InsecureServing.Serve(handler, 0, stopCh); err != nil {
+	if c.InsecureServing != nil {
+		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
+		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Authorization, &c.Authentication)
+		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
 
 	run := func(stop <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
-			ClientConfig: c.Generic.Kubeconfig,
+			ClientConfig: c.Kubeconfig,
 		}
 		var clientBuilder controller.ControllerClientBuilder
-		if c.Generic.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
-			if len(c.Generic.ComponentConfig.KubeCloudShared.ServiceAccountKeyFile) == 0 {
+		if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
+			if len(c.ComponentConfig.KubeCloudShared.ServiceAccountKeyFile) == 0 {
 				// It'c possible another controller process is creating the tokens for us.
 				// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
 				glog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
 			}
 			clientBuilder = controller.SAControllerClientBuilder{
-				ClientConfig:         restclient.AnonymousClientConfig(c.Generic.Kubeconfig),
-				CoreClient:           c.Generic.Client.CoreV1(),
-				AuthenticationClient: c.Generic.Client.AuthenticationV1(),
+				ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
+				CoreClient:           c.Client.CoreV1(),
+				AuthenticationClient: c.Client.AuthenticationV1(),
 				Namespace:            "kube-system",
 			}
 		} else {
@@ -176,7 +176,7 @@ func Run(c *config.CompletedConfig) error {
 		select {}
 	}
 
-	if !c.Generic.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
+	if !c.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
 		run(wait.NeverStop)
 		panic("unreachable")
 	}
@@ -188,13 +188,13 @@ func Run(c *config.CompletedConfig) error {
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
-	rl, err := resourcelock.New(c.Generic.ComponentConfig.GenericComponent.LeaderElection.ResourceLock,
+	rl, err := resourcelock.New(c.ComponentConfig.GenericComponent.LeaderElection.ResourceLock,
 		"kube-system",
 		"kube-controller-manager",
-		c.Generic.LeaderElectionClient.CoreV1(),
+		c.LeaderElectionClient.CoreV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
-			EventRecorder: c.Generic.EventRecorder,
+			EventRecorder: c.EventRecorder,
 		})
 	if err != nil {
 		glog.Fatalf("error creating lock: %v", err)
@@ -202,9 +202,9 @@ func Run(c *config.CompletedConfig) error {
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: c.Generic.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.Generic.ComponentConfig.GenericComponent.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.Generic.ComponentConfig.GenericComponent.LeaderElection.RetryPeriod.Duration,
+		LeaseDuration: c.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: c.ComponentConfig.GenericComponent.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   c.ComponentConfig.GenericComponent.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
@@ -409,8 +409,8 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		return ControllerContext{}, err
 	}
 
-	cloud, loopMode, err := createCloudProvider(s.Generic.ComponentConfig.CloudProvider.Name, s.Generic.ComponentConfig.ExternalCloudVolumePlugin,
-		s.Generic.ComponentConfig.CloudProvider.CloudConfigFile, s.Generic.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
+	cloud, loopMode, err := createCloudProvider(s.ComponentConfig.CloudProvider.Name, s.ComponentConfig.ExternalCloudVolumePlugin,
+		s.ComponentConfig.CloudProvider.CloudConfigFile, s.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
 	if err != nil {
 		return ControllerContext{}, err
 	}
@@ -418,7 +418,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 	ctx := ControllerContext{
 		ClientBuilder:      clientBuilder,
 		InformerFactory:    sharedInformers,
-		ComponentConfig:    s.Generic.ComponentConfig,
+		ComponentConfig:    s.ComponentConfig,
 		RESTMapper:         restMapper,
 		AvailableResources: availableResources,
 		Cloud:              cloud,

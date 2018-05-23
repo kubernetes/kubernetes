@@ -24,7 +24,6 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -73,7 +73,7 @@ type AutoscaleOptions struct {
 	namespace        string
 	dryRun           bool
 	builder          *resource.Builder
-	canBeAutoscaled  func(kind schema.GroupKind) error
+	canBeAutoscaled  polymorphichelpers.CanBeAutoscaledFunc
 	generatorFunc    func(string, *meta.RESTMapping) (kubectl.StructuredGenerator, error)
 
 	HPAClient autoscalingv1client.HorizontalPodAutoscalersGetter
@@ -132,7 +132,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
-	o.canBeAutoscaled = f.CanBeAutoscaled
+	o.canBeAutoscaled = polymorphichelpers.CanBeAutoscaledFn
 	o.args = args
 	o.RecordFlags.Complete(f.Command(cmd, false))
 

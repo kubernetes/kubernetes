@@ -212,6 +212,10 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 		postUpgradeResourceStore.SslList = nil
 	}
 
+	// TODO(rramkumar): Remove this when GLBC v1.2.0 is released.
+	t.resourceStore.BeList = nil
+	postUpgradeResourceStore.BeList = nil
+
 	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
 		i1 := v1.Interface()
 		i2 := v2.Interface()

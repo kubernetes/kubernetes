@@ -17,8 +17,8 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io/ioutil"
-	"os"
 
 	"github.com/golang/glog"
 	"github.com/pmezard/go-difflib/difflib"
@@ -119,6 +119,9 @@ func runDiff(flags *diffFlags, args []string) error {
 		if err != nil {
 			return err
 		}
+		if path == "" {
+			return fmt.Errorf("empty manifest path")
+		}
 		existingManifest, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
@@ -133,7 +136,7 @@ func runDiff(flags *diffFlags, args []string) error {
 			Context:  flags.contextLines,
 		}
 
-		difflib.WriteUnifiedDiff(os.Stdout, diff)
+		difflib.WriteUnifiedDiff(flags.parent.out, diff)
 	}
 	return nil
 }

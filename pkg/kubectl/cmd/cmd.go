@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/wait"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/spf13/cobra"
@@ -148,7 +149,7 @@ __kubectl_get_resource_clusterrole()
 __kubectl_get_containers()
 {
     local template
-    template="{{ range .spec.containers  }}{{ .name }} {{ end }}"
+    template="{{ range .spec.initContainers }}{{ .name }} {{end}}{{ range .spec.containers  }}{{ .name }} {{ end }}"
     __kubectl_debug "${FUNCNAME} nouns are ${nouns[*]}"
 
     local len="${#nouns[@]}"
@@ -362,6 +363,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				NewCmdApply("kubectl", f, ioStreams),
 				NewCmdPatch(f, ioStreams),
 				NewCmdReplace(f, ioStreams),
+				wait.NewCmdWait(f, ioStreams),
 				NewCmdConvert(f, ioStreams),
 			},
 		},

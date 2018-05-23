@@ -18,21 +18,21 @@ limitations under the License.
 package rbac
 
 import (
+	rbacv1 "k8s.io/api/rbac/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 type RoleToRuleMapper interface {
 	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namespace
 	// of the role binding, the empty string if a cluster role binding.
-	GetRoleReferenceRules(roleRef rbac.RoleRef, namespace string) ([]rbac.PolicyRule, error)
+	GetRoleReferenceRules(roleRef rbacv1.RoleRef, namespace string) ([]rbacv1.PolicyRule, error)
 }
 
 type SubjectLocator interface {
-	AllowedSubjects(attributes authorizer.Attributes) ([]rbac.Subject, error)
+	AllowedSubjects(attributes authorizer.Attributes) ([]rbacv1.Subject, error)
 }
 
 var _ = SubjectLocator(&SubjectAccessEvaluator{})
@@ -59,10 +59,10 @@ func NewSubjectAccessEvaluator(roles rbacregistryvalidation.RoleGetter, roleBind
 
 // AllowedSubjects returns the subjects that can perform an action and any errors encountered while computing the list.
 // It is possible to have both subjects and errors returned if some rolebindings couldn't be resolved, but others could be.
-func (r *SubjectAccessEvaluator) AllowedSubjects(requestAttributes authorizer.Attributes) ([]rbac.Subject, error) {
-	subjects := []rbac.Subject{{Kind: rbac.GroupKind, APIGroup: rbac.GroupName, Name: user.SystemPrivilegedGroup}}
+func (r *SubjectAccessEvaluator) AllowedSubjects(requestAttributes authorizer.Attributes) ([]rbacv1.Subject, error) {
+	subjects := []rbacv1.Subject{{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: user.SystemPrivilegedGroup}}
 	if len(r.superUser) > 0 {
-		subjects = append(subjects, rbac.Subject{Kind: rbac.UserKind, APIGroup: rbac.GroupName, Name: r.superUser})
+		subjects = append(subjects, rbacv1.Subject{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: r.superUser})
 	}
 	errorlist := []error{}
 
@@ -104,7 +104,7 @@ func (r *SubjectAccessEvaluator) AllowedSubjects(requestAttributes authorizer.At
 		}
 	}
 
-	dedupedSubjects := []rbac.Subject{}
+	dedupedSubjects := []rbacv1.Subject{}
 	for _, subject := range subjects {
 		found := false
 		for _, curr := range dedupedSubjects {

@@ -21,8 +21,12 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 
+	"sort"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// +k8s:deepcopy-gen=false
 
 // PolicyRuleBuilder let's us attach methods.  A no-no for API types.
 // We use it to construct rules in code.  It's more compact than trying to write them
@@ -87,8 +91,15 @@ func (r *PolicyRuleBuilder) Rule() (rbacv1.PolicyRule, error) {
 		return rbacv1.PolicyRule{}, fmt.Errorf("a rule must have either nonResourceURLs or resources: %#v", r.PolicyRule)
 	}
 
+	sort.Strings(r.PolicyRule.Resources)
+	sort.Strings(r.PolicyRule.ResourceNames)
+	sort.Strings(r.PolicyRule.APIGroups)
+	sort.Strings(r.PolicyRule.NonResourceURLs)
+	sort.Strings(r.PolicyRule.Verbs)
 	return r.PolicyRule, nil
 }
+
+// +k8s:deepcopy-gen=false
 
 // ClusterRoleBindingBuilder let's us attach methods.  A no-no for API types.
 // We use it to construct bindings in code.  It's more compact than trying to write them
@@ -112,14 +123,14 @@ func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 
 func (r *ClusterRoleBindingBuilder) Groups(groups ...string) *ClusterRoleBindingBuilder {
 	for _, group := range groups {
-		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, rbacv1.Subject{Kind: rbacv1.GroupKind, Name: group})
+		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, rbacv1.Subject{APIGroup: rbacv1.GroupName, Kind: rbacv1.GroupKind, Name: group})
 	}
 	return r
 }
 
 func (r *ClusterRoleBindingBuilder) Users(users ...string) *ClusterRoleBindingBuilder {
 	for _, user := range users {
-		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, rbacv1.Subject{Kind: rbacv1.UserKind, Name: user})
+		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, rbacv1.Subject{APIGroup: rbacv1.GroupName, Kind: rbacv1.UserKind, Name: user})
 	}
 	return r
 }
@@ -145,4 +156,92 @@ func (r *ClusterRoleBindingBuilder) Binding() (rbacv1.ClusterRoleBinding, error)
 	}
 
 	return r.ClusterRoleBinding, nil
+}
+
+// +k8s:deepcopy-gen=false
+
+// RoleBindingBuilder let's us attach methods. It is similar to
+// ClusterRoleBindingBuilder above.
+type RoleBindingBuilder struct {
+	RoleBinding rbacv1.RoleBinding
+}
+
+// NewRoleBinding creates a RoleBinding builder that can be used
+// to define the subjects of a role binding. At least one of
+// the `Groups`, `Users` or `SAs` method must be called before
+// calling the `Binding*` methods.
+func NewRoleBinding(roleName, namespace string) *RoleBindingBuilder {
+	return &RoleBindingBuilder{
+		RoleBinding: rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      roleName,
+				Namespace: namespace,
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: GroupName,
+				Kind:     "Role",
+				Name:     roleName,
+			},
+		},
+	}
+}
+
+func NewRoleBindingForClusterRole(roleName, namespace string) *RoleBindingBuilder {
+	return &RoleBindingBuilder{
+		RoleBinding: rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      roleName,
+				Namespace: namespace,
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: GroupName,
+				Kind:     "ClusterRole",
+				Name:     roleName,
+			},
+		},
+	}
+}
+
+// Groups adds the specified groups as the subjects of the RoleBinding.
+func (r *RoleBindingBuilder) Groups(groups ...string) *RoleBindingBuilder {
+	for _, group := range groups {
+		r.RoleBinding.Subjects = append(r.RoleBinding.Subjects, rbacv1.Subject{Kind: rbacv1.GroupKind, APIGroup: GroupName, Name: group})
+	}
+	return r
+}
+
+// Users adds the specified users as the subjects of the RoleBinding.
+func (r *RoleBindingBuilder) Users(users ...string) *RoleBindingBuilder {
+	for _, user := range users {
+		r.RoleBinding.Subjects = append(r.RoleBinding.Subjects, rbacv1.Subject{Kind: rbacv1.UserKind, APIGroup: GroupName, Name: user})
+	}
+	return r
+}
+
+// SAs adds the specified service accounts as the subjects of the
+// RoleBinding.
+func (r *RoleBindingBuilder) SAs(namespace string, serviceAccountNames ...string) *RoleBindingBuilder {
+	for _, saName := range serviceAccountNames {
+		r.RoleBinding.Subjects = append(r.RoleBinding.Subjects, rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: namespace, Name: saName})
+	}
+	return r
+}
+
+// BindingOrDie calls the binding method and panics if there is an error.
+func (r *RoleBindingBuilder) BindingOrDie() rbacv1.RoleBinding {
+	ret, err := r.Binding()
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
+
+// Binding builds and returns the RoleBinding API object from the builder
+// object.
+func (r *RoleBindingBuilder) Binding() (rbacv1.RoleBinding, error) {
+	if len(r.RoleBinding.Subjects) == 0 {
+		return rbacv1.RoleBinding{}, fmt.Errorf("subjects are required: %#v", r.RoleBinding)
+	}
+
+	return r.RoleBinding, nil
 }

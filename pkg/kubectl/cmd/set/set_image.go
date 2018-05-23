@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -49,12 +50,12 @@ type SetImageOptions struct {
 	All          bool
 	Output       string
 	Local        bool
-	ResolveImage func(in string) (string, error)
+	ResolveImage ImageResolver
 
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
 
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
 	ContainerImages        map[string]string
 
@@ -134,10 +135,10 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return err
 	}
 
-	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
+	o.UpdatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.ResolveImage = f.ResolveImage
+	o.ResolveImage = resolveImageFunc
 
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")
@@ -308,4 +309,14 @@ func getResourcesAndImages(args []string) (resources []string, containerImages m
 func hasWildcardKey(containerImages map[string]string) bool {
 	_, ok := containerImages["*"]
 	return ok
+}
+
+// ImageResolver is a func that receives an image name, and
+// resolves it to an appropriate / compatible image name.
+// Adds flexibility for future image resolving methods.
+type ImageResolver func(in string) (string, error)
+
+// implements ImageResolver
+func resolveImageFunc(in string) (string, error) {
+	return in, nil
 }

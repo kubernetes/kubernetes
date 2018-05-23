@@ -39,7 +39,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.API.AdvertiseAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
-			obj.AuthorizationModes = []string{"foo"}
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
 			obj.Etcd.ServerCertSANs = []string{"foo"}
@@ -69,9 +68,16 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					StaticPodPath: "foo",
 					ClusterDNS:    []string{"foo"},
 					ClusterDomain: "foo",
-					Authorization: kubeletconfigv1beta1.KubeletAuthorization{Mode: "foo"},
+					Authorization: kubeletconfigv1beta1.KubeletAuthorization{
+						Mode: "Webhook",
+					},
 					Authentication: kubeletconfigv1beta1.KubeletAuthentication{
-						X509: kubeletconfigv1beta1.KubeletX509Authentication{ClientCAFile: "foo"},
+						X509: kubeletconfigv1beta1.KubeletX509Authentication{
+							ClientCAFile: "/etc/kubernetes/pki/ca.crt",
+						},
+						Anonymous: kubeletconfigv1beta1.KubeletAnonymousAuthentication{
+							Enabled: utilpointer.BoolPtr(false),
+						},
 					},
 				},
 			}

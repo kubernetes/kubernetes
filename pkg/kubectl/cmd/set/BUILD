@@ -27,6 +27,7 @@ go_library(
         "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/genericclioptions/printers:go_default_library",
         "//pkg/kubectl/genericclioptions/resource:go_default_library",
+        "//pkg/kubectl/polymorphichelpers:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

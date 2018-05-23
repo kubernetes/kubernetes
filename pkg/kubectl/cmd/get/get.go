@@ -219,6 +219,9 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 
+	if resource.MultipleTypesRequested(args) {
+		o.PrintFlags.EnsureWithKind()
+	}
 	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
 		printFlags := o.PrintFlags.Copy()
@@ -229,9 +232,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 					printFlags.UseOpenAPIColumns(apiSchema, mapping)
 				}
 			}
-			if resource.MultipleTypesRequested(args) {
-				printFlags.EnsureWithKind(mapping.GroupVersionKind.GroupKind())
-			}
+			printFlags.SetKind(mapping.GroupVersionKind.GroupKind())
 		}
 		if withNamespace {
 			printFlags.EnsureWithNamespace()

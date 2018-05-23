@@ -159,3 +159,7 @@ func (m *execMounter) GetMountRefs(pathname string) ([]string, error) {
 func (m *execMounter) GetFSGroup(pathname string) (int64, error) {
 	return m.wrappedMounter.GetFSGroup(pathname)
 }
+
+func (m *execMounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return m.wrappedMounter.GetSELinuxSupport(pathname)
+}

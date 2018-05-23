@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -79,20 +78,12 @@ type ClientAccessFactory interface {
 	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
 
-	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
-	// return false if no pod spec is supported, or return an error.
-	UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
-
 	// MapBasedSelectorForObject returns the map-based selector associated with the provided object. If a
 	// new set-based selector is provided, an error is returned if the selector cannot be converted to a
 	// map-based selector
 	MapBasedSelectorForObject(object runtime.Object) (string, error)
-	// PortsForObject returns the ports associated with the provided object
-	PortsForObject(object runtime.Object) ([]string, error)
 	// ProtocolsForObject returns the <port, protocol> mapping associated with the provided object
 	ProtocolsForObject(object runtime.Object) (map[string]string, error)
-	// LabelsForObject returns the labels associated with the provided object
-	LabelsForObject(object runtime.Object) (map[string]string, error)
 
 	// Command will stringify and return all environment arguments ie. a command run by a client
 	// using the factory.
@@ -110,11 +101,6 @@ type ClientAccessFactory interface {
 	// in case the object is already resumed.
 	Resumer(info *resource.Info) ([]byte, error)
 
-	// ResolveImage resolves the image names. For kubernetes this function is just
-	// passthrough but it allows to perform more sophisticated image name resolving for
-	// third-party vendors.
-	ResolveImage(imageName string) (string, error)
-
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overridden.
@@ -123,8 +109,6 @@ type ClientAccessFactory interface {
 	Generators(cmdName string) map[string]kubectl.Generator
 	// Check whether the kind of resources could be exposed
 	CanBeExposed(kind schema.GroupKind) error
-	// Check whether the kind of resources could be autoscaled
-	CanBeAutoscaled(kind schema.GroupKind) error
 }
 
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
@@ -190,31 +174,12 @@ func makePortsString(ports []api.ServicePort, useNodePort bool) string {
 	return strings.Join(pieces, ",")
 }
 
-func getPorts(spec api.PodSpec) []string {
-	result := []string{}
-	for _, container := range spec.Containers {
-		for _, port := range container.Ports {
-			result = append(result, strconv.Itoa(int(port.ContainerPort)))
-		}
-	}
-	return result
-}
-
 func getProtocols(spec api.PodSpec) map[string]string {
 	result := make(map[string]string)
 	for _, container := range spec.Containers {
 		for _, port := range container.Ports {
 			result[strconv.Itoa(int(port.ContainerPort))] = string(port.Protocol)
 		}
-	}
-	return result
-}
-
-// Extracts the ports exposed by a service from the given service spec.
-func getServicePorts(spec api.ServiceSpec) []string {
-	result := []string{}
-	for _, servicePort := range spec.Ports {
-		result = append(result, strconv.Itoa(int(servicePort.Port)))
 	}
 	return result
 }

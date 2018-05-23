@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -66,7 +67,7 @@ type SetServiceAccountOptions struct {
 	all                    bool
 	output                 string
 	local                  bool
-	updatePodSpecForObject func(runtime.Object, func(*v1.PodSpec) error) (bool, error)
+	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	infos                  []*resource.Info
 	serviceAccountName     string
 
@@ -129,7 +130,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.dryRun = cmdutil.GetDryRunFlag(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
-	o.updatePodSpecForObject = f.UpdatePodSpecForObject
+	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 
 	if o.dryRun {
 		o.PrintFlags.Complete("%s (dry run)")

@@ -39,8 +39,7 @@ const (
 	master_v1alpha2YAML                = "testdata/conversion/master/v1alpha2.yaml"
 	master_internalYAML                = "testdata/conversion/master/internal.yaml"
 	master_incompleteYAML              = "testdata/defaulting/master/incomplete.yaml"
-	master_defaultedv1alpha1YAML       = "testdata/defaulting/master/defaulted_v1alpha1.yaml"
-	master_defaultedv1alpha2YAML       = "testdata/defaulting/master/defaulted_v1alpha2.yaml"
+	master_defaultedYAML               = "testdata/defaulting/master/defaulted.yaml"
 	master_invalidYAML                 = "testdata/validation/invalid_mastercfg.yaml"
 	master_beforeUpgradeYAML           = "testdata/v1alpha1_upgrade/before.yaml"
 	master_afterUpgradeYAML            = "testdata/v1alpha1_upgrade/after.yaml"
@@ -79,12 +78,6 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 			out:          master_internalYAML,
 			groupVersion: kubeadm.SchemeGroupVersion,
 		},
-		{ // v1alpha1 (faulty) -> internal -> v1alpha1
-			name:         "v1alpha1WithoutTypeMetaTov1alpha1",
-			in:           master_v1alpha1WithoutTypeMetaYAML,
-			out:          master_v1alpha1YAML,
-			groupVersion: v1alpha1.SchemeGroupVersion,
-		},
 		{ // v1alpha2 -> internal
 			name:         "v1alpha2ToInternal",
 			in:           master_v1alpha2YAML,
@@ -105,16 +98,10 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using ConfigFileAndDefaultsToInternalConfig,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha1 (faulty) -> default -> validate -> internal -> v1alpha1
-			name:         "incompleteYAMLToDefaultedv1alpha1",
-			in:           master_incompleteYAML,
-			out:          master_defaultedv1alpha1YAML,
-			groupVersion: v1alpha1.SchemeGroupVersion,
-		},
 		{ // v1alpha1 (faulty) -> default -> validate -> internal -> v1alpha2
 			name:         "incompleteYAMLToDefaultedv1alpha2",
 			in:           master_incompleteYAML,
-			out:          master_defaultedv1alpha2YAML,
+			out:          master_defaultedYAML,
 			groupVersion: v1alpha2.SchemeGroupVersion,
 		},
 		{ // v1alpha1 (faulty) -> validation should fail

@@ -47,9 +47,9 @@ import (
 	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
+	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
@@ -867,6 +867,13 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 	}
 	checks = addCommonChecks(execer, cfg, checks)
 
+	// Check ipvs required kernel module once we use ipvs kube-proxy mode
+	if cfg.KubeProxy.Config.Mode == ipvsutil.IPVSProxyMode {
+		checks = append(checks,
+			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
+		)
+	}
+
 	if len(cfg.Etcd.Endpoints) == 0 {
 		// Only do etcd related checks when no external endpoints were specified
 		checks = append(checks,
@@ -887,16 +894,6 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		checks = append(checks,
 			ExternalEtcdVersionCheck{Etcd: cfg.Etcd},
 		)
-	}
-
-	// Check the config for authorization mode
-	for _, authzMode := range cfg.AuthorizationModes {
-		switch authzMode {
-		case authzmodes.ModeABAC:
-			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationPolicyPath})
-		case authzmodes.ModeWebhook:
-			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationWebhookConfigPath})
-		}
 	}
 
 	if ip := net.ParseIP(cfg.API.AdvertiseAddress); ip != nil {
@@ -922,6 +919,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
+		ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 	}
 	checks = addCommonChecks(execer, cfg, checks)
 
@@ -1054,10 +1052,11 @@ func TryStartKubelet(ignorePreflightErrors sets.String) {
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		glog.Infoln("[preflight] no supported init system detected, won't ensure kubelet is running.")
-	} else if initSystem.ServiceExists("kubelet") && !initSystem.ServiceIsActive("kubelet") {
+	} else if initSystem.ServiceExists("kubelet") {
 
-		glog.Infoln("[preflight] starting the kubelet service")
-		if err := initSystem.ServiceStart("kubelet"); err != nil {
+		glog.Infoln("[preflight] Activating the kubelet service")
+		// This runs "systemctl daemon-reload && systemctl restart kubelet"
+		if err := initSystem.ServiceRestart("kubelet"); err != nil {
 			glog.Warningf("[preflight] unable to start the kubelet service: [%v]\n", err)
 			glog.Warningf("[preflight] please ensure kubelet is running manually.")
 		}
