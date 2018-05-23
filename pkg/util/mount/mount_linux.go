@@ -982,6 +982,10 @@ func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	return getFSGroup(realpath)
 }
 
+func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
+	return getMode(pathname)
+}
+
 // This implementation is shared between Linux and NsEnterMounter
 func getFSGroup(pathname string) (int64, error) {
 	info, err := os.Stat(pathname)
@@ -989,6 +993,15 @@ func getFSGroup(pathname string) (int64, error) {
 		return 0, err
 	}
 	return int64(info.Sys().(*syscall.Stat_t).Gid), nil
+}
+
+// This implementation is shared between Linux and NsEnterMounter
+func getMode(pathname string) (os.FileMode, error) {
+	info, err := os.Stat(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return info.Mode(), nil
 }
 
 // This implementation is shared between Linux and NsEnterMounter

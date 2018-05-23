@@ -117,6 +117,8 @@ type Interface interface {
 	// GetSELinuxSupport returns true if given path is on a mount that supports
 	// SELinux.
 	GetSELinuxSupport(pathname string) (bool, error)
+	// GetMode returns permissions of the path.
+	GetMode(pathname string) (os.FileMode, error)
 }
 
 type Subpath struct {

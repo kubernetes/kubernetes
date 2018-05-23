@@ -461,6 +461,14 @@ func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, nil
 }
 
+func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
+	info, err := os.Stat(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return info.Mode(), nil
+}
+
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return doSafeMakeDir(pathname, base, perm)

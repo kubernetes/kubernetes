@@ -232,3 +232,7 @@ func (f *FakeMounter) GetFSGroup(pathname string) (int64, error) {
 func (f *FakeMounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("GetSELinuxSupport not implemented")
 }
+
+func (f *FakeMounter) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
+}

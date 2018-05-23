@@ -347,3 +347,11 @@ func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {
 func (mounter *NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return getSELinuxSupport(pathname, procMountInfoPath)
 }
+
+func (mounter *NsenterMounter) GetMode(pathname string) (os.FileMode, error) {
+	kubeletpath, err := mounter.ne.KubeletPath(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return getMode(kubeletpath)
+}

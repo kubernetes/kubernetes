@@ -110,3 +110,7 @@ func (*NsenterMounter) GetFSGroup(pathname string) (int64, error) {
 func (*NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("not implemented")
 }
+
+func (*NsenterMounter) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
+}

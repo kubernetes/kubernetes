@@ -175,12 +175,6 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
 			}
 
-			fileinfo, err := os.Lstat(hostPath)
-			if err != nil {
-				return nil, cleanupAction, err
-			}
-			perm := fileinfo.Mode()
-
 			volumePath, err := filepath.EvalSymlinks(hostPath)
 			if err != nil {
 				return nil, cleanupAction, err
@@ -195,6 +189,11 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
 				// later auto-create it with the incorrect mode 0750
 				// Make extra care not to escape the volume!
+				perm, err := mounter.GetMode(volumePath)
+				if err != nil {
+					return nil, cleanupAction, err
+				}
+
 				if err := mounter.SafeMakeDir(hostPath, volumePath, perm); err != nil {
 					glog.Errorf("failed to mkdir %q: %v", hostPath, err)
 					return nil, cleanupAction, err

@@ -163,3 +163,7 @@ func (m *execMounter) GetFSGroup(pathname string) (int64, error) {
 func (m *execMounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return m.wrappedMounter.GetSELinuxSupport(pathname)
 }
+
+func (m *execMounter) GetMode(pathname string) (os.FileMode, error) {
+	return m.wrappedMounter.GetMode(pathname)
+}

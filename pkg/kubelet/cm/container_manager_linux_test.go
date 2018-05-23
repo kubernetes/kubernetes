@@ -120,6 +120,10 @@ func (mi *fakeMountInterface) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("not implemented")
 }
 
+func (mi *fakeMountInterface) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
+}
+
 func fakeContainerMgrMountInt() mount.Interface {
 	return &fakeMountInterface{
 		[]mount.MountPoint{
