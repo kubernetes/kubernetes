@@ -923,7 +923,10 @@ var validVolumeDownwardAPIFieldPathExpressions = sets.NewString(
 	"metadata.namespace",
 	"metadata.labels",
 	"metadata.annotations",
-	"metadata.uid")
+	"metadata.uid",
+	"spec.nodeName",
+	"spec.serviceAccountName",
+	"status.hostIP")
 
 func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}

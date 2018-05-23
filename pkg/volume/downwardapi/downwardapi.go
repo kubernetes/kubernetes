@@ -237,8 +237,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 			fileProjection.Mode = *defaultMode
 		}
 		if fileInfo.FieldRef != nil {
-			// TODO: unify with Kubelet.podFieldSelectorRuntimeValue
-			if values, err := fieldpath.ExtractFieldPathAsString(pod, fileInfo.FieldRef.FieldPath); err != nil {
+			if values, err := podFieldSelectorRuntimeValue(pod, fileInfo.FieldRef.FieldPath, host); err != nil {
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
 				errlist = append(errlist, err)
 			} else {
@@ -260,6 +259,30 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 		data[fPath] = fileProjection
 	}
 	return data, utilerrors.NewAggregate(errlist)
+}
+
+// TODO: support "status.podIP" once we can get pod ip before first setup volume.
+// podFieldSelectorRuntimeValue extracts the field from the pod
+// and returns it as a string.
+func podFieldSelectorRuntimeValue(pod *v1.Pod, fieldPath string, host volume.VolumeHost) (string, error) {
+	switch fieldPath {
+	case "spec.nodeName":
+		return pod.Spec.NodeName, nil
+	case "spec.serviceAccountName":
+		return pod.Spec.ServiceAccountName, nil
+	case "status.hostIP":
+		if len(pod.Status.HostIP) > 0 {
+			return pod.Status.HostIP, nil
+		}
+		hostIP, err := host.GetHostIP()
+		if err != nil {
+			return "", err
+		}
+		return hostIP.String(), nil
+	}
+
+	// TODO: unify with Kubelet.podFieldSelectorRuntimeValue
+	return fieldpath.ExtractFieldPathAsString(pod, fieldPath)
 }
 
 func (d *downwardAPIVolume) GetPath() string {
