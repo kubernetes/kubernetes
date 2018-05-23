@@ -84,7 +84,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/openapi:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/testing:all-srcs",

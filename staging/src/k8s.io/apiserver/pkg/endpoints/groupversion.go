@@ -24,7 +24,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -78,10 +77,6 @@ type APIGroupVersion struct {
 	// EnableAPIResponseCompression indicates whether API Responses should support compression
 	// if the client requests it via Accept-Encoding
 	EnableAPIResponseCompression bool
-
-	// OpenAPISpecSource is a getter for the entire openapi spec, but the handlers will only be given
-	// access to the GroupVersionKind that they serve requests for
-	OpenAPISpecSource openapi.SpecSource
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
