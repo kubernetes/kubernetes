@@ -55,6 +55,12 @@ const (
 	// this prevents constantly updating the memcg notifier if synchronize
 	// is run frequently.
 	notifierRefreshInterval = 10 * time.Second
+	// OffendingContainersKey is the key in eviction event annotations for the list of container names which exceeded their requests
+	OffendingContainersKey = "offending_containers"
+	// OffendingContainersUsageKey is the key in eviction event annotations for the list of usage of containers which exceeded their requests
+	OffendingContainersUsageKey = "offending_containers_usage"
+	// StarvedResourceKey is the key for the starved resource in eviction event annotations
+	StarvedResourceKey = "starved_resource"
 )
 
 var (
@@ -1053,12 +1059,15 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 	return signalToReclaimFunc
 }
 
-// evictionMessage constructs a useful message about why an eviction occurred
-func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats statsFunc) string {
-	message := fmt.Sprintf(message, resourceToReclaim)
+// evictionMessage constructs a useful message about why an eviction occurred, and annotations to provide metadata about the eviction
+func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats statsFunc) (message string, annotations map[string]string) {
+	annotations = make(map[string]string)
+	message = fmt.Sprintf(message, resourceToReclaim)
+	containers := []string{}
+	containerUsage := []string{}
 	podStats, ok := stats(pod)
 	if !ok {
-		return message
+		return
 	}
 	for _, containerStats := range podStats.Containers {
 		for _, container := range pod.Spec.Containers {
@@ -1077,11 +1086,16 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 				}
 				if usage != nil && usage.Cmp(requests) > 0 {
 					message += fmt.Sprintf(containerMessage, container.Name, usage.String(), requests.String())
+					containers = append(containers, container.Name)
+					containerUsage = append(containerUsage, usage.String())
 				}
 			}
 		}
 	}
-	return message
+	annotations[OffendingContainersKey] = strings.Join(containers, ",")
+	annotations[OffendingContainersUsageKey] = strings.Join(containerUsage, ",")
+	annotations[StarvedResourceKey] = string(resourceToReclaim)
+	return
 }
 
 // thresholdStopCh is a ThresholdStopCh which can only be closed after notifierRefreshInterval time has passed
