@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -75,13 +74,6 @@ type ClientAccessFactory interface {
 	// NewBuilder returns an object that assists in loading objects from both disk and the server
 	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
-
-	// MapBasedSelectorForObject returns the map-based selector associated with the provided object. If a
-	// new set-based selector is provided, an error is returned if the selector cannot be converted to a
-	// map-based selector
-	MapBasedSelectorForObject(object runtime.Object) (string, error)
-	// ProtocolsForObject returns the <port, protocol> mapping associated with the provided object
-	ProtocolsForObject(object runtime.Object) (map[string]string, error)
 
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
@@ -152,16 +144,6 @@ func makePortsString(ports []api.ServicePort, useNodePort bool) string {
 		pieces[ix] = fmt.Sprintf("%s:%d", strings.ToLower(string(ports[ix].Protocol)), port)
 	}
 	return strings.Join(pieces, ",")
-}
-
-func getProtocols(spec api.PodSpec) map[string]string {
-	result := make(map[string]string)
-	for _, container := range spec.Containers {
-		for _, port := range container.Ports {
-			result[strconv.Itoa(int(port.ContainerPort))] = string(port.Protocol)
-		}
-	}
-	return result
 }
 
 // Extracts the protocols exposed by a service from the given service spec.
