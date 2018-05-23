@@ -493,7 +493,7 @@ func TestLookupResult(t *testing.T) {
 		if test.expectedPredicateKeyMiss {
 			predicateKeys := sets.NewString()
 			predicateKeys.Insert(test.predicateKey)
-			ecache.InvalidateCachedPredicateItem(test.nodeName, predicateKeys)
+			ecache.InvalidatePredicatesOnNode(test.nodeName, predicateKeys)
 		}
 		// calculate predicate with equivalence cache
 		result, ok := ecache.lookupResult(test.podName,
@@ -709,7 +709,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 	}
 
 	// invalidate cached predicate for all nodes
-	ecache.InvalidateCachedPredicateItemOfAllNodes(sets.NewString(testPredicate))
+	ecache.InvalidatePredicates(sets.NewString(testPredicate))
 
 	// there should be no cached predicate any more
 	for _, test := range tests {
@@ -782,7 +782,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 
 	for _, test := range tests {
 		// invalidate cached predicate for all nodes
-		ecache.InvalidateAllCachedPredicateItemOfNode(test.nodeName)
+		ecache.InvalidateAllPredicatesOnNode(test.nodeName)
 		if _, exist := ecache.cache[test.nodeName]; exist {
 			t.Errorf("Failed: cached item for node: %v should be invalidated", test.nodeName)
 			break
@@ -857,7 +857,7 @@ func TestEquivalenceCacheInvalidationRace(t *testing.T) {
 		if err := cache.AddPod(pod); err != nil {
 			t.Errorf("Could not add pod to cache: %v", err)
 		}
-		eCache.InvalidateAllCachedPredicateItemOfNode("machine1")
+		eCache.InvalidateAllPredicatesOnNode("machine1")
 		mockCache.cacheInvalidated <- struct{}{}
 	}()
 

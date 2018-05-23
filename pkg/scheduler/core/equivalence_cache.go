@@ -153,22 +153,8 @@ func (ec *EquivalenceCache) lookupResult(
 	return value, ok
 }
 
-// InvalidateCachedPredicateItem marks all items of given predicateKeys, of all pods, on the given node as invalid
-func (ec *EquivalenceCache) InvalidateCachedPredicateItem(nodeName string, predicateKeys sets.String) {
-	if len(predicateKeys) == 0 {
-		return
-	}
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
-	for predicateKey := range predicateKeys {
-		delete(ec.cache[nodeName], predicateKey)
-	}
-	glog.V(5).Infof("Done invalidating cached predicates: %v on node: %s", predicateKeys, nodeName)
-}
-
-// InvalidateCachedPredicateItemOfAllNodes marks all items of given
-// predicateKeys, of all pods, on all node as invalid
-func (ec *EquivalenceCache) InvalidateCachedPredicateItemOfAllNodes(predicateKeys sets.String) {
+// InvalidatePredicates clears all cached results for the given predicates.
+func (ec *EquivalenceCache) InvalidatePredicates(predicateKeys sets.String) {
 	if len(predicateKeys) == 0 {
 		return
 	}
@@ -183,9 +169,21 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemOfAllNodes(predicateKey
 	glog.V(5).Infof("Done invalidating cached predicates: %v on all node", predicateKeys)
 }
 
-// InvalidateAllCachedPredicateItemOfNode marks all cached items on given node
-// as invalid
-func (ec *EquivalenceCache) InvalidateAllCachedPredicateItemOfNode(nodeName string) {
+// InvalidatePredicatesOnNode clears cached results for the given predicates on one node.
+func (ec *EquivalenceCache) InvalidatePredicatesOnNode(nodeName string, predicateKeys sets.String) {
+	if len(predicateKeys) == 0 {
+		return
+	}
+	ec.mu.Lock()
+	defer ec.mu.Unlock()
+	for predicateKey := range predicateKeys {
+		delete(ec.cache[nodeName], predicateKey)
+	}
+	glog.V(5).Infof("Done invalidating cached predicates: %v on node: %s", predicateKeys, nodeName)
+}
+
+// InvalidateAllPredicatesOnNode clears all cached results for one node.
+func (ec *EquivalenceCache) InvalidateAllPredicatesOnNode(nodeName string) {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
 	delete(ec.cache, nodeName)
@@ -194,6 +192,7 @@ func (ec *EquivalenceCache) InvalidateAllCachedPredicateItemOfNode(nodeName stri
 
 // InvalidateCachedPredicateItemForPodAdd is a wrapper of
 // InvalidateCachedPredicateItem for pod add case
+// TODO: This logic does not belong with the equivalence cache implementation.
 func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName string) {
 	// MatchInterPodAffinity: we assume scheduler can make sure newly bound pod
 	// will not break the existing inter pod affinity. So we does not need to
@@ -227,7 +226,7 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 			}
 		}
 	}
-	ec.InvalidateCachedPredicateItem(nodeName, invalidPredicates)
+	ec.InvalidatePredicatesOnNode(nodeName, invalidPredicates)
 }
 
 // EquivalenceClassInfo holds equivalence hash which is used for checking

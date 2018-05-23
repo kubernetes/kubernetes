@@ -410,7 +410,7 @@ func (c *configFactory) invalidatePredicatesForPvUpdate(oldPV, newPV *v1.Persist
 			break
 		}
 	}
-	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+	c.equivalencePodCache.InvalidatePredicates(invalidPredicates)
 }
 
 // isZoneRegionLabel check if given key of label is zone or region label.
@@ -468,7 +468,7 @@ func (c *configFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
 		invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
 	}
 
-	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+	c.equivalencePodCache.InvalidatePredicates(invalidPredicates)
 }
 
 func (c *configFactory) onPvcAdd(obj interface{}) {
@@ -538,7 +538,7 @@ func (c *configFactory) invalidatePredicatesForPvc(pvc *v1.PersistentVolumeClaim
 		// Add/delete impacts the available PVs to choose from
 		invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
 	}
-	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+	c.equivalencePodCache.InvalidatePredicates(invalidPredicates)
 }
 
 func (c *configFactory) invalidatePredicatesForPvcUpdate(old, new *v1.PersistentVolumeClaim) {
@@ -553,12 +553,12 @@ func (c *configFactory) invalidatePredicatesForPvcUpdate(old, new *v1.Persistent
 		invalidPredicates.Insert(maxPDVolumeCountPredicateKeys...)
 	}
 
-	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+	c.equivalencePodCache.InvalidatePredicates(invalidPredicates)
 }
 
 func (c *configFactory) onServiceAdd(obj interface{}) {
 	if c.enableEquivalenceClassCache {
-		c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(serviceAffinitySet)
+		c.equivalencePodCache.InvalidatePredicates(serviceAffinitySet)
 	}
 	c.podQueue.MoveAllToActiveQueue()
 }
@@ -569,7 +569,7 @@ func (c *configFactory) onServiceUpdate(oldObj interface{}, newObj interface{}) 
 		oldService := oldObj.(*v1.Service)
 		newService := newObj.(*v1.Service)
 		if !reflect.DeepEqual(oldService.Spec.Selector, newService.Spec.Selector) {
-			c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(serviceAffinitySet)
+			c.equivalencePodCache.InvalidatePredicates(serviceAffinitySet)
 		}
 	}
 	c.podQueue.MoveAllToActiveQueue()
@@ -577,7 +577,7 @@ func (c *configFactory) onServiceUpdate(oldObj interface{}, newObj interface{}) 
 
 func (c *configFactory) onServiceDelete(obj interface{}) {
 	if c.enableEquivalenceClassCache {
-		c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(serviceAffinitySet)
+		c.equivalencePodCache.InvalidatePredicates(serviceAffinitySet)
 	}
 	c.podQueue.MoveAllToActiveQueue()
 }
@@ -694,13 +694,13 @@ func (c *configFactory) invalidateCachedPredicatesOnUpdatePod(newPod *v1.Pod, ol
 			if !reflect.DeepEqual(oldPod.GetLabels(), newPod.GetLabels()) {
 				// MatchInterPodAffinity need to be reconsidered for this node,
 				// as well as all nodes in its same failure domain.
-				c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(
+				c.equivalencePodCache.InvalidatePredicates(
 					matchInterPodAffinitySet)
 			}
 			// if requested container resource changed, invalidate GeneralPredicates of this node
 			if !reflect.DeepEqual(predicates.GetResourceRequest(newPod),
 				predicates.GetResourceRequest(oldPod)) {
-				c.equivalencePodCache.InvalidateCachedPredicateItem(
+				c.equivalencePodCache.InvalidatePredicatesOnNode(
 					newPod.Spec.NodeName, generalPredicatesSets)
 			}
 		}
@@ -741,14 +741,14 @@ func (c *configFactory) invalidateCachedPredicatesOnDeletePod(pod *v1.Pod) {
 		// MatchInterPodAffinity need to be reconsidered for this node,
 		// as well as all nodes in its same failure domain.
 		// TODO(resouer) can we just do this for nodes in the same failure domain
-		c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(
+		c.equivalencePodCache.InvalidatePredicates(
 			matchInterPodAffinitySet)
 
 		// if this pod have these PV, cached result of disk conflict will become invalid.
 		for _, volume := range pod.Spec.Volumes {
 			if volume.GCEPersistentDisk != nil || volume.AWSElasticBlockStore != nil ||
 				volume.RBD != nil || volume.ISCSI != nil {
-				c.equivalencePodCache.InvalidateCachedPredicateItem(
+				c.equivalencePodCache.InvalidatePredicatesOnNode(
 					pod.Spec.NodeName, noDiskConflictSet)
 			}
 		}
@@ -858,7 +858,7 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 		if newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable {
 			invalidPredicates.Insert(predicates.CheckNodeConditionPred)
 		}
-		c.equivalencePodCache.InvalidateCachedPredicateItem(newNode.GetName(), invalidPredicates)
+		c.equivalencePodCache.InvalidatePredicatesOnNode(newNode.GetName(), invalidPredicates)
 	}
 }
 
@@ -885,7 +885,7 @@ func (c *configFactory) deleteNodeFromCache(obj interface{}) {
 		glog.Errorf("scheduler cache RemoveNode failed: %v", err)
 	}
 	if c.enableEquivalenceClassCache {
-		c.equivalencePodCache.InvalidateAllCachedPredicateItemOfNode(node.GetName())
+		c.equivalencePodCache.InvalidateAllPredicatesOnNode(node.GetName())
 	}
 }
 
@@ -1315,7 +1315,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 						c.schedulerCache.RemoveNode(&node)
 						// invalidate cached predicate for the node
 						if c.enableEquivalenceClassCache {
-							c.equivalencePodCache.InvalidateAllCachedPredicateItemOfNode(nodeName)
+							c.equivalencePodCache.InvalidateAllPredicatesOnNode(nodeName)
 						}
 					}
 				}
