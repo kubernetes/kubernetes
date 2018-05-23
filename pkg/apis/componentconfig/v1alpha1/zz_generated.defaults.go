@@ -28,6 +28,9 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&CloudControllerManagerConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_CloudControllerManagerConfiguration(obj.(*CloudControllerManagerConfiguration))
+	})
 	scheme.AddTypeDefaultingFunc(&KubeControllerManagerConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_KubeControllerManagerConfiguration(obj.(*KubeControllerManagerConfiguration))
 	})
@@ -35,9 +38,18 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	return nil
 }
 
+func SetObjectDefaults_CloudControllerManagerConfiguration(in *CloudControllerManagerConfiguration) {
+	SetDefaults_CloudControllerManagerConfiguration(in)
+	SetDefaults_GenericComponentConfiguration(&in.GenericComponent)
+	SetDefaults_LeaderElectionConfiguration(&in.GenericComponent.LeaderElection)
+	SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
+}
+
 func SetObjectDefaults_KubeControllerManagerConfiguration(in *KubeControllerManagerConfiguration) {
 	SetDefaults_KubeControllerManagerConfiguration(in)
+	SetDefaults_GenericComponentConfiguration(&in.GenericComponent)
 	SetDefaults_LeaderElectionConfiguration(&in.GenericComponent.LeaderElection)
+	SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
 	SetDefaults_VolumeConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration)
 	SetDefaults_PersistentVolumeRecyclerConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration.PersistentVolumeRecyclerConfiguration)
 }
