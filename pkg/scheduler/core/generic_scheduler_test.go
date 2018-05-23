@@ -1367,10 +1367,10 @@ func (c *syncingMockCache) UpdateNodeNameToInfoMap(infoMap map[string]*scheduler
 	return err
 }
 
-// TestEquivalenceCacheInvalidationRace tests that equivalence cache invalidation is correctly
+// TestCacheInvalidationRace tests that equivalence cache invalidation is correctly
 // handled when an invalidation event happens early in a scheduling cycle. Specifically, the event
 // occurs after schedulercache is snapshotted and before equivalence cache lock is acquired.
-func TestEquivalenceCacheInvalidationRace(t *testing.T) {
+func TestCacheInvalidationRace(t *testing.T) {
 	// Create a predicate that returns false the first time and true on subsequent calls.
 	podWillFit := false
 	var callCount int
@@ -1394,7 +1394,7 @@ func TestEquivalenceCacheInvalidationRace(t *testing.T) {
 		cacheInvalidated: make(chan struct{}),
 	}
 
-	eCache := equivalence.NewEquivalenceCache()
+	eCache := equivalence.NewCache()
 	// Ensure that equivalence cache invalidation happens after the scheduling cycle starts, but before
 	// the equivalence cache would be updated.
 	go func() {

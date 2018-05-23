@@ -247,8 +247,8 @@ func TestRunPredicate(t *testing.T) {
 			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1"}}
 			meta := algorithm.EmptyPredicateMetadataProducer(nil, nil)
 
-			ecache := NewEquivalenceCache()
-			equivClass := ecache.GetEquivalenceClassInfo(pod)
+			ecache := NewCache()
+			equivClass := NewClass(pod)
 			if test.expectCacheHit {
 				ecache.updateResult(pod.Name, "testPredicate", test.expectFit, test.expectedReasons, equivClass.hash, test.cache, node)
 			}
@@ -339,7 +339,7 @@ func TestUpdateResult(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ecache := NewEquivalenceCache()
+		ecache := NewCache()
 		if test.expectPredicateMap {
 			ecache.cache[test.nodeName] = make(predicateMap)
 			predicateItem := predicateResult{
@@ -473,7 +473,7 @@ func TestLookupResult(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ecache := NewEquivalenceCache()
+		ecache := NewCache()
 		node := schedulercache.NewNodeInfo()
 		node.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: test.nodeName}})
 		// set cached item to equivalence cache
@@ -527,9 +527,6 @@ func TestLookupResult(t *testing.T) {
 }
 
 func TestGetEquivalenceHash(t *testing.T) {
-
-	ecache := NewEquivalenceCache()
-
 	pod1 := makeBasicPod("pod1")
 	pod2 := makeBasicPod("pod2")
 
@@ -620,7 +617,7 @@ func TestGetEquivalenceHash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			for i, podInfo := range test.podInfoList {
 				testPod := podInfo.pod
-				eclassInfo := ecache.GetEquivalenceClassInfo(testPod)
+				eclassInfo := NewClass(testPod)
 				if eclassInfo == nil && podInfo.hashIsValid {
 					t.Errorf("Failed: pod %v is expected to have valid hash", testPod)
 				}
@@ -688,7 +685,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 	}
-	ecache := NewEquivalenceCache()
+	ecache := NewCache()
 
 	for _, test := range tests {
 		node := schedulercache.NewNodeInfo()
@@ -760,7 +757,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 	}
-	ecache := NewEquivalenceCache()
+	ecache := NewCache()
 
 	for _, test := range tests {
 		node := schedulercache.NewNodeInfo()

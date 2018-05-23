@@ -105,7 +105,7 @@ type Config struct {
 	SchedulerCache schedulercache.Cache
 	// Ecache is used for optimistically invalid affected cache items after
 	// successfully binding a pod
-	Ecache     *equivalence.EquivalenceCache
+	Ecache     *equivalence.Cache
 	NodeLister algorithm.NodeLister
 	Algorithm  algorithm.ScheduleAlgorithm
 	GetBinder  func(pod *v1.Pod) Binder

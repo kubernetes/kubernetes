@@ -124,7 +124,7 @@ type configFactory struct {
 	hardPodAffinitySymmetricWeight int32
 
 	// Equivalence class cache
-	equivalencePodCache *equivalence.EquivalenceCache
+	equivalencePodCache *equivalence.Cache
 
 	// Enable equivalence class cache
 	enableEquivalenceClassCache bool
@@ -1075,7 +1075,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 	// Init equivalence class cache
 	if c.enableEquivalenceClassCache {
-		c.equivalencePodCache = equivalence.NewEquivalenceCache()
+		c.equivalencePodCache = equivalence.NewCache()
 		glog.Info("Created equivalence class cache")
 	}
 

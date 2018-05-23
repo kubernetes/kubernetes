@@ -86,7 +86,7 @@ func (f *FitError) Error() string {
 
 type genericScheduler struct {
 	cache                    schedulercache.Cache
-	equivalenceCache         *equivalence.EquivalenceCache
+	equivalenceCache         *equivalence.Cache
 	schedulingQueue          SchedulingQueue
 	predicates               map[string]algorithm.FitPredicate
 	priorityMetaProducer     algorithm.PriorityMetadataProducer
@@ -343,10 +343,10 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		// We can use the same metadata producer for all nodes.
 		meta := g.predicateMetaProducer(pod, g.cachedNodeInfoMap)
 
-		var equivCacheInfo *equivalence.EquivalenceClassInfo
+		var equivClass *equivalence.Class
 		if g.equivalenceCache != nil {
 			// getEquivalenceClassInfo will return immediately if no equivalence pod found
-			equivCacheInfo = g.equivalenceCache.GetEquivalenceClassInfo(pod)
+			equivClass = equivalence.NewClass(pod)
 		}
 
 		checkNode := func(i int) {
@@ -360,7 +360,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 				g.equivalenceCache,
 				g.schedulingQueue,
 				g.alwaysCheckAllPredicates,
-				equivCacheInfo,
+				equivClass,
 			)
 			if err != nil {
 				predicateResultLock.Lock()
@@ -460,10 +460,10 @@ func podFitsOnNode(
 	info *schedulercache.NodeInfo,
 	predicateFuncs map[string]algorithm.FitPredicate,
 	cache schedulercache.Cache,
-	ecache *equivalence.EquivalenceCache,
+	ecache *equivalence.Cache,
 	queue SchedulingQueue,
 	alwaysCheckAllPredicates bool,
-	equivCacheInfo *equivalence.EquivalenceClassInfo,
+	equivClass *equivalence.Class,
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	var (
 		eCacheAvailable  bool
@@ -500,7 +500,7 @@ func podFitsOnNode(
 		// Bypass eCache if node has any nominated pods.
 		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
 		// when pods are nominated or their nominations change.
-		eCacheAvailable = equivCacheInfo != nil && !podsAdded
+		eCacheAvailable = equivClass != nil && !podsAdded
 		for _, predicateKey := range predicates.Ordering() {
 			var (
 				fit     bool
@@ -510,7 +510,7 @@ func podFitsOnNode(
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				if eCacheAvailable {
-					fit, reasons, err = ecache.RunPredicate(predicate, predicateKey, pod, metaToUse, nodeInfoToUse, equivCacheInfo, cache)
+					fit, reasons, err = ecache.RunPredicate(predicate, predicateKey, pod, metaToUse, nodeInfoToUse, equivClass, cache)
 				} else {
 					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
 				}
@@ -1057,7 +1057,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
 	cache schedulercache.Cache,
-	eCache *equivalence.EquivalenceCache,
+	eCache *equivalence.Cache,
 	podQueue SchedulingQueue,
 	predicates map[string]algorithm.FitPredicate,
 	predicateMetaProducer algorithm.PredicateMetadataProducer,
