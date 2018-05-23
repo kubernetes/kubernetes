@@ -9,7 +9,6 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
-        "equivalence_cache_test.go",
         "extender_test.go",
         "generic_scheduler_test.go",
         "scheduling_queue_test.go",
@@ -22,6 +21,7 @@ go_test(
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/cache:go_default_library",
+        "//pkg/scheduler/core/equivalence:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
@@ -38,7 +38,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "equivalence_cache.go",
         "extender.go",
         "generic_scheduler.go",
         "scheduling_queue.go",
@@ -51,10 +50,10 @@ go_library(
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/cache:go_default_library",
+        "//pkg/scheduler/core/equivalence:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
-        "//pkg/util/hash:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
@@ -80,6 +79,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/scheduler/core/equivalence:all-srcs",
+    ],
     tags = ["automanaged"],
 )
