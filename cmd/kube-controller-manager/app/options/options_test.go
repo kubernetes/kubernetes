@@ -102,7 +102,6 @@ func TestAddFlags(t *testing.T) {
 		"--resource-quota-sync-period=10m",
 		"--route-reconciliation-period=30s",
 		"--secondary-node-eviction-rate=0.05",
-		"--service-account-private-key-file=/service-account-private-key",
 		"--terminated-pod-gc-threshold=12000",
 		"--unhealthy-zone-threshold=0.6",
 		"--use-service-account-credentials=true",
@@ -150,7 +149,6 @@ func TestAddFlags(t *testing.T) {
 				AllocateNodeCIDRs:            true,
 				CIDRAllocatorType:            "CloudAllocator",
 				ConfigureCloudRoutes:         false,
-				ServiceAccountKeyFile:        "/service-account-private-key",
 			},
 			AttachDetachController: &cmoptions.AttachDetachControllerOptions{
 				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
