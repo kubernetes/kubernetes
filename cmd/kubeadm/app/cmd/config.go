@@ -274,7 +274,7 @@ func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg 
 	return uploadconfig.UploadConfiguration(internalcfg, client)
 }
 
-// NewCmdConfigImages returns the "config images" command
+// NewCmdConfigImages returns the "kubeadm config images" command
 func NewCmdConfigImages(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "images",
@@ -286,12 +286,13 @@ func NewCmdConfigImages(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// NewCmdConfigImagesPull returns the `config images pull` command
+// NewCmdConfigImagesPull returns the `kubeadm config images pull` command
 func NewCmdConfigImagesPull() *cobra.Command {
 	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 	var cfgPath, featureGatesString string
 	var err error
+
 	cmd := &cobra.Command{
 		Use:   "pull",
 		Short: "Pull images used by kubeadm.",
@@ -306,7 +307,9 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			kubeadmutil.CheckErr(imagesPull.PullAll())
 		},
 	}
-	AddImagesCommonConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
+	AddImagesCommonConfigFlags(cmd.PersistentFlags(), cfg, &cfgPath, &featureGatesString)
+	AddImagesPullFlags(cmd.PersistentFlags(), cfg)
+
 	return cmd
 }
 
@@ -316,7 +319,7 @@ type ImagesPull struct {
 	images []string
 }
 
-// NewImagesPull initializes and returns the `config images pull` command
+// NewImagesPull initializes and returns the `kubeadm config images pull` command
 func NewImagesPull(puller images.Puller, images []string) *ImagesPull {
 	return &ImagesPull{
 		puller: puller,
@@ -353,8 +356,7 @@ func NewCmdConfigImagesList(out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(imagesList.Run(out))
 		},
 	}
-	AddImagesCommonConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddImagesListFlags(cmd.PersistentFlags(), &cfgPath)
+	AddImagesCommonConfigFlags(cmd.PersistentFlags(), cfg, &cfgPath, &featureGatesString)
 
 	return cmd
 }
@@ -387,21 +389,17 @@ func (i *ImagesList) Run(out io.Writer) error {
 }
 
 // AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
-func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterConfiguration, featureGatesString *string) {
+func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterConfiguration, cfgPath *string, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane.`,
 	)
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
-}
-
-// AddImagesListFlags adds the flag that defines the location of the config file
-func AddImagesListFlags(flagSet *flag.FlagSet, cfgPath *string) {
 	flagSet.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file.")
 }
 
-// AddImagesPullFlags adds flags related to the `config images pull` command
-func AddImagesPullFlags(flagSet *flag.FlagSet, criSocketPath *string) {
-	flagSet.StringVar(criSocketPath, "cri-socket-path", *criSocketPath, "Path to the CRI socket.")
+// AddImagesPullFlags adds flags related to the `kubeadm config images pull` command
+func AddImagesPullFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterConfiguration) {
+	flagSet.StringVar(&cfg.CRISocket, "cri-socket-path", cfg.CRISocket, "Path to the CRI socket.")
 }
