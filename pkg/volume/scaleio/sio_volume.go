@@ -252,7 +252,7 @@ func (v *sioVolume) Delete() error {
 // ************************
 var _ volume.Provisioner = &sioVolume{}
 
-func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
+func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.TopologySelectorTerm) (*api.PersistentVolume, error) {
 	glog.V(4).Info(log("attempting to dynamically provision pvc %v", v.options.PVC.Name))
 
 	if !util.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {

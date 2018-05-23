@@ -384,6 +384,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informers.Storage().V1().StorageClasses(),
 		PodInformer:               informers.Core().V1().Pods(),
+		NodeInformer:              informers.Core().V1().Nodes(),
 		EnableDynamicProvisioning: true,
 	}
 	ctrl, err := persistentvolume.NewController(params)
