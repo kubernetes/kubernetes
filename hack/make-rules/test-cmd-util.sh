@@ -3828,6 +3828,12 @@ run_clusterroles_tests() {
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
 
+  # test `kubectl set subject clusterrolebinding --all`
+  kubectl set subject "${kube_flags[@]}" clusterrolebinding --all --user=test-all-user
+  kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:foo:test-all-user:'
+  kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
+  kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'
+
   # test `kubectl create rolebinding`
   # test `kubectl set subject rolebinding`
   kubectl create "${kube_flags[@]}" rolebinding admin --clusterrole=admin --user=default-admin
@@ -3848,6 +3854,12 @@ run_clusterroles_tests() {
   kubectl set subject "${kube_flags[@]}" rolebinding sarole --serviceaccount=otherfoo:foo
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
+
+  # test `kubectl set subject rolebinding --all`
+  kubectl set subject "${kube_flags[@]}" rolebinding --all --user=test-all-user
+  kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:foo:test-all-user:'
+  kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
+  kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'
 
   set +o nounset
   set +o errexit

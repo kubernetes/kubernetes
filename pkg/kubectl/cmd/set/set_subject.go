@@ -262,7 +262,9 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		return o.PrintObj(actual, o.Out)
+		if err := o.PrintObj(actual, o.Out); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
