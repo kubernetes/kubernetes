@@ -88,7 +88,7 @@ func TestAssumePV(t *testing.T) {
 
 		// Add oldPV to cache
 		internal_cache.add(scenario.oldPV)
-		if err := getPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
+		if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
 			t.Errorf("Failed to GetPV() after initial update: %v", err)
 			continue
 		}
@@ -107,7 +107,7 @@ func TestAssumePV(t *testing.T) {
 		if !scenario.shouldSucceed {
 			expectedPV = scenario.oldPV
 		}
-		if err := getPV(cache, scenario.oldPV.Name, expectedPV); err != nil {
+		if err := verifyPV(cache, scenario.oldPV.Name, expectedPV); err != nil {
 			t.Errorf("Failed to GetPV() after initial update: %v", err)
 		}
 	}
@@ -128,13 +128,13 @@ func TestRestorePV(t *testing.T) {
 
 	// Add oldPV to cache
 	internal_cache.add(oldPV)
-	if err := getPV(cache, oldPV.Name, oldPV); err != nil {
+	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
 		t.Fatalf("Failed to GetPV() after initial update: %v", err)
 	}
 
 	// Restore PV
 	cache.Restore(oldPV.Name)
-	if err := getPV(cache, oldPV.Name, oldPV); err != nil {
+	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
 		t.Fatalf("Failed to GetPV() after iniital restore: %v", err)
 	}
 
@@ -142,13 +142,13 @@ func TestRestorePV(t *testing.T) {
 	if err := cache.Assume(newPV); err != nil {
 		t.Fatalf("Assume() returned error %v", err)
 	}
-	if err := getPV(cache, oldPV.Name, newPV); err != nil {
+	if err := verifyPV(cache, oldPV.Name, newPV); err != nil {
 		t.Fatalf("Failed to GetPV() after Assume: %v", err)
 	}
 
 	// Restore PV
 	cache.Restore(oldPV.Name)
-	if err := getPV(cache, oldPV.Name, oldPV); err != nil {
+	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
 		t.Fatalf("Failed to GetPV() after restore: %v", err)
 	}
 }
@@ -243,6 +243,39 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	verifyListPVs(t, cache, pvs2, "class2")
 }
 
+func TestAssumeUpdatePVCache(t *testing.T) {
+	cache := NewPVAssumeCache(nil)
+	internal_cache, ok := cache.(*pvAssumeCache)
+	if !ok {
+		t.Fatalf("Failed to get internal cache")
+	}
+
+	pvName := "test-pv0"
+
+	// Add a PV
+	pv := makePV(pvName, "1", "")
+	internal_cache.add(pv)
+	if err := verifyPV(cache, pvName, pv); err != nil {
+		t.Fatalf("failed to get PV: %v", err)
+	}
+
+	// Assume PV
+	newPV := pv.DeepCopy()
+	newPV.Spec.ClaimRef = &v1.ObjectReference{Name: "test-claim"}
+	if err := cache.Assume(newPV); err != nil {
+		t.Fatalf("failed to assume PV: %v", err)
+	}
+	if err := verifyPV(cache, pvName, newPV); err != nil {
+		t.Fatalf("failed to get PV after assume: %v", err)
+	}
+
+	// Add old PV
+	internal_cache.add(pv)
+	if err := verifyPV(cache, pvName, newPV); err != nil {
+		t.Fatalf("failed to get PV after old PV added: %v", err)
+	}
+}
+
 func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
 	pvList := cache.ListPVs(storageClassName)
 	if len(pvList) != len(expectedPVs) {
@@ -259,7 +292,7 @@ func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1
 	}
 }
 
-func getPV(cache PVAssumeCache, name string, expectedPV *v1.PersistentVolume) error {
+func verifyPV(cache PVAssumeCache, name string, expectedPV *v1.PersistentVolume) error {
 	pv, err := cache.GetPV(name)
 	if err != nil {
 		return err

@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 	"strings"
 
@@ -28,11 +27,11 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
@@ -40,9 +39,8 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -102,8 +100,8 @@ var (
 
 // NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.NodeConfiguration{}
-	legacyscheme.Scheme.Default(cfg)
+	cfg := &kubeadmapiv1alpha2.NodeConfiguration{}
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var skipPreFlight bool
 	var cfgPath string
@@ -115,9 +113,8 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
-			j, err := NewValidJoin(cfg, args, skipPreFlight, cfgPath, featureGatesString, ignorePreflightErrors)
+			j, err := NewValidJoin(cmd.PersistentFlags(), cfg, args, skipPreFlight, cfgPath, featureGatesString, ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(j.Validate(cmd))
 			kubeadmutil.CheckErr(j.Run(out))
 		},
 	}
@@ -129,7 +126,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 }
 
 // NewValidJoin validates the command line that are passed to the cobra command
-func NewValidJoin(cfg *kubeadmapiext.NodeConfiguration, args []string, skipPreFlight bool, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
+func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.NodeConfiguration, args []string, skipPreFlight bool, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
 	cfg.DiscoveryTokenAPIServers = args
 
 	var err error
@@ -137,20 +134,20 @@ func NewValidJoin(cfg *kubeadmapiext.NodeConfiguration, args []string, skipPreFl
 		return nil, err
 	}
 
-	legacyscheme.Scheme.Default(cfg)
-	internalcfg := &kubeadmapi.NodeConfiguration{}
-	legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
+	if err := validation.ValidateMixedArguments(flagSet); err != nil {
+		return nil, err
+	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewJoin(cfgPath, args, internalcfg, ignorePreflightErrorsSet)
+	return NewJoin(cfgPath, args, cfg, ignorePreflightErrorsSet)
 }
 
 // AddJoinConfigFlags adds join flags bound to the config to the specified flagset
-func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfiguration, featureGatesString *string) {
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.NodeConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.DiscoveryFile, "discovery-file", "",
 		"A file or url from which to load cluster information.")
@@ -205,31 +202,23 @@ type Join struct {
 }
 
 // NewJoin instantiates Join struct with given arguments
-func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, ignorePreflightErrors sets.String) (*Join, error) {
+func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1alpha2.NodeConfiguration, ignorePreflightErrors sets.String) (*Join, error) {
 
-	if cfg.NodeName == "" {
+	if defaultcfg.NodeName == "" {
 		glog.V(1).Infoln("[join] found NodeName empty")
 		glog.V(1).Infoln("[join] considered OS hostname as NodeName")
-		cfg.NodeName = nodeutil.GetHostname("")
 	}
 
-	if cfgPath != "" {
-		glog.V(1).Infoln("[join] reading configuration from", cfgPath)
-		b, err := ioutil.ReadFile(cfgPath)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
-		}
-		glog.V(1).Infoln("[join] decoding configuration information")
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
-			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
-		}
+	internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
+	if err != nil {
+		return nil, err
 	}
 
 	glog.Infoln("[preflight] running pre-flight checks")
 
 	// Then continue with the others...
 	glog.V(1).Infoln("[preflight] running various checks on all nodes")
-	if err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
+	if err := preflight.RunJoinNodeChecks(utilsexec.New(), internalcfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
 
@@ -237,15 +226,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, i
 	glog.V(1).Infoln("[preflight] starting kubelet service if it's inactive")
 	preflight.TryStartKubelet(ignorePreflightErrors)
 
-	return &Join{cfg: cfg}, nil
-}
-
-// Validate validates mixed arguments passed to cobra.Command
-func (j *Join) Validate(cmd *cobra.Command) error {
-	if err := validation.ValidateMixedArguments(cmd.PersistentFlags()); err != nil {
-		return err
-	}
-	return validation.ValidateNodeConfiguration(j.cfg).ToAggregate()
+	return &Join{cfg: internalcfg}, nil
 }
 
 // Run executes worker node provisioning and tries to join an existing cluster.
@@ -271,10 +252,28 @@ func (j *Join) Run(out io.Writer) error {
 		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	glog.V(1).Infoln("[join] consuming base kubelet configuration")
+	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
+	if err != nil {
+		return err
+	}
+
+	// Write the configuration for the kubelet down to disk so the kubelet can start
+	if err := kubeletphase.DownloadConfig(kubeconfigFile, kubeletVersion); err != nil {
+		return err
+	}
+
+	// Now the kubelet will perform the TLS Bootstrap, transforming bootstrap-kubeconfig.conf to kubeconfig.conf in /etc/kubernetes
+
+	// NOTE: the "--dynamic-config-dir" flag should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf for this to work
+	// This feature is disabled by default, as it is alpha still
+	glog.V(1).Infoln("[join] enabling dynamic kubelet configuration")
 	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		if err := kubeletphase.ConsumeBaseKubeletConfiguration(j.cfg.NodeName); err != nil {
+		client, err := kubeletphase.GetLocalNodeTLSBootstrappedClient()
+		if err != nil {
+			return err
+		}
+
+		if err := kubeletphase.EnableDynamicConfigForNode(client, j.cfg.NodeName, kubeletVersion); err != nil {
 			return fmt.Errorf("error consuming base kubelet configuration: %v", err)
 		}
 	}

@@ -21,9 +21,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
 type FileNameFlags struct {
@@ -72,9 +73,10 @@ type DeleteFlags struct {
 	Output         *string
 }
 
-func (f *DeleteFlags) ToOptions(streams genericclioptions.IOStreams) *DeleteOptions {
+func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericclioptions.IOStreams) *DeleteOptions {
 	options := &DeleteOptions{
-		IOStreams: streams,
+		DynamicClient: dynamicClient,
+		IOStreams:     streams,
 	}
 
 	// add filename options

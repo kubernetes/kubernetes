@@ -17,66 +17,19 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
-	"sort"
 	"strings"
 	"testing"
-	"time"
 
-	"k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/watch"
-	manualfake "k8s.io/client-go/rest/fake"
-	"k8s.io/client-go/restmapper"
-	testcore "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
-func TestPortsForObject(t *testing.T) {
-	f := NewFactory(NewTestConfigFlags())
-
-	pod := &api.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Ports: []api.ContainerPort{
-						{
-							ContainerPort: 101,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	expected := sets.NewString("101")
-	ports, err := f.PortsForObject(pod)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	got := sets.NewString(ports...)
-
-	if !expected.Equal(got) {
-		t.Fatalf("Ports mismatch! Expected %v, got %v", expected, got)
-	}
-}
-
 func TestProtocolsForObject(t *testing.T) {
-	f := NewFactory(NewTestConfigFlags())
+	f := NewFactory(genericclioptions.NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -113,59 +66,8 @@ func TestProtocolsForObject(t *testing.T) {
 	}
 }
 
-func TestLabelsForObject(t *testing.T) {
-	f := NewFactory(NewTestConfigFlags())
-
-	tests := []struct {
-		name     string
-		object   runtime.Object
-		expected string
-		err      error
-	}{
-		{
-			name: "successful re-use of labels",
-			object: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
-				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
-			},
-			expected: "svc=test",
-			err:      nil,
-		},
-		{
-			name: "empty labels",
-			object: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
-				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
-			},
-			expected: "",
-			err:      nil,
-		},
-		{
-			name: "nil labels",
-			object: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
-				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
-			},
-			expected: "",
-			err:      nil,
-		},
-	}
-
-	for _, test := range tests {
-		gotLabels, err := f.LabelsForObject(test.object)
-		if err != test.err {
-			t.Fatalf("%s: Error mismatch: Expected %v, got %v", test.name, test.err, err)
-		}
-		got := kubectl.MakeLabels(gotLabels)
-		if test.expected != got {
-			t.Fatalf("%s: Labels mismatch! Expected %s, got %s", test.name, test.expected, got)
-		}
-
-	}
-}
-
 func TestCanBeExposed(t *testing.T) {
-	factory := NewFactory(NewTestConfigFlags())
+	factory := NewFactory(genericclioptions.NewTestConfigFlags())
 	tests := []struct {
 		kind      schema.GroupKind
 		expectErr bool
@@ -187,200 +89,6 @@ func TestCanBeExposed(t *testing.T) {
 		}
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
-		}
-	}
-}
-
-func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *api.PodList {
-	pods := []api.Pod{}
-	for i := 0; i < count; i++ {
-		newPod := api.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              fmt.Sprintf("pod-%d", i+1),
-				Namespace:         metav1.NamespaceDefault,
-				CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, i, 0, time.UTC),
-				Labels:            labels,
-			},
-			Status: api.PodStatus{
-				Conditions: []api.PodCondition{
-					{
-						Status: api.ConditionTrue,
-						Type:   api.PodReady,
-					},
-				},
-			},
-		}
-		pods = append(pods, newPod)
-	}
-	if isUnready > -1 && isUnready < count {
-		pods[isUnready].Status.Conditions[0].Status = api.ConditionFalse
-	}
-	if isUnhealthy > -1 && isUnhealthy < count {
-		pods[isUnhealthy].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 5}}
-	}
-	return &api.PodList{
-		Items: pods,
-	}
-}
-
-func TestGetFirstPod(t *testing.T) {
-	labelSet := map[string]string{"test": "selector"}
-	tests := []struct {
-		name string
-
-		podList  *api.PodList
-		watching []watch.Event
-		sortBy   func([]*v1.Pod) sort.Interface
-
-		expected    *api.Pod
-		expectedNum int
-		expectedErr bool
-	}{
-		{
-			name:    "kubectl logs - two ready pods",
-			podList: newPodList(2, -1, -1, labelSet),
-			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
-			expected: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "pod-1",
-					Namespace:         metav1.NamespaceDefault,
-					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
-					Labels:            map[string]string{"test": "selector"},
-				},
-				Status: api.PodStatus{
-					Conditions: []api.PodCondition{
-						{
-							Status: api.ConditionTrue,
-							Type:   api.PodReady,
-						},
-					},
-				},
-			},
-			expectedNum: 2,
-		},
-		{
-			name:    "kubectl logs - one unhealthy, one healthy",
-			podList: newPodList(2, -1, 1, labelSet),
-			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
-			expected: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "pod-2",
-					Namespace:         metav1.NamespaceDefault,
-					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
-					Labels:            map[string]string{"test": "selector"},
-				},
-				Status: api.PodStatus{
-					Conditions: []api.PodCondition{
-						{
-							Status: api.ConditionTrue,
-							Type:   api.PodReady,
-						},
-					},
-					ContainerStatuses: []api.ContainerStatus{{RestartCount: 5}},
-				},
-			},
-			expectedNum: 2,
-		},
-		{
-			name:    "kubectl attach - two ready pods",
-			podList: newPodList(2, -1, -1, labelSet),
-			sortBy:  func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
-			expected: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "pod-1",
-					Namespace:         metav1.NamespaceDefault,
-					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
-					Labels:            map[string]string{"test": "selector"},
-				},
-				Status: api.PodStatus{
-					Conditions: []api.PodCondition{
-						{
-							Status: api.ConditionTrue,
-							Type:   api.PodReady,
-						},
-					},
-				},
-			},
-			expectedNum: 2,
-		},
-		{
-			name:    "kubectl attach - wait for ready pod",
-			podList: newPodList(1, 1, -1, labelSet),
-			watching: []watch.Event{
-				{
-					Type: watch.Modified,
-					Object: &api.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "pod-1",
-							Namespace:         metav1.NamespaceDefault,
-							CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
-							Labels:            map[string]string{"test": "selector"},
-						},
-						Status: api.PodStatus{
-							Conditions: []api.PodCondition{
-								{
-									Status: api.ConditionTrue,
-									Type:   api.PodReady,
-								},
-							},
-						},
-					},
-				},
-			},
-			sortBy: func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
-			expected: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "pod-1",
-					Namespace:         metav1.NamespaceDefault,
-					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
-					Labels:            map[string]string{"test": "selector"},
-				},
-				Status: api.PodStatus{
-					Conditions: []api.PodCondition{
-						{
-							Status: api.ConditionTrue,
-							Type:   api.PodReady,
-						},
-					},
-				},
-			},
-			expectedNum: 1,
-		},
-	}
-
-	for i := range tests {
-		test := tests[i]
-		fake := fake.NewSimpleClientset(test.podList)
-		if len(test.watching) > 0 {
-			watcher := watch.NewFake()
-			for _, event := range test.watching {
-				switch event.Type {
-				case watch.Added:
-					go watcher.Add(event.Object)
-				case watch.Modified:
-					go watcher.Modify(event.Object)
-				}
-			}
-			fake.PrependWatchReactor("pods", testcore.DefaultWatchReactor(watcher, nil))
-		}
-		selector := labels.Set(labelSet).AsSelector()
-
-		pod, numPods, err := GetFirstPod(fake.Core(), metav1.NamespaceDefault, selector.String(), 1*time.Minute, test.sortBy)
-		pod.Spec.SecurityContext = nil
-		if !test.expectedErr && err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-			continue
-		}
-		if test.expectedErr && err == nil {
-			t.Errorf("%s: expected an error", test.name)
-			continue
-		}
-		if test.expectedNum != numPods {
-			t.Errorf("%s: expected %d pods, got %d", test.name, test.expectedNum, numPods)
-			continue
-		}
-		if !apiequality.Semantic.DeepEqual(test.expected, pod) {
-			t.Errorf("%s:\nexpected pod:\n%#v\ngot:\n%#v\n\n", test.name, test.expected, pod)
 		}
 	}
 }
@@ -437,47 +145,6 @@ func TestMakePortsString(t *testing.T) {
 		output := makePortsString(test.ports, test.useNodePort)
 		if output != test.expectedOutput {
 			t.Errorf("expected: %s, saw: %s.", test.expectedOutput, output)
-		}
-	}
-}
-
-func fakeClient() resource.FakeClientFunc {
-	return func(version schema.GroupVersion) (resource.RESTClient, error) {
-		return &manualfake.RESTClient{}, nil
-	}
-}
-
-func TestDiscoveryReplaceAliases(t *testing.T) {
-	tests := []struct {
-		name     string
-		arg      string
-		expected string
-	}{
-		{
-			name:     "no-replacement",
-			arg:      "service",
-			expected: "service",
-		},
-		{
-			name:     "all-replacement",
-			arg:      "all",
-			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions",
-		},
-		{
-			name:     "alias-in-comma-separated-arg",
-			arg:      "all,secrets",
-			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions,secrets",
-		},
-	}
-
-	ds := &fakeDiscoveryClient{}
-	mapper := restmapper.NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
-	b := resource.NewFakeBuilder(fakeClient(), mapper, categories.LegacyCategoryExpander)
-
-	for _, test := range tests {
-		replaced := b.ReplaceAliases(test.arg)
-		if replaced != test.expected {
-			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
 		}
 	}
 }

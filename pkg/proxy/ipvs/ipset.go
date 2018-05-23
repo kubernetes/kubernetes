@@ -21,6 +21,7 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
+	"fmt"
 	"github.com/golang/glog"
 )
 
@@ -28,41 +29,41 @@ const (
 	// MinIPSetCheckVersion is the min ipset version we need.  IPv6 is supported in ipset 6.x
 	MinIPSetCheckVersion = "6.0"
 
-	// KubeLoopBackIPSet is used to store endpoints dst ip:port, source ip for solving hairpin purpose.
-	KubeLoopBackIPSet = "KUBE-LOOP-BACK"
+	kubeLoopBackIPSetComment = "Kubernetes endpoints dst ip:port, source ip for solving hairpin purpose"
+	kubeLoopBackIPSet        = "KUBE-LOOP-BACK"
 
-	// KubeClusterIPSet is used to store service cluster ip + port for masquerade purpose.
-	KubeClusterIPSet = "KUBE-CLUSTER-IP"
+	kubeClusterIPSetComment = "Kubernetes service cluster ip + port for masquerade purpose"
+	kubeClusterIPSet        = "KUBE-CLUSTER-IP"
 
-	// KubeExternalIPSet is used to store service external ip + port for masquerade and filter purpose.
-	KubeExternalIPSet = "KUBE-EXTERNAL-IP"
+	kubeExternalIPSetComment = "Kubernetes service external ip + port for masquerade and filter purpose"
+	kubeExternalIPSet        = "KUBE-EXTERNAL-IP"
 
-	// KubeLoadBalancerSet is used to store service load balancer ingress ip + port, it is the service lb portal.
-	KubeLoadBalancerSet = "KUBE-LOAD-BALANCER"
+	kubeLoadBalancerSetComment = "Kubernetes service lb portal"
+	kubeLoadBalancerSet        = "KUBE-LOAD-BALANCER"
 
-	// KubeLoadBalancerLocalSet is used to store service load balancer ingress ip + port with externalTrafficPolicy=local.
-	KubeLoadBalancerLocalSet = "KUBE-LOAD-BALANCER-LOCAL"
+	kubeLoadBalancerLocalSetComment = "Kubernetes service load balancer ip + port with externalTrafficPolicy=local"
+	kubeLoadBalancerLocalSet        = "KUBE-LOAD-BALANCER-LOCAL"
 
-	// KubeLoadbalancerFWSet is used to store service load balancer ingress ip + port for load balancer with sourceRange.
-	KubeLoadbalancerFWSet = "KUBE-LOAD-BALANCER-FW"
+	kubeLoadbalancerFWSetComment = "Kubernetes service load balancer ip + port for load balancer with sourceRange"
+	kubeLoadbalancerFWSet        = "KUBE-LOAD-BALANCER-FW"
 
-	// KubeLoadBalancerSourceIPSet is used to store service load balancer ingress ip + port + source IP for packet filter purpose.
-	KubeLoadBalancerSourceIPSet = "KUBE-LOAD-BALANCER-SOURCE-IP"
+	kubeLoadBalancerSourceIPSetComment = "Kubernetes service load balancer ip + port + source IP for packet filter purpose"
+	kubeLoadBalancerSourceIPSet        = "KUBE-LOAD-BALANCER-SOURCE-IP"
 
-	// KubeLoadBalancerSourceCIDRSet is used to store service load balancer ingress ip + port + source cidr for packet filter purpose.
-	KubeLoadBalancerSourceCIDRSet = "KUBE-LOAD-BALANCER-SOURCE-CIDR"
+	kubeLoadBalancerSourceCIDRSetComment = "Kubernetes service load balancer ip + port + source cidr for packet filter purpose"
+	kubeLoadBalancerSourceCIDRSet        = "KUBE-LOAD-BALANCER-SOURCE-CIDR"
 
-	// KubeNodePortSetTCP is used to store the nodeport TCP port for masquerade purpose.
-	KubeNodePortSetTCP = "KUBE-NODE-PORT-TCP"
+	kubeNodePortSetTCPComment = "Kubernetes nodeport TCP port for masquerade purpose"
+	kubeNodePortSetTCP        = "KUBE-NODE-PORT-TCP"
 
-	// KubeNodePortLocalSetTCP is used to store the nodeport TCP port with externalTrafficPolicy=local.
-	KubeNodePortLocalSetTCP = "KUBE-NODE-PORT-LOCAL-TCP"
+	kubeNodePortLocalSetTCPComment = "Kubernetes nodeport TCP port with externalTrafficPolicy=local"
+	kubeNodePortLocalSetTCP        = "KUBE-NODE-PORT-LOCAL-TCP"
 
-	// KubeNodePortSetUDP is used to store the nodeport UDP port for masquerade purpose.
-	KubeNodePortSetUDP = "KUBE-NODE-PORT-UDP"
+	kubeNodePortSetUDPComment = "Kubernetes nodeport UDP port for masquerade purpose"
+	kubeNodePortSetUDP        = "KUBE-NODE-PORT-UDP"
 
-	// KubeNodePortLocalSetUDP is used to store the nodeport UDP port with externalTrafficPolicy=local.
-	KubeNodePortLocalSetUDP = "KUBE-NODE-PORT-LOCAL-UDP"
+	kubeNodePortLocalSetUDPComment = "Kubernetes nodeport UDP port with externalTrafficPolicy=local"
+	kubeNodePortLocalSetUDP        = "KUBE-NODE-PORT-LOCAL-UDP"
 )
 
 // IPSetVersioner can query the current ipset version.
@@ -81,7 +82,7 @@ type IPSet struct {
 }
 
 // NewIPSet initialize a new IPSet struct
-func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, isIPv6 bool) *IPSet {
+func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, isIPv6 bool, comment string) *IPSet {
 	hashFamily := utilipset.ProtocolFamilyIPV4
 	if isIPv6 {
 		hashFamily = utilipset.ProtocolFamilyIPV6
@@ -91,6 +92,7 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 			Name:       name,
 			SetType:    setType,
 			HashFamily: hashFamily,
+			Comment:    comment,
 		},
 		activeEntries: sets.NewString(),
 		handle:        handle,
@@ -104,6 +106,10 @@ func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
 
 func (set *IPSet) isEmpty() bool {
 	return len(set.activeEntries.UnsortedList()) == 0
+}
+
+func (set *IPSet) getComment() string {
+	return fmt.Sprintf("\"%s\"", set.Comment)
 }
 
 func (set *IPSet) resetEntries() {
@@ -145,12 +151,10 @@ func (set *IPSet) syncIPSetEntries() {
 	}
 }
 
-func ensureIPSets(ipSets ...*IPSet) error {
-	for _, set := range ipSets {
-		if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
-			glog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
-			return err
-		}
+func ensureIPSet(set *IPSet) error {
+	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
+		glog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
+		return err
 	}
 	return nil
 }

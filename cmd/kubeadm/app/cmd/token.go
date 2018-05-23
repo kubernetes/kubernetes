@@ -35,8 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -46,9 +48,10 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
+
+const defaultKubeConfig = "/etc/kubernetes/admin.conf"
 
 // NewCmdToken returns cobra.Command for token management
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
@@ -85,18 +88,18 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	}
 
 	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,
-		"kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
+		"kubeconfig", defaultKubeConfig, "The KubeConfig file to use when talking to the cluster. If the flag is not set a set of standard locations are searched for an existing KubeConfig file")
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		"dry-run", dryRun, "Whether to enable dry-run mode or not")
 
-	cfg := &kubeadmapiext.MasterConfiguration{
+	cfg := &kubeadmapiv1alpha2.MasterConfiguration{
 		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 		KubernetesVersion: "v1.9.0",
 	}
 
 	// Default values for the cobra help text
-	legacyscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath, description string
 	var printJoinCommand bool
@@ -121,6 +124,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			glog.V(1).Infoln("[token] getting Clientsets from KubeConfig file")
+			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -152,6 +156,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			This command will list all bootstrap tokens for you.
 		`),
 		Run: func(tokenCmd *cobra.Command, args []string) {
+			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -175,6 +180,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) < 1 {
 				kubeadmutil.CheckErr(fmt.Errorf("missing subcommand; 'token delete' is missing token of form [%q]", tokenutil.TokenIDRegexpString))
 			}
+			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -211,7 +217,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiext.MasterConfiguration, description string, printJoinCommand bool, kubeConfigFile string) error {
+func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1alpha2.MasterConfiguration, description string, printJoinCommand bool, kubeConfigFile string) error {
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	glog.V(1).Infoln("[token] loading configurations")
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -380,4 +386,17 @@ func getClientset(file string, dryRun bool) (clientset.Interface, error) {
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
+}
+
+func findExistingKubeConfig(file string) string {
+	// The user did provide a --kubeconfig flag. Respect that and threat it as an
+	// explicit path without building a DefaultClientConfigLoadingRules object.
+	if file != defaultKubeConfig {
+		return file
+	}
+	// The user did not provide a --kubeconfig flag. Find a config in the standard
+	// locations using DefaultClientConfigLoadingRules, but also consider `defaultKubeConfig`.
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	rules.Precedence = append(rules.Precedence, defaultKubeConfig)
+	return rules.GetDefaultFilename()
 }

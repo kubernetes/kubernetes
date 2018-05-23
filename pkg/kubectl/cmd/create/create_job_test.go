@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	fake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
@@ -84,7 +85,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	printFlags := NewPrintFlags("created")
+	printFlags := NewPrintFlags("created", legacyscheme.Scheme)
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmdOptions := &CreateJobOptions{

@@ -21,9 +21,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"text/template"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
 
 // GoTemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
@@ -59,6 +61,10 @@ func (p *GoTemplatePrinter) AllowMissingKeys(allow bool) {
 
 // PrintObj formats the obj with the Go Template.
 func (p *GoTemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	if printers.InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
+		return fmt.Errorf(printers.InternalObjectPrinterErr)
+	}
+
 	var data []byte
 	var err error
 	data, err = json.Marshal(obj)

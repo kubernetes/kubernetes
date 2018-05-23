@@ -21,28 +21,31 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestTemplate(t *testing.T) {
-	testCase := map[string]struct {
+	testCase := []struct {
+		name      string
 		template  string
 		obj       runtime.Object
 		expectOut string
 		expectErr func(error) (string, bool)
 	}{
-		"support base64 decoding of secret data": {
-			template: "{{ .Data.username | base64decode }}",
-			obj: &api.Secret{
+		{
+			name:     "support base64 decoding of secret data",
+			template: "{{ .data.username | base64decode }}",
+			obj: &v1.Secret{
 				Data: map[string][]byte{
 					"username": []byte("hunter"),
 				},
 			},
 			expectOut: "hunter",
 		},
-		"test error path for base64 decoding": {
-			template: "{{ .Data.username | base64decode }}",
+		{
+			name:     "test error path for base64 decoding",
+			template: "{{ .data.username | base64decode }}",
 			obj:      &badlyMarshaledSecret{},
 			expectErr: func(err error) (string, bool) {
 				matched := strings.Contains(err.Error(), "base64 decode")
@@ -50,48 +53,50 @@ func TestTemplate(t *testing.T) {
 			},
 		},
 	}
-	for name, test := range testCase {
-		buffer := &bytes.Buffer{}
+	for _, test := range testCase {
+		t.Run(test.name, func(t *testing.T) {
+			buffer := &bytes.Buffer{}
 
-		p, err := NewGoTemplatePrinter([]byte(test.template))
-		if err != nil {
-			if test.expectErr == nil {
-				t.Errorf("[%s]expected success but got:\n %v\n", name, err)
-				continue
+			p, err := NewGoTemplatePrinter([]byte(test.template))
+			if err != nil {
+				if test.expectErr == nil {
+					t.Errorf("[%s]expected success but got:\n %v\n", test.name, err)
+					return
+				}
+				if expected, ok := test.expectErr(err); !ok {
+					t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, expected, err)
+				}
+				return
 			}
-			if expected, ok := test.expectErr(err); !ok {
-				t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", name, expected, err)
-			}
-			continue
-		}
 
-		err = p.PrintObj(test.obj, buffer)
-		if err != nil {
-			if test.expectErr == nil {
-				t.Errorf("[%s]expected success but got:\n %v\n", name, err)
-				continue
+			err = p.PrintObj(test.obj, buffer)
+			if err != nil {
+				if test.expectErr == nil {
+					t.Errorf("[%s]expected success but got:\n %v\n", test.name, err)
+					return
+				}
+				if expected, ok := test.expectErr(err); !ok {
+					t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, expected, err)
+				}
+				return
 			}
-			if expected, ok := test.expectErr(err); !ok {
-				t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", name, expected, err)
+
+			if test.expectErr != nil {
+				t.Errorf("[%s]expect:\n error\n but got:\n no error\n", test.name)
+				return
 			}
-			continue
-		}
 
-		if test.expectErr != nil {
-			t.Errorf("[%s]expect:\n error\n but got:\n no error\n", name)
-			continue
-		}
-
-		if test.expectOut != buffer.String() {
-			t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", name, test.expectOut, buffer.String())
-		}
+			if test.expectOut != buffer.String() {
+				t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, test.expectOut, buffer.String())
+			}
+		})
 	}
 }
 
 type badlyMarshaledSecret struct {
-	api.Secret
+	v1.Secret
 }
 
 func (a badlyMarshaledSecret) MarshalJSON() ([]byte, error) {
-	return []byte(`{"apiVersion":"v1","Data":{"username":"--THIS IS NOT BASE64--"},"kind":"Secret"}`), nil
+	return []byte(`{"apiVersion":"v1","data":{"username":"--THIS IS NOT BASE64--"},"kind":"Secret"}`), nil
 }

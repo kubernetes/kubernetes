@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"fmt"
 	"hash/fnv"
 	"sync"
 
@@ -28,11 +29,7 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 
 	"github.com/golang/glog"
-	"github.com/golang/groupcache/lru"
 )
-
-// We use predicate names as cache's key, its count is limited
-const maxCacheEntries = 100
 
 // EquivalenceCache holds:
 // 1. a map of AlgorithmCache with node name as key
@@ -42,11 +39,8 @@ type EquivalenceCache struct {
 	algorithmCache map[string]AlgorithmCache
 }
 
-// The AlgorithmCache stores PredicateMap with predicate name as key
-type AlgorithmCache struct {
-	// Only consider predicates for now
-	predicatesCache *lru.Cache
-}
+// The AlgorithmCache stores PredicateMap with predicate name as key, PredicateMap as value.
+type AlgorithmCache map[string]PredicateMap
 
 // PredicateMap stores HostPrediacte with equivalence hash as key
 type PredicateMap map[uint64]HostPredicate
@@ -55,12 +49,6 @@ type PredicateMap map[uint64]HostPredicate
 type HostPredicate struct {
 	Fit         bool
 	FailReasons []algorithm.PredicateFailureReason
-}
-
-func newAlgorithmCache() AlgorithmCache {
-	return AlgorithmCache{
-		predicatesCache: lru.New(maxCacheEntries),
-	}
 }
 
 // NewEquivalenceCache returns EquivalenceCache to speed up predicates by caching
@@ -86,6 +74,12 @@ func (ec *EquivalenceCache) RunPredicate(
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
+
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		// This may happen during tests.
+		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("nodeInfo is nil or node is invalid")
+	}
+
 	fit, reasons, invalid := ec.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash)
 	if !invalid {
 		return fit, reasons, nil
@@ -109,22 +103,21 @@ func (ec *EquivalenceCache) updateResult(
 	equivalenceHash uint64,
 ) {
 	if _, exist := ec.algorithmCache[nodeName]; !exist {
-		ec.algorithmCache[nodeName] = newAlgorithmCache()
+		ec.algorithmCache[nodeName] = AlgorithmCache{}
 	}
 	predicateItem := HostPredicate{
 		Fit:         fit,
 		FailReasons: reasons,
 	}
 	// if cached predicate map already exists, just update the predicate by key
-	if v, ok := ec.algorithmCache[nodeName].predicatesCache.Get(predicateKey); ok {
-		predicateMap := v.(PredicateMap)
+	if predicateMap, ok := ec.algorithmCache[nodeName][predicateKey]; ok {
 		// maps in golang are references, no need to add them back
 		predicateMap[equivalenceHash] = predicateItem
 	} else {
-		ec.algorithmCache[nodeName].predicatesCache.Add(predicateKey,
+		ec.algorithmCache[nodeName][predicateKey] =
 			PredicateMap{
 				equivalenceHash: predicateItem,
-			})
+			}
 	}
 	glog.V(5).Infof("Updated cached predicate: %v for pod: %v on node: %s, with item %v", predicateKey, podName, nodeName, predicateItem)
 }
@@ -139,20 +132,13 @@ func (ec *EquivalenceCache) lookupResult(
 ) (bool, []algorithm.PredicateFailureReason, bool) {
 	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache",
 		predicateKey, podName, nodeName)
-	if algorithmCache, exist := ec.algorithmCache[nodeName]; exist {
-		if cachePredicate, exist := algorithmCache.predicatesCache.Get(predicateKey); exist {
-			predicateMap := cachePredicate.(PredicateMap)
-			// TODO(resouer) Is it possible a race that cache failed to update immediately?
-			if hostPredicate, ok := predicateMap[equivalenceHash]; ok {
-				if hostPredicate.Fit {
-					return true, []algorithm.PredicateFailureReason{}, false
-				}
-				return false, hostPredicate.FailReasons, false
-			}
-			// is invalid
-			return false, []algorithm.PredicateFailureReason{}, true
+	if hostPredicate, exist := ec.algorithmCache[nodeName][predicateKey][equivalenceHash]; exist {
+		if hostPredicate.Fit {
+			return true, []algorithm.PredicateFailureReason{}, false
 		}
+		return false, hostPredicate.FailReasons, false
 	}
+	// is invalid
 	return false, []algorithm.PredicateFailureReason{}, true
 }
 
@@ -163,10 +149,8 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItem(nodeName string, predi
 	}
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
-	if algorithmCache, exist := ec.algorithmCache[nodeName]; exist {
-		for predicateKey := range predicateKeys {
-			algorithmCache.predicatesCache.Remove(predicateKey)
-		}
+	for predicateKey := range predicateKeys {
+		delete(ec.algorithmCache[nodeName], predicateKey)
 	}
 	glog.V(5).Infof("Done invalidating cached predicates: %v on node: %s", predicateKeys, nodeName)
 }
@@ -181,8 +165,7 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemOfAllNodes(predicateKey
 	// algorithmCache uses nodeName as key, so we just iterate it and invalid given predicates
 	for _, algorithmCache := range ec.algorithmCache {
 		for predicateKey := range predicateKeys {
-			// just use keys is enough
-			algorithmCache.predicatesCache.Remove(predicateKey)
+			delete(algorithmCache, predicateKey)
 		}
 	}
 	glog.V(5).Infof("Done invalidating cached predicates: %v on all node", predicateKeys)

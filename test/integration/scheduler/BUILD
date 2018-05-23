@@ -23,6 +23,7 @@ go_test(
     tags = ["integration"],
     deps = [
         "//cmd/kube-scheduler/app:go_default_library",
+        "//cmd/kube-scheduler/app/config:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -88,6 +89,8 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/controller:go_default_library",
+        "//pkg/controller/disruption:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
@@ -96,9 +99,11 @@ go_library(
         "//test/integration/framework:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",

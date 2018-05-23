@@ -62,7 +62,7 @@ func (c *FakeServices) List(opts v1.ListOptions) (result *core_v1.ServiceList, e
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core_v1.ServiceList{}
+	list := &core_v1.ServiceList{ListMeta: obj.(*core_v1.ServiceList).ListMeta}
 	for _, item := range obj.(*core_v1.ServiceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -117,14 +117,6 @@ func (c *FakeServices) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(servicesResource, c.ns, name), &core_v1.Service{})
 
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(servicesResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &core_v1.ServiceList{})
 	return err
 }
 

@@ -19,10 +19,11 @@ go_test(
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
-        "//pkg/master/reconcilers:go_default_library",
+        "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
@@ -35,7 +36,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
@@ -43,8 +44,6 @@ go_library(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/staticpod:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
-        "//pkg/master/reconcilers:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

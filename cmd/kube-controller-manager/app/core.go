@@ -79,20 +79,23 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 func startNodeIpamController(ctx ControllerContext) (bool, error) {
 	var clusterCIDR *net.IPNet = nil
 	var serviceCIDR *net.IPNet = nil
-	if ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
-		var err error
-		if len(strings.TrimSpace(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
-			_, clusterCIDR, err = net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
-			if err != nil {
-				glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
-			}
-		}
 
-		if len(strings.TrimSpace(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)) != 0 {
-			_, serviceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)
-			if err != nil {
-				glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIpamController.ServiceCIDR, err)
-			}
+	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
+		return false, nil
+	}
+
+	var err error
+	if len(strings.TrimSpace(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
+		_, clusterCIDR, err = net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
+		if err != nil {
+			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
+		}
+	}
+
+	if len(strings.TrimSpace(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)) != 0 {
+		_, serviceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)
+		if err != nil {
+			glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIpamController.ServiceCIDR, err)
 		}
 	}
 
@@ -103,7 +106,6 @@ func startNodeIpamController(ctx ControllerContext) (bool, error) {
 		clusterCIDR,
 		serviceCIDR,
 		int(ctx.ComponentConfig.NodeIpamController.NodeCIDRMaskSize),
-		ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs,
 		ipam.CIDRAllocatorType(ctx.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
 	)
 	if err != nil {
@@ -350,13 +352,10 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	discoveryClient := cacheddiscovery.NewMemCacheClient(gcClientset.Discovery())
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
-	config.ContentConfig = dynamic.ContentConfig()
-	// TODO: Make NewMetadataCodecFactory support arbitrary (non-compiled)
-	// resource types. Otherwise we'll be storing full Unstructured data in our
-	// caches for custom resources. Consider porting it to work with
-	// metav1beta1.PartialObjectMetadata.
-	metaOnlyClientPool := dynamic.NewClientPool(config, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc)
-	clientPool := dynamic.NewClientPool(config, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return true, err
+	}
 
 	// Get an initial set of deletable resources to prime the garbage collector.
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
@@ -365,8 +364,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
-		metaOnlyClientPool,
-		clientPool,
+		dynamicClient,
 		ctx.RESTMapper,
 		deletableResources,
 		ignoredResources,

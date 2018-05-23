@@ -11,7 +11,7 @@ go_test(
     srcs = ["proxy_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -36,7 +36,6 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/scheme:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",
@@ -45,6 +44,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ],
 )
 

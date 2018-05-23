@@ -161,9 +161,6 @@ const (
 	// system:nodes group subject is removed if present.
 	NodesClusterRoleBinding = "system:node"
 
-	// KubeletBaseConfigMapRoleName defines the base kubelet configuration ConfigMap.
-	KubeletBaseConfigMapRoleName = "kubeadm:kubelet-base-configmap"
-
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
@@ -191,17 +188,17 @@ const (
 	// MasterConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
 	MasterConfigurationConfigMapKey = "MasterConfiguration"
 
-	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
-	KubeletBaseConfigurationConfigMap = "kubelet-base-config-1.9"
+	// KubeletBaseConfigurationConfigMapPrefix specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
+	KubeletBaseConfigurationConfigMapPrefix = "kubelet-config-"
 
 	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration of kubelet should be stored
 	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
-	// KubeletBaseConfigurationDir specifies the directory on the node where stores the initial remote configuration of kubelet
-	KubeletBaseConfigurationDir = "/var/lib/kubelet/config/init"
+	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	KubeletBaseConfigMapRolePrefix = "kubeadm:kubelet-config-"
 
-	// KubeletBaseConfigurationFile specifies the file name on the node which stores initial remote configuration of kubelet
-	KubeletBaseConfigurationFile = "kubelet"
+	// KubeletConfigurationFile specifies the file name on the node which stores initial remote configuration of kubelet
+	KubeletConfigurationFile = "/var/lib/kubelet/config.yaml"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.2.17"
@@ -255,6 +252,19 @@ const (
 	KubeAuditPolicyLogVolumeName = "audit-log"
 	// StaticPodAuditPolicyLogDir is the name of the directory in the static pod that will have the audit logs
 	StaticPodAuditPolicyLogDir = "/var/log/kubernetes/audit"
+
+	// LeaseEndpointReconcilerType will select a storage based reconciler
+	// Copied from pkg/master/reconcilers to avoid pulling extra dependencies
+	// TODO: Import this constant from a consts only package, that does not pull any further dependencies.
+	LeaseEndpointReconcilerType = "lease"
+
+	// KubeletEnvFile is a file "kubeadm init" writes at runtime. Using that interface, kubeadm can customize certain
+	// kubelet flags conditionally based on the environment at runtime. Also, parameters given to the configuration file
+	// might be passed through this file. "kubeadm init" writes one variable, with the name ${KubeletEnvFileVariableName}.
+	KubeletEnvFile = "/var/lib/kubelet/kubeadm-flags.env"
+
+	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
+	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"
 )
 
 var (
@@ -270,11 +280,6 @@ var (
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// AuthorizationPolicyPath defines the supported location of authorization policy file
-	AuthorizationPolicyPath = filepath.Join(KubernetesDir, "abac_policy.json")
-	// AuthorizationWebhookConfigPath defines the supported location of webhook config file
-	AuthorizationWebhookConfigPath = filepath.Join(KubernetesDir, "webhook_authz.conf")
-
 	// DefaultTokenUsages specifies the default functions a token will get
 	DefaultTokenUsages = bootstrapapi.KnownTokenUsages
 
@@ -285,16 +290,19 @@ var (
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.9.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.10.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.9.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.10.0")
+
+	// MinimumKubeletConfigVersion specifies the minimum version of Kubernetes where kubeadm supports specifying --config to the kubelet
+	MinimumKubeletConfigVersion = version.MustParseSemantic("v1.11.0-alpha.1")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		9:  "3.1.12",
 		10: "3.1.12",
 		11: "3.2.18",
+		12: "3.2.18",
 	}
 )
 

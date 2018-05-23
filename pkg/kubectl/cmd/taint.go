@@ -17,10 +17,9 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
-
-	"encoding/json"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -35,16 +34,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
 
 // TaintOptions have the data required to perform the taint operation
 type TaintOptions struct {
-	PrintFlags *printers.PrintFlags
-	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
+	PrintFlags *genericclioptions.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
 	resources      []string
 	taintsToAdd    []v1.Taint
@@ -87,7 +87,7 @@ var (
 
 func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	options := &TaintOptions{
-		PrintFlags: printers.NewPrintFlags("tainted"),
+		PrintFlags: genericclioptions.NewPrintFlags("tainted").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
 	}
 
@@ -148,14 +148,9 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		}
 	}
 
-	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		printer, err := o.PrintFlags.ToPrinter()
-		if err != nil {
-			return nil, err
-		}
-
-		return printer.PrintObj, nil
+		return o.PrintFlags.ToPrinter()
 	}
 
 	if len(o.resources) < 1 {
@@ -291,6 +286,7 @@ func (o TaintOptions) RunTaint() error {
 		if err != nil {
 			return err
 		}
+		outputObj = cmdutil.AsDefaultVersionedOrOriginal(outputObj, mapping)
 
 		printer, err := o.ToPrinter(operation)
 		if err != nil {

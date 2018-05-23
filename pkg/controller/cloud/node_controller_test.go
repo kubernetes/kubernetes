@@ -252,7 +252,7 @@ func TestNodeShutdown(t *testing.T) {
 			}
 			eventBroadcaster.StartLogging(glog.Infof)
 
-			cloudNodeController.Run()
+			cloudNodeController.Run(wait.NeverStop)
 
 			select {
 			case <-fnh.PatchWaitChan:
@@ -351,7 +351,7 @@ func TestNodeDeleted(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
-	cloudNodeController.Run()
+	cloudNodeController.Run(wait.NeverStop)
 
 	select {
 	case <-fnh.DeleteWaitChan:
@@ -768,7 +768,7 @@ func TestNodeAddresses(t *testing.T) {
 		},
 	}
 
-	cloudNodeController.Run()
+	cloudNodeController.Run(wait.NeverStop)
 
 	<-time.After(2 * time.Second)
 
@@ -870,15 +870,15 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
-	assert.Equal(t, 1, len(fnh.UpdatedNodes[0].Status.Addresses), "Node status unexpectedly updated")
+	assert.Equal(t, 3, len(fnh.UpdatedNodes[0].Status.Addresses), "Node status unexpectedly updated")
 
-	cloudNodeController.Run()
+	cloudNodeController.Run(wait.NeverStop)
 
 	<-time.After(2 * time.Second)
 
 	updatedNodes := fnh.GetUpdatedNodesCopy()
 
-	assert.Equal(t, 1, len(updatedNodes[0].Status.Addresses), 1, "Node Addresses not correctly updated")
+	assert.Equal(t, 3, len(updatedNodes[0].Status.Addresses), "Node Addresses not correctly updated")
 	assert.Equal(t, "10.0.0.1", updatedNodes[0].Status.Addresses[0].Address, "Node Addresses not correctly updated")
 }
 

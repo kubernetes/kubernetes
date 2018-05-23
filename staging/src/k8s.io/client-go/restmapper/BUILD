@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "category_expansion.go",
         "discovery.go",
         "shortcut.go",
     ],
@@ -20,6 +21,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "category_expansion_test.go",
         "discovery_test.go",
         "shortcut_test.go",
     ],

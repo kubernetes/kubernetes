@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/printers"
-
 	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
@@ -29,11 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -58,7 +58,7 @@ var (
 
 // serviceAccountConfig encapsulates the data required to perform the operation.
 type SetServiceAccountOptions struct {
-	PrintFlags  *printers.PrintFlags
+	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
 	fileNameOptions        resource.FilenameOptions
@@ -67,7 +67,7 @@ type SetServiceAccountOptions struct {
 	all                    bool
 	output                 string
 	local                  bool
-	updatePodSpecForObject func(runtime.Object, func(*v1.PodSpec) error) (bool, error)
+	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	infos                  []*resource.Info
 	serviceAccountName     string
 
@@ -79,7 +79,7 @@ type SetServiceAccountOptions struct {
 
 func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
 	return &SetServiceAccountOptions{
-		PrintFlags:  printers.NewPrintFlags("serviceaccount updated"),
+		PrintFlags:  genericclioptions.NewPrintFlags("serviceaccount updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -130,7 +130,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.dryRun = cmdutil.GetDryRunFlag(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
-	o.updatePodSpecForObject = f.UpdatePodSpecForObject
+	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 
 	if o.dryRun {
 		o.PrintFlags.Complete("%s (dry run)")
@@ -152,7 +152,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	resources := args[:len(args)-1]
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -174,7 +174,6 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 func (o *SetServiceAccountOptions) Run() error {
 	patchErrs := []error{}
 	patchFn := func(info *resource.Info) ([]byte, error) {
-		info.Object = cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping)
 		_, err := o.updatePodSpecForObject(info.Object, func(podSpec *v1.PodSpec) error {
 			podSpec.ServiceAccountName = o.serviceAccountName
 			return nil
@@ -187,10 +186,10 @@ func (o *SetServiceAccountOptions) Run() error {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+		return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 	}
 
-	patches := CalculatePatches(o.infos, cmdutil.InternalVersionJSONEncoder(), patchFn)
+	patches := CalculatePatches(o.infos, scheme.DefaultJSONEncoder(), patchFn)
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
@@ -198,19 +197,18 @@ func (o *SetServiceAccountOptions) Run() error {
 			continue
 		}
 		if o.local || o.dryRun {
-			if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(patch.Info.Object, patch.Info.Mapping), o.Out); err != nil {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
 		}
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			patchErrs = append(patchErrs, fmt.Errorf("failed to patch ServiceAccountName %v", err))
 			continue
 		}
-		info.Refresh(patched, true)
 
-		if err := o.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+		if err := o.PrintObj(actual, o.Out); err != nil {
 			return err
 		}
 	}

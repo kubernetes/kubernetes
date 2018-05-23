@@ -110,11 +110,6 @@ func addNotReadyPodsWithSpecifiedRestartPolicyAndPhase(store cache.Store, namesp
 	}
 }
 
-type serverResponse struct {
-	statusCode int
-	obj        interface{}
-}
-
 func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltesting.FakeHandler) {
 	fakeEndpointsHandler := utiltesting.FakeHandler{
 		StatusCode:   http.StatusOK,

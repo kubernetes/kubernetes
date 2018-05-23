@@ -199,6 +199,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		closeFn()
 		glog.Fatal(err)
 	}
+	var lastHealthContent []byte
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		result := privilegedClient.Get().AbsPath("/healthz").Do()
 		status := 0
@@ -206,10 +207,12 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		if status == 200 {
 			return true, nil
 		}
+		lastHealthContent, _ = result.Raw()
 		return false, nil
 	})
 	if err != nil {
 		closeFn()
+		glog.Errorf("last health content: %q", string(lastHealthContent))
 		glog.Fatal(err)
 	}
 
@@ -235,7 +238,7 @@ func NewMasterConfig() *master.Config {
 	info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(legacyscheme.Scheme, info)
 
-	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Registry)
+	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
 	// FIXME (soltysh): this GroupVersionResource override should be configurable
 	// we need to set both for the whole group and for cronjobs, separately
 	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})

@@ -105,6 +105,31 @@ func TestAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
+			name:   "list allowed secret via pod",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:   "watch allowed secret via pod",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:   "disallowed list many secrets",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:   "disallowed watch many secrets",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:   "disallowed list secrets from all namespaces with name",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: ""},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
 			name:   "allowed shared secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
@@ -753,10 +778,11 @@ func generate(opts sampleDataOpts) ([]*api.Node, []*api.Pod, []*api.PersistentVo
 			ObjectMeta: metav1.ObjectMeta{Name: nodeName},
 			Spec: api.NodeSpec{
 				ConfigSource: &api.NodeConfigSource{
-					ConfigMapRef: &api.ObjectReference{
-						Name:      name,
-						Namespace: "ns0",
-						UID:       types.UID(fmt.Sprintf("ns0-%s", name)),
+					ConfigMap: &api.ConfigMapNodeConfigSource{
+						Name:             name,
+						Namespace:        "ns0",
+						UID:              types.UID(fmt.Sprintf("ns0-%s", name)),
+						KubeletConfigKey: "kubelet",
 					},
 				},
 			},

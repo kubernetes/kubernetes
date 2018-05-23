@@ -28,7 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -43,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-var v190alpha3 = version.MustParseSemantic("v1.9.0-alpha.3")
 var expiry = 180 * 24 * time.Hour
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
@@ -74,7 +74,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	}
 
 	// Upgrade to a self-hosted control plane if possible
-	if err := upgradeToSelfHosting(client, cfg, newK8sVer, dryRun); err != nil {
+	if err := upgradeToSelfHosting(client, cfg, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -88,7 +88,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
-	certAndKeyDir := kubeadmapiext.DefaultCertificatesDir
+	certAndKeyDir := kubeadmapiv1alpha2.DefaultCertificatesDir
 	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
 	// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
 	if err != nil {
@@ -103,13 +103,18 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		}
 	}
 
-	// Upgrade kube-dns and kube-proxy
+	// Create the new, version-branched kubelet ComponentConfig ConfigMap
+	if err := kubeletphase.CreateConfigMap(cfg, client); err != nil {
+		errs = append(errs, fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err))
+	}
+
+	// Upgrade kube-dns/CoreDNS and kube-proxy
 	if err := dns.EnsureDNSAddon(cfg, client); err != nil {
 		errs = append(errs, err)
 	}
-	// Remove the old kube-dns deployment if coredns is now used
+	// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
 	if !dryRun {
-		if err := removeOldKubeDNSDeploymentIfCoreDNSIsUsed(cfg, client); err != nil {
+		if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg, client); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -120,28 +125,32 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	return errors.NewAggregate(errs)
 }
 
-func removeOldKubeDNSDeploymentIfCoreDNSIsUsed(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
-	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
-		return apiclient.TryRunCommand(func() error {
-			coreDNSDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNS, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if coreDNSDeployment.Status.ReadyReplicas == 0 {
-				return fmt.Errorf("the CoreDNS deployment isn't ready yet")
-			}
-			err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, kubeadmconstants.KubeDNS)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-			return nil
-		}, 10)
-	}
-	return nil
+func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+	return apiclient.TryRunCommand(func() error {
+		installedDeploymentName := kubeadmconstants.KubeDNS
+		deploymentToDelete := kubeadmconstants.CoreDNS
+
+		if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
+			installedDeploymentName = kubeadmconstants.CoreDNS
+			deploymentToDelete = kubeadmconstants.KubeDNS
+		}
+		dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(installedDeploymentName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if dnsDeployment.Status.ReadyReplicas == 0 {
+			return fmt.Errorf("the DNS deployment isn't ready yet")
+		}
+		err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}, 10)
 }
 
-func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
-	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) && newK8sVer.AtLeast(v190alpha3) {
+func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, dryRun bool) error {
+	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) {
 
 		waiter := getWaiter(dryRun, client)
 

@@ -20,4 +20,4 @@
 # For systems without journald
 mkdir -p /var/log/journal
 
-/usr/local/bin/fluentd $@
+exec /usr/local/bin/fluentd $@

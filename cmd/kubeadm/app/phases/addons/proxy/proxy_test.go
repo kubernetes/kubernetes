@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -174,12 +174,12 @@ func TestEnsureProxyAddon(t *testing.T) {
 		// Create a fake client and set up default test configuration
 		client := clientsetfake.NewSimpleClientset()
 
-		masterConfig := &kubeadmapiext.MasterConfiguration{
-			API: kubeadmapiext.API{
+		masterConfig := &kubeadmapiv1alpha2.MasterConfiguration{
+			API: kubeadmapiv1alpha2.API{
 				AdvertiseAddress: "1.2.3.4",
 				BindPort:         1234,
 			},
-			KubeProxy: kubeadmapiext.KubeProxy{
+			KubeProxy: kubeadmapiv1alpha2.KubeProxy{
 				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 					BindAddress:        "",
 					HealthzBindAddress: "0.0.0.0:10256",
@@ -193,11 +193,11 @@ func TestEnsureProxyAddon(t *testing.T) {
 					},
 				},
 			},
-			Networking: kubeadmapiext.Networking{
+			Networking: kubeadmapiv1alpha2.Networking{
 				PodSubnet: "5.6.7.8/24",
 			},
 			ImageRepository:          "someRepo",
-			KubernetesVersion:        "v1.9.0",
+			KubernetesVersion:        "v1.10.0",
 			UnifiedControlPlaneImage: "someImage",
 		}
 
@@ -214,7 +214,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 			masterConfig.Networking.PodSubnet = "2001:101::/96"
 		}
 
-		kubeadmapiext.SetDefaults_MasterConfiguration(masterConfig)
+		kubeadmapiv1alpha2.SetDefaults_MasterConfiguration(masterConfig)
 		intMaster, err := cmdutil.ConfigFileAndDefaultsToInternalConfig("", masterConfig)
 		if err != nil {
 			t.Errorf(" test failed to convert v1alpha1 to internal version")

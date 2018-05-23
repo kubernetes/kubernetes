@@ -238,3 +238,86 @@ func TestAPIListChunking(t *testing.T) {
 		t.Errorf("unexpected items: %#v", list)
 	}
 }
+
+func makeSecret(name string) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Data: map[string][]byte{
+			"key": []byte("value"),
+		},
+	}
+}
+
+func TestNameInFieldSelector(t *testing.T) {
+	s, clientSet, closeFn := setup(t)
+	defer closeFn()
+
+	numNamespaces := 3
+	namespaces := make([]*v1.Namespace, 0, numNamespaces)
+	for i := 0; i < 3; i++ {
+		ns := framework.CreateTestingNamespace(fmt.Sprintf("ns%d", i), s, t)
+		defer framework.DeleteTestingNamespace(ns, s, t)
+		namespaces = append(namespaces, ns)
+
+		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(makeSecret("foo"))
+		if err != nil {
+			t.Errorf("Couldn't create secret: %v", err)
+		}
+		_, err = clientSet.CoreV1().Secrets(ns.Name).Create(makeSecret("bar"))
+		if err != nil {
+			t.Errorf("Couldn't create secret: %v", err)
+		}
+	}
+
+	testcases := []struct {
+		namespace       string
+		selector        string
+		expectedSecrets int
+	}{
+		{
+			namespace:       "",
+			selector:        "metadata.name=foo",
+			expectedSecrets: numNamespaces,
+		},
+		{
+			namespace:       "",
+			selector:        "metadata.name=foo,metadata.name=bar",
+			expectedSecrets: 0,
+		},
+		{
+			namespace:       "",
+			selector:        "metadata.name=foo,metadata.namespace=ns1",
+			expectedSecrets: 1,
+		},
+		{
+			namespace:       "ns1",
+			selector:        "metadata.name=foo,metadata.namespace=ns1",
+			expectedSecrets: 1,
+		},
+		{
+			namespace:       "ns1",
+			selector:        "metadata.name=foo,metadata.namespace=ns2",
+			expectedSecrets: 0,
+		},
+		{
+			namespace:       "ns1",
+			selector:        "metadata.name=foo,metadata.namespace=",
+			expectedSecrets: 0,
+		},
+	}
+
+	for _, tc := range testcases {
+		opts := metav1.ListOptions{
+			FieldSelector: tc.selector,
+		}
+		secrets, err := clientSet.CoreV1().Secrets(tc.namespace).List(opts)
+		if err != nil {
+			t.Errorf("%s: Unexpected error: %v", tc.selector, err)
+		}
+		if len(secrets.Items) != tc.expectedSecrets {
+			t.Errorf("%s: Unexpected number of secrets: %d, expected: %d", tc.selector, len(secrets.Items), tc.expectedSecrets)
+		}
+	}
+}

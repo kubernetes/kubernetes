@@ -26,16 +26,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -82,26 +81,24 @@ type LogsOptions struct {
 	AllContainers bool
 	Options       runtime.Object
 
-	Mapper  meta.RESTMapper
-	Typer   runtime.ObjectTyper
-	Decoder runtime.Decoder
-
-	Object        runtime.Object
-	GetPodTimeout time.Duration
-	LogsForObject func(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
+	Object           runtime.Object
+	GetPodTimeout    time.Duration
+	RESTClientGetter genericclioptions.RESTClientGetter
+	LogsForObject    polymorphichelpers.LogsForObjectFunc
 
 	genericclioptions.IOStreams
 }
 
-func NewLogsOptions(streams genericclioptions.IOStreams) *LogsOptions {
+func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
 	return &LogsOptions{
-		IOStreams: streams,
+		IOStreams:     streams,
+		AllContainers: allContainers,
 	}
 }
 
 // NewCmdLogs creates a new pod logs command
 func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewLogsOptions(streams)
+	o := NewLogsOptions(streams, false)
 
 	cmd := &cobra.Command{
 		Use: "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
@@ -121,7 +118,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 		Aliases: []string{"log"},
 	}
-	cmd.Flags().Bool("all-containers", false, "Get all containers's logs in the pod(s).")
+	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers's logs in the pod(s).")
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
 	cmd.Flags().Bool("timestamps", false, "Include timestamps on each line in the log output")
 	cmd.Flags().Int64("limit-bytes", 0, "Maximum bytes of logs to return. Defaults to no limit.")
@@ -140,7 +137,6 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	selector := cmdutil.GetFlagString(cmd, "selector")
-	o.AllContainers = cmdutil.GetFlagBool(cmd, "all-containers")
 	switch len(args) {
 	case 0:
 		if len(selector) == 0 {
@@ -196,7 +192,8 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 	o.Options = logOptions
-	o.LogsForObject = f.LogsForObject
+	o.RESTClientGetter = f
+	o.LogsForObject = polymorphichelpers.LogsForObjectFn
 
 	if len(selector) != 0 {
 		if logOptions.Follow {
@@ -237,7 +234,7 @@ func (o LogsOptions) Validate() error {
 		return errors.New("unexpected logs options object")
 	}
 	if o.AllContainers && len(logsOptions.Container) > 0 {
-		return fmt.Errorf("--all-containers=true should not be specifiled with container name %s", logsOptions.Container)
+		return fmt.Errorf("--all-containers=true should not be specified with container name %s", logsOptions.Container)
 	}
 	if errs := validation.ValidatePodLogOptions(logsOptions); len(errs) > 0 {
 		return errs.ToAggregate()
@@ -286,7 +283,7 @@ func (o LogsOptions) getPodLogs(pod *api.Pod) error {
 }
 
 func (o LogsOptions) getLogs(obj runtime.Object) error {
-	req, err := o.LogsForObject(obj, o.Options, o.GetPodTimeout)
+	req, err := o.LogsForObject(o.RESTClientGetter, obj, o.Options, o.GetPodTimeout)
 	if err != nil {
 		return err
 	}

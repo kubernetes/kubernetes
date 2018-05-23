@@ -50,8 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 const (
@@ -152,7 +152,7 @@ func TestCordon(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			new_node := &corev1.Node{}
@@ -606,7 +606,7 @@ func TestDrain(t *testing.T) {
 				tf := cmdtesting.NewTestFactory()
 				defer tf.Cleanup()
 
-				codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+				codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 				ns := legacyscheme.Codecs
 
 				tf.Client = &fake.RESTClient{
@@ -834,7 +834,7 @@ func TestDeletePods(t *testing.T) {
 			defer tf.Cleanup()
 
 			o := DrainOptions{
-				PrintFlags: printers.NewPrintFlags("drained"),
+				PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 			}
 			o.Out = os.Stdout
 

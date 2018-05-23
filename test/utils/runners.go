@@ -124,6 +124,7 @@ type RCConfig struct {
 	CpuLimit          int64 // millicores
 	MemRequest        int64 // bytes
 	MemLimit          int64 // bytes
+	GpuLimit          int64 // count
 	ReadinessProbe    *v1.Probe
 	DNSPolicy         *v1.DNSPolicy
 	PriorityClassName string
@@ -615,7 +616,7 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 			c.Ports = append(c.Ports, v1.ContainerPort{Name: k, ContainerPort: int32(v), HostPort: int32(v)})
 		}
 	}
-	if config.CpuLimit > 0 || config.MemLimit > 0 {
+	if config.CpuLimit > 0 || config.MemLimit > 0 || config.GpuLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits = v1.ResourceList{}
 	}
 	if config.CpuLimit > 0 {
@@ -632,6 +633,9 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 	}
 	if config.MemRequest > 0 {
 		template.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)
+	}
+	if config.GpuLimit > 0 {
+		template.Spec.Containers[0].Resources.Limits["nvidia.com/gpu"] = *resource.NewQuantity(config.GpuLimit, resource.DecimalSI)
 	}
 	if len(config.Volumes) > 0 {
 		template.Spec.Volumes = config.Volumes

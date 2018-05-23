@@ -13,6 +13,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/apis/scheduling/v1alpha1:go_default_library",
+        "//pkg/apis/scheduling/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion:go_default_library",
         "//pkg/registry/scheduling/priorityclass/storage:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

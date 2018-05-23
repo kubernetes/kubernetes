@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/wait"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/spf13/cobra"
@@ -94,13 +95,15 @@ __kubectl_parse_config()
     fi
 }
 
+# $1 is the name of resource (required)
+# $2 is template string for kubectl get (optional)
 __kubectl_parse_get()
 {
     local template
-    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
+    template="${2:-"{{ range .items  }}{{ .metadata.name }} {{ end }}"}"
     local kubectl_out
     if kubectl_out=$(kubectl get $(__kubectl_override_flags) -o template --template="${template}" "$1" 2>/dev/null); then
-        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+        COMPREPLY+=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
 
@@ -146,7 +149,7 @@ __kubectl_get_resource_clusterrole()
 __kubectl_get_containers()
 {
     local template
-    template="{{ range .spec.containers  }}{{ .name }} {{ end }}"
+    template="{{ range .spec.initContainers }}{{ .name }} {{end}}{{ range .spec.containers  }}{{ .name }} {{ end }}"
     __kubectl_debug "${FUNCNAME} nouns are ${nouns[*]}"
 
     local len="${#nouns[@]}"
@@ -169,6 +172,36 @@ __kubectl_require_pod_and_container()
     fi;
     __kubectl_get_containers
     return 0
+}
+
+__kubectl_cp()
+{
+    if [[ $(type -t compopt) = "builtin" ]]; then
+        compopt -o nospace
+    fi
+
+    case "$cur" in
+        /*|[.~]*) # looks like a path
+            return
+            ;;
+        *:*) # TODO: complete remote files in the pod
+            return
+            ;;
+        */*) # complete <namespace>/<pod>
+            local template namespace kubectl_out
+            template="{{ range .items }}{{ .metadata.namespace }}/{{ .metadata.name }}: {{ end }}"
+            namespace="${cur%%/*}"
+            if kubectl_out=( $(kubectl get $(__kubectl_override_flags) --namespace "${namespace}" -o template --template="${template}" pods 2>/dev/null) ); then
+                COMPREPLY=( $(compgen -W "${kubectl_out[*]}" -- "${cur}") )
+            fi
+            return
+            ;;
+        *) # complete namespaces, pods, and filedirs
+            __kubectl_parse_get "namespace" "{{ range .items  }}{{ .metadata.name }}/ {{ end }}"
+            __kubectl_parse_get "pod" "{{ range .items  }}{{ .metadata.name }}: {{ end }}"
+            _filedir
+            ;;
+    esac
 }
 
 __custom_func() {
@@ -201,6 +234,10 @@ __custom_func() {
             ;;
         kubectl_config_delete-cluster)
             __kubectl_config_get_clusters
+            return
+            ;;
+        kubectl_cp)
+            __kubectl_cp
             return
             ;;
         *)
@@ -238,13 +275,21 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		BashCompletionFunction: bashCompletionFunc,
 	}
 
-	kubeConfigFlags := cmdutil.NewConfigFlags()
-	kubeConfigFlags.AddFlags(cmds.PersistentFlags())
+	flags := cmds.PersistentFlags()
+	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
+
+	// Normalize all flags that are coming from other packages or pre-configurations
+	// a.k.a. change all "_" to "-". e.g. glog package
+	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+
+	kubeConfigFlags := genericclioptions.NewConfigFlags()
+	kubeConfigFlags.AddFlags(flags)
+	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
+	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
 
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
-	f := cmdutil.NewFactory(kubeConfigFlags)
-	f.BindFlags(cmds.PersistentFlags())
+	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
 	// Sending in 'nil' for the getLanguageFn() results in using
 	// the LANG environment variable.
@@ -318,6 +363,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				NewCmdApply("kubectl", f, ioStreams),
 				NewCmdPatch(f, ioStreams),
 				NewCmdReplace(f, ioStreams),
+				wait.NewCmdWait(f, ioStreams),
 				NewCmdConvert(f, ioStreams),
 			},
 		},

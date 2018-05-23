@@ -1067,6 +1067,7 @@ items:
     resources:
     - nodes
     verbs:
+    - delete
     - patch
     - update
   - apiGroups:
@@ -1111,6 +1112,8 @@ items:
     - secrets
     verbs:
     - get
+    - list
+    - watch
   - apiGroups:
     - ""
     resources:

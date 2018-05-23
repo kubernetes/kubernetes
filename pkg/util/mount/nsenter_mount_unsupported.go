@@ -106,3 +106,7 @@ func (*NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
 func (*NsenterMounter) GetFSGroup(pathname string) (int64, error) {
 	return -1, errors.New("not implemented")
 }
+
+func (*NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, errors.New("not implemented")
+}

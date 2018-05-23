@@ -84,6 +84,10 @@ type StatsProvider interface {
 
 	// GetPodCgroupRoot returns the literal cgroupfs value for the cgroup containing all pods
 	GetPodCgroupRoot() string
+
+	// GetPodByCgroupfs provides the pod that maps to the specified cgroup literal, as well
+	// as whether the pod was found.
+	GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool)
 }
 
 type handler struct {

@@ -59,7 +59,7 @@ func (c *FakeNamespaces) List(opts v1.ListOptions) (result *core_v1.NamespaceLis
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core_v1.NamespaceList{}
+	list := &core_v1.NamespaceList{ListMeta: obj.(*core_v1.NamespaceList).ListMeta}
 	for _, item := range obj.(*core_v1.NamespaceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -109,14 +109,6 @@ func (c *FakeNamespaces) UpdateStatus(namespace *core_v1.Namespace) (*core_v1.Na
 func (c *FakeNamespaces) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(namespacesResource, name), &core_v1.Namespace{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(namespacesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &core_v1.NamespaceList{})
 	return err
 }
 

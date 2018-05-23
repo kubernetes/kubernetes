@@ -1844,12 +1844,17 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 func TestValidateVolumes(t *testing.T) {
 	validInitiatorName := "iqn.2015-02.example.com:init"
 	invalidInitiatorName := "2015-02.example.com:init"
+
+	type verr struct {
+		etype  field.ErrorType
+		field  string
+		detail string
+	}
+
 	testCases := []struct {
-		name      string
-		vol       core.Volume
-		errtype   field.ErrorType
-		errfield  string
-		errdetail string
+		name string
+		vol  core.Volume
+		errs []verr
 	}{
 		// EmptyDir and basic volume names
 		{
@@ -1894,8 +1899,10 @@ func TestValidateVolumes(t *testing.T) {
 				Name:         "",
 				VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "name",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "name",
+			}},
 		},
 		{
 			name: "name > 63 characters",
@@ -1903,9 +1910,11 @@ func TestValidateVolumes(t *testing.T) {
 				Name:         strings.Repeat("a", 64),
 				VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "name",
-			errdetail: "must be no more than",
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "name",
+				detail: "must be no more than",
+			}},
 		},
 		{
 			name: "name not a DNS label",
@@ -1913,9 +1922,11 @@ func TestValidateVolumes(t *testing.T) {
 				Name:         "a.b.c",
 				VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "name",
-			errdetail: dnsLabelErrMsg,
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "name",
+				detail: dnsLabelErrMsg,
+			}},
 		},
 		// More than one source field specified.
 		{
@@ -1930,9 +1941,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeForbidden,
-			errfield:  "hostPath",
-			errdetail: "may not specify more than 1 volume",
+			errs: []verr{{
+				etype:  field.ErrorTypeForbidden,
+				field:  "hostPath",
+				detail: "may not specify more than 1 volume",
+			}},
 		},
 		// HostPath Default
 		{
@@ -1972,8 +1985,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeNotSupported,
-			errfield: "type",
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "type",
+			}},
 		},
 		{
 			name: "invalid HostPath backsteps",
@@ -1986,9 +2001,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "path",
-			errdetail: "must not contain '..'",
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "path",
+				detail: "must not contain '..'",
+			}},
 		},
 		// GcePersistentDisk
 		{
@@ -2069,9 +2086,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "gitRepo.directory",
-			errdetail: `must not contain '..'`,
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "gitRepo.directory",
+				detail: `must not contain '..'`,
+			}},
 		},
 		{
 			name: "GitRepo contains ..",
@@ -2084,9 +2103,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "gitRepo.directory",
-			errdetail: `must not contain '..'`,
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "gitRepo.directory",
+				detail: `must not contain '..'`,
+			}},
 		},
 		{
 			name: "GitRepo absolute target",
@@ -2099,8 +2120,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "gitRepo.directory",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "gitRepo.directory",
+			}},
 		},
 		// ISCSI
 		{
@@ -2162,8 +2185,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "iscsi.targetPortal",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "iscsi.targetPortal",
+			}},
 		},
 		{
 			name: "empty iqn",
@@ -2179,8 +2204,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "iscsi.iqn",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "iscsi.iqn",
+			}},
 		},
 		{
 			name: "invalid IQN: iqn format",
@@ -2196,8 +2223,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "iscsi.iqn",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "iscsi.iqn",
+			}},
 		},
 		{
 			name: "invalid IQN: eui format",
@@ -2213,8 +2242,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "iscsi.iqn",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "iscsi.iqn",
+			}},
 		},
 		{
 			name: "invalid IQN: naa format",
@@ -2230,8 +2261,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "iscsi.iqn",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "iscsi.iqn",
+			}},
 		},
 		{
 			name: "valid initiatorName",
@@ -2264,8 +2297,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "iscsi.initiatorname",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "iscsi.initiatorname",
+			}},
 		},
 		{
 			name: "empty secret",
@@ -2282,8 +2317,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "iscsi.secretRef",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "iscsi.secretRef",
+			}},
 		},
 		{
 			name: "empty secret",
@@ -2300,8 +2337,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "iscsi.secretRef",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "iscsi.secretRef",
+			}},
 		},
 		// Secret
 		{
@@ -2369,8 +2408,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "secret.items[0].path",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "secret.items[0].path",
+			}},
 		},
 		{
 			name: "secret with leading ..",
@@ -2383,8 +2424,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "secret.items[0].path",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "secret.items[0].path",
+			}},
 		},
 		{
 			name: "secret with .. inside",
@@ -2397,8 +2440,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "secret.items[0].path",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "secret.items[0].path",
+			}},
 		},
 		{
 			name: "secret with invalid positive defaultMode",
@@ -2411,8 +2456,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "secret.defaultMode",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "secret.defaultMode",
+			}},
 		},
 		{
 			name: "secret with invalid negative defaultMode",
@@ -2425,8 +2472,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "secret.defaultMode",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "secret.defaultMode",
+			}},
 		},
 		// ConfigMap
 		{
@@ -2500,8 +2549,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "configMap.items[0].path",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "configMap.items[0].path",
+			}},
 		},
 		{
 			name: "configmap with leading ..",
@@ -2514,8 +2565,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "configMap.items[0].path",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "configMap.items[0].path",
+			}},
 		},
 		{
 			name: "configmap with .. inside",
@@ -2528,8 +2581,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "configMap.items[0].path",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "configMap.items[0].path",
+			}},
 		},
 		{
 			name: "configmap with invalid positive defaultMode",
@@ -2542,8 +2597,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "configMap.defaultMode",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "configMap.defaultMode",
+			}},
 		},
 		{
 			name: "configmap with invalid negative defaultMode",
@@ -2556,8 +2613,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "configMap.defaultMode",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "configMap.defaultMode",
+			}},
 		},
 		// Glusterfs
 		{
@@ -2585,8 +2644,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "glusterfs.endpoints",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "glusterfs.endpoints",
+			}},
 		},
 		{
 			name: "empty path",
@@ -2600,8 +2661,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "glusterfs.path",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "glusterfs.path",
+			}},
 		},
 		// Flocker
 		{
@@ -2636,8 +2699,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "flocker",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "flocker",
+			}},
 		},
 		{
 			name: "both specified",
@@ -2650,8 +2715,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "flocker",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "flocker",
+			}},
 		},
 		{
 			name: "slash in flocker datasetName",
@@ -2663,9 +2730,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "flocker.datasetName",
-			errdetail: "must not contain '/'",
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "flocker.datasetName",
+				detail: "must not contain '/'",
+			}},
 		},
 		// RBD
 		{
@@ -2693,8 +2762,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "rbd.monitors",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "rbd.monitors",
+			}},
 		},
 		{
 			name: "empty image",
@@ -2708,8 +2779,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "rbd.image",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "rbd.image",
+			}},
 		},
 		// Cinder
 		{
@@ -2747,8 +2820,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "cephfs.monitors",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "cephfs.monitors",
+			}},
 		},
 		// DownwardAPI
 		{
@@ -2921,8 +2996,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "downwardAPI.mode",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "downwardAPI.mode",
+			}},
 		},
 		{
 			name: "downapi invalid negative item mode",
@@ -2941,8 +3018,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "downwardAPI.mode",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "downwardAPI.mode",
+			}},
 		},
 		{
 			name: "downapi empty metatada path",
@@ -2960,8 +3039,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "downwardAPI.path",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "downwardAPI.path",
+			}},
 		},
 		{
 			name: "downapi absolute path",
@@ -2979,8 +3060,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "downwardAPI.path",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "downwardAPI.path",
+			}},
 		},
 		{
 			name: "downapi dot dot path",
@@ -2998,9 +3081,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "downwardAPI.path",
-			errdetail: `must not contain '..'`,
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "downwardAPI.path",
+				detail: `must not contain '..'`,
+			}},
 		},
 		{
 			name: "downapi dot dot file name",
@@ -3018,9 +3103,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "downwardAPI.path",
-			errdetail: `must not start with '..'`,
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "downwardAPI.path",
+				detail: `must not start with '..'`,
+			}},
 		},
 		{
 			name: "downapi dot dot first level dirent",
@@ -3038,9 +3125,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "downwardAPI.path",
-			errdetail: `must not start with '..'`,
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "downwardAPI.path",
+				detail: `must not start with '..'`,
+			}},
 		},
 		{
 			name: "downapi fieldRef and ResourceFieldRef together",
@@ -3062,9 +3151,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "downwardAPI",
-			errdetail: "fieldRef and resourceFieldRef can not be specified simultaneously",
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "downwardAPI",
+				detail: "fieldRef and resourceFieldRef can not be specified simultaneously",
+			}},
 		},
 		{
 			name: "downapi invalid positive defaultMode",
@@ -3076,8 +3167,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "downwardAPI.defaultMode",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "downwardAPI.defaultMode",
+			}},
 		},
 		{
 			name: "downapi invalid negative defaultMode",
@@ -3089,8 +3182,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "downwardAPI.defaultMode",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "downwardAPI.defaultMode",
+			}},
 		},
 		// FC
 		{
@@ -3134,9 +3229,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeRequired,
-			errfield:  "fc.targetWWNs",
-			errdetail: "must specify either targetWWNs or wwids",
+			errs: []verr{{
+				etype:  field.ErrorTypeRequired,
+				field:  "fc.targetWWNs",
+				detail: "must specify either targetWWNs or wwids",
+			}},
 		},
 		{
 			name: "FC invalid: both targetWWNs and wwids simultaneously",
@@ -3152,9 +3249,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "fc.targetWWNs",
-			errdetail: "targetWWNs and wwids can not be specified simultaneously",
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "fc.targetWWNs",
+				detail: "targetWWNs and wwids can not be specified simultaneously",
+			}},
 		},
 		{
 			name: "FC valid targetWWNs and empty lun",
@@ -3169,9 +3268,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeRequired,
-			errfield:  "fc.lun",
-			errdetail: "lun is required if targetWWNs is specified",
+			errs: []verr{{
+				etype:  field.ErrorTypeRequired,
+				field:  "fc.lun",
+				detail: "lun is required if targetWWNs is specified",
+			}},
 		},
 		{
 			name: "FC valid targetWWNs and invalid lun",
@@ -3186,9 +3287,11 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:   field.ErrorTypeInvalid,
-			errfield:  "fc.lun",
-			errdetail: validation.InclusiveRangeError(0, 255),
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "fc.lun",
+				detail: validation.InclusiveRangeError(0, 255),
+			}},
 		},
 		// FlexVolume
 		{
@@ -3229,8 +3332,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "azureFile.secretName",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "azureFile.secretName",
+			}},
 		},
 		{
 			name: "AzureFile empty share",
@@ -3244,8 +3349,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "azureFile.shareName",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "azureFile.shareName",
+			}},
 		},
 		// Quobyte
 		{
@@ -3273,8 +3380,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "quobyte.registry",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "quobyte.registry",
+			}},
 		},
 		{
 			name: "wrong format registry quobyte",
@@ -3287,8 +3396,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "quobyte.registry",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "quobyte.registry",
+			}},
 		},
 		{
 			name: "wrong format multiple registries quobyte",
@@ -3301,8 +3412,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "quobyte.registry",
+			errs: []verr{{
+				etype: field.ErrorTypeInvalid,
+				field: "quobyte.registry",
+			}},
 		},
 		{
 			name: "empty volume quobyte",
@@ -3314,8 +3427,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "quobyte.volume",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "quobyte.volume",
+			}},
 		},
 		// AzureDisk
 		{
@@ -3341,8 +3456,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "azureDisk.diskName",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "azureDisk.diskName",
+			}},
 		},
 		{
 			name: "AzureDisk empty disk uri",
@@ -3355,8 +3472,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "azureDisk.diskURI",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "azureDisk.diskURI",
+			}},
 		},
 		// ScaleIO
 		{
@@ -3384,8 +3503,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "scaleIO.volumeName",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "scaleIO.volumeName",
+			}},
 		},
 		{
 			name: "ScaleIO with empty gateway",
@@ -3399,8 +3520,10 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "scaleIO.gateway",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "scaleIO.gateway",
+			}},
 		},
 		{
 			name: "ScaleIO with empty system",
@@ -3414,32 +3537,100 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "scaleIO.system",
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "scaleIO.system",
+			}},
+		},
+		// ProjectedVolumeSource
+		{
+			name: "ProjectedVolumeSource more than one projection in a source",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{
+							{
+								Secret: &core.SecretProjection{
+									LocalObjectReference: core.LocalObjectReference{
+										Name: "foo",
+									},
+								},
+							},
+							{
+								Secret: &core.SecretProjection{
+									LocalObjectReference: core.LocalObjectReference{
+										Name: "foo",
+									},
+								},
+								DownwardAPI: &core.DownwardAPIProjection{},
+							},
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeForbidden,
+				field: "projected.sources[1]",
+			}},
+		},
+		{
+			name: "ProjectedVolumeSource more than one projection in a source",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{
+							{
+								Secret: &core.SecretProjection{},
+							},
+							{
+								Secret:      &core.SecretProjection{},
+								DownwardAPI: &core.DownwardAPIProjection{},
+							},
+						},
+					},
+				},
+			},
+			errs: []verr{
+				{
+					etype: field.ErrorTypeRequired,
+					field: "projected.sources[0].secret.name",
+				},
+				{
+					etype: field.ErrorTypeRequired,
+					field: "projected.sources[1].secret.name",
+				},
+				{
+					etype: field.ErrorTypeForbidden,
+					field: "projected.sources[1]",
+				},
+			},
 		},
 	}
 
-	for i, tc := range testCases {
-		names, errs := ValidateVolumes([]core.Volume{tc.vol}, field.NewPath("field"))
-		if len(errs) > 0 && tc.errtype == "" {
-			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
-		} else if len(errs) > 1 {
-			t.Errorf("[%d: %q] expected 1 error, got %d: %v", i, tc.name, len(errs), errs)
-		} else if len(errs) == 0 && tc.errtype != "" {
-			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
-		} else if len(errs) == 1 {
-			if errs[0].Type != tc.errtype {
-				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
-			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
-				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
-			} else if !strings.Contains(errs[0].Detail, tc.errdetail) {
-				t.Errorf("[%d: %q] expected error detail %q, got %q", i, tc.name, tc.errdetail, errs[0].Detail)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			names, errs := ValidateVolumes([]core.Volume{tc.vol}, field.NewPath("field"))
+			if len(errs) != len(tc.errs) {
+				t.Fatalf("unexpected error(s): got %d, want %d: %v", len(tc.errs), len(errs), errs)
 			}
-		} else {
-			if len(names) != 1 || !IsMatchedVolume(tc.vol.Name, names) {
-				t.Errorf("[%d: %q] wrong names result: %v", i, tc.name, names)
+			if len(errs) == 0 && (len(names) > 1 || !IsMatchedVolume(tc.vol.Name, names)) {
+				t.Errorf("wrong names result: %v", names)
 			}
-		}
+			for i, err := range errs {
+				expErr := tc.errs[i]
+				if err.Type != expErr.etype {
+					t.Errorf("unexpected error type: got %v, want %v", expErr.etype, err.Type)
+				}
+				if !strings.HasSuffix(err.Field, "."+expErr.field) {
+					t.Errorf("unexpected error field: got %v, want %v", expErr.field, err.Field)
+				}
+				if !strings.Contains(err.Detail, expErr.detail) {
+					t.Errorf("unexpected error detail: got %v, want %v", expErr.detail, err.Detail)
+				}
+			}
+		})
 	}
 
 	dupsCase := []core.Volume{

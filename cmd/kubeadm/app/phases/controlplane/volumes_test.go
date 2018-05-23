@@ -556,9 +556,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		if _, ok := mounts.volumeMounts[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
 			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
 		}
-		if _, ok := mounts.volumeMounts[kubeadmconstants.KubeControllerManager][cloudConfigVolumeName]; ok {
-			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], cloudConfigVolumeName)
-		}
 		if !reflect.DeepEqual(mounts.volumes, rt.vol) {
 			t.Errorf(
 				"failed getHostPathVolumesForTheControlPlane:\n\texpected: %v\n\t  actual: %v",
@@ -615,19 +612,35 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 	mounts.AddHostPathMounts("component", vols, volMounts)
 	hostPathMounts := []kubeadmapi.HostPathMount{
 		{
-			Name:      "foo",
-			HostPath:  "/tmp/qux",
-			MountPath: "/tmp/qux",
+			Name:      "foo-0",
+			HostPath:  "/tmp/qux-0",
+			MountPath: "/tmp/qux-0",
 			Writable:  false,
+			PathType:  v1.HostPathFile,
 		},
 		{
-			Name:      "bar",
-			HostPath:  "/tmp/asd",
-			MountPath: "/tmp/asd",
+			Name:      "bar-0",
+			HostPath:  "/tmp/asd-0",
+			MountPath: "/tmp/asd-0",
 			Writable:  true,
+			PathType:  v1.HostPathDirectory,
+		},
+		{
+			Name:      "foo-1",
+			HostPath:  "/tmp/qux-1",
+			MountPath: "/tmp/qux-1",
+			Writable:  false,
+			PathType:  v1.HostPathFileOrCreate,
+		},
+		{
+			Name:      "bar-1",
+			HostPath:  "/tmp/asd-1",
+			MountPath: "/tmp/asd-1",
+			Writable:  true,
+			PathType:  v1.HostPathDirectoryOrCreate,
 		},
 	}
-	mounts.AddExtraHostPathMounts("component", hostPathMounts, &hostPathDirectoryOrCreate)
+	mounts.AddExtraHostPathMounts("component", hostPathMounts)
 	for _, hostMount := range hostPathMounts {
 		volumeName := hostMount.Name
 		if _, ok := mounts.volumes["component"][volumeName]; !ok {
@@ -642,6 +655,9 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 		}
 		if _, ok := mounts.volumeMounts["component"][volumeName]; !ok {
 			t.Errorf("Expected to find volume mount %q", volumeName)
+		}
+		if *vol.HostPath.Type != v1.HostPathType(hostMount.PathType) {
+			t.Errorf("Expected to host path type %q", hostMount.PathType)
 		}
 		volMount, _ := mounts.volumeMounts["component"][volumeName]
 		if volMount.Name != volumeName {

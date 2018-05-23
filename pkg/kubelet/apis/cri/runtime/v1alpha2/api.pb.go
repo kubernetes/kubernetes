@@ -744,7 +744,7 @@ type PodSandboxConfig struct {
 	// structured logs, systemd-journald journal files, gRPC trace files, etc.
 	// E.g.,
 	//     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
-	//     ContainerConfig.LogPath = `containerName_Instance#.log`
+	//     ContainerConfig.LogPath = `containerName/Instance#.log`
 	//
 	// WARNING: Log management and how kubelet should interface with the
 	// container logs are under active discussion in
@@ -1790,7 +1790,7 @@ type ContainerConfig struct {
 	// the log (STDOUT and STDERR) on the host.
 	// E.g.,
 	//     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
-	//     ContainerConfig.LogPath = `containerName_Instance#.log`
+	//     ContainerConfig.LogPath = `containerName/Instance#.log`
 	//
 	// WARNING: Log management and how kubelet should interface with the
 	// container logs are under active discussion in
@@ -3052,7 +3052,8 @@ func (*RemoveImageResponse) ProtoMessage()               {}
 func (*RemoveImageResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{76} }
 
 type NetworkConfig struct {
-	// CIDR to use for pod IP addresses.
+	// CIDR to use for pod IP addresses. If the CIDR is empty, runtimes
+	// should omit it.
 	PodCidr string `protobuf:"bytes,1,opt,name=pod_cidr,json=podCidr,proto3" json:"pod_cidr,omitempty"`
 }
 

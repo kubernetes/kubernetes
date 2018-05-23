@@ -30,7 +30,7 @@ const (
 	// HighAvailability is alpha in v1.9
 	HighAvailability = "HighAvailability"
 
-	// CoreDNS is alpha in v1.9
+	// CoreDNS is GA in v1.11
 	CoreDNS = "CoreDNS"
 
 	// SelfHosting is alpha in v1.8 and v1.9
@@ -46,16 +46,14 @@ const (
 	Auditing = "Auditing"
 )
 
-var v190 = version.MustParseSemantic("v1.9.0-alpha.1")
-
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
 	SelfHosting:         {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 	StoreCertsInSecrets: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 	// We don't want to advertise this feature gate exists in v1.9 to avoid confusion as it is not yet working
-	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190, HiddenInHelpText: true},
-	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}, MinimumVersion: v190},
-	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, HiddenInHelpText: true},
+	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.GA}},
+	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 	Auditing:             {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 }
 
@@ -92,7 +90,10 @@ func ValidateVersion(allFeatures FeatureList, requestedFeatures map[string]bool,
 
 // Enabled indicates whether a feature name has been enabled
 func Enabled(featureList map[string]bool, featureName string) bool {
-	return featureList[string(featureName)]
+	if enabled, ok := featureList[string(featureName)]; ok {
+		return enabled
+	}
+	return InitFeatureGates[string(featureName)].Default
 }
 
 // Supports indicates whether a feature name is supported on the given

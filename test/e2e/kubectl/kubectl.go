@@ -58,7 +58,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -67,6 +66,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -529,7 +529,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				ExecOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
 			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-			runTestPod, _, err := util.GetFirstPod(f.InternalClientset.Core(), ns, "run=run-test-3", 1*time.Minute, g)
+			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.InternalClientset.Core(), ns, "run=run-test-3", 1*time.Minute, g)
 			if err != nil {
 				os.Exit(1)
 			}
@@ -1868,11 +1868,12 @@ func startProxyServer() (int, *exec.Cmd, error) {
 }
 
 func curlUnix(url string, path string) (string, error) {
-	dial := func(proto, addr string) (net.Conn, error) {
-		return net.Dial("unix", path)
+	dial := func(ctx context.Context, proto, addr string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, "unix", path)
 	}
 	transport := utilnet.SetTransportDefaults(&http.Transport{
-		Dial: dial,
+		DialContext: dial,
 	})
 	return curlTransport(url, transport)
 }

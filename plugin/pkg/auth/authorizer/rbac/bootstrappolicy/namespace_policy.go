@@ -21,19 +21,20 @@ import (
 
 	"github.com/golang/glog"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
 var (
 	// namespaceRoles is a map of namespace to slice of roles to create
-	namespaceRoles = map[string][]rbac.Role{}
+	namespaceRoles = map[string][]rbacv1.Role{}
 
 	// namespaceRoleBindings is a map of namespace to slice of roleBindings to create
-	namespaceRoleBindings = map[string][]rbac.RoleBinding{}
+	namespaceRoleBindings = map[string][]rbacv1.RoleBinding{}
 )
 
-func addNamespaceRole(namespace string, role rbac.Role) {
+func addNamespaceRole(namespace string, role rbacv1.Role) {
 	if !strings.HasPrefix(namespace, "kube-") {
 		glog.Fatalf(`roles can only be bootstrapped into reserved namespaces starting with "kube-", not %q`, namespace)
 	}
@@ -51,7 +52,7 @@ func addNamespaceRole(namespace string, role rbac.Role) {
 	namespaceRoles[namespace] = existingRoles
 }
 
-func addNamespaceRoleBinding(namespace string, roleBinding rbac.RoleBinding) {
+func addNamespaceRoleBinding(namespace string, roleBinding rbacv1.RoleBinding) {
 	if !strings.HasPrefix(namespace, "kube-") {
 		glog.Fatalf(`rolebindings can only be bootstrapped into reserved namespaces starting with "kube-", not %q`, namespace)
 	}
@@ -70,86 +71,86 @@ func addNamespaceRoleBinding(namespace string, roleBinding rbac.RoleBinding) {
 }
 
 func init() {
-	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+	addNamespaceRole(metav1.NamespaceSystem, rbacv1.Role{
 		// role for finding authentication config info for starting a server
 		ObjectMeta: metav1.ObjectMeta{Name: "extension-apiserver-authentication-reader"},
-		Rules: []rbac.PolicyRule{
+		Rules: []rbacv1.PolicyRule{
 			// this particular config map is exposed and contains authentication configuration information
-			rbac.NewRule("get").Groups(legacyGroup).Resources("configmaps").Names("extension-apiserver-authentication").RuleOrDie(),
+			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("configmaps").Names("extension-apiserver-authentication").RuleOrDie(),
 		},
 	})
-	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+	addNamespaceRole(metav1.NamespaceSystem, rbacv1.Role{
 		// role for the bootstrap signer to be able to inspect kube-system secrets
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "bootstrap-signer"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 		},
 	})
-	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+	addNamespaceRole(metav1.NamespaceSystem, rbacv1.Role{
 		// role for the cloud providers to access/create kube-system configmaps
 		// Deprecated starting Kubernetes 1.10 and will be deleted according to GA deprecation policy.
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "cloud-provider"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
 		},
 	})
-	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+	addNamespaceRole(metav1.NamespaceSystem, rbacv1.Role{
 		// role for the token-cleaner to be able to remove secrets, but only in kube-system
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "token-cleaner"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 			eventsRule(),
 		},
 	})
 	// TODO: Create util on Role+Binding for leader locking if more cases evolve.
-	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+	addNamespaceRole(metav1.NamespaceSystem, rbacv1.Role{
 		// role for the leader locking on supplied configmap
 		ObjectMeta: metav1.ObjectMeta{Name: "system::leader-locking-kube-controller-manager"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
-			rbac.NewRule("get", "update").Groups(legacyGroup).Resources("configmaps").Names("kube-controller-manager").RuleOrDie(),
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("configmaps").Names("kube-controller-manager").RuleOrDie(),
 		},
 	})
-	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+	addNamespaceRole(metav1.NamespaceSystem, rbacv1.Role{
 		// role for the leader locking on supplied configmap
 		ObjectMeta: metav1.ObjectMeta{Name: "system::leader-locking-kube-scheduler"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
-			rbac.NewRule("get", "update").Groups(legacyGroup).Resources("configmaps").Names("kube-scheduler").RuleOrDie(),
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("configmaps").Names("kube-scheduler").RuleOrDie(),
 		},
 	})
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
-		rbac.NewRoleBinding("system::leader-locking-kube-controller-manager", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "kube-controller-manager").BindingOrDie())
+		rbacv1helpers.NewRoleBinding("system::leader-locking-kube-controller-manager", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "kube-controller-manager").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
-		rbac.NewRoleBinding("system::leader-locking-kube-scheduler", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "kube-scheduler").BindingOrDie())
+		rbacv1helpers.NewRoleBinding("system::leader-locking-kube-scheduler", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "kube-scheduler").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
-		rbac.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
+		rbacv1helpers.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
 	// cloud-provider is deprecated starting Kubernetes 1.10 and will be deleted according to GA deprecation policy.
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
-		rbac.NewRoleBinding(saRolePrefix+"cloud-provider", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "cloud-provider").BindingOrDie())
+		rbacv1helpers.NewRoleBinding(saRolePrefix+"cloud-provider", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "cloud-provider").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
-		rbac.NewRoleBinding(saRolePrefix+"token-cleaner", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "token-cleaner").BindingOrDie())
+		rbacv1helpers.NewRoleBinding(saRolePrefix+"token-cleaner", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "token-cleaner").BindingOrDie())
 
-	addNamespaceRole(metav1.NamespacePublic, rbac.Role{
+	addNamespaceRole(metav1.NamespacePublic, rbacv1.Role{
 		// role for the bootstrap signer to be able to write its configmap
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "bootstrap-signer"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
-			rbac.NewRule("update").Groups(legacyGroup).Resources("configmaps").Names("cluster-info").RuleOrDie(),
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("configmaps").Names("cluster-info").RuleOrDie(),
 			eventsRule(),
 		},
 	})
 	addNamespaceRoleBinding(metav1.NamespacePublic,
-		rbac.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespacePublic).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
+		rbacv1helpers.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespacePublic).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
 
 }
 
 // NamespaceRoles returns a map of namespace to slice of roles to create
-func NamespaceRoles() map[string][]rbac.Role {
+func NamespaceRoles() map[string][]rbacv1.Role {
 	return namespaceRoles
 }
 
 // NamespaceRoleBindings returns a map of namespace to slice of roles to create
-func NamespaceRoleBindings() map[string][]rbac.RoleBinding {
+func NamespaceRoleBindings() map[string][]rbacv1.RoleBinding {
 	return namespaceRoleBindings
 }

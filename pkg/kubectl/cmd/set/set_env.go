@@ -34,9 +34,10 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/util/env"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -93,7 +94,7 @@ var (
 )
 
 type EnvOptions struct {
-	PrintFlags *printers.PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 	resource.FilenameOptions
 
 	EnvParams         []string
@@ -114,7 +115,7 @@ type EnvOptions struct {
 	output                 string
 	dryRun                 bool
 	builder                func() *resource.Builder
-	updatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
 	enforceNamespace       bool
 	clientset              *kubernetes.Clientset
@@ -126,7 +127,7 @@ type EnvOptions struct {
 // pod templates are selected by default and allowing environment to be overwritten
 func NewEnvOptions(streams genericclioptions.IOStreams) *EnvOptions {
 	return &EnvOptions{
-		PrintFlags: printers.NewPrintFlags("env updated"),
+		PrintFlags: genericclioptions.NewPrintFlags("env updated").WithTypeSetter(scheme.Scheme),
 
 		ContainerSelector: "*",
 		Overwrite:         true,
@@ -192,7 +193,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return fmt.Errorf("all resources must be specified before environment changes: %s", strings.Join(args, " "))
 	}
 
-	o.updatePodSpecForObject = f.UpdatePodSpecForObject
+	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.dryRun = cmdutil.GetDryRunFlag(cmd)
 
@@ -241,7 +242,7 @@ func (o *EnvOptions) RunEnv() error {
 
 	if len(o.From) != 0 {
 		b := o.builder().
-			WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...).
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			LocalParam(o.Local).
 			ContinueOnError().
 			NamespaceParam(o.namespace).DefaultNamespace().
@@ -305,7 +306,7 @@ func (o *EnvOptions) RunEnv() error {
 	}
 
 	b := o.builder().
-		WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
@@ -413,18 +414,17 @@ func (o *EnvOptions) RunEnv() error {
 		}
 
 		if o.Local || o.dryRun {
-			if err := o.PrintObj(patch.Info.Object, o.Out); err != nil {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v\n", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
 		// make sure arguments to set or replace environment variables are set
 		// before returning a successful message
@@ -432,7 +432,7 @@ func (o *EnvOptions) RunEnv() error {
 			return fmt.Errorf("at least one environment variable must be provided")
 		}
 
-		if err := o.PrintObj(info.Object, o.Out); err != nil {
+		if err := o.PrintObj(actual, o.Out); err != nil {
 			return err
 		}
 	}

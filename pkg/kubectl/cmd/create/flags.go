@@ -18,7 +18,10 @@ package create
 
 import (
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	genericprinters "k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -26,9 +29,11 @@ import (
 // used across all create commands, and provides a method
 // of retrieving a known printer based on flag values provided.
 type PrintFlags struct {
-	JSONYamlPrintFlags *printers.JSONYamlPrintFlags
-	NamePrintFlags     *printers.NamePrintFlags
+	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
+	NamePrintFlags     *genericclioptions.NamePrintFlags
 	TemplateFlags      *printers.KubeTemplatePrintFlags
+
+	TypeSetter *genericprinters.TypeSetterPrinter
 
 	OutputFormat *string
 }
@@ -43,19 +48,19 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 		outputFormat = *f.OutputFormat
 	}
 
-	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
-		return p, err
+	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
+		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
-	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
-		return p, err
+	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
+		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
-	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
-		return p, err
+	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
+		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
-	return nil, printers.NoCompatiblePrinterError{Options: f}
+	return nil, genericclioptions.NoCompatiblePrinterError{Options: f}
 }
 
 func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
@@ -68,14 +73,16 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	}
 }
 
-func NewPrintFlags(operation string) *PrintFlags {
+func NewPrintFlags(operation string, scheme runtime.ObjectTyper) *PrintFlags {
 	outputFormat := ""
 
 	return &PrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-		NamePrintFlags:     printers.NewNamePrintFlags(operation),
+		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
+		NamePrintFlags:     genericclioptions.NewNamePrintFlags(operation),
 		TemplateFlags:      printers.NewKubeTemplatePrintFlags(),
+
+		TypeSetter: genericprinters.NewTypeSetter(scheme),
 	}
 }

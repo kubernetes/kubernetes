@@ -22,6 +22,16 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
+const (
+	// These defaults are deprecated and exported so that we can warn if
+	// they are being used.
+
+	// DefaultClusterSigningCertFile is deprecated. Do not use.
+	DefaultClusterSigningCertFile = "/etc/kubernetes/ca/ca.pem"
+	// DefaultClusterSigningKeyFile is deprecated. Do not use.
+	DefaultClusterSigningKeyFile = "/etc/kubernetes/ca/ca.key"
+)
+
 // CSRSigningControllerOptions holds the CSRSigningController options.
 type CSRSigningControllerOptions struct {
 	ClusterSigningDuration metav1.Duration

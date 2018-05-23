@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // This init should be removed after switching this command and its tests to user external types.
@@ -174,7 +173,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -198,7 +197,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			cmd.Flags().Set("image", "nginx")
 			cmd.Flags().Set("generator", "run/v1")
 
-			printFlags := printers.NewPrintFlags("created")
+			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -208,7 +207,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(genericclioptions.NewTestIOStreamsDiscard()),
+				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
 
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
@@ -331,7 +330,7 @@ func TestGenerateService(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.ClientConfigVal = defaultClientConfig()
@@ -366,7 +365,7 @@ func TestGenerateService(t *testing.T) {
 				}),
 			}
 
-			printFlags := printers.NewPrintFlags("created")
+			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -377,7 +376,7 @@ func TestGenerateService(t *testing.T) {
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(genericclioptions.NewTestIOStreamsDiscard()),
+				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
 
 				IOStreams: ioStreams,
 
@@ -392,7 +391,7 @@ func TestGenerateService(t *testing.T) {
 			cmd := &cobra.Command{}
 			cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
 			cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
-			addRunFlags(cmd)
+			addRunFlags(cmd, opts)
 
 			if !test.expectPOST {
 				opts.DryRun = true

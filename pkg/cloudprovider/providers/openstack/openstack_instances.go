@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
@@ -43,6 +42,7 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 
 	compute, err := os.NewComputeV2()
 	if err != nil {
+		glog.Errorf("unable to access compute v2 API : %v", err)
 		return nil, false
 	}
 
@@ -61,11 +61,7 @@ func (i *Instances) CurrentNodeName(ctx context.Context, hostname string) (types
 	if err != nil {
 		return "", err
 	}
-	domain := "." + i.opts.DHCPDomain
-	if i.opts.DHCPDomain != "" && strings.HasSuffix(md.Hostname, domain) {
-		return types.NodeName(strings.TrimSuffix(md.Hostname, domain)), nil
-	}
-	return types.NodeName(strings.Split(md.Hostname, ".")[0]), nil
+	return types.NodeName(md.Name), nil
 }
 
 // AddSSHKeyToAllInstances is not implemented for OpenStack

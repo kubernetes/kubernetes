@@ -19,16 +19,18 @@ package rollout
 import (
 	"io"
 
+	"github.com/spf13/cobra"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
-
-	"github.com/spf13/cobra"
 )
 
 // UndoOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -36,8 +38,8 @@ import (
 type UndoOptions struct {
 	resource.FilenameOptions
 
-	PrintFlags *printers.PrintFlags
-	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
+	PrintFlags *genericclioptions.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
 	Rollbackers []kubectl.Rollbacker
 	Infos       []*resource.Info
@@ -64,7 +66,8 @@ var (
 
 func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &UndoOptions{
-		PrintFlags: printers.NewPrintFlags(""),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
+		ToRevision: int64(0),
 	}
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
@@ -90,7 +93,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ValidArgs: validArgs,
 	}
 
-	cmd.Flags().Int64("to-revision", 0, "The revision to rollback to. Default to 0 (last revision).")
+	cmd.Flags().Int64Var(&o.ToRevision, "to-revision", o.ToRevision, "The revision to rollback to. Default to 0 (last revision).")
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
@@ -102,7 +105,6 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
-	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
 	o.Out = out
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
@@ -111,17 +113,12 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		return err
 	}
 
-	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
 		if o.DryRun {
 			o.PrintFlags.Complete("%s (dry run)")
 		}
-		printer, err := o.PrintFlags.ToPrinter()
-		if err != nil {
-			return nil, err
-		}
-
-		return printer.PrintObj, nil
+		return o.PrintFlags.ToPrinter()
 	}
 
 	r := f.NewBuilder().

@@ -3362,9 +3362,6 @@ type ServiceSpec struct {
 	// The primary use case for setting this field is to use a StatefulSet's Headless Service
 	// to propagate SRV records for its Pods without respect to their readiness for purpose
 	// of peer discovery.
-	// This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints
-	// when that annotation is deprecated and all clients have been converted to use this
-	// field.
 	// +optional
 	PublishNotReadyAddresses bool `json:"publishNotReadyAddresses,omitempty" protobuf:"varint,13,opt,name=publishNotReadyAddresses"`
 	// sessionAffinityConfig contains the configurations of session affinity.
@@ -3410,6 +3407,7 @@ type ServicePort struct {
 }
 
 // +genclient
+// +genclient:skipVerbs=deleteCollection
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -3640,12 +3638,46 @@ type NodeSpec struct {
 	DoNotUse_ExternalID string `json:"externalID,omitempty" protobuf:"bytes,2,opt,name=externalID"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.
 type NodeConfigSource struct {
-	metav1.TypeMeta `json:",inline"`
-	ConfigMapRef    *ObjectReference `json:"configMapRef,omitempty" protobuf:"bytes,1,opt,name=configMapRef"`
+	// For historical context, regarding the below kind, apiVersion, and configMapRef deprecation tags:
+	// 1. kind/apiVersion were used by the kubelet to persist this struct to disk (they had no protobuf tags)
+	// 2. configMapRef and proto tag 1 were used by the API to refer to a configmap,
+	//    but used a generic ObjectReference type that didn't really have the fields we needed
+	// All uses/persistence of the NodeConfigSource struct prior to 1.11 were gated by alpha feature flags,
+	// so there was no persisted data for these fields that needed to be migrated/handled.
+
+	// +k8s:deprecated=kind
+	// +k8s:deprecated=apiVersion
+	// +k8s:deprecated=configMapRef,protobuf=1
+
+	// ConfigMap is a reference to a Node's ConfigMap
+	ConfigMap *ConfigMapNodeConfigSource `json:"configMap,omitempty" protobuf:"bytes,2,opt,name=configMap"`
+}
+
+// ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.
+type ConfigMapNodeConfigSource struct {
+	// Namespace is the metadata.namespace of the referenced ConfigMap.
+	// This field is required in all cases.
+	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
+
+	// Name is the metadata.name of the referenced ConfigMap.
+	// This field is required in all cases.
+	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
+
+	// UID is the metadata.UID of the referenced ConfigMap.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
+	// +optional
+	UID types.UID `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
+
+	// ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
+	// +optional
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
+
+	// KubeletConfigKey declares which key of the referenced ConfigMap corresponds to the KubeletConfiguration structure
+	// This field is required in all cases.
+	KubeletConfigKey string `json:"kubeletConfigKey" protobuf:"bytes,5,opt,name=kubeletConfigKey"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -3695,6 +3727,53 @@ type NodeSystemInfo struct {
 	Architecture string `json:"architecture" protobuf:"bytes,10,opt,name=architecture"`
 }
 
+// NodeConfigStatus describes the status of the config assigned by Node.Spec.ConfigSource.
+type NodeConfigStatus struct {
+	// Assigned reports the checkpointed config the node will try to use.
+	// When Node.Spec.ConfigSource is updated, the node checkpoints the associated
+	// config payload to local disk, along with a record indicating intended
+	// config. The node refers to this record to choose its config checkpoint, and
+	// reports this record in Assigned. Assigned only updates in the status after
+	// the record has been checkpointed to disk. When the Kubelet is restarted,
+	// it tries to make the Assigned config the Active config by loading and
+	// validating the checkpointed payload identified by Assigned.
+	// +optional
+	Assigned *NodeConfigSource `json:"assigned,omitempty" protobuf:"bytes,1,opt,name=assigned"`
+	// Active reports the checkpointed config the node is actively using.
+	// Active will represent either the current version of the Assigned config,
+	// or the current LastKnownGood config, depending on whether attempting to use the
+	// Assigned config results in an error.
+	// +optional
+	Active *NodeConfigSource `json:"active,omitempty" protobuf:"bytes,2,opt,name=active"`
+	// LastKnownGood reports the checkpointed config the node will fall back to
+	// when it encounters an error attempting to use the Assigned config.
+	// The Assigned config becomes the LastKnownGood config when the node determines
+	// that the Assigned config is stable and correct.
+	// This is currently implemented as a 10-minute soak period starting when the local
+	// record of Assigned config is updated. If the Assigned config is Active at the end
+	// of this period, it becomes the LastKnownGood. Note that if Spec.ConfigSource is
+	// reset to nil (use local defaults), the LastKnownGood is also immediately reset to nil,
+	// because the local default config is always assumed good.
+	// You should not make assumptions about the node's method of determining config stability
+	// and correctness, as this may change or become configurable in the future.
+	// +optional
+	LastKnownGood *NodeConfigSource `json:"lastKnownGood,omitempty" protobuf:"bytes,3,opt,name=lastKnownGood"`
+	// Error describes any problems reconciling the Spec.ConfigSource to the Active config.
+	// Errors may occur, for example, attempting to checkpoint Spec.ConfigSource to the local Assigned
+	// record, attempting to checkpoint the payload associated with Spec.ConfigSource, attempting
+	// to load or validate the Assigned config, etc.
+	// Errors may occur at different points while syncing config. Earlier errors (e.g. download or
+	// checkpointing errors) will not result in a rollback to LastKnownGood, and may resolve across
+	// Kubelet retries. Later errors (e.g. loading or validating a checkpointed config) will result in
+	// a rollback to LastKnownGood. In the latter case, it is usually possible to resolve the error
+	// by fixing the config assigned in Spec.ConfigSource.
+	// You can find additional information for debugging by searching the error message in the Kubelet log.
+	// Error is a human-readable description of the error state; machines can check whether or not Error
+	// is empty, but should not rely on the stability of the Error text across Kubelet versions.
+	// +optional
+	Error string `json:"error,omitempty" protobuf:"bytes,4,opt,name=error"`
+}
+
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
 	// Capacity represents the total resources of a node.
@@ -3739,6 +3818,9 @@ type NodeStatus struct {
 	// List of volumes that are attached to the node.
 	// +optional
 	VolumesAttached []AttachedVolume `json:"volumesAttached,omitempty" protobuf:"bytes,10,rep,name=volumesAttached"`
+	// Status of the config assigned to the node via the dynamic Kubelet config feature.
+	// +optional
+	Config *NodeConfigStatus `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
 }
 
 type UniqueVolumeName string
@@ -3826,8 +3908,6 @@ const (
 	NodePIDPressure NodeConditionType = "PIDPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
-	// NodeKubeletConfigOk indicates whether the kubelet is correctly configured
-	NodeKubeletConfigOk NodeConditionType = "KubeletConfigOk"
 )
 
 // NodeCondition contains condition information for a node.
@@ -3976,6 +4056,7 @@ const (
 
 // +genclient
 // +genclient:nonNamespaced
+// +genclient:skipVerbs=deleteCollection
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Namespace provides a scope for Names.

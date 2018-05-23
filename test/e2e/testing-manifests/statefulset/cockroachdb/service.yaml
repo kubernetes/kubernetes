@@ -9,13 +9,6 @@ metadata:
   labels:
     app: cockroachdb
   annotations:
-    # This is needed to make the peer-finder work properly and to help avoid
-    # edge cases where instance 0 comes up after losing its data and needs to
-    # decide whether it should create a new cluster or try to join an existing
-    # one. If it creates a new cluster when it should have joined an existing
-    # one, we'd end up with two separate clusters listening at the same service
-    # endpoint, which would be very bad.
-    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
     # Enable automatic monitoring of all instances when Prometheus is running in the cluster.
     prometheus.io/scrape: "true"
     prometheus.io/path: "_status/vars"
@@ -31,3 +24,10 @@ spec:
   clusterIP: None
   selector:
     app: cockroachdb
+  # This is needed to make the peer-finder work properly and to help avoid
+  # edge cases where instance 0 comes up after losing its data and needs to
+  # decide whether it should create a new cluster or try to join an existing
+  # one. If it creates a new cluster when it should have joined an existing
+  # one, we'd end up with two separate clusters listening at the same service
+  # endpoint, which would be very bad.
+  publishNotReadyAddresses: true

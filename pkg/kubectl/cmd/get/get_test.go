@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
@@ -49,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -61,7 +61,7 @@ func init() {
 	scheme.Scheme.AddConversionFuncs(v1.Convert_v1_PodSecurityContext_To_core_PodSecurityContext)
 }
 
-var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
+var unstructuredSerializer = resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer
 
 func defaultHeader() http.Header {
 	header := http.Header{}
@@ -75,7 +75,7 @@ func defaultClientConfig() *restclient.Config {
 		ContentConfig: restclient.ContentConfig{
 			NegotiatedSerializer: scheme.Codecs,
 			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &scheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
+			GroupVersion:         &schema.GroupVersion{Group: "", Version: "v1"},
 		},
 	}
 }
@@ -251,7 +251,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	// overide the openAPISchema function to return custom output
 	// for Pod type.
@@ -308,7 +308,7 @@ func TestGetObjects(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -323,6 +323,60 @@ func TestGetObjects(t *testing.T) {
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
 foo       0/0                 0          <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestGetObjectsShowKind(t *testing.T) {
+	pods, _, _ := testData()
+
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+	}
+	tf.Namespace = "test"
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("show-kind", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME      READY     STATUS    RESTARTS   AGE
+pod/foo   0/0                 0          <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestGetObjectsShowLabels(t *testing.T) {
+	pods, _, _ := testData()
+
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+	}
+	tf.Namespace = "test"
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("show-labels", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME      READY     STATUS    RESTARTS   AGE         LABELS
+foo       0/0                 0          <unknown>   <none>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -346,7 +400,7 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -399,7 +453,7 @@ func TestGetSortedObjects(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -431,7 +485,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -458,34 +512,7 @@ func TestGetListObjects(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
-	}
-	tf.Namespace = "test"
-
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
-	cmd.Run(cmd, []string{"pods"})
-
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
-`
-	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetAllListObjects(t *testing.T) {
-	pods, _, _ := testData()
-
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -512,7 +539,7 @@ func TestGetListComponentStatus(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -553,7 +580,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -603,7 +630,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -642,7 +669,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -742,7 +769,7 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -786,7 +813,7 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -835,7 +862,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -944,7 +971,7 @@ func TestWatchLabelSelector(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	podList := &api.PodList{
 		Items: pods,
@@ -996,7 +1023,7 @@ func TestWatchFieldSelector(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	podList := &api.PodList{
 		Items: pods,
@@ -1048,7 +1075,7 @@ func TestWatchResource(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -1092,7 +1119,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -1137,7 +1164,7 @@ func TestWatchOnlyResource(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -1180,7 +1207,7 @@ func TestWatchOnlyList(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	podList := &api.PodList{
 		Items: pods,

@@ -35,6 +35,7 @@ import (
 	"github.com/fatih/camelcase"
 
 	versionedextension "k8s.io/api/extensions/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -63,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
@@ -166,10 +168,10 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]printers.Desc
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 		policy.Kind("PodDisruptionBudget"):             &PodDisruptionBudgetDescriber{c},
-		rbac.Kind("Role"):                              &RoleDescriber{c},
-		rbac.Kind("ClusterRole"):                       &ClusterRoleDescriber{c},
-		rbac.Kind("RoleBinding"):                       &RoleBindingDescriber{c},
-		rbac.Kind("ClusterRoleBinding"):                &ClusterRoleBindingDescriber{c},
+		rbac.Kind("Role"):                              &RoleDescriber{externalclient},
+		rbac.Kind("ClusterRole"):                       &ClusterRoleDescriber{externalclient},
+		rbac.Kind("RoleBinding"):                       &RoleBindingDescriber{externalclient},
+		rbac.Kind("ClusterRoleBinding"):                &ClusterRoleBindingDescriber{externalclient},
 		networking.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
 		scheduling.Kind("PriorityClass"):               &PriorityClassDescriber{c},
 	}
@@ -203,12 +205,7 @@ type genericDescriber struct {
 }
 
 func (g *genericDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (output string, err error) {
-	apiResource := &metav1.APIResource{
-		Name:       g.mapping.Resource.Resource,
-		Namespaced: g.mapping.Scope.Name() == meta.RESTScopeNameNamespace,
-		Kind:       g.mapping.GroupVersionKind.Kind,
-	}
-	obj, err := g.dynamic.Resource(apiResource, namespace).Get(name, metav1.GetOptions{})
+	obj, err := g.dynamic.Resource(g.mapping.Resource).Namespace(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2448,7 +2445,7 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 
 // RoleDescriber generates information about a node.
 type RoleDescriber struct {
-	clientset.Interface
+	externalclient.Interface
 }
 
 func (d *RoleDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
@@ -2457,7 +2454,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings print
 		return "", err
 	}
 
-	breakdownRules := []rbac.PolicyRule{}
+	breakdownRules := []rbacv1.PolicyRule{}
 	for _, rule := range role.Rules {
 		breakdownRules = append(breakdownRules, validation.BreakdownRule(rule)...)
 	}
@@ -2466,7 +2463,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings print
 	if err != nil {
 		return "", err
 	}
-	sort.Stable(rbac.SortableRuleSlice(compactRules))
+	sort.Stable(rbacv1helpers.SortableRuleSlice(compactRules))
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
@@ -2487,7 +2484,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings print
 
 // ClusterRoleDescriber generates information about a node.
 type ClusterRoleDescriber struct {
-	clientset.Interface
+	externalclient.Interface
 }
 
 func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
@@ -2496,7 +2493,7 @@ func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSetting
 		return "", err
 	}
 
-	breakdownRules := []rbac.PolicyRule{}
+	breakdownRules := []rbacv1.PolicyRule{}
 	for _, rule := range role.Rules {
 		breakdownRules = append(breakdownRules, validation.BreakdownRule(rule)...)
 	}
@@ -2505,7 +2502,7 @@ func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	sort.Stable(rbac.SortableRuleSlice(compactRules))
+	sort.Stable(rbacv1helpers.SortableRuleSlice(compactRules))
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
@@ -2543,7 +2540,7 @@ func combineResourceGroup(resource, group []string) string {
 
 // RoleBindingDescriber generates information about a node.
 type RoleBindingDescriber struct {
-	clientset.Interface
+	externalclient.Interface
 }
 
 func (d *RoleBindingDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
@@ -2575,7 +2572,7 @@ func (d *RoleBindingDescriber) Describe(namespace, name string, describerSetting
 
 // ClusterRoleBindingDescriber generates information about a node.
 type ClusterRoleBindingDescriber struct {
-	clientset.Interface
+	externalclient.Interface
 }
 
 func (d *ClusterRoleBindingDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
@@ -2769,6 +2766,14 @@ func describeStatefulSet(ps *apps.StatefulSet, selector labels.Selector, events 
 		printLabelsMultiline(w, "Labels", ps.Labels)
 		printAnnotationsMultiline(w, "Annotations", ps.Annotations)
 		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", ps.Spec.Replicas, ps.Status.Replicas)
+		w.Write(LEVEL_0, "Update Strategy:\t%s\n", ps.Spec.UpdateStrategy.Type)
+		if ps.Spec.UpdateStrategy.RollingUpdate != nil {
+			ru := ps.Spec.UpdateStrategy.RollingUpdate
+			if ru.Partition != 0 {
+				w.Write(LEVEL_1, "Partition:\t%d\n", ru.Partition)
+			}
+		}
+
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		DescribePodTemplate(&ps.Spec.Template, w)
 		describeVolumeClaimTemplates(ps.Spec.VolumeClaimTemplates, w)

@@ -227,7 +227,7 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 	}
 }
 
-func LegacyTestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
+func TestLegacyReplicaCalcDisjointResourcesMetrics(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas: 1,
 		expectedError:   fmt.Errorf("no metrics returned matched known pods"),
@@ -243,7 +243,7 @@ func LegacyTestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcScaleUp(t *testing.T) {
+func TestLegacyReplicaCalcScaleUp(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 5,
@@ -260,7 +260,7 @@ func LegacyTestReplicaCalcScaleUp(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
+func TestLegacyReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 4,
@@ -278,7 +278,7 @@ func LegacyTestReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
+func TestLegacyReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
@@ -296,7 +296,7 @@ func LegacyTestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcScaleUpCM(t *testing.T) {
+func TestLegacyReplicaCalcScaleUpCM(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 4,
@@ -310,7 +310,7 @@ func LegacyTestReplicaCalcScaleUpCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
+func TestLegacyReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 4,
@@ -325,7 +325,7 @@ func LegacyTestReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
+func TestLegacyReplicaCalcScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
@@ -340,7 +340,7 @@ func LegacyTestReplicaCalcScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcScaleDown(t *testing.T) {
+func TestLegacyReplicaCalcScaleDown(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  5,
 		expectedReplicas: 3,
@@ -357,7 +357,7 @@ func LegacyTestReplicaCalcScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcScaleDownCM(t *testing.T) {
+func TestLegacyReplicaCalcScaleDownCM(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  5,
 		expectedReplicas: 3,
@@ -371,7 +371,7 @@ func LegacyTestReplicaCalcScaleDownCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
+func TestLegacyReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  5,
 		expectedReplicas: 2,
@@ -389,7 +389,7 @@ func LegacyTestReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcTolerance(t *testing.T) {
+func TestLegacyReplicaCalcTolerance(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
@@ -406,7 +406,7 @@ func LegacyTestReplicaCalcTolerance(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcToleranceCM(t *testing.T) {
+func TestLegacyReplicaCalcToleranceCM(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
@@ -420,7 +420,7 @@ func LegacyTestReplicaCalcToleranceCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcSuperfluousMetrics(t *testing.T) {
+func TestLegacyReplicaCalcSuperfluousMetrics(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  4,
 		expectedReplicas: 24,
@@ -436,7 +436,7 @@ func LegacyTestReplicaCalcSuperfluousMetrics(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcMissingMetrics(t *testing.T) {
+func TestLegacyReplicaCalcMissingMetrics(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  4,
 		expectedReplicas: 3,
@@ -453,7 +453,7 @@ func LegacyTestReplicaCalcMissingMetrics(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcEmptyMetrics(t *testing.T) {
+func TestLegacyReplicaCalcEmptyMetrics(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas: 4,
 		expectedError:   fmt.Errorf("unable to get metrics for resource cpu: no metrics returned from heapster"),
@@ -468,7 +468,7 @@ func LegacyTestReplicaCalcEmptyMetrics(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcEmptyCPURequest(t *testing.T) {
+func TestLegacyReplicaCalcEmptyCPURequest(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas: 1,
 		expectedError:   fmt.Errorf("missing request for"),
@@ -483,7 +483,7 @@ func LegacyTestReplicaCalcEmptyCPURequest(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
+func TestLegacyReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  2,
 		expectedReplicas: 2,
@@ -500,7 +500,7 @@ func LegacyTestReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcMissingMetricsNoChangeGt(t *testing.T) {
+func TestLegacyReplicaCalcMissingMetricsNoChangeGt(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  2,
 		expectedReplicas: 2,
@@ -517,7 +517,7 @@ func LegacyTestReplicaCalcMissingMetricsNoChangeGt(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
+func TestLegacyReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  2,
 		expectedReplicas: 2,
@@ -534,7 +534,7 @@ func LegacyTestReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
+func TestLegacyReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
@@ -552,7 +552,7 @@ func LegacyTestReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
+func TestLegacyReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 4,
@@ -570,7 +570,7 @@ func LegacyTestReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
 	tc.runTest(t)
 }
 
-func LegacyTestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
+func TestLegacyReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  4,
 		expectedReplicas: 3,
@@ -591,7 +591,7 @@ func LegacyTestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 // TestComputedToleranceAlgImplementation is a regression test which
 // back-calculates a minimal percentage for downscaling based on a small percentage
 // increase in pod utilization which is calibrated against the tolerance value.
-func LegacyTestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
+func TestLegacyReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 
 	startPods := int32(10)
 	// 150 mCPU per pod.

@@ -248,7 +248,7 @@ const (
 	TokenRequest utilfeature.Feature = "TokenRequest"
 
 	// owner: @Random-Liu
-	// alpha: v1.10
+	// beta: v1.11
 	//
 	// Enable container log rotation for cri container runtime
 	CRIContainerLogRotation utilfeature.Feature = "CRIContainerLogRotation"
@@ -322,7 +322,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
 	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
-	CRIContainerLogRotation:                     {Default: false, PreRelease: utilfeature.Alpha},
+	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
@@ -340,7 +340,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	apiextensionsfeatures.CustomResourceValidation:   {Default: true, PreRelease: utilfeature.Beta},
-	apiextensionsfeatures.CustomResourceSubresources: {Default: false, PreRelease: utilfeature.Alpha},
+	apiextensionsfeatures.CustomResourceSubresources: {Default: true, PreRelease: utilfeature.Beta},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	ServiceProxyAllowExternalIPs: {Default: false, PreRelease: utilfeature.Deprecated},

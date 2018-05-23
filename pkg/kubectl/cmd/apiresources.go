@@ -72,7 +72,8 @@ type groupResource struct {
 
 func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *ApiResourcesOptions {
 	return &ApiResourcesOptions{
-		IOStreams: ioStreams,
+		IOStreams:  ioStreams,
+		Namespaced: true,
 	}
 }
 
@@ -85,37 +86,25 @@ func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 		Long:    "Print the supported API resources on the server",
 		Example: apiresources_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(cmd))
 			cmdutil.CheckErr(o.Validate(cmd))
 			cmdutil.CheckErr(o.RunApiResources(cmd, f))
 		},
 	}
 
-	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
-	cmd.Flags().StringP("output", "o", "", "Output format. One of: wide|name.")
+	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "Output format. One of: wide|name.")
 
-	cmd.Flags().StringVar(&o.APIGroup, "api-group", "", "Limit to resources in the specified API group.")
-	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", true, "Namespaced indicates if a resource is namespaced or not.")
+	cmd.Flags().StringVar(&o.APIGroup, "api-group", o.APIGroup, "Limit to resources in the specified API group.")
+	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", o.Namespaced, "If false, non-namespaced resources will be returned, otherwise returning namespaced resources by default.")
 	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
 	cmd.Flags().BoolVar(&o.Cached, "cached", o.Cached, "Use the cached list of resources if available.")
 	return cmd
 }
 
-func (o *ApiResourcesOptions) Complete(cmd *cobra.Command) error {
-	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
-	return nil
-}
-
 func (o *ApiResourcesOptions) Validate(cmd *cobra.Command) error {
-	validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
 	supportedOutputTypes := sets.NewString("", "wide", "name")
-	outputFormat := cmdutil.GetFlagString(cmd, "output")
-	if !validOutputTypes.Has(outputFormat) {
-		return fmt.Errorf("output must be one of '' or 'wide': %v", outputFormat)
-	}
-	if !supportedOutputTypes.Has(outputFormat) {
-		return fmt.Errorf("--output %v is not available in kubectl api-resources", outputFormat)
+	if !supportedOutputTypes.Has(o.Output) {
+		return fmt.Errorf("--output %v is not available in kubectl api-resources", o.Output)
 	}
 	return nil
 }
@@ -124,7 +113,7 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 	w := printers.GetNewTabWriter(o.Out)
 	defer w.Flush()
 
-	discoveryclient, err := f.DiscoveryClient()
+	discoveryclient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}

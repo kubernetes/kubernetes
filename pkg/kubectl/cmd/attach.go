@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -160,7 +161,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		return err
 	}
 
-	attachablePod, err := f.AttachablePodForObject(obj, p.GetPodTimeout)
+	attachablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, obj, p.GetPodTimeout)
 	if err != nil {
 		return err
 	}
@@ -177,7 +178,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", fullCmdName, p.PodName, p.Namespace)
 	}
 
-	config, err := f.ClientConfig()
+	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -187,6 +188,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 	if err != nil {
 		return err
 	}
+
 	p.PodClient = clientset.Core()
 
 	if p.CommandName == "" {

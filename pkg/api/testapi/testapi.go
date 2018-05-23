@@ -136,13 +136,13 @@ func init() {
 	}
 
 	if _, ok := Groups[api.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: api.GroupName, Version: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: api.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(api.GroupName)[0].Version}
 		Groups[api.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[extensions.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: extensions.GroupName, Version: legacyscheme.Registry.GroupOrDie(extensions.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: extensions.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(extensions.GroupName)[0].Version}
 		Groups[extensions.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
@@ -155,7 +155,7 @@ func init() {
 			}
 			internalTypes[k] = t
 		}
-		externalGroupVersion := schema.GroupVersion{Group: autoscaling.GroupName, Version: legacyscheme.Registry.GroupOrDie(autoscaling.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: autoscaling.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(autoscaling.GroupName)[0].Version}
 		Groups[autoscaling.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
@@ -168,91 +168,91 @@ func init() {
 				break
 			}
 		}
-		externalGroupVersion := schema.GroupVersion{Group: autoscaling.GroupName, Version: legacyscheme.Registry.GroupOrDie(autoscaling.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: autoscaling.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(autoscaling.GroupName)[0].Version}
 		Groups[autoscaling.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[batch.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: batch.GroupName, Version: legacyscheme.Registry.GroupOrDie(batch.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: batch.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(batch.GroupName)[0].Version}
 		Groups[batch.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[apps.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: apps.GroupName, Version: legacyscheme.Registry.GroupOrDie(apps.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: apps.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(apps.GroupName)[0].Version}
 		Groups[apps.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[policy.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: policy.GroupName, Version: legacyscheme.Registry.GroupOrDie(policy.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: policy.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(policy.GroupName)[0].Version}
 		Groups[policy.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[rbac.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: rbac.GroupName, Version: legacyscheme.Registry.GroupOrDie(rbac.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: rbac.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(rbac.GroupName)[0].Version}
 		Groups[rbac.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[scheduling.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: scheduling.GroupName, Version: legacyscheme.Registry.GroupOrDie(scheduling.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: scheduling.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(scheduling.GroupName)[0].Version}
 		Groups[scheduling.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[settings.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: settings.GroupName, Version: legacyscheme.Registry.GroupOrDie(settings.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: settings.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(settings.GroupName)[0].Version}
 		Groups[settings.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[storage.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: storage.GroupName, Version: legacyscheme.Registry.GroupOrDie(storage.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: storage.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(storage.GroupName)[0].Version}
 		Groups[storage.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[certificates.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: certificates.GroupName, Version: legacyscheme.Registry.GroupOrDie(certificates.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: certificates.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(certificates.GroupName)[0].Version}
 		Groups[certificates.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[imagepolicy.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: imagepolicy.GroupName, Version: legacyscheme.Registry.GroupOrDie(imagepolicy.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: imagepolicy.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(imagepolicy.GroupName)[0].Version}
 		Groups[imagepolicy.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[authorization.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: authorization.GroupName, Version: legacyscheme.Registry.GroupOrDie(authorization.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: authorization.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(authorization.GroupName)[0].Version}
 		Groups[authorization.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[admissionregistration.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: admissionregistration.GroupName, Version: legacyscheme.Registry.GroupOrDie(admissionregistration.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: admissionregistration.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(admissionregistration.GroupName)[0].Version}
 		Groups[admissionregistration.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[admission.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: admission.GroupName, Version: legacyscheme.Registry.GroupOrDie(admission.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: admission.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(admission.GroupName)[0].Version}
 		Groups[admission.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[networking.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: networking.GroupName, Version: legacyscheme.Registry.GroupOrDie(networking.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: networking.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(networking.GroupName)[0].Version}
 		Groups[networking.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
 	if _, ok := Groups[events.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: events.GroupName, Version: legacyscheme.Registry.GroupOrDie(events.GroupName).GroupVersions[0].Version}
+		externalGroupVersion := schema.GroupVersion{Group: events.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(events.GroupName)[0].Version}
 		Groups[events.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}

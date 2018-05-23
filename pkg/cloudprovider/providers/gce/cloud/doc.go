@@ -109,4 +109,9 @@ limitations under the License.
 //  func (gce *GCEInstanceGroups) MyMethod() {
 //    // Custom implementation.
 //  }
+//
+// Update generated codes
+//
+// Run hack/update-cloudprovider-gce.sh to update the generated codes.
+//
 package cloud

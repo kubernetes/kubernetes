@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -79,7 +80,7 @@ func TestClusterScopedCRUD(t *testing.T) {
 	testFieldSelector(t, ns, noxuDefinition, dynamicClient)
 }
 
-func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.DynamicInterface) {
+func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.Interface) {
 	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	initialList, err := noxuResourceClient.List(metav1.ListOptions{})
 	if err != nil {
@@ -201,7 +202,7 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 	}
 }
 
-func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.DynamicInterface) {
+func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.Interface) {
 	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	initialList, err := noxuResourceClient.List(metav1.ListOptions{})
 	if err != nil {
@@ -703,7 +704,7 @@ func TestCrossNamespaceListWatch(t *testing.T) {
 	checkNamespacesWatchHelper(t, ns2, noxuNamespacesWatch2)
 }
 
-func createInstanceWithNamespaceHelper(t *testing.T, ns string, name string, noxuNamespacedResourceClient dynamic.DynamicResourceInterface, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition) *unstructured.Unstructured {
+func createInstanceWithNamespaceHelper(t *testing.T, ns string, name string, noxuNamespacedResourceClient dynamic.ResourceInterface, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition) *unstructured.Unstructured {
 	createdInstance, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, name), noxuNamespacedResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu Instance:%v", err)
@@ -795,6 +796,41 @@ func TestNameConflict(t *testing.T) {
 		}
 		return false, nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStatusGetAndPatch(t *testing.T) {
+	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure we don't get 405 Method Not Allowed from Getting CRD/status subresource
+	result := &apiextensionsv1beta1.CustomResourceDefinition{}
+	err = apiExtensionClient.ApiextensionsV1beta1().RESTClient().Get().
+		Resource("customresourcedefinitions").
+		Name(noxuDefinition.Name).
+		SubResource("status").
+		Do().
+		Into(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure we don't get 405 Method Not Allowed from Patching CRD/status subresource
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().
+		Patch(noxuDefinition.Name, types.StrategicMergePatchType,
+			[]byte(fmt.Sprintf(`{"labels":{"test-label":"dummy"}}`)),
+			"status")
 	if err != nil {
 		t.Fatal(err)
 	}

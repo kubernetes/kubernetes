@@ -59,7 +59,7 @@ func TestCreatePdb(t *testing.T) {
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", outputFormat)
 
-	printFlags := NewPrintFlags("created")
+	printFlags := NewPrintFlags("created", legacyscheme.Scheme)
 	printFlags.OutputFormat = &outputFormat
 
 	options := &PodDisruptionBudgetOpts{
@@ -69,12 +69,12 @@ func TestCreatePdb(t *testing.T) {
 			IOStreams:  ioStreams,
 		},
 	}
-	err := options.Complete(cmd, []string{pdbName})
+	err := options.Complete(tf, cmd, []string{pdbName})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	err = options.Run(tf)
+	err = options.Run()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

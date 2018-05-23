@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	versionedfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -282,10 +283,12 @@ func getResourceList(cpu, memory string) api.ResourceList {
 
 func TestDescribeService(t *testing.T) {
 	testCases := []struct {
+		name    string
 		service *api.Service
 		expect  []string
 	}{
 		{
+			name: "test1",
 			service: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
@@ -323,6 +326,7 @@ func TestDescribeService(t *testing.T) {
 			},
 		},
 		{
+			name: "test2",
 			service: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
@@ -361,18 +365,20 @@ func TestDescribeService(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		fake := fake.NewSimpleClientset(testCase.service)
-		c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-		d := ServiceDescriber{c}
-		out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		for _, expected := range testCase.expect {
-			if !strings.Contains(out, expected) {
-				t.Errorf("expected to find %q in output: %q", expected, out)
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.service)
+			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+			d := ServiceDescriber{c}
+			out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
-		}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
 	}
 }
 
@@ -452,12 +458,14 @@ func VerifyDatesInOrder(
 func TestDescribeContainers(t *testing.T) {
 	trueVal := true
 	testCases := []struct {
+		name             string
 		container        api.Container
 		status           api.ContainerStatus
 		expectedElements []string
 	}{
 		// Running state.
 		{
+			name:      "test1",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name: "test",
@@ -473,6 +481,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Waiting state.
 		{
+			name:      "test2",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name: "test",
@@ -488,6 +497,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Terminated state.
 		{
+			name:      "test3",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name: "test",
@@ -506,6 +516,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Last Terminated
 		{
+			name:      "test4",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name: "test",
@@ -529,6 +540,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// No state defaults to waiting.
 		{
+			name:      "test5",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -539,6 +551,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Env
 		{
+			name:      "test6",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{ConfigMapRef: &api.ConfigMapEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -548,6 +561,7 @@ func TestDescribeContainers(t *testing.T) {
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap\tOptional: false"},
 		},
 		{
+			name:      "test7",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{Prefix: "p_", ConfigMapRef: &api.ConfigMapEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -557,6 +571,7 @@ func TestDescribeContainers(t *testing.T) {
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap with prefix 'p_'\tOptional: false"},
 		},
 		{
+			name:      "test8",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{ConfigMapRef: &api.ConfigMapEnvSource{Optional: &trueVal, LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -566,6 +581,7 @@ func TestDescribeContainers(t *testing.T) {
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap\tOptional: true"},
 		},
 		{
+			name:      "test9",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}, Optional: &trueVal}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -575,6 +591,7 @@ func TestDescribeContainers(t *testing.T) {
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tSecret\tOptional: true"},
 		},
 		{
+			name:      "test10",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{Prefix: "p_", SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -585,6 +602,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Command
 		{
+			name:      "test11",
 			container: api.Container{Name: "test", Image: "image", Command: []string{"sleep", "1000"}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -595,6 +613,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Args
 		{
+			name:      "test12",
 			container: api.Container{Name: "test", Image: "image", Args: []string{"time", "1000"}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -605,6 +624,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Using limits.
 		{
+			name: "test13",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -625,6 +645,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Using requests.
 		{
+			name: "test14",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -640,6 +661,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// volumeMounts read/write
 		{
+			name: "test15",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -654,6 +676,7 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// volumeMounts readonly
 		{
+			name: "test16",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -670,6 +693,7 @@ func TestDescribeContainers(t *testing.T) {
 
 		// volumeDevices
 		{
+			name: "test17",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -685,23 +709,25 @@ func TestDescribeContainers(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		out := new(bytes.Buffer)
-		pod := api.Pod{
-			Spec: api.PodSpec{
-				Containers: []api.Container{testCase.container},
-			},
-			Status: api.PodStatus{
-				ContainerStatuses: []api.ContainerStatus{testCase.status},
-			},
-		}
-		writer := NewPrefixWriter(out)
-		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(&pod), writer, "")
-		output := out.String()
-		for _, expected := range testCase.expectedElements {
-			if !strings.Contains(output, expected) {
-				t.Errorf("Test case %d: expected to find %q in output: %q", i, expected, output)
+		t.Run(testCase.name, func(t *testing.T) {
+			out := new(bytes.Buffer)
+			pod := api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{testCase.container},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{testCase.status},
+				},
 			}
-		}
+			writer := NewPrefixWriter(out)
+			describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(&pod), writer, "")
+			output := out.String()
+			for _, expected := range testCase.expectedElements {
+				if !strings.Contains(output, expected) {
+					t.Errorf("Test case %d: expected to find %q in output: %q", i, expected, output)
+				}
+			}
+		})
 	}
 }
 
@@ -787,10 +813,12 @@ func TestDefaultDescribers(t *testing.T) {
 
 func TestGetPodsTotalRequests(t *testing.T) {
 	testCases := []struct {
+		name         string
 		pods         *api.PodList
 		expectedReqs map[api.ResourceName]resource.Quantity
 	}{
 		{
+			name: "test1",
 			pods: &api.PodList{
 				Items: []api.Pod{
 					{
@@ -852,10 +880,12 @@ func TestGetPodsTotalRequests(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		reqs, _ := getPodsTotalRequestsAndLimits(testCase.pods)
-		if !apiequality.Semantic.DeepEqual(reqs, testCase.expectedReqs) {
-			t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
-		}
+		t.Run(testCase.name, func(t *testing.T) {
+			reqs, _ := getPodsTotalRequestsAndLimits(testCase.pods)
+			if !apiequality.Semantic.DeepEqual(reqs, testCase.expectedReqs) {
+				t.Errorf("Expected %v, got %v", testCase.expectedReqs, reqs)
+			}
+		})
 	}
 }
 
@@ -863,12 +893,14 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 	block := api.PersistentVolumeBlock
 	file := api.PersistentVolumeFilesystem
 	testCases := []struct {
+		name               string
 		plugin             string
 		pv                 *api.PersistentVolume
 		expectedElements   []string
 		unexpectedElements []string
 	}{
 		{
+			name:   "test0",
 			plugin: "hostpath",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -881,6 +913,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
+			name:   "test1",
 			plugin: "gce",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -894,6 +927,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			expectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
+			name:   "test2",
 			plugin: "ebs",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -906,6 +940,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
+			name:   "test3",
 			plugin: "nfs",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -918,6 +953,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
+			name:   "test4",
 			plugin: "iscsi",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -931,6 +967,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			expectedElements: []string{"VolumeMode", "Block"},
 		},
 		{
+			name:   "test5",
 			plugin: "gluster",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -943,6 +980,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
+			name:   "test6",
 			plugin: "rbd",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -955,6 +993,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
+			name:   "test7",
 			plugin: "quobyte",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -967,6 +1006,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
+			name:   "test8",
 			plugin: "cinder",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -979,6 +1019,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
 		{
+			name:   "test9",
 			plugin: "fc",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -992,6 +1033,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			expectedElements: []string{"VolumeMode", "Block"},
 		},
 		{
+			name:   "test10",
 			plugin: "local",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -1005,6 +1047,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"Required Terms", "Term "},
 		},
 		{
+			name:   "test11",
 			plugin: "local",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -1019,6 +1062,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"Required Terms", "Term "},
 		},
 		{
+			name:   "test12",
 			plugin: "local",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -1035,6 +1079,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			unexpectedElements: []string{"Term "},
 		},
 		{
+			name:   "test13",
 			plugin: "local",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -1059,6 +1104,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			expectedElements: []string{"Node Affinity", "Required Terms", "Term 0", "Term 1"},
 		},
 		{
+			name:   "test14",
 			plugin: "local",
 			pv: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
@@ -1094,25 +1140,27 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		fake := fake.NewSimpleClientset(test.pv)
-		c := PersistentVolumeDescriber{fake}
-		str, err := c.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
-		if err != nil {
-			t.Errorf("Unexpected error for test %s: %v", test.plugin, err)
-		}
-		if str == "" {
-			t.Errorf("Unexpected empty string for test %s.  Expected PV Describer output", test.plugin)
-		}
-		for _, expected := range test.expectedElements {
-			if !strings.Contains(str, expected) {
-				t.Errorf("expected to find %q in output: %q", expected, str)
+		t.Run(test.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(test.pv)
+			c := PersistentVolumeDescriber{fake}
+			str, err := c.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("Unexpected error for test %s: %v", test.plugin, err)
 			}
-		}
-		for _, unexpected := range test.unexpectedElements {
-			if strings.Contains(str, unexpected) {
-				t.Errorf("unexpected to find %q in output: %q", unexpected, str)
+			if str == "" {
+				t.Errorf("Unexpected empty string for test %s.  Expected PV Describer output", test.plugin)
 			}
-		}
+			for _, expected := range test.expectedElements {
+				if !strings.Contains(str, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, str)
+				}
+			}
+			for _, unexpected := range test.unexpectedElements {
+				if strings.Contains(str, unexpected) {
+					t.Errorf("unexpected to find %q in output: %q", unexpected, str)
+				}
+			}
+		})
 	}
 }
 
@@ -1271,25 +1319,27 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		fake := fake.NewSimpleClientset(test.pvc)
-		c := PersistentVolumeClaimDescriber{fake}
-		str, err := c.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
-		if err != nil {
-			t.Errorf("Unexpected error for test %s: %v", test.name, err)
-		}
-		if str == "" {
-			t.Errorf("Unexpected empty string for test %s.  Expected PVC Describer output", test.name)
-		}
-		for _, expected := range test.expectedElements {
-			if !strings.Contains(str, expected) {
-				t.Errorf("expected to find %q in output: %q", expected, str)
+		t.Run(test.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(test.pvc)
+			c := PersistentVolumeClaimDescriber{fake}
+			str, err := c.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("Unexpected error for test %s: %v", test.name, err)
 			}
-		}
-		for _, unexpected := range test.unexpectedElements {
-			if strings.Contains(str, unexpected) {
-				t.Errorf("unexpected to find %q in output: %q", unexpected, str)
+			if str == "" {
+				t.Errorf("Unexpected empty string for test %s.  Expected PVC Describer output", test.name)
 			}
-		}
+			for _, expected := range test.expectedElements {
+				if !strings.Contains(str, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, str)
+				}
+			}
+			for _, unexpected := range test.unexpectedElements {
+				if strings.Contains(str, unexpected) {
+					t.Errorf("unexpected to find %q in output: %q", unexpected, str)
+				}
+			}
+		})
 	}
 }
 
@@ -1879,20 +1929,22 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test.hpa.ObjectMeta = metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "foo",
-		}
-		fake := fake.NewSimpleClientset(&test.hpa)
-		desc := HorizontalPodAutoscalerDescriber{fake}
-		str, err := desc.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
-		if err != nil {
-			t.Errorf("Unexpected error for test %s: %v", test.name, err)
-		}
-		if str == "" {
-			t.Errorf("Unexpected empty string for test %s.  Expected HPA Describer output", test.name)
-		}
-		t.Logf("Description for %q:\n%s", test.name, str)
+		t.Run(test.name, func(t *testing.T) {
+			test.hpa.ObjectMeta = metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: "foo",
+			}
+			fake := fake.NewSimpleClientset(&test.hpa)
+			desc := HorizontalPodAutoscalerDescriber{fake}
+			str, err := desc.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("Unexpected error for test %s: %v", test.name, err)
+			}
+			if str == "" {
+				t.Errorf("Unexpected empty string for test %s.  Expected HPA Describer output", test.name)
+			}
+			t.Logf("Description for %q:\n%s", test.name, str)
+		})
 	}
 }
 
@@ -2022,27 +2074,29 @@ func TestDescribeEvents(t *testing.T) {
 	}
 
 	for name, d := range m {
-		out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
-		if err != nil {
-			t.Errorf("unexpected error for %q: %v", name, err)
-		}
-		if !strings.Contains(out, "bar") {
-			t.Errorf("unexpected out for %q: %s", name, out)
-		}
-		if !strings.Contains(out, "Events:") {
-			t.Errorf("events not found for %q when ShowEvents=true: %s", name, out)
-		}
+		t.Run(name, func(t *testing.T) {
+			out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error for %q: %v", name, err)
+			}
+			if !strings.Contains(out, "bar") {
+				t.Errorf("unexpected out for %q: %s", name, out)
+			}
+			if !strings.Contains(out, "Events:") {
+				t.Errorf("events not found for %q when ShowEvents=true: %s", name, out)
+			}
 
-		out, err = d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: false})
-		if err != nil {
-			t.Errorf("unexpected error for %q: %s", name, err)
-		}
-		if !strings.Contains(out, "bar") {
-			t.Errorf("unexpected out for %q: %s", name, out)
-		}
-		if strings.Contains(out, "Events:") {
-			t.Errorf("events found for %q when ShowEvents=false: %s", name, out)
-		}
+			out, err = d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: false})
+			if err != nil {
+				t.Errorf("unexpected error for %q: %s", name, err)
+			}
+			if !strings.Contains(out, "bar") {
+				t.Errorf("unexpected out for %q: %s", name, out)
+			}
+			if strings.Contains(out, "Events:") {
+				t.Errorf("events found for %q when ShowEvents=false: %s", name, out)
+			}
+		})
 	}
 }
 
@@ -2070,13 +2124,15 @@ func TestPrintLabelsMultiline(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		out := new(bytes.Buffer)
-		writer := NewPrefixWriter(out)
-		printAnnotationsMultiline(writer, "Annotations", testCase.annotations)
-		output := out.String()
-		if output != testCase.expectPrint {
-			t.Errorf("Test case %d: expected to find %q in output: %q", i, testCase.expectPrint, output)
-		}
+		t.Run(testCase.expectPrint, func(t *testing.T) {
+			out := new(bytes.Buffer)
+			writer := NewPrefixWriter(out)
+			printAnnotationsMultiline(writer, "Annotations", testCase.annotations)
+			output := out.String()
+			if output != testCase.expectPrint {
+				t.Errorf("Test case %d: expected to find %q in output: %q", i, testCase.expectPrint, output)
+			}
+		})
 	}
 }
 
@@ -2524,6 +2580,46 @@ func TestDescribeNode(t *testing.T) {
 		}
 	}
 
+}
+
+func TestDescribeStatefulSet(t *testing.T) {
+	fake := fake.NewSimpleClientset(&apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: apps.StatefulSetSpec{
+			Replicas: 1,
+			Selector: &metav1.LabelSelector{},
+			Template: api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Image: "mytest-image:latest"},
+					},
+				},
+			},
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{
+				Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+					Partition: 2,
+				},
+			},
+		},
+	})
+	d := StatefulSetDescriber{fake}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOutputs := []string{
+		"bar", "foo", "Containers:", "mytest-image:latest", "Update Strategy", "RollingUpdate", "Partition",
+	}
+	for _, o := range expectedOutputs {
+		if !strings.Contains(out, o) {
+			t.Errorf("unexpected out: %s", out)
+			break
+		}
+	}
 }
 
 // boolPtr returns a pointer to a bool

@@ -124,4 +124,7 @@ type PodContainerManager interface {
 
 	// GetAllPodsFromCgroups enumerates the set of pod uids to their associated cgroup based on state of cgroupfs system.
 	GetAllPodsFromCgroups() (map[types.UID]CgroupName, error)
+
+	// IsPodCgroup returns true if the literal cgroupfs name corresponds to a pod
+	IsPodCgroup(cgroupfs string) (bool, types.UID)
 }

@@ -17,33 +17,12 @@ limitations under the License.
 package meta
 
 import (
-	"errors"
 	"reflect"
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-type fakeConvertor struct{}
-
-func (fakeConvertor) Convert(in, out, context interface{}) error {
-	return nil
-}
-
-func (fakeConvertor) ConvertToVersion(in runtime.Object, _ runtime.GroupVersioner) (runtime.Object, error) {
-	return in, nil
-}
-
-func (fakeConvertor) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
-	return label, value, nil
-}
-
-var validAccessor = resourceAccessor{}
-var validConvertor = fakeConvertor{}
-
-var unmatchedErr = errors.New("no version")
 
 func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 	testGroup := "test.group"

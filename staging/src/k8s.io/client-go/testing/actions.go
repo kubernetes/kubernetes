@@ -225,10 +225,31 @@ func NewRootDeleteAction(resource schema.GroupVersionResource, name string) Dele
 	return action
 }
 
+func NewRootDeleteSubresourceAction(resource schema.GroupVersionResource, subresource string, name string) DeleteActionImpl {
+	action := DeleteActionImpl{}
+	action.Verb = "delete"
+	action.Resource = resource
+	action.Subresource = subresource
+	action.Name = name
+
+	return action
+}
+
 func NewDeleteAction(resource schema.GroupVersionResource, namespace, name string) DeleteActionImpl {
 	action := DeleteActionImpl{}
 	action.Verb = "delete"
 	action.Resource = resource
+	action.Namespace = namespace
+	action.Name = name
+
+	return action
+}
+
+func NewDeleteSubresourceAction(resource schema.GroupVersionResource, subresource, namespace, name string) DeleteActionImpl {
+	action := DeleteActionImpl{}
+	action.Verb = "delete"
+	action.Resource = resource
+	action.Subresource = subresource
 	action.Namespace = namespace
 	action.Name = name
 

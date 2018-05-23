@@ -18,19 +18,27 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -53,7 +61,7 @@ func TestLog(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -74,6 +82,16 @@ func TestLog(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
+			oldLogFn := polymorphichelpers.LogsForObjectFn
+			defer func() {
+				polymorphichelpers.LogsForObjectFn = oldLogFn
+			}()
+			clientset, err := tf.ClientSet()
+			if err != nil {
+				t.Fatal(err)
+			}
+			polymorphichelpers.LogsForObjectFn = logTestMock{client: clientset}.logsForObject
+
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 			cmd := NewCmdLogs(tf, streams)
@@ -140,7 +158,7 @@ func TestValidateLogFlags(t *testing.T) {
 			name:     "container name combined with --all-containers",
 			flags:    map[string]string{"all-containers": "true"},
 			args:     []string{"my-pod", "my-container"},
-			expected: "--all-containers=true should not be specifiled with container",
+			expected: "--all-containers=true should not be specified with container",
 		},
 	}
 	for _, test := range tests {
@@ -152,7 +170,7 @@ func TestValidateLogFlags(t *testing.T) {
 		}
 		// checkErr breaks tests in case of errors, plus we just
 		// need to check errors returned by the command validation
-		o := NewLogsOptions(streams)
+		o := NewLogsOptions(streams, test.flags["all-containers"] == "true")
 		cmd.Run = func(cmd *cobra.Command, args []string) {
 			o.Complete(f, cmd, args)
 			out = o.Validate().Error()
@@ -213,11 +231,28 @@ func TestLogComplete(t *testing.T) {
 		}
 		// checkErr breaks tests in case of errors, plus we just
 		// need to check errors returned by the command validation
-		o := NewLogsOptions(genericclioptions.NewTestIOStreamsDiscard())
+		o := NewLogsOptions(genericclioptions.NewTestIOStreamsDiscard(), false)
 		err = o.Complete(f, cmd, test.args)
 		out = err.Error()
 		if !strings.Contains(out, test.expected) {
 			t.Errorf("%s: expected to find:\n\t%s\nfound:\n\t%s\n", test.name, test.expected, out)
 		}
+	}
+}
+
+type logTestMock struct {
+	client internalclientset.Interface
+}
+
+func (m logTestMock) logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
+	switch t := object.(type) {
+	case *api.Pod:
+		opts, ok := options.(*api.PodLogOptions)
+		if !ok {
+			return nil, errors.New("provided options object is not a PodLogOptions")
+		}
+		return m.client.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
+	default:
+		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
 }

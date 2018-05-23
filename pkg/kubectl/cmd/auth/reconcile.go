@@ -22,27 +22,27 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	internalcoreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	internalrbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
+	rbacv1 "k8s.io/api/rbac/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/registry/rbac/reconciliation"
 )
 
 // ReconcileOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ReconcileOptions struct {
-	PrintFlags      *printers.PrintFlags
+	PrintFlags      *genericclioptions.PrintFlags
 	FilenameOptions *resource.FilenameOptions
 
 	Visitor         resource.Visitor
-	RBACClient      internalrbacclient.RbacInterface
-	NamespaceClient internalcoreclient.NamespaceInterface
+	RBACClient      rbacv1client.RbacV1Interface
+	NamespaceClient corev1client.CoreV1Interface
 
 	PrintObject printers.ResourcePrinterFunc
 
@@ -63,7 +63,7 @@ var (
 func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOptions {
 	return &ReconcileOptions{
 		FilenameOptions: &resource.FilenameOptions{},
-		PrintFlags:      printers.NewPrintFlags("reconciled"),
+		PrintFlags:      genericclioptions.NewPrintFlags("reconciled").WithTypeSetter(scheme.Scheme),
 		IOStreams:       ioStreams,
 	}
 }
@@ -103,7 +103,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	}
 
 	r := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, o.FilenameOptions).
@@ -115,12 +115,18 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	}
 	o.Visitor = r
 
-	client, err := f.ClientSet()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
-	o.RBACClient = client.Rbac()
-	o.NamespaceClient = client.Core().Namespaces()
+	o.RBACClient, err = rbacv1client.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+	o.NamespaceClient, err = corev1client.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
 
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -160,13 +166,13 @@ func (o *ReconcileOptions) RunReconcile() error {
 		}
 
 		switch t := info.Object.(type) {
-		case *rbac.Role:
+		case *rbacv1.Role:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
 				Confirm:                true,
 				RemoveExtraPermissions: false,
 				Role: reconciliation.RoleRuleOwner{Role: t},
 				Client: reconciliation.RoleModifier{
-					NamespaceClient: o.NamespaceClient,
+					NamespaceClient: o.NamespaceClient.Namespaces(),
 					Client:          o.RBACClient,
 				},
 			}
@@ -176,7 +182,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			}
 			o.PrintObject(result.Role.GetObject(), o.Out)
 
-		case *rbac.ClusterRole:
+		case *rbacv1.ClusterRole:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
 				Confirm:                true,
 				RemoveExtraPermissions: false,
@@ -191,14 +197,14 @@ func (o *ReconcileOptions) RunReconcile() error {
 			}
 			o.PrintObject(result.Role.GetObject(), o.Out)
 
-		case *rbac.RoleBinding:
+		case *rbacv1.RoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
 				Confirm:             true,
 				RemoveExtraSubjects: false,
 				RoleBinding:         reconciliation.RoleBindingAdapter{RoleBinding: t},
 				Client: reconciliation.RoleBindingClientAdapter{
 					Client:          o.RBACClient,
-					NamespaceClient: o.NamespaceClient,
+					NamespaceClient: o.NamespaceClient.Namespaces(),
 				},
 			}
 			result, err := reconcileOptions.Run()
@@ -207,7 +213,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			}
 			o.PrintObject(result.RoleBinding.GetObject(), o.Out)
 
-		case *rbac.ClusterRoleBinding:
+		case *rbacv1.ClusterRoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
 				Confirm:             true,
 				RemoveExtraSubjects: false,

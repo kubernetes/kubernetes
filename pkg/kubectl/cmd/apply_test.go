@@ -398,7 +398,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -523,6 +523,7 @@ func TestApplyObject(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -587,6 +588,7 @@ func TestApplyObjectOutput(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -648,6 +650,7 @@ func TestApplyRetry(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -697,6 +700,7 @@ func TestApplyNonExistObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -749,6 +753,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 
 	// 1. apply non exist object
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -823,6 +828,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -923,6 +929,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -989,6 +996,7 @@ func TestUnstructuredApply(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -1021,8 +1029,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 	}
 	path := "/namespaces/test/widgets/widget"
 
-	verifiedPatch := false
-
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test repeated apply operations on an unstructured object", func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
@@ -1039,41 +1045,15 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 							Header:     defaultHeader(),
 							Body:       body}, nil
 					case p == path && m == "PATCH":
-						// In idempotent updates, kubectl sends a logically empty
-						// request body with the PATCH request.
-						// Should look like this:
-						// Request Body: {"metadata":{"annotations":{}}}
+						// In idempotent updates, kubectl will resolve to an empty patch and not send anything to the server
+						// Thus, if we reach this branch, kubectl is unnecessarily sending a patch.
 
 						patch, err := ioutil.ReadAll(req.Body)
 						if err != nil {
 							t.Fatal(err)
 						}
-
-						contentType := req.Header.Get("Content-Type")
-						if contentType != "application/merge-patch+json" {
-							t.Fatalf("Unexpected Content-Type: %s", contentType)
-						}
-
-						patchMap := map[string]interface{}{}
-						if err := json.Unmarshal(patch, &patchMap); err != nil {
-							t.Fatal(err)
-						}
-						if len(patchMap) != 1 {
-							t.Fatalf("Unexpected Patch. Has more than 1 entry. path: %s", patch)
-						}
-
-						annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-						if len(annotationsMap) != 0 {
-							t.Fatalf("Unexpected Patch. Found unexpected annotation: %s", patch)
-						}
-
-						verifiedPatch = true
-
-						body := ioutil.NopCloser(bytes.NewReader(serversideData))
-						return &http.Response{
-							StatusCode: 200,
-							Header:     defaultHeader(),
-							Body:       body}, nil
+						t.Fatalf("Unexpected Patch: %s", patch)
+						return nil, nil
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil
@@ -1082,6 +1062,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -1095,9 +1076,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 			}
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
-			}
-			if !verifiedPatch {
-				t.Fatal("No server-side patch call detected")
 			}
 		})
 	}
@@ -1158,7 +1136,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -1254,6 +1232,7 @@ func TestForceApply(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
+			tf.ClientConfigVal = defaultClientConfig()
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

@@ -21,9 +21,6 @@ import (
 	"os"
 	"testing"
 
-	// required for triggering api machinery startup when running unit tests
-	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
@@ -34,7 +31,7 @@ import (
 )
 
 // phaseTestK8sVersion is a fake kubernetes version to use when testing
-const phaseTestK8sVersion = "v1.9.0"
+const phaseTestK8sVersion = "v1.10.0"
 
 func TestCertsSubCommandsHasFlags(t *testing.T) {
 

@@ -39,7 +39,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.API.AdvertiseAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
-			obj.AuthorizationModes = []string{"foo"}
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
 			obj.Etcd.ServerCertSANs = []string{"foo"}
@@ -64,20 +63,21 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				Writable:  false,
 			}}
 			obj.Etcd.ExtraArgs = map[string]string{"foo": "foo"}
-			obj.Etcd.SelfHosted = &kubeadm.SelfHostedEtcd{
-				CertificatesDir:    "/etc/kubernetes/pki/etcd",
-				ClusterServiceName: "etcd-cluster",
-				EtcdVersion:        "v0.1.0",
-				OperatorVersion:    "v0.1.0",
-			}
 			obj.KubeletConfiguration = kubeadm.KubeletConfiguration{
 				BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 					StaticPodPath: "foo",
 					ClusterDNS:    []string{"foo"},
 					ClusterDomain: "foo",
-					Authorization: kubeletconfigv1beta1.KubeletAuthorization{Mode: "foo"},
+					Authorization: kubeletconfigv1beta1.KubeletAuthorization{
+						Mode: "Webhook",
+					},
 					Authentication: kubeletconfigv1beta1.KubeletAuthentication{
-						X509: kubeletconfigv1beta1.KubeletX509Authentication{ClientCAFile: "foo"},
+						X509: kubeletconfigv1beta1.KubeletX509Authentication{
+							ClientCAFile: "/etc/kubernetes/pki/ca.crt",
+						},
+						Anonymous: kubeletconfigv1beta1.KubeletAnonymousAuthentication{
+							Enabled: utilpointer.BoolPtr(false),
+						},
 					},
 				},
 			}
