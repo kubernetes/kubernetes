@@ -74,6 +74,16 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.RenewDeadline <= time.Duration(JitterFactor*float64(lec.RetryPeriod)) {
 		return nil, fmt.Errorf("renewDeadline must be greater than retryPeriod*JitterFactor")
 	}
+	if lec.LeaseDuration < 1 {
+		return nil, fmt.Errorf("leaseDuration must be greater than zero")
+	}
+	if lec.RenewDeadline < 1 {
+		return nil, fmt.Errorf("renewDeadline must be greater than zero")
+	}
+	if lec.RetryPeriod < 1 {
+		return nil, fmt.Errorf("retryPeriod must be greater than zero")
+	}
+
 	if lec.Lock == nil {
 		return nil, fmt.Errorf("Lock must not be nil.")
 	}
