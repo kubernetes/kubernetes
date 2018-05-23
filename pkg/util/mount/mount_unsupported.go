@@ -134,3 +134,7 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	return -1, errors.New("not implemented")
 }
+
+func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, errors.New("not implemented")
+}
