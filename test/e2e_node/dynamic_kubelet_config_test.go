@@ -296,7 +296,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 			})
 		})
 
-		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap", func() {
+		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
@@ -360,7 +360,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 			})
 		})
 
-		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey", func() {
+		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
 			It(itDescription, func() {
 				const badConfigKey = "bad"
 				var err error
@@ -415,7 +415,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		})
 
 		// exposes resource leaks across config changes
-		Context("update Node.Spec.ConfigSource: 100 update stress test", func() {
+		Context("update Node.Spec.ConfigSource: 100 update stress test:", func() {
 			It(itDescription, func() {
 				var err error
 
@@ -472,7 +472,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("update ConfigMap in-place: state transitions", func() {
+		Context("update ConfigMap in-place: state transitions:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
@@ -552,7 +552,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("update ConfigMap in-place: recover to last-known-good version", func() {
+		Context("update ConfigMap in-place: recover to last-known-good version:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
@@ -631,7 +631,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("delete and recreate ConfigMap: state transitions", func() {
+		Context("delete and recreate ConfigMap: state transitions:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
@@ -711,7 +711,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("delete and recreate ConfigMap: error while ConfigMap is absent", func() {
+		Context("delete and recreate ConfigMap: error while ConfigMap is absent:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
