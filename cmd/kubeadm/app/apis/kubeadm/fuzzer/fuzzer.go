@@ -79,6 +79,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 							Enabled: utilpointer.BoolPtr(false),
 						},
 					},
+					RotateCertificates: true,
 				},
 			}
 			kubeletconfigv1beta1.SetDefaults_KubeletConfiguration(obj.KubeletConfiguration.BaseConfig)

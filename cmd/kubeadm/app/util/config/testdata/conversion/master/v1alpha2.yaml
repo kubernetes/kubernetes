@@ -123,6 +123,7 @@ kubeletConfiguration:
     registryBurst: 10
     registryPullQPS: 5
     resolvConf: /etc/resolv.conf
+    rotateCertificates: true
     runtimeRequestTimeout: 2m0s
     serializeImagePulls: true
     staticPodPath: /etc/kubernetes/manifests
