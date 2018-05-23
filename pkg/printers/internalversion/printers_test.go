@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -3289,6 +3290,55 @@ func TestPrintStorageClass(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintLease(t *testing.T) {
+	holder1 := "holder1"
+	holder2 := "holder2"
+	tests := []struct {
+		sc     coordination.Lease
+		expect string
+	}{
+		{
+			coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "lease1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: coordination.LeaseSpec{
+					HolderIdentity: &holder1,
+				},
+			},
+			"lease1\tholder1\t0s\n",
+		},
+		{
+			coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "lease2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: coordination.LeaseSpec{
+					HolderIdentity: &holder2,
+				},
+			},
+			"lease2\tholder2\t5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.sc, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
