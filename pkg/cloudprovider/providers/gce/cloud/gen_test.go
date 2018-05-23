@@ -312,28 +312,17 @@ func TestDisksGroup(t *testing.T) {
 	mock := NewMockGCE(pr)
 
 	var key *meta.Key
-	keyAlpha := meta.ZonalKey("key-alpha", "location")
-	key = keyAlpha
 	keyGA := meta.ZonalKey("key-ga", "location")
 	key = keyGA
 	// Ignore unused variables.
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaDisks().Get(ctx, key); err == nil {
-		t.Errorf("AlphaDisks().Get(%v, %v) = _, nil; want error", ctx, key)
-	}
 	if _, err := mock.Disks().Get(ctx, key); err == nil {
 		t.Errorf("Disks().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
-	{
-		obj := &alpha.Disk{}
-		if err := mock.AlphaDisks().Insert(ctx, keyAlpha, obj); err != nil {
-			t.Errorf("AlphaDisks().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
-		}
-	}
 	{
 		obj := &ga.Disk{}
 		if err := mock.Disks().Insert(ctx, keyGA, obj); err != nil {
@@ -342,35 +331,16 @@ func TestDisksGroup(t *testing.T) {
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaDisks().Get(ctx, key); err != nil {
-		t.Errorf("AlphaDisks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
-	}
 	if obj, err := mock.Disks().Get(ctx, key); err != nil {
 		t.Errorf("Disks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
 	// List.
-	mock.MockAlphaDisks.Objects[*keyAlpha] = mock.MockAlphaDisks.Obj(&alpha.Disk{Name: keyAlpha.Name})
 	mock.MockDisks.Objects[*keyGA] = mock.MockDisks.Obj(&ga.Disk{Name: keyGA.Name})
 	want := map[string]bool{
-		"key-alpha": true,
-		"key-ga":    true,
+		"key-ga": true,
 	}
 	_ = want // ignore unused variables.
-	{
-		objs, err := mock.AlphaDisks().List(ctx, location, filter.None)
-		if err != nil {
-			t.Errorf("AlphaDisks().List(%v, %v, %v) = %v, %v; want _, nil", ctx, location, filter.None, objs, err)
-		} else {
-			got := map[string]bool{}
-			for _, obj := range objs {
-				got[obj.Name] = true
-			}
-			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaDisks().List(); got %+v, want %+v", got, want)
-			}
-		}
-	}
 	{
 		objs, err := mock.Disks().List(ctx, location, filter.None)
 		if err != nil {
@@ -387,17 +357,11 @@ func TestDisksGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaDisks().Delete(ctx, keyAlpha); err != nil {
-		t.Errorf("AlphaDisks().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
-	}
 	if err := mock.Disks().Delete(ctx, keyGA); err != nil {
 		t.Errorf("Disks().Delete(%v, %v) = %v; want nil", ctx, keyGA, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaDisks().Delete(ctx, keyAlpha); err == nil {
-		t.Errorf("AlphaDisks().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
-	}
 	if err := mock.Disks().Delete(ctx, keyGA); err == nil {
 		t.Errorf("Disks().Delete(%v, %v) = nil; want error", ctx, keyGA)
 	}
@@ -1315,39 +1279,39 @@ func TestRegionDisksGroup(t *testing.T) {
 	mock := NewMockGCE(pr)
 
 	var key *meta.Key
-	keyAlpha := meta.RegionalKey("key-alpha", "location")
-	key = keyAlpha
+	keyBeta := meta.RegionalKey("key-beta", "location")
+	key = keyBeta
 	// Ignore unused variables.
 	_, _, _ = ctx, mock, key
 
 	// Get not found.
-	if _, err := mock.AlphaRegionDisks().Get(ctx, key); err == nil {
-		t.Errorf("AlphaRegionDisks().Get(%v, %v) = _, nil; want error", ctx, key)
+	if _, err := mock.BetaRegionDisks().Get(ctx, key); err == nil {
+		t.Errorf("BetaRegionDisks().Get(%v, %v) = _, nil; want error", ctx, key)
 	}
 
 	// Insert.
 	{
-		obj := &alpha.Disk{}
-		if err := mock.AlphaRegionDisks().Insert(ctx, keyAlpha, obj); err != nil {
-			t.Errorf("AlphaRegionDisks().Insert(%v, %v, %v) = %v; want nil", ctx, keyAlpha, obj, err)
+		obj := &beta.Disk{}
+		if err := mock.BetaRegionDisks().Insert(ctx, keyBeta, obj); err != nil {
+			t.Errorf("BetaRegionDisks().Insert(%v, %v, %v) = %v; want nil", ctx, keyBeta, obj, err)
 		}
 	}
 
 	// Get across versions.
-	if obj, err := mock.AlphaRegionDisks().Get(ctx, key); err != nil {
-		t.Errorf("AlphaRegionDisks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
+	if obj, err := mock.BetaRegionDisks().Get(ctx, key); err != nil {
+		t.Errorf("BetaRegionDisks().Get(%v, %v) = %v, %v; want nil", ctx, key, obj, err)
 	}
 
 	// List.
-	mock.MockAlphaRegionDisks.Objects[*keyAlpha] = mock.MockAlphaRegionDisks.Obj(&alpha.Disk{Name: keyAlpha.Name})
+	mock.MockBetaRegionDisks.Objects[*keyBeta] = mock.MockBetaRegionDisks.Obj(&beta.Disk{Name: keyBeta.Name})
 	want := map[string]bool{
-		"key-alpha": true,
+		"key-beta": true,
 	}
 	_ = want // ignore unused variables.
 	{
-		objs, err := mock.AlphaRegionDisks().List(ctx, location, filter.None)
+		objs, err := mock.BetaRegionDisks().List(ctx, location, filter.None)
 		if err != nil {
-			t.Errorf("AlphaRegionDisks().List(%v, %v, %v) = %v, %v; want _, nil", ctx, location, filter.None, objs, err)
+			t.Errorf("BetaRegionDisks().List(%v, %v, %v) = %v, %v; want _, nil", ctx, location, filter.None, objs, err)
 		} else {
 			got := map[string]bool{}
 			for _, obj := range objs {
@@ -1360,13 +1324,13 @@ func TestRegionDisksGroup(t *testing.T) {
 	}
 
 	// Delete across versions.
-	if err := mock.AlphaRegionDisks().Delete(ctx, keyAlpha); err != nil {
-		t.Errorf("AlphaRegionDisks().Delete(%v, %v) = %v; want nil", ctx, keyAlpha, err)
+	if err := mock.BetaRegionDisks().Delete(ctx, keyBeta); err != nil {
+		t.Errorf("BetaRegionDisks().Delete(%v, %v) = %v; want nil", ctx, keyBeta, err)
 	}
 
 	// Delete not found.
-	if err := mock.AlphaRegionDisks().Delete(ctx, keyAlpha); err == nil {
-		t.Errorf("AlphaRegionDisks().Delete(%v, %v) = nil; want error", ctx, keyAlpha)
+	if err := mock.BetaRegionDisks().Delete(ctx, keyBeta); err == nil {
+		t.Errorf("BetaRegionDisks().Delete(%v, %v) = nil; want error", ctx, keyBeta)
 	}
 }
 
