@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
+	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -84,6 +85,8 @@ const (
 	MaxGCEPDVolumeCountPred = "MaxGCEPDVolumeCount"
 	// MaxAzureDiskVolumeCountPred defines the name of predicate MaxAzureDiskVolumeCount.
 	MaxAzureDiskVolumeCountPred = "MaxAzureDiskVolumeCount"
+	// MaxAttachableVolumeLimitPred defines the name of the predicate MaxAttachableVolumeCount
+	MaxAttachableVolumeLimitPred = "MaxAttachableVolumeCount"
 	// NoVolumeZoneConflictPred defines the name of predicate NoVolumeZoneConflict.
 	NoVolumeZoneConflictPred = "NoVolumeZoneConflict"
 	// CheckNodeMemoryPressurePred defines the name of predicate CheckNodeMemoryPressure.
@@ -134,7 +137,7 @@ var (
 		GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
 		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
-		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred,
+		CheckServiceAffinityPred, MaxAttachableVolumeLimitPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred,
 		MaxAzureDiskVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
 		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
 )
@@ -289,10 +292,11 @@ func NoDiskConflict(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *sch
 
 // MaxPDVolumeCountChecker contains information to check the max number of volumes for a predicate.
 type MaxPDVolumeCountChecker struct {
-	filter     VolumeFilter
-	maxVolumes int
-	pvInfo     PersistentVolumeInfo
-	pvcInfo    PersistentVolumeClaimInfo
+	filter          VolumeFilter
+	maxVolumes      int
+	pvInfo          PersistentVolumeInfo
+	pvcInfo         PersistentVolumeClaimInfo
+	volumePluginMgr *volume.VolumePluginMgr
 
 	// The string below is generated randomly during the struct's initialization.
 	// It is used to prefix volumeID generated inside the predicate() method to
@@ -313,8 +317,8 @@ type VolumeFilter struct {
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
-func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
-
+func NewMaxPDVolumeCountPredicate(
+	filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
 	var filter VolumeFilter
 	var maxVolumes int
 
@@ -346,6 +350,17 @@ func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo
 	return c.predicate
 }
 
+// NewMaxAttachableVolumeLimitPredicate returns a predicate that can count maximum number of attachable volumes
+func NewMaxAttachableVolumeLimitPredicate(
+	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, volumePluginMgr *volume.VolumePluginMgr) algorithm.FitPredicate {
+	c := &MaxPDVolumeCountChecker{
+		pvcInfo:         pvcInfo,
+		pvInfo:          pvInfo,
+		volumePluginMgr: volumePluginMgr,
+	}
+	return c.attachableLimitPredicate
+}
+
 // getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
 func getMaxVols(defaultVal int) int {
 	if rawMaxVols := os.Getenv(KubeMaxPDVols); rawMaxVols != "" {
@@ -373,36 +388,21 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 				return fmt.Errorf("PersistentVolumeClaim had no name")
 			}
 
-			// Until we know real ID of the volume use namespace/pvcName as substitute
-			// with a random prefix (calculated and stored inside 'c' during initialization)
-			// to avoid conflicts with existing volume IDs.
-			pvID := fmt.Sprintf("%s-%s/%s", c.randomVolumeIDPrefix, namespace, pvcName)
-
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil || pvc == nil {
-				// if the PVC is not found, log the error and count the PV towards the PV limit
 				glog.V(4).Infof("Unable to look up PVC info for %s/%s, assuming PVC matches predicate when counting limits: %v", namespace, pvcName, err)
-				filteredVolumes[pvID] = true
 				continue
 			}
 
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
-				// PVC is not bound. It was either deleted and created again or
-				// it was forcefully unbound by admin. The pod can still use the
-				// original PV where it was bound to -> log the error and count
-				// the PV towards the PV limit
 				glog.V(4).Infof("PVC %s/%s is not bound, assuming PVC matches predicate when counting limits", namespace, pvcName)
-				filteredVolumes[pvID] = true
 				continue
 			}
 
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
 			if err != nil || pv == nil {
-				// if the PV is not found, log the error
-				// and count the PV towards the PV limit
 				glog.V(4).Infof("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err)
-				filteredVolumes[pvID] = true
 				continue
 			}
 
@@ -412,6 +412,136 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 		}
 	}
 
+	return nil
+}
+
+func (c *MaxPDVolumeCountChecker) attachableLimitPredicate(
+	pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+
+	// if feature gate is disable we return
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicVolumeThreshold) {
+		return true, nil, nil
+	}
+
+	// If a pod doesn't have any volume attached to it, the predicate will always be true.
+	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
+	if len(pod.Spec.Volumes) == 0 {
+		return true, nil, nil
+	}
+
+	volumeLimits := nodeInfo.VolumeLimits()
+
+	// if node does not have volume limits we should let older predicates do their job
+	if len(volumeLimits) == 0 {
+		return true, nil, nil
+	}
+
+	// a map of volume unique name and volume limit key
+	newVolumes := make(map[string]string)
+	if err := c.filterAttachableVolumes(pod.Spec.Volumes, pod.Namespace, newVolumes); err != nil {
+		return false, nil, err
+	}
+
+	if len(newVolumes) == 0 {
+		return true, nil, nil
+	}
+
+	// a map of volume unique name and volume limit key
+	attachedVolumes := make(map[string]string)
+	for _, existingPod := range nodeInfo.Pods() {
+		if err := c.filterAttachableVolumes(existingPod.Spec.Volumes, existingPod.Namespace, attachedVolumes); err != nil {
+			return false, nil, err
+		}
+	}
+
+	newVolumeCount := map[string]int{}
+	attachedVolumeCount := map[string]int{}
+
+	for k, volumeType := range attachedVolumes {
+		if _, ok := newVolumes[k]; ok {
+			delete(newVolumes, k)
+		}
+		attachedVolumeCount[volumeType]++
+	}
+
+	for _, volType := range newVolumes {
+		newVolumeCount[volType]++
+	}
+
+	for volumeLimitKey, count := range newVolumeCount {
+		maxVolumeLimit, ok := volumeLimits[v1.ResourceName(volumeLimitKey)]
+		if ok {
+			currentVolumeCount := attachedVolumeCount[volumeLimitKey]
+			if currentVolumeCount+count > int(maxVolumeLimit) {
+				return false, []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
+			}
+		}
+	}
+
+	return true, nil, nil
+}
+
+func (c *MaxPDVolumeCountChecker) filterAttachableVolumes(
+	volumes []v1.Volume, namespace string, result map[string]string) error {
+
+	for _, vol := range volumes {
+		if vol.PersistentVolumeClaim != nil {
+			pvcName := vol.PersistentVolumeClaim.ClaimName
+
+			if pvcName == "" {
+				return fmt.Errorf("PersistentVolumeClaim had no name")
+			}
+
+			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
+
+			if err != nil {
+				glog.Errorf("Unable to look up PVC info for %s/%s", namespace, pvcName)
+				continue
+			}
+
+			pvName := pvc.Spec.VolumeName
+			if pvName == "" {
+				glog.Errorf("Persistent volume had no name for claim %s/%s", namespace, pvcName)
+				continue
+			}
+			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
+
+			if err != nil {
+				glog.Errorf("Unable to look up PV info for PVC %s/%s and PV %s", namespace, pvcName, pvName)
+				continue
+			}
+
+			volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
+			plugin, err := c.volumePluginMgr.FindVolumePluginWithLimitsBySpec(volumeSpec)
+
+			if err != nil {
+				continue
+			}
+
+			pluginName := plugin.VolumeLimitKey(volumeSpec)
+			volumeName, err := plugin.GetVolumeName(volumeSpec)
+			if err != nil {
+				glog.Errorf("Unable to find name of the volume for PVC %s/%s", namespace, pvcName)
+				continue
+			}
+			result[volumeName] = pluginName
+		} else {
+			volumeSpec := volume.NewSpecFromVolume(&vol)
+			plugin, err := c.volumePluginMgr.FindVolumePluginWithLimitsBySpec(volumeSpec)
+
+			if err != nil {
+				continue
+			}
+
+			pluginName := plugin.VolumeLimitKey(volumeSpec)
+			volumeName, err := plugin.GetVolumeName(volumeSpec)
+			if err != nil {
+				glog.Errorf("Unable to find name for volume : %#v", vol)
+				continue
+			}
+			result[volumeName] = pluginName
+		}
+	}
 	return nil
 }
 

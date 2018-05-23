@@ -111,6 +111,12 @@ func defaultPredicates() sets.String {
 				return predicates.NewVolumeZonePredicate(args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 			},
 		),
+		factory.RegisterFitPredicateFactory(
+			predicates.MaxAttachableVolumeLimitPred,
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewMaxAttachableVolumeLimitPredicate(args.PVInfo, args.PVCInfo, args.VolumePluginMgr)
+			},
+		),
 		// Fit is determined by whether or not there would be too many AWS EBS volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxEBSVolumeCountPred,

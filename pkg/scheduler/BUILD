@@ -82,6 +82,7 @@ filegroup(
         "//pkg/scheduler/testing:all-srcs",
         "//pkg/scheduler/util:all-srcs",
         "//pkg/scheduler/volumebinder:all-srcs",
+        "//pkg/scheduler/volumeplugins:all-srcs",
     ],
     tags = ["automanaged"],
 )
