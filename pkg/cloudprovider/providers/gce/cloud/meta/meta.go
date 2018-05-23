@@ -160,22 +160,20 @@ var AllServices = []*ServiceInfo{
 		Resource:    "disks",
 		keyType:     Zonal,
 		serviceType: reflect.TypeOf(&ga.DisksService{}),
-	},
-	{
-		Object:      "Disk",
-		Service:     "Disks",
-		Resource:    "disks",
-		version:     VersionAlpha,
-		keyType:     Zonal,
-		serviceType: reflect.TypeOf(&alpha.DisksService{}),
+		additionalMethods: []string{
+			"Resize",
+		},
 	},
 	{
 		Object:      "Disk",
 		Service:     "RegionDisks",
 		Resource:    "disks",
-		version:     VersionAlpha,
+		version:     VersionBeta,
 		keyType:     Regional,
-		serviceType: reflect.TypeOf(&alpha.DisksService{}),
+		serviceType: reflect.TypeOf(&beta.RegionDisksService{}),
+		additionalMethods: []string{
+			"Resize",
+		},
 	},
 	{
 		Object:      "Firewall",
