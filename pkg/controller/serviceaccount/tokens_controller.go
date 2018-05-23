@@ -70,13 +70,15 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, namespaces listersv1.NamespaceLister, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
 	}
 
 	e := &TokensController{
+		namespaces: namespaces,
+
 		client: cl,
 		token:  options.TokenGenerator,
 		rootCA: options.RootCA,
@@ -131,6 +133,8 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 
 // TokensController manages ServiceAccountToken secrets for ServiceAccount objects
 type TokensController struct {
+	namespaces listersv1.NamespaceLister
+
 	client clientset.Interface
 	token  serviceaccount.TokenGenerator
 
@@ -409,6 +413,13 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	// Save the secret
 	createdToken, err := e.client.CoreV1().Secrets(serviceAccount.Namespace).Create(secret)
 	if err != nil {
+		// Special case to stop retrying on terminating namespace
+		if apierrors.IsForbidden(err) {
+			if ns, err := e.namespaces.Get(serviceAccount.Namespace); err == nil && ns.Status.Phase != v1.NamespaceActive {
+				return false, nil
+			}
+		}
+
 		// retriable error
 		return true, err
 	}
