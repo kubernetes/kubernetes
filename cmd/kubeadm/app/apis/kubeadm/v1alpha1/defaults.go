@@ -247,12 +247,13 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	obj.KubeletConfiguration.BaseConfig.Authorization.Mode = kubeletconfigv1beta1.KubeletAuthorizationModeWebhook
 
 	// Let clients using other authentication methods like ServiceAccount tokens also access the kubelet API
-	// TODO: Enable in a future PR
-	// obj.KubeletConfiguration.BaseConfig.Authentication.Webhook.Enabled = utilpointer.BoolPtr(true)
+	obj.KubeletConfiguration.BaseConfig.Authentication.Webhook.Enabled = utilpointer.BoolPtr(true)
 
 	// Disable the readonly port of the kubelet, in order to not expose unnecessary information
-	// TODO: Enable in a future PR
-	// obj.KubeletConfiguration.BaseConfig.ReadOnlyPort = 0
+	obj.KubeletConfiguration.BaseConfig.ReadOnlyPort = 0
+
+	// Enables client certificate rotation for the kubelet
+	obj.KubeletConfiguration.BaseConfig.RotateCertificates = true
 
 	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
 	obj.KubeletConfiguration.BaseConfig.HealthzBindAddress = "127.0.0.1"
