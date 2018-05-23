@@ -54,7 +54,6 @@ const defaultRootDir = "/var/lib/kubelet"
 type KubeletFlags struct {
 	KubeConfig          string
 	BootstrapKubeconfig string
-	RotateCertificates  bool
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
@@ -232,7 +231,6 @@ func NewKubeletFlags() *KubeletFlags {
 		RegisterSchedulable:                 true,
 		ExperimentalKernelMemcgNotification: false,
 		RemoteRuntimeEndpoint:               remoteRuntimeEndpoint,
-		RotateCertificates:                  false,
 		// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
 		EnableCustomMetrics: false,
 		NodeLabels:          make(map[string]string),
@@ -352,7 +350,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 		"If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used to request a client certificate from the API server. "+
 		"On success, a kubeconfig file referencing the generated client certificate and key is written to the path specified by --kubeconfig. "+
 		"The client certificate and key file will be stored in the directory pointed by --cert-dir.")
-	fs.BoolVar(&f.RotateCertificates, "rotate-certificates", f.RotateCertificates, "<Warning: Beta feature> Auto rotate the kubelet client certificates by requesting new certificates from the kube-apiserver when the certificate expiration approaches.")
 
 	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
@@ -497,6 +494,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.StringVar(&c.TLSMinVersion, "tls-min-version", c.TLSMinVersion,
 		"Minimum TLS version supported. "+
 			"Value must match version names from https://golang.org/pkg/crypto/tls/#pkg-constants.")
+	fs.BoolVar(&c.RotateCertificates, "rotate-certificates", c.RotateCertificates, "<Warning: Beta feature> Auto rotate the kubelet client certificates by requesting new certificates from the kube-apiserver when the certificate expiration approaches.")
 
 	fs.Int32Var(&c.RegistryPullQPS, "registry-qps", c.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited.")
 	fs.Int32Var(&c.RegistryBurst, "registry-burst", c.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry-qps. Only used if --registry-qps > 0")
