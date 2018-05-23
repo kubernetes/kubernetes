@@ -3178,12 +3178,22 @@ run_deployment_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
   kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-config:'
   kube::test::get_object_assert secret "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-secret:'
+  # Set env of deployments by configmap from keys
+  kubectl set env deployment nginx-deployment --keys=key-2 --from=configmap/test-set-env-config "${kube_flags[@]}"
+  # Assert correct value in deployment env
+  kube::test::get_object_assert 'deploy nginx-deployment' "{{ (index (index .spec.template.spec.containers 0).env 0).name}}" 'KEY_2'
+  # Assert single value in deployment env
+  kube::test::get_object_assert 'deploy nginx-deployment' "{{ len (index .spec.template.spec.containers 0).env }}" '1'
+  # Set env of deployments by configmap
+  kubectl set env deployment nginx-deployment --from=configmap/test-set-env-config "${kube_flags[@]}"
+  # Assert all values in deployment env
+  kube::test::get_object_assert 'deploy nginx-deployment' "{{ len (index .spec.template.spec.containers 0).env }}" '2'
   # Set env of deployments for all container
   kubectl set env deployment nginx-deployment env=prod "${kube_flags[@]}"
   # Set env of deployments for specific container
   kubectl set env deployment nginx-deployment superenv=superprod -c=nginx "${kube_flags[@]}"
-  # Set env of deployments by configmap
-  kubectl set env deployment nginx-deployment --from=configmap/test-set-env-config "${kube_flags[@]}"
+  # Set env of deployments by secret from keys
+  kubectl set env deployment nginx-deployment --keys=username --from=secret/test-set-env-secret "${kube_flags[@]}"
   # Set env of deployments by secret
   kubectl set env deployment nginx-deployment --from=secret/test-set-env-secret "${kube_flags[@]}"
   # Remove specific env of deployment
