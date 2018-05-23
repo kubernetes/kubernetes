@@ -82,8 +82,6 @@ type ClientAccessFactory interface {
 	// new set-based selector is provided, an error is returned if the selector cannot be converted to a
 	// map-based selector
 	MapBasedSelectorForObject(object runtime.Object) (string, error)
-	// PortsForObject returns the ports associated with the provided object
-	PortsForObject(object runtime.Object) ([]string, error)
 	// ProtocolsForObject returns the <port, protocol> mapping associated with the provided object
 	ProtocolsForObject(object runtime.Object) (map[string]string, error)
 
@@ -111,8 +109,6 @@ type ClientAccessFactory interface {
 	Generators(cmdName string) map[string]kubectl.Generator
 	// Check whether the kind of resources could be exposed
 	CanBeExposed(kind schema.GroupKind) error
-	// Check whether the kind of resources could be autoscaled
-	CanBeAutoscaled(kind schema.GroupKind) error
 }
 
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
@@ -178,31 +174,12 @@ func makePortsString(ports []api.ServicePort, useNodePort bool) string {
 	return strings.Join(pieces, ",")
 }
 
-func getPorts(spec api.PodSpec) []string {
-	result := []string{}
-	for _, container := range spec.Containers {
-		for _, port := range container.Ports {
-			result = append(result, strconv.Itoa(int(port.ContainerPort)))
-		}
-	}
-	return result
-}
-
 func getProtocols(spec api.PodSpec) map[string]string {
 	result := make(map[string]string)
 	for _, container := range spec.Containers {
 		for _, port := range container.Ports {
 			result[strconv.Itoa(int(port.ContainerPort))] = string(port.Protocol)
 		}
-	}
-	return result
-}
-
-// Extracts the ports exposed by a service from the given service spec.
-func getServicePorts(spec api.ServiceSpec) []string {
-	result := []string{}
-	for _, servicePort := range spec.Ports {
-		result = append(result, strconv.Itoa(int(servicePort.Port)))
 	}
 	return result
 }

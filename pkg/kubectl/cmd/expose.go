@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -94,7 +95,7 @@ type ExposeServiceOptions struct {
 	CanBeExposed              func(kind schema.GroupKind) error
 	ClientForMapping          func(*meta.RESTMapping) (resource.RESTClient, error)
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
-	PortsForObject            func(runtime.Object) ([]string, error)
+	PortsForObject            polymorphichelpers.PortsForObjectFunc
 	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
 
 	Namespace string
@@ -193,7 +194,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	o.CanBeExposed = f.CanBeExposed
 	o.ClientForMapping = f.ClientForMapping
 	o.MapBasedSelectorForObject = f.MapBasedSelectorForObject
-	o.PortsForObject = f.PortsForObject
+	o.PortsForObject = polymorphichelpers.PortsForObjectFn
 	o.ProtocolsForObject = f.ProtocolsForObject
 	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
