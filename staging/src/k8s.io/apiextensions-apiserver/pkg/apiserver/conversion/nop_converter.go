@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -24,24 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// nopConverter is a converter that only sets the apiVersion fields, but does not real conversion. It supports fields selectors.
+// nopConverter is a converter that only sets the apiVersion fields, but does not real conversion.
 type nopConverter struct {
-	clusterScoped bool
 	validVersions map[schema.GroupVersion]bool
 }
 
 var _ runtime.ObjectConvertor = &nopConverter{}
 
-func (c *nopConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
-	// We currently only support metadata.namespace and metadata.name.
-	switch {
-	case label == "metadata.name":
-		return label, value, nil
-	case !c.clusterScoped && label == "metadata.namespace":
-		return label, value, nil
-	default:
-		return "", "", fmt.Errorf("field label not supported: %s", label)
-	}
+func (nopConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+	return "", "", errors.New("unstructured cannot convert field labels")
 }
 
 func (c *nopConverter) Convert(in, out, context interface{}) error {
@@ -72,29 +64,16 @@ func (c *nopConverter) Convert(in, out, context interface{}) error {
 	return nil
 }
 
-func (c *nopConverter) convertToVersion(in runtime.Object, target runtime.GroupVersioner) error {
+func (c *nopConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
 	kind := in.GetObjectKind().GroupVersionKind()
 	gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{kind})
 	if !ok {
 		// TODO: should this be a typed error?
-		return fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
+		return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
 	}
 	if !c.validVersions[gvk.GroupVersion()] {
-		return fmt.Errorf("request to convert CRD to an invalid group/version: %s", gvk.String())
+		return nil, fmt.Errorf("request to convert CRD to an invalid group/version: %s", gvk.String())
 	}
 	in.GetObjectKind().SetGroupVersionKind(gvk)
-	return nil
-}
-
-// ConvertToVersion converts in object to the given gvk in place and returns the same `in` object.
-func (c *nopConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
-	var err error
-	// Run the converter on the list items instead of list itself
-	if list, ok := in.(*unstructured.UnstructuredList); ok {
-		err = list.EachListItem(func(item runtime.Object) error {
-			return c.convertToVersion(item, target)
-		})
-	}
-	err = c.convertToVersion(in, target)
-	return in, err
+	return in, nil
 }
