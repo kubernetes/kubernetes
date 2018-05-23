@@ -46,10 +46,10 @@ import (
 const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
 
 // ControllerRevisionName returns the Name for a ControllerRevision in the form prefix-hash. If the length
-// of prefix is greater than 223 bytes, it is truncated to allow for a name that is no larger than 253 bytes.
+// of prefix is greater than 52 bytes, it is truncated to allow for a name that is no larger than 63 bytes.
 func ControllerRevisionName(prefix string, hash string) string {
-	if len(prefix) > 223 {
-		prefix = prefix[:223]
+	if len(prefix) > 52 {
+		prefix = prefix[:52]
 	}
 
 	return fmt.Sprintf("%s-%s", prefix, hash)
