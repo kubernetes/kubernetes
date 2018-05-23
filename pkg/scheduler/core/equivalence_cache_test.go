@@ -635,7 +635,6 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 	tests := []struct {
 		podName                           string
 		nodeName                          string
-		predicateKey                      string
 		equivalenceHashForUpdatePredicate uint64
 		cachedItem                        predicateItemType
 	}{
@@ -707,7 +706,6 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 	tests := []struct {
 		podName                           string
 		nodeName                          string
-		predicateKey                      string
 		equivalenceHashForUpdatePredicate uint64
 		cachedItem                        predicateItemType
 	}{
