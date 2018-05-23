@@ -331,7 +331,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			}
 			inputImageList, expectedImageList := generateTestingImageLists(numTestImages, int(tc.nodeStatusMaxImages))
 			testKubelet := newTestKubeletWithImageList(
-				t, inputImageList, false /* controllerAttachDetachEnabled */)
+				t, inputImageList, false /* controllerAttachDetachEnabled */, true /*initFakeVolumePlugin*/)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 			kubelet.nodeStatusMaxImages = tc.nodeStatusMaxImages
@@ -1252,7 +1252,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	// generate one more in inputImageList than we configure the Kubelet to report
 	inputImageList, _ := generateTestingImageLists(nodeStatusMaxImages+1, nodeStatusMaxImages)
 	testKubelet := newTestKubeletWithImageList(
-		t, inputImageList, false /* controllerAttachDetachEnabled */)
+		t, inputImageList, false /* controllerAttachDetachEnabled */, true /* initFakeVolumePlugin */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = nodeStatusMaxImages
@@ -1614,5 +1614,70 @@ func TestValidateNodeIPParam(t *testing.T) {
 		} else {
 			assert.Error(t, err, fmt.Sprintf("test %s", test.testName))
 		}
+	}
+}
+
+func TestSetVolumeLimits(t *testing.T) {
+	testKubelet := newTestKubeletWithoutFakeVolumePlugin(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
+	kubelet.hostname = testKubeletHostname
+
+	var testcases = []struct {
+		name              string
+		cloudProviderName string
+		expectedVolumeKey string
+		expectedLimit     int64
+	}{
+		{
+			name:              "For default GCE cloudprovider",
+			cloudProviderName: "gce",
+			expectedVolumeKey: util.GCEVolumeLimitKey,
+			expectedLimit:     16,
+		},
+		{
+			name:              "For default AWS Cloudprovider",
+			cloudProviderName: "aws",
+			expectedVolumeKey: util.EBSVolumeLimitKey,
+			expectedLimit:     39,
+		},
+		{
+			name:              "for default Azure cloudprovider",
+			cloudProviderName: "azure",
+			expectedVolumeKey: util.AzureVolumeLimitKey,
+			expectedLimit:     16,
+		},
+	}
+	for _, test := range testcases {
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
+			Spec:       v1.NodeSpec{},
+		}
+
+		fakeCloud := &fakecloud.FakeCloud{
+			Provider: test.cloudProviderName,
+			Err:      nil,
+		}
+		kubelet.cloud = fakeCloud
+		kubelet.cloudproviderRequestParallelism = make(chan int, 1)
+		kubelet.cloudproviderRequestSync = make(chan int)
+		kubelet.cloudproviderRequestTimeout = 10 * time.Second
+		kubelet.setVolumeLimits(node)
+		nodeLimits := []v1.ResourceList{}
+		nodeLimits = append(nodeLimits, node.Status.Allocatable)
+		nodeLimits = append(nodeLimits, node.Status.Capacity)
+		for _, volumeLimits := range nodeLimits {
+			fl, ok := volumeLimits[v1.ResourceName(test.expectedVolumeKey)]
+			if !ok {
+				t.Errorf("Expected to found volume limit for %s found none", test.expectedVolumeKey)
+			}
+			foundLimit, _ := fl.AsInt64()
+			expectedValue := resource.NewQuantity(test.expectedLimit, resource.DecimalSI)
+			if expectedValue.Cmp(fl) != 0 {
+				t.Errorf("Expected volume limit for %s to be %v found %v", test.expectedVolumeKey, test.expectedLimit, foundLimit)
+			}
+		}
+
 	}
 }
