@@ -258,8 +258,12 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 		// Use the nodeTunneler's dialer when proxying to pods, services, and nodes
 		proxyDialerFn = nodeTunneler.Dial
 	}
-	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
-	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
+
+	proxyTLSClientConfig := &tls.Config{}
+	if s.KubeletConfig.CAFile == "" && s.KubeletConfig.CAData == nil {
+		// Kubelet CA is not specified, we can't verify the connection.
+		proxyTLSClientConfig.InsecureSkipVerify = true
+	}
 	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
 		DialContext:     proxyDialerFn,
 		TLSClientConfig: proxyTLSClientConfig,
