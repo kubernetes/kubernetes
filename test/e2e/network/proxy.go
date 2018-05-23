@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -52,14 +53,24 @@ const (
 	proxyHTTPCallTimeout = 30 * time.Second
 )
 
+var deprecatedCAdvisorPortRemovedVersion = utilversion.MustParseSemantic("v1.11.0-alpha.0")
+
 var _ = SIGDescribe("Proxy", func() {
 	version := testapi.Groups[v1.GroupName].GroupVersion().Version
+
 	Context("version "+version, func() {
 		options := framework.FrameworkOptions{
 			ClientQPS: -1.0,
 		}
 		f := framework.NewFramework("proxy", options, nil)
 		prefix := "/api/" + version
+
+		skipCAdvisorProxyTests := false
+		BeforeEach(func() {
+			var err error
+			skipCAdvisorProxyTests, err = framework.ServerVersionGTE(deprecatedCAdvisorPortRemovedVersion, f.ClientSet.Discovery())
+			Expect(err).NotTo(HaveOccurred())
+		})
 
 		/*
 			    Testname: proxy-subresource-node-logs-port
@@ -74,7 +85,9 @@ var _ = SIGDescribe("Proxy", func() {
 				subresource.
 		*/
 		framework.ConformanceIt("should proxy logs on node using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
-		It("should proxy to cadvisor using proxy subresource", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
+		if !skipCAdvisorProxyTests {
+			It("should proxy to cadvisor using proxy subresource", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
+		}
 
 		// using the porter image to serve content, access the content
 		// (of multiple pods?) from multiple (endpoints/services?)
