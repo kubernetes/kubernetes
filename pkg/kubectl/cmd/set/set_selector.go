@@ -201,7 +201,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
-		CalculatePatch(patch, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+		CalculatePatch(patch, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
 			if selectErr != nil {
 				return nil, selectErr

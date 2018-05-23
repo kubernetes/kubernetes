@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -323,12 +324,53 @@ func (o *EnvOptions) RunEnv() error {
 	if err != nil {
 		return err
 	}
-	patches := CalculatePatches(infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-		_, err := o.updatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
+	patches := CalculatePatches(infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
+		_, err := o.updatePodSpecForObject(obj, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
+			objName, err := meta.NewAccessor().Name(obj)
+			if err != nil {
+				return err
+			}
+
+			gvks, _, err := scheme.Scheme.ObjectKinds(obj)
+			if err != nil {
+				return err
+			}
+			objKind := obj.GetObjectKind().GroupVersionKind().Kind
+			if len(objKind) == 0 {
+				for _, gvk := range gvks {
+					if len(gvk.Kind) == 0 {
+						continue
+					}
+					if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+						continue
+					}
+
+					objKind = gvk.Kind
+					break
+				}
+			}
+
 			if len(containers) == 0 {
-				fmt.Fprintf(o.ErrOut, "warning: %s/%s does not have any containers matching %q\n", info.Mapping.Resource, info.Name, o.ContainerSelector)
+				if gvks, _, err := scheme.Scheme.ObjectKinds(obj); err == nil {
+					objKind := obj.GetObjectKind().GroupVersionKind().Kind
+					if len(objKind) == 0 {
+						for _, gvk := range gvks {
+							if len(gvk.Kind) == 0 {
+								continue
+							}
+							if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+								continue
+							}
+
+							objKind = gvk.Kind
+							break
+						}
+					}
+
+					fmt.Fprintf(o.ErrOut, "warning: %s/%s does not have any containers matching %q\n", objKind, objName, o.ContainerSelector)
+				}
 				return nil
 			}
 			for _, c := range containers {
@@ -343,7 +385,7 @@ func (o *EnvOptions) RunEnv() error {
 					resolveErrors := map[string][]string{}
 					store := envutil.NewResourceStore()
 
-					fmt.Fprintf(o.Out, "# %s %s, container %s\n", info.Mapping.Resource, info.Name, c.Name)
+					fmt.Fprintf(o.Out, "# %s %s, container %s\n", objKind, objName, c.Name)
 					for _, env := range c.Env {
 						// Print the simple value
 						if env.ValueFrom == nil {
@@ -357,7 +399,7 @@ func (o *EnvOptions) RunEnv() error {
 							continue
 						}
 
-						value, err := envutil.GetEnvVarRefValue(o.clientset, o.namespace, store, env.ValueFrom, info.Object, c)
+						value, err := envutil.GetEnvVarRefValue(o.clientset, o.namespace, store, env.ValueFrom, obj, c)
 						// Print the resolved value
 						if err == nil {
 							fmt.Fprintf(o.Out, "%s=%s\n", env.Name, value)
@@ -390,7 +432,7 @@ func (o *EnvOptions) RunEnv() error {
 		})
 
 		if err == nil {
-			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
+			return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 		}
 		return nil, err
 	})

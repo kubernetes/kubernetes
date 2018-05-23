@@ -86,23 +86,12 @@ type ClientAccessFactory interface {
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
 
-	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
-	// Returns the patched object in bytes and any error that occurred during the encoding or
-	// in case the object is already paused.
-	Pauser(info *resource.Info) ([]byte, error)
-	// Resumer resumes a paused object inside the info. Currently supported only for Deployments.
-	// Returns the patched object in bytes and any error that occurred during the encoding or
-	// in case the object is already resumed.
-	Resumer(info *resource.Info) ([]byte, error)
-
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overridden.
 	DefaultNamespace() (string, bool, error)
 	// Generators returns the generators for the provided command
 	Generators(cmdName string) map[string]kubectl.Generator
-	// Check whether the kind of resources could be exposed
-	CanBeExposed(kind schema.GroupKind) error
 }
 
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
@@ -115,9 +104,6 @@ type ObjectMappingFactory interface {
 	UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer(mapping *meta.RESTMapping) (printers.Describer, error)
-
-	// Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
-	Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
 
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool) (validation.Schema, error)

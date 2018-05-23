@@ -5,17 +5,22 @@ go_library(
     srcs = [
         "attachablepodforobject.go",
         "canbeautoscaled.go",
+        "canbeexposed.go",
         "helpers.go",
         "historyviewer.go",
         "interface.go",
         "logsforobject.go",
+        "objectpauser.go",
+        "objectresumer.go",
         "portsforobject.go",
+        "rollbacker.go",
         "statusviewer.go",
         "updatepodspec.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/polymorphichelpers",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -36,6 +41,7 @@ go_library(
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -48,6 +54,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "canbeexposed_test.go",
         "helpers_test.go",
         "logsforobject_test.go",
         "portsforobject_test.go",

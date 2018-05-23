@@ -19,7 +19,6 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
@@ -41,7 +40,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -179,32 +177,6 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 		{Resource: "daemonset"},
 		{Resource: "job"},
 		{Resource: "replicaset"},
-	}
-}
-
-func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
-	switch obj := info.Object.(type) {
-	case *extensions.Deployment:
-		if obj.Spec.Paused {
-			return nil, errors.New("is already paused")
-		}
-		obj.Spec.Paused = true
-		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
-	default:
-		return nil, fmt.Errorf("pausing is not supported")
-	}
-}
-
-func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
-	switch obj := info.Object.(type) {
-	case *extensions.Deployment:
-		if !obj.Spec.Paused {
-			return nil, errors.New("is not paused")
-		}
-		obj.Spec.Paused = false
-		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
-	default:
-		return nil, fmt.Errorf("resuming is not supported")
 	}
 }
 
@@ -420,17 +392,6 @@ func Contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVers
 
 func (f *ring0Factory) Generators(cmdName string) map[string]kubectl.Generator {
 	return DefaultGenerators(cmdName)
-}
-
-func (f *ring0Factory) CanBeExposed(kind schema.GroupKind) error {
-	switch kind {
-	case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"),
-		extensions.Kind("Deployment"), apps.Kind("Deployment"), extensions.Kind("ReplicaSet"), apps.Kind("ReplicaSet"):
-		// nothing to do here
-	default:
-		return fmt.Errorf("cannot expose a %s", kind)
-	}
-	return nil
 }
 
 // this method exists to help us find the points still relying on internal types.
