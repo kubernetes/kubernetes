@@ -399,7 +399,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			restPatcher: testPatcher,
 			name:        name,
 			patchType:   patchType,
-			patchJS:     patch,
+			patchBytes:  patch,
 
 			trace: utiltrace.New("Patch" + name),
 		}
