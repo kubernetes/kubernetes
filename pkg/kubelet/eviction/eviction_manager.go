@@ -429,7 +429,8 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		if !isHardEvictionThreshold(thresholdToReclaim) {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
 		}
-		if m.evictPod(pod, gracePeriodOverride, evictionMessage(resourceToReclaim, pod, statsFunc)) {
+		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc)
+		if m.evictPod(pod, gracePeriodOverride, message, annotations) {
 			return []*v1.Pod{pod}
 		}
 	}
@@ -534,7 +535,7 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
-				return m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessage, pod.Spec.Volumes[i].Name, size.String()))
+				return m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessage, pod.Spec.Volumes[i].Name, size.String()), nil)
 			}
 		}
 	}
@@ -566,7 +567,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	podEphemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
-		return m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessage, podEphemeralStorageLimit.String()))
+		return m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessage, podEphemeralStorageLimit.String()), nil)
 	}
 	return false
 }
@@ -588,7 +589,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
-				return m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessage, containerStat.Name, ephemeralStorageThreshold.String()))
+				return m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessage, containerStat.Name, ephemeralStorageThreshold.String()), nil)
 
 			}
 		}
@@ -596,7 +597,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 	return false
 }
 
-func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string) bool {
+func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string) bool {
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
@@ -611,7 +612,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		Reason:  Reason,
 	}
 	// record that we are evicting the pod
-	m.recorder.Eventf(pod, v1.EventTypeWarning, Reason, evictMsg)
+	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	err := m.killPodFunc(pod, status, &gracePeriodOverride)
 	if err != nil {
