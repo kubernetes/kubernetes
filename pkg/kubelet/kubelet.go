@@ -1617,7 +1617,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
+	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not record an event here, as we keep all event logging for sync pod failures
