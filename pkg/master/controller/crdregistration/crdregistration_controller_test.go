@@ -42,8 +42,16 @@ func TestHandleVersionUpdate(t *testing.T) {
 			startingCRDs: []*apiextensions.CustomResourceDefinition{
 				{
 					Spec: apiextensions.CustomResourceDefinitionSpec{
-						Group:   "group.com",
-						Version: "v1",
+						Group: "group.com",
+						// Version field is deprecated and crd registration won't rely on it at all.
+						// defaulting route will fill up Versions field if user only provided version field.
+						Versions: []apiextensions.CustomResourceDefinitionVersion{
+							{
+								Name:    "v1",
+								Served:  true,
+								Storage: true,
+							},
+						},
 					},
 				},
 			},
@@ -66,8 +74,14 @@ func TestHandleVersionUpdate(t *testing.T) {
 			startingCRDs: []*apiextensions.CustomResourceDefinition{
 				{
 					Spec: apiextensions.CustomResourceDefinitionSpec{
-						Group:   "group.com",
-						Version: "v1",
+						Group: "group.com",
+						Versions: []apiextensions.CustomResourceDefinitionVersion{
+							{
+								Name:    "v1",
+								Served:  true,
+								Storage: true,
+							},
+						},
 					},
 				},
 			},
@@ -98,7 +112,6 @@ func TestHandleVersionUpdate(t *testing.T) {
 			t.Errorf("%s expected %v, got %v", test.name, test.expectedRemoved, registration.removed)
 		}
 	}
-
 }
 
 type fakeAPIServiceRegistration struct {

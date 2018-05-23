@@ -62,6 +62,15 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
 		crd.Spec.Subresources = nil
 	}
+
+	for _, v := range crd.Spec.Versions {
+		if v.Storage {
+			if !apiextensions.IsStoredVersion(crd, v.Name) {
+				crd.Status.StoredVersions = append(crd.Status.StoredVersions, v.Name)
+			}
+			break
+		}
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -89,6 +98,15 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
 		newCRD.Spec.Subresources = nil
 		oldCRD.Spec.Subresources = nil
+	}
+
+	for _, v := range newCRD.Spec.Versions {
+		if v.Storage {
+			if !apiextensions.IsStoredVersion(newCRD, v.Name) {
+				newCRD.Status.StoredVersions = append(newCRD.Status.StoredVersions, v.Name)
+			}
+			break
+		}
 	}
 }
 
