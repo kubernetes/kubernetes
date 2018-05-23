@@ -269,7 +269,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("newProvisionerInternal() failed: %v", err)
 	}
 
-	persistentSpec, err := provisioner.Provision()
+	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Fatalf("Provision() failed: %v", err)
 	}

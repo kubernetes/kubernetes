@@ -174,6 +174,8 @@ type PersistentVolumeController struct {
 	classListerSynced  cache.InformerSynced
 	podLister          corelisters.PodLister
 	podListerSynced    cache.InformerSynced
+	NodeLister         corelisters.NodeLister
+	NodeListerSynced   cache.InformerSynced
 
 	kubeClient                clientset.Interface
 	eventRecorder             record.EventRecorder
@@ -1434,13 +1436,26 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 		return
 	}
 
+	var selectedNode *v1.Node = nil
+	var allowedTopologies []v1.TopologySelectorTerm = nil
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
+		if nodeName, ok := claim.Annotations[annSelectedNode]; ok {
+			selectedNode, err = ctrl.NodeLister.Get(nodeName)
+			if err != nil {
+				strerr := fmt.Sprintf("Failed to get target node: %v", err)
+				glog.V(3).Infof("unexpected error getting target node %q for claim %q: %v", nodeName, claimToClaimKey(claim), err)
+				ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+				return
+			}
+		}
+		allowedTopologies = storageClass.AllowedTopologies
+	}
+
 	opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_provision")
-	// TODO: modify the Provision() interface to pass in the allowed topology information
-	// of the provisioned volume.
-	volume, err = provisioner.Provision()
+	volume, err = provisioner.Provision(selectedNode, allowedTopologies)
 	opComplete(&err)
 	if err != nil {
-		// Other places of failure has nothing to do with DynamicProvisioningScheduling,
+		// Other places of failure have nothing to do with DynamicProvisioningScheduling,
 		// so just let controller retry in the next sync. We'll only call func
 		// rescheduleProvisioning here when the underlying provisioning actually failed.
 		ctrl.rescheduleProvisioning(claim)
