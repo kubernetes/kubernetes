@@ -136,7 +136,7 @@ func (ds *dockerService) updateCreateConfig(
 	return nil
 }
 
-func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
+func (ds *dockerService) determinePodIPBySandboxID(uid string, sandbox *dockertypes.ContainerJSON) string {
 	return ""
 }
 

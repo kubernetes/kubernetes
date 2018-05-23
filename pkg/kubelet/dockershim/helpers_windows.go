@@ -83,7 +83,28 @@ func (ds *dockerService) updateCreateConfig(
 	return nil
 }
 
-func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
+func (ds *dockerService) determinePodIPBySandboxID(sandboxID string, sandbox *dockertypes.ContainerJSON) string {
+	// Versions and feature support
+	// ============================
+	// Windows version >= Windows Server, Version 1709, Supports both sandbox and non-sandbox case
+	// Windows version == Windows Server 2016 Support only non-sandbox case
+	// Windows version < Windows Server 2016 is Not Supported
+
+	// Sandbox support in Windows mandates CNI Plugin.
+	// Presence of CONTAINER_NETWORK flag is considered as non-Sandbox cases here
+	// Hyper-V isolated containers are also considered as non-Sandbox cases
+
+	// Todo: Add a kernel version check for more validation
+
+	// Hyper-V only supports one container per Pod yet and the container will have a different
+	// IP address from sandbox. Retrieve the IP from the containers as this is a non-Sandbox case.
+	// TODO(feiskyer): remove this workaround after Hyper-V supports multiple containers per Pod.
+	if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" && sandbox.HostConfig.Isolation != kubeletapis.HypervIsolationValue {
+		// Sandbox case, fetch the IP from the sandbox container.
+		return ds.getIP(sandboxID, sandbox)
+	}
+
+	// Non-Sandbox case, fetch the IP from the containers within the Pod.
 	opts := dockertypes.ContainerListOptions{
 		All:     true,
 		Filters: dockerfilters.NewArgs(),
@@ -103,45 +124,8 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 			continue
 		}
 
-		// Versions and feature support
-		// ============================
-		// Windows version == Windows Server, Version 1709,, Supports both sandbox and non-sandbox case
-		// Windows version == Windows Server 2016   Support only non-sandbox case
-		// Windows version < Windows Server 2016 is Not Supported
-
-		// Sandbox support in Windows mandates CNI Plugin.
-		// Presence of CONTAINER_NETWORK flag is considered as non-Sandbox cases here
-
-		// Todo: Add a kernel version check for more validation
-
-		if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" {
-			// On Windows, every container that is created in a Sandbox, needs to invoke CNI plugin again for adding the Network,
-			// with the shared container name as NetNS info,
-			// This is passed down to the platform to replicate some necessary information to the new container
-
-			//
-			// This place is chosen as a hack for now, since ds.getIP would end up calling CNI's addToNetwork
-			// That is why addToNetwork is required to be idempotent
-
-			// Instead of relying on this call, an explicit call to addToNetwork should be
-			// done immediately after ContainerCreation, in case of Windows only. TBD Issue # to handle this
-
-			if r.HostConfig.Isolation == kubeletapis.HypervIsolationValue {
-				// Hyper-V only supports one container per Pod yet and the container will have a different
-				// IP address from sandbox. Return the first non-sandbox container IP as POD IP.
-				// TODO(feiskyer): remove this workaround after Hyper-V supports multiple containers per Pod.
-				if containerIP := ds.getIP(c.ID, r); containerIP != "" {
-					return containerIP
-				}
-			} else {
-				// Do not return any IP, so that we would continue and get the IP of the Sandbox
-				ds.getIP(sandboxID, r)
-			}
-		} else {
-			// ds.getIP will call the CNI plugin to fetch the IP
-			if containerIP := ds.getIP(c.ID, r); containerIP != "" {
-				return containerIP
-			}
+		if containerIP := ds.getIP(c.ID, r); containerIP != "" {
+			return containerIP
 		}
 	}
 
