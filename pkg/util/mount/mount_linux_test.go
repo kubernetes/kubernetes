@@ -1291,7 +1291,7 @@ func TestBindSubPath(t *testing.T) {
 		}
 
 		_, subpathMount := getTestPaths(base)
-		bindPathTarget, err := doBindSubPath(fm, subpath, 1)
+		bindPathTarget, err := doBindSubPath(fm, subpath)
 		if test.expectError {
 			if err == nil {
 				t.Errorf("test %q failed: expected error, got success", test.name)
