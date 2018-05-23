@@ -401,6 +401,10 @@ func (fftc *fakeFileTypeChecker) GetSELinuxSupport(pathname string) (bool, error
 	return false, errors.New("not implemented")
 }
 
+func (fftc *fakeFileTypeChecker) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
+}
+
 func setUp() error {
 	err := os.MkdirAll("/tmp/ExistingFolder", os.FileMode(0755))
 	if err != nil {

@@ -176,3 +176,7 @@ func (fm *fakeMounter) GetFSGroup(pathname string) (int64, error) {
 func (fm *fakeMounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("not implemented")
 }
+
+func (fm *fakeMounter) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
+}
