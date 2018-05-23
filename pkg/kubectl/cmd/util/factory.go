@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
@@ -102,8 +101,6 @@ type ObjectMappingFactory interface {
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	// Returns a RESTClient for working with Unstructured objects.
 	UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	// Returns a Describer for displaying the specified RESTMapping type or an error.
-	Describer(mapping *meta.RESTMapping) (printers.Describer, error)
 
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool) (validation.Schema, error)

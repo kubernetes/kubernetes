@@ -271,10 +271,17 @@ func NewTestFactory() *TestFactory {
 		WithClientConfig(clientConfig).
 		WithRESTMapper(testRESTMapper())
 
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		panic(fmt.Sprintf("unable to create a fake restclient config: %v", err))
+	}
+
 	return &TestFactory{
 		Factory:           cmdutil.NewFactory(configFlags),
 		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(legacyscheme.Scheme),
 		tempConfigFile:    tmpFile,
+
+		ClientConfigVal: restConfig,
 	}
 }
 
