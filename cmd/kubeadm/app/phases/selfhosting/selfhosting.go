@@ -31,7 +31,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 const (
@@ -86,7 +86,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 		}
 
 		// Load the Static Pod file in order to be able to create a self-hosted variant of that file
-		pod, err := volumeutil.LoadPodFromFile(manifestPath)
+		pod, err := corev1helper.LoadPodFromFile(manifestPath)
 		if err != nil {
 			return err
 		}
