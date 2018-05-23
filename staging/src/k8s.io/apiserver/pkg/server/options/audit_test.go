@@ -40,8 +40,9 @@ func TestAuditValidOptions(t *testing.T) {
 		options  func() *AuditOptions
 		expected string
 	}{{
-		name:    "default",
-		options: NewAuditOptions,
+		name:     "default",
+		options:  NewAuditOptions,
+		expected: "Registry{static: , dynamic: }",
 	}, {
 		name: "default log",
 		options: func() *AuditOptions {
@@ -49,7 +50,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.LogOptions.Path = "/audit"
 			return o
 		},
-		expected: "log",
+		expected: "Registry{static: log, dynamic: }",
 	}, {
 		name: "default webhook",
 		options: func() *AuditOptions {
@@ -57,7 +58,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.WebhookOptions.ConfigFile = webhookConfig
 			return o
 		},
-		expected: "buffered<webhook>",
+		expected: "Registry{static: buffered<webhook>, dynamic: }",
 	}, {
 		name: "default union",
 		options: func() *AuditOptions {
@@ -66,7 +67,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.WebhookOptions.ConfigFile = webhookConfig
 			return o
 		},
-		expected: "union[log,buffered<webhook>]",
+		expected: "Registry{static: union[log,buffered<webhook>], dynamic: }",
 	}, {
 		name: "custom",
 		options: func() *AuditOptions {
@@ -77,7 +78,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.WebhookOptions.ConfigFile = webhookConfig
 			return o
 		},
-		expected: "union[buffered<log>,webhook]",
+		expected: "Registry{static: union[buffered<log>,webhook], dynamic: }",
 	}, {
 		name: "default webhook with truncating",
 		options: func() *AuditOptions {
@@ -86,7 +87,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.WebhookOptions.TruncateOptions.Enabled = true
 			return o
 		},
-		expected: "truncate<buffered<webhook>>",
+		expected: "Registry{static: truncate<buffered<webhook>>, dynamic: }",
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

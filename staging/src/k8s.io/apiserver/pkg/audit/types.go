@@ -40,3 +40,14 @@ type Backend interface {
 	// the stopCh channel passed to the Run method has been closed.
 	Shutdown()
 }
+
+// Registry allows caller to dynamicly register/unregister backends to it.
+type Registry interface {
+	Backend
+
+	// Register register a new Backend to the registry.
+	Register(Backend)
+
+	// UnRegister remove the Backend from registry.
+	UnRegister(Backend)
+}

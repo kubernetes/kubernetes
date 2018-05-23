@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "format.go",
         "metrics.go",
+        "registry.go",
         "request.go",
         "scheme.go",
         "types.go",
@@ -39,6 +40,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "registry_test.go",
         "request_test.go",
         "union_test.go",
     ],

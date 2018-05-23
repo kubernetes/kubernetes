@@ -288,6 +288,8 @@ func (o *AuditOptions) ApplyTo(c *server.Config) error {
 	if c.AuditBackend != nil && c.AuditPolicyChecker == nil {
 		glog.V(2).Info("No audit policy file provided for AdvancedAuditing, no events will be recorded.")
 	}
+
+	c.AuditBackend = audit.WithRegistry(c.AuditBackend)
 	return nil
 }
 
