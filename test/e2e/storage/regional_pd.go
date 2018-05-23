@@ -44,7 +44,7 @@ const (
 	statefulSetReadyTimeout = 3 * time.Minute
 )
 
-var _ = utils.SIGDescribe("Regional PD [Feature:RegionalPD]", func() {
+var _ = utils.SIGDescribe("Regional PD", func() {
 	f := framework.NewDefaultFramework("regional-pd")
 
 	// filled in BeforeEach
