@@ -511,7 +511,11 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			}
 
 			if fstype == "ext4" || fstype == "ext3" {
-				args = []string{"-F", source}
+				args = []string{
+					"-F",  // Force flag
+					"-m0", // Zero blocks reserved for super-user
+					source,
+				}
 			}
 			glog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
 			_, err := mounter.Exec.Run("mkfs."+fstype, args...)
