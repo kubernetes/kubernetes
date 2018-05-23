@@ -36,6 +36,11 @@ func TestPrintConfiguration(t *testing.T) {
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
 				KubernetesVersion: "v1.7.1",
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						DataDir: "/some/path",
+					},
+				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	api:
@@ -48,12 +53,9 @@ func TestPrintConfiguration(t *testing.T) {
 	  path: ""
 	certificatesDir: ""
 	etcd:
-	  caFile: ""
-	  certFile: ""
-	  dataDir: ""
-	  endpoints: null
-	  image: ""
-	  keyFile: ""
+	  local:
+	    dataDir: /some/path
+	    image: ""
 	imageRepository: ""
 	kind: MasterConfiguration
 	kubeProxy: {}
@@ -74,6 +76,11 @@ func TestPrintConfiguration(t *testing.T) {
 				Networking: kubeadmapi.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 				},
+				Etcd: kubeadmapi.Etcd{
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{"https://one-etcd-instance:2379"},
+					},
+				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	api:
@@ -86,12 +93,12 @@ func TestPrintConfiguration(t *testing.T) {
 	  path: ""
 	certificatesDir: ""
 	etcd:
-	  caFile: ""
-	  certFile: ""
-	  dataDir: ""
-	  endpoints: null
-	  image: ""
-	  keyFile: ""
+	  external:
+	    caFile: ""
+	    certFile: ""
+	    endpoints:
+	    - https://one-etcd-instance:2379
+	    keyFile: ""
 	imageRepository: ""
 	kind: MasterConfiguration
 	kubeProxy: {}

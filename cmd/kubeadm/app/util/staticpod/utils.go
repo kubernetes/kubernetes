@@ -242,8 +242,8 @@ func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) 
 			return addr
 		}
 	case componentName == kubeadmconstants.Etcd:
-		if cfg.Etcd.ExtraArgs != nil {
-			if arg, exists := cfg.Etcd.ExtraArgs[etcdListenClientURLsArg]; exists {
+		if cfg.Etcd.Local != nil && cfg.Etcd.Local.ExtraArgs != nil {
+			if arg, exists := cfg.Etcd.Local.ExtraArgs[etcdListenClientURLsArg]; exists {
 				// Use the first url in the listen-client-urls if multiple url's are specified.
 				if strings.ContainsAny(arg, ",") {
 					arg = strings.Split(arg, ",")[0]
