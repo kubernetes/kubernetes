@@ -316,6 +316,50 @@ func MatchNodeSelectorTerms(
 	return false
 }
 
+// TopologySelectorRequirementsAsSelector converts the []TopologySelectorLabelRequirement api type into a struct
+// that implements labels.Selector.
+func TopologySelectorRequirementsAsSelector(tsm []v1.TopologySelectorLabelRequirement) (labels.Selector, error) {
+	if len(tsm) == 0 {
+		return labels.Nothing(), nil
+	}
+
+	selector := labels.NewSelector()
+	for _, expr := range tsm {
+		r, err := labels.NewRequirement(expr.Key, selection.In, expr.Values)
+		if err != nil {
+			return nil, err
+		}
+		selector = selector.Add(*r)
+	}
+
+	return selector, nil
+}
+
+// MatchTopologySelectorTerms checks whether given labels match topology selector terms in ORed;
+// nil or empty term matches no objects; while empty term list matches all objects.
+func MatchTopologySelectorTerms(topologySelectorTerms []v1.TopologySelectorTerm, lbls labels.Set) bool {
+	if len(topologySelectorTerms) == 0 {
+		// empty term list matches all objects
+		return true
+	}
+
+	for _, req := range topologySelectorTerms {
+		// nil or empty term selects no objects
+		if len(req.MatchLabelExpressions) == 0 {
+			continue
+		}
+
+		labelSelector, err := TopologySelectorRequirementsAsSelector(req.MatchLabelExpressions)
+		if err != nil || !labelSelector.Matches(lbls) {
+			continue
+		}
+
+		return true
+	}
+
+	return false
+}
+
 // AddOrUpdateTolerationInPodSpec tries to add a toleration to the toleration list in PodSpec.
 // Returns true if something was updated, false otherwise.
 func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration) bool {
