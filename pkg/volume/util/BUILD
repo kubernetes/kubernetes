@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "atomic_writer.go",
+        "attach_limit.go",
         "device_util.go",
         "doc.go",
         "error.go",
