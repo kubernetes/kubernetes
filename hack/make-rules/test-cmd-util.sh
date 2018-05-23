@@ -1838,7 +1838,7 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" delete resources myobj --cascade=true
 
   # Make sure it's gone
-  kube::test::get_object_assert resources "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert resources "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create a new resource of type Foo
   kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/foo.yaml "${kube_flags[@]}"
@@ -1919,7 +1919,7 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" delete foos test --cascade=true
 
   # Make sure it's gone
-  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create a new resource of type Bar
   kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/bar.yaml "${kube_flags[@]}"

@@ -302,12 +302,12 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		found++
 
 		// if we're here, it means that cascade=false (not the default), so we should orphan as requested
-		orphan := true
 		options := &metav1.DeleteOptions{}
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		options.OrphanDependents = &orphan
+		policy := metav1.DeletePropagationOrphan
+		options.PropagationPolicy = &policy
 		return o.deleteResource(info, options)
 	})
 	if err != nil {
@@ -350,8 +350,8 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 }
 
 func (o *DeleteOptions) cascadingDeleteResource(info *resource.Info) error {
-	falseVar := false
-	return o.deleteResource(info, &metav1.DeleteOptions{OrphanDependents: &falseVar})
+	policy := metav1.DeletePropagationForeground
+	return o.deleteResource(info, &metav1.DeleteOptions{PropagationPolicy: &policy})
 }
 
 func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) error {
