@@ -917,7 +917,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
-		err = apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
+		definition, err = apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
