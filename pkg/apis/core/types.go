@@ -3269,27 +3269,12 @@ type ConfigMapNodeConfigSource struct {
 	Name string
 
 	// UID is the metadata.UID of the referenced ConfigMap.
-	// This field is currently reqired in Node.Spec.
-	// TODO(#61643): This field will be forbidden in Node.Spec when #61643 is resolved.
-	//               #61643 changes the behavior of dynamic Kubelet config to respect
-	//               ConfigMap updates, and thus removes the ability to pin the Spec to a given UID.
-	// TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
-	//               #63314 (the PR that resolves #56896) adds a structured status to the Node
-	//               object for reporting information about the config. This status requires UID
-	//               and ResourceVersion, so that it represents a fully-explicit description of
-	//               the configuration in use, while (see previous TODO) the Spec will be
-	//               restricted to namespace/name in #61643.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
 	// +optional
 	UID types.UID
 
 	// ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap.
-	// This field is forbidden in Node.Spec.
-	// TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
-	//               #63314 (the PR that resolves #56896) adds a structured status to the Node
-	//               object for reporting information about the config. This status requires UID
-	//               and ResourceVersion, so that it represents a fully-explicit description of
-	//               the configuration in use, while (see previous TODO) the Spec will be
-	//               restricted to namespace/name in #61643.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
 	// +optional
 	ResourceVersion string
 
