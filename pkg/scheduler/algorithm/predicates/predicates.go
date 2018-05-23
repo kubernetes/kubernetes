@@ -289,10 +289,11 @@ func NoDiskConflict(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *sch
 
 // MaxPDVolumeCountChecker contains information to check the max number of volumes for a predicate.
 type MaxPDVolumeCountChecker struct {
-	filter     VolumeFilter
-	maxVolumes int
-	pvInfo     PersistentVolumeInfo
-	pvcInfo    PersistentVolumeClaimInfo
+	filter         VolumeFilter
+	volumeLimitKey v1.ResourceName
+	maxVolumes     int
+	pvInfo         PersistentVolumeInfo
+	pvcInfo        PersistentVolumeClaimInfo
 
 	// The string below is generated randomly during the struct's initialization.
 	// It is used to prefix volumeID generated inside the predicate() method to
@@ -313,21 +314,25 @@ type VolumeFilter struct {
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
-func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
-
+func NewMaxPDVolumeCountPredicate(
+	filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
 	var filter VolumeFilter
 	var maxVolumes int
+	var volumeLimitKey v1.ResourceName
 
 	switch filterName {
 
 	case EBSVolumeFilterType:
 		filter = EBSVolumeFilter
+		volumeLimitKey = v1.ResourceName(volumeutil.EBSVolumeLimitKey)
 		maxVolumes = getMaxVols(DefaultMaxEBSVolumes)
 	case GCEPDVolumeFilterType:
 		filter = GCEPDVolumeFilter
+		volumeLimitKey = v1.ResourceName(volumeutil.GCEVolumeLimitKey)
 		maxVolumes = getMaxVols(DefaultMaxGCEPDVolumes)
 	case AzureDiskVolumeFilterType:
 		filter = AzureDiskVolumeFilter
+		volumeLimitKey = v1.ResourceName(volumeutil.AzureVolumeLimitKey)
 		maxVolumes = getMaxVols(DefaultMaxAzureDiskVolumes)
 	default:
 		glog.Fatalf("Wrong filterName, Only Support %v %v %v ", EBSVolumeFilterType,
@@ -337,6 +342,7 @@ func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo
 	}
 	c := &MaxPDVolumeCountChecker{
 		filter:               filter,
+		volumeLimitKey:       volumeLimitKey,
 		maxVolumes:           maxVolumes,
 		pvInfo:               pvInfo,
 		pvcInfo:              pvcInfo,
@@ -362,7 +368,6 @@ func getMaxVols(defaultVal int) int {
 }
 
 func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace string, filteredVolumes map[string]bool) error {
-
 	for i := range volumes {
 		vol := &volumes[i]
 		if id, ok := c.filter.FilterVolume(vol); ok {
@@ -449,15 +454,23 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta algorithm.Predicat
 	}
 
 	numNewVolumes := len(newVolumes)
+	maxAttachLimit := c.maxVolumes
 
-	if numExistingVolumes+numNewVolumes > c.maxVolumes {
+	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		volumeLimits := nodeInfo.VolumeLimits()
+		if maxAttachLimitFromAllocatable, ok := volumeLimits[c.volumeLimitKey]; ok {
+			maxAttachLimit = int(maxAttachLimitFromAllocatable)
+		}
+	}
+
+	if numExistingVolumes+numNewVolumes > maxAttachLimit {
 		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
 		return false, []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
 	}
 	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) {
 		nodeInfo.TransientInfo.TransientLock.Lock()
 		defer nodeInfo.TransientInfo.TransientLock.Unlock()
-		nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount = c.maxVolumes - numExistingVolumes
+		nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount = maxAttachLimit - numExistingVolumes
 		nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes = numNewVolumes
 	}
 	return true, nil, nil

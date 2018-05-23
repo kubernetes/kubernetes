@@ -412,6 +412,17 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	return clone
 }
 
+// VolumeLimits returns volume limits associated with the node
+func (n *NodeInfo) VolumeLimits() map[v1.ResourceName]int64 {
+	volumeLimits := map[v1.ResourceName]int64{}
+	for k, v := range n.AllocatableResource().ScalarResources {
+		if v1helper.IsAttachableVolumeResourceName(k) {
+			volumeLimits[k] = v
+		}
+	}
+	return volumeLimits
+}
+
 // String returns representation of human readable format of this NodeInfo.
 func (n *NodeInfo) String() string {
 	podKeys := make([]string, len(n.pods))
