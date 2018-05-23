@@ -412,8 +412,9 @@ func (ds *dockerService) PodSandboxStatus(ctx context.Context, req *runtimeapi.P
 
 	var IP string
 	// TODO: Remove this when sandbox is available on windows
+	// Currently windows supports both sandbox and non-sandbox cases.
 	// This is a workaround for windows, where sandbox is not in use, and pod IP is determined through containers belonging to the Pod.
-	if IP = ds.determinePodIPBySandboxID(podSandboxID); IP == "" {
+	if IP = ds.determinePodIPBySandboxID(podSandboxID, r); IP == "" {
 		IP = ds.getIP(podSandboxID, r)
 	}
 
