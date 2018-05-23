@@ -94,13 +94,13 @@ func RunPlan(flags *planFlags) error {
 
 	// Currently this is the only method we have for distinguishing
 	// external etcd vs static pod etcd
-	isExternalEtcd := len(upgradeVars.cfg.Etcd.Endpoints) > 0
+	isExternalEtcd := upgradeVars.cfg.Etcd.External != nil
 	if isExternalEtcd {
 		client, err := etcdutil.New(
-			upgradeVars.cfg.Etcd.Endpoints,
-			upgradeVars.cfg.Etcd.CAFile,
-			upgradeVars.cfg.Etcd.CertFile,
-			upgradeVars.cfg.Etcd.KeyFile)
+			upgradeVars.cfg.Etcd.External.Endpoints,
+			upgradeVars.cfg.Etcd.External.CAFile,
+			upgradeVars.cfg.Etcd.External.CertFile,
+			upgradeVars.cfg.Etcd.External.KeyFile)
 		if err != nil {
 			return err
 		}

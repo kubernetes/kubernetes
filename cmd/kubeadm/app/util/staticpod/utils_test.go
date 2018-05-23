@@ -207,8 +207,10 @@ func TestEtcdProbe(t *testing.T) {
 			name: "valid etcd probe using listen-client-urls IPv4 addresses",
 			cfg: &kubeadmapi.MasterConfiguration{
 				Etcd: kubeadmapi.Etcd{
-					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://1.2.3.4:2379,http://4.3.2.1:2379"},
+					Local: &kubeadmapi.LocalEtcd{
+						ExtraArgs: map[string]string{
+							"listen-client-urls": "http://1.2.3.4:2379,http://4.3.2.1:2379"},
+					},
 				},
 			},
 			component: kubeadmconstants.Etcd,
@@ -223,8 +225,10 @@ func TestEtcdProbe(t *testing.T) {
 			name: "valid etcd probe using listen-client-urls IPv6 addresses",
 			cfg: &kubeadmapi.MasterConfiguration{
 				Etcd: kubeadmapi.Etcd{
-					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://[2001:db8::1]:2379,http://[2001:db8::2]:2379"},
+					Local: &kubeadmapi.LocalEtcd{
+						ExtraArgs: map[string]string{
+							"listen-client-urls": "http://[2001:db8::1]:2379,http://[2001:db8::2]:2379"},
+					},
 				},
 			},
 			component: kubeadmconstants.Etcd,
@@ -239,8 +243,10 @@ func TestEtcdProbe(t *testing.T) {
 			name: "valid IPv4 etcd probe using hostname for listen-client-urls",
 			cfg: &kubeadmapi.MasterConfiguration{
 				Etcd: kubeadmapi.Etcd{
-					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://localhost:2379"},
+					Local: &kubeadmapi.LocalEtcd{
+						ExtraArgs: map[string]string{
+							"listen-client-urls": "http://localhost:2379"},
+					},
 				},
 			},
 			component: kubeadmconstants.Etcd,

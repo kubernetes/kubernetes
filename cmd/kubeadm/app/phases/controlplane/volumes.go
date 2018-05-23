@@ -62,8 +62,8 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 		mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeAuditPolicyLogVolumeName, cfg.AuditPolicyConfiguration.LogDir, kubeadmconstants.StaticPodAuditPolicyLogDir, false, &hostPathDirectoryOrCreate)
 	}
 	// If external etcd is specified, mount the directories needed for accessing the CA/serving certs and the private key
-	if len(cfg.Etcd.Endpoints) != 0 {
-		etcdVols, etcdVolMounts := getEtcdCertVolumes(cfg.Etcd, cfg.CertificatesDir)
+	if cfg.Etcd.External != nil {
+		etcdVols, etcdVolMounts := getEtcdCertVolumes(cfg.Etcd.External, cfg.CertificatesDir)
 		mounts.AddHostPathMounts(kubeadmconstants.KubeAPIServer, etcdVols, etcdVolMounts)
 	}
 
@@ -178,7 +178,7 @@ func (c *controlPlaneHostPathMounts) addComponentVolumeMount(component string, v
 }
 
 // getEtcdCertVolumes returns the volumes/volumemounts needed for talking to an external etcd cluster
-func getEtcdCertVolumes(etcdCfg kubeadmapi.Etcd, k8sCertificatesDir string) ([]v1.Volume, []v1.VolumeMount) {
+func getEtcdCertVolumes(etcdCfg *kubeadmapi.ExternalEtcd, k8sCertificatesDir string) ([]v1.Volume, []v1.VolumeMount) {
 	certPaths := []string{etcdCfg.CAFile, etcdCfg.CertFile, etcdCfg.KeyFile}
 	certDirs := sets.NewString()
 	for _, certPath := range certPaths {

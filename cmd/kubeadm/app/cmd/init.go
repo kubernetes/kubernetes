@@ -95,7 +95,7 @@ var (
 				- {{ .APIServerImage }}
 				- {{ .ControllerManagerImage }}
 				- {{ .SchedulerImage }}
-				- {{ .EtcdImage }} (only if no external etcd endpoints are configured)
+{{ .EtcdImage }}
 				- You can check or miligate this in beforehand with "kubeadm config images pull" to make sure the images
 				  are downloaded locally and cached.
 
@@ -338,7 +338,7 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}
 	// Add etcd static pod spec only if external etcd is not configured
-	if len(i.cfg.Etcd.Endpoints) == 0 {
+	if i.cfg.Etcd.External == nil {
 		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
 		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
 			return fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
@@ -380,7 +380,12 @@ func (i *Init) Run(out io.Writer) error {
 			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"ControllerManagerImage": images.GetCoreImage(kubeadmconstants.KubeControllerManager, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"SchedulerImage":         images.GetCoreImage(kubeadmconstants.KubeScheduler, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
-			"EtcdImage":              images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.Image),
+		}
+		// Set .EtcdImage conditionally
+		if i.cfg.Etcd.Local != nil {
+			ctx["EtcdImage"] = fmt.Sprintf("				- %s", images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.Local.Image))
+		} else {
+			ctx["EtcdImage"] = ""
 		}
 
 		kubeletFailTempl.Execute(out, ctx)

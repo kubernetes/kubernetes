@@ -457,6 +457,11 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
+				Etcd: kubeadm.Etcd{
+					Local: &kubeadm.LocalEtcd{
+						DataDir: "/some/path",
+					},
+				},
 				KubeProxy: kubeadm.KubeProxy{
 					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 						BindAddress:        "192.168.59.103",
@@ -497,6 +502,11 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				API: kubeadm.API{
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
+				},
+				Etcd: kubeadm.Etcd{
+					Local: &kubeadm.LocalEtcd{
+						DataDir: "/some/path",
+					},
 				},
 				KubeProxy: kubeadm.KubeProxy{
 					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{

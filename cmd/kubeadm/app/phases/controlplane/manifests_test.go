@@ -182,49 +182,10 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "custom etcd cert and key files",
-			cfg: &kubeadmapi.MasterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				Etcd:            kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
-				CertificatesDir: testCertsDir,
-			},
-			expected: []string{
-				"kube-apiserver",
-				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
-				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + testCertsDir + "/sa.pub",
-				"--client-ca-file=" + testCertsDir + "/ca.crt",
-				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
-				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
-				"--kubelet-client-certificate=" + testCertsDir + "/apiserver-kubelet-client.crt",
-				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
-				"--enable-bootstrap-token-auth=true",
-				"--secure-port=123",
-				"--allow-privileged=true",
-				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
-				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
-				"--requestheader-username-headers=X-Remote-User",
-				"--requestheader-group-headers=X-Remote-Group",
-				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
-				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
-				"--requestheader-allowed-names=front-proxy-client",
-				"--authorization-mode=Node,RBAC",
-				"--advertise-address=4.3.2.1",
-				"--etcd-servers=https://127.0.0.1:2379",
-				"--etcd-cafile=" + testCertsDir + "/etcd/ca.crt",
-				"--etcd-certfile=" + testCertsDir + "/apiserver-etcd-client.crt",
-				"--etcd-keyfile=" + testCertsDir + "/apiserver-etcd-client.key",
-			},
-		},
-		{
 			name: "ignores the audit policy if the feature gate is not enabled",
 			cfg: &kubeadmapi.MasterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				Etcd:            kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir: testCertsDir,
 				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
 					Path:      "/foo/bar",
@@ -267,7 +228,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			cfg: &kubeadmapi.MasterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				Etcd:            kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir: testCertsDir,
 			},
 			expected: []string{
@@ -303,10 +263,17 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "an external etcd with custom ca, certs and keys",
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				FeatureGates:    map[string]bool{features.HighAvailability: true},
-				Etcd:            kubeadmapi.Etcd{Endpoints: []string{"https://8.6.4.1:2379", "https://8.6.4.2:2379"}, CAFile: "fuz", CertFile: "fiz", KeyFile: "faz"},
+				API:          kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
+				Networking:   kubeadmapi.Networking{ServiceSubnet: "bar"},
+				FeatureGates: map[string]bool{features.HighAvailability: true},
+				Etcd: kubeadmapi.Etcd{
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{"https://8.6.4.1:2379", "https://8.6.4.2:2379"},
+						CAFile:    "fuz",
+						CertFile:  "fiz",
+						KeyFile:   "faz",
+					},
+				},
 				CertificatesDir: testCertsDir,
 			},
 			expected: []string{
@@ -343,9 +310,13 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "an insecure etcd",
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				Etcd:            kubeadmapi.Etcd{Endpoints: []string{"http://127.0.0.1:2379", "http://127.0.0.1:2380"}},
+				API:        kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
+				Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Etcd: kubeadmapi.Etcd{
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{"http://127.0.0.1:2379", "http://127.0.0.1:2380"},
+					},
+				},
 				CertificatesDir: testCertsDir,
 			},
 			expected: []string{

@@ -56,15 +56,9 @@ apiServerExtraArgs: null
 certificatesDir: %s
 controllerManagerExtraArgs: null
 etcd:
-  caFile: ""
-  certFile: ""
-  dataDir: %s
-  endpoints: null
-  extraArgs: null
-  image: ""
-  keyFile: ""
-  serverCertSANs: null
-  peerCertSANs: null
+  local:
+    dataDir: %s
+    image: ""
 featureFlags: null
 imageRepository: k8s.gcr.io
 kubernetesVersion: %s

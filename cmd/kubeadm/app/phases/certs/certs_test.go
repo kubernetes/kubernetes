@@ -325,9 +325,11 @@ func TestNewEtcdServerCertAndKey(t *testing.T) {
 
 	cfg := &kubeadmapi.MasterConfiguration{
 		Etcd: kubeadmapi.Etcd{
-			ServerCertSANs: []string{
-				proxy,
-				proxyIP,
+			Local: &kubeadmapi.LocalEtcd{
+				ServerCertSANs: []string{
+					proxy,
+					proxyIP,
+				},
 			},
 		},
 	}
@@ -358,9 +360,11 @@ func TestNewEtcdPeerCertAndKey(t *testing.T) {
 			API:      kubeadmapi.API{AdvertiseAddress: addr},
 			NodeName: hostname,
 			Etcd: kubeadmapi.Etcd{
-				PeerCertSANs: []string{
-					proxy,
-					proxyIP,
+				Local: &kubeadmapi.LocalEtcd{
+					PeerCertSANs: []string{
+						proxy,
+						proxyIP,
+					},
 				},
 			},
 		}
@@ -693,13 +697,18 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 
 		cfg := &kubeadmapi.MasterConfiguration{
 			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+			Etcd:            kubeadmapi.Etcd{Local: &kubeadmapi.LocalEtcd{}},
 			Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 			NodeName:        "valid-hostname",
 			CertificatesDir: tmpdir,
 		}
 
 		if test.externalEtcd {
-			cfg.Etcd.Endpoints = []string{"192.168.1.1:2379"}
+			if cfg.Etcd.External == nil {
+				cfg.Etcd.External = &kubeadmapi.ExternalEtcd{}
+			}
+			cfg.Etcd.Local = nil
+			cfg.Etcd.External.Endpoints = []string{"192.168.1.1:2379"}
 		}
 
 		// executes setup func (if necessary)

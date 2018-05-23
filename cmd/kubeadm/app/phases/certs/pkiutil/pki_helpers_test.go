@@ -508,11 +508,13 @@ func TestGetEtcdAltNames(t *testing.T) {
 	proxyIP := "10.10.10.100"
 	cfg := &kubeadmapi.MasterConfiguration{
 		Etcd: kubeadmapi.Etcd{
-			ServerCertSANs: []string{
-				proxy,
-				proxyIP,
-				"1.2.3.L",
-				"invalid,commas,in,DNS",
+			Local: &kubeadmapi.LocalEtcd{
+				ServerCertSANs: []string{
+					proxy,
+					proxyIP,
+					"1.2.3.L",
+					"invalid,commas,in,DNS",
+				},
 			},
 		},
 	}
@@ -562,11 +564,13 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 		API:      kubeadmapi.API{AdvertiseAddress: advertiseIP},
 		NodeName: hostname,
 		Etcd: kubeadmapi.Etcd{
-			PeerCertSANs: []string{
-				proxy,
-				proxyIP,
-				"1.2.3.L",
-				"invalid,commas,in,DNS",
+			Local: &kubeadmapi.LocalEtcd{
+				PeerCertSANs: []string{
+					proxy,
+					proxyIP,
+					"1.2.3.L",
+					"invalid,commas,in,DNS",
+				},
 			},
 		},
 	}

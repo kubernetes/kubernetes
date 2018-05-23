@@ -119,17 +119,26 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.ImageRepository = DefaultImageRepository
 	}
 
-	if obj.Etcd.DataDir == "" {
-		obj.Etcd.DataDir = DefaultEtcdDataDir
-	}
-
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
 	}
 
 	SetDefaults_KubeletConfiguration(obj)
+	SetDefaults_Etcd(obj)
 	SetDefaults_ProxyConfiguration(obj)
 	SetDefaults_AuditPolicyConfiguration(obj)
+}
+
+// SetDefaults_Etcd assigns default values for the Proxy
+func SetDefaults_Etcd(obj *MasterConfiguration) {
+	if obj.Etcd.External == nil && obj.Etcd.Local == nil {
+		obj.Etcd.Local = &LocalEtcd{}
+	}
+	if obj.Etcd.Local != nil {
+		if obj.Etcd.Local.DataDir == "" {
+			obj.Etcd.Local.DataDir = DefaultEtcdDataDir
+		}
+	}
 }
 
 // SetDefaults_ProxyConfiguration assigns default values for the Proxy

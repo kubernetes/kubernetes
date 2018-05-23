@@ -135,7 +135,9 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			name: "external etcd configuration",
 			cfg: kubeadmapiv1alpha2.MasterConfiguration{
 				Etcd: kubeadmapiv1alpha2.Etcd{
-					Endpoints: []string{"hi"},
+					External: &kubeadmapiv1alpha2.ExternalEtcd{
+						Endpoints: []string{"https://some.etcd.com:2379"},
+					},
 				},
 			},
 			expectedImages: defaultNumberOfImages - 1,

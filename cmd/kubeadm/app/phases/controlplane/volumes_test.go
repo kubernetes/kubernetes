@@ -234,7 +234,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actualVol, actualVolMount := getEtcdCertVolumes(kubeadmapi.Etcd{
+		actualVol, actualVolMount := getEtcdCertVolumes(&kubeadmapi.ExternalEtcd{
 			CAFile:   rt.ca,
 			CertFile: rt.cert,
 			KeyFile:  rt.key,
@@ -525,10 +525,12 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 			cfg: &kubeadmapi.MasterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd: kubeadmapi.Etcd{
-					Endpoints: []string{"foo"},
-					CAFile:    "/etc/certs/etcd/my-etcd-ca.crt",
-					CertFile:  testCertsDir + "/etcd/my-etcd.crt",
-					KeyFile:   "/var/lib/etcd/certs/my-etcd.key",
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{"foo"},
+						CAFile:    "/etc/certs/etcd/my-etcd-ca.crt",
+						CertFile:  testCertsDir + "/etcd/my-etcd.crt",
+						KeyFile:   "/var/lib/etcd/certs/my-etcd.key",
+					},
 				},
 			},
 			vol:      volMap2,

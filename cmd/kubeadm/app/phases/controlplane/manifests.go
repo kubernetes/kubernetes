@@ -169,16 +169,16 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	command := []string{"kube-apiserver"}
 
 	// If the user set endpoints for an external etcd cluster
-	if len(cfg.Etcd.Endpoints) > 0 {
-		defaultArguments["etcd-servers"] = strings.Join(cfg.Etcd.Endpoints, ",")
+	if cfg.Etcd.External != nil {
+		defaultArguments["etcd-servers"] = strings.Join(cfg.Etcd.External.Endpoints, ",")
 
 		// Use any user supplied etcd certificates
-		if cfg.Etcd.CAFile != "" {
-			defaultArguments["etcd-cafile"] = cfg.Etcd.CAFile
+		if cfg.Etcd.External.CAFile != "" {
+			defaultArguments["etcd-cafile"] = cfg.Etcd.External.CAFile
 		}
-		if cfg.Etcd.CertFile != "" && cfg.Etcd.KeyFile != "" {
-			defaultArguments["etcd-certfile"] = cfg.Etcd.CertFile
-			defaultArguments["etcd-keyfile"] = cfg.Etcd.KeyFile
+		if cfg.Etcd.External.CertFile != "" && cfg.Etcd.External.KeyFile != "" {
+			defaultArguments["etcd-certfile"] = cfg.Etcd.External.CertFile
+			defaultArguments["etcd-keyfile"] = cfg.Etcd.External.KeyFile
 		}
 	} else {
 		// Default to etcd static pod on localhost
@@ -186,17 +186,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		defaultArguments["etcd-cafile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName)
 		defaultArguments["etcd-certfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName)
 		defaultArguments["etcd-keyfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
-
-		// Warn for unused user supplied variables
-		if cfg.Etcd.CAFile != "" {
-			glog.Warningf("[controlplane] configuration for %s CAFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CAFile, kubeadmconstants.Etcd)
-		}
-		if cfg.Etcd.CertFile != "" {
-			glog.Warningf("[controlplane] configuration for %s CertFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CertFile, kubeadmconstants.Etcd)
-		}
-		if cfg.Etcd.KeyFile != "" {
-			glog.Warningf("[controlplane] configuration for %s KeyFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.KeyFile, kubeadmconstants.Etcd)
-		}
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {

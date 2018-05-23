@@ -13,12 +13,9 @@ certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
 criSocket: /var/run/dockershim.sock
 etcd:
-  caFile: ""
-  certFile: ""
-  dataDir: /var/lib/etcd
-  endpoints: null
-  image: ""
-  keyFile: ""
+  local:
+    dataDir: /var/lib/etcd
+    image: ""
 imageRepository: k8s.gcr.io
 kind: MasterConfiguration
 kubeProxy:
