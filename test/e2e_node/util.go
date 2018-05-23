@@ -172,7 +172,6 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
 			Namespace:        "kube-system",
 			Name:             cm.Name,
-			UID:              cm.UID,
 			KubeletConfigKey: "kubelet",
 		},
 	}
