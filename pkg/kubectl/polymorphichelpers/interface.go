@@ -60,6 +60,20 @@ type UpdatePodSpecForObjectFunc func(obj runtime.Object, fn func(*v1.PodSpec) er
 // UpdatePodSpecForObjectFn gives a way to easily override the function for unit testing if needed
 var UpdatePodSpecForObjectFn UpdatePodSpecForObjectFunc = updatePodSpecForObject
 
+// MapBasedSelectorForObjectFunc will call the provided function on mapping the baesd selector for object,
+// return "" if object is not supported, or return an error.
+type MapBasedSelectorForObjectFunc func(object runtime.Object) (string, error)
+
+// MapBasedSelectorForObjectFn gives a way to easily override the function for unit testing if needed
+var MapBasedSelectorForObjectFn MapBasedSelectorForObjectFunc = mapBasedSelectorForObject
+
+// ProtocolsForObjectFunc will call the provided function on the protocols for the object,
+// return nil-map if no protocols for the object, or return an error.
+type ProtocolsForObjectFunc func(object runtime.Object) (map[string]string, error)
+
+// ProtocolsForObjectFn gives a way to easily override the function for unit testing if needed
+var ProtocolsForObjectFn ProtocolsForObjectFunc = protocolsForObject
+
 // PortsForObjectFunc returns the ports associated with the provided object
 type PortsForObjectFunc func(object runtime.Object) ([]string, error)
 
