@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -170,10 +171,8 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		newResources := GetDeletableResources(discoveryClient)
 
 		// This can occur if there is an internal error in GetDeletableResources.
-		// If the gc attempts to sync with 0 resources it will block forever.
-		// TODO: Implement a more complete solution for the garbage collector hanging.
 		if len(newResources) == 0 {
-			glog.V(5).Infof("no resources reported by discovery, skipping garbage collector sync")
+			glog.V(2).Infof("no resources reported by discovery, skipping garbage collector sync")
 			return
 		}
 
@@ -183,39 +182,90 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			return
 		}
 
-		// Something has changed, time to sync.
-		glog.V(2).Infof("syncing garbage collector with updated resources from discovery: %v", newResources)
-
 		// Ensure workers are paused to avoid processing events before informers
 		// have resynced.
 		gc.workerLock.Lock()
 		defer gc.workerLock.Unlock()
 
-		// Resetting the REST mapper will also invalidate the underlying discovery
-		// client. This is a leaky abstraction and assumes behavior about the REST
-		// mapper, but we'll deal with it for now.
-		gc.restMapper.Reset()
+		// Once we get here, we should not unpause workers until we've successfully synced
+		attempt := 0
+		wait.PollImmediateInfinite(time.Second, func() (bool, error) {
+			attempt++
 
-		// Perform the monitor resync and wait for controllers to report cache sync.
-		//
-		// NOTE: It's possible that newResources will diverge from the resources
-		// discovered by restMapper during the call to Reset, since they are
-		// distinct discovery clients invalidated at different times. For example,
-		// newResources may contain resources not returned in the restMapper's
-		// discovery call if the resources appeared in-between the calls. In that
-		// case, the restMapper will fail to map some of newResources until the next
-		// sync period.
-		if err := gc.resyncMonitors(newResources); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
-			return
-		}
-		// TODO: WaitForCacheSync can block forever during normal operation. Could
-		// pass a timeout channel, but we have to consider the implications of
-		// un-pausing the GC with a partially synced graph builder.
-		if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
-			utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
-			return
-		}
+			// On a reattempt, check if available resources have changed
+			if attempt > 1 {
+				newResources = GetDeletableResources(discoveryClient)
+				if len(newResources) == 0 {
+					glog.V(2).Infof("no resources reported by discovery, will retry (attempt %d)", attempt)
+					return false, nil
+				}
+			}
+
+			added := sets.NewString()
+			removed := sets.NewString()
+			for old := range oldResources {
+				if _, ok := newResources[old]; !ok {
+					removed.Insert(fmt.Sprintf("%+v", old))
+				}
+			}
+			for new := range newResources {
+				if _, ok := oldResources[new]; !ok {
+					added.Insert(fmt.Sprintf("%+v", new))
+				}
+			}
+
+			// Something has changed, time to sync.
+			glog.V(2).Infof("syncing garbage collector with updated resources from discovery (attempt %d). added: %v, removed: %v", attempt, added.List(), removed.List())
+
+			// Resetting the REST mapper will also invalidate the underlying discovery
+			// client. This is a leaky abstraction and assumes behavior about the REST
+			// mapper, but we'll deal with it for now.
+			gc.restMapper.Reset()
+
+			// Perform the monitor resync and wait for controllers to report cache sync.
+			//
+			// NOTE: It's possible that newResources will diverge from the resources
+			// discovered by restMapper during the call to Reset, since they are
+			// distinct discovery clients invalidated at different times. For example,
+			// newResources may contain resources not returned in the restMapper's
+			// discovery call if the resources appeared in-between the calls. In that
+			// case, the restMapper will fail to map some of newResources, and we'll attempt to rediscover
+			if err := gc.resyncMonitors(newResources); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors, will retry (attempt %d): %v", attempt, err))
+				return false, nil
+			}
+
+			// wait for caches to fill for a while (our sync period) before attempting to rediscover resources and retry syncing.
+			// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
+			// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
+			// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
+			// note that workers stay paused until we successfully resync.
+			waitForSyncStop := make(chan struct{})
+			go func() {
+				select {
+				case <-stopCh:
+				case <-time.After(period):
+				}
+				// interrupt the WaitForCacheSync call if it is still running
+				close(waitForSyncStop)
+			}()
+
+			if controller.WaitForCacheSync("garbage collector", waitForSyncStop, gc.dependencyGraphBuilder.IsSynced) {
+				// success, break out of the poll
+				return true, nil
+			}
+
+			// waiting for cache sync failed
+			select {
+			case <-stopCh:
+				// we're stopping, we don't care that it failed
+				return true, nil
+			default:
+				// we're not stopping, log the timeout and try again
+				utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync, will retry (attempt %d)", attempt))
+				return false, nil
+			}
+		})
 
 		// Finally, keep track of our new state. Do this after all preceding steps
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
