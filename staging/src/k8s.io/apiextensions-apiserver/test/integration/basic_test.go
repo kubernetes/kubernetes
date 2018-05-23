@@ -81,124 +81,163 @@ func TestClusterScopedCRUD(t *testing.T) {
 }
 
 func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.Interface) {
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
-	initialList, err := noxuResourceClient.List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
+	noxuResourceClients := map[string]dynamic.ResourceInterface{}
+	noxuWatchs := map[string]watch.Interface{}
+	disabledVersions := map[string]bool{}
+	for _, v := range noxuDefinition.Spec.Versions {
+		disabledVersions[v.Name] = !v.Served
 	}
-	if e, a := 0, len(initialList.Items); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	initialListTypeMeta, err := meta.TypeAccessor(initialList)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if e, a := noxuDefinition.Spec.Group+"/"+noxuDefinition.Spec.Version, initialListTypeMeta.GetAPIVersion(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := noxuDefinition.Spec.Names.ListKind, initialListTypeMeta.GetKind(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
+	for _, v := range noxuDefinition.Spec.Versions {
+		noxuResourceClients[v.Name] = NewNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, v.Name)
 
-	initialListListMeta, err := meta.ListAccessor(initialList)
-	if err != nil {
-		t.Fatal(err)
-	}
-	noxuWatch, err := noxuResourceClient.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer noxuWatch.Stop()
-
-	createdNoxuInstance, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
-	if err != nil {
-		t.Fatalf("unable to create noxu Instance:%v", err)
-	}
-
-	select {
-	case watchEvent := <-noxuWatch.ResultChan():
-		if e, a := watch.Added, watchEvent.Type; e != a {
-			t.Errorf("expected %v, got %v", e, a)
-			break
+		noxuWatch, err := noxuResourceClients[v.Name].Watch(metav1.ListOptions{})
+		if disabledVersions[v.Name] {
+			if err == nil {
+				t.Errorf("expected the watch creation fail for disabled version %s", v.Name)
+			}
+		} else {
+			if err != nil {
+				t.Fatal(err)
+			}
+			noxuWatchs[v.Name] = noxuWatch
 		}
-		createdObjectMeta, err := meta.Accessor(watchEvent.Object)
+	}
+	defer func() {
+		for _, w := range noxuWatchs {
+			w.Stop()
+		}
+	}()
+
+	for version, noxuResourceClient := range noxuResourceClients {
+		createdNoxuInstance, err := instantiateVersionedCustomResource(t, testserver.NewVersionedNoxuInstance(ns, "foo", version), noxuResourceClient, noxuDefinition, version)
+		if disabledVersions[version] {
+			if err == nil {
+				t.Errorf("expected the CR creation fail for disabled version %s", version)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("unable to create noxu Instance:%v", err)
+		}
+		if e, a := noxuDefinition.Spec.Group+"/"+version, createdNoxuInstance.GetAPIVersion(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		for watchVersion, noxuWatch := range noxuWatchs {
+			select {
+			case watchEvent := <-noxuWatch.ResultChan():
+				if e, a := watch.Added, watchEvent.Type; e != a {
+					t.Errorf("expected %v, got %v", e, a)
+					break
+				}
+				createdObjectMeta, err := meta.Accessor(watchEvent.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// it should have a UUID
+				if len(createdObjectMeta.GetUID()) == 0 {
+					t.Errorf("missing uuid: %#v", watchEvent.Object)
+				}
+				if e, a := ns, createdObjectMeta.GetNamespace(); e != a {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+				createdTypeMeta, err := meta.TypeAccessor(watchEvent.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if e, a := noxuDefinition.Spec.Group+"/"+watchVersion, createdTypeMeta.GetAPIVersion(); e != a {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+				if e, a := noxuDefinition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+			case <-time.After(5 * time.Second):
+				t.Errorf("missing watch event")
+			}
+		}
+
+		// Check get for all versions
+		for version2, noxuResourceClient2 := range noxuResourceClients {
+			// Get test
+			gottenNoxuInstance, err := noxuResourceClient2.Get("foo", metav1.GetOptions{})
+
+			if disabledVersions[version2] {
+				if err == nil {
+					t.Errorf("expected the get operation fail for disabled version %s", version2)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if e, a := version2, gottenNoxuInstance.GroupVersionKind().Version; !reflect.DeepEqual(e, a) {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+			}
+
+			// List test
+			listWithItem, err := noxuResourceClient2.List(metav1.ListOptions{})
+			if disabledVersions[version2] {
+				if err == nil {
+					t.Errorf("expected the list operation fail for disabled version %s", version2)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if e, a := 1, len(listWithItem.Items); e != a {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+				if e, a := version2, listWithItem.GroupVersionKind().Version; !reflect.DeepEqual(e, a) {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+				if e, a := version2, listWithItem.Items[0].GroupVersionKind().Version; !reflect.DeepEqual(e, a) {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+			}
+		}
+
+		// Delete test
+		if err := noxuResourceClient.Delete("foo", metav1.NewDeleteOptions(0)); err != nil {
+			t.Fatal(err)
+		}
+
+		listWithoutItem, err := noxuResourceClient.List(metav1.ListOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		// it should have a UUID
-		if len(createdObjectMeta.GetUID()) == 0 {
-			t.Errorf("missing uuid: %#v", watchEvent.Object)
-		}
-		if e, a := ns, createdObjectMeta.GetNamespace(); e != a {
+		if e, a := 0, len(listWithoutItem.Items); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
-		createdTypeMeta, err := meta.TypeAccessor(watchEvent.Object)
-		if err != nil {
+
+		for _, noxuWatch := range noxuWatchs {
+			select {
+			case watchEvent := <-noxuWatch.ResultChan():
+				if e, a := watch.Deleted, watchEvent.Type; e != a {
+					t.Errorf("expected %v, got %v", e, a)
+					break
+				}
+				deletedObjectMeta, err := meta.Accessor(watchEvent.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// it should have a UUID
+				createdObjectMeta, err := meta.Accessor(createdNoxuInstance)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if e, a := createdObjectMeta.GetUID(), deletedObjectMeta.GetUID(); e != a {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+
+			case <-time.After(5 * time.Second):
+				t.Errorf("missing watch event")
+			}
+		}
+
+		// Delete test
+		if err := noxuResourceClient.DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 			t.Fatal(err)
 		}
-		if e, a := noxuDefinition.Spec.Group+"/"+noxuDefinition.Spec.Version, createdTypeMeta.GetAPIVersion(); e != a {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-		if e, a := noxuDefinition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-
-	case <-time.After(5 * time.Second):
-		t.Errorf("missing watch event")
-	}
-
-	gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if e, a := createdNoxuInstance, gottenNoxuInstance; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-
-	listWithItem, err := noxuResourceClient.List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if e, a := 1, len(listWithItem.Items); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := *createdNoxuInstance, listWithItem.Items[0]; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-
-	if err := noxuResourceClient.Delete("foo", nil); err != nil {
-		t.Fatal(err)
-	}
-
-	listWithoutItem, err := noxuResourceClient.List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if e, a := 0, len(listWithoutItem.Items); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-
-	select {
-	case watchEvent := <-noxuWatch.ResultChan():
-		if e, a := watch.Deleted, watchEvent.Type; e != a {
-			t.Errorf("expected %v, got %v", e, a)
-			break
-		}
-		deletedObjectMeta, err := meta.Accessor(watchEvent.Object)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// it should have a UUID
-		createdObjectMeta, err := meta.Accessor(createdNoxuInstance)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if e, a := createdObjectMeta.GetUID(), deletedObjectMeta.GetUID(); e != a {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-
-	case <-time.After(5 * time.Second):
-		t.Errorf("missing watch event")
 	}
 }
 

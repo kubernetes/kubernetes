@@ -42,30 +42,7 @@ import (
 )
 
 func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
-	createdInstance, err := client.Create(instanceToCreate)
-	if err != nil {
-		t.Logf("%#v", createdInstance)
-		return nil, err
-	}
-	createdObjectMeta, err := meta.Accessor(createdInstance)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// it should have a UUID
-	if len(createdObjectMeta.GetUID()) == 0 {
-		t.Errorf("missing uuid: %#v", createdInstance)
-	}
-	createdTypeMeta, err := meta.TypeAccessor(createdInstance)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if e, a := definition.Spec.Group+"/"+definition.Spec.Version, createdTypeMeta.GetAPIVersion(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := definition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	return createdInstance, nil
+	return instantiateVersionedCustomResource(t, instanceToCreate, client, definition, definition.Spec.Versions[0].Name)
 }
 
 func instantiateVersionedCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition, version string) (*unstructured.Unstructured, error) {
@@ -105,12 +82,7 @@ func NewNamespacedCustomResourceVersionedClient(ns string, client dynamic.Interf
 }
 
 func NewNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.ResourceInterface {
-	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
-
-	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
-		return client.Resource(gvr).Namespace(ns)
-	}
-	return client.Resource(gvr)
+	return NewNamespacedCustomResourceVersionedClient(ns, client, crd, crd.Spec.Versions[0].Name)
 }
 
 func TestMultipleResourceInstances(t *testing.T) {

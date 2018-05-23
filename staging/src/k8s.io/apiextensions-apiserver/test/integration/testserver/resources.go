@@ -80,10 +80,10 @@ func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *
 	}
 }
 
-func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
+func NewVersionedNoxuInstance(namespace, name, version string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "mygroup.example.com/v1beta1",
+			"apiVersion": "mygroup.example.com/" + version,
 			"kind":       "WishIHadChosenNoxu",
 			"metadata": map[string]interface{}{
 				"namespace": namespace,
@@ -98,6 +98,10 @@ func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 			},
 		},
 	}
+}
+
+func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
+	return NewVersionedNoxuInstance(namespace, name, "v1beta1")
 }
 
 func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
@@ -131,26 +135,6 @@ func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiext
 					Served:  false,
 					Storage: false,
 				},
-			},
-		},
-	}
-}
-
-func NewVersionedNoxuInstance(namespace, name, version string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "mygroup.example.com/" + version,
-			"kind":       "WishIHadChosenNoxu",
-			"metadata": map[string]interface{}{
-				"namespace": namespace,
-				"name":      name,
-			},
-			"content": map[string]interface{}{
-				"key": "value",
-			},
-			"num": map[string]interface{}{
-				"num1": noxuInstanceNum,
-				"num2": 1000000,
 			},
 		},
 	}
