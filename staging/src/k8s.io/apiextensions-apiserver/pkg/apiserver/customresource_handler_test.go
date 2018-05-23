@@ -65,8 +65,8 @@ func TestConvertFieldLabel(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			c := crdObjectConverter{
-				UnstructuredObjectConverter: unstructured.UnstructuredObjectConverter{},
-				clusterScoped:               test.clusterScoped,
+				unstructuredDelegate: unstructured.UnstructuredObjectConverter{},
+				clusterScoped:        test.clusterScoped,
 			}
 
 			label, value, err := c.ConvertFieldLabel("", "", test.label, "value")
