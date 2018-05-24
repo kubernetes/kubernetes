@@ -59,7 +59,7 @@ func TestPlugin(t *testing.T) {
 			plugin: &Plugin{
 				Description: Description{
 					Name:      "test",
-					Use:       "test spaces",
+					Usage:     "test spaces",
 					ShortDesc: "The test",
 					Command:   "echo 1",
 				},
@@ -174,6 +174,38 @@ func TestPlugin(t *testing.T) {
 		err := test.plugin.Validate()
 		if err != test.expectedErr {
 			t.Errorf("%s: expected error %v, got %v", test.plugin.Name, test.expectedErr, err)
+		}
+	}
+}
+
+func TestGetUsage(t *testing.T) {
+	tests := []struct {
+		plugin        *Plugin
+		expectedUsage string
+	}{
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name: "name-only",
+				},
+			},
+			expectedUsage: "name-only",
+		},
+		{
+			plugin: &Plugin{
+				Description: Description{
+					Name:  "usage",
+					Usage: "usage foo bar",
+				},
+			},
+			expectedUsage: "usage foo bar",
+		},
+	}
+
+	for _, test := range tests {
+		usage := test.plugin.GetUsage()
+		if usage != test.expectedUsage {
+			t.Errorf("%s: expected GetUsage to return %s, but got %s", test.plugin.Name, test.expectedUsage, usage)
 		}
 	}
 }

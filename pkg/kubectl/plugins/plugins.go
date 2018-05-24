@@ -46,7 +46,7 @@ type Plugin struct {
 // plugin as a command. Usually comes from a descriptor file.
 type Description struct {
 	Name      string  `json:"name"`
-	Use       string  `json:"use"`
+	Usage     string  `json:"use"`
 	ShortDesc string  `json:"shortDesc"`
 	LongDesc  string  `json:"longDesc,omitempty"`
 	Example   string  `json:"example,omitempty"`
@@ -55,13 +55,13 @@ type Description struct {
 	Tree      Plugins `json:"tree,omitempty"`
 }
 
-// GetUse returns the Usage line for the command if
+// GetUsage returns the Usage line for the command if
 // it is specified. Otherwise, it returns the command Name.
-func (d Description) GetUse() string {
-	if d.Use == "" {
+func (d Description) GetUsage() string {
+	if d.Usage == "" {
 		return d.Name
 	}
-	return d.Use
+	return d.Usage
 }
 
 // Source holds the location of a given plugin in the filesystem.

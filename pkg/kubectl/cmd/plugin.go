@@ -79,7 +79,7 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 	}
 
 	cmd := &cobra.Command{
-		Use:     plugin.GetUse(),
+		Use:     plugin.GetUsage(),
 		Short:   plugin.ShortDesc,
 		Long:    templates.LongDesc(plugin.LongDesc),
 		Example: templates.Examples(plugin.Example),
