@@ -80,6 +80,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/httplog:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/trace:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/wsstream:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )
 
