@@ -39,7 +39,7 @@ const (
 	totalResizeWaitPeriod = 20 * time.Minute
 )
 
-var _ = utils.SIGDescribe("Volume expand [Feature:ExpandPersistentVolumes] [Slow]", func() {
+var _ = utils.SIGDescribe("Volume expand [Slow]", func() {
 	var (
 		c           clientset.Interface
 		ns          string
