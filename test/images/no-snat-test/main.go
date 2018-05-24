@@ -19,14 +19,18 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/util/flag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 // ip = target for /whoami query
@@ -48,16 +52,32 @@ func (m *MasqTester) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&m.Port, "port", m.Port, "The port to serve /checknosnat and /whoami endpoints on.")
 }
 
-func main() {
+// NewMasqCommand creates a *cobra.Command object with default parameters
+func NewMasqCommand() *cobra.Command {
 	m := NewMasqTester()
-	m.AddFlags(pflag.CommandLine)
+	cmd := &cobra.Command{
+		Use:  "MasqTest",
+		Long: `MasqTest`,
+		Run: func(cmd *cobra.Command, args []string) {
+			verflag.PrintAndExitIfRequested()
+			m.Run()
+		},
+	}
+	m.AddFlags(cmd.Flags())
 
-	flag.InitFlags()
+	return cmd
+}
+func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	command := NewMasqCommand()
+
+	utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	if err := m.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if err := command.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
