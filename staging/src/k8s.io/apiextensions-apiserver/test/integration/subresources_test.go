@@ -450,8 +450,8 @@ func TestValidateOnlyStatus(t *testing.T) {
 	if !isStatus || statusError == nil {
 		t.Fatalf("expected status error, got %T: %v", err, err)
 	}
-	if !strings.Contains(statusError.Error(), "Invalid value") {
-		t.Fatalf("expected 'Invalid value' in error, got: %v", err)
+	if !strings.Contains(statusError.Error(), "num in body should be less than or equal to 10") {
+		t.Fatalf("expected 'num in body should be less than or equal to 10' in error, got: %v", err)
 	}
 }
 

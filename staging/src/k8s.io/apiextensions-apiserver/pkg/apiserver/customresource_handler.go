@@ -492,6 +492,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				converter:         safeConverter,
 				decoderVersion:    schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
 				encoderVersion:    schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
+				validator:         validator,
 			},
 			crd.Status.AcceptedNames.Categories,
 			table,
@@ -513,7 +514,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
-			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter},
+			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, validator: validator},
 			ParameterCodec: parameterCodec,
 
 			Creater:         creator,
@@ -549,6 +550,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		// shallow copy
 		statusScope := requestScopes[v.Name]
 		statusScope.Subresource = "status"
+		statusScope.Serializer = unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, validator: statusValidator, validatedField: "status"}
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,
@@ -582,6 +584,10 @@ type unstructuredNegotiatedSerializer struct {
 	typer     runtime.ObjectTyper
 	creator   runtime.ObjectCreater
 	converter runtime.ObjectConvertor
+
+	// empty or a top-level field name like "status" the validator should be applied to
+	validatedField string
+	validator      *validate.SchemaValidator
 }
 
 func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
@@ -610,7 +616,7 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{}}
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{validator: s.validator, validatedField: s.validatedField}}
 	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
 }
 
@@ -702,6 +708,7 @@ type crdConversionRESTOptionsGetter struct {
 	converter      runtime.ObjectConvertor
 	encoderVersion schema.GroupVersion
 	decoderVersion schema.GroupVersion
+	validator      *validate.SchemaValidator
 }
 
 func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
@@ -710,8 +717,9 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
 			// drop invalid fields while decoding old CRs (before we had any ObjectMeta validation)
 			dropInvalidMetadata: true,
+			validator:           t.validator,
 		}}
-		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{}}
+		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{validator: t.validator}}
 		ret.StorageConfig.Codec = versioning.NewCodec(
 			ret.StorageConfig.Codec,
 			d,
@@ -799,6 +807,9 @@ func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, 
 // - TODO: optionally application of post-validation algorithms like defaulting and/or OpenAPI based pruning.
 type unstructuredSchemaCoercer struct {
 	dropInvalidMetadata bool
+	validator           *validate.SchemaValidator
+	// empty or a top-level field name like "status" the validator should be applied to
+	validatedField string
 }
 
 func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
@@ -814,6 +825,27 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	objectMeta, foundObjectMeta, err := getObjectMeta(u, v.dropInvalidMetadata)
 	if err != nil {
 		return err
+	}
+
+	// do OpenAPI validation
+	if v.validator != nil {
+		validatee := u.UnstructuredContent()
+		if len(v.validatedField) > 0 {
+			validatee = nil
+			if fld, found := u.UnstructuredContent()[v.validatedField]; found {
+				if fldMap, ok := fld.(map[string]interface{}); !ok {
+					return fmt.Errorf("expected object at .%s", v.validatedField)
+				} else {
+					validatee = fldMap
+				}
+			}
+		}
+		if validatee != nil {
+			result := v.validator.Validate(validatee)
+			if result.AsError() != nil {
+				return result.AsError()
+			}
+		}
 	}
 
 	// restore meta fields, starting clean
