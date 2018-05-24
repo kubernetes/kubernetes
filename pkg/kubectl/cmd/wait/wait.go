@@ -42,7 +42,7 @@ import (
 type WaitFlags struct {
 	RESTClientGetter     genericclioptions.RESTClientGetter
 	PrintFlags           *genericclioptions.PrintFlags
-	ResourceBuilderFlags *ResourceBuilderFlags
+	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 
 	Timeout      time.Duration
 	ForCondition string
@@ -55,7 +55,7 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 	return &WaitFlags{
 		RESTClientGetter:     restClientGetter,
 		PrintFlags:           genericclioptions.NewPrintFlags("condition met"),
-		ResourceBuilderFlags: NewResourceBuilderFlags(),
+		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags(),
 
 		Timeout: 30 * time.Second,
 
@@ -151,7 +151,7 @@ func conditionFuncFor(condition string) (ConditionFunc, error) {
 // WaitOptions is a set of options that allows you to wait.  This is the object reflects the runtime needs of a wait
 // command, making the logic itself easy to unit test with our existing mocks.
 type WaitOptions struct {
-	ResourceFinder ResourceFinder
+	ResourceFinder genericclioptions.ResourceFinder
 	DynamicClient  dynamic.Interface
 	Timeout        time.Duration
 

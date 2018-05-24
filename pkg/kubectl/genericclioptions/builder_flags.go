@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package wait
+package genericclioptions
 
 import (
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
@@ -29,15 +28,15 @@ import (
 type ResourceBuilderFlags struct {
 	FilenameOptions resource.FilenameOptions
 
-	LabelSelector     string
-	FieldSelector     string
-	AllNamespaces     bool
 	Namespace         string
 	ExplicitNamespace bool
 
-	// TODO add conditional support.  These are false for now.
-	All   bool
-	Local bool
+	LabelSelector *string
+	FieldSelector *string
+	AllNamespaces *bool
+
+	All   *bool
+	Local *bool
 }
 
 // NewResourceBuilderFlags returns a default ResourceBuilderFlags
@@ -46,6 +45,13 @@ func NewResourceBuilderFlags() *ResourceBuilderFlags {
 		FilenameOptions: resource.FilenameOptions{
 			Recursive: true,
 		},
+
+		LabelSelector: str_ptr(""),
+		FieldSelector: str_ptr(""),
+		AllNamespaces: bool_ptr(false),
+
+		All:   bool_ptr(false),
+		Local: bool_ptr(false),
 	}
 }
 
@@ -59,23 +65,44 @@ func (o *ResourceBuilderFlags) AddFlags(flagset *pflag.FlagSet) {
 	flagset.SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
 	flagset.BoolVar(&o.FilenameOptions.Recursive, "recursive", o.FilenameOptions.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 
-	flagset.StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	flagset.StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
-	flagset.BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	if o.LabelSelector != nil {
+		flagset.StringVarP(o.LabelSelector, "selector", "l", *o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	}
+	if o.FieldSelector != nil {
+		flagset.StringVar(o.FieldSelector, "field-selector", *o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+	}
+	if o.AllNamespaces != nil {
+		flagset.BoolVar(o.AllNamespaces, "all-namespaces", *o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	}
 }
 
 // ToBuilder gives you back a resource finder to visit resources that are located
-func (o *ResourceBuilderFlags) ToBuilder(restClientGetter genericclioptions.RESTClientGetter, resources []string) ResourceFinder {
+func (o *ResourceBuilderFlags) ToBuilder(restClientGetter RESTClientGetter, resources []string) ResourceFinder {
 	namespace, enforceNamespace, namespaceErr := restClientGetter.ToRawKubeConfigLoader().Namespace()
+
+	labelSelector := ""
+	if o.LabelSelector != nil {
+		labelSelector = *o.LabelSelector
+	}
+
+	fieldSelector := ""
+	if o.FieldSelector != nil {
+		fieldSelector = *o.FieldSelector
+	}
+
+	allResources := false
+	if o.All != nil {
+		allResources = *o.All
+	}
 
 	return &ResourceFindBuilderWrapper{
 		builder: resource.NewBuilder(restClientGetter).
 			Unstructured().
 			NamespaceParam(namespace).DefaultNamespace().
 			FilenameParam(enforceNamespace, &o.FilenameOptions).
-			LabelSelectorParam(o.LabelSelector).
-			FieldSelectorParam(o.FieldSelector).
-			ResourceTypeOrNameArgs(o.All, resources...).
+			LabelSelectorParam(labelSelector).
+			FieldSelectorParam(fieldSelector).
+			ResourceTypeOrNameArgs(allResources, resources...).
 			Latest().
 			Flatten().
 			AddError(namespaceErr),
@@ -111,4 +138,12 @@ func ResourceFinderForResult(result resource.Visitor) ResourceFinder {
 	return ResourceFinderFunc(func() resource.Visitor {
 		return result
 	})
+}
+
+func str_ptr(val string) *string {
+	return &val
+}
+
+func bool_ptr(val bool) *bool {
+	return &val
 }
