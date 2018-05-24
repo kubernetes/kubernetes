@@ -28,6 +28,8 @@ go_library(
         "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/certificates/install:go_default_library",
         "//pkg/apis/componentconfig/install:go_default_library",
+        "//pkg/apis/coordination:go_default_library",
+        "//pkg/apis/coordination/install:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/events:go_default_library",

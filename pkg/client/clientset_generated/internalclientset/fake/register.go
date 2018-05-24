@@ -30,6 +30,7 @@ import (
 	autoscalinginternalversion "k8s.io/kubernetes/pkg/apis/autoscaling"
 	batchinternalversion "k8s.io/kubernetes/pkg/apis/batch"
 	certificatesinternalversion "k8s.io/kubernetes/pkg/apis/certificates"
+	coordinationinternalversion "k8s.io/kubernetes/pkg/apis/coordination"
 	coreinternalversion "k8s.io/kubernetes/pkg/apis/core"
 	eventsinternalversion "k8s.io/kubernetes/pkg/apis/events"
 	extensionsinternalversion "k8s.io/kubernetes/pkg/apis/extensions"
@@ -73,6 +74,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	autoscalinginternalversion.AddToScheme(scheme)
 	batchinternalversion.AddToScheme(scheme)
 	certificatesinternalversion.AddToScheme(scheme)
+	coordinationinternalversion.AddToScheme(scheme)
 	eventsinternalversion.AddToScheme(scheme)
 	extensionsinternalversion.AddToScheme(scheme)
 	networkinginternalversion.AddToScheme(scheme)
