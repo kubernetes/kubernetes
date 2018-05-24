@@ -22,6 +22,7 @@ import (
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestVersionedNamspacedScopedCRD(t *testing.T) {
@@ -108,7 +109,7 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 	}
 
 	// The storage version list should be initilized to storage version
-	crd, err := testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +123,7 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 	if err != nil {
 		t.Fatal(err)
 	}
-	crd, err = testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

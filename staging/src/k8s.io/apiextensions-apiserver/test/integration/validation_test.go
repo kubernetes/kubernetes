@@ -44,7 +44,7 @@ func TestForProperValidationErrors(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	tests := []struct {
 		name          string
@@ -181,7 +181,7 @@ func TestCustomResourceValidation(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, newNoxuValidationInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -202,7 +202,7 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, newNoxuValidationInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -245,7 +245,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	tests := []struct {
 		name          string
@@ -339,7 +339,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	// CR is rejected
 	_, err = instantiateCustomResource(t, newNoxuValidationInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
@@ -348,7 +348,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 	}
 
 	// update the CRD to a less stricter schema
-	_, err = testserver.UpdateCustomResourceDefinition(apiExtensionClient, "noxus.mygroup.example.com", func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
+	_, err = updateCustomResourceDefinitionWithRetry(apiExtensionClient, "noxus.mygroup.example.com", func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
 		crd.Spec.Validation.OpenAPIV3Schema.Required = []string{"alpha", "beta"}
 	})
 	if err != nil {

@@ -98,7 +98,7 @@ func TestStatusSubresource(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -227,7 +227,7 @@ func TestScaleSubresource(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -412,7 +412,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	// set .spec.num = 10 and .status.num = 10
 	noxuInstance := NewNoxuSubresourceInstance(ns, "foo")
@@ -552,7 +552,7 @@ func TestGeneration(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
@@ -631,7 +631,7 @@ func TestSubresourcePatch(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	_, err = instantiateCustomResource(t, NewNoxuSubresourceInstance(ns, "foo"), noxuResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)

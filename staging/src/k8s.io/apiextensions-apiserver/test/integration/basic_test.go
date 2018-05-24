@@ -88,7 +88,7 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 		disabledVersions[v.Name] = !v.Served
 	}
 	for _, v := range noxuDefinition.Spec.Versions {
-		noxuResourceClients[v.Name] = NewNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, v.Name)
+		noxuResourceClients[v.Name] = newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, v.Name)
 
 		noxuWatch, err := noxuResourceClients[v.Name].Watch(metav1.ListOptions{})
 		if disabledVersions[v.Name] {
@@ -242,7 +242,7 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 }
 
 func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.Interface) {
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	initialList, err := noxuResourceClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -449,7 +449,7 @@ func TestNoNamespaceReject(t *testing.T) {
 	}
 
 	ns := ""
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	initialList, err := noxuResourceClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -509,7 +509,7 @@ func TestSelfLink(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuNamespacedResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	noxuInstanceToCreate := testserver.NewNoxuInstance(ns, "foo")
 	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
@@ -528,7 +528,7 @@ func TestSelfLink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	curletResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, curletDefinition)
+	curletResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, curletDefinition)
 
 	curletInstanceToCreate := testserver.NewCurletInstance(ns, "foo")
 	createdCurletInstance, err := curletResourceClient.Create(curletInstanceToCreate)
@@ -555,7 +555,7 @@ func TestPreserveInt(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuNamespacedResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	noxuInstanceToCreate := testserver.NewNoxuInstance(ns, "foo")
 	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
@@ -597,7 +597,7 @@ func TestPatch(t *testing.T) {
 	}
 
 	ns := "not-the-default"
-	noxuNamespacedResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	noxuInstanceToCreate := testserver.NewNoxuInstance(ns, "foo")
 	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
@@ -657,7 +657,7 @@ func TestCrossNamespaceListWatch(t *testing.T) {
 	}
 
 	ns := ""
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 	initialList, err := noxuResourceClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -679,13 +679,13 @@ func TestCrossNamespaceListWatch(t *testing.T) {
 
 	instances := make(map[string]*unstructured.Unstructured)
 	ns1 := "namespace-1"
-	noxuNamespacedResourceClient1 := NewNamespacedCustomResourceClient(ns1, dynamicClient, noxuDefinition)
+	noxuNamespacedResourceClient1 := newNamespacedCustomResourceClient(ns1, dynamicClient, noxuDefinition)
 	instances[ns1] = createInstanceWithNamespaceHelper(t, ns1, "foo1", noxuNamespacedResourceClient1, noxuDefinition)
 	noxuNamespacesWatch1, err := noxuNamespacedResourceClient1.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
 	defer noxuNamespacesWatch1.Stop()
 
 	ns2 := "namespace-2"
-	noxuNamespacedResourceClient2 := NewNamespacedCustomResourceClient(ns2, dynamicClient, noxuDefinition)
+	noxuNamespacedResourceClient2 := newNamespacedCustomResourceClient(ns2, dynamicClient, noxuDefinition)
 	instances[ns2] = createInstanceWithNamespaceHelper(t, ns2, "foo2", noxuNamespacedResourceClient2, noxuDefinition)
 	noxuNamespacesWatch2, err := noxuNamespacedResourceClient2.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
 	defer noxuNamespacesWatch2.Stop()
@@ -800,7 +800,7 @@ func TestNameConflict(t *testing.T) {
 
 	// A NameConflict occurs
 	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := testserver.GetCustomResourceDefinition(noxu2Definition, apiExtensionClient)
+		crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxu2Definition.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -823,7 +823,7 @@ func TestNameConflict(t *testing.T) {
 
 	// Names are now accepted
 	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := testserver.GetCustomResourceDefinition(noxu2Definition, apiExtensionClient)
+		crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxu2Definition.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
