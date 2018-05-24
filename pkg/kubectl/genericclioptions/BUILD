@@ -3,6 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "builder_flags.go",
+        "builder_flags_fake.go",
         "config_flags.go",
         "config_flags_fake.go",
         "doc.go",
@@ -16,6 +18,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubectl/genericclioptions/printers:go_default_library",
+        "//pkg/kubectl/genericclioptions/resource:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
