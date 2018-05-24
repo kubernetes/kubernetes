@@ -319,17 +319,19 @@ func getLocalNode(f *framework.Framework) *apiv1.Node {
 	return &nodeList.Items[0]
 }
 
-// logs prometheus metrics from the local kubelet.
-func logKubeletMetrics(metricKeys ...string) {
+// logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus
+// metrics exposed on the current node and identified by the metricNames.
+// The Kubelet subsystem prefix is automatically prepended to these metric names.
+func logKubeletLatencyMetrics(metricNames ...string) {
 	metricSet := sets.NewString()
-	for _, key := range metricKeys {
+	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
 	metric, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
-		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletMetrics(metric, metricSet))
+		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletLatencyMetrics(metric, metricSet))
 	}
 }
 
