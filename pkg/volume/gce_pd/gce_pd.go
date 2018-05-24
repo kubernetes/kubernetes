@@ -17,10 +17,12 @@ limitations under the License.
 package gce_pd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -54,6 +56,19 @@ const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
 	gceVolumeLimitKey           = "storage-limits-gce-pd"
 )
+
+// The constants and DiskAttachLimit are used to map from the machine type (number of CPUs) to the limit of
+// persistant disks that can be attached to an instance. Please refer to gcloud doc
+// https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+const (
+	Default = iota
+	OneCpu
+	TwotoFourCPUs
+	EightCPUsandAbove
+	EightCPUs = 8
+)
+
+var DiskAttachLimit = []int64{16, 32, 64, 128}
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
@@ -109,7 +124,31 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, erro
 	}
 
 	volumeLimits := map[string]int64{
-		gceVolumeLimitKey: 16,
+		gceVolumeLimitKey: DiskAttachLimit[Default],
+	}
+	instances, ok := cloud.Instances()
+	if !ok {
+		glog.Warning("Failed to get instances from cloud provider")
+		return volumeLimits, nil
+	}
+
+	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
+	if err != nil {
+		glog.Errorf("Failed to get instance type from GCE cloud provider")
+		return volumeLimits, nil
+	}
+	if strings.HasPrefix(instanceType, "n1-standard-") || strings.HasPrefix(instanceType, "n1-highmem-") || strings.HasPrefix(instanceType, "n1-highcpu-") {
+		splits := strings.Split(instanceType, "-")
+		last := splits[len(splits)-1]
+		if num, err := strconv.Atoi(last); err == nil {
+			if num == OneCpu {
+				volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[OneCpu]
+			} else if num < EightCPUs {
+				volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[TwotoFourCPUs]
+			} else {
+				volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[EightCPUsandAbove]
+			}
+		}
 	}
 	return volumeLimits, nil
 }
