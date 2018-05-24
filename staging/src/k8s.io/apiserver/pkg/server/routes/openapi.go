@@ -25,6 +25,11 @@ import (
 	"k8s.io/kube-openapi/pkg/handler"
 )
 
+const (
+	// OpenAPIv2Path is the path we serve the OpenAPIv2 spec from
+	OpenAPIv2Path = "/openapi/v2"
+)
+
 // OpenAPI installs spec endpoints for each web service.
 type OpenAPI struct {
 	Config *common.Config
@@ -39,7 +44,7 @@ func (oa OpenAPI) Install(c *restful.Container, mux *mux.PathRecorderMux) {
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
-	_, err = handler.BuildAndRegisterOpenAPIVersionedService("/openapi/v2", c.RegisteredWebServices(), oa.Config, mux)
+	_, err = handler.BuildAndRegisterOpenAPIVersionedService(OpenAPIv2Path, c.RegisteredWebServices(), oa.Config, mux)
 	if err != nil {
 		glog.Fatalf("Failed to register versioned open api spec for root: %v", err)
 	}
