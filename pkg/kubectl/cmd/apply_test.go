@@ -1224,6 +1224,12 @@ func TestForceApply(t *testing.T) {
 	}
 	scaleClientExpected := []string{"get", "update", "get", "get"}
 
+	oldFn := cmdutil.ScaleClientFn
+	defer func() {
+		cmdutil.ScaleClientFn = oldFn
+	}()
+	cmdutil.ScaleClientFn = nil
+
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply with --force", func(t *testing.T) {
 			deleted := false
