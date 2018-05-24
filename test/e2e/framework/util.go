@@ -3474,7 +3474,7 @@ func newExecPodSpec(ns, generateName string) *v1.Pod {
 				{
 					Name:    "exec",
 					Image:   BusyBoxImage,
-					Command: []string{"sh", "-c", "while true; do sleep 5; done"},
+					Command: []string{"sh", "-c", "trap exit TERM; while true; do sleep 5; done"},
 				},
 			},
 		},

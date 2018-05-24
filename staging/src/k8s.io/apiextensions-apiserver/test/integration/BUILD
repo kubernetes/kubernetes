@@ -13,6 +13,7 @@ go_test(
         "registration_test.go",
         "subresources_test.go",
         "validation_test.go",
+        "versioning_test.go",
         "yaml_test.go",
     ],
     tags = ["integration"],

@@ -766,6 +766,45 @@
     "operations": [
      {
       "type": "v1beta1.CertificateSigningRequest",
+      "method": "GET",
+      "summary": "read status of the specified CertificateSigningRequest",
+      "nickname": "readCertificateSigningRequestStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the CertificateSigningRequest",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.CertificateSigningRequest"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.CertificateSigningRequest",
       "method": "PUT",
       "summary": "replace status of the specified CertificateSigningRequest",
       "nickname": "replaceCertificateSigningRequestStatus",
@@ -814,6 +853,55 @@
       ],
       "consumes": [
        "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.CertificateSigningRequest",
+      "method": "PATCH",
+      "summary": "partially update status of the specified CertificateSigningRequest",
+      "nickname": "patchCertificateSigningRequestStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the CertificateSigningRequest",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.CertificateSigningRequest"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      }
     ]

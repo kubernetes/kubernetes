@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -172,7 +173,6 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
 			Namespace:        "kube-system",
 			Name:             cm.Name,
-			UID:              cm.UID,
 			KubeletConfigKey: "kubelet",
 		},
 	}
@@ -320,18 +320,38 @@ func getLocalNode(f *framework.Framework) *apiv1.Node {
 	return &nodeList.Items[0]
 }
 
-// logs prometheus metrics from the local kubelet.
-func logKubeletMetrics(metricKeys ...string) {
+// logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus
+// metrics exposed on the current node and identified by the metricNames.
+// The Kubelet subsystem prefix is automatically prepended to these metric names.
+func logKubeletLatencyMetrics(metricNames ...string) {
 	metricSet := sets.NewString()
-	for _, key := range metricKeys {
+	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
 	metric, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
-		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletMetrics(metric, metricSet))
+		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletLatencyMetrics(metric, metricSet))
 	}
+}
+
+// returns config related metrics from the local kubelet, filtered to the filterMetricNames passed in
+func getKubeletMetrics(filterMetricNames sets.String) (frameworkmetrics.KubeletMetrics, error) {
+	// grab Kubelet metrics
+	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := metrics.NewKubeletMetrics()
+	for name := range ms {
+		if !filterMetricNames.Has(name) {
+			continue
+		}
+		filtered[name] = ms[name]
+	}
+	return filtered, nil
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an

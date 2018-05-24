@@ -100,6 +100,62 @@ func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 	}
 }
 
+func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "mygroup.example.com",
+			Version: "v1beta1",
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:     "noxus",
+				Singular:   "nonenglishnoxu",
+				Kind:       "WishIHadChosenNoxu",
+				ShortNames: []string{"foo", "bar", "abc", "def"},
+				ListKind:   "NoxuItemList",
+				Categories: []string{"all"},
+			},
+			Scope: scope,
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: false,
+				},
+				{
+					Name:    "v1beta2",
+					Served:  true,
+					Storage: true,
+				},
+				{
+					Name:    "v0",
+					Served:  false,
+					Storage: false,
+				},
+			},
+		},
+	}
+}
+
+func NewVersionedNoxuInstance(namespace, name, version string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "mygroup.example.com/" + version,
+			"kind":       "WishIHadChosenNoxu",
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+				"name":      name,
+			},
+			"content": map[string]interface{}{
+				"key": "value",
+			},
+			"num": map[string]interface{}{
+				"num1": noxuInstanceNum,
+				"num2": 1000000,
+			},
+		},
+	}
+}
+
 func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus2.mygroup.example.com"},

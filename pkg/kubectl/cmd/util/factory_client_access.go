@@ -19,15 +19,8 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
-	"strings"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -47,7 +40,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -178,37 +170,6 @@ func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]str
 	}
 }
 
-// Set showSecrets false to filter out stuff like secrets.
-func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
-	if len(os.Args) == 0 {
-		return ""
-	}
-
-	flags := ""
-	parseFunc := func(flag *pflag.Flag, value string) error {
-		flags = flags + " --" + flag.Name
-		if set, ok := flag.Annotations["classified"]; showSecrets || !ok || len(set) == 0 {
-			flags = flags + "=" + value
-		} else {
-			flags = flags + "=CLASSIFIED"
-		}
-		return nil
-	}
-	var err error
-	err = cmd.Flags().ParseAll(os.Args[1:], parseFunc)
-	if err != nil || !cmd.Flags().Parsed() {
-		return ""
-	}
-
-	args := ""
-	if arguments := cmd.Flags().Args(); len(arguments) > 0 {
-		args = " " + strings.Join(arguments, " ")
-	}
-
-	base := filepath.Base(os.Args[0])
-	return base + args + flags
-}
-
 func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 	return []schema.GroupResource{
 		{Resource: "replicationcontroller"},
@@ -216,32 +177,6 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 		{Resource: "daemonset"},
 		{Resource: "job"},
 		{Resource: "replicaset"},
-	}
-}
-
-func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
-	switch obj := info.Object.(type) {
-	case *extensions.Deployment:
-		if obj.Spec.Paused {
-			return nil, errors.New("is already paused")
-		}
-		obj.Spec.Paused = true
-		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
-	default:
-		return nil, fmt.Errorf("pausing is not supported")
-	}
-}
-
-func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
-	switch obj := info.Object.(type) {
-	case *extensions.Deployment:
-		if !obj.Spec.Paused {
-			return nil, errors.New("is not paused")
-		}
-		obj.Spec.Paused = false
-		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
-	default:
-		return nil, fmt.Errorf("resuming is not supported")
 	}
 }
 
@@ -457,17 +392,6 @@ func Contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVers
 
 func (f *ring0Factory) Generators(cmdName string) map[string]kubectl.Generator {
 	return DefaultGenerators(cmdName)
-}
-
-func (f *ring0Factory) CanBeExposed(kind schema.GroupKind) error {
-	switch kind {
-	case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"),
-		extensions.Kind("Deployment"), apps.Kind("Deployment"), extensions.Kind("ReplicaSet"), apps.Kind("ReplicaSet"):
-		// nothing to do here
-	default:
-		return fmt.Errorf("cannot expose a %s", kind)
-	}
-	return nil
 }
 
 // this method exists to help us find the points still relying on internal types.
