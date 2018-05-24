@@ -432,7 +432,7 @@ func (g openAPITypeWriter) generateStructExtensions(t *types.Type) error {
 	extensions, errors := parseExtensions(t.CommentLines)
 	// Initially, we will only log struct extension errors.
 	if len(errors) > 0 {
-		for e := range errors {
+		for _, e := range errors {
 			glog.V(2).Infof("[%s]: %s\n", t.String(), e)
 		}
 	}
@@ -442,17 +442,16 @@ func (g openAPITypeWriter) generateStructExtensions(t *types.Type) error {
 }
 
 func (g openAPITypeWriter) generateMemberExtensions(m *types.Member, parent *types.Type) error {
-	extensions, errors := parseExtensions(m.CommentLines)
+	extensions, parseErrors := parseExtensions(m.CommentLines)
+	validationErrors := validateMemberExtensions(extensions, m)
+	errors := append(parseErrors, validationErrors...)
 	// Initially, we will only log member extension errors.
 	if len(errors) > 0 {
 		errorPrefix := fmt.Sprintf("[%s] %s:", parent.String(), m.String())
-		for e := range errors {
+		for _, e := range errors {
 			glog.V(2).Infof("%s %s\n", errorPrefix, e)
 		}
 	}
-	// TODO(seans3): Validate member extensions here.
-	// Example: listType extension is only on a Slice.
-	// Example: cross-extension validation - listMapKey only makes sense with listType=map
 	g.emitExtensions(extensions)
 	return nil
 }
