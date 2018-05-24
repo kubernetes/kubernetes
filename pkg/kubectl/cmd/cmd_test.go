@@ -39,7 +39,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // This init should be removed after switching this command and its tests to user external types.
@@ -114,19 +113,6 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 	}
 	return pods, svc, rc
-}
-
-type testDescriber struct {
-	Name, Namespace string
-	Settings        printers.DescriberSettings
-	Output          string
-	Err             error
-}
-
-func (t *testDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (output string, err error) {
-	t.Namespace, t.Name = namespace, name
-	t.Settings = describerSettings
-	return t.Output, t.Err
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
