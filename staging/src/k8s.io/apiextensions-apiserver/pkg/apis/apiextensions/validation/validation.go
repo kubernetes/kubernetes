@@ -449,8 +449,8 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 		return allErrs
 	}
 
-	if schema.Default != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "default is not supported"))
+	if schema.Default != nil && !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceDefaulting) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "disabled by feature-gate"))
 	}
 
 	if schema.ID != "" {

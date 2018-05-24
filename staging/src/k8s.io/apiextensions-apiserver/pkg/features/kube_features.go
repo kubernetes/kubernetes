@@ -46,6 +46,12 @@ const (
 	//
 	// CustomResourcePruning enables pruning of unspecified fields (by the validation schema) in CustomResources.
 	CustomResourcePruning utilfeature.Feature = "CustomResourcePruning"
+
+	// owner: @sttts
+	// alpha: v1.12
+	//
+	// CustomResourceDefaulting enables defaulting for CustomResources with default given in the validation schema.
+	CustomResourceDefaulting utilfeature.Feature = "CustomResourceDefaulting"
 )
 
 func init() {
@@ -59,4 +65,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CustomResourceValidation:   {Default: true, PreRelease: utilfeature.Beta},
 	CustomResourceSubresources: {Default: true, PreRelease: utilfeature.Beta},
 	CustomResourcePruning:      {Default: false, PreRelease: utilfeature.Alpha},
+	CustomResourceDefaulting:   {Default: false, PreRelease: utilfeature.Alpha},
 }

@@ -374,6 +374,37 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			errors: []validationMatch{},
 		},
 		{
+			name: "defaulting",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {Default: jsonPtr(42.0)},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disabled feature-gate
+			},
+		},
+		{
 			name: "x-kubernetes-no-prune",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
@@ -965,4 +996,9 @@ func float64Ptr(f float64) *float64 {
 
 func int64Ptr(f int64) *int64 {
 	return &f
+}
+
+func jsonPtr(x interface{}) *apiextensions.JSON {
+	ret := apiextensions.JSON(x)
+	return &ret
 }

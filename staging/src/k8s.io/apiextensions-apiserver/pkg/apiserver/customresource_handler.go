@@ -28,6 +28,7 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
+	postvalidationalgorithms "github.com/go-openapi/validate/post"
 	"github.com/golang/glog"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/pruning"
 
@@ -529,12 +530,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
-			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, skeletonValidator: skeletonValidator, pruning: *crd.Spec.Prune},
+			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, skeletonValidator: skeletonValidator, pruning: *crd.Spec.Prune, defaulting: true},
 			ParameterCodec: parameterCodec,
 
 			Creater:         creator,
 			Convertor:       safeConverter,
-			Defaulter:       unstructuredDefaulter{parameterScheme},
+			Defaulter:       unstructuredNoopDefaulter{parameterScheme},
 			Typer:           typer,
 			UnsafeConvertor: unsafeConverter,
 
@@ -565,7 +566,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		// shallow copy
 		statusScope := requestScopes[v.Name]
 		statusScope.Subresource = "status"
-		statusScope.Serializer = unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, skeletonValidator: statusValidator, validatedField: "status", pruning: *crd.Spec.Prune}
+		statusScope.Serializer = unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, skeletonValidator: statusValidator, validatedField: "status", pruning: *crd.Spec.Prune, defaulting: true}
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,
@@ -604,6 +605,7 @@ type unstructuredNegotiatedSerializer struct {
 	validatedField    string
 	skeletonValidator *validate.SchemaValidator
 	pruning           bool
+	defaulting        bool
 }
 
 func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
@@ -632,7 +634,7 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{validator: s.skeletonValidator, validatedField: s.validatedField, pruning: s.pruning}}
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{validator: s.skeletonValidator, validatedField: s.validatedField, pruning: s.pruning, defaulting: s.defaulting}}
 	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
 }
 
@@ -668,12 +670,13 @@ func (c unstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, 
 	return ret, nil
 }
 
-type unstructuredDefaulter struct {
+type unstructuredNoopDefaulter struct {
 	delegate runtime.ObjectDefaulter
 }
 
-func (d unstructuredDefaulter) Default(in runtime.Object) {
-	// Delegate for things other than Unstructured.
+func (d unstructuredNoopDefaulter) Default(in runtime.Object) {
+	// Delegate for things other than Unstructured. For Unstructured we do defaulting
+	// during decoding.
 	if _, ok := in.(runtime.Unstructured); !ok {
 		d.delegate.Default(in)
 	}
@@ -736,15 +739,16 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 			dropInvalidMetadata: true,
 			validator:           t.skeletonValidator,
 			pruning:             t.pruning,
+			defaulting:          true,
 		}}
-		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{validator: t.skeletonValidator, pruning: t.pruning}}
+		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{validator: t.skeletonValidator, pruning: t.pruning, defaulting: false}}
 		ret.StorageConfig.Codec = versioning.NewCodec(
 			ret.StorageConfig.Codec,
 			d,
 			c,
 			&unstructuredCreator{},
 			crdserverscheme.NewUnstructuredObjectTyper(),
-			&unstructuredDefaulter{delegate: Scheme},
+			&unstructuredNoopDefaulter{delegate: Scheme},
 			t.encoderVersion,
 			t.decoderVersion,
 			"crdRESTOptions",
@@ -829,6 +833,7 @@ type unstructuredSchemaCoercer struct {
 	// empty or a top-level field name like "status" the validator should be applied to
 	validatedField string
 	pruning        bool
+	defaulting     bool
 }
 
 func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
@@ -860,13 +865,17 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 			}
 		}
 		prune := v.pruning && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourcePruning)
-		if validatee != nil && prune {
+		defaulting := v.defaulting && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceDefaulting)
+		if validatee != nil && (prune || defaulting) {
 			result := v.validator.Validate(validatee)
 			if result.AsError() != nil {
 				return result.AsError()
 			}
 			if prune {
 				pruning.Prune(result)
+			}
+			if defaulting {
+				postvalidationalgorithms.ApplyDefaults(result)
 			}
 		}
 	}
