@@ -209,7 +209,7 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	}
 
 	var err error
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

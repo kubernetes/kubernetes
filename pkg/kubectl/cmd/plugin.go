@@ -158,7 +158,7 @@ type factoryAttrsPluginEnvProvider struct {
 }
 
 func (p *factoryAttrsPluginEnvProvider) Env() (plugins.EnvList, error) {
-	cmdNamespace, _, err := p.factory.DefaultNamespace()
+	cmdNamespace, _, err := p.factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return plugins.EnvList{}, err
 	}

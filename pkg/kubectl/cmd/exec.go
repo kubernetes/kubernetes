@@ -166,7 +166,7 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		}
 	}
 
-	namespace, _, err := f.DefaultNamespace()
+	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

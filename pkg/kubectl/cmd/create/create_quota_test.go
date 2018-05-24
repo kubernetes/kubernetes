@@ -51,10 +51,8 @@ func TestCreateQuota(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
-
-			tf.Namespace = "test"
 
 			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdCreateQuota(tf, ioStreams)

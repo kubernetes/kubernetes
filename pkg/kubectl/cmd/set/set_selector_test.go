@@ -317,7 +317,7 @@ func TestGetResourcesAndSelector(t *testing.T) {
 }
 
 func TestSelectorTest(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
@@ -328,7 +328,6 @@ func TestSelectorTest(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()

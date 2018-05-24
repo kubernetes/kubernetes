@@ -146,7 +146,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 }
 
 func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Command) error {
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

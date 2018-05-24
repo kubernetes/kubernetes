@@ -32,7 +32,7 @@ import (
 func TestReplaceObject(t *testing.T) {
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -62,7 +62,6 @@ func TestReplaceObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
@@ -89,7 +88,7 @@ func TestReplaceObject(t *testing.T) {
 func TestReplaceMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -133,7 +132,6 @@ func TestReplaceMultipleObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
@@ -160,7 +158,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 func TestReplaceDirectory(t *testing.T) {
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -191,7 +189,6 @@ func TestReplaceDirectory(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)
@@ -218,7 +215,7 @@ func TestReplaceDirectory(t *testing.T) {
 func TestForceReplaceObjectNotFound(t *testing.T) {
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -238,7 +235,6 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdReplace(tf, streams)

@@ -146,7 +146,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 
 	o.Namespace = ""
 	if !o.AllNamespaces {
-		o.Namespace, _, err = f.DefaultNamespace()
+		o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 		if err != nil {
 			return err
 		}

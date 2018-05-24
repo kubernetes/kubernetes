@@ -265,7 +265,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return cmdutil.UsageErrorf(cmd, "--port must be set when exposing a service")
 	}
 
-	namespace, _, err := f.DefaultNamespace()
+	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

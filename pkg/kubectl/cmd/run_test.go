@@ -170,7 +170,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -190,7 +190,6 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				}),
 			}
 
-			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{}
 
 			cmd := NewCmdRun(tf, genericclioptions.NewTestIOStreamsDiscard())
@@ -505,7 +504,7 @@ func TestRunValidations(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			_, _, codec := cmdtesting.NewExternalScheme()
@@ -513,7 +512,6 @@ func TestRunValidations(t *testing.T) {
 				NegotiatedSerializer: scheme.Codecs,
 				Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()

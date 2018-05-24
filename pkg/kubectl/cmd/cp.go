@@ -144,7 +144,7 @@ func extractFileSpec(arg string) (fileSpec, error) {
 
 func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
-	o.Namespace, _, err = f.DefaultNamespace()
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

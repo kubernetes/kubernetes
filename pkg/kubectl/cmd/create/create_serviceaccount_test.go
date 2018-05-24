@@ -32,7 +32,7 @@ import (
 func TestCreateServiceAccount(t *testing.T) {
 	serviceAccountObject := &v1.ServiceAccount{}
 	serviceAccountObject.Name = "my-service-account"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -51,7 +51,6 @@ func TestCreateServiceAccount(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateServiceAccount(tf, ioStreams)
 	cmd.Flags().Set("output", "name")

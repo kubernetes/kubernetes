@@ -31,7 +31,7 @@ import (
 func TestPatchObject(t *testing.T) {
 	_, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -55,7 +55,6 @@ func TestPatchObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdPatch(tf, stream)
@@ -73,7 +72,7 @@ func TestPatchObject(t *testing.T) {
 func TestPatchObjectFromFile(t *testing.T) {
 	_, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -90,7 +89,6 @@ func TestPatchObjectFromFile(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdPatch(tf, stream)
@@ -111,7 +109,7 @@ func TestPatchNoop(t *testing.T) {
 	getObject := &svc.Items[0]
 	patchObject := &svc.Items[0]
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -130,7 +128,6 @@ func TestPatchNoop(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	// Patched
 	{
@@ -159,7 +156,7 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 	}
 	svcCopy.Labels["post-patch"] = "post-patch-value"
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -178,7 +175,6 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdPatch(tf, stream)

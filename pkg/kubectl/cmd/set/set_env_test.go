@@ -45,7 +45,7 @@ import (
 )
 
 func TestSetEnvLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
@@ -56,7 +56,6 @@ func TestSetEnvLocal(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 	outputFormat := "name"
 
@@ -83,7 +82,7 @@ func TestSetEnvLocal(t *testing.T) {
 }
 
 func TestSetMultiResourcesEnvLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
@@ -94,7 +93,6 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
@@ -447,16 +445,15 @@ func TestSetEnvRemote(t *testing.T) {
 		t.Run(input.name, func(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 			defer tf.Cleanup()
 
-			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
 				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
+					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", "test", input.args[1])
 					switch p, m := req.URL.Path, req.Method; {
 					case p == resourcePath && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
@@ -585,10 +582,9 @@ func TestSetEnvFromResource(t *testing.T) {
 			},
 		}
 		t.Run(input.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},

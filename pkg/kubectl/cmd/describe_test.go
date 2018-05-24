@@ -41,7 +41,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 	}()
 	cmdutil.DescriberFn = d.describerFor
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("non-default")
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
 
@@ -52,7 +52,6 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	tf.Namespace = "non-default"
 	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"type", "foo"})
 
@@ -82,7 +81,7 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
 	}
-	tf.Namespace = "non-default"
+	tf.WithNamespace("non-default")
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -107,7 +106,7 @@ func TestDescribeObject(t *testing.T) {
 	cmdutil.DescriberFn = d.describerFor
 
 	_, _, rc := testData()
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -123,7 +122,6 @@ func TestDescribeObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -149,7 +147,7 @@ func TestDescribeListObjects(t *testing.T) {
 	cmdutil.DescriberFn = d.describerFor
 
 	pods, _, _ := testData()
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -160,7 +158,6 @@ func TestDescribeListObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	tf.Namespace = "test"
 	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"pods"})
 	if buf.String() != fmt.Sprintf("%s\n\n%s", d.Output, d.Output) {
@@ -177,7 +174,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 	cmdutil.DescriberFn = d.describerFor
 
 	pods, _, _ := testData()
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -186,7 +183,6 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
-	tf.Namespace = "test"
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("show-events", "true")
 	cmd.Run(cmd, []string{"pods"})
@@ -204,7 +200,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	cmdutil.DescriberFn = d.describerFor
 
 	pods, _, _ := testData()
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -213,7 +209,6 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
-	tf.Namespace = "test"
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("show-events", "false")
 	cmd.Run(cmd, []string{"pods"})

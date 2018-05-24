@@ -135,7 +135,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		return cmdutil.UsageErrorf(cmd, "expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(argsIn), argsIn)
 	}
 
-	namespace, _, err := f.DefaultNamespace()
+	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
