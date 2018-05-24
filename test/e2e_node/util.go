@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -333,6 +334,24 @@ func logKubeletLatencyMetrics(metricNames ...string) {
 	} else {
 		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletLatencyMetrics(metric, metricSet))
 	}
+}
+
+// returns config related metrics from the local kubelet, filtered to the filterMetricNames passed in
+func getKubeletMetrics(filterMetricNames sets.String) (frameworkmetrics.KubeletMetrics, error) {
+	// grab Kubelet metrics
+	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := metrics.NewKubeletMetrics()
+	for name := range ms {
+		if !filterMetricNames.Has(name) {
+			continue
+		}
+		filtered[name] = ms[name]
+	}
+	return filtered, nil
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
