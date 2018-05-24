@@ -151,6 +151,8 @@ func (t *dnsNameserverTest) run() {
 
 	t.createUtilPod()
 	defer t.deleteUtilPod()
+	originalConfigMapData := t.fetchDNSConfigMapData()
+	defer t.restoreDNSConfigMap(originalConfigMapData)
 
 	t.createDNSServer(map[string]string{
 		"abc.acme.local": "1.1.1.1",
@@ -159,10 +161,28 @@ func (t *dnsNameserverTest) run() {
 	})
 	defer t.deleteDNSServerPod()
 
-	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
-		"stubDomains":         fmt.Sprintf(`{"acme.local":["%v"]}`, t.dnsServerPod.Status.PodIP),
-		"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
-	}})
+	if t.name == "coredns" {
+		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
+			"Corefile": fmt.Sprintf(`.:53 {
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           upstream
+           fallthrough in-addr.arpa ip6.arpa
+        }
+        proxy . %v
+    }
+     acme.local:53 {
+       proxy . %v
+    }`, t.dnsServerPod.Status.PodIP, t.dnsServerPod.Status.PodIP),
+		}})
+
+		t.deleteCoreDNSPods()
+	} else {
+		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
+			"stubDomains":         fmt.Sprintf(`{"acme.local":["%v"]}`, t.dnsServerPod.Status.PodIP),
+			"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
+		}})
+	}
 
 	t.checkDNSRecordFrom(
 		"abc.acme.local",
@@ -180,7 +200,7 @@ func (t *dnsNameserverTest) run() {
 		"dnsmasq",
 		moreForeverTestTimeout)
 
-	t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
+	t.restoreDNSConfigMap(originalConfigMapData)
 	// Wait for the deleted ConfigMap to take effect, otherwise the
 	// configuration can bleed into other tests.
 	t.checkDNSRecordFrom(
@@ -199,6 +219,8 @@ func (t *dnsPtrFwdTest) run() {
 
 	t.createUtilPod()
 	defer t.deleteUtilPod()
+	originalConfigMapData := t.fetchDNSConfigMapData()
+	defer t.restoreDNSConfigMap(originalConfigMapData)
 
 	t.createDNSServerWithPtrRecord()
 	defer t.deleteDNSServerPod()
@@ -210,9 +232,24 @@ func (t *dnsPtrFwdTest) run() {
 		"dnsmasq",
 		moreForeverTestTimeout)
 
-	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
-		"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
-	}})
+	if t.name == "coredns" {
+		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
+			"Corefile": fmt.Sprintf(`.:53 {
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           upstream
+           fallthrough in-addr.arpa ip6.arpa
+        }
+        proxy . %v
+    }`, t.dnsServerPod.Status.PodIP),
+		}})
+
+		t.deleteCoreDNSPods()
+	} else {
+		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
+			"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
+		}})
+	}
 
 	t.checkDNSRecordFrom(
 		"123.2.0.192.in-addr.arpa",
@@ -220,7 +257,7 @@ func (t *dnsPtrFwdTest) run() {
 		"dnsmasq",
 		moreForeverTestTimeout)
 
-	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{}})
+	t.restoreDNSConfigMap(originalConfigMapData)
 	t.checkDNSRecordFrom(
 		"123.2.0.192.in-addr.arpa",
 		func(actual []string) bool { return len(actual) == 0 },
@@ -237,6 +274,8 @@ func (t *dnsExternalNameTest) run() {
 
 	t.createUtilPod()
 	defer t.deleteUtilPod()
+	originalConfigMapData := t.fetchDNSConfigMapData()
+	defer t.restoreDNSConfigMap(originalConfigMapData)
 
 	fooHostname := "foo.example.com"
 	t.createDNSServer(map[string]string{
@@ -270,9 +309,24 @@ func (t *dnsExternalNameTest) run() {
 		"dnsmasq",
 		moreForeverTestTimeout)
 
-	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
-		"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
-	}})
+	if t.name == "coredns" {
+		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
+			"Corefile": fmt.Sprintf(`.:53 {
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           upstream
+           fallthrough in-addr.arpa ip6.arpa
+        }
+        proxy . %v
+    }`, t.dnsServerPod.Status.PodIP),
+		}})
+
+		t.deleteCoreDNSPods()
+	} else {
+		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
+			"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
+		}})
+	}
 
 	t.checkDNSRecordFrom(
 		fmt.Sprintf("%s.%s.svc.cluster.local", serviceNameLocal, f.Namespace.Name),
@@ -282,7 +336,7 @@ func (t *dnsExternalNameTest) run() {
 		"dnsmasq",
 		moreForeverTestTimeout)
 
-	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{}})
+	t.restoreDNSConfigMap(originalConfigMapData)
 }
 
 var _ = SIGDescribe("DNS configMap nameserver", func() {
