@@ -378,6 +378,14 @@ func TestUpdateResult(t *testing.T) {
 	}
 }
 
+// slicesEqual wraps reflect.DeepEqual, but returns true when comparing nil and empty slice.
+func slicesEqual(a, b []algorithm.PredicateFailureReason) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+	return reflect.DeepEqual(a, b)
+}
+
 func TestLookupResult(t *testing.T) {
 	tests := []struct {
 		name                              string
@@ -504,9 +512,9 @@ func TestLookupResult(t *testing.T) {
 		if fit != test.expectedPredicateItem.fit {
 			t.Errorf("Failed: %s, expected fit: %v, but got: %v", test.name, test.cachedItem.fit, fit)
 		}
-		if !reflect.DeepEqual(reasons, test.expectedPredicateItem.reasons) {
+		if !slicesEqual(reasons, test.expectedPredicateItem.reasons) {
 			t.Errorf("Failed: %s, expected reasons: %v, but got: %v",
-				test.name, test.cachedItem.reasons, reasons)
+				test.name, test.expectedPredicateItem.reasons, reasons)
 		}
 	}
 }
