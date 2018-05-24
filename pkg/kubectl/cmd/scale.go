@@ -289,7 +289,7 @@ func ScaleJob(info *resource.Info, jobsClient batchclient.JobsGetter, count uint
 }
 
 func scaler(f cmdutil.Factory) (kubectl.Scaler, error) {
-	scalesGetter, err := f.ScaleClient()
+	scalesGetter, err := cmdutil.ScaleClientFn(f)
 	if err != nil {
 		return nil, err
 	}

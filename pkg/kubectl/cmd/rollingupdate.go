@@ -214,7 +214,7 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 		return err
 	}
 
-	o.ScaleClient, err = f.ScaleClient()
+	o.ScaleClient, err = cmdutil.ScaleClientFn(f)
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,6 @@ func (o *RollingUpdateOptions) Validate(cmd *cobra.Command, args []string) error
 }
 
 func (o *RollingUpdateOptions) Run() error {
-
 	filename := ""
 	if len(o.FilenameOptions.Filenames) > 0 {
 		filename = o.FilenameOptions.Filenames[0]
