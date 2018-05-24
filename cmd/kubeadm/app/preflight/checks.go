@@ -892,13 +892,13 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 	if cfg.Etcd.External != nil {
 		// Only check etcd version when external endpoints are specified
 		if cfg.Etcd.External.CAFile != "" {
-			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.CAFile})
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.CAFile, Label: "ExternalEtcdClientCertificates"})
 		}
 		if cfg.Etcd.External.CertFile != "" {
-			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.CertFile})
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.CertFile, Label: "ExternalEtcdClientCertificates"})
 		}
 		if cfg.Etcd.External.KeyFile != "" {
-			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.KeyFile})
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.KeyFile, Label: "ExternalEtcdClientCertificates"})
 		}
 		checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
 	}
