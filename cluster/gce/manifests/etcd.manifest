@@ -5,7 +5,8 @@
   "name":"etcd-server{{ suffix }}",
   "namespace": "kube-system",
   "annotations": {
-    "scheduler.alpha.kubernetes.io/critical-pod": ""
+    "scheduler.alpha.kubernetes.io/critical-pod": "",
+    "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
   }
 },
 "spec":{
@@ -62,7 +63,7 @@
     "ports": [
       { "name": "serverport",
         "containerPort": {{ server_port }},
-        "hostPort": {{ server_port }} 
+        "hostPort": {{ server_port }}
       },
       { "name": "clientport",
         "containerPort": {{ port }},
