@@ -232,7 +232,7 @@ func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
 func MakeDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *apps.Deployment {
 	if len(command) == 0 {
-		command = "while true; do sleep 1; done"
+		command = "trap exit TERM; while true; do sleep 1; done"
 	}
 	zero := int64(0)
 	deploymentName := "deployment-" + string(uuid.NewUUID())
