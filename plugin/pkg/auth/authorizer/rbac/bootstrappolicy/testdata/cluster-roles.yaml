@@ -1137,6 +1137,14 @@ items:
     - list
     - watch
   - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims/status
+    verbs:
+    - get
+    - patch
+    - update
+  - apiGroups:
     - storage.k8s.io
     resources:
     - volumeattachments

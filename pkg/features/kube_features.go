@@ -94,7 +94,7 @@ const (
 	LocalStorageCapacityIsolation utilfeature.Feature = "LocalStorageCapacityIsolation"
 
 	// owner: @gnufied
-	// alpha: v1.8
+	// beta: v1.11
 	// Ability to Expand persistent volumes
 	ExpandPersistentVolumes utilfeature.Feature = "ExpandPersistentVolumes"
 
@@ -307,7 +307,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
-	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
+	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
 	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
