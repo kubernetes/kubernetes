@@ -655,6 +655,7 @@ type RCStartupStatus struct {
 	RunningButNotReady    int
 	Waiting               int
 	Pending               int
+	Scheduled             int
 	Unknown               int
 	Inactive              int
 	FailedContainers      int
@@ -707,6 +708,10 @@ func ComputeRCStartupStatus(pods []*v1.Pod, expected int) RCStartupStatus {
 			startupStatus.Inactive++
 		} else if p.Status.Phase == v1.PodUnknown {
 			startupStatus.Unknown++
+		}
+		// Record count of scheduled pods (useful for computing scheduler throughput).
+		if p.Spec.NodeName != "" {
+			startupStatus.Scheduled++
 		}
 	}
 	return startupStatus
