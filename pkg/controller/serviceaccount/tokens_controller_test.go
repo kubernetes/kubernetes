@@ -206,6 +206,7 @@ type reaction struct {
 func TestTokenCreation(t *testing.T) {
 	testcases := map[string]struct {
 		ClientObjects []runtime.Object
+		Namespace     *v1.Namespace
 
 		IsAsync    bool
 		MaxRetries int
@@ -294,6 +295,28 @@ func TestTokenCreation(t *testing.T) {
 				// Retry 2
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, namedCreatedTokenSecret("default-token-vnmz7")),
+			},
+		},
+		"new serviceaccount encountering namespace terminating create error": {
+			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences()), createdTokenSecret()},
+			Namespace:     &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Status: v1.NamespaceStatus{Phase: v1.NamespaceTerminating}},
+			MaxRetries:    2,
+			IsAsync:       true,
+			Reactors: []reaction{{
+				verb:     "create",
+				resource: "secrets",
+				reactor: func(t *testing.T) core.ReactionFunc {
+					return func(core.Action) (bool, runtime.Object, error) {
+						return true, nil, apierrors.NewForbidden(api.Resource("secrets"), "foo", errors.New("No can do"))
+					}
+				},
+			}},
+
+			AddedServiceAccount: serviceAccount(emptySecretReferences()),
+			ExpectedActions: []core.Action{
+				// Attempt
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
+				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, createdTokenSecret()),
 			},
 		},
 		"new serviceaccount with missing secrets": {
@@ -583,7 +606,14 @@ func TestTokenCreation(t *testing.T) {
 		secretInformer := informers.Core().V1().Secrets().Informer()
 		secrets := secretInformer.GetStore()
 		serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-		controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+		namespaces := informers.Core().V1().Namespaces().Informer().GetStore()
+		controller, err := NewTokensController(
+			informers.Core().V1().ServiceAccounts(),
+			informers.Core().V1().Secrets(),
+			informers.Core().V1().Namespaces().Lister(),
+			client,
+			TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries},
+		)
 		if err != nil {
 			t.Fatalf("error creating Tokens controller: %v", err)
 		}
@@ -593,6 +623,12 @@ func TestTokenCreation(t *testing.T) {
 		}
 		for _, s := range tc.ExistingSecrets {
 			secrets.Add(s)
+		}
+
+		if tc.Namespace != nil {
+			namespaces.Add(tc.Namespace)
+		} else {
+			namespaces.Add(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Status: v1.NamespaceStatus{Phase: v1.NamespaceActive}})
 		}
 
 		if tc.AddedServiceAccount != nil {
