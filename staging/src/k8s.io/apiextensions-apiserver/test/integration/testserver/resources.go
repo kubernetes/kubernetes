@@ -315,25 +315,6 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 	}
 }
 
-// UpdateCustomResourceDefinition updates a CRD, retrying up to 5 times on version conflict errors.
-func UpdateCustomResourceDefinition(client clientset.Interface, name string, update func(*apiextensionsv1beta1.CustomResourceDefinition)) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
-	for i := 0; i < 5; i++ {
-		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get CustomResourceDefinition %q: %v", name, err)
-		}
-		update(crd)
-		crd, err = client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
-		if err == nil {
-			return crd, nil
-		}
-		if !errors.IsConflict(err) {
-			return nil, fmt.Errorf("failed to update CustomResourceDefinition %q: %v", name, err)
-		}
-	}
-	return nil, fmt.Errorf("too many retries after conflicts updating CustomResourceDefinition %q", name)
-}
-
 func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
 	if err := apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
 		return err
@@ -355,10 +336,6 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 		return true, nil
 	})
 	return err
-}
-
-func GetCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
-	return apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
 }
 
 func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, config *rest.Config) (scale.ScalesGetter, error) {
