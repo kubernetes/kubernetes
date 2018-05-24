@@ -192,9 +192,10 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	o.Builder = f.NewBuilder()
 	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
 	o.ClientForMapping = f.ClientForMapping
-	o.MapBasedSelectorForObject = f.MapBasedSelectorForObject
+	o.MapBasedSelectorForObject = polymorphichelpers.MapBasedSelectorForObjectFn
+	o.ProtocolsForObject = polymorphichelpers.ProtocolsForObjectFn
 	o.PortsForObject = polymorphichelpers.PortsForObjectFn
-	o.ProtocolsForObject = f.ProtocolsForObject
+
 	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
