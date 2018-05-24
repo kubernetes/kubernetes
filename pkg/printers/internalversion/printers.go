@@ -608,6 +608,11 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 		reason = "Terminating"
 	}
 
+	// if the reason is "NodeLost", set the count of ready containers as 0.
+	if pod.Status.Reason == node.NodeUnreachablePodReason {
+		readyContainers = 0
+	}
+
 	row.Cells = append(row.Cells, pod.Name, fmt.Sprintf("%d/%d", readyContainers, totalContainers), reason, restarts, translateTimestamp(pod.CreationTimestamp))
 
 	if options.Wide {
