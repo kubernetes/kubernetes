@@ -196,6 +196,8 @@ metadata:
     kubernetes.io/name: "KubeDNS"
   name: kube-dns
   namespace: kube-system
+  annotations:
+    prometheus.io/scrape: "true"
   # Without this resourceVersion value, an update of the Service between versions will yield:
   #   Service "kube-dns" is invalid: metadata.resourceVersion: Invalid value: "": must be specified for an update
   resourceVersion: "0"
@@ -264,6 +266,9 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
+        - containerPort: 9153
+          name: metrics
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /health
@@ -303,6 +308,7 @@ data:
         prometheus :9153
         proxy . {{ .UpstreamNameserver }}
         cache 30
+        reload
     }{{ .StubDomain }}
 `
 	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
