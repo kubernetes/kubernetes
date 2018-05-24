@@ -116,10 +116,6 @@ func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
 	return restclient.RESTClientFor(clientConfig)
 }
 
-func (f *ring0Factory) DefaultNamespace() (string, bool, error) {
-	return f.clientGetter.ToRawKubeConfigLoader().Namespace()
-}
-
 const (
 	// TODO(sig-cli): Enforce consistent naming for generators here.
 	// See discussion in https://github.com/kubernetes/kubernetes/issues/46237

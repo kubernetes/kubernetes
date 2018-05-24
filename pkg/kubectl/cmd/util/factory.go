@@ -73,10 +73,6 @@ type ClientAccessFactory interface {
 	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
 
-	// Returns the default namespace to use in cases where no
-	// other namespace is specified and whether the namespace was
-	// overridden.
-	DefaultNamespace() (string, bool, error)
 	// Generators returns the generators for the provided command
 	Generators(cmdName string) map[string]kubectl.Generator
 }
