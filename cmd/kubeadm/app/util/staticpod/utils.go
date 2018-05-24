@@ -22,7 +22,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"strings"
 
 	"k8s.io/api/core/v1"
 
@@ -44,8 +43,8 @@ const (
 	// kubeSchedulerAddressArg represents the address argument of the kube-scheduler configuration.
 	kubeSchedulerAddressArg = "address"
 
-	// etcdListenClientURLsArg represents the listen-client-urls argument of the etcd configuration.
-	etcdListenClientURLsArg = "listen-client-urls"
+	// etcdAdvertiseClientURLsArg represents the advertise-client-urls argument of the etcd configuration.
+	etcdAdvertiseClientURLsArg = "advertise-client-urls"
 )
 
 // ComponentPod returns a Pod object from the container and volume specifications
@@ -99,10 +98,10 @@ func ComponentProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, p
 }
 
 // EtcdProbe is a helper function for building a shell-based, etcdctl v1.Probe object to healthcheck etcd
-func EtcdProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, port int, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
+func EtcdProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
 	tlsFlags := fmt.Sprintf("--cacert=%[1]s/%[2]s --cert=%[1]s/%[3]s --key=%[1]s/%[4]s", certsDir, CACertName, CertName, KeyName)
 	// etcd pod is alive if a linearizable get succeeds.
-	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl --endpoints=%s:%d %s get foo", GetProbeAddress(cfg, componentName), port, tlsFlags)
+	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl --endpoints=%s %s get foo", GetEtcdProbeURL(cfg, componentName), tlsFlags)
 
 	return &v1.Probe{
 		Handler: v1.Handler{
@@ -216,6 +215,32 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 	return pod, nil
 }
 
+// GetEtcdProbeURL will return a validated --advertise-client-url URL or https://127.0.0.1:2379
+// to use for etcd liveness probes. in static pod manifests.
+func GetEtcdProbeURL(cfg *kubeadmapi.MasterConfiguration, componentName string) string {
+	if cfg.Etcd.ExtraArgs != nil {
+		if arg, exists := cfg.Etcd.ExtraArgs[etcdAdvertiseClientURLsArg]; exists {
+			// basic etcd url validation. Reference:
+			// https://github.com/coreos/etcd/blob/master/pkg/types/urls.go#L35-L47
+			u, err := url.Parse(arg)
+			_, _, splitErr := net.SplitHostPort(u.Host)
+			switch {
+			case err != nil:
+				// Ensure the Scheme is http or https
+			case u.Scheme != "https" && u.Scheme != "http":
+				// Ensure the Path is not set.
+			case u.Path != "":
+				// Ensure that Hostname looks like <ip or host>:<port>
+			case splitErr != nil:
+				// Ensure that hostport split works.
+			default:
+				return u.String()
+			}
+		}
+	}
+	return "https://127.0.0.1:2379"
+}
+
 // GetProbeAddress returns an IP address or 127.0.0.1 to use for liveness probes
 // in static pod manifests.
 func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) string {
@@ -240,42 +265,6 @@ func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) 
 	case componentName == kubeadmconstants.KubeScheduler:
 		if addr, exists := cfg.SchedulerExtraArgs[kubeSchedulerAddressArg]; exists {
 			return addr
-		}
-	case componentName == kubeadmconstants.Etcd:
-		if cfg.Etcd.ExtraArgs != nil {
-			if arg, exists := cfg.Etcd.ExtraArgs[etcdListenClientURLsArg]; exists {
-				// Use the first url in the listen-client-urls if multiple url's are specified.
-				if strings.ContainsAny(arg, ",") {
-					arg = strings.Split(arg, ",")[0]
-				}
-				parsedURL, err := url.Parse(arg)
-				if err != nil || parsedURL.Hostname() == "" {
-					break
-				}
-				// Return the IP if the URL contains an address instead of a name.
-				if ip := net.ParseIP(parsedURL.Hostname()); ip != nil {
-					return ip.String()
-				}
-				// Use the local resolver to try resolving the name within the URL.
-				// If the name can not be resolved, return an IPv4 loopback address.
-				// Otherwise, select the first valid IPv4 address.
-				// If the name does not resolve to an IPv4 address, select the first valid IPv6 address.
-				addrs, err := net.LookupIP(parsedURL.Hostname())
-				if err != nil {
-					break
-				}
-				var ip net.IP
-				for _, addr := range addrs {
-					if addr.To4() != nil {
-						ip = addr
-						break
-					}
-					if addr.To16() != nil && ip == nil {
-						ip = addr
-					}
-				}
-				return ip.String()
-			}
 		}
 	}
 	return "127.0.0.1"
