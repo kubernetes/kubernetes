@@ -132,6 +132,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		limitranger.PluginName,              //LimitRanger
 		serviceaccount.PluginName,           //ServiceAccount
 		setdefault.PluginName,               //DefaultStorageClass
+		resize.PluginName,                   //PersistentVolumeClaimResize
 		defaulttolerationseconds.PluginName, //DefaultTolerationSeconds
 		mutatingwebhook.PluginName,          //MutatingAdmissionWebhook
 		validatingwebhook.PluginName,        //ValidatingAdmissionWebhook
