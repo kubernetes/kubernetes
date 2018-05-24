@@ -206,21 +206,22 @@ func (l *PodStartupLatency) PrintJSON() string {
 	return PrettyPrintJSON(PodStartupLatencyToPerfData(l))
 }
 
-type SchedulingLatency struct {
-	Scheduling LatencyMetric `json:"scheduling"`
-	Binding    LatencyMetric `json:"binding"`
-	Total      LatencyMetric `json:"total"`
+type SchedulingMetrics struct {
+	SchedulingLatency LatencyMetric `json:"schedulingLatency"`
+	BindingLatency    LatencyMetric `json:"bindingLatency"`
+	E2ELatency        LatencyMetric `json:"e2eLatency"`
+	ThroughputSamples []float64     `json:"throughputSamples"`
 }
 
-func (l *SchedulingLatency) SummaryKind() string {
-	return "SchedulingLatency"
+func (l *SchedulingMetrics) SummaryKind() string {
+	return "SchedulingMetrics"
 }
 
-func (l *SchedulingLatency) PrintHumanReadable() string {
+func (l *SchedulingMetrics) PrintHumanReadable() string {
 	return PrettyPrintJSON(l)
 }
 
-func (l *SchedulingLatency) PrintJSON() string {
+func (l *SchedulingMetrics) PrintJSON() string {
 	return PrettyPrintJSON(l)
 }
 
@@ -438,9 +439,9 @@ func getMetrics(c clientset.Interface) (string, error) {
 	return string(body), nil
 }
 
-// Retrieves scheduler metrics information.
-func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
-	result := SchedulingLatency{}
+// Retrieves scheduler latency metrics.
+func getSchedulingLatency(c clientset.Interface) (*SchedulingMetrics, error) {
+	result := SchedulingMetrics{}
 
 	// Check if master Node is registered
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -491,11 +492,11 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 		var metric *LatencyMetric = nil
 		switch sample.Metric[model.MetricNameLabel] {
 		case "scheduler_scheduling_algorithm_latency_microseconds":
-			metric = &result.Scheduling
+			metric = &result.SchedulingLatency
 		case "scheduler_binding_latency_microseconds":
-			metric = &result.Binding
+			metric = &result.BindingLatency
 		case "scheduler_e2e_scheduling_latency_microseconds":
-			metric = &result.Total
+			metric = &result.E2ELatency
 		}
 		if metric == nil {
 			continue
@@ -512,7 +513,7 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 }
 
 // Verifies (currently just by logging them) the scheduling latencies.
-func VerifySchedulerLatency(c clientset.Interface) (*SchedulingLatency, error) {
+func VerifySchedulerLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 	latency, err := getSchedulingLatency(c)
 	if err != nil {
 		return nil, err
