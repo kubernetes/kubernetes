@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import time
 
+from pathlib import Path
 from shlex import split
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
@@ -29,8 +30,9 @@ from socket import gethostname, getfqdn
 from charms import layer
 from charms.layer import snap
 from charms.reactive import hook
+from charms.reactive import endpoint_from_flag
 from charms.reactive import set_state, remove_state, is_state
-from charms.reactive import when, when_any, when_not
+from charms.reactive import when, when_any, when_not, when_none
 
 from charms.kubernetes.common import get_version
 
@@ -49,6 +51,7 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 kubeconfig_path = '/root/cdk/kubeconfig'
 kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
 kubeclientconfig_path = '/root/.kube/config'
+gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 db = unitdata.kv()
@@ -623,6 +626,13 @@ def configure_kubelet(dns, ingress_ip):
                     'to kubelet')
         kubelet_opts['feature-gates'] = 'DevicePlugins=true'
 
+    if is_state('endpoint.aws.ready'):
+        kubelet_opts['cloud-provider'] = 'aws'
+    elif is_state('endpoint.gcp.ready'):
+        cloud_config_path = _cloud_config_path('kubelet')
+        kubelet_opts['cloud-provider'] = 'gce'
+        kubelet_opts['cloud-config'] = str(cloud_config_path)
+
     configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
 
 
@@ -738,7 +748,7 @@ def launch_default_ingress_controller():
                 "k8s.gcr.io/nginx-ingress-controller-arm64:0.9.0-beta.15"
         else:
             context['ingress_image'] = \
-                "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15" # noqa
+                "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15"  # noqa
     if get_version('kubelet') < (1, 9):
         context['daemonset_api_version'] = 'extensions/v1beta1'
     else:
@@ -1027,6 +1037,10 @@ def _systemctl_is_active(application):
 def get_node_name():
     kubelet_extra_args = parse_extra_args('kubelet-extra-args')
     cloud_provider = kubelet_extra_args.get('cloud-provider', '')
+    if is_state('endpoint.aws.ready'):
+        cloud_provider = 'aws'
+    elif is_state('endpoint.gcp.ready'):
+        cloud_provider = 'gcp'
     if cloud_provider == 'aws':
         return getfqdn()
     else:
@@ -1067,3 +1081,158 @@ def remove_label(label):
     retry = 'Failed to remove label {0}. Will retry.'.format(label)
     if not persistent_call(cmd, retry):
         raise ApplyNodeLabelFailed(retry)
+
+
+@when_any('endpoint.aws.joined',
+          'endpoint.gcp.joined')
+@when('kube-control.cluster_tag.available')
+@when_not('kubernetes-worker.cloud-request-sent')
+def request_integration():
+    hookenv.status_set('maintenance', 'requesting cloud integration')
+    kube_control = endpoint_from_flag('kube-control.cluster_tag.available')
+    cluster_tag = kube_control.get_cluster_tag()
+    if is_state('endpoint.aws.joined'):
+        cloud = endpoint_from_flag('endpoint.aws.joined')
+        cloud.tag_instance({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.tag_instance_security_group({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.tag_instance_subnet({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.enable_object_storage_management(['kubernetes-*'])
+    elif is_state('endpoint.gcp.joined'):
+        cloud = endpoint_from_flag('endpoint.gcp.joined')
+        cloud.label_instance({
+            'k8s-io-cluster-name': cluster_tag,
+        })
+        cloud.enable_object_storage_management()
+    cloud.enable_instance_inspection()
+    cloud.enable_dns_management()
+    set_state('kubernetes-worker.cloud-request-sent')
+    hookenv.status_set('waiting', 'waiting for cloud integration')
+
+
+@when_none('endpoint.aws.joined',
+           'endpoint.gcp.joined')
+def clear_requested_integration():
+    remove_state('kubernetes-worker.cloud-request-sent')
+
+
+@when_any('endpoint.aws.ready',
+          'endpoint.gcp.ready')
+@when_not('kubernetes-worker.restarted-for-cloud')
+def restart_for_cloud():
+    if is_state('endpoint.gcp.ready'):
+        _write_gcp_snap_config('kubelet')
+    set_state('kubernetes-worker.restarted-for-cloud')
+    set_state('kubernetes-worker.restart-needed')
+
+
+def _snap_common_path(component):
+    return Path('/var/snap/{}/common'.format(component))
+
+
+def _cloud_config_path(component):
+    return _snap_common_path(component) / 'cloud-config.conf'
+
+
+def _gcp_creds_path(component):
+    return _snap_common_path(component) / 'gcp-creds.json'
+
+
+def _daemon_env_path(component):
+    return _snap_common_path(component) / 'environment'
+
+
+def _write_gcp_snap_config(component):
+    # gcp requires additional credentials setup
+    gcp = endpoint_from_flag('endpoint.gcp.ready')
+    creds_path = _gcp_creds_path(component)
+    with creds_path.open('w') as fp:
+        os.fchmod(fp.fileno(), 0o600)
+        fp.write(gcp.credentials)
+
+    # create a cloud-config file that sets token-url to nil to make the
+    # services use the creds env var instead of the metadata server, as
+    # well as making the cluster multizone
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text('[Global]\n'
+                                 'token-url = nil\n'
+                                 'multizone = true\n')
+
+    daemon_env_path = _daemon_env_path(component)
+    if daemon_env_path.exists():
+        daemon_env = daemon_env_path.read_text()
+        if not daemon_env.endswith('\n'):
+            daemon_env += '\n'
+    else:
+        daemon_env = ''
+    if gcp_creds_env_key not in daemon_env:
+        daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
+        daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
+        daemon_env_path.write_text(daemon_env)
+
+
+def get_first_mount(mount_relation):
+    mount_relation_list = mount_relation.mounts()
+    if mount_relation_list and len(mount_relation_list) > 0:
+        # mount relation list is a list of the mount layer relations
+        # for now we just use the first one that is nfs
+        for mount in mount_relation_list:
+            # for now we just check the first mount and use that.
+            # the nfs charm only supports one for now.
+            if ('mounts' in mount and
+                    mount['mounts'][0]['fstype'] == 'nfs'):
+                return mount['mounts'][0]
+    return None
+
+
+@when('nfs.available')
+def nfs_state_control(mount):
+    ''' Determine if we should remove the state that controls the re-render
+    and execution of the nfs-relation-changed event because there
+    are changes in the relationship data, and we should re-render any
+    configs '''
+
+    mount_data = get_first_mount(mount)
+    if mount_data:
+        nfs_relation_data = {
+            'options': mount_data['options'],
+            'host': mount_data['hostname'],
+            'mountpoint': mount_data['mountpoint'],
+            'fstype': mount_data['fstype']
+        }
+
+        # Re-execute the rendering if the data has changed.
+        if data_changed('nfs-config', nfs_relation_data):
+            hookenv.log('reconfiguring nfs')
+            remove_state('nfs.configured')
+
+
+@when('nfs.available')
+@when_not('nfs.configured')
+def nfs_storage(mount):
+    '''NFS on kubernetes requires nfs config rendered into a deployment of
+    the nfs client provisioner. That will handle the persistent volume claims
+    with no persistent volume to back them.'''
+
+    mount_data = get_first_mount(mount)
+    if not mount_data:
+        return
+
+    addon_path = '/root/cdk/addons/{}'
+    # Render the NFS deployment
+    manifest = addon_path.format('nfs-provisioner.yaml')
+    render('nfs-provisioner.yaml', manifest, mount_data)
+    hookenv.log('Creating the nfs provisioner.')
+    try:
+        kubectl('apply', '-f', manifest)
+    except CalledProcessError as e:
+        hookenv.log(e)
+        hookenv.log('Failed to create nfs provisioner. Will attempt again next update.')  # noqa
+        return
+
+    set_state('nfs.configured')

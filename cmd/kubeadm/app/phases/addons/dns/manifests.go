@@ -17,8 +17,8 @@ limitations under the License.
 package dns
 
 const (
-	// v180AndAboveKubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
-	v180AndAboveKubeDNSDeployment = `
+	// KubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
+	KubeDNSDeployment = `
 apiVersion: apps/v1
 kind: Deployment
 metadata:

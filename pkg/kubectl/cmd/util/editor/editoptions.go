@@ -46,10 +46,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/crlf"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // EditOptions contains all the options for running edit cli command.
@@ -57,8 +57,8 @@ type EditOptions struct {
 	resource.FilenameOptions
 	RecordFlags *genericclioptions.RecordFlags
 
-	PrintFlags *printers.PrintFlags
-	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
+	PrintFlags *genericclioptions.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
 	Output             string
 	OutputPatch        bool
@@ -88,7 +88,7 @@ func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *E
 
 		EditMode: editMode,
 
-		PrintFlags: printers.NewPrintFlags("edited"),
+		PrintFlags: genericclioptions.NewPrintFlags("edited").WithTypeSetter(scheme.Scheme),
 
 		WindowsLineEndings: goruntime.GOOS == "windows",
 
@@ -163,13 +163,9 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 			Do()
 	}
 
-	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		printer, err := o.PrintFlags.ToPrinter()
-		if err != nil {
-			return nil, err
-		}
-		return printer.PrintObj, nil
+		return o.PrintFlags.ToPrinter()
 	}
 
 	o.CmdNamespace = cmdNamespace
@@ -184,7 +180,7 @@ func (o *EditOptions) Validate() error {
 }
 
 func (o *EditOptions) Run() error {
-	edit := NewDefaultEditor(o.f.EditorEnvs())
+	edit := NewDefaultEditor(editorEnvs())
 	// editFn is invoked for each edit session (once with a list for normal edit, once for each individual resource in a edit-on-create invocation)
 	editFn := func(infos []*resource.Info) error {
 		var (
@@ -809,4 +805,12 @@ func hashOnLineBreak(s string) string {
 		}
 	}
 	return r
+}
+
+// editorEnvs returns an ordered list of env vars to check for editor preferences.
+func editorEnvs() []string {
+	return []string{
+		"KUBE_EDITOR",
+		"EDITOR",
+	}
 }

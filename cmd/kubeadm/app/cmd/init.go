@@ -31,12 +31,11 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -61,7 +60,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -93,23 +91,31 @@ var (
 		This error is likely caused by:
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-			- Either there is no internet connection, or imagePullPolicy is set to "Never",
-			  so the kubelet cannot pull or find the following control plane images:
+			- No internet connection is available so the kubelet cannot pull or find the following control plane images:
 				- {{ .APIServerImage }}
 				- {{ .ControllerManagerImage }}
 				- {{ .SchedulerImage }}
 				- {{ .EtcdImage }} (only if no external etcd endpoints are configured)
+				- You can check or miligate this in beforehand with "kubeadm config images pull" to make sure the images
+				  are downloaded locally and cached.
 
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
 			- 'journalctl -xeu kubelet'
+
+		Additionally, a control plane component may have crashed or exited when started by the container runtime.
+		To troubleshoot, list all containers using your preferred container runtimes CLI, e.g. docker.
+		Here is one example how you may list all Kubernetes containers running in docker:
+			- 'docker ps -a | grep kube | grep -v pause'
+			Once you have found the failing container, you can inspect its logs with:
+			- 'docker logs CONTAINERID'
 		`)))
 )
 
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.MasterConfiguration{}
-	legacyscheme.Scheme.Default(cfg)
+	externalcfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	kubeadmscheme.Scheme.Default(externalcfg)
 
 	var cfgPath string
 	var skipPreFlight bool
@@ -122,33 +128,34 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		Use:   "init",
 		Short: "Run this command in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
+
+			kubeadmscheme.Scheme.Default(externalcfg)
+
 			var err error
-			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
+			if externalcfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
-
-			legacyscheme.Scheme.Default(cfg)
-			internalcfg := &kubeadmapi.MasterConfiguration{}
-			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
-			i, err := NewInit(cfgPath, internalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun)
+			err = validation.ValidateMixedArguments(cmd.Flags())
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(i.Validate(cmd))
+
+			i, err := NewInit(cfgPath, externalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun)
+			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
 
-	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
+	AddInitConfigFlags(cmd.PersistentFlags(), externalcfg, &featureGatesString)
 	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
 
 	return cmd
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, featureGatesString *string) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
@@ -187,7 +194,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 	)
 	flagSet.StringVar(
 		&cfg.Token, "token", cfg.Token,
-		"The token to use for establishing bidirectional trust between nodes and masters.",
+		"The token to use for establishing bidirectional trust between nodes and masters. The format is [a-z0-9]{6}\\.[a-z0-9]{16} - e.g. abcdef.0123456789abcdef",
 	)
 	flagSet.DurationVar(
 		&cfg.TokenTTL.Duration, "token-ttl", cfg.TokenTTL.Duration,
@@ -231,39 +238,20 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool) (*Init, error) {
+func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha2.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool) (*Init, error) {
 
-	if cfgPath != "" {
-		glog.V(1).Infof("[init] reading config file from: " + cfgPath)
-		b, err := ioutil.ReadFile(cfgPath)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
-		}
-		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
-			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
-		}
-	}
-
-	// Set defaults dynamically that the API group defaulting can't (by fetching information from the internet, looking up network interfaces, etc.)
-	glog.V(1).Infof("[init] setting dynamic defaults")
-	err := configutil.SetInitDynamicDefaults(cfg)
+	// Either use the config file if specified, or convert the defaults in the external to an internal cfg representation
+	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, externalcfg)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(1).Infof("[init] validating Kubernetes version")
+	glog.V(1).Infof("[init] validating feature gates")
 	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
 		return nil, err
 	}
 
 	glog.Infof("[init] using Kubernetes version: %s\n", cfg.KubernetesVersion)
-	glog.Infof("[init] using Authorization modes: %v\n", cfg.AuthorizationModes)
-
-	// Warn about the limitations with the current cloudprovider solution.
-	if cfg.CloudProvider != "" {
-		glog.Warningln("[init] for cloudprovider integrations to work --cloud-provider must be set for all kubelets in the cluster")
-		glog.Infoln("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
-	}
 
 	glog.Infoln("[preflight] running pre-flight checks")
 
@@ -271,30 +259,29 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePrefligh
 		return nil, err
 	}
 
-	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infof("Starting kubelet")
-	preflight.TryStartKubelet(ignorePreflightErrors)
-
-	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun}, nil
+	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun, ignorePreflightErrors: ignorePreflightErrors}, nil
 }
 
 // Init defines struct used by "kubeadm init" command
 type Init struct {
-	cfg            *kubeadmapi.MasterConfiguration
-	skipTokenPrint bool
-	dryRun         bool
-}
-
-// Validate validates configuration passed to "kubeadm init"
-func (i *Init) Validate(cmd *cobra.Command) error {
-	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
-		return err
-	}
-	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
+	cfg                   *kubeadmapi.MasterConfiguration
+	skipTokenPrint        bool
+	dryRun                bool
+	ignorePreflightErrors sets.String
 }
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
+
+	// Write env file with flags for the kubelet to use
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(i.cfg); err != nil {
+		return err
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	glog.V(1).Infof("Starting kubelet")
+	preflight.TryStartKubelet(i.ignorePreflightErrors)
+
 	// Get directories to write files to; can be faked if we're dry-running
 	glog.V(1).Infof("[init] Getting certificates directory from configuration")
 	realCertsDir := i.cfg.CertificatesDir
@@ -366,14 +353,14 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		glog.V(1).Infof("[init] feature --dynamic-config-dir is enabled")
-		glog.V(1).Infof("[init] writing base kubelet configuration to disk on master")
-		// Write base kubelet configuration for dynamic kubelet configuration feature.
-		if err := kubeletphase.WriteInitKubeletConfigToDiskOnMaster(i.cfg); err != nil {
-			return fmt.Errorf("error writing base kubelet configuration to disk: %v", err)
-		}
+	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
+	if err != nil {
+		return err
+	}
+
+	// Write the kubelet configuration to disk.
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig, kubeletVersion); err != nil {
+		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
 	}
 
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
@@ -401,15 +388,6 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		// Create base kubelet configuration for dynamic kubelet configuration feature.
-		glog.V(1).Infof("[init] creating base kubelet configuration")
-		if err := kubeletphase.CreateBaseKubeletConfiguration(i.cfg, client); err != nil {
-			return fmt.Errorf("error creating base kubelet configuration: %v", err)
-		}
-	}
-
 	// Upload currently used configuration to the cluster
 	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
 	// depend on centralized information from this source in the future
@@ -418,10 +396,24 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error uploading configuration: %v", err)
 	}
 
+	glog.V(1).Infof("[init] creating kubelet configuration configmap")
+	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
+		return fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err)
+	}
+
 	// PHASE 4: Mark the master with the right label/taint
 	glog.V(1).Infof("[init] marking the master with right label")
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName, !i.cfg.NoTaintMaster); err != nil {
 		return fmt.Errorf("error marking master: %v", err)
+	}
+
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+	// This feature is disabled by default, as it is alpha still
+	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		// Enable dynamic kubelet configuration for the node.
+		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeName, kubeletVersion); err != nil {
+			return fmt.Errorf("error enabling dynamic kubelet configuration: %v", err)
+		}
 	}
 
 	// PHASE 5: Set up the node bootstrap tokens
@@ -557,12 +549,9 @@ func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
 		return dryrunutil.NewWaiter()
 	}
 
+	// TODO: List images locally using `crictl` and pull in preflight checks if not available
+	// When we do that, we can always assume the images exist at this point and have a shorter timeout.
 	timeout := 30 * time.Minute
-
-	// No need for a large timeout if we don't expect downloads
-	if i.cfg.ImagePullPolicy == v1.PullNever {
-		timeout = 60 * time.Second
-	}
 	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 
@@ -577,14 +566,7 @@ func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
-		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10255/healthz"); err != nil {
-			errC <- err
-		}
-	}(errorChan, waiter)
-
-	go func(errC chan error, waiter apiclient.Waiter) {
-		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
-		if err := waiter.WaitForHealthyKubelet(60*time.Second, "http://localhost:10255/healthz/syncloop"); err != nil {
+		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10248/healthz"); err != nil {
 			errC <- err
 		}
 	}(errorChan, waiter)

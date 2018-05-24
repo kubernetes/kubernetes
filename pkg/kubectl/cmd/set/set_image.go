@@ -29,10 +29,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -40,7 +41,7 @@ import (
 type SetImageOptions struct {
 	resource.FilenameOptions
 
-	PrintFlags  *printers.PrintFlags
+	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
 	Infos        []*resource.Info
@@ -49,12 +50,12 @@ type SetImageOptions struct {
 	All          bool
 	Output       string
 	Local        bool
-	ResolveImage func(in string) (string, error)
+	ResolveImage ImageResolver
 
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
 
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
 	ContainerImages        map[string]string
 
@@ -87,7 +88,7 @@ var (
 
 func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 	return &SetImageOptions{
-		PrintFlags:  printers.NewPrintFlags("image updated"),
+		PrintFlags:  genericclioptions.NewPrintFlags("image updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -134,10 +135,10 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return err
 	}
 
-	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
+	o.UpdatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.ResolveImage = f.ResolveImage
+	o.ResolveImage = resolveImageFunc
 
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")
@@ -161,7 +162,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		WithScheme(scheme.Scheme, scheme.Registry.RegisteredGroupVersions()...).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -274,21 +275,20 @@ func (o *SetImageOptions) Run() error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(patch.Info.Object, o.Out); err != nil {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
 		}
 
 		// patch the change
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
-		if err := o.PrintObj(info.Object, o.Out); err != nil {
+		if err := o.PrintObj(actual, o.Out); err != nil {
 			return err
 		}
 	}
@@ -309,4 +309,14 @@ func getResourcesAndImages(args []string) (resources []string, containerImages m
 func hasWildcardKey(containerImages map[string]string) bool {
 	_, ok := containerImages["*"]
 	return ok
+}
+
+// ImageResolver is a func that receives an image name, and
+// resolves it to an appropriate / compatible image name.
+// Adds flexibility for future image resolving methods.
+type ImageResolver func(in string) (string, error)
+
+// implements ImageResolver
+func resolveImageFunc(in string) (string, error) {
+	return in, nil
 }

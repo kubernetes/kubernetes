@@ -196,7 +196,7 @@ type KubeletFlags struct {
 	// enable gathering custom metrics.
 	EnableCustomMetrics bool
 	// allowPrivileged enables containers to request privileged mode.
-	// Defaults to false.
+	// Defaults to true.
 	AllowPrivileged bool
 	// hostNetworkSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use of host network. Defaults to "*". Valid
@@ -242,8 +242,10 @@ func NewKubeletFlags() *KubeletFlags {
 		HostNetworkSources:  []string{kubetypes.AllSource},
 		HostPIDSources:      []string{kubetypes.AllSource},
 		HostIPCSources:      []string{kubetypes.AllSource},
-		// TODO(#56523): default CAdvisorPort to 0 (disabled) and deprecate it
-		CAdvisorPort: 4194,
+		// TODO(#56523:v1.12.0): Remove --cadvisor-port, it has been deprecated since v1.10
+		CAdvisorPort: 0,
+		// TODO(#58010:v1.13.0): Remove --allow-privileged, it is deprecated
+		AllowPrivileged: true,
 	}
 }
 
@@ -398,7 +400,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "")
 	fs.MarkDeprecated("experimental-bootstrap-kubeconfig", "Use --bootstrap-kubeconfig")
 	fs.Int32Var(&f.CAdvisorPort, "cadvisor-port", f.CAdvisorPort, "The port of the localhost cAdvisor endpoint (set to 0 to disable)")
-	fs.MarkDeprecated("cadvisor-port", "The default will change to 0 (disabled) in 1.12, and the cadvisor port will be removed entirely in 1.13")
+	fs.MarkDeprecated("cadvisor-port", "The default will change to 0 (disabled) in 1.11, and the cadvisor port will be removed entirely in 1.12")
 	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxPerPodContainerCount, "maximum-dead-containers-per-container", f.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
@@ -416,8 +418,8 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
 	fs.BoolVar(&f.EnableCustomMetrics, "enable-custom-metrics", f.EnableCustomMetrics, "Support for gathering custom metrics.")
 	fs.MarkDeprecated("enable-custom-metrics", "will be removed in a future version")
-	// TODO(#58010:v1.12.0): Remove --allow-privileged, it is deprecated
-	fs.BoolVar(&f.AllowPrivileged, "allow-privileged", f.AllowPrivileged, "If true, allow containers to request privileged mode.")
+	// TODO(#58010:v1.13.0): Remove --allow-privileged, it is deprecated
+	fs.BoolVar(&f.AllowPrivileged, "allow-privileged", f.AllowPrivileged, "If true, allow containers to request privileged mode. Default: true")
 	fs.MarkDeprecated("allow-privileged", "will be removed in a future version")
 	// TODO(#58010:v1.12.0): Remove --host-network-sources, it is deprecated
 	fs.StringSliceVar(&f.HostNetworkSources, "host-network-sources", f.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network.")
@@ -539,8 +541,8 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.BoolVar(&c.MakeIPTablesUtilChains, "make-iptables-util-chains", c.MakeIPTablesUtilChains, "If true, kubelet will ensure iptables utility rules are present on host.")
 	fs.Int32Var(&c.IPTablesMasqueradeBit, "iptables-masquerade-bit", c.IPTablesMasqueradeBit, "The bit of the fwmark space to mark packets for SNAT. Must be within the range [0, 31]. Please match this parameter with corresponding parameter in kube-proxy.")
 	fs.Int32Var(&c.IPTablesDropBit, "iptables-drop-bit", c.IPTablesDropBit, "The bit of the fwmark space to mark packets for dropping. Must be within the range [0, 31].")
-	fs.StringVar(&c.ContainerLogMaxSize, "container-log-max-size", c.ContainerLogMaxSize, "<Warning: Alpha feature> Set the maximum size (e.g. 10Mi) of container log file before it is rotated.")
-	fs.Int32Var(&c.ContainerLogMaxFiles, "container-log-max-files", c.ContainerLogMaxFiles, "<Warning: Alpha feature> Set the maximum number of container log files that can be present for a container. The number must be >= 2.")
+	fs.StringVar(&c.ContainerLogMaxSize, "container-log-max-size", c.ContainerLogMaxSize, "<Warning: Alpha feature> Set the maximum size (e.g. 10Mi) of container log file before it is rotated. This flag can only be used with --container-runtime=remote.")
+	fs.Int32Var(&c.ContainerLogMaxFiles, "container-log-max-files", c.ContainerLogMaxFiles, "<Warning: Alpha feature> Set the maximum number of container log files that can be present for a container. The number must be >= 2. This flag can only be used with --container-runtime=remote.")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.Int64Var(&c.MaxOpenFiles, "max-open-files", c.MaxOpenFiles, "Number of files that can be opened by Kubelet process.")

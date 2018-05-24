@@ -46,7 +46,7 @@ func (d *azureDiskDeleter) GetPath() string {
 }
 
 func (d *azureDiskDeleter) Delete() error {
-	volumeSource, err := getVolumeSource(d.spec)
+	volumeSource, _, err := getVolumeSource(d.spec)
 	if err != nil {
 		return err
 	}

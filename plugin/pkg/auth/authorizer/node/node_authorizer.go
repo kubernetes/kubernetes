@@ -21,11 +21,11 @@ import (
 
 	"github.com/golang/glog"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -49,14 +49,14 @@ import (
 type NodeAuthorizer struct {
 	graph      *Graph
 	identifier nodeidentifier.NodeIdentifier
-	nodeRules  []rbacapi.PolicyRule
+	nodeRules  []rbacv1.PolicyRule
 
 	// allows overriding for testing
 	features utilfeature.FeatureGate
 }
 
 // NewAuthorizer returns a new node authorizer
-func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules []rbacapi.PolicyRule) authorizer.Authorizer {
+func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules []rbacv1.PolicyRule) authorizer.Authorizer {
 	return &NodeAuthorizer{
 		graph:      graph,
 		identifier: identifier,
@@ -91,9 +91,9 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 		requestResource := schema.GroupResource{Group: attrs.GetAPIGroup(), Resource: attrs.GetResource()}
 		switch requestResource {
 		case secretResource:
-			return r.authorizeGet(nodeName, secretVertexType, attrs)
+			return r.authorizeReadNamespacedObject(nodeName, secretVertexType, attrs)
 		case configMapResource:
-			return r.authorizeGet(nodeName, configMapVertexType, attrs)
+			return r.authorizeReadNamespacedObject(nodeName, configMapVertexType, attrs)
 		case pvcResource:
 			if r.features.Enabled(features.ExpandPersistentVolumes) {
 				if attrs.GetSubresource() == "status" {
@@ -150,6 +150,24 @@ func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, 
 	if len(attrs.GetSubresource()) > 0 {
 		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot get subresource", nil
+	}
+	return r.authorize(nodeName, startingType, attrs)
+}
+
+// authorizeReadNamespacedObject authorizes "get", "list" and "watch" requests to single objects of a
+// specified types if they are related to the specified node.
+func (r *NodeAuthorizer) authorizeReadNamespacedObject(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	if attrs.GetVerb() != "get" && attrs.GetVerb() != "list" && attrs.GetVerb() != "watch" {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only read resources of this type", nil
+	}
+	if len(attrs.GetSubresource()) > 0 {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "cannot read subresource", nil
+	}
+	if len(attrs.GetNamespace()) == 0 {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only read namespaced object of this type", nil
 	}
 	return r.authorize(nodeName, startingType, attrs)
 }

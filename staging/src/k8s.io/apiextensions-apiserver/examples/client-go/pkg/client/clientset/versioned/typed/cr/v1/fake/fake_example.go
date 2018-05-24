@@ -62,7 +62,7 @@ func (c *FakeExamples) List(opts v1.ListOptions) (result *cr_v1.ExampleList, err
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &cr_v1.ExampleList{}
+	list := &cr_v1.ExampleList{ListMeta: obj.(*cr_v1.ExampleList).ListMeta}
 	for _, item := range obj.(*cr_v1.ExampleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

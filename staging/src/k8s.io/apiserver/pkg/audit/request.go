@@ -171,7 +171,12 @@ func LogResponseObject(ae *auditinternal.Event, obj runtime.Object, gv schema.Gr
 		return
 	}
 	if status, ok := obj.(*metav1.Status); ok {
-		ae.ResponseStatus = status
+		// selectively copy the bounded fields.
+		ae.ResponseStatus = &metav1.Status{
+			Status: status.Status,
+			Reason: status.Reason,
+			Code:   status.Code,
+		}
 	}
 
 	if ae.Level.Less(auditinternal.LevelRequestResponse) {

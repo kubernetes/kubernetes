@@ -424,6 +424,14 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("scheduling.k8s.io", "v1alpha1", "priorityclasses"): {
 		stub:             `{"metadata":{"name":"pc1"},"Value":1000}`,
 		expectedEtcdPath: "/registry/priorityclasses/pc1",
+		expectedGVK:      gvkP("scheduling.k8s.io", "v1beta1", "PriorityClass"),
+	},
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/scheduling/v1beta1
+	gvr("scheduling.k8s.io", "v1beta1", "priorityclasses"): {
+		stub:             `{"metadata":{"name":"pc2"},"Value":1000}`,
+		expectedEtcdPath: "/registry/priorityclasses/pc2",
 	},
 	// --
 }
@@ -437,7 +445,6 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	gvk("", "v1", "RangeAllocation"),     // stored in various places in etcd but cannot be directly created
 	gvk("", "v1", "ComponentStatus"),     // status info not stored in etcd
 	gvk("", "v1", "SerializedReference"), // used for serilization, not stored in etcd
-	gvk("", "v1", "NodeConfigSource"),    // subfield of node.spec, but shouldn't be directly created
 	gvk("", "v1", "PodStatusResult"),     // wrapper object not stored in etcd
 	// --
 

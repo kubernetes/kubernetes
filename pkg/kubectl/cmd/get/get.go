@@ -20,12 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
+	"net/url"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-
-	"net/url"
 
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -43,9 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -139,8 +136,9 @@ func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptio
 		PrintFlags: NewGetPrintFlags(),
 		CmdParent:  parent,
 
-		IOStreams: streams,
-		ChunkSize: 500,
+		IOStreams:   streams,
+		ChunkSize:   500,
+		ServerPrint: true,
 	}
 }
 
@@ -174,8 +172,8 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
-	addOpenAPIPrintColumnFlags(cmd)
-	addServerPrintColumnFlags(cmd)
+	addOpenAPIPrintColumnFlags(cmd, o)
+	addServerPrintColumnFlags(cmd, o)
 	cmd.Flags().BoolVar(&o.Export, "export", o.Export, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	return cmd
@@ -189,8 +187,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		}
 		return nil
 	}
-
-	o.ServerPrint = cmdutil.GetFlagBool(cmd, useServerPrintColumns)
 
 	var err error
 	o.Namespace, o.ExplicitNamespace, err = f.DefaultNamespace()
@@ -222,8 +218,10 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 
 	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
-	o.PrintWithOpenAPICols = cmdutil.GetFlagBool(cmd, useOpenAPIPrintColumnFlagLabel)
 
+	if resource.MultipleTypesRequested(args) {
+		o.PrintFlags.EnsureWithKind()
+	}
 	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
 		printFlags := o.PrintFlags.Copy()
@@ -234,9 +232,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 					printFlags.UseOpenAPIColumns(apiSchema, mapping)
 				}
 			}
-			if resource.MultipleTypesRequested(args) {
-				printFlags.EnsureWithKind(mapping.GroupVersionKind.GroupKind())
-			}
+			printFlags.SetKind(mapping.GroupVersionKind.GroupKind())
 		}
 		if withNamespace {
 			printFlags.EnsureWithNamespace()
@@ -246,6 +242,8 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		if err != nil {
 			return nil, err
 		}
+
+		printer = maybeWrapSortingPrinter(printer, isSorting)
 		return printer.PrintObj, nil
 	}
 
@@ -421,6 +419,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			}
 
 			lastMapping = mapping
+		}
+
+		// ensure a versioned object is passed to the custom-columns printer
+		// if we are using OpenAPI columns to print
+		if o.PrintWithOpenAPICols {
+			printer.PrintObj(info.Object, w)
+			continue
 		}
 
 		internalObj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
@@ -721,12 +726,12 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 }
 
-func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, false, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
+func addOpenAPIPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
+	cmd.Flags().BoolVar(&opt.PrintWithOpenAPICols, useOpenAPIPrintColumnFlagLabel, opt.PrintWithOpenAPICols, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
 }
 
-func addServerPrintColumnFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(useServerPrintColumns, true, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
+func addServerPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
+	cmd.Flags().BoolVar(&opt.ServerPrint, useServerPrintColumns, opt.ServerPrint, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
 }
 
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
@@ -737,46 +742,12 @@ func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 	return cmdutil.GetFlagString(cmd, "output") != ""
 }
 
-// outputOptsForMappingFromOpenAPI looks for the output format metatadata in the
-// openapi schema and modifies the passed print options for the mapping if found.
-func updatePrintOptionsForOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping, printOpts *printers.PrintOptions) bool {
-
-	// user has not specified any output format, check if OpenAPI has
-	// default specification to print this resource type
-	api, err := f.OpenAPISchema()
-	if err != nil {
-		// Error getting schema
-		return false
+func maybeWrapSortingPrinter(printer printers.ResourcePrinter, sortBy string) printers.ResourcePrinter {
+	if len(sortBy) != 0 {
+		return &kubectl.SortingPrinter{
+			Delegate:  printer,
+			SortField: fmt.Sprintf("%s", sortBy),
+		}
 	}
-	// Found openapi metadata for this resource
-	schema := api.LookupResource(mapping.GroupVersionKind)
-	if schema == nil {
-		// Schema not found, return empty columns
-		return false
-	}
-
-	columns, found := openapi.GetPrintColumns(schema.GetExtensions())
-	if !found {
-		// Extension not found, return empty columns
-		return false
-	}
-
-	return outputOptsFromStr(columns, printOpts)
-}
-
-// outputOptsFromStr parses the print-column metadata and generates printer.OutputOptions object.
-func outputOptsFromStr(columnStr string, printOpts *printers.PrintOptions) bool {
-	if columnStr == "" {
-		return false
-	}
-	parts := strings.SplitN(columnStr, "=", 2)
-	if len(parts) < 2 {
-		return false
-	}
-
-	printOpts.OutputFormatType = parts[0]
-	printOpts.OutputFormatArgument = parts[1]
-	printOpts.AllowMissingKeys = true
-
-	return true
+	return printer
 }

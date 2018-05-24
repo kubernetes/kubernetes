@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,23 +19,36 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	utilsexec "k8s.io/utils/exec"
 )
+
+const (
+	masterConfig = "MasterConfiguration"
+	nodeConfig   = "NodeConfiguration"
+	sillyToken   = "abcdef.0123456789abcdef"
+)
+
+var availableAPIObjects = []string{masterConfig, nodeConfig}
 
 // NewCmdConfig returns cobra.Command for "kubeadm config" command
 func NewCmdConfig(out io.Writer) *cobra.Command {
@@ -60,10 +73,69 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster.")
 
+	cmd.AddCommand(NewCmdConfigPrintDefault(out))
 	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
-
+	cmd.AddCommand(NewCmdConfigImages(out))
 	return cmd
+}
+
+// NewCmdConfigPrintDefault returns cobra.Command for "kubeadm config print-default" command
+func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
+	apiObjects := []string{}
+	cmd := &cobra.Command{
+		Use:     "print-default",
+		Aliases: []string{"print-defaults"},
+		Short:   "Print the default values for a kubeadm configuration object.",
+		Long: fmt.Sprintf(dedent.Dedent(`
+			This command prints the default MasterConfiguration object that is used for 'kubeadm init' and 'kubeadm upgrade',
+			and the default NodeConfiguration object that is used for 'kubeadm join'.
+
+			Note that sensitive values like the Bootstrap Token fields are replaced with silly values like %q in order to pass validation but
+			not perform the real computation for creating a token.
+		`), sillyToken),
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(apiObjects) == 0 {
+				apiObjects = availableAPIObjects
+			}
+			for i, apiObject := range apiObjects {
+				if i > 0 {
+					fmt.Fprintln(out, "---")
+				}
+
+				cfgBytes, err := getDefaultAPIObjectBytes(apiObject)
+				kubeadmutil.CheckErr(err)
+				// Print the API object byte array
+				fmt.Fprintf(out, "%s", cfgBytes)
+			}
+		},
+	}
+	cmd.Flags().StringSliceVar(&apiObjects, "api-objects", apiObjects,
+		fmt.Sprintf("A comma-separated list for API objects to print the default values for. Available values: %v. This flag unset means 'print all known objects'", availableAPIObjects))
+	return cmd
+}
+
+func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
+	if apiObject == masterConfig {
+
+		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha2.MasterConfiguration{
+			Token: sillyToken,
+		})
+		kubeadmutil.CheckErr(err)
+
+		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
+	}
+	if apiObject == nodeConfig {
+		internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha2.NodeConfiguration{
+			Token: sillyToken,
+			DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
+			DiscoveryTokenUnsafeSkipCAVerification: true,
+		})
+		kubeadmutil.CheckErr(err)
+
+		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
+	}
+	return []byte{}, fmt.Errorf("--api-object needs to be one of %v", availableAPIObjects)
 }
 
 // NewCmdConfigUpload returns cobra.Command for "kubeadm config upload" command
@@ -125,7 +197,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 			// The default configuration is empty; everything should come from the file on disk
 			glog.V(1).Infoln("[config] creating empty default configuration")
-			defaultcfg := &kubeadmapiext.MasterConfiguration{}
+			defaultcfg := &kubeadmapiv1alpha2.MasterConfiguration{}
 			// Upload the configuration using the file; don't care about the defaultcfg really
 			glog.V(1).Infof("[config] uploading configuration")
 			err = uploadConfiguration(client, cfgPath, defaultcfg)
@@ -138,8 +210,8 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiext.MasterConfiguration{}
-	legacyscheme.Scheme.Default(cfg)
+	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var featureGatesString string
 
@@ -188,7 +260,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 }
 
 // uploadConfiguration handles the uploading of the configuration internally
-func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiext.MasterConfiguration) error {
+func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1alpha2.MasterConfiguration) error {
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk
@@ -200,4 +272,136 @@ func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg 
 
 	// Then just call the uploadconfig phase to do the rest of the work
 	return uploadconfig.UploadConfiguration(internalcfg, client)
+}
+
+// NewCmdConfigImages returns the "config images" command
+func NewCmdConfigImages(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "images",
+		Short: "Interact with container images used by kubeadm.",
+		RunE:  cmdutil.SubCmdRunE("images"),
+	}
+	cmd.AddCommand(NewCmdConfigImagesList(out))
+	cmd.AddCommand(NewCmdConfigImagesPull())
+	return cmd
+}
+
+// NewCmdConfigImagesPull returns the `config images pull` command
+func NewCmdConfigImagesPull() *cobra.Command {
+	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	kubeadmscheme.Scheme.Default(cfg)
+	var cfgPath, featureGatesString string
+	var err error
+	cmd := &cobra.Command{
+		Use:   "pull",
+		Short: "Pull images used by kubeadm.",
+		Run: func(_ *cobra.Command, _ []string) {
+			cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
+			kubeadmutil.CheckErr(err)
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+			kubeadmutil.CheckErr(err)
+			puller, err := images.NewImagePuller(utilsexec.New(), internalcfg.GetCRISocket())
+			kubeadmutil.CheckErr(err)
+			imagesPull := NewImagesPull(puller, images.GetAllImages(internalcfg))
+			kubeadmutil.CheckErr(imagesPull.PullAll())
+		},
+	}
+	AddImagesCommonConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
+	return cmd
+}
+
+// ImagesPull is the struct used to hold information relating to image pulling
+type ImagesPull struct {
+	puller images.Puller
+	images []string
+}
+
+// NewImagesPull initializes and returns the `config images pull` command
+func NewImagesPull(puller images.Puller, images []string) *ImagesPull {
+	return &ImagesPull{
+		puller: puller,
+		images: images,
+	}
+}
+
+// PullAll pulls all images that the ImagesPull knows about
+func (ip *ImagesPull) PullAll() error {
+	for _, image := range ip.images {
+		if err := ip.puller.Pull(image); err != nil {
+			return fmt.Errorf("failed to pull image %q: %v", image, err)
+		}
+		glog.Infof("[config/images] Pulled %s\n", image)
+	}
+	return nil
+}
+
+// NewCmdConfigImagesList returns the "kubeadm config images list" command
+func NewCmdConfigImagesList(out io.Writer) *cobra.Command {
+	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	kubeadmscheme.Scheme.Default(cfg)
+	var cfgPath, featureGatesString string
+	var err error
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "Print a list of images kubeadm will use. The configuration file is used in case any images or image repositories are customized.",
+		Run: func(_ *cobra.Command, _ []string) {
+			cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
+			kubeadmutil.CheckErr(err)
+			imagesList, err := NewImagesList(cfgPath, cfg)
+			kubeadmutil.CheckErr(err)
+			kubeadmutil.CheckErr(imagesList.Run(out))
+		},
+	}
+	AddImagesCommonConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
+	AddImagesListFlags(cmd.PersistentFlags(), &cfgPath)
+
+	return cmd
+}
+
+// NewImagesList returns the underlying struct for the "kubeadm config images list" command
+func NewImagesList(cfgPath string, cfg *kubeadmapiv1alpha2.MasterConfiguration) (*ImagesList, error) {
+	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert cfg to an internal cfg: %v", err)
+	}
+
+	return &ImagesList{
+		cfg: internalcfg,
+	}, nil
+}
+
+// ImagesList defines the struct used for "kubeadm config images list"
+type ImagesList struct {
+	cfg *kubeadmapi.MasterConfiguration
+}
+
+// Run runs the images command and writes the result to the io.Writer passed in
+func (i *ImagesList) Run(out io.Writer) error {
+	imgs := images.GetAllImages(i.cfg)
+	for _, img := range imgs {
+		fmt.Fprintln(out, img)
+	}
+
+	return nil
+}
+
+// AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
+func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterConfiguration, featureGatesString *string) {
+	flagSet.StringVar(
+		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
+		`Choose a specific Kubernetes version for the control plane.`,
+	)
+	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
+		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
+}
+
+// AddImagesListFlags adds the flag that defines the location of the config file
+func AddImagesListFlags(flagSet *flag.FlagSet, cfgPath *string) {
+	flagSet.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file.")
+}
+
+// AddImagesPullFlags adds flags related to the `config images pull` command
+func AddImagesPullFlags(flagSet *flag.FlagSet, criSocketPath *string) {
+	flagSet.StringVar(criSocketPath, "cri-socket-path", *criSocketPath, "Path to the CRI socket.")
 }

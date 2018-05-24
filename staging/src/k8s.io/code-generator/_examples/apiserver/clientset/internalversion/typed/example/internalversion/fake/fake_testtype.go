@@ -62,7 +62,7 @@ func (c *FakeTestTypes) List(opts v1.ListOptions) (result *example.TestTypeList,
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &example.TestTypeList{}
+	list := &example.TestTypeList{ListMeta: obj.(*example.TestTypeList).ListMeta}
 	for _, item := range obj.(*example.TestTypeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

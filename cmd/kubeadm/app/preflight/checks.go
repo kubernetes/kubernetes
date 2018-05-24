@@ -38,22 +38,19 @@ import (
 	"github.com/PuerkitoBio/purell"
 	"github.com/blang/semver"
 	"github.com/golang/glog"
-	"github.com/spf13/pflag"
 
 	"net/url"
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
-	apiservoptions "k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	schedulerapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
+	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
+	"k8s.io/kubernetes/pkg/util/procfs"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -63,6 +60,8 @@ import (
 const (
 	bridgenf                    = "/proc/sys/net/bridge/bridge-nf-call-iptables"
 	bridgenf6                   = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
+	ipv4Forward                 = "/proc/sys/net/ipv4/ip_forward"
+	ipv6DefaultForwarding       = "/proc/sys/net/ipv6/conf/default/forwarding"
 	externalEtcdRequestTimeout  = time.Duration(10 * time.Second)
 	externalEtcdRequestRetries  = 3
 	externalEtcdRequestInterval = time.Duration(5 * time.Second)
@@ -107,7 +106,7 @@ func (criCheck CRICheck) Check() (warnings, errors []error) {
 		errors = append(errors, fmt.Errorf("unable to find command crictl: %s", err))
 		return warnings, errors
 	}
-	if err := criCheck.exec.Command(fmt.Sprintf("%s -r %s info", crictlPath, criCheck.socket)).Run(); err != nil {
+	if err := criCheck.exec.Command(crictlPath, "-r", criCheck.socket, "info").Run(); err != nil {
 		errors = append(errors, fmt.Errorf("unable to check if the container runtime at %q is running: %s", criCheck.socket, err))
 		return warnings, errors
 	}
@@ -509,56 +508,6 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
-// ExtraArgsCheck checks if arguments are valid.
-type ExtraArgsCheck struct {
-	APIServerExtraArgs         map[string]string
-	ControllerManagerExtraArgs map[string]string
-	SchedulerExtraArgs         map[string]string
-}
-
-// Name will return ExtraArgs as name for ExtraArgsCheck
-func (ExtraArgsCheck) Name() string {
-	return "ExtraArgs"
-}
-
-// Check validates additional arguments of the control plane components.
-func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
-	glog.V(1).Infoln("validating additional arguments of the control plane components")
-	argsCheck := func(name string, args map[string]string, f *pflag.FlagSet) []error {
-		errs := []error{}
-		for k, v := range args {
-			if err := f.Set(k, v); err != nil {
-				errs = append(errs, fmt.Errorf("%s: failed to parse extra argument --%s=%s", name, k, v))
-			}
-		}
-		return errs
-	}
-
-	warnings = []error{}
-	if len(eac.APIServerExtraArgs) > 0 {
-		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		s := apiservoptions.NewServerRunOptions()
-		s.AddFlags(flags)
-		warnings = append(warnings, argsCheck("kube-apiserver", eac.APIServerExtraArgs, flags)...)
-	}
-	if len(eac.ControllerManagerExtraArgs) > 0 {
-		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		s := cmoptions.NewKubeControllerManagerOptions()
-		s.AddFlags(flags, []string{}, []string{})
-		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
-	}
-	if len(eac.SchedulerExtraArgs) > 0 {
-		opts, err := schedulerapp.NewOptions()
-		if err != nil {
-			warnings = append(warnings, err)
-		}
-		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		opts.AddFlags(flags)
-		warnings = append(warnings, argsCheck("kube-scheduler", eac.SchedulerExtraArgs, flags)...)
-	}
-	return warnings, nil
-}
-
 // SystemVerificationCheck defines struct used for for running the system verification node check in test/e2e_node/system
 type SystemVerificationCheck struct {
 	CRISocket string
@@ -867,6 +816,33 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 	return err
 }
 
+// ResolveCheck tests for potential issues related to the system resolver configuration
+type ResolveCheck struct{}
+
+// Name returns label for ResolveCheck
+func (ResolveCheck) Name() string {
+	return "Resolve"
+}
+
+// Check validates the system resolver configuration
+func (ResolveCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("validating the system resolver configuration")
+
+	warnings = []error{}
+
+	// procfs.PidOf only returns an error if the string passed is empty
+	// or there is an issue compiling the regex, so we can ignore it here
+	pids, _ := procfs.PidOf("systemd-resolved")
+	if len(pids) > 0 {
+		warnings = append(warnings, fmt.Errorf(
+			"systemd-resolved was detected, for cluster dns resolution to work "+
+				"properly --resolv-conf=/run/systemd/resolve/resolv.conf must be set "+
+				"for the kubelet. (/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)\n"))
+	}
+
+	return warnings, errors
+}
+
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
 func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
@@ -885,16 +861,18 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestsDir)},
-		ExtraArgsCheck{
-			APIServerExtraArgs:         cfg.APIServerExtraArgs,
-			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
-			SchedulerExtraArgs:         cfg.SchedulerExtraArgs,
-		},
 		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
 	checks = addCommonChecks(execer, cfg, checks)
+
+	// Check ipvs required kernel module once we use ipvs kube-proxy mode
+	if cfg.KubeProxy.Config.Mode == ipvsutil.IPVSProxyMode {
+		checks = append(checks,
+			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
+		)
+	}
 
 	if len(cfg.Etcd.Endpoints) == 0 {
 		// Only do etcd related checks when no external endpoints were specified
@@ -918,20 +896,11 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		)
 	}
 
-	// Check the config for authorization mode
-	for _, authzMode := range cfg.AuthorizationModes {
-		switch authzMode {
-		case authzmodes.ModeABAC:
-			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationPolicyPath})
-		case authzmodes.ModeWebhook:
-			checks = append(checks, FileExistingCheck{Path: kubeadmconstants.AuthorizationWebhookConfigPath})
-		}
-	}
-
 	if ip := net.ParseIP(cfg.API.AdvertiseAddress); ip != nil {
 		if ip.To4() == nil && ip.To16() != nil {
 			checks = append(checks,
 				FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+				FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
 			)
 		}
 	}
@@ -950,28 +919,31 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
+		ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 	}
 	checks = addCommonChecks(execer, cfg, checks)
 
-	var bridgenf6Check Checker
+	addIPv6Checks := false
 	for _, server := range cfg.DiscoveryTokenAPIServers {
 		ipstr, _, err := net.SplitHostPort(server)
 		if err == nil {
 			checks = append(checks,
 				HTTPProxyCheck{Proto: "https", Host: ipstr},
 			)
-			if bridgenf6Check == nil {
+			if !addIPv6Checks {
 				if ip := net.ParseIP(ipstr); ip != nil {
 					if ip.To4() == nil && ip.To16() != nil {
-						// This check should be added only once
-						bridgenf6Check = FileContentCheck{Path: bridgenf6, Content: []byte{'1'}}
+						addIPv6Checks = true
 					}
 				}
 			}
 		}
 	}
-	if bridgenf6Check != nil {
-		checks = append(checks, bridgenf6Check)
+	if addIPv6Checks {
+		checks = append(checks,
+			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
+		)
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
@@ -1000,6 +972,7 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 	if runtime.GOOS == "linux" {
 		checks = append(checks,
 			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
 			SwapCheck{},
 			InPathCheck{executable: "ip", mandatory: true, exec: execer},
 			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
@@ -1010,7 +983,8 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 			InPathCheck{executable: "socat", mandatory: false, exec: execer},
 			InPathCheck{executable: "tc", mandatory: false, exec: execer},
 			InPathCheck{executable: "touch", mandatory: false, exec: execer},
-			criCtlChecker)
+			criCtlChecker,
+			ResolveCheck{})
 	}
 	checks = append(checks,
 		SystemVerificationCheck{CRISocket: cfg.GetCRISocket()},
@@ -1078,10 +1052,11 @@ func TryStartKubelet(ignorePreflightErrors sets.String) {
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		glog.Infoln("[preflight] no supported init system detected, won't ensure kubelet is running.")
-	} else if initSystem.ServiceExists("kubelet") && !initSystem.ServiceIsActive("kubelet") {
+	} else if initSystem.ServiceExists("kubelet") {
 
-		glog.Infoln("[preflight] starting the kubelet service")
-		if err := initSystem.ServiceStart("kubelet"); err != nil {
+		glog.Infoln("[preflight] Activating the kubelet service")
+		// This runs "systemctl daemon-reload && systemctl restart kubelet"
+		if err := initSystem.ServiceRestart("kubelet"); err != nil {
 			glog.Warningf("[preflight] unable to start the kubelet service: [%v]\n", err)
 			glog.Warningf("[preflight] please ensure kubelet is running manually.")
 		}

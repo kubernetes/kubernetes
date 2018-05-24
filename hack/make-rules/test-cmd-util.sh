@@ -1185,6 +1185,39 @@ run_kubectl_apply_deployments_tests() {
   set +o errexit
 }
 
+# Runs tests for kubectl alpha diff
+run_kubectl_diff_tests() {
+    set -o nounset
+    set -o errexit
+
+    create_and_use_new_namespace
+    kube::log::status "Testing kubectl alpha diff"
+
+    kubectl apply -f hack/testdata/pod.yaml
+
+    # Ensure that selfLink has been added, and shown in the diff
+    output_message=$(kubectl alpha diff -f hack/testdata/pod.yaml)
+    kube::test::if_has_string "${output_message}" 'selfLink'
+    output_message=$(kubectl alpha diff LOCAL LIVE -f hack/testdata/pod.yaml)
+    kube::test::if_has_string "${output_message}" 'selfLink'
+    output_message=$(kubectl alpha diff LOCAL MERGED -f hack/testdata/pod.yaml)
+    kube::test::if_has_string "${output_message}" 'selfLink'
+
+    output_message=$(kubectl alpha diff MERGED MERGED -f hack/testdata/pod.yaml)
+    kube::test::if_empty_string "${output_message}"
+    output_message=$(kubectl alpha diff LIVE LIVE -f hack/testdata/pod.yaml)
+    kube::test::if_empty_string "${output_message}"
+    output_message=$(kubectl alpha diff LAST LAST -f hack/testdata/pod.yaml)
+    kube::test::if_empty_string "${output_message}"
+    output_message=$(kubectl alpha diff LOCAL LOCAL -f hack/testdata/pod.yaml)
+    kube::test::if_empty_string "${output_message}"
+
+    kubectl delete -f  hack/testdata/pod.yaml
+
+    set +o nounset
+    set +o errexit
+}
+
 # Runs tests for --save-config tests.
 run_save_config_tests() {
   set -o nounset
@@ -2349,7 +2382,11 @@ run_namespace_tests() {
   # Post-condition: namespace 'my-namespace' is created.
   kube::test::get_object_assert 'namespaces/my-namespace' "{{$id_field}}" 'my-namespace'
   # Clean up
-  kubectl delete namespace my-namespace
+  kubectl delete namespace my-namespace --wait=false
+  # make sure that wait properly waits for finalization
+  kubectl wait --for=delete ns/my-namespace
+  output_message=$(! kubectl get ns/my-namespace 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" ' not found'
 
   ######################
   # Pods in Namespaces #
@@ -3769,6 +3806,8 @@ run_clusterroles_tests() {
   kubectl create "${kube_flags[@]}" clusterrole url-reader --verb=get --non-resource-url=/logs/* --non-resource-url=/healthz/*
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:'
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.nonResourceURLs}}{{.}}:{{end}}{{end}}" '/logs/\*:/healthz/\*:'
+  kubectl create "${kube_flags[@]}" clusterrole aggregation-reader --aggregation-rule="foo1=foo2"
+  kube::test::get_object_assert clusterrole/aggregation-reader "{{$id_field}}" 'aggregation-reader'
 
   # test `kubectl create clusterrolebinding`
   # test `kubectl set subject clusterrolebinding`
@@ -4617,6 +4656,17 @@ __EOF__
 }
 __EOF__
 
+  # taint/untaint
+  # Pre-condition: node has no taints
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.taints}}" '<no value>'
+  # taint can add a taint
+  kubectl taint node 127.0.0.1 dedicated=foo:PreferNoSchedule
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{.effect}}{{end}}' 'PreferNoSchedule'
+  # taint can remove a taint
+  kubectl taint node 127.0.0.1 dedicated-
+  # Post-condition: node has no taints
+  kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.taints}}" '<no value>'
+
   ### kubectl cordon update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
@@ -4971,6 +5021,11 @@ runTests() {
   if kube::test::if_supports_resource "${deployments}" ; then
     record_command run_kubectl_apply_deployments_tests
   fi
+
+  ################
+  # Kubectl diff #
+  ################
+  record_command run_kubectl_diff_tests
 
   ###############
   # Kubectl get #

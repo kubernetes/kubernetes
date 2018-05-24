@@ -673,7 +673,6 @@ function construct-kubelet-flags {
   if [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
     flags+=" --container-runtime=${CONTAINER_RUNTIME}"
   fi
-  # TODO(mtaufen): CONTAINER_RUNTIME_ENDPOINT seems unused; delete it?
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
     flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
   fi
@@ -865,6 +864,7 @@ ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-f
 ENABLE_PATCH_CONVERSION_DETECTOR: $(yaml-quote ${ENABLE_PATCH_CONVERSION_DETECTOR:-false})
 ADVANCED_AUDIT_POLICY: $(yaml-quote ${ADVANCED_AUDIT_POLICY:-})
 ADVANCED_AUDIT_BACKEND: $(yaml-quote ${ADVANCED_AUDIT_BACKEND:-log})
+ADVANCED_AUDIT_TRUNCATING_BACKEND: $(yaml-quote ${ADVANCED_AUDIT_TRUNCATING_BACKEND:-})
 ADVANCED_AUDIT_LOG_MODE: $(yaml-quote ${ADVANCED_AUDIT_LOG_MODE:-})
 ADVANCED_AUDIT_LOG_BUFFER_SIZE: $(yaml-quote ${ADVANCED_AUDIT_LOG_BUFFER_SIZE:-})
 ADVANCED_AUDIT_LOG_MAX_BATCH_SIZE: $(yaml-quote ${ADVANCED_AUDIT_LOG_MAX_BATCH_SIZE:-})
@@ -892,6 +892,7 @@ CONTAINER_RUNTIME_NAME: $(yaml-quote ${CONTAINER_RUNTIME_NAME:-})
 NODE_LOCAL_SSDS_EXT: $(yaml-quote ${NODE_LOCAL_SSDS_EXT:-})
 LOAD_IMAGE_COMMAND: $(yaml-quote ${LOAD_IMAGE_COMMAND:-})
 ZONE: $(yaml-quote ${ZONE})
+REGION: $(yaml-quote ${REGION})
 VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR})
 KUBELET_ARGS: $(yaml-quote ${KUBELET_ARGS})
 REQUIRE_METADATA_KUBELET_CONFIG_FILE: $(yaml-quote true)
@@ -1043,6 +1044,11 @@ EOF
     if [ -n "${ETCD_QUOTA_BACKEND_BYTES:-}" ]; then
       cat >>$file <<EOF
 ETCD_QUOTA_BACKEND_BYTES: $(yaml-quote ${ETCD_QUOTA_BACKEND_BYTES})
+EOF
+    fi
+    if [ -n "${ETCD_EXTRA_ARGS:-}" ]; then
+    cat >>$file <<EOF
+ETCD_EXTRA_ARGS: $(yaml-quote ${ETCD_EXTRA_ARGS})
 EOF
     fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then

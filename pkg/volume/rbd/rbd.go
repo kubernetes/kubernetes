@@ -232,6 +232,10 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 	if err != nil {
 		return nil, err
 	}
+	ams, err := getVolumeAccessModes(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	secretName, secretNs, err := getSecretNameAndNamespace(spec, pod.Namespace)
 	if err != nil {
@@ -255,12 +259,13 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 	}
 
 	return &rbdMounter{
-		rbd:     newRBD("", spec.Name(), img, pool, ro, plugin, &RBDUtil{}),
-		Mon:     mon,
-		Id:      id,
-		Keyring: keyring,
-		Secret:  secret,
-		fsType:  fstype,
+		rbd:         newRBD("", spec.Name(), img, pool, ro, plugin, &RBDUtil{}),
+		Mon:         mon,
+		Id:          id,
+		Keyring:     keyring,
+		Secret:      secret,
+		fsType:      fstype,
+		accessModes: ams,
 	}, nil
 }
 
@@ -319,6 +324,10 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 	if err != nil {
 		return nil, err
 	}
+	ams, err := getVolumeAccessModes(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	return &rbdMounter{
 		rbd:          newRBD(podUID, spec.Name(), img, pool, ro, plugin, manager),
@@ -328,6 +337,7 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 		Secret:       secret,
 		fsType:       fstype,
 		mountOptions: volutil.MountOptionFromSpec(spec),
+		accessModes:  ams,
 	}, nil
 }
 
@@ -764,6 +774,7 @@ type rbdMounter struct {
 	mountOptions  []string
 	imageFormat   string
 	imageFeatures []string
+	accessModes   []v1.PersistentVolumeAccessMode
 }
 
 var _ volume.Mounter = &rbdMounter{}
@@ -936,14 +947,20 @@ func (rbd *rbdDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
 	loop, err := volumepathhandler.BlockVolumePathHandler.GetLoopDevice(blkUtil, device)
 	if err != nil {
-		return fmt.Errorf("rbd: failed to get loopback for device: %v, err: %v", device, err)
+		if err.Error() != volumepathhandler.ErrDeviceNotFound {
+			return fmt.Errorf("rbd: failed to get loopback for device: %v, err: %v", device, err)
+		}
+		glog.Warning("rbd: loopback for device: % not found", device)
+	} else {
+		if len(loop) != 0 {
+			// Remove loop device before detaching volume since volume detach operation gets busy if volume is opened by loopback.
+			err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
+			if err != nil {
+				return fmt.Errorf("rbd: failed to remove loopback :%v, err: %v", loop, err)
+			}
+			glog.V(4).Infof("rbd: successfully removed loop device: %s", loop)
+		}
 	}
-	// Remove loop device before detaching volume since volume detach operation gets busy if volume is opened by loopback.
-	err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
-	if err != nil {
-		return fmt.Errorf("rbd: failed to remove loopback :%v, err: %v", loop, err)
-	}
-	glog.V(4).Infof("rbd: successfully removed loop device: %s", loop)
 
 	err = rbd.manager.DetachBlockDisk(*rbd, mapPath)
 	if err != nil {
@@ -1037,6 +1054,19 @@ func getVolumeSourceReadOnly(spec *volume.Spec) (bool, error) {
 	}
 
 	return false, fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+func getVolumeAccessModes(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, error) {
+	// Only PersistentVolumeSpec has AccessModes
+	if spec.PersistentVolume != nil {
+		if spec.PersistentVolume.Spec.RBD != nil {
+			return spec.PersistentVolume.Spec.AccessModes, nil
+		} else {
+			return nil, fmt.Errorf("Spec does not reference a RBD volume type")
+		}
+	}
+
+	return nil, nil
 }
 
 func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (string, error) {

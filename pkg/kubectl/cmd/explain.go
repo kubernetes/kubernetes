@@ -85,18 +85,14 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 			cmdutil.CheckErr(o.Run(args))
 		},
 	}
-	cmd.Flags().Bool("recursive", false, "Print the fields of fields (Currently only 1 level deep)")
-	cmd.Flags().String("api-version", "", "Get different explanations for particular API version")
+	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "Print the fields of fields (Currently only 1 level deep)")
+	cmd.Flags().StringVar(&o.ApiVersion, "api-version", o.ApiVersion, "Get different explanations for particular API version")
 	return cmd
 }
 
 func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
-
-	o.Recursive = cmdutil.GetFlagBool(cmd, "recursive")
-	o.ApiVersion = cmdutil.GetFlagString(cmd, "api-version")
-
-	o.Mapper, err = f.RESTMapper()
+	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}

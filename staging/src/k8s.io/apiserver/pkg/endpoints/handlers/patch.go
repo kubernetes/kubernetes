@@ -48,6 +48,11 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		trace := utiltrace.New("Patch " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
+		if isDryRun(req.URL) {
+			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			return
+		}
+
 		// Do this first, otherwise name extraction can fail for unrecognized content types
 		// TODO: handle this in negotiation
 		contentType := req.Header.Get("Content-Type")
@@ -76,12 +81,6 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
-
-		schemaReferenceObj, err := scope.UnsafeConvertor.ConvertToVersion(r.New(), scope.Kind.GroupVersion())
-		if err != nil {
-			scope.err(err, w, req)
-			return
-		}
 
 		patchBytes, err := readBody(req)
 		if err != nil {
@@ -132,8 +131,6 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			codec: codec,
 
 			timeout: timeout,
-
-			schemaReferenceObj: schemaReferenceObj,
 
 			restPatcher: r,
 			name:        name,
@@ -189,9 +186,6 @@ type patcher struct {
 	codec runtime.Codec
 
 	timeout time.Duration
-
-	// Schema
-	schemaReferenceObj runtime.Object
 
 	// Operation information
 	restPatcher rest.Patcher
@@ -262,6 +256,9 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 
 type smpPatcher struct {
 	*patcher
+
+	// Schema
+	schemaReferenceObj runtime.Object
 }
 
 func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -372,7 +369,11 @@ func (p *patcher) patchResource(ctx context.Context) (runtime.Object, error) {
 	case types.JSONPatchType, types.MergePatchType:
 		p.mechanism = &jsonPatcher{patcher: p}
 	case types.StrategicMergePatchType:
-		p.mechanism = &smpPatcher{patcher: p}
+		schemaReferenceObj, err := p.unsafeConvertor.ConvertToVersion(p.restPatcher.New(), p.kind.GroupVersion())
+		if err != nil {
+			return nil, err
+		}
+		p.mechanism = &smpPatcher{patcher: p, schemaReferenceObj: schemaReferenceObj}
 	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
 	case types.ApplyPatchType:
 		p.mechanism = &applyPatcher{patcher: p}

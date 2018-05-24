@@ -23,6 +23,8 @@ import (
 	"github.com/spf13/cobra"
 
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -47,7 +49,10 @@ var (
 		kubectl create clusterrole foo --verb=get,list,watch --resource=pods,pods/status
 
 		# Create a ClusterRole name "foo" with NonResourceURL specified
-		kubectl create clusterrole "foo" --verb=get --non-resource-url=/logs/*`))
+		kubectl create clusterrole "foo" --verb=get --non-resource-url=/logs/*
+
+		# Create a ClusterRole name "monitoring" with AggregationRule specified
+		kubectl create clusterrole monitoring --aggregation-rule="rbac.example.com/aggregate-to-monitoring=true"`))
 
 	// Valid nonResource verb list for validation.
 	validNonResourceVerbs = []string{"*", "get", "post", "put", "delete", "patch", "head", "options"}
@@ -56,12 +61,14 @@ var (
 type CreateClusterRoleOptions struct {
 	*CreateRoleOptions
 	NonResourceURLs []string
+	AggregationRule map[string]string
 }
 
 // ClusterRole is a command to ease creating ClusterRoles.
 func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	c := &CreateClusterRoleOptions{
 		CreateRoleOptions: NewCreateRoleOptions(ioStreams),
+		AggregationRule:   map[string]string{},
 	}
 	cmd := &cobra.Command{
 		Use: "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
@@ -85,6 +92,7 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	cmd.Flags().StringSliceVar(&c.NonResourceURLs, "non-resource-url", c.NonResourceURLs, "A partial url that user should have access to.")
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
 	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", c.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
+	cmd.Flags().Var(utilflag.NewMapStringString(&c.AggregationRule), "aggregation-rule", "An aggregation label selector for combining ClusterRoles.")
 
 	return cmd
 }
@@ -105,6 +113,13 @@ func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 func (c *CreateClusterRoleOptions) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("name must be specified")
+	}
+
+	if len(c.AggregationRule) > 0 {
+		if len(c.NonResourceURLs) > 0 || len(c.Verbs) > 0 || len(c.Resources) > 0 || len(c.ResourceNames) > 0 {
+			return fmt.Errorf("aggregation rule must be specified without nonResourceURLs, verbs, resources or resourceNames")
+		}
+		return nil
 	}
 
 	// validate verbs.
@@ -156,13 +171,28 @@ func (c *CreateClusterRoleOptions) Validate() error {
 }
 
 func (c *CreateClusterRoleOptions) RunCreateRole() error {
-	clusterRole := &rbacv1.ClusterRole{}
-	clusterRole.Name = c.Name
-	rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, c.NonResourceURLs)
-	if err != nil {
-		return err
+	clusterRole := &rbacv1.ClusterRole{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "ClusterRole"},
 	}
-	clusterRole.Rules = rules
+	clusterRole.Name = c.Name
+
+	var err error
+	if len(c.AggregationRule) == 0 {
+		rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, c.NonResourceURLs)
+		if err != nil {
+			return err
+		}
+		clusterRole.Rules = rules
+	} else {
+		clusterRole.AggregationRule = &rbacv1.AggregationRule{
+			ClusterRoleSelectors: []metav1.LabelSelector{
+				{
+					MatchLabels: c.AggregationRule,
+				},
+			},
+		}
+	}
 
 	// Create ClusterRole.
 	if !c.DryRun {

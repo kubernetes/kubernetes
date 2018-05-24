@@ -86,10 +86,14 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*v1.ObjectReferen
 		}
 		// example paths: /<prefix>/<version>/*
 		parts := strings.Split(selfLinkUrl.Path, "/")
-		if len(parts) < 3 {
+		if len(parts) < 4 {
 			return nil, fmt.Errorf("unexpected self link format: '%v'; got version '%v'", selfLink, version)
 		}
-		version = parts[2]
+		if parts[1] == "api" {
+			version = parts[2]
+		} else {
+			version = parts[2] + "/" + parts[3]
+		}
 	}
 
 	// only has list metadata

@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
         "defaults.go",
         "doc.go",
         "register.go",
@@ -52,21 +53,20 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/features:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/scheme:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/json-iterator/go:go_default_library",
         "//vendor/github.com/ugorji/go/codec:go_default_library",
-        "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
     ],
 )
 

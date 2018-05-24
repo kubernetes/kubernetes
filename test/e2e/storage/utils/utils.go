@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -191,14 +190,11 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	}
 	Expect(err).NotTo(HaveOccurred())
 
-	// Wait for pod to enter "Terminating state"
-	time.Sleep(30 * time.Second)
-
 	By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
-	err = f.WaitForPodTerminated(clientPod.Name, "")
-	if !apierrs.IsNotFound(err) && err != nil {
-		Expect(err).NotTo(HaveOccurred(), "Expected pod to terminate.")
+	err = f.WaitForPodNotFound(clientPod.Name, framework.PodDeleteTimeout)
+	if err != nil {
+		Expect(err).NotTo(HaveOccurred(), "Expected pod to be not found.")
 	}
 
 	if forceDelete {

@@ -288,17 +288,6 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
 		{[]Checker{InPathCheck{executable: "foobarbaz", exec: exec.New()}}, true, "\t[WARNING FileExisting-foobarbaz]: foobarbaz not found in system path\n"},
 		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, ""},
-		{[]Checker{ExtraArgsCheck{
-			APIServerExtraArgs:         map[string]string{"secure-port": "1234"},
-			ControllerManagerExtraArgs: map[string]string{"use-service-account-credentials": "true"},
-			SchedulerExtraArgs:         map[string]string{"leader-elect": "true"},
-		}}, true, ""},
-		{[]Checker{ExtraArgsCheck{
-			APIServerExtraArgs: map[string]string{"secure-port": "foo"},
-		}}, true, "\t[WARNING ExtraArgs]: kube-apiserver: failed to parse extra argument --secure-port=foo\n"},
-		{[]Checker{ExtraArgsCheck{
-			APIServerExtraArgs: map[string]string{"invalid-argument": "foo"},
-		}}, true, "\t[WARNING ExtraArgs]: kube-apiserver: failed to parse extra argument --invalid-argument=foo\n"},
 		{[]Checker{InPathCheck{executable: "foobar", mandatory: false, exec: exec.New(), suggestion: "install foobar"}}, true, "\t[WARNING FileExisting-foobar]: foobar not found in system path\nSuggestion: install foobar\n"},
 	}
 	for _, rt := range tokenTest {
@@ -638,13 +627,13 @@ func TestKubeletVersionCheck(t *testing.T) {
 		expectErrors   bool
 		expectWarnings bool
 	}{
-		{"v1.10.2", "", false, false},              // check minimally supported version when there is no information about control plane
-		{"v1.7.3", "v1.7.8", true, false},          // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
-		{"v1.9.0", "v1.9.5", false, false},         // kubelet within same major.minor as control plane
-		{"v1.9.5", "v1.9.1", false, false},         // kubelet is newer, but still within same major.minor as control plane
-		{"v1.9.0", "v1.10.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
-		{"v1.10.0-alpha.1", "v1.9.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
-		{"v1.10.0", "v1.9.5", true, false},         // kubelet is newer (release) than control plane, should fail.
+		{"v1.11.2", "", false, false},               // check minimally supported version when there is no information about control plane
+		{"v1.8.3", "v1.8.8", true, false},           // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
+		{"v1.10.0", "v1.10.5", false, false},        // kubelet within same major.minor as control plane
+		{"v1.10.5", "v1.10.1", false, false},        // kubelet is newer, but still within same major.minor as control plane
+		{"v1.10.0", "v1.11.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
+		{"v1.11.0-alpha.1", "v1.10.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
+		{"v1.11.0", "v1.10.5", true, false},         // kubelet is newer (release) than control plane, should fail.
 	}
 
 	for _, tc := range cases {

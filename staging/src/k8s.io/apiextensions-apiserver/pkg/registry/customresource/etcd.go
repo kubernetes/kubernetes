@@ -116,6 +116,8 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+var _ = rest.Patcher(&StatusREST{})
+
 func (r *StatusREST) New() runtime.Object {
 	return &unstructured.Unstructured{}
 }

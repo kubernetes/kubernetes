@@ -62,7 +62,7 @@ func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *v1beta1.ReplicaSetL
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.ReplicaSetList{}
+	list := &v1beta1.ReplicaSetList{ListMeta: obj.(*v1beta1.ReplicaSetList).ListMeta}
 	for _, item := range obj.(*v1beta1.ReplicaSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

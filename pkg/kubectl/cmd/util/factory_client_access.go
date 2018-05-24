@@ -24,18 +24,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
-	"sync"
-
-	"k8s.io/api/core/v1"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
@@ -57,25 +52,15 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
-type RESTClientGetter interface {
-	ToRESTConfig() (*restclient.Config, error)
-	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
-	ToRawKubeConfigLoader() clientcmd.ClientConfig
-}
-
 type ring0Factory struct {
-	clientGetter RESTClientGetter
-
-	requireMatchedServerVersion bool
-	checkServerVersion          sync.Once
-	matchesServerVersionErr     error
+	clientGetter genericclioptions.RESTClientGetter
 }
 
-func NewClientAccessFactory(clientGetter RESTClientGetter) ClientAccessFactory {
+func NewClientAccessFactory(clientGetter genericclioptions.RESTClientGetter) ClientAccessFactory {
 	if clientGetter == nil {
 		panic("attempt to instantiate client_access_factory with nil clientGetter")
 	}
@@ -87,12 +72,24 @@ func NewClientAccessFactory(clientGetter RESTClientGetter) ClientAccessFactory {
 	return f
 }
 
-func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (f *ring0Factory) ToRESTConfig() (*restclient.Config, error) {
+	return f.clientGetter.ToRESTConfig()
+}
+
+func (f *ring0Factory) ToRESTMapper() (meta.RESTMapper, error) {
+	return f.clientGetter.ToRESTMapper()
+}
+
+func (f *ring0Factory) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	return f.clientGetter.ToDiscoveryClient()
 }
 
+func (f *ring0Factory) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+	return f.clientGetter.ToRawKubeConfigLoader()
+}
+
 func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -100,118 +97,33 @@ func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 }
 
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
 	return internalclientset.NewForConfig(clientConfig)
 }
 
-func (f *ring0Factory) DynamicClient() (dynamic.DynamicInterface, error) {
-	clientConfig, err := f.ClientConfig()
+func (f *ring0Factory) DynamicClient() (dynamic.Interface, error) {
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
 	return dynamic.NewForConfig(clientConfig)
 }
-func (f *ring0Factory) checkMatchingServerVersion() error {
-	f.checkServerVersion.Do(func() {
-		if !f.requireMatchedServerVersion {
-			return
-		}
-		discoveryClient, err := f.DiscoveryClient()
-		if err != nil {
-			f.matchesServerVersionErr = err
-			return
-		}
-		f.matchesServerVersionErr = discovery.MatchesServerVersion(version.Get(), discoveryClient)
-	})
 
-	return f.matchesServerVersionErr
+// NewBuilder returns a new resource builder for structured api objects.
+func (f *ring0Factory) NewBuilder() *resource.Builder {
+	return resource.NewBuilder(f.clientGetter)
 }
 
-func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
-	if err := f.checkMatchingServerVersion(); err != nil {
-		return nil, err
-	}
-	clientConfig, err := f.clientGetter.ToRESTConfig()
+func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
 	setKubernetesDefaults(clientConfig)
-	return clientConfig, nil
-}
-func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
-	return f.clientGetter.ToRESTConfig()
-}
-
-func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
-	clientConfig, err := f.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
 	return restclient.RESTClientFor(clientConfig)
-}
-
-func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error) {
-	// TODO: replace with a swagger schema based approach (identify pod template via schema introspection)
-	switch t := obj.(type) {
-	case *v1.Pod:
-		return true, fn(&t.Spec)
-	// ReplicationController
-	case *v1.ReplicationController:
-		if t.Spec.Template == nil {
-			t.Spec.Template = &v1.PodTemplateSpec{}
-		}
-		return true, fn(&t.Spec.Template.Spec)
-
-	// Deployment
-	case *extensionsv1beta1.Deployment:
-		return true, fn(&t.Spec.Template.Spec)
-	case *appsv1beta1.Deployment:
-		return true, fn(&t.Spec.Template.Spec)
-	case *appsv1beta2.Deployment:
-		return true, fn(&t.Spec.Template.Spec)
-	case *appsv1.Deployment:
-		return true, fn(&t.Spec.Template.Spec)
-
-	// DaemonSet
-	case *extensionsv1beta1.DaemonSet:
-		return true, fn(&t.Spec.Template.Spec)
-	case *appsv1beta2.DaemonSet:
-		return true, fn(&t.Spec.Template.Spec)
-	case *appsv1.DaemonSet:
-		return true, fn(&t.Spec.Template.Spec)
-
-	// ReplicaSet
-	case *extensionsv1beta1.ReplicaSet:
-		return true, fn(&t.Spec.Template.Spec)
-	case *appsv1beta2.ReplicaSet:
-		return true, fn(&t.Spec.Template.Spec)
-	case *appsv1.ReplicaSet:
-		return true, fn(&t.Spec.Template.Spec)
-
-	// StatefulSet
-	case *appsv1beta1.StatefulSet:
-		return true, fn(&t.Spec.Template.Spec)
-	case *appsv1beta2.StatefulSet:
-		return true, fn(&t.Spec.Template.Spec)
-	case *appsv1.StatefulSet:
-		return true, fn(&t.Spec.Template.Spec)
-
-	// Job
-	case *batchv1.Job:
-		return true, fn(&t.Spec.Template.Spec)
-
-	// CronJob
-	case *batchv1beta1.CronJob:
-		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
-	case *batchv2alpha1.CronJob:
-		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
-
-	default:
-		return false, fmt.Errorf("the object is not a pod or does not have a pod template")
-	}
 }
 
 func (f *ring0Factory) MapBasedSelectorForObject(object runtime.Object) (string, error) {
@@ -248,24 +160,6 @@ func (f *ring0Factory) MapBasedSelectorForObject(object runtime.Object) (string,
 	}
 }
 
-func (f *ring0Factory) PortsForObject(object runtime.Object) ([]string, error) {
-	// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
-	switch t := object.(type) {
-	case *api.ReplicationController:
-		return getPorts(t.Spec.Template.Spec), nil
-	case *api.Pod:
-		return getPorts(t.Spec), nil
-	case *api.Service:
-		return getServicePorts(t.Spec), nil
-	case *extensions.Deployment:
-		return getPorts(t.Spec.Template.Spec), nil
-	case *extensions.ReplicaSet:
-		return getPorts(t.Spec.Template.Spec), nil
-	default:
-		return nil, fmt.Errorf("cannot extract ports from %T", object)
-	}
-}
-
 func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]string, error) {
 	// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
 	switch t := object.(type) {
@@ -282,10 +176,6 @@ func (f *ring0Factory) ProtocolsForObject(object runtime.Object) (map[string]str
 	default:
 		return nil, fmt.Errorf("cannot extract protocols from %T", object)
 	}
-}
-
-func (f *ring0Factory) LabelsForObject(object runtime.Object) (map[string]string, error) {
-	return meta.NewAccessor().Labels(object)
 }
 
 // Set showSecrets false to filter out stuff like secrets.
@@ -319,14 +209,6 @@ func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
 	return base + args + flags
 }
 
-func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
-	// Globally persistent flags across all subcommands.
-	// TODO Change flag names to consts to allow safer lookup from subcommands.
-	// TODO Add a verbose flag that turns on glog logging. Probably need a way
-	// to do that automatically for every subcommand.
-	flags.BoolVar(&f.requireMatchedServerVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
-}
-
 func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 	return []schema.GroupResource{
 		{Resource: "replicationcontroller"},
@@ -348,10 +230,6 @@ func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("pausing is not supported")
 	}
-}
-
-func (f *ring0Factory) ResolveImage(name string) (string, error) {
-	return name, nil
 }
 
 func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
@@ -592,56 +470,12 @@ func (f *ring0Factory) CanBeExposed(kind schema.GroupKind) error {
 	return nil
 }
 
-func (f *ring0Factory) CanBeAutoscaled(kind schema.GroupKind) error {
-	switch kind {
-	case api.Kind("ReplicationController"), extensions.Kind("ReplicaSet"),
-		extensions.Kind("Deployment"), apps.Kind("Deployment"), apps.Kind("ReplicaSet"):
-		// nothing to do here
-	default:
-		return fmt.Errorf("cannot autoscale a %v", kind)
-	}
-	return nil
-}
-
-func (f *ring0Factory) EditorEnvs() []string {
-	return []string{"KUBE_EDITOR", "EDITOR"}
-}
-
-// overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
-var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
-
-// computeDiscoverCacheDir takes the parentDir and the host and comes up with a "usually non-colliding" name.
-func computeDiscoverCacheDir(parentDir, host string) string {
-	// strip the optional scheme from host if its there:
-	schemelessHost := strings.Replace(strings.Replace(host, "https://", "", 1), "http://", "", 1)
-	// now do a simple collapse of non-AZ09 characters.  Collisions are possible but unlikely.  Even if we do collide the problem is short lived
-	safeHost := overlyCautiousIllegalFileCharacters.ReplaceAllString(schemelessHost, "_")
-
-	return filepath.Join(parentDir, safeHost)
-}
-
 // this method exists to help us find the points still relying on internal types.
 func InternalVersionDecoder() runtime.Decoder {
 	return legacyscheme.Codecs.UniversalDecoder()
 }
 
 func InternalVersionJSONEncoder() runtime.Encoder {
-	encoder := legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...)
+	encoder := legacyscheme.Codecs.LegacyCodec(legacyscheme.Scheme.PrioritizedVersionsAllGroups()...)
 	return unstructured.JSONFallbackEncoder{Encoder: encoder}
-}
-
-// setKubernetesDefaults sets default values on the provided client config for accessing the
-// Kubernetes API or returns an error if any of the defaults are impossible or invalid.
-// TODO this isn't what we want.  Each clientset should be setting defaults as it sees fit.
-func setKubernetesDefaults(config *restclient.Config) error {
-	// TODO remove this hack.  This is allowing the GetOptions to be serialized.
-	config.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
-
-	if config.APIPath == "" {
-		config.APIPath = "/api"
-	}
-	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = legacyscheme.Codecs
-	}
-	return restclient.SetKubernetesDefaults(config)
 }

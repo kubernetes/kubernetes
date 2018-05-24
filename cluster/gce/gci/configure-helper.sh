@@ -1265,6 +1265,7 @@ function prepare-etcd-manifest {
   local cluster_state="new"
   local etcd_protocol="http"
   local etcd_creds=""
+  local etcd_extra_args="${ETCD_EXTRA_ARGS:-}"
 
   if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
     cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
@@ -1320,6 +1321,7 @@ function prepare-etcd-manifest {
   fi
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else
@@ -1553,6 +1555,10 @@ function start-kube-apiserver {
       if [[ -n "${ADVANCED_AUDIT_LOG_INITIAL_BACKOFF:-}" ]]; then
         params+=" --audit-log-initial-backoff=${ADVANCED_AUDIT_LOG_INITIAL_BACKOFF}"
       fi
+      # Truncating backend parameters
+      if [[ -n "${ADVANCED_AUDIT_TRUNCATING_BACKEND:-}" ]]; then
+        params+=" --audit-log-truncate-enabled=${ADVANCED_AUDIT_TRUNCATING_BACKEND}"
+      fi
     fi
     if [[ "${ADVANCED_AUDIT_BACKEND:-}" == *"webhook"* ]]; then
       params+=" --audit-webhook-mode=batch"
@@ -1586,14 +1592,18 @@ function start-kube-apiserver {
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-}" ]]; then
         params+=" --audit-webhook-initial-backoff=${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF}"
       fi
+      # Truncating backend parameters
+      if [[ -n "${ADVANCED_AUDIT_TRUNCATING_BACKEND:-}" ]]; then
+        params+=" --audit-webhook-truncate-enabled=${ADVANCED_AUDIT_TRUNCATING_BACKEND}"
+      fi
     fi
   fi
 
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
     params+=" --enable-logs-handler=false"
   fi
-  if [[ -n "${APISERVER_KUBELET_CA:-}" ]]; then
-    params+=" --kubelet-certificate-authority=${APISERVER_KUBELET_CA}"
+  if [[ "${APISERVER_SET_KUBELET_CA:-false}" == "true" ]]; then
+    params+=" --kubelet-certificate-authority=${CA_CERT_BUNDLE_PATH}"
   fi
 
   local admission_controller_config_mount=""
@@ -1622,15 +1632,19 @@ function start-kube-apiserver {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
-  if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
+  if [[ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]]; then
+    params+=" --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
+    if [[ -n "${PROXY_SSH_USER:-}" ]]; then
+      params+=" --ssh-user=${PROXY_SSH_USER}"
+      params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+    fi
+  elif [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     local -r vm_external_ip=$(get-metadata-value "instance/network-interfaces/0/access-configs/0/external-ip")
     if [[ -n "${PROXY_SSH_USER:-}" ]]; then
       params+=" --advertise-address=${vm_external_ip}"
       params+=" --ssh-user=${PROXY_SSH_USER}"
       params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
     fi
-  elif [ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]; then
-    params="${params} --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
   fi
 
   local webhook_authn_config_mount=""
@@ -2114,10 +2128,16 @@ function start-fluentd-resource-update {
   wait-for-apiserver-and-update-fluentd &
 }
 
-# Update {{ container-runtime }} with actual container runtime name.
+# Update {{ container-runtime }} with actual container runtime name,
+# and {{ container-runtime-endpoint }} with actual container runtime
+# endpoint.
 function update-container-runtime {
-  local -r configmap_yaml="$1"
-  sed -i -e "s@{{ *container_runtime *}}@${CONTAINER_RUNTIME_NAME:-docker}@g" "${configmap_yaml}"
+  local -r file="$1"
+  local -r container_runtime_endpoint="${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}"
+  sed -i \
+    -e "s@{{ *container_runtime *}}@${CONTAINER_RUNTIME_NAME:-docker}@g" \
+    -e "s@{{ *container_runtime_endpoint *}}@${container_runtime_endpoint#unix://}@g" \
+    "${file}"
 }
 
 # Remove configuration in yaml file if node journal is not enabled.
@@ -2143,7 +2163,8 @@ function update-prometheus-to-sd-parameters {
 
 # Updates parameters in yaml file for event-exporter configuration
 function update-event-exporter {
-    sed -i -e "s@{{ *event_exporter_zone *}}@${ZONE:-}@g" "$1"
+    local -r stackdriver_resource_model="${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}"
+    sed -i -e "s@{{ exporter_sd_resource_model }}@${stackdriver_resource_model}@g" "$1"
 }
 
 function update-dashboard-controller {
@@ -2186,12 +2207,6 @@ function setup-fluentd {
   sed -i -e "s@{{ fluentd_gcp_configmap_name }}@${fluentd_gcp_configmap_name}@g" "${fluentd_gcp_yaml}"
   fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.2-1.5.30-1-k8s}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
-  if [[ "${STACKDRIVER_METADATA_AGENT_URL:-}" != "" ]]; then
-    metadata_agent_url="${STACKDRIVER_METADATA_AGENT_URL}"
-  else
-    metadata_agent_url="http://${HOSTNAME}:8799"
-  fi
-  sed -i -e "s@{{ stackdriver_metadata_agent_url }}@${metadata_agent_url}@g" "${fluentd_gcp_yaml}"
   update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}
   update-container-runtime ${fluentd_gcp_configmap_yaml}
@@ -2400,8 +2415,9 @@ EOF
 # Starts an image-puller - used in test clusters.
 function start-image-puller {
   echo "Start image-puller"
-  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/e2e-image-puller.manifest" \
-    /etc/kubernetes/manifests/
+  local -r e2e_image_puller_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/e2e-image-puller.manifest"
+  update-container-runtime "${e2e_image_puller_manifest}"
+  cp "${e2e_image_puller_manifest}" /etc/kubernetes/manifests/
 }
 
 # Setups manifests for ingress controller and gce-specific policies for service controller.
@@ -2414,11 +2430,19 @@ function start-lb-controller {
     prepare-log-file /var/log/glbc.log
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
 
-    local -r glbc_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
-    if [[ ! -z "${GCE_GLBC_IMAGE:-}" ]]; then
-      sed -i "s@image:.*@image: ${GCE_GLBC_IMAGE}@" "${glbc_manifest}"
+    local -r src_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
+    local -r dest_manifest="/etc/kubernetes/manifests/glbc.manifest"
+
+    if [[ -n "${CUSTOM_INGRESS_YAML:-}" ]]; then
+      echo "${CUSTOM_INGRESS_YAML}" > "${dest_manifest}"
+    else
+      cp "${src_manifest}" "${dest_manifest}"
     fi
-    cp "${glbc_manifest}" /etc/kubernetes/manifests/
+
+    # Override the glbc image if GCE_GLBC_IMAGE is specified.
+    if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
+      sed -i "s|image:.*|image: ${GCE_GLBC_IMAGE}|" "${dest_manifest}"
+    fi
   fi
 }
 

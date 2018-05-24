@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -40,7 +40,7 @@ type CustomColumnsPrintFlags struct {
 // Supported format types can be found in pkg/printers/printers.go
 func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, error) {
 	if len(templateFormat) == 0 {
-		return nil, NoCompatiblePrinterError{}
+		return nil, genericclioptions.NoCompatiblePrinterError{}
 	}
 
 	templateValue := ""
@@ -64,7 +64,7 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrin
 	}
 
 	if _, supportedFormat := supportedFormats[templateFormat]; !supportedFormat {
-		return nil, NoCompatiblePrinterError{}
+		return nil, genericclioptions.NoCompatiblePrinterError{}
 	}
 
 	if len(templateValue) == 0 {
@@ -83,8 +83,7 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrin
 		return p, err
 	}
 
-	p, err := NewCustomColumnsPrinterFromSpec(templateValue, decoder, f.NoHeaders)
-	return NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, scheme.Versions...), err
+	return NewCustomColumnsPrinterFromSpec(templateValue, decoder, f.NoHeaders)
 }
 
 // AddFlags receives a *cobra.Command reference and binds

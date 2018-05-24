@@ -37,7 +37,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
@@ -49,31 +48,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
-// TODO: Break out the cloudprovider functionality out of core and only support the new flow
-// described in https://github.com/kubernetes/community/pull/128
-var cloudproviders = []string{
-	"aws",
-	"azure",
-	"cloudstack",
-	"gce",
-	"external", // Support for out-of-tree cloud providers
-	"openstack",
-	"ovirt",
-	"photon",
-	"vsphere",
-}
-
-// Describes the authorization modes that are enforced by kubeadm
-var requiredAuthzModes = []string{
-	authzmodes.ModeRBAC,
-	authzmodes.ModeNode,
-}
-
 // ValidateMasterConfiguration validates master configuration and collects all encountered errors
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudProvider"))...)
-	allErrs = append(allErrs, ValidateAuthorizationModes(c.AuthorizationModes, field.NewPath("authorizationModes"))...)
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("apiServerCertSANs"))...)
 	allErrs = append(allErrs, ValidateCertSANs(c.Etcd.ServerCertSANs, field.NewPath("etcd").Child("serverCertSANs"))...)
@@ -113,29 +90,6 @@ func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 
 	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
-	}
-	return allErrs
-}
-
-// ValidateAuthorizationModes  validates authorization modes and collects all encountered errors
-func ValidateAuthorizationModes(authzModes []string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	found := map[string]bool{}
-	for _, authzMode := range authzModes {
-		if !authzmodes.IsValidAuthorizationMode(authzMode) {
-			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "invalid authorization mode"))
-		}
-
-		if found[authzMode] {
-			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "duplicate authorization mode"))
-			continue
-		}
-		found[authzMode] = true
-	}
-	for _, requiredMode := range requiredAuthzModes {
-		if !found[requiredMode] {
-			allErrs = append(allErrs, field.Required(fldPath, fmt.Sprintf("authorization mode %s must be enabled", requiredMode)))
-		}
 	}
 	return allErrs
 }
@@ -329,21 +283,6 @@ func ValidateNodeName(nodename string, fldPath *field.Path) field.ErrorList {
 	if node.GetHostname(nodename) != nodename {
 		allErrs = append(allErrs, field.Invalid(fldPath, nodename, "nodename is not valid, must be lower case"))
 	}
-	return allErrs
-}
-
-// ValidateCloudProvider validates if cloud provider is supported
-func ValidateCloudProvider(provider string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(provider) == 0 {
-		return allErrs
-	}
-	for _, supported := range cloudproviders {
-		if provider == supported {
-			return allErrs
-		}
-	}
-	allErrs = append(allErrs, field.Invalid(fldPath, provider, "cloudprovider not supported"))
 	return allErrs
 }
 

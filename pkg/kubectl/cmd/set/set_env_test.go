@@ -24,8 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/printers"
-
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -42,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -50,10 +48,9 @@ func TestSetEnvLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -65,11 +62,7 @@ func TestSetEnvLocal(t *testing.T) {
 
 	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
-	opts.PrintFlags = &printers.PrintFlags{
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-		NamePrintFlags:     printers.NewNamePrintFlags(""),
-		OutputFormat:       &outputFormat,
-	}
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
 		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"},
 	}
@@ -93,10 +86,9 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -108,11 +100,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	outputFormat := "name"
 	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
-	opts.PrintFlags = &printers.PrintFlags{
-		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-		NamePrintFlags:     printers.NewNamePrintFlags(""),
-		OutputFormat:       &outputFormat,
-	}
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
 		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"},
 	}
@@ -463,17 +451,15 @@ func TestSetEnvRemote(t *testing.T) {
 			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 			defer tf.Cleanup()
 
-			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-			ns := serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
-				NegotiatedSerializer: ns,
+				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
 					switch p, m := req.URL.Path, req.Method; {
 					case p == resourcePath && m == http.MethodGet:
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
 					case p == resourcePath && m == http.MethodPatch:
 						stream, err := req.GetBody()
 						if err != nil {
@@ -484,7 +470,7 @@ func TestSetEnvRemote(t *testing.T) {
 							return nil, err
 						}
 						assert.Contains(t, string(bytes), `"value":`+`"`+"prod"+`"`, fmt.Sprintf("env not updated for %#v", input.object))
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -496,11 +482,7 @@ func TestSetEnvRemote(t *testing.T) {
 			outputFormat := "yaml"
 			streams := genericclioptions.NewTestIOStreamsDiscard()
 			opts := NewEnvOptions(streams)
-			opts.PrintFlags = &printers.PrintFlags{
-				JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-				NamePrintFlags:     printers.NewNamePrintFlags(""),
-				OutputFormat:       &outputFormat,
-			}
+			opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 			opts.Local = false
 			opts.IOStreams = streams
 			err := opts.Complete(tf, NewCmdEnv(tf, streams), input.args)

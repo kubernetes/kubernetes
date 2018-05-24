@@ -59,7 +59,7 @@ func (c *FakeClusterRoleBindings) List(opts v1.ListOptions) (result *rbac_v1.Clu
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rbac_v1.ClusterRoleBindingList{}
+	list := &rbac_v1.ClusterRoleBindingList{ListMeta: obj.(*rbac_v1.ClusterRoleBindingList).ListMeta}
 	for _, item := range obj.(*rbac_v1.ClusterRoleBindingList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

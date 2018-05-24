@@ -35,9 +35,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -83,7 +85,7 @@ var (
 type ExposeServiceOptions struct {
 	FilenameOptions resource.FilenameOptions
 	RecordFlags     *genericclioptions.RecordFlags
-	PrintFlags      *printers.PrintFlags
+	PrintFlags      *genericclioptions.PrintFlags
 	PrintObj        printers.ResourcePrinterFunc
 
 	DryRun           bool
@@ -93,14 +95,13 @@ type ExposeServiceOptions struct {
 	CanBeExposed              func(kind schema.GroupKind) error
 	ClientForMapping          func(*meta.RESTMapping) (resource.RESTClient, error)
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
-	PortsForObject            func(runtime.Object) ([]string, error)
+	PortsForObject            polymorphichelpers.PortsForObjectFunc
 	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
-	LabelsForObject           func(runtime.Object) (map[string]string, error)
 
 	Namespace string
 	Mapper    meta.RESTMapper
 
-	DynamicClient dynamic.DynamicInterface
+	DynamicClient dynamic.Interface
 	Builder       *resource.Builder
 
 	Recorder genericclioptions.Recorder
@@ -110,7 +111,7 @@ type ExposeServiceOptions struct {
 func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServiceOptions {
 	return &ExposeServiceOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		PrintFlags:  printers.NewPrintFlags("exposed"),
+		PrintFlags:  genericclioptions.NewPrintFlags("exposed").WithTypeSetter(scheme.Scheme),
 
 		Recorder:  genericclioptions.NoopRecorder{},
 		IOStreams: ioStreams,
@@ -193,13 +194,12 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	o.CanBeExposed = f.CanBeExposed
 	o.ClientForMapping = f.ClientForMapping
 	o.MapBasedSelectorForObject = f.MapBasedSelectorForObject
-	o.PortsForObject = f.PortsForObject
+	o.PortsForObject = polymorphichelpers.PortsForObjectFn
 	o.ProtocolsForObject = f.ProtocolsForObject
-	o.Mapper, err = f.RESTMapper()
+	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}
-	o.LabelsForObject = f.LabelsForObject
 
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
 	if err != nil {
@@ -293,7 +293,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		if kubectl.IsZero(params["labels"]) {
-			labels, err := o.LabelsForObject(info.Object)
+			labels, err := meta.NewAccessor().Labels(info.Object)
 			if err != nil {
 				return err
 			}

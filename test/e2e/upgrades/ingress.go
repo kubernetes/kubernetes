@@ -29,6 +29,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -45,6 +46,7 @@ type IngressUpgradeTest struct {
 	httpClient    *http.Client
 	ip            string
 	ipName        string
+	skipSSLCheck  bool
 }
 
 // GCPResourceStore keeps track of the GCP resources spun up by an ingress.
@@ -145,6 +147,26 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 	framework.ExpectNoError(t.gceController.CleanupGCEIngressController())
 }
 
+// Skip checks if the test or part of the test should be skipped.
+func (t *IngressUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+	sslNameChangeVersion, err := version.ParseGeneric("v1.10.0")
+	framework.ExpectNoError(err)
+	var hasVersionBelow, hasVersionAboveOrEqual bool
+	for _, v := range upgCtx.Versions {
+		if v.Version.LessThan(sslNameChangeVersion) {
+			hasVersionBelow = true
+			continue
+		}
+		hasVersionAboveOrEqual = true
+	}
+	// Skip SSL certificates check if k8s version changes between 1.10-
+	// and 1.10+ because the naming scheme has changed.
+	if hasVersionBelow && hasVersionAboveOrEqual {
+		t.skipSSLCheck = true
+	}
+	return false
+}
+
 func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}, testDuringDisruption bool) {
 	if testDuringDisruption {
 		By("continuously hitting the Ingress IP")
@@ -184,6 +206,15 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	for _, ig := range postUpgradeResourceStore.IgList {
 		ig.Size = 0
 	}
+	// Stub out compute.SslCertificates in case we know it will change during an upgrade/downgrade.
+	if t.skipSSLCheck {
+		t.resourceStore.SslList = nil
+		postUpgradeResourceStore.SslList = nil
+	}
+
+	// TODO(rramkumar): Remove this when GLBC v1.2.0 is released.
+	t.resourceStore.BeList = nil
+	postUpgradeResourceStore.BeList = nil
 
 	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
 		i1 := v1.Interface()

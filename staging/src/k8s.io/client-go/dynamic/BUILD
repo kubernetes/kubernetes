@@ -8,10 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "client_test.go",
-        "dynamic_util_test.go",
-    ],
+    srcs = ["client_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -29,10 +26,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "bad_debt.go",
-        "client.go",
-        "client_pool.go",
-        "dynamic_util.go",
+        "interface.go",
         "scheme.go",
         "simple.go",
     ],
@@ -49,7 +43,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/versioning:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )

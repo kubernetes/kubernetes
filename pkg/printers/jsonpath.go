@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
 
 // exists returns true if it would be possible to call the index function
@@ -107,11 +108,21 @@ func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
 	if err := j.Parse(tmpl); err != nil {
 		return nil, err
 	}
-	return &JSONPathPrinter{tmpl, j}, nil
+	return &JSONPathPrinter{
+		rawTemplate: tmpl,
+		JSONPath:    j,
+	}, nil
 }
 
 // PrintObj formats the obj with the JSONPath Template.
 func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	// we use reflect.Indirect here in order to obtain the actual value from a pointer.
+	// we need an actual value in order to retrieve the package path for an object.
+	// using reflect.Indirect indiscriminately is valid here, as all runtime.Objects are supposed to be pointers.
+	if printers.InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
+		return fmt.Errorf(printers.InternalObjectPrinterErr)
+	}
+
 	var queryObj interface{} = obj
 	if meta.IsListType(obj) {
 		data, err := json.Marshal(obj)

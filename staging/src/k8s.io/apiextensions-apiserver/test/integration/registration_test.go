@@ -41,7 +41,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client dynamic.DynamicResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
+func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
 	createdInstance, err := client.Create(instanceToCreate)
 	if err != nil {
 		t.Logf("%#v", createdInstance)
@@ -68,8 +68,35 @@ func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unst
 	return createdInstance, nil
 }
 
-func NewNamespacedCustomResourceClient(ns string, client dynamic.DynamicInterface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.DynamicResourceInterface {
-	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
+func instantiateVersionedCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition, version string) (*unstructured.Unstructured, error) {
+	createdInstance, err := client.Create(instanceToCreate)
+	if err != nil {
+		t.Logf("%#v", createdInstance)
+		return nil, err
+	}
+	createdObjectMeta, err := meta.Accessor(createdInstance)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// it should have a UUID
+	if len(createdObjectMeta.GetUID()) == 0 {
+		t.Errorf("missing uuid: %#v", createdInstance)
+	}
+	createdTypeMeta, err := meta.TypeAccessor(createdInstance)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, a := definition.Spec.Group+"/"+version, createdTypeMeta.GetAPIVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := definition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	return createdInstance, nil
+}
+
+func NewNamespacedCustomResourceVersionedClient(ns string, client dynamic.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition, version string) dynamic.ResourceInterface {
+	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: version, Resource: crd.Spec.Names.Plural}
 
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
 		return client.Resource(gvr).Namespace(ns)
@@ -77,22 +104,13 @@ func NewNamespacedCustomResourceClient(ns string, client dynamic.DynamicInterfac
 	return client.Resource(gvr)
 }
 
-func NewNamespacedCustomResourceStatusClient(ns string, client dynamic.DynamicInterface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.DynamicResourceInterface {
+func NewNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.ResourceInterface {
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
 
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
-		return client.NamespacedSubresource(gvr, "status", ns)
+		return client.Resource(gvr).Namespace(ns)
 	}
-	return client.ClusterSubresource(gvr, "status")
-}
-
-func NewNamespacedCustomResourceScaleClient(ns string, client dynamic.DynamicInterface, crd *apiextensionsv1beta1.CustomResourceDefinition) dynamic.DynamicResourceInterface {
-	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural}
-
-	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
-		return client.NamespacedSubresource(gvr, "scale", ns)
-	}
-	return client.ClusterSubresource(gvr, "scale")
+	return client.Resource(gvr)
 }
 
 func TestMultipleResourceInstances(t *testing.T) {

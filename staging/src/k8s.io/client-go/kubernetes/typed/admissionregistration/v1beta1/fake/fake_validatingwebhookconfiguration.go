@@ -59,7 +59,7 @@ func (c *FakeValidatingWebhookConfigurations) List(opts v1.ListOptions) (result 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.ValidatingWebhookConfigurationList{}
+	list := &v1beta1.ValidatingWebhookConfigurationList{ListMeta: obj.(*v1beta1.ValidatingWebhookConfigurationList).ListMeta}
 	for _, item := range obj.(*v1beta1.ValidatingWebhookConfigurationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

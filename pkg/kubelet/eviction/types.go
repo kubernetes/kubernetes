@@ -48,6 +48,8 @@ type Config struct {
 	Thresholds []evictionapi.Threshold
 	// KernelMemcgNotification if true will integrate with the kernel memcg notification to determine if memory thresholds are crossed.
 	KernelMemcgNotification bool
+	// PodCgroupRoot is the cgroup which contains all pods.
+	PodCgroupRoot string
 }
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.

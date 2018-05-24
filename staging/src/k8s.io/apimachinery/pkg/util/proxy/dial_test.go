@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -42,6 +43,7 @@ func TestDialURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var d net.Dialer
 
 	testcases := map[string]struct {
 		TLSConfig   *tls.Config
@@ -68,25 +70,25 @@ func TestDialURL(t *testing.T) {
 
 		"insecure, custom dial": {
 			TLSConfig: &tls.Config{InsecureSkipVerify: true},
-			Dial:      net.Dial,
+			Dial:      d.DialContext,
 		},
 		"secure, no roots, custom dial": {
 			TLSConfig:   &tls.Config{InsecureSkipVerify: false},
-			Dial:        net.Dial,
+			Dial:        d.DialContext,
 			ExpectError: "unknown authority",
 		},
 		"secure with roots, custom dial": {
 			TLSConfig: &tls.Config{InsecureSkipVerify: false, RootCAs: roots},
-			Dial:      net.Dial,
+			Dial:      d.DialContext,
 		},
 		"secure with mismatched server, custom dial": {
 			TLSConfig:   &tls.Config{InsecureSkipVerify: false, RootCAs: roots, ServerName: "bogus.com"},
-			Dial:        net.Dial,
+			Dial:        d.DialContext,
 			ExpectError: "not bogus.com",
 		},
 		"secure with matched server, custom dial": {
 			TLSConfig: &tls.Config{InsecureSkipVerify: false, RootCAs: roots, ServerName: "example.com"},
-			Dial:      net.Dial,
+			Dial:      d.DialContext,
 		},
 	}
 
@@ -102,7 +104,7 @@ func TestDialURL(t *testing.T) {
 			// Clone() mutates the receiver (!), so also call it on the copy
 			tlsConfigCopy.Clone()
 			transport := &http.Transport{
-				Dial:            tc.Dial,
+				DialContext:     tc.Dial,
 				TLSClientConfig: tlsConfigCopy,
 			}
 
@@ -125,7 +127,7 @@ func TestDialURL(t *testing.T) {
 			u, _ := url.Parse(ts.URL)
 			_, p, _ := net.SplitHostPort(u.Host)
 			u.Host = net.JoinHostPort("127.0.0.1", p)
-			conn, err := DialURL(u, transport)
+			conn, err := DialURL(context.Background(), u, transport)
 
 			// Make sure dialing doesn't mutate the transport's TLSConfig
 			if !reflect.DeepEqual(tc.TLSConfig, tlsConfigCopy) {

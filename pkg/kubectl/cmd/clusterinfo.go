@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	ct "github.com/daviddengcn/go-colortext"
@@ -76,7 +76,7 @@ func NewCmdClusterInfo(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 
 func (o *ClusterInfoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
-	o.Client, err = f.ClientConfig()
+	o.Client, err = f.ToRESTConfig()
 	if err != nil {
 		return err
 	}

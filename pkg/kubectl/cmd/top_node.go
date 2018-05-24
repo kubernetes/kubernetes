@@ -136,7 +136,7 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	o.DiscoveryClient = clientset.DiscoveryClient
 
-	config, err := f.ClientConfig()
+	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}

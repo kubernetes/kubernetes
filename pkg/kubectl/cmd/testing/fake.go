@@ -44,14 +44,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -268,8 +267,9 @@ func NewTestFactory() *TestFactory {
 	fallbackReader := bytes.NewBuffer([]byte{})
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
 
-	configFlags := cmdutil.NewTestConfigFlags().
-		WithClientConfig(clientConfig)
+	configFlags := genericclioptions.NewTestConfigFlags().
+		WithClientConfig(clientConfig).
+		WithRESTMapper(testRESTMapper())
 
 	return &TestFactory{
 		Factory:           cmdutil.NewFactory(configFlags),
@@ -286,11 +286,7 @@ func (f *TestFactory) Cleanup() {
 	os.Remove(f.tempConfigFile.Name())
 }
 
-func (f *TestFactory) CategoryExpander() categories.CategoryExpander {
-	return categories.LegacyCategoryExpander
-}
-
-func (f *TestFactory) ClientConfig() (*restclient.Config, error) {
+func (f *TestFactory) ToRESTConfig() (*restclient.Config, error) {
 	return f.ClientConfigVal, nil
 }
 
@@ -333,7 +329,7 @@ func (f *TestFactory) Command(*cobra.Command, bool) string {
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper, err := f.RESTMapper()
+	mapper, err := f.ToRESTMapper()
 
 	return resource.NewFakeBuilder(
 		func(version schema.GroupVersion) (resource.RESTClient, error) {
@@ -346,7 +342,7 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 			return f.Client, nil
 		},
 		mapper,
-		f.CategoryExpander(),
+		resource.FakeCategoryExpander,
 	).AddError(err)
 }
 
@@ -397,7 +393,7 @@ func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
 	return clientset, nil
 }
 
-func (f *TestFactory) DynamicClient() (dynamic.DynamicInterface, error) {
+func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 	if f.FakeDynamicClient != nil {
 		return f.FakeDynamicClient, nil
 	}
@@ -417,18 +413,22 @@ func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
 
 func (f *TestFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	fakeClient := f.Client.(*fake.RESTClient)
-	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(f.ClientConfigVal)
-	discoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
 	cacheDir := filepath.Join("", ".kube", "cache", "discovery")
-	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(f.ClientConfigVal, cacheDir, "", time.Duration(10*time.Minute))
+	if err != nil {
+		return nil, err
+	}
+	cachedClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+
+	return cachedClient, nil
 }
 
 func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
 	return f.ClientSet()
 }
 
-func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
+func testRESTMapper() meta.RESTMapper {
 	groupResources := testDynamicResources()
 	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
 	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
@@ -436,32 +436,13 @@ func (f *TestFactory) RESTMapper() (meta.RESTMapper, error) {
 	mapper = meta.FirstHitRESTMapper{
 		MultiRESTMapper: meta.MultiRESTMapper{
 			mapper,
-			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme),
+			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		},
 	}
 
-	// TODO: should probably be the external scheme
 	fakeDs := &fakeCachedDiscoveryClient{}
 	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
-	return expander, nil
-}
-
-func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	c, err := f.ClientSet()
-	if err != nil {
-		panic(err)
-	}
-
-	switch t := object.(type) {
-	case *api.Pod:
-		opts, ok := options.(*api.PodLogOptions)
-		if !ok {
-			return nil, errors.New("provided options object is not a PodLogOptions")
-		}
-		return c.Core().Pods(f.Namespace).GetLogs(t.Name, opts), nil
-	default:
-		return nil, fmt.Errorf("cannot get the logs from %T", object)
-	}
+	return expander
 }
 
 func (f *TestFactory) ScaleClient() (scaleclient.ScalesGetter, error) {

@@ -1068,11 +1068,18 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		glog.V(4).Infof("UnmapDevice: deviceToDetach.DevicePath: %v", deviceToDetach.DevicePath)
 		loopPath, err := og.blkUtil.GetLoopDevice(deviceToDetach.DevicePath)
 		if err != nil {
-			glog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
+			if err.Error() == volumepathhandler.ErrDeviceNotFound {
+				glog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
+			} else {
+				errInfo := "UnmapDevice.GetLoopDevice failed to get loopback device, " + fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)
+				return deviceToDetach.GenerateError(errInfo, err)
+			}
 		} else {
-			err = og.blkUtil.RemoveLoopDevice(loopPath)
-			if err != nil {
-				return deviceToDetach.GenerateError("UnmapDevice.AttachFileDevice failed", err)
+			if len(loopPath) != 0 {
+				err = og.blkUtil.RemoveLoopDevice(loopPath)
+				if err != nil {
+					return deviceToDetach.GenerateError("UnmapDevice.RemoveLoopDevice failed", err)
+				}
 			}
 		}
 

@@ -513,7 +513,7 @@ func TestCopyToPod(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	tf.Namespace = "test"
 	ns := legacyscheme.Codecs
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},

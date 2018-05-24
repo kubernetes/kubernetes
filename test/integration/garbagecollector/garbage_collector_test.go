@@ -168,9 +168,9 @@ func link(t *testing.T, owner, dependent metav1.Object) {
 
 func createRandomCustomResourceDefinition(
 	t *testing.T, apiExtensionClient apiextensionsclientset.Interface,
-	dynamicClient dynamic.DynamicInterface,
+	dynamicClient dynamic.Interface,
 	namespace string,
-) (*apiextensionsv1beta1.CustomResourceDefinition, dynamic.DynamicResourceInterface) {
+) (*apiextensionsv1beta1.CustomResourceDefinition, dynamic.ResourceInterface) {
 	// Create a random custom resource definition and ensure it's available for
 	// use.
 	definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
@@ -193,7 +193,7 @@ type testContext struct {
 	gc                 *garbagecollector.GarbageCollector
 	clientSet          clientset.Interface
 	apiExtensionClient apiextensionsclientset.Interface
-	dynamicClient      dynamic.DynamicInterface
+	dynamicClient      dynamic.Interface
 	startGC            func(workers int)
 	// syncPeriod is how often the GC started with startGC will be resynced.
 	syncPeriod time.Duration
@@ -224,9 +224,6 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	restMapper.Reset()
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	config := *result.ClientConfig
-	config.ContentConfig = dynamic.ContentConfig()
-	metaOnlyClientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-	clientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	dynamicClient, err := dynamic.NewForConfig(&config)
 	if err != nil {
 		t.Fatalf("failed to create dynamicClient: %v", err)
@@ -235,8 +232,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
-		metaOnlyClientPool,
-		clientPool,
+		dynamicClient,
 		restMapper,
 		deletableResources,
 		garbagecollector.DefaultIgnoredResources(),

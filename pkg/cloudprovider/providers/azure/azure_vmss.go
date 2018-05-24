@@ -247,10 +247,10 @@ func (ss *scaleSet) GetPrimaryVMSetName() string {
 // GetIPByNodeName gets machine private IP and public IP by node name.
 // TODO(feiskyer): Azure vmss doesn't support associating a public IP to single virtual machine yet,
 // fix this after it is supported.
-func (ss *scaleSet) GetIPByNodeName(nodeName, vmSetName string) (string, string, error) {
-	nic, err := ss.GetPrimaryInterface(nodeName, vmSetName)
+func (ss *scaleSet) GetIPByNodeName(nodeName string) (string, string, error) {
+	nic, err := ss.GetPrimaryInterface(nodeName)
 	if err != nil {
-		glog.Errorf("error: ss.GetIPByNodeName(%s), GetPrimaryInterface(%q, %q), err=%v", nodeName, nodeName, vmSetName, err)
+		glog.Errorf("error: ss.GetIPByNodeName(%s), GetPrimaryInterface(%q), err=%v", nodeName, nodeName, err)
 		return "", "", err
 	}
 
@@ -418,7 +418,7 @@ func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (vmSetN
 }
 
 // GetPrimaryInterface gets machine primary network interface by node name and vmSet.
-func (ss *scaleSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error) {
+func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, error) {
 	managedByAS, err := ss.isNodeManagedByAvailabilitySet(nodeName)
 	if err != nil {
 		glog.Errorf("Failed to check isNodeManagedByAvailabilitySet: %v", err)
@@ -426,19 +426,13 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Int
 	}
 	if managedByAS {
 		// vm is managed by availability set.
-		return ss.availabilitySet.GetPrimaryInterface(nodeName, "")
+		return ss.availabilitySet.GetPrimaryInterface(nodeName)
 	}
 
 	ssName, instanceID, vm, err := ss.getVmssVM(nodeName)
 	if err != nil {
 		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.getVmssVM(%s), err=%v", nodeName, nodeName, err)
 		return network.Interface{}, err
-	}
-
-	// Check scale set name.
-	// Backends of Standard load balancer could belong to multiple VMSS, so we don't check vmSet for it.
-	if !strings.EqualFold(ssName, vmSetName) && !ss.useStandardLoadBalancer() {
-		return network.Interface{}, errNotInVMSet
 	}
 
 	primaryInterfaceID, err := ss.getPrimaryInterfaceID(vm)
@@ -699,7 +693,7 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 	}
 
 	for ssName, instanceIDs := range scalesets {
-		// Only add nodes belonging to specified vmSet to basic LB backends.
+		// Only add nodes belonging to specified vmSet for basic SKU LB.
 		if !ss.useStandardLoadBalancer() && !strings.EqualFold(ssName, vmSetName) {
 			continue
 		}

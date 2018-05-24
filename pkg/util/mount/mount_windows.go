@@ -145,7 +145,11 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 	// If current file is a symlink, then it is a mountpoint.
 	if stat.Mode()&os.ModeSymlink != 0 {
-		return false, nil
+		target, err := os.Readlink(file)
+		if err != nil {
+			return true, fmt.Errorf("Readlink error: %v", err)
+		}
+		return !mounter.ExistsPath(target), nil
 	}
 
 	return true, nil
@@ -450,6 +454,11 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 // windows platform, see SetVolumeOwnership implementation.
 func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	return 0, nil
+}
+
+func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+	// Windows does not support SELinux.
+	return false, nil
 }
 
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.

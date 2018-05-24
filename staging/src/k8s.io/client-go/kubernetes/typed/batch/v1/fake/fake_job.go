@@ -62,7 +62,7 @@ func (c *FakeJobs) List(opts v1.ListOptions) (result *batch_v1.JobList, err erro
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &batch_v1.JobList{}
+	list := &batch_v1.JobList{ListMeta: obj.(*batch_v1.JobList).ListMeta}
 	for _, item := range obj.(*batch_v1.JobList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

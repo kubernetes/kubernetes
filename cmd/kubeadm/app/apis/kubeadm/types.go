@@ -42,24 +42,13 @@ type MasterConfiguration struct {
 	Networking Networking
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string
-	// CloudProvider is the name of the cloud provider.
-	CloudProvider string
 	// NodeName is the name of the node that will host the k8s control plane.
 	// Defaults to the hostname if not provided.
 	NodeName string
-	// AuthorizationModes is a set of authorization modes used inside the cluster.
-	// If not specified, defaults to Node and RBAC, meaning both the node
-	// authorizer and RBAC are enabled.
-	AuthorizationModes []string
 	// NoTaintMaster will, if set, suppress the tainting of the
 	// master node allowing workloads to be run on it (e.g. in
 	// single node configurations).
 	NoTaintMaster bool
-
-	// Mark the controller and api server pods as privileged as some cloud
-	// controllers like openstack need escalated privileges under some conditions
-	// example - loading a config drive to fetch node information.
-	PrivilegedPods bool
 
 	// Token is used for establishing bidirectional trust between nodes and masters.
 	// Used for joining nodes in the cluster.
@@ -103,9 +92,6 @@ type MasterConfiguration struct {
 	APIServerCertSANs []string
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string
-
-	// ImagePullPolicy for control plane images. Can be Always, IfNotPresent or Never.
-	ImagePullPolicy v1.PullPolicy
 
 	// ImageRepository is the container registry to pull control plane images from.
 	ImageRepository string
@@ -193,27 +179,12 @@ type Etcd struct {
 	// If empty, automatically populated by kubeadm using the image
 	// repository and default etcd version.
 	Image string
-	// SelfHosted holds configuration for self-hosting etcd.
-	SelfHosted *SelfHostedEtcd
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server
 	// signing cert. This is currently used for the etcd static-pod.
 	ServerCertSANs []string
 	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer
 	// signing cert. This is currently used for the etcd static-pod.
 	PeerCertSANs []string
-}
-
-// SelfHostedEtcd describes options required to configure self-hosted etcd.
-type SelfHostedEtcd struct {
-	// CertificatesDir represents the directory where all etcd TLS assets are stored.
-	// Defaults to "/etc/kubernetes/pki/etcd".
-	CertificatesDir string
-	// ClusterServiceName is the name of the service that load balances the etcd cluster.
-	ClusterServiceName string
-	// EtcdVersion is the version of etcd running in the cluster.
-	EtcdVersion string
-	// OperatorVersion is the version of the etcd-operator to use.
-	OperatorVersion string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -300,6 +271,8 @@ type HostPathMount struct {
 	MountPath string
 	// Writable controls write access to the volume
 	Writable bool
+	// PathType is the type of the HostPath.
+	PathType v1.HostPathType
 }
 
 // KubeProxy contains elements describing the proxy configuration.

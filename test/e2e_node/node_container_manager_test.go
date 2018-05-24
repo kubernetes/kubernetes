@@ -38,7 +38,7 @@ import (
 )
 
 func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
-	initialConfig.EnforceNodeAllocatable = []string{"pods", "kube-reserved", "system-reserved"}
+	initialConfig.EnforceNodeAllocatable = []string{"pods", kubeReservedCgroup, systemReservedCgroup}
 	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
 		string(v1.ResourceMemory): "100Mi",
@@ -98,8 +98,8 @@ func getAllocatableLimits(cpu, memory string, capacity v1.ResourceList) (*resour
 }
 
 const (
-	kubeReservedCgroup   = "kube_reserved"
-	systemReservedCgroup = "system_reserved"
+	kubeReservedCgroup   = "kube-reserved"
+	systemReservedCgroup = "system-reserved"
 )
 
 func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error {

@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -196,7 +197,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	forwardablePod, err := f.AttachablePodForObject(obj, getPodTimeout)
+	forwardablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, obj, getPodTimeout)
 	if err != nil {
 		return err
 	}
@@ -218,9 +219,10 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
+
 	o.PodClient = clientset.Core()
 
-	o.Config, err = f.ClientConfig()
+	o.Config, err = f.ToRESTConfig()
 	if err != nil {
 		return err
 	}

@@ -1,3 +1,4 @@
+
 cluster/images/etcd-version-monitor
 cmd/hyperkube
 cmd/kube-apiserver/app
@@ -6,6 +7,8 @@ cmd/kube-proxy/app
 cmd/kube-scheduler/app
 cmd/kubeadm/app
 cmd/kubeadm/app/apis/kubeadm/v1alpha1
+cmd/kubeadm/app/apis/kubeadm/v1alpha2
+cmd/kubeadm/app/util/config
 cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
@@ -65,6 +68,7 @@ pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
 pkg/apis/scheduling
 pkg/apis/scheduling/v1alpha1
+pkg/apis/scheduling/v1beta1
 pkg/apis/settings
 pkg/apis/settings/v1alpha1
 pkg/apis/storage
@@ -99,7 +103,6 @@ pkg/controller/deployment/util
 pkg/controller/disruption
 pkg/controller/endpoint
 pkg/controller/garbagecollector
-pkg/controller/garbagecollector/metaonly
 pkg/controller/job
 pkg/controller/namespace
 pkg/controller/namespace/deletion
@@ -134,7 +137,6 @@ pkg/kubeapiserver/authorizer/modes
 pkg/kubeapiserver/options
 pkg/kubeapiserver/server
 pkg/kubectl
-pkg/kubectl/categories
 pkg/kubectl/cmd
 pkg/kubectl/cmd/auth
 pkg/kubectl/cmd/config
@@ -148,8 +150,11 @@ pkg/kubectl/cmd/util
 pkg/kubectl/cmd/util/editor
 pkg/kubectl/cmd/util/jsonmerge
 pkg/kubectl/cmd/util/sanity
+pkg/kubectl/cmd/wait
+pkg/kubectl/genericclioptions
+pkg/kubectl/genericclioptions/printers
+pkg/kubectl/genericclioptions/resource
 pkg/kubectl/metricsutil
-pkg/kubectl/resource
 pkg/kubectl/util
 pkg/kubectl/util/crlf
 pkg/kubectl/util/slice
@@ -218,6 +223,7 @@ pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
 pkg/master/tunneler
+pkg/printers
 pkg/printers/internalversion
 pkg/printers/storage
 pkg/probe
@@ -441,6 +447,7 @@ staging/src/k8s.io/api/rbac/v1
 staging/src/k8s.io/api/rbac/v1alpha1
 staging/src/k8s.io/api/rbac/v1beta1
 staging/src/k8s.io/api/scheduling/v1alpha1
+staging/src/k8s.io/api/scheduling/v1beta1
 staging/src/k8s.io/api/settings/v1alpha1
 staging/src/k8s.io/api/storage/v1
 staging/src/k8s.io/api/storage/v1alpha1
@@ -461,8 +468,6 @@ staging/src/k8s.io/apimachinery/pkg/api/testing/fuzzer
 staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip
 staging/src/k8s.io/apimachinery/pkg/api/validation
 staging/src/k8s.io/apimachinery/pkg/api/validation/path
-staging/src/k8s.io/apimachinery/pkg/apimachinery/announced
-staging/src/k8s.io/apimachinery/pkg/apimachinery/registered
 staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
@@ -583,6 +588,7 @@ staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook
+staging/src/k8s.io/client-go/deprecated-dynamic
 staging/src/k8s.io/client-go/discovery/cached
 staging/src/k8s.io/client-go/dynamic
 staging/src/k8s.io/client-go/dynamic/fake
@@ -698,6 +704,7 @@ test/e2e/ui
 test/e2e/upgrades
 test/e2e/upgrades/apps
 test/e2e/upgrades/storage
+test/e2e_kubeadm
 test/e2e_node
 test/e2e_node/builder
 test/e2e_node/environment

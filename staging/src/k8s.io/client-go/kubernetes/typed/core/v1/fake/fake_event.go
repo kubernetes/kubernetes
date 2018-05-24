@@ -62,7 +62,7 @@ func (c *FakeEvents) List(opts v1.ListOptions) (result *core_v1.EventList, err e
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core_v1.EventList{}
+	list := &core_v1.EventList{ListMeta: obj.(*core_v1.EventList).ListMeta}
 	for _, item := range obj.(*core_v1.EventList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
