@@ -22,44 +22,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
-
-type FileNameFlags struct {
-	Usage string
-
-	Filenames *[]string
-	Recursive *bool
-}
-
-func (o *FileNameFlags) ToOptions() resource.FilenameOptions {
-	options := resource.FilenameOptions{}
-
-	if o.Recursive != nil {
-		options.Recursive = *o.Recursive
-	}
-	if o.Filenames != nil {
-		options.Filenames = *o.Filenames
-	}
-
-	return options
-}
-
-func (o *FileNameFlags) AddFlags(cmd *cobra.Command) {
-	if o.Recursive != nil {
-		cmd.Flags().BoolVarP(o.Recursive, "recursive", "R", *o.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
-	}
-	if o.Filenames != nil {
-		kubectl.AddJsonFilenameFlag(cmd, o.Filenames, "Filename, directory, or URL to files "+o.Usage)
-	}
-}
 
 // PrintFlags composes common printer flag structs
 // used for commands requiring deletion logic.
 type DeleteFlags struct {
-	FileNameFlags *FileNameFlags
+	FileNameFlags *genericclioptions.FileNameFlags
 	LabelSelector *string
 	FieldSelector *string
 
@@ -121,7 +90,7 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 }
 
 func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
-	f.FileNameFlags.AddFlags(cmd)
+	f.FileNameFlags.AddFlags(cmd.Flags())
 	if f.LabelSelector != nil {
 		cmd.Flags().StringVarP(f.LabelSelector, "selector", "l", *f.LabelSelector, "Selector (label query) to filter on, not including uninitialized ones.")
 	}
@@ -175,7 +144,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	recursive := false
 
 	return &DeleteFlags{
-		FileNameFlags: &FileNameFlags{Usage: usage, Filenames: &filenames, Recursive: &recursive},
+		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Recursive: &recursive},
 		LabelSelector: &labelSelector,
 		FieldSelector: &fieldSelector,
 
@@ -203,7 +172,7 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	recursive := false
 
 	return &DeleteFlags{
-		FileNameFlags: &FileNameFlags{Usage: usage, Filenames: &filenames, Recursive: &recursive},
+		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Recursive: &recursive},
 
 		Cascade:     &cascade,
 		GracePeriod: &gracePeriod,
