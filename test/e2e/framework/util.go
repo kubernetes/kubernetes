@@ -2325,6 +2325,21 @@ func (f *Framework) testContainerOutputMatcher(scenarioName string,
 	ExpectNoError(f.MatchContainerOutput(pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
 }
 
+// testContainerOutputMatcher runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using the given matcher.
+func (f *Framework) testContainerOutputMatcherWithOutputFunc(scenarioName string,
+	pod *v1.Pod,
+	containerIndex int,
+	outputGenerator ExpectedOutputFunc,
+	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
+	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
+	if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
+		Failf("Invalid container index: %d", containerIndex)
+	}
+	ExpectNoError(f.MatchContainerOutputWithOutputFunc(pod, pod.Spec.Containers[containerIndex].Name, outputGenerator, matcher))
+}
+
 // MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
 // It then tests that the matcher with each expectedOutput matches the output of the specified container.
 func (f *Framework) MatchContainerOutput(
@@ -2378,6 +2393,72 @@ func (f *Framework) MatchContainerOutput(
 		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
 	}
 
+	for _, expected := range expectedOutput {
+		m := matcher(expected)
+		matches, err := m.Match(logs)
+		if err != nil {
+			return fmt.Errorf("expected %q in container output: %v", expected, err)
+		} else if !matches {
+			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
+		}
+	}
+
+	return nil
+}
+
+// MatchContainerOutputWithOutputFunc creates a pod and waits for all it's containers to exit with success.
+// It then tests that the matcher with each outputGenerator() matches the output of the specified container.
+func (f *Framework) MatchContainerOutputWithOutputFunc(
+	pod *v1.Pod,
+	containerName string,
+	outputGenerator ExpectedOutputFunc,
+	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
+	ns := pod.ObjectMeta.Namespace
+	if ns == "" {
+		ns = f.Namespace.Name
+	}
+	podClient := f.PodClientNS(ns)
+
+	createdPod := podClient.Create(pod)
+	defer func() {
+		By("delete the pod")
+		podClient.DeleteSync(createdPod.Name, &metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
+	}()
+
+	// Wait for client pod to complete.
+	podErr := WaitForPodSuccessInNamespace(f.ClientSet, createdPod.Name, ns)
+
+	// Grab its logs.  Get host first.
+	podStatus, err := podClient.Get(createdPod.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get pod status: %v", err)
+	}
+
+	if podErr != nil {
+		// Pod failed. Dump all logs from all containers to see what's wrong
+		for _, container := range podStatus.Spec.Containers {
+			logs, err := GetPodLogs(f.ClientSet, ns, podStatus.Name, container.Name)
+			if err != nil {
+				Logf("Failed to get logs from node %q pod %q container %q: %v",
+					podStatus.Spec.NodeName, podStatus.Name, container.Name, err)
+				continue
+			}
+			Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, container.Name, logs)
+		}
+		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
+	}
+
+	Logf("Trying to get logs from node %s pod %s container %s: %v",
+		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
+
+	// Sometimes the actual containers take a second to get started, try to get logs for 60s
+	logs, err := GetPodLogs(f.ClientSet, ns, podStatus.Name, containerName)
+	if err != nil {
+		Logf("Failed to get logs from node %q pod %q container %q. %v",
+			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
+		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
+	}
+	expectedOutput := outputGenerator(podStatus)
 	for _, expected := range expectedOutput {
 		m := matcher(expected)
 		matches, err := m.Match(logs)
