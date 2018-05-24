@@ -113,6 +113,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:ExpandPersistentVolume
 
 		By("Creating a deployment with the provisioned volume")
 		deployment, err := framework.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
+		Expect(err).NotTo(HaveOccurred(), "Failed creating deployment %v", err)
 		defer c.AppsV1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		By("Expanding current pvc")
