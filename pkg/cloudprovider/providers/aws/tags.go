@@ -137,7 +137,7 @@ func (t *awsTagging) hasClusterTag(tags []*ec2.Tag) bool {
 	clusterTagKey := t.clusterTagKey()
 	for _, tag := range tags {
 		tagKey := aws.StringValue(tag.Key)
-                // Check if this is a newer-style cluster tag before checking if legacy tag value matches ClusterID
+		// Check if this is a newer-style cluster tag before checking if legacy tag value matches ClusterID
 		if tagKey == clusterTagKey {
 			return true
 		}
