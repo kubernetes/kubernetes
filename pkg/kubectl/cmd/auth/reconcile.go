@@ -97,7 +97,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 		return errors.New("no arguments are allowed")
 	}
 
-	namespace, enforceNamespace, err := f.DefaultNamespace()
+	namespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

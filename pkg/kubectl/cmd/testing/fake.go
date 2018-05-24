@@ -25,8 +25,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -234,12 +232,12 @@ func (d *fakeCachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList
 type TestFactory struct {
 	cmdutil.Factory
 
+	kubeConfigFlags *genericclioptions.TestConfigFlags
+
 	Client             kubectl.RESTClient
 	ScaleGetter        scaleclient.ScalesGetter
 	UnstructuredClient kubectl.RESTClient
-	Namespace          string
 	ClientConfigVal    *restclient.Config
-	CommandVal         string
 	FakeDynamicClient  *fakedynamic.FakeDynamicClient
 
 	tempConfigFile *os.File
@@ -276,11 +274,17 @@ func NewTestFactory() *TestFactory {
 
 	return &TestFactory{
 		Factory:           cmdutil.NewFactory(configFlags),
+		kubeConfigFlags:   configFlags,
 		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(legacyscheme.Scheme),
 		tempConfigFile:    tmpFile,
 
 		ClientConfigVal: restConfig,
 	}
+}
+
+func (f *TestFactory) WithNamespace(ns string) *TestFactory {
+	f.kubeConfigFlags.WithNamespace(ns)
+	return f
 }
 
 func (f *TestFactory) Cleanup() {
@@ -292,10 +296,6 @@ func (f *TestFactory) Cleanup() {
 }
 
 func (f *TestFactory) ToRESTConfig() (*restclient.Config, error) {
-	return f.ClientConfigVal, nil
-}
-
-func (f *TestFactory) BareClientConfig() (*restclient.Config, error) {
 	return f.ClientConfigVal, nil
 }
 
@@ -314,19 +314,11 @@ func (f *TestFactory) Validator(validate bool) (validation.Schema, error) {
 	return validation.NullSchema{}, nil
 }
 
-func (f *TestFactory) DefaultNamespace() (string, bool, error) {
-	return f.Namespace, false, nil
-}
-
 func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 	if f.OpenAPISchemaFunc != nil {
 		return f.OpenAPISchemaFunc()
 	}
 	return openapitesting.EmptyResources{}, nil
-}
-
-func (f *TestFactory) Command(*cobra.Command, bool) string {
-	return f.CommandVal
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
@@ -423,10 +415,6 @@ func (f *TestFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, err
 	cachedClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
 	return cachedClient, nil
-}
-
-func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
-	return f.ClientSet()
 }
 
 func testRESTMapper() meta.RESTMapper {

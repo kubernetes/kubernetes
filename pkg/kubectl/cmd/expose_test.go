@@ -467,7 +467,7 @@ func TestRunExposeService(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace(test.ns)
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -486,7 +486,6 @@ func TestRunExposeService(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = test.ns
 
 			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdExposeService(tf, ioStreams)
