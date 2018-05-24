@@ -243,6 +243,9 @@ func MakeDeployment(replicas int32, podLabels map[string]string, nodeSelector ma
 		},
 		Spec: apps.DeploymentSpec{
 			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: podLabels,
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabels,
