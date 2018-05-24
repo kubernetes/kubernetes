@@ -426,6 +426,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Admit:                        s.admissionControl,
 		MinRequestTimeout:            s.minRequestTimeout,
 		EnableAPIResponseCompression: s.enableAPIResponseCompression,
+		OpenAPIConfig:                s.openAPIConfig,
 	}
 }
 

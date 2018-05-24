@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -55,6 +56,7 @@ type RequestScope struct {
 	UnsafeConvertor runtime.ObjectConvertor
 
 	TableConvertor rest.TableConvertor
+	OpenAPISchema  openapiproto.Schema
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind

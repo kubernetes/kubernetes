@@ -39,6 +39,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
+	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 )
 
 const (
@@ -494,6 +496,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
+	}
+	if a.group.OpenAPIConfig != nil {
+		openAPIDefinitions, err := openapibuilder.BuildOpenAPIDefinitionsForResource(defaultVersionedObject, a.group.OpenAPIConfig)
+		if err != nil {
+			return nil, fmt.Errorf("unable to build openapi definitions for %v: %v", fqKindToRegister, err)
+		}
+		reqScope.OpenAPISchema, err = utilopenapi.ToProtoSchema(openAPIDefinitions, fqKindToRegister)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get openapi schema for %v: %v", fqKindToRegister, err)
+		}
 	}
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
