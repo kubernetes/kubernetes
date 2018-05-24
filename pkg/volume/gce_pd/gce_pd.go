@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -54,6 +53,19 @@ const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
 	gceVolumeLimitKey           = "storage-limits-gce-pd"
 )
+
+// The constants and DiskAttachLimit are used to map from the machine type (number of CPUs) to the limit of
+// persistant disks that can be attached to an instance. Please refer to gcloud doc
+// https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+const (
+	Default = iota
+	OneCPU
+	TwotoFourCPUs
+	EightCPUsandAbove
+	EightCPUs = 8
+)
+
+var DiskAttachLimit = []int64{16, 32, 64, 128}
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
@@ -102,15 +114,38 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 }
 
 func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
-	cloud := plugin.host.GetCloudProvider()
-
-	if cloud.ProviderName() != gcecloud.ProviderName {
-		return nil, fmt.Errorf("Expected gce cloud got %s", cloud.ProviderName())
-	}
 
 	volumeLimits := map[string]int64{
-		gceVolumeLimitKey: 16,
+		gceVolumeLimitKey: DiskAttachLimit[Default],
 	}
+	kubeClient := plugin.host.GetKubeClient()
+	if kubeClient == nil {
+		return nil, fmt.Errorf("failed to get kube client")
+	}
+	node, err := kubeClient.CoreV1().Nodes().Get(string(plugin.host.GetNodeName()), metav1.GetOptions{})
+	if err != nil {
+		glog.Errorf("failed to get node object %s: %v", node.Name, err)
+		return nil, err
+	}
+
+	cpu, ok := node.Status.Capacity[v1.ResourceCPU]
+	if !ok {
+		return nil, fmt.Errorf("Cannot get CPU resource information from node status")
+	}
+
+	cpuValue, ok := cpu.AsInt64()
+	if cpuValue < OneCPU {
+		volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[Default]
+	} else if cpuValue == OneCPU {
+		volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[OneCPU]
+	} else if cpuValue < EightCPUs {
+		volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[TwotoFourCPUs]
+	} else if cpuValue >= EightCPUs{
+		volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[EightCPUsandAbove]
+	} else {
+		volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[Default]
+	}
+
 	return volumeLimits, nil
 }
 
