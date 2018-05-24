@@ -9,7 +9,7 @@ docs/admin/kubeadm_alpha.md
 docs/admin/kubeadm_alpha_phase.md
 docs/admin/kubeadm_alpha_phase_addon.md
 docs/admin/kubeadm_alpha_phase_addon_all.md
-docs/admin/kubeadm_alpha_phase_addon_kube-dns.md
+docs/admin/kubeadm_alpha_phase_addon_coredns.md
 docs/admin/kubeadm_alpha_phase_addon_kube-proxy.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_all.md
@@ -86,7 +86,7 @@ docs/man/man1/kube-controller-manager.1
 docs/man/man1/kube-proxy.1
 docs/man/man1/kube-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-addon-all.1
-docs/man/man1/kubeadm-alpha-phase-addon-kube-dns.1
+docs/man/man1/kubeadm-alpha-phase-addon-coredns.1
 docs/man/man1/kubeadm-alpha-phase-addon-kube-proxy.1
 docs/man/man1/kubeadm-alpha-phase-addon.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-all.1

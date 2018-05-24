@@ -39,24 +39,24 @@ import (
 
 var (
 	allAddonsLongDesc = normalizer.LongDesc(`
-		Installs the kube-dns and the kube-proxys addons components via the API server.  
+		Installs the CoreDNS and the kube-proxys addons components via the API server.
 		Please note that although the DNS server is deployed, it will not be scheduled until CNI is installed.
 		` + cmdutil.AlphaDisclaimer)
 
 	allAddonsExample = normalizer.Examples(`
-		# Installs the kube-dns and the kube-proxys addons components via the API server, 
+		# Installs the CoreDNS and the kube-proxys addons components via the API server,
 		# functionally equivalent to what installed by kubeadm init. 
 
 		kubeadm alpha phase selfhosting from-staticpods
 		`)
 
-	kubednsAddonsLongDesc = normalizer.LongDesc(`
-		Installs the kube-dns addon components via the API server.  
+	corednsAddonsLongDesc = normalizer.LongDesc(`
+		Installs the CoreDNS addon components via the API server.
 		Please note that although the DNS server is deployed, it will not be scheduled until CNI is installed.
 		` + cmdutil.AlphaDisclaimer)
 
 	kubeproxyAddonsLongDesc = normalizer.LongDesc(`
-		Installs the kube-proxy addon components via the API server.  
+		Installs the kube-proxy addon components via the API server.
 		` + cmdutil.AlphaDisclaimer)
 )
 
@@ -116,9 +116,9 @@ func getAddonsSubCommands() []*cobra.Command {
 			cmdFunc:  EnsureAllAddons,
 		},
 		{
-			use:     "kube-dns",
-			short:   "Installs the kube-dns addon to a Kubernetes cluster",
-			long:    kubednsAddonsLongDesc,
+			use:     "coredns",
+			short:   "Installs the CoreDNS addon to a Kubernetes cluster",
+			long:    corednsAddonsLongDesc,
 			cmdFunc: dnsaddon.EnsureDNSAddon,
 		},
 		{
@@ -151,7 +151,7 @@ func getAddonsSubCommands() []*cobra.Command {
 			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, `The range of IP addresses used for the Pod network`)
 		}
 
-		if properties.use == "all" || properties.use == "kube-dns" {
+		if properties.use == "all" || properties.use == "coredns" {
 			cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain, `Alternative domain for services`)
 			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, `The range of IP address used for service VIPs`)
 			cmd.Flags().StringVar(&featureGatesString, "feature-gates", featureGatesString, "A set of key=value pairs that describe feature gates for various features."+
