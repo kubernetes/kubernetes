@@ -19,12 +19,12 @@ package kubectl
 import (
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
-	clientappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
-	clientextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -38,28 +38,28 @@ type StatusViewer interface {
 func StatusViewerFor(kind schema.GroupKind, c kubernetes.Interface) (StatusViewer, error) {
 	switch kind {
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(), apps.Kind("Deployment"):
-		return &DeploymentStatusViewer{c.ExtensionsV1beta1()}, nil
+		return &DeploymentStatusViewer{c.AppsV1()}, nil
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind(), apps.Kind("DaemonSet"):
-		return &DaemonSetStatusViewer{c.ExtensionsV1beta1()}, nil
+		return &DaemonSetStatusViewer{c.AppsV1()}, nil
 	case apps.Kind("StatefulSet"):
-		return &StatefulSetStatusViewer{c.AppsV1beta1()}, nil
+		return &StatefulSetStatusViewer{c.AppsV1()}, nil
 	}
 	return nil, fmt.Errorf("no status viewer has been implemented for %v", kind)
 }
 
 // DeploymentStatusViewer implements the StatusViewer interface.
 type DeploymentStatusViewer struct {
-	c clientextensionsv1beta1.DeploymentsGetter
+	c clientappsv1.DeploymentsGetter
 }
 
 // DaemonSetStatusViewer implements the StatusViewer interface.
 type DaemonSetStatusViewer struct {
-	c clientextensionsv1beta1.DaemonSetsGetter
+	c clientappsv1.DaemonSetsGetter
 }
 
 // StatefulSetStatusViewer implements the StatusViewer interface.
 type StatefulSetStatusViewer struct {
-	c clientappsv1beta1.StatefulSetsGetter
+	c clientappsv1.StatefulSetsGetter
 }
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done.
@@ -78,7 +78,7 @@ func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) 
 		}
 	}
 	if deployment.Generation <= deployment.Status.ObservedGeneration {
-		cond := util.GetDeploymentCondition(deployment.Status, extensionsv1beta1.DeploymentProgressing)
+		cond := util.GetDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
 		if cond != nil && cond.Reason == util.TimedOutReason {
 			return "", false, fmt.Errorf("deployment %q exceeded its progress deadline", name)
 		}
@@ -104,7 +104,7 @@ func (s *DaemonSetStatusViewer) Status(namespace, name string, revision int64) (
 	if err != nil {
 		return "", false, err
 	}
-	if daemon.Spec.UpdateStrategy.Type != extensionsv1beta1.RollingUpdateDaemonSetStrategyType {
+	if daemon.Spec.UpdateStrategy.Type != appsv1.RollingUpdateDaemonSetStrategyType {
 		return "", true, fmt.Errorf("Status is available only for RollingUpdate strategy type")
 	}
 	if daemon.Generation <= daemon.Status.ObservedGeneration {
@@ -128,7 +128,7 @@ func (s *StatefulSetStatusViewer) Status(namespace, name string, revision int64)
 	if sts.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
 		return "", true, fmt.Errorf("%s updateStrategy does not have a Status`", apps.OnDeleteStatefulSetStrategyType)
 	}
-	if sts.Status.ObservedGeneration == nil || sts.Generation > *sts.Status.ObservedGeneration {
+	if sts.Status.ObservedGeneration == 0 || sts.Generation > sts.Status.ObservedGeneration {
 		return "Waiting for statefulset spec update to be observed...\n", false, nil
 	}
 	if sts.Spec.Replicas != nil && sts.Status.ReadyReplicas < *sts.Spec.Replicas {
