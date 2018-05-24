@@ -277,7 +277,7 @@ func (o *SetResourcesOptions) Run() error {
 
 		if o.Local || o.DryRun {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
-				return err
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
@@ -289,7 +289,7 @@ func (o *SetResourcesOptions) Run() error {
 		}
 
 		if err := o.PrintObj(actual, o.Out); err != nil {
-			return err
+			allErrs = append(allErrs, err)
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)

@@ -159,7 +159,9 @@ func (o ResumeConfig) RunResume() error {
 				allErrs = append(allErrs, err)
 				continue
 			}
-			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+			if err = printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+				allErrs = append(allErrs, err)
+			}
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -174,7 +176,9 @@ func (o ResumeConfig) RunResume() error {
 			allErrs = append(allErrs, err)
 			continue
 		}
-		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+		if err = printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 
 	return utilerrors.NewAggregate(allErrs)

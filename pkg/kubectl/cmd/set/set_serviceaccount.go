@@ -198,7 +198,7 @@ func (o *SetServiceAccountOptions) Run() error {
 		}
 		if o.local || o.dryRun {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
-				return err
+				patchErrs = append(patchErrs, err)
 			}
 			continue
 		}
@@ -209,7 +209,7 @@ func (o *SetServiceAccountOptions) Run() error {
 		}
 
 		if err := o.PrintObj(actual, o.Out); err != nil {
-			return err
+			patchErrs = append(patchErrs, err)
 		}
 	}
 	return utilerrors.NewAggregate(patchErrs)

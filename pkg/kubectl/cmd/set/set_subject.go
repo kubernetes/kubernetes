@@ -251,7 +251,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 
 		if o.Local || o.DryRun {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
-				return err
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
