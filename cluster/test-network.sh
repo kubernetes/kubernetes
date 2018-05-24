@@ -27,4 +27,4 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 KUBE_CONFIG_FILE="config-default.sh"
 
-${KUBE_ROOT}/hack/ginkgo-e2e.sh --ginkgo.focus=Networking
+${KUBE_ROOT}/cluster/test-e2e.sh --ginkgo.focus=Networking

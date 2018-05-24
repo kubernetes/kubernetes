@@ -48,5 +48,5 @@ if [[ -f /.dockerenv ]]; then
 else
 	# Running locally.
  	ARGS=$(echo $ARGS | sed 's/\[/\\\[/g' | sed 's/\]/\\\]/g')
-	${KUBE_ROOT}/hack/ginkgo-e2e.sh "--e2e-verify-service-account=false" "--dump-logs-on-failure=false" $ARGS
+	${KUBE_ROOT}/cluster/test-e2e.sh "--e2e-verify-service-account=false" "--dump-logs-on-failure=false" $ARGS
 fi

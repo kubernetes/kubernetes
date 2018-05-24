@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: remove this file until modify file reference in test-infra repo.
+
 set -o errexit
 set -o nounset
 set -o pipefail
