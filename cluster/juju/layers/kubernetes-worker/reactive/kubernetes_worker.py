@@ -740,15 +740,12 @@ def launch_default_ingress_controller():
     # Render the ingress daemon set controller manifest
     context['ingress_image'] = config.get('nginx-image')
     if context['ingress_image'] == "" or context['ingress_image'] == "auto":
-        if context['arch'] == 's390x':
-            context['ingress_image'] = \
-                "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
-        elif context['arch'] == 'arm64':
-            context['ingress_image'] = \
-                "k8s.gcr.io/nginx-ingress-controller-arm64:0.9.0-beta.15"
-        else:
-            context['ingress_image'] = \
-                "quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.15.0" $ noqa
+        images = {'amd64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.15.0', # noqa
+                  'arm64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-arm64:0.15.0', # noqa
+                  's390x': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-s390x:0.15.0', # noqa
+                  'ppcle': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-ppc64le:0.15.0', # noqa
+                  }
+        context['ingress_image'] = images.get(context['arch'], images['amd64'])
     if get_version('kubelet') < (1, 9):
         context['daemonset_api_version'] = 'extensions/v1beta1'
     else:
