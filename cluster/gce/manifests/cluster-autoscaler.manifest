@@ -7,6 +7,9 @@
         "labels": {
             "tier": "cluster-management",
             "component": "cluster-autoscaler"
+        },
+        "annotations": {
+            "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
         }
     },
     "spec": {
