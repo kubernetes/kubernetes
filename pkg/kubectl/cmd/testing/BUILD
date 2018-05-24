@@ -18,7 +18,6 @@ go_library(
         "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/genericclioptions/resource:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
-        "//pkg/printers:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta/testrestmapper:go_default_library",
