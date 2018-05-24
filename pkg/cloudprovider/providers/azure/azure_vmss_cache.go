@@ -67,12 +67,13 @@ func (ss *scaleSet) newVmssCache() (*timedCache, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 		result, err := ss.VirtualMachineScaleSetsClient.Get(ctx, ss.ResourceGroup, key)
-		exists, realErr := checkResourceExistsFromError(err)
+		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
 		}
 
 		if !exists {
+			glog.V(2).Infof("Virtual machine scale set %q not found with message: %q", key, message)
 			return nil, nil
 		}
 
@@ -147,12 +148,13 @@ func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 		result, err := ss.VirtualMachineScaleSetVMsClient.Get(ctx, ss.ResourceGroup, ssName, instanceID)
-		exists, realErr := checkResourceExistsFromError(err)
+		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
 		}
 
 		if !exists {
+			glog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
 			return nil, nil
 		}
 
