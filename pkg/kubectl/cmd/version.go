@@ -47,6 +47,7 @@ var (
 type VersionOptions struct {
 	ClientOnly bool
 	Short      bool
+	Verify     bool
 	Output     string
 
 	discoveryClient discovery.CachedDiscoveryInterface
@@ -76,6 +77,7 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	}
 	cmd.Flags().BoolVarP(&o.ClientOnly, "client", "c", o.ClientOnly, "Client version only (no server required).")
 	cmd.Flags().BoolVarP(&o.Short, "short", "", o.Short, "Print just the version number.")
+	cmd.Flags().BoolVarP(&o.Verify, "verify", "", o.Verify, "Verify if client corresponds with server version information. Verify version match by running with short option")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "One of 'yaml' or 'json'.")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
@@ -95,6 +97,9 @@ func (o *VersionOptions) Validate() error {
 		return errors.New(`--output must be 'yaml' or 'json'`)
 	}
 
+	if o.Verify && (o.ClientOnly || len(o.Output) != 0) {
+		return errors.New(`--verify can not run with --client or --output`)
+	}
 	return nil
 }
 
@@ -113,6 +118,27 @@ func (o *VersionOptions) Run() error {
 		o.discoveryClient.Invalidate()
 		serverVersion, serverErr = o.discoveryClient.ServerVersion()
 		versionInfo.ServerVersion = serverVersion
+	}
+
+	if o.Verify {
+		if serverVersion == nil {
+			return errors.New(`Could not get server version`)
+		}
+		var matched bool
+		if o.Short {
+			if clientVersion.GitVersion == serverVersion.GitVersion {
+				matched = true
+			}
+		} else {
+			if clientVersion == *serverVersion {
+				matched = true
+			}
+		}
+		if !matched {
+			return errors.New(`mismatch`)
+		}
+		fmt.Fprintf(o.Out, "match\n")
+		return nil
 	}
 
 	switch o.Output {
