@@ -275,7 +275,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		effectiveTimeout = 168 * time.Hour
 	}
 	waitOptions := kubectlwait.WaitOptions{
-		ResourceFinder: kubectlwait.ResourceFinderForResult(o.Result),
+		ResourceFinder: genericclioptions.ResourceFinderForResult(o.Result),
 		DynamicClient:  o.DynamicClient,
 		Timeout:        effectiveTimeout,
 
