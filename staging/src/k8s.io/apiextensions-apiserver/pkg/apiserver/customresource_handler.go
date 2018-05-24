@@ -349,8 +349,8 @@ func (r *crdHandler) removeDeadStorage() {
 			}
 		}
 		if !found {
-			for version, storage := range s.storages {
-				glog.V(4).Infof("Removing dead CRD storage for %v", s.requestScopes[version].Resource)
+			glog.V(4).Infof("Removing dead CRD storage for %s/%s", s.spec.Group, s.spec.Names.Kind)
+			for _, storage := range s.storages {
 				// destroy only the main storage. Those for the subresources share cacher and etcd clients.
 				storage.CustomResource.DestroyFunc()
 			}
