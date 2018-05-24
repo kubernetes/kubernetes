@@ -8,6 +8,7 @@ go_library(
         "config_flags.go",
         "config_flags_fake.go",
         "doc.go",
+        "filename_flags.go",
         "io_options.go",
         "json_yaml_flags.go",
         "name_flags.go",
