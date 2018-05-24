@@ -17,15 +17,13 @@ ClusterName: kubernetes
 ControllerManagerExtraArgs: null
 ControllerManagerExtraVolumes: null
 Etcd:
-  CAFile: ""
-  CertFile: ""
-  DataDir: /var/lib/etcd
-  Endpoints: null
-  ExtraArgs: null
-  Image: ""
-  KeyFile: ""
-  PeerCertSANs: null
-  ServerCertSANs: null
+  External: null
+  Local:
+    DataDir: /var/lib/etcd
+    ExtraArgs: null
+    Image: ""
+    PeerCertSANs: null
+    ServerCertSANs: null
 FeatureGates: null
 ImageRepository: k8s.gcr.io
 KubeProxy:
