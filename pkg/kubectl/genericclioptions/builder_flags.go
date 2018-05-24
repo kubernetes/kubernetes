@@ -17,53 +17,46 @@ limitations under the License.
 package genericclioptions
 
 import (
-	"strings"
-
-	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
 // ResourceBuilderFlags are flags for finding resources
+// TODO(juanvallejo): wire --local flag from commands through
 type ResourceBuilderFlags struct {
-	FilenameOptions resource.FilenameOptions
-
-	Namespace         string
-	ExplicitNamespace bool
+	FileNameFlags *FileNameFlags
 
 	LabelSelector *string
 	FieldSelector *string
 	AllNamespaces *bool
 
-	All   *bool
-	Local *bool
+	All bool
 }
 
 // NewResourceBuilderFlags returns a default ResourceBuilderFlags
 func NewResourceBuilderFlags() *ResourceBuilderFlags {
+	filenames := []string{}
+
 	return &ResourceBuilderFlags{
-		FilenameOptions: resource.FilenameOptions{
-			Recursive: true,
+		FileNameFlags: &FileNameFlags{
+			Usage:     "identifying the resource.",
+			Filenames: &filenames,
+			Recursive: boolPtr(true),
 		},
 
-		LabelSelector: str_ptr(""),
-		FieldSelector: str_ptr(""),
-		AllNamespaces: bool_ptr(false),
-
-		All:   bool_ptr(false),
-		Local: bool_ptr(false),
+		LabelSelector: strPtr(""),
+		AllNamespaces: boolPtr(false),
 	}
+}
+
+func (o *ResourceBuilderFlags) WithFieldSelector(selector string) *ResourceBuilderFlags {
+	o.FieldSelector = &selector
+	return o
 }
 
 // AddFlags registers flags for finding resources
 func (o *ResourceBuilderFlags) AddFlags(flagset *pflag.FlagSet) {
-	flagset.StringSliceVarP(&o.FilenameOptions.Filenames, "filename", "f", o.FilenameOptions.Filenames, "Filename, directory, or URL to files identifying the resource.")
-	annotations := make([]string, 0, len(resource.FileExtensions))
-	for _, ext := range resource.FileExtensions {
-		annotations = append(annotations, strings.TrimLeft(ext, "."))
-	}
-	flagset.SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
-	flagset.BoolVar(&o.FilenameOptions.Recursive, "recursive", o.FilenameOptions.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
+	o.FileNameFlags.AddFlags(flagset)
 
 	if o.LabelSelector != nil {
 		flagset.StringVarP(o.LabelSelector, "selector", "l", *o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
@@ -80,29 +73,23 @@ func (o *ResourceBuilderFlags) AddFlags(flagset *pflag.FlagSet) {
 func (o *ResourceBuilderFlags) ToBuilder(restClientGetter RESTClientGetter, resources []string) ResourceFinder {
 	namespace, enforceNamespace, namespaceErr := restClientGetter.ToRawKubeConfigLoader().Namespace()
 
-	labelSelector := ""
+	builder := resource.NewBuilder(restClientGetter).
+		Unstructured().
+		NamespaceParam(namespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(o.All, resources...)
+	if o.FileNameFlags != nil {
+		opts := o.FileNameFlags.ToOptions()
+		builder = builder.FilenameParam(enforceNamespace, &opts)
+	}
 	if o.LabelSelector != nil {
-		labelSelector = *o.LabelSelector
+		builder = builder.LabelSelectorParam(*o.LabelSelector)
 	}
-
-	fieldSelector := ""
 	if o.FieldSelector != nil {
-		fieldSelector = *o.FieldSelector
-	}
-
-	allResources := false
-	if o.All != nil {
-		allResources = *o.All
+		builder = builder.FieldSelectorParam(*o.FieldSelector)
 	}
 
 	return &ResourceFindBuilderWrapper{
-		builder: resource.NewBuilder(restClientGetter).
-			Unstructured().
-			NamespaceParam(namespace).DefaultNamespace().
-			FilenameParam(enforceNamespace, &o.FilenameOptions).
-			LabelSelectorParam(labelSelector).
-			FieldSelectorParam(fieldSelector).
-			ResourceTypeOrNameArgs(allResources, resources...).
+		builder: builder.
 			Latest().
 			Flatten().
 			AddError(namespaceErr),
@@ -140,10 +127,10 @@ func ResourceFinderForResult(result resource.Visitor) ResourceFinder {
 	})
 }
 
-func str_ptr(val string) *string {
+func strPtr(val string) *string {
 	return &val
 }
 
-func bool_ptr(val bool) *bool {
+func boolPtr(val bool) *bool {
 	return &val
 }
