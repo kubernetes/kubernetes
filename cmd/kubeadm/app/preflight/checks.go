@@ -89,8 +89,8 @@ type Checker interface {
 
 // CRICheck verifies the container runtime through the CRI.
 type CRICheck struct {
-	socket string
-	exec   utilsexec.Interface
+	Socket string
+	Exec   utilsexec.Interface
 }
 
 // Name returns label for CRICheck.
@@ -101,13 +101,13 @@ func (CRICheck) Name() string {
 // Check validates the container runtime through the CRI.
 func (criCheck CRICheck) Check() (warnings, errors []error) {
 	glog.V(1).Infoln("validating the container runtime through the CRI")
-	crictlPath, err := criCheck.exec.LookPath("crictl")
+	crictlPath, err := criCheck.Exec.LookPath("crictl")
 	if err != nil {
 		errors = append(errors, fmt.Errorf("unable to find command crictl: %s", err))
 		return warnings, errors
 	}
-	if err := criCheck.exec.Command(crictlPath, "-r", criCheck.socket, "info").Run(); err != nil {
-		errors = append(errors, fmt.Errorf("unable to check if the container runtime at %q is running: %s", criCheck.socket, err))
+	if err := criCheck.Exec.Command(crictlPath, "-r", criCheck.Socket, "info").Run(); err != nil {
+		errors = append(errors, fmt.Errorf("unable to check if the container runtime at %q is running: %s", criCheck.Socket, err))
 		return warnings, errors
 	}
 	return warnings, errors
@@ -970,7 +970,7 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 
 	// Check whether or not the CRI socket defined is the default
 	if cfg.GetCRISocket() != kubeadmdefaults.DefaultCRISocket {
-		checks = append(checks, CRICheck{socket: cfg.GetCRISocket(), exec: execer})
+		checks = append(checks, CRICheck{Socket: cfg.GetCRISocket(), Exec: execer})
 	} else {
 		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
 	}

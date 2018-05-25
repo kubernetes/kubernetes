@@ -148,10 +148,11 @@ func (r *Reset) Run(out io.Writer) error {
 	}
 
 	glog.Infoln("[reset] removing kubernetes-managed containers")
-	dockerCheck := preflight.ServiceCheck{Service: "docker", CheckIfActive: true}
 	execer := utilsexec.New()
+	dockerCheck := preflight.ServiceCheck{Service: "docker", CheckIfActive: true}
+	criCheck := preflight.CRICheck{Socket: r.criSocketPath, Exec: execer}
 
-	reset(execer, dockerCheck, r.criSocketPath)
+	reset(execer, dockerCheck, criCheck, r.criSocketPath)
 
 	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}
 
@@ -183,10 +184,15 @@ func (r *Reset) Run(out io.Writer) error {
 	return nil
 }
 
-func reset(execer utilsexec.Interface, dockerCheck preflight.Checker, criSocketPath string) {
-	crictlPath, err := execer.LookPath("crictl")
-	if err == nil {
-		resetWithCrictl(execer, dockerCheck, criSocketPath, crictlPath)
+func reset(execer utilsexec.Interface, dockerCheck preflight.Checker, criCheck preflight.Checker, criSocketPath string) {
+	if criSocketPath != kubeadmapiv1alpha2.DefaultCRISocket {
+		crictlPath, err := execer.LookPath("crictl")
+		if err == nil {
+			resetWithCrictl(execer, dockerCheck, criCheck, criSocketPath, crictlPath)
+		} else {
+			glog.Warningf("[reset] WARNING: crictl not found in the PATH. Trying to use docker instead")
+			resetWithDocker(execer, dockerCheck)
+		}
 	} else {
 		resetWithDocker(execer, dockerCheck)
 	}
@@ -202,8 +208,18 @@ func resetWithDocker(execer utilsexec.Interface, dockerCheck preflight.Checker) 
 	}
 }
 
-func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, criSocketPath, crictlPath string) {
+func resetWithCrictl(execer utilsexec.Interface, dockerCheck, criCheck preflight.Checker, criSocketPath, crictlPath string) {
 	if criSocketPath != "" {
+		_, errors := criCheck.Check()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				glog.V(1).Infof("[reset] %v", err)
+			}
+			glog.V(1).Infof("[reset] Trying to use docker instead")
+			resetWithDocker(execer, dockerCheck)
+			return
+		}
+
 		glog.Infof("[reset] cleaning up running containers using crictl with socket %s\n", criSocketPath)
 		glog.V(1).Infoln("[reset] listing running pods using crictl")
 
