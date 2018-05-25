@@ -28,6 +28,7 @@ release_filegroup(
         "configure.sh",
         "master.yaml",
         "node.yaml",
+        "shutdown.sh",
     ],
     visibility = ["//visibility:public"],
 )
