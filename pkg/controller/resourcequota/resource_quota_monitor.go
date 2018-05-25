@@ -93,6 +93,7 @@ type QuotaMonitor struct {
 	resourceChanges workqueue.RateLimitingInterface
 
 	// list of resources to ignore
+	// TODO: we either find a way to discover this or find a way to provide it via config
 	ignoredResources map[schema.GroupResource]struct{}
 
 	// The period that should be used to re-sync the monitored resource
