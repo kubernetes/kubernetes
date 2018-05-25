@@ -46,15 +46,6 @@ import (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory interface {
-	ClientAccessFactory
-	ObjectMappingFactory
-	BuilderFactory
-}
-
-// ClientAccessFactory holds the first level of factory methods.
-// Generally provides discovery, negotiation, and no-dep calls.
-// TODO The polymorphic calls probably deserve their own interface.
-type ClientAccessFactory interface {
 	genericclioptions.RESTClientGetter
 
 	// ClientSet gives you back an internal, generated clientset
@@ -79,11 +70,7 @@ type ClientAccessFactory interface {
 	DefaultNamespace() (string, bool, error)
 	// Generators returns the generators for the provided command
 	Generators(cmdName string) map[string]kubectl.Generator
-}
 
-// ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
-// Generally they provide object typing and functions that build requests based on the negotiated clients.
-type ObjectMappingFactory interface {
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -94,33 +81,9 @@ type ObjectMappingFactory interface {
 	Validator(validate bool) (validation.Schema, error)
 	// OpenAPISchema returns the schema openapi schema definition
 	OpenAPISchema() (openapi.Resources, error)
-}
 
-// BuilderFactory holds the third level of factory methods. These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
-// Generally they depend upon client mapper functions
-type BuilderFactory interface {
 	// ScaleClient gives you back scale getter
 	ScaleClient() (scaleclient.ScalesGetter, error)
-}
-
-type factory struct {
-	ClientAccessFactory
-	ObjectMappingFactory
-	BuilderFactory
-}
-
-// NewFactory creates a factory with the default Kubernetes resources defined
-// Receives a clientGetter capable of providing a discovery client and a REST client configuration.
-func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
-	clientAccessFactory := NewClientAccessFactory(clientGetter)
-	objectMappingFactory := NewObjectMappingFactory(clientAccessFactory)
-	builderFactory := NewBuilderFactory(clientAccessFactory, objectMappingFactory)
-
-	return &factory{
-		ClientAccessFactory:  clientAccessFactory,
-		ObjectMappingFactory: objectMappingFactory,
-		BuilderFactory:       builderFactory,
-	}
 }
 
 func makePortsString(ports []api.ServicePort, useNodePort bool) string {
