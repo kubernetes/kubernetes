@@ -215,7 +215,7 @@ func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, 
 			resetWithDocker(execer, dockerCheck)
 			return
 		}
-		sandboxes := strings.Split(string(output), " ")
+		sandboxes := strings.Fields(string(output))
 		glog.V(1).Infoln("[reset] Stopping and removing running containers using crictl")
 		for _, s := range sandboxes {
 			if strings.TrimSpace(s) == "" {
