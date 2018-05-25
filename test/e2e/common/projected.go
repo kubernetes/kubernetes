@@ -39,7 +39,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 	   Testname: projected-secret-no-defaultMode
 	   Description: Simple projected Secret test with no defaultMode set.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume", func() {
+	framework.ConformanceIt("secret should be consumable from pods in volume", func() {
 		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
@@ -47,7 +47,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 	   Testname: projected-secret-with-defaultMode
 	   Description: Simple projected Secret test with defaultMode set.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set", func() {
+	framework.ConformanceIt("secret should be consumable from pods in volume with defaultMode set", func() {
 		defaultMode := int32(0400)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
@@ -70,7 +70,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 			mounting it to a volume with a custom path (mapping) on the pod with
 			no other settings and make sure the pod actually consumes it.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings", func() {
+	framework.ConformanceIt("secret should be consumable from pods in volume with mappings", func() {
 		doProjectedSecretE2EWithMapping(f, nil)
 	})
 
@@ -203,7 +203,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 	   Testname: projected-secret-simple-optional
 	   Description: Make sure secrets works when optional updates included.
 	*/
-	framework.ConformanceIt("optional updates should be reflected in volume", func() {
+	framework.ConformanceIt("secret optional updates should be reflected in volume", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
@@ -405,7 +405,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		    Description: Make sure that a projected volume with a configMap with
 			no mappings succeeds properly.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume", func() {
+	framework.ConformanceIt("configmap should be consumable from pods in volume", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, nil)
 	})
 
@@ -414,7 +414,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		    Description: Make sure that a projected volume configMap is consumable
 			with defaultMode set.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set", func() {
+	framework.ConformanceIt("configmap should be consumable from pods in volume with defaultMode set", func() {
 		defaultMode := int32(0400)
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
@@ -443,7 +443,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 			map and mounting it to a volume with a custom path (mapping) on the
 			pod with no other settings and make sure the pod actually consumes it.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings", func() {
+	framework.ConformanceIt("configmap should be consumable from pods in volume with mappings", func() {
 		doProjectedConfigMapE2EWithMappings(f, 0, 0, nil)
 	})
 
@@ -565,7 +565,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 			configMaps, that the values in these configMaps can be updated,
 			deleted, and created.
 	*/
-	framework.ConformanceIt("optional updates should be reflected in volume", func() {
+	framework.ConformanceIt("configmap optional updates should be reflected in volume", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
