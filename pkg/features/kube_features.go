@@ -35,6 +35,7 @@ const (
 
 	// owner: @mtaufen
 	// alpha: v1.4
+	// beta: v1.11
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
 
 	// owner: @pweil-
@@ -290,7 +291,7 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
-	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
+	DynamicKubeletConfig:                        {Default: true, PreRelease: utilfeature.Beta},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},
