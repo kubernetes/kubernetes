@@ -204,7 +204,7 @@ func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.
 				errorCode = http.StatusBadRequest
 			}
 
-			return false, &googleapi.Error{Code: errorCode, Message: msg}
+			return true, &googleapi.Error{Code: errorCode, Message: msg}
 		}
 	}
 
