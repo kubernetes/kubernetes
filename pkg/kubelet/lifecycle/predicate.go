@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
-type getNodeAnyWayFuncType func() (*v1.Node, error)
+type getNodeFuncType func() (*v1.Node, error)
 
 type pluginResourceUpdateFuncType func(*schedulercache.NodeInfo, *PodAdmitAttributes) error
 
@@ -40,23 +40,23 @@ type AdmissionFailureHandler interface {
 }
 
 type predicateAdmitHandler struct {
-	getNodeAnyWayFunc        getNodeAnyWayFuncType
+	getNodeFunc              getNodeFuncType
 	pluginResourceUpdateFunc pluginResourceUpdateFuncType
 	admissionFailureHandler  AdmissionFailureHandler
 }
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
 
-func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) *predicateAdmitHandler {
+func NewPredicateAdmitHandler(getNodeFunc getNodeFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) *predicateAdmitHandler {
 	return &predicateAdmitHandler{
-		getNodeAnyWayFunc,
+		getNodeFunc,
 		pluginResourceUpdateFunc,
 		admissionFailureHandler,
 	}
 }
 
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
-	node, err := w.getNodeAnyWayFunc()
+	node, err := w.getNodeFunc()
 	if err != nil {
 		glog.Errorf("Cannot get Node info: %v", err)
 		return PodAdmitResult{

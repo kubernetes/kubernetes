@@ -196,18 +196,6 @@ func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 
 // GetNode returns the node info for the configured node name of this Kubelet.
 func (kl *Kubelet) GetNode() (*v1.Node, error) {
-	if kl.kubeClient == nil {
-		return kl.initialNode()
-	}
-	return kl.nodeInfo.GetNodeInfo(string(kl.nodeName))
-}
-
-// getNodeAnyWay() must return a *v1.Node which is required by RunGeneralPredicates().
-// The *v1.Node is obtained as follows:
-// Return kubelet's nodeInfo for this node, except on error or if in standalone mode,
-// in which case return a manufactured nodeInfo representing a node with no pods,
-// zero capacity, and the default labels.
-func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
 		if n, err := kl.nodeInfo.GetNodeInfo(string(kl.nodeName)); err == nil {
 			return n, nil
@@ -231,16 +219,6 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	node, err := kl.GetNode()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get node: %v", err)
-	}
-	return utilnode.GetNodeHostIP(node)
-}
-
-// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or
-// the initialNode.
-func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
-	node, err := kl.getNodeAnyWay()
-	if err != nil {
-		return nil, err
 	}
 	return utilnode.GetNodeHostIP(node)
 }

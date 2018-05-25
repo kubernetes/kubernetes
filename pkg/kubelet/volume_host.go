@@ -176,7 +176,7 @@ func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
 }
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
-	node, err := kvh.kubelet.getNodeAnyWay()
+	node, err := kvh.kubelet.GetNode()
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}

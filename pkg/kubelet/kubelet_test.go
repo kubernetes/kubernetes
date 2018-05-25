@@ -291,7 +291,7 @@ func newTestKubeletWithImageList(
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 	// Add this as cleanup predicate pod admitter
-	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
+	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.GetNode, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
@@ -636,7 +636,7 @@ func TestHandlePluginResources(t *testing.T) {
 
 	// add updatePluginResourcesFunc to admission handler, to test it's behavior.
 	kl.admitHandlers = lifecycle.PodAdmitHandlers{}
-	kl.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kl.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc))
+	kl.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kl.GetNode, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc))
 
 	// pod requiring adjustedResource can be successfully allocated because updatePluginResourcesFunc
 	// adjusts node.allocatableResource for this resource to a sufficient value.
