@@ -186,7 +186,7 @@ func NewISCSIServer(cs clientset.Interface, namespace string) (config VolumeTest
 }
 
 // CephRBD-specific wrapper for CreateStorageServer.
-func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
+func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
 	config = VolumeTestConfig{
 		Namespace:   namespace,
 		Prefix:      "rbd",
@@ -205,7 +205,28 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestCo
 	Logf("sleeping a bit to give ceph server time to initialize")
 	time.Sleep(VolumeServerPodStartupSleep)
 
-	return config, pod, ip
+	// create secrets for the server
+	secret = &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Prefix + "-secret",
+		},
+		Data: map[string][]byte{
+			// from test/images/volumes-tester/rbd/keyring
+			"key": []byte("AQDRrKNVbEevChAAEmRC+pW/KBVHxa0w/POILA=="),
+		},
+		Type: "kubernetes.io/rbd",
+	}
+
+	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(secret)
+	if err != nil {
+		Failf("Failed to create secrets for Ceph RBD: %v", err)
+	}
+
+	return config, pod, secret, ip
 }
 
 // Wrapper for StartVolumeServer(). A storage server config is passed in, and a pod pointer
