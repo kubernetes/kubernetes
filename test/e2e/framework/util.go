@@ -5194,8 +5194,8 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 }
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
-func DsFromManifest(url string) (*extensions.DaemonSet, error) {
-	var controller extensions.DaemonSet
+func DsFromManifest(url string) (*apps.DaemonSet, error) {
+	var controller apps.DaemonSet
 	Logf("Parsing ds from %v", url)
 
 	var response *http.Response
