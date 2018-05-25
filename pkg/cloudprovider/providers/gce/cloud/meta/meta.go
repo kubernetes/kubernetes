@@ -345,6 +345,13 @@ var AllServices = []*ServiceInfo{
 		version:     VersionBeta,
 		keyType:     Global,
 		serviceType: reflect.TypeOf(&beta.SecurityPoliciesService{}),
+		additionalMethods: []string{
+			"AddRule",
+			"GetRule",
+			"Patch",
+			"PatchRule",
+			"RemoveRule",
+		},
 	},
 	{
 		Object:      "SslCertificate",
