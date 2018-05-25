@@ -154,7 +154,9 @@ func (o PauseConfig) RunPause() error {
 				allErrs = append(allErrs, err)
 				continue
 			}
-			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+			if err = printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+				allErrs = append(allErrs, err)
+			}
 			continue
 		}
 
@@ -170,7 +172,9 @@ func (o PauseConfig) RunPause() error {
 			allErrs = append(allErrs, err)
 			continue
 		}
-		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+		if err = printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 
 	return utilerrors.NewAggregate(allErrs)
