@@ -6,6 +6,7 @@ go_library(
         "conversion.go",
         "factory.go",
         "factory_client_access.go",
+        "generator.go",
         "helpers.go",
         "kubectl_match_version.go",
         "printing.go",

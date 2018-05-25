@@ -27,7 +27,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
@@ -67,8 +66,6 @@ type Factory interface {
 	// other namespace is specified and whether the namespace was
 	// overridden.
 	DefaultNamespace() (string, bool, error)
-	// Generators returns the generators for the provided command
-	Generators(cmdName string) map[string]kubectl.Generator
 
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
