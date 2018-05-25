@@ -167,7 +167,7 @@ func WithMaxInFlightLimit(
 					metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
 				}
 				// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
-				// that he should always get an answer.  It's a super-admin or a loopback connection.
+				// that they should always get an answer.  It's a super-admin or a loopback connection.
 				if currUser, ok := apirequest.UserFrom(ctx); ok {
 					for _, group := range currUser.GetGroups() {
 						if group == user.SystemPrivilegedGroup {
