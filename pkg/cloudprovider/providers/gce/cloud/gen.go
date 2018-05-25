@@ -11535,6 +11535,11 @@ type BetaSecurityPolicies interface {
 	List(ctx context.Context, fl *filter.F) ([]*beta.SecurityPolicy, error)
 	Insert(ctx context.Context, key *meta.Key, obj *beta.SecurityPolicy) error
 	Delete(ctx context.Context, key *meta.Key) error
+	AddRule(context.Context, *meta.Key, *beta.SecurityPolicyRule) error
+	GetRule(context.Context, *meta.Key) (*beta.SecurityPolicyRule, error)
+	Patch(context.Context, *meta.Key, *beta.SecurityPolicy) error
+	PatchRule(context.Context, *meta.Key, *beta.SecurityPolicyRule) error
+	RemoveRule(context.Context, *meta.Key) error
 }
 
 // NewMockBetaSecurityPolicies returns a new mock for SecurityPolicies.
@@ -11570,10 +11575,15 @@ type MockBetaSecurityPolicies struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(ctx context.Context, key *meta.Key, m *MockBetaSecurityPolicies) (bool, *beta.SecurityPolicy, error)
-	ListHook   func(ctx context.Context, fl *filter.F, m *MockBetaSecurityPolicies) (bool, []*beta.SecurityPolicy, error)
-	InsertHook func(ctx context.Context, key *meta.Key, obj *beta.SecurityPolicy, m *MockBetaSecurityPolicies) (bool, error)
-	DeleteHook func(ctx context.Context, key *meta.Key, m *MockBetaSecurityPolicies) (bool, error)
+	GetHook        func(ctx context.Context, key *meta.Key, m *MockBetaSecurityPolicies) (bool, *beta.SecurityPolicy, error)
+	ListHook       func(ctx context.Context, fl *filter.F, m *MockBetaSecurityPolicies) (bool, []*beta.SecurityPolicy, error)
+	InsertHook     func(ctx context.Context, key *meta.Key, obj *beta.SecurityPolicy, m *MockBetaSecurityPolicies) (bool, error)
+	DeleteHook     func(ctx context.Context, key *meta.Key, m *MockBetaSecurityPolicies) (bool, error)
+	AddRuleHook    func(context.Context, *meta.Key, *beta.SecurityPolicyRule, *MockBetaSecurityPolicies) error
+	GetRuleHook    func(context.Context, *meta.Key, *MockBetaSecurityPolicies) (*beta.SecurityPolicyRule, error)
+	PatchHook      func(context.Context, *meta.Key, *beta.SecurityPolicy, *MockBetaSecurityPolicies) error
+	PatchRuleHook  func(context.Context, *meta.Key, *beta.SecurityPolicyRule, *MockBetaSecurityPolicies) error
+	RemoveRuleHook func(context.Context, *meta.Key, *MockBetaSecurityPolicies) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -11719,6 +11729,46 @@ func (m *MockBetaSecurityPolicies) Obj(o *beta.SecurityPolicy) *MockSecurityPoli
 	return &MockSecurityPoliciesObj{o}
 }
 
+// AddRule is a mock for the corresponding method.
+func (m *MockBetaSecurityPolicies) AddRule(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicyRule) error {
+	if m.AddRuleHook != nil {
+		return m.AddRuleHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// GetRule is a mock for the corresponding method.
+func (m *MockBetaSecurityPolicies) GetRule(ctx context.Context, key *meta.Key) (*beta.SecurityPolicyRule, error) {
+	if m.GetRuleHook != nil {
+		return m.GetRuleHook(ctx, key, m)
+	}
+	return nil, fmt.Errorf("GetRuleHook must be set")
+}
+
+// Patch is a mock for the corresponding method.
+func (m *MockBetaSecurityPolicies) Patch(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicy) error {
+	if m.PatchHook != nil {
+		return m.PatchHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// PatchRule is a mock for the corresponding method.
+func (m *MockBetaSecurityPolicies) PatchRule(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicyRule) error {
+	if m.PatchRuleHook != nil {
+		return m.PatchRuleHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// RemoveRule is a mock for the corresponding method.
+func (m *MockBetaSecurityPolicies) RemoveRule(ctx context.Context, key *meta.Key) error {
+	if m.RemoveRuleHook != nil {
+		return m.RemoveRuleHook(ctx, key, m)
+	}
+	return nil
+}
+
 // GCEBetaSecurityPolicies is a simplifying adapter for the GCE SecurityPolicies.
 type GCEBetaSecurityPolicies struct {
 	s *Service
@@ -11858,6 +11908,166 @@ func (g *GCEBetaSecurityPolicies) Delete(ctx context.Context, key *meta.Key) err
 
 	err = g.s.WaitForCompletion(ctx, op)
 	glog.V(4).Infof("GCEBetaSecurityPolicies.Delete(%v, %v) = %v", ctx, key, err)
+	return err
+}
+
+// AddRule is a method on GCEBetaSecurityPolicies.
+func (g *GCEBetaSecurityPolicies) AddRule(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicyRule) error {
+	glog.V(5).Infof("GCEBetaSecurityPolicies.AddRule(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaSecurityPolicies.AddRule(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "SecurityPolicies")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "AddRule",
+		Version:   meta.Version("beta"),
+		Service:   "SecurityPolicies",
+	}
+	glog.V(5).Infof("GCEBetaSecurityPolicies.AddRule(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.AddRule(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.SecurityPolicies.AddRule(projectID, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.AddRule(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaSecurityPolicies.AddRule(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// GetRule is a method on GCEBetaSecurityPolicies.
+func (g *GCEBetaSecurityPolicies) GetRule(ctx context.Context, key *meta.Key) (*beta.SecurityPolicyRule, error) {
+	glog.V(5).Infof("GCEBetaSecurityPolicies.GetRule(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaSecurityPolicies.GetRule(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "SecurityPolicies")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "GetRule",
+		Version:   meta.Version("beta"),
+		Service:   "SecurityPolicies",
+	}
+	glog.V(5).Infof("GCEBetaSecurityPolicies.GetRule(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.GetRule(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return nil, err
+	}
+	call := g.s.Beta.SecurityPolicies.GetRule(projectID, key.Name)
+	call.Context(ctx)
+	v, err := call.Do()
+	glog.V(4).Infof("GCEBetaSecurityPolicies.GetRule(%v, %v, ...) = %+v, %v", ctx, key, v, err)
+	return v, err
+}
+
+// Patch is a method on GCEBetaSecurityPolicies.
+func (g *GCEBetaSecurityPolicies) Patch(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicy) error {
+	glog.V(5).Infof("GCEBetaSecurityPolicies.Patch(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaSecurityPolicies.Patch(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "SecurityPolicies")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Patch",
+		Version:   meta.Version("beta"),
+		Service:   "SecurityPolicies",
+	}
+	glog.V(5).Infof("GCEBetaSecurityPolicies.Patch(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.Patch(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.SecurityPolicies.Patch(projectID, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.Patch(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaSecurityPolicies.Patch(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// PatchRule is a method on GCEBetaSecurityPolicies.
+func (g *GCEBetaSecurityPolicies) PatchRule(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicyRule) error {
+	glog.V(5).Infof("GCEBetaSecurityPolicies.PatchRule(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaSecurityPolicies.PatchRule(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "SecurityPolicies")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "PatchRule",
+		Version:   meta.Version("beta"),
+		Service:   "SecurityPolicies",
+	}
+	glog.V(5).Infof("GCEBetaSecurityPolicies.PatchRule(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.PatchRule(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.SecurityPolicies.PatchRule(projectID, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.PatchRule(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaSecurityPolicies.PatchRule(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// RemoveRule is a method on GCEBetaSecurityPolicies.
+func (g *GCEBetaSecurityPolicies) RemoveRule(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEBetaSecurityPolicies.RemoveRule(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaSecurityPolicies.RemoveRule(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "SecurityPolicies")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "RemoveRule",
+		Version:   meta.Version("beta"),
+		Service:   "SecurityPolicies",
+	}
+	glog.V(5).Infof("GCEBetaSecurityPolicies.RemoveRule(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.RemoveRule(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.SecurityPolicies.RemoveRule(projectID, key.Name)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaSecurityPolicies.RemoveRule(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaSecurityPolicies.RemoveRule(%v, %v, ...) = %+v", ctx, key, err)
 	return err
 }
 
