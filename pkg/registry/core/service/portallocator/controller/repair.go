@@ -204,5 +204,10 @@ func collectServiceNodePorts(service *api.Service) []int {
 			servicePorts = append(servicePorts, int(servicePort.NodePort))
 		}
 	}
+
+	if service.Spec.HealthCheckNodePort != 0 {
+		servicePorts = append(servicePorts, int(service.Spec.HealthCheckNodePort))
+	}
+
 	return servicePorts
 }
