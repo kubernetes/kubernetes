@@ -191,30 +191,47 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		gc.workerLock.Lock()
 		defer gc.workerLock.Unlock()
 
-		// Resetting the REST mapper will also invalidate the underlying discovery
-		// client. This is a leaky abstraction and assumes behavior about the REST
-		// mapper, but we'll deal with it for now.
-		gc.restMapper.Reset()
+		resyncFinishedCh := make(chan struct{})
+		defer close(resyncFinishedCh)
+		for {
+			// Start watching for changes to deletable resources until either the
+			// resync is successful or if told to stop by stopCh.
+			newResources, resourcesUpdatedCh := listWatchDeletableResources(discoveryClient, period, resyncFinishedCh)
 
-		// Perform the monitor resync and wait for controllers to report cache sync.
-		//
-		// NOTE: It's possible that newResources will diverge from the resources
-		// discovered by restMapper during the call to Reset, since they are
-		// distinct discovery clients invalidated at different times. For example,
-		// newResources may contain resources not returned in the restMapper's
-		// discovery call if the resources appeared in-between the calls. In that
-		// case, the restMapper will fail to map some of newResources until the next
-		// sync period.
-		if err := gc.resyncMonitors(newResources); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
-			return
-		}
-		// TODO: WaitForCacheSync can block forever during normal operation. Could
-		// pass a timeout channel, but we have to consider the implications of
-		// un-pausing the GC with a partially synced graph builder.
-		if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
-			utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
-			return
+			// Resetting the REST mapper will also invalidate the underlying discovery
+			// client. This is a leaky abstraction and assumes behavior about the REST
+			// mapper, but we'll deal with it for now.
+			gc.restMapper.Reset()
+
+			// Perform the monitor resync and wait for controllers to report cache sync.
+			//
+			// NOTE: It's possible that newResources will diverge from the resources
+			// discovered by restMapper during the call to Reset, since they are
+			// distinct discovery clients invalidated at different times. For example,
+			// newResources may contain resources not returned in the restMapper's
+			// discovery call if the resources appeared in-between the calls. In that
+			// case, the restMapper will fail to map some of newResources until the next
+			// sync period.
+			if err := gc.resyncMonitors(newResources); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
+				continue
+			}
+
+			// We will stop waiting for the cache to be synced either if we detect changes to the set of
+			// deletable resources or if told to stop by stopCh.
+			if controller.WaitForCacheSync("garbage collector", either(resourcesUpdatedCh, stopCh), gc.dependencyGraphBuilder.IsSynced) {
+				break
+			}
+
+			// The cache sync was stopped for some reason, now we need to decide if we should retry or give up.
+			select {
+			case <-stopCh:
+				utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
+				return
+			case <-resourcesUpdatedCh:
+				glog.V(2).Infof("discovered new resources, restarting sync without unpausing workers")
+				continue
+			}
 		}
 
 		// Finally, keep track of our new state. Do this after all preceding steps
@@ -613,4 +630,44 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 	}
 
 	return deletableGroupVersionResources
+}
+
+// listWatchDeletableResources will return a list of deleatble resources and a chan that will
+// remain open until the discoveryClient returns a set of deletable resources which is different
+// from the set that the monitors are synced to.
+func listWatchDeletableResources(discoveryClient discovery.ServerResourcesInterface, period time.Duration, stopCh <-chan struct{}) (map[schema.GroupVersionResource]struct{}, <-chan struct{}) {
+	// Get the current resource list from discovery.
+	currentResources := GetDeletableResources(discoveryClient)
+
+	// Start polling for changes to deletable resources
+	resourcesUpdatedCh := make(chan struct{})
+	go func() {
+		wait.PollUntil(period, func() (bool, error) {
+			// Get the current resource list from discovery.
+			newResources := GetDeletableResources(discoveryClient)
+			// Decide whether discovery has reported a change.
+			if reflect.DeepEqual(currentResources, newResources) {
+				return false, nil
+			}
+			close(resourcesUpdatedCh)
+			return true, nil
+		}, stopCh)
+	}()
+
+	// Return the set of deletable resources and a channel which will eventually close if it becomes stale
+	return currentResources, resourcesUpdatedCh
+}
+
+// either will create a new stop channel that closes once either
+// of two input stop channels closes
+func either(ch1, ch2 <-chan struct{}) <-chan struct{} {
+	eitherCh := make(chan struct{})
+	go func() {
+		select {
+		case <-ch1:
+		case <-ch2:
+		}
+		close(eitherCh)
+	}()
+	return eitherCh
 }
