@@ -137,13 +137,13 @@ func (t *awsTagging) hasClusterTag(tags []*ec2.Tag) bool {
 	clusterTagKey := t.clusterTagKey()
 	for _, tag := range tags {
 		tagKey := aws.StringValue(tag.Key)
-		// Check if this is a newer-style cluster tag before checking if legacy tag value matches ClusterID
-		if tagKey == clusterTagKey {
+		// For 1.6, we continue to recognize the legacy tags, for the 1.5 -> 1.6 upgrade
+		// Note that we want to continue traversing tag list if we see a legacy tag with value != ClusterID
+		if (tagKey == TagNameKubernetesClusterLegacy) && (aws.StringValue(tag.Value) == t.ClusterID) {
 			return true
 		}
-		// For 1.6, we continue to recognize the legacy tags, for the 1.5 -> 1.6 upgrade
-		if tagKey == TagNameKubernetesClusterLegacy {
-			return aws.StringValue(tag.Value) == t.ClusterID
+		if tagKey == clusterTagKey {
+			return true
 		}
 	}
 	return false
