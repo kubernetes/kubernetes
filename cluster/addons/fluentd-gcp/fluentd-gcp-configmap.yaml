@@ -408,10 +408,10 @@ data:
       buffer_queue_full_action block
       # Set the chunk limit conservatively to avoid exceeding the recommended
       # chunk size of 5MB per write request.
-      buffer_chunk_limit 1M
+      buffer_chunk_limit 512k
       # Cap the combined memory usage of this buffer and the one below to
-      # 1MiB/chunk * (6 + 2) chunks = 8 MiB
-      buffer_queue_limit 6
+      # 512kib/chunk * (4 + 2) chunks = 3 MiB
+      buffer_queue_limit 4
       # Never wait more than 5 seconds before flushing logs in the non-error case.
       flush_interval 5s
       # Never wait longer than 30 seconds between retries.
@@ -450,7 +450,7 @@ data:
       buffer_type file
       buffer_path /var/log/fluentd-buffers/kubernetes.system.buffer
       buffer_queue_full_action block
-      buffer_chunk_limit 1M
+      buffer_chunk_limit 512k
       buffer_queue_limit 2
       flush_interval 5s
       max_retry_wait 30
