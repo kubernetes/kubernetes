@@ -182,7 +182,6 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return err
 	}
 	o.includeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
-	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
 
 	// retrieves resource and annotation args from args
@@ -195,6 +194,22 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.newAnnotations, o.removeAnnotations, err = parseAnnotations(annotationArgs)
 	if err != nil {
 		return err
+	}
+
+	o.builder = f.NewBuilder().
+		Unstructured().
+		LocalParam(o.local).
+		ContinueOnError().
+		NamespaceParam(o.namespace).DefaultNamespace().
+		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(o.includeUninitialized).
+		Flatten()
+
+	if !o.local {
+		o.builder.LabelSelectorParam(o.selector).
+			FieldSelectorParam(o.fieldSelector).
+			ResourceTypeOrNameArgs(o.all, o.resources...).
+			Latest()
 	}
 
 	return nil
@@ -219,23 +234,7 @@ func (o AnnotateOptions) Validate() error {
 
 // RunAnnotate does the work
 func (o AnnotateOptions) RunAnnotate() error {
-	b := o.builder.
-		Unstructured().
-		LocalParam(o.local).
-		ContinueOnError().
-		NamespaceParam(o.namespace).DefaultNamespace().
-		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(o.includeUninitialized).
-		Flatten()
-
-	if !o.local {
-		b = b.LabelSelectorParam(o.selector).
-			FieldSelectorParam(o.fieldSelector).
-			ResourceTypeOrNameArgs(o.all, o.resources...).
-			Latest()
-	}
-
-	r := b.Do()
+	r := o.builder.Do()
 	if err := r.Err(); err != nil {
 		return err
 	}
