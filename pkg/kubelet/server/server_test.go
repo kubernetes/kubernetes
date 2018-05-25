@@ -943,33 +943,6 @@ func TestContainerLogs(t *testing.T) {
 	}
 }
 
-func TestContainerLogsWithLimitBytes(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	output := "foo bar"
-	podNamespace := "other"
-	podName := "foo"
-	expectedPodName := getPodName(podName, podNamespace)
-	expectedContainerName := "baz"
-	bytes := int64(3)
-	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{LimitBytes: &bytes}, output)
-	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?limitBytes=3")
-	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Errorf("Error reading container logs: %v", err)
-	}
-	result := string(body)
-	if result != output[:bytes] {
-		t.Errorf("Expected: '%v', got: '%v'", output[:bytes], result)
-	}
-}
-
 func TestContainerLogsWithTail(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
