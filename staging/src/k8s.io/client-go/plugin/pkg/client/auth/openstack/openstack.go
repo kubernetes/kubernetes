@@ -140,6 +140,7 @@ func newOpenstackAuthProvider(_ string, config map[string]string, persister rest
 	var ttlDuration time.Duration
 	var err error
 
+	glog.Warningf("WARNING: in-tree openstack auth plugin is now deprecated. please use the \"client-keystone-auth\" kubectl/client-go credential plugin instead")
 	ttl, found := config["ttl"]
 	if !found {
 		ttlDuration = DefaultTTLDuration
