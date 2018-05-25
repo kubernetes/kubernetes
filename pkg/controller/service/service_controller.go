@@ -153,7 +153,7 @@ func New(
 func (s *ServiceController) enqueueService(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %#v: %v", obj, err)
+		runtime.HandleError(fmt.Errorf("unable to get key for object %#v: %v", obj, err))
 		return
 	}
 	s.queue.Add(key)
@@ -508,7 +508,7 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 func (s *ServiceController) nodeSyncLoop() {
 	newHosts, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
 	if err != nil {
-		glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
+		runtime.HandleError(fmt.Errorf("failed to retrieve current set of nodes from node lister: %v", err))
 		return
 	}
 	if nodeSlicesEqualForLB(newHosts, s.knownHosts) {
@@ -524,7 +524,7 @@ func (s *ServiceController) nodeSyncLoop() {
 	// Try updating all services, and save the ones that fail to try again next round.
 	services, err := s.serviceLister.List(labels.Everything())
 	if err != nil {
-		glog.Errorf("Failed to retrieve services from lister: %v", err)
+		runtime.HandleError(fmt.Errorf("failed to retrieve services from lister: %v", err))
 		return
 	}
 
@@ -555,7 +555,7 @@ func (s *ServiceController) updateLoadBalancerHosts(services []*v1.Service, host
 				return
 			}
 			if err := s.lockedUpdateLoadBalancerHosts(service, hosts); err != nil {
-				glog.Errorf("External error while updating load balancer: %v.", err)
+				runtime.HandleError(fmt.Errorf("external error while updating load balancer: %v", err))
 				servicesToRetry = append(servicesToRetry, service)
 			}
 		}()
@@ -618,12 +618,12 @@ func (s *ServiceController) syncService(key string) error {
 	// service holds the latest service info from apiserver
 	service, err := s.serviceLister.Services(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		glog.V(2).Infof("Service %q has been deleted", key)
+		glog.V(4).Infof("Service %q has been deleted", key)
 		return nil
 	}
 
 	if err != nil {
-		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
+		glog.Errorf("Unable to retrieve service %v from store: %v", key, err)
 		return err
 	}
 
