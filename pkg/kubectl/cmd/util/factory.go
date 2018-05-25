@@ -28,7 +28,6 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
@@ -77,8 +76,6 @@ type ClientAccessFactory interface {
 	// other namespace is specified and whether the namespace was
 	// overridden.
 	DefaultNamespace() (string, bool, error)
-	// Generators returns the generators for the provided command
-	Generators(cmdName string) map[string]kubectl.Generator
 }
 
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
