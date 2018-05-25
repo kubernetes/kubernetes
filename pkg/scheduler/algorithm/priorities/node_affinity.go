@@ -37,12 +37,11 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
-	var affinity *v1.Affinity
+	// default is the podspec.
+	affinity := pod.Spec.Affinity
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		// We were able to parse metadata, use affinity from there.
 		affinity = priorityMeta.affinity
-	} else {
-		// We couldn't parse metadata - fallback to the podspec.
-		affinity = pod.Spec.Affinity
 	}
 
 	var count int32

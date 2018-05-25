@@ -603,18 +603,18 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 	}
 	filtered := make([]*v1.Pod, 0, len(pods))
 	for _, p := range pods {
-		if p.Spec.NodeName == node.Name {
-			// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
-			podKey, _ := getPodKey(p)
-			for _, np := range n.Pods() {
-				npodkey, _ := getPodKey(np)
-				if npodkey == podKey {
-					filtered = append(filtered, p)
-					break
-				}
-			}
-		} else {
+		if p.Spec.NodeName != node.Name {
 			filtered = append(filtered, p)
+			continue
+		}
+		// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
+		podKey, _ := getPodKey(p)
+		for _, np := range n.Pods() {
+			npodkey, _ := getPodKey(np)
+			if npodkey == podKey {
+				filtered = append(filtered, p)
+				break
+			}
 		}
 	}
 	return filtered
