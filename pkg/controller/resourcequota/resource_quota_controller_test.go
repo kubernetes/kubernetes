@@ -93,7 +93,7 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 		ResourceQuotaInformer:     informerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
-		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
+		IgnoredResources:          install.DefaultIgnoredResources(),
 		DiscoveryFunc:             mockDiscoveryFunc,
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 		InformersStarted:          alwaysStarted,

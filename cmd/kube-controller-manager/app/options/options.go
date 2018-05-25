@@ -42,6 +42,7 @@ import (
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
+	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 
@@ -186,12 +187,19 @@ func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
 	// TODO: enable HTTPS by default
 	s.SecureServing.BindPort = 0
 
-	gcIgnoredResources := make([]componentconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
-	for r := range garbagecollector.DefaultIgnoredResources() {
+	gcDefaultIgnoredResources := garbagecollector.DefaultIgnoredResources()
+	gcIgnoredResources := make([]componentconfig.GroupResource, 0, len(gcDefaultIgnoredResources))
+	for r := range gcDefaultIgnoredResources {
 		gcIgnoredResources = append(gcIgnoredResources, componentconfig.GroupResource{Group: r.Group, Resource: r.Resource})
 	}
-
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
+
+	rqDefaultIgnoredResources := quotainstall.DefaultIgnoredResources()
+	rqIgnoredResources := make([]componentconfig.GroupResource, 0, len(rqDefaultIgnoredResources))
+	for r := range rqDefaultIgnoredResources {
+		rqIgnoredResources = append(rqIgnoredResources, componentconfig.GroupResource{Group: r.Group, Resource: r.Resource})
+	}
+	s.ResourceQuotaController.RQIgnoredResources = rqIgnoredResources
 
 	return &s
 }

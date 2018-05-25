@@ -111,10 +111,12 @@ func TestAddFlags(t *testing.T) {
 		"--secure-port=10001",
 	}
 	f.Parse(args)
-	// Sort GCIgnoredResources because it's built from a map, which means the
-	// insertion order is random.
-	sort.Sort(sortedGCIgnoredResources(s.GarbageCollectorController.GCIgnoredResources))
+	// Sort GCIgnoredResources and RQIgnoredResources because they are built from a map,
+	// which means the insertion order is random.
+	sort.Sort(sortedIgnoredResources(s.GarbageCollectorController.GCIgnoredResources))
+	sort.Sort(sortedIgnoredResources(s.ResourceQuotaController.RQIgnoredResources))
 
+	rqIgnoredResources := append(ignoredResources, componentconfig.GroupResource{Group: "extensions", Resource: "networkpolicies"})
 	expected := &KubeControllerManagerOptions{
 		CloudProvider: &cmoptions.CloudProviderOptions{
 			Name:            "gce",
@@ -175,20 +177,8 @@ func TestAddFlags(t *testing.T) {
 			ConcurrentEndpointSyncs: 10,
 		},
 		GarbageCollectorController: &cmoptions.GarbageCollectorControllerOptions{
-			ConcurrentGCSyncs: 30,
-			GCIgnoredResources: []componentconfig.GroupResource{
-				{Group: "extensions", Resource: "replicationcontrollers"},
-				{Group: "", Resource: "bindings"},
-				{Group: "", Resource: "componentstatuses"},
-				{Group: "", Resource: "events"},
-				{Group: "authentication.k8s.io", Resource: "tokenreviews"},
-				{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"},
-				{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"},
-				{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"},
-				{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"},
-				{Group: "apiregistration.k8s.io", Resource: "apiservices"},
-				{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"},
-			},
+			ConcurrentGCSyncs:      30,
+			GCIgnoredResources:     ignoredResources,
 			EnableGarbageCollector: false,
 		},
 		HPAController: &cmoptions.HPAControllerOptions{
@@ -245,6 +235,7 @@ func TestAddFlags(t *testing.T) {
 		ResourceQuotaController: &cmoptions.ResourceQuotaControllerOptions{
 			ResourceQuotaSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
 			ConcurrentResourceQuotaSyncs: 10,
+			RQIgnoredResources:           rqIgnoredResources,
 		},
 		SAController: &cmoptions.SAControllerOptions{
 			ConcurrentSATokenSyncs: 10,
@@ -271,22 +262,37 @@ func TestAddFlags(t *testing.T) {
 		Master:     "192.168.4.20",
 	}
 
-	// Sort GCIgnoredResources because it's built from a map, which means the
+	// Sort GCIgnoredResources and RQIgnoredResources because they are built from a map, which means the
 	// insertion order is random.
-	sort.Sort(sortedGCIgnoredResources(expected.GarbageCollectorController.GCIgnoredResources))
+	sort.Sort(sortedIgnoredResources(expected.GarbageCollectorController.GCIgnoredResources))
+	sort.Sort(sortedIgnoredResources(expected.ResourceQuotaController.RQIgnoredResources))
 
 	if !reflect.DeepEqual(expected, s) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))
 	}
 }
 
-type sortedGCIgnoredResources []componentconfig.GroupResource
+var ignoredResources = []componentconfig.GroupResource{
+	{Group: "extensions", Resource: "replicationcontrollers"},
+	{Group: "", Resource: "bindings"},
+	{Group: "", Resource: "componentstatuses"},
+	{Group: "", Resource: "events"},
+	{Group: "authentication.k8s.io", Resource: "tokenreviews"},
+	{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"},
+	{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"},
+	{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"},
+	{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"},
+	{Group: "apiregistration.k8s.io", Resource: "apiservices"},
+	{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"},
+}
 
-func (r sortedGCIgnoredResources) Len() int {
+type sortedIgnoredResources []componentconfig.GroupResource
+
+func (r sortedIgnoredResources) Len() int {
 	return len(r)
 }
 
-func (r sortedGCIgnoredResources) Less(i, j int) bool {
+func (r sortedIgnoredResources) Less(i, j int) bool {
 	if r[i].Group < r[j].Group {
 		return true
 	} else if r[i].Group > r[j].Group {
@@ -295,6 +301,6 @@ func (r sortedGCIgnoredResources) Less(i, j int) bool {
 	return r[i].Resource < r[j].Resource
 }
 
-func (r sortedGCIgnoredResources) Swap(i, j int) {
+func (r sortedIgnoredResources) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }

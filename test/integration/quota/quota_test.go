@@ -110,7 +110,7 @@ func TestQuota(t *testing.T) {
 		InformerFactory:           informers,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		DiscoveryFunc:             discoveryFunc,
-		IgnoredResourcesFunc:      qc.IgnoredResources,
+		IgnoredResources:          quotainstall.DefaultIgnoredResources(),
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
@@ -305,7 +305,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		InformerFactory:           informers,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		DiscoveryFunc:             discoveryFunc,
-		IgnoredResourcesFunc:      qc.IgnoredResources,
+		IgnoredResources:          quotainstall.DefaultIgnoredResources(),
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}

@@ -70,8 +70,8 @@ type ResourceQuotaControllerOptions struct {
 	Registry quota.Registry
 	// Discover list of supported resources on the server.
 	DiscoveryFunc NamespacedResourcesFunc
-	// A function that returns the list of resources to ignore
-	IgnoredResourcesFunc func() map[schema.GroupResource]struct{}
+	// A list of resources to ignore
+	IgnoredResources map[schema.GroupResource]struct{}
 	// InformersStarted knows if informers were started.
 	InformersStarted <-chan struct{}
 	// InformerFactory interfaces with informers.
@@ -152,7 +152,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*Resou
 		qm := &QuotaMonitor{
 			informersStarted:  options.InformersStarted,
 			informerFactory:   options.InformerFactory,
-			ignoredResources:  options.IgnoredResourcesFunc(),
+			ignoredResources:  options.IgnoredResources,
 			resourceChanges:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
 			resyncPeriod:      options.ReplenishmentResyncPeriod,
 			replenishmentFunc: rq.replenishQuota,

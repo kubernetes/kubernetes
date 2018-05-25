@@ -263,6 +263,11 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 
+	ignoredResources := make(map[schema.GroupResource]struct{})
+	for _, r := range ctx.ComponentConfig.ResourceQuotaController.RQIgnoredResources {
+		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
+	}
+
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
@@ -270,9 +275,9 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		InformerFactory:           ctx.InformerFactory,
 		ReplenishmentResyncPeriod: ctx.ResyncPeriod,
 		DiscoveryFunc:             discoveryFunc,
-		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
 		InformersStarted:          ctx.InformersStarted,
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
+		IgnoredResources:          ignoredResources,
 	}
 	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {

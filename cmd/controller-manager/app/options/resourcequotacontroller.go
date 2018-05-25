@@ -26,6 +26,7 @@ import (
 type ResourceQuotaControllerOptions struct {
 	ResourceQuotaSyncPeriod      metav1.Duration
 	ConcurrentResourceQuotaSyncs int32
+	RQIgnoredResources           []componentconfig.GroupResource
 }
 
 // AddFlags adds flags related to ResourceQuotaController for controller manager to the specified FlagSet.
@@ -46,6 +47,7 @@ func (o *ResourceQuotaControllerOptions) ApplyTo(cfg *componentconfig.ResourceQu
 
 	cfg.ResourceQuotaSyncPeriod = o.ResourceQuotaSyncPeriod
 	cfg.ConcurrentResourceQuotaSyncs = o.ConcurrentResourceQuotaSyncs
+	cfg.RQIgnoredResources = o.RQIgnoredResources
 
 	return nil
 }

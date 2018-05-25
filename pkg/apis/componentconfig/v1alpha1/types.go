@@ -546,6 +546,8 @@ type ResourceQuotaControllerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive quota
 	// management, but more CPU (and network) load.
 	ConcurrentResourceQuotaSyncs int32 `json:"concurrentResourceQuotaSyncs"`
+	// RQIgnoredResources is the list of GroupResources that the resource quota controller should ignore.
+	RQIgnoredResources []GroupResource `json:"rQIgnoredResources"`
 }
 
 type SAControllerConfiguration struct {
