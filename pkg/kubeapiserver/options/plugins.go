@@ -131,7 +131,6 @@ func DefaultOffAdmissionPlugins() sets.String {
 		lifecycle.PluginName,                //NamespaceLifecycle
 		limitranger.PluginName,              //LimitRanger
 		serviceaccount.PluginName,           //ServiceAccount
-		label.PluginName,                    //PersistentVolumeLabel
 		setdefault.PluginName,               //DefaultStorageClass
 		defaulttolerationseconds.PluginName, //DefaultTolerationSeconds
 		mutatingwebhook.PluginName,          //MutatingAdmissionWebhook
