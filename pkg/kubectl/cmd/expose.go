@@ -188,7 +188,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 		return err
 	}
 
-	o.Generators = f.Generators
+	o.Generators = cmdutil.GeneratorFn
 	o.Builder = f.NewBuilder()
 	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
 	o.ClientForMapping = f.ClientForMapping
