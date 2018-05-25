@@ -45,7 +45,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 			volume is a directory with 0777 unix file permissions and that is has
 			the sticky bit (mode flag t) set.
 	*/
-	framework.ConformanceIt("should give a volume the correct mode", func() {
+	framework.ConformanceIt("should give a volume the correct mode [NodeConformance]", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
@@ -61,7 +61,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 	})
 
 	// This test requires mounting a folder into a container with write privileges.
-	It("should support r/w", func() {
+	It("should support r/w [NodeConformance]", func() {
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
 		source := &v1.HostPathVolumeSource{
@@ -85,7 +85,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		})
 	})
 
-	It("should support subPath", func() {
+	It("should support subPath [NodeConformance]", func() {
 		subPath := "sub-path"
 		fileName := "test-file"
 		retryDuration := 180
