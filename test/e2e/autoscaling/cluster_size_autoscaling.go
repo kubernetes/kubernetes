@@ -250,7 +250,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(1))
 
 			By("Scale GPU deployment")
-			framework.ScaleRC(f.ClientSet, f.ScalesGetter, f.Namespace.Name, "gpu-pod-rc", 2, false)
+			framework.ScaleRC(f.ClientSet, f.ScalesGetter, f.Namespace.Name, "gpu-pod-rc", 2, true)
 
 			framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 				func(size int) bool { return size == nodeCount+2 }, scaleUpTimeout))
