@@ -23,10 +23,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/glog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	utilsexec "k8s.io/utils/exec"
 )
 
 // WriteKubeletDynamicEnvFile writes a environment file with dynamic flags to the kubelet.
@@ -49,6 +51,13 @@ func buildKubeletArgMap(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, registe
 		kubeletFlags["network-plugin"] = "cni"
 		kubeletFlags["cni-conf-dir"] = "/etc/cni/net.d"
 		kubeletFlags["cni-bin-dir"] = "/opt/cni/bin"
+		execer := utilsexec.New()
+		driver, err := kubeadmutil.GetCgroupDriverDocker(execer)
+		if err != nil {
+			glog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
+		} else {
+			kubeletFlags["cgroup-driver"] = driver
+		}
 	} else {
 		kubeletFlags["container-runtime"] = "remote"
 		kubeletFlags["container-runtime-endpoint"] = nodeRegOpts.CRISocket
@@ -65,7 +74,7 @@ func buildKubeletArgMap(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, registe
 
 	// TODO: Pass through --hostname-override if a custom name is used?
 	// TODO: Check if `systemd-resolved` is running, and set `--resolv-conf` based on that
-	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs`
+	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs` for CRI other than Docker
 
 	return kubeletFlags
 }
