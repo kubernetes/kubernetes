@@ -127,6 +127,10 @@ func PrePullAllImages() error {
 	images := framework.ImageWhiteList.List()
 	glog.V(4).Infof("Pre-pulling images with %s %+v", puller.Name(), images)
 	for _, image := range images {
+		if image == "" {
+			glog.Warningf("Cannot pre-pull an image with an empty name")
+			continue
+		}
 		var (
 			err    error
 			output []byte
