@@ -741,10 +741,6 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 
 	// Do the bind mount
 	options := []string{"bind"}
-	if subpath.ReadOnly {
-		options = append(options, "ro")
-	}
-
 	glog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
 	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
