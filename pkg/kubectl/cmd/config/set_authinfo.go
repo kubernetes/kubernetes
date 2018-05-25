@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -34,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-type createAuthInfoOptions struct {
+type setAuthInfoOptions struct {
 	configAccess      clientcmd.ConfigAccess
 	name              string
 	authPath          flag.StringFlag
@@ -56,7 +57,7 @@ const (
 )
 
 var (
-	create_authinfo_long = fmt.Sprintf(templates.LongDesc(`
+	setAuthinfoLong = fmt.Sprintf(templates.LongDesc(`
 		Sets a user entry in kubeconfig
 
 		Specifying a name that already exists will merge new fields on top of existing values.
@@ -72,7 +73,7 @@ var (
 
 		Bearer token and basic auth are mutually exclusive.`), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
 
-	create_authinfo_example = templates.Examples(`
+	setAuthinfoExample = templates.Examples(`
 		# Set only the "client-key" field on the "cluster-admin"
 		# entry, without touching other values:
 		kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
@@ -94,17 +95,17 @@ var (
 )
 
 func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createAuthInfoOptions{configAccess: configAccess}
+	options := &setAuthInfoOptions{configAccess: configAccess}
 	return newCmdConfigSetAuthInfo(out, options)
 }
 
-func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cobra.Command {
+func newCmdConfigSetAuthInfo(out io.Writer, options *setAuthInfoOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: fmt.Sprintf("set-credentials NAME [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password] [--%v=provider_name] [--%v=key=value]", clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword, flagAuthProvider, flagAuthProviderArg),
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Sets a user entry in kubeconfig"),
-		Long:    create_authinfo_long,
-		Example: create_authinfo_example,
+		Long:    setAuthinfoLong,
+		Example: setAuthinfoExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := options.complete(cmd, out)
 			if err != nil {
@@ -131,7 +132,7 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 	return cmd
 }
 
-func (o createAuthInfoOptions) run() error {
+func (o setAuthInfoOptions) run() error {
 	err := o.validate()
 	if err != nil {
 		return err
@@ -146,7 +147,10 @@ func (o createAuthInfoOptions) run() error {
 	if !exists {
 		startingStanza = clientcmdapi.NewAuthInfo()
 	}
-	authInfo := o.modifyAuthInfo(*startingStanza)
+	authInfo, err := o.modifyAuthInfo(*startingStanza)
+	if err != nil {
+		return err
+	}
 	config.AuthInfos[o.name] = &authInfo
 
 	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
@@ -157,7 +161,7 @@ func (o createAuthInfoOptions) run() error {
 }
 
 // authInfo builds an AuthInfo object from the options
-func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo) clientcmdapi.AuthInfo {
+func (o *setAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo) (clientcmdapi.AuthInfo, error) {
 	modifiedAuthInfo := existingAuthInfo
 
 	var setToken, setBasic bool
@@ -165,10 +169,17 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if o.clientCertificate.Provided() {
 		certPath := o.clientCertificate.Value()
 		if o.embedCertData.Value() {
-			modifiedAuthInfo.ClientCertificateData, _ = ioutil.ReadFile(certPath)
+			ccd, err := ioutil.ReadFile(certPath)
+			if err != nil {
+				return existingAuthInfo, err
+			}
+			modifiedAuthInfo.ClientCertificateData = ccd
 			modifiedAuthInfo.ClientCertificate = ""
 		} else {
-			certPath, _ = filepath.Abs(certPath)
+			certPath, err := filepath.Abs(certPath)
+			if err != nil {
+				return existingAuthInfo, err
+			}
 			modifiedAuthInfo.ClientCertificate = certPath
 			if len(modifiedAuthInfo.ClientCertificate) > 0 {
 				modifiedAuthInfo.ClientCertificateData = nil
@@ -178,10 +189,17 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if o.clientKey.Provided() {
 		keyPath := o.clientKey.Value()
 		if o.embedCertData.Value() {
-			modifiedAuthInfo.ClientKeyData, _ = ioutil.ReadFile(keyPath)
+			ckd, err := ioutil.ReadFile(keyPath)
+			if err != nil {
+				return existingAuthInfo, err
+			}
+			modifiedAuthInfo.ClientKeyData = ckd
 			modifiedAuthInfo.ClientKey = ""
 		} else {
-			keyPath, _ = filepath.Abs(keyPath)
+			keyPath, err := filepath.Abs(keyPath)
+			if err != nil {
+				return existingAuthInfo, err
+			}
 			modifiedAuthInfo.ClientKey = keyPath
 			if len(modifiedAuthInfo.ClientKey) > 0 {
 				modifiedAuthInfo.ClientKeyData = nil
@@ -236,10 +254,10 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 		}
 	}
 
-	return modifiedAuthInfo
+	return modifiedAuthInfo, nil
 }
 
-func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) error {
+func (o *setAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
 		return fmt.Errorf("Unexpected args: %v", args)
@@ -263,7 +281,7 @@ func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) erro
 	return nil
 }
 
-func (o createAuthInfoOptions) validate() error {
+func (o setAuthInfoOptions) validate() error {
 	if len(o.name) == 0 {
 		return errors.New("you must specify a non-empty user name")
 	}
@@ -284,13 +302,13 @@ func (o createAuthInfoOptions) validate() error {
 			return fmt.Errorf("you must specify a --%s or --%s to embed", clientcmd.FlagCertFile, clientcmd.FlagKeyFile)
 		}
 		if certPath != "" {
-			if _, err := ioutil.ReadFile(certPath); err != nil {
-				return fmt.Errorf("error reading %s data from %s: %v", clientcmd.FlagCertFile, certPath, err)
+			if _, err := os.Stat(certPath); err != nil {
+				return err
 			}
 		}
 		if keyPath != "" {
-			if _, err := ioutil.ReadFile(keyPath); err != nil {
-				return fmt.Errorf("error reading %s data from %s: %v", clientcmd.FlagKeyFile, keyPath, err)
+			if _, err := os.Stat(keyPath); err != nil {
+				return err
 			}
 		}
 	}

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -33,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-type createClusterOptions struct {
+type setClusterOptions struct {
 	configAccess          clientcmd.ConfigAccess
 	name                  string
 	server                flag.StringFlag
@@ -43,12 +44,12 @@ type createClusterOptions struct {
 }
 
 var (
-	create_cluster_long = templates.LongDesc(`
+	setClusterLong = templates.LongDesc(`
 		Sets a cluster entry in kubeconfig.
 
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
 
-	create_cluster_example = templates.Examples(`
+	setClusterExample = templates.Examples(`
 		# Set only the server field on the e2e cluster entry without touching other values.
 		kubectl config set-cluster e2e --server=https://1.2.3.4
 
@@ -60,14 +61,14 @@ var (
 )
 
 func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createClusterOptions{configAccess: configAccess}
+	options := &setClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use: fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Sets a cluster entry in kubeconfig"),
-		Long:    create_cluster_long,
-		Example: create_cluster_example,
+		Long:    setClusterLong,
+		Example: setClusterExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
@@ -88,7 +89,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	return cmd
 }
 
-func (o createClusterOptions) run() error {
+func (o setClusterOptions) run() error {
 	err := o.validate()
 	if err != nil {
 		return err
@@ -103,7 +104,10 @@ func (o createClusterOptions) run() error {
 	if !exists {
 		startingStanza = clientcmdapi.NewCluster()
 	}
-	cluster := o.modifyCluster(*startingStanza)
+	cluster, err := o.modifyCluster(*startingStanza)
+	if err != nil {
+		return err
+	}
 	config.Clusters[o.name] = &cluster
 
 	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
@@ -114,7 +118,7 @@ func (o createClusterOptions) run() error {
 }
 
 // cluster builds a Cluster object from the options
-func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluster) clientcmdapi.Cluster {
+func (o *setClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluster) (clientcmdapi.Cluster, error) {
 	modifiedCluster := existingCluster
 
 	if o.server.Provided() {
@@ -131,11 +135,18 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 	if o.certificateAuthority.Provided() {
 		caPath := o.certificateAuthority.Value()
 		if o.embedCAData.Value() {
-			modifiedCluster.CertificateAuthorityData, _ = ioutil.ReadFile(caPath)
+			cad, err := ioutil.ReadFile(caPath)
+			if err != nil {
+				return existingCluster, err
+			}
+			modifiedCluster.CertificateAuthorityData = cad
 			modifiedCluster.InsecureSkipTLSVerify = false
 			modifiedCluster.CertificateAuthority = ""
 		} else {
-			caPath, _ = filepath.Abs(caPath)
+			caPath, err := filepath.Abs(caPath)
+			if err != nil {
+				return existingCluster, err
+			}
 			modifiedCluster.CertificateAuthority = caPath
 			// Specifying a certificate authority file clears certificate authority data and insecure mode
 			if caPath != "" {
@@ -145,10 +156,10 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 		}
 	}
 
-	return modifiedCluster
+	return modifiedCluster, nil
 }
 
-func (o *createClusterOptions) complete(cmd *cobra.Command) error {
+func (o *setClusterOptions) complete(cmd *cobra.Command) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
 		return helpErrorf(cmd, "Unexpected args: %v", args)
@@ -158,7 +169,7 @@ func (o *createClusterOptions) complete(cmd *cobra.Command) error {
 	return nil
 }
 
-func (o createClusterOptions) validate() error {
+func (o setClusterOptions) validate() error {
 	if len(o.name) == 0 {
 		return errors.New("you must specify a non-empty cluster name")
 	}
@@ -170,8 +181,8 @@ func (o createClusterOptions) validate() error {
 		if caPath == "" {
 			return fmt.Errorf("you must specify a --%s to embed", clientcmd.FlagCAFile)
 		}
-		if _, err := ioutil.ReadFile(caPath); err != nil {
-			return fmt.Errorf("could not read %s data from %s: %v", clientcmd.FlagCAFile, caPath, err)
+		if _, err := os.Stat(caPath); err != nil {
+			return err
 		}
 	}
 
