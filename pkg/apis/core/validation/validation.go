@@ -2749,7 +2749,7 @@ func validateTaintEffect(effect *core.TaintEffect, allowEmpty bool, fldPath *fie
 			// TODO: Uncomment this block when implement TaintEffectNoScheduleNoAdmit.
 			// string(core.TaintEffectNoScheduleNoAdmit),
 		}
-		allErrors = append(allErrors, field.NotSupported(fldPath, effect, validValues))
+		allErrors = append(allErrors, field.NotSupported(fldPath, *effect, validValues))
 	}
 	return allErrors
 }
