@@ -23,29 +23,38 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const schedulerSubsystem = "scheduler"
+const (
+	// SchedulerSubsystem - subsystem name used by scheduler
+	SchedulerSubsystem = "scheduler"
+	// SchedulingLatencyName - scheduler latency metric name
+	SchedulingLatencyName = "scheduling_latencies_summary"
+
+	// OperationLabel - operation label name
+	OperationLabel = "operation"
+	// Binding - binding operation label value
+	Binding = "binding"
+	// SchedulingAlgorithm - scheduling algorithm operation label value
+	SchedulingAlgorithm = "scheduling_algorithm"
+	// E2eScheduling - e2e scheduling operation label value
+	E2eScheduling = "e2e_scheduling"
+)
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
-	E2eSchedulingLatency = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: schedulerSubsystem,
-			Name:      "e2e_scheduling_latency_microseconds",
-			Help:      "E2e scheduling latency (scheduling algorithm + binding)",
-			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
+	SchedulingLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      SchedulingLatencyName,
+			Help:      "Scheduling latency in microseconds split by sub-parts of the scheduling operation",
+			// Make the sliding window of 5h.
+			// TODO: The value for this should be based on some SLI definition (long term).
+			MaxAge: 5 * time.Hour,
 		},
-	)
-	SchedulingAlgorithmLatency = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: schedulerSubsystem,
-			Name:      "scheduling_algorithm_latency_microseconds",
-			Help:      "Scheduling algorithm latency",
-			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
-		},
+		[]string{OperationLabel},
 	)
 	SchedulingAlgorithmPredicateEvaluationDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Subsystem: schedulerSubsystem,
+			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_predicate_evaluation",
 			Help:      "Scheduling algorithm predicate evaluation duration",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
@@ -53,7 +62,7 @@ var (
 	)
 	SchedulingAlgorithmPriorityEvaluationDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Subsystem: schedulerSubsystem,
+			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_priority_evaluation",
 			Help:      "Scheduling algorithm priority evaluation duration",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
@@ -61,50 +70,48 @@ var (
 	)
 	SchedulingAlgorithmPremptionEvaluationDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Subsystem: schedulerSubsystem,
+			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_preemption_evaluation",
 			Help:      "Scheduling algorithm preemption evaluation duration",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
-	BindingLatency = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: schedulerSubsystem,
-			Name:      "binding_latency_microseconds",
-			Help:      "Binding latency",
-			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
-		},
-	)
 	PreemptionVictims = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Subsystem: schedulerSubsystem,
+			Subsystem: SchedulerSubsystem,
 			Name:      "pod_preemption_victims",
 			Help:      "Number of selected preemption victims",
 		})
 	PreemptionAttempts = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Subsystem: schedulerSubsystem,
+			Subsystem: SchedulerSubsystem,
 			Name:      "total_preemption_attempts",
 			Help:      "Total preemption attempts in the cluster till now",
 		})
+	metricsList = []prometheus.Collector{
+		SchedulingLatency,
+		SchedulingAlgorithmPredicateEvaluationDuration,
+		SchedulingAlgorithmPriorityEvaluationDuration,
+		SchedulingAlgorithmPremptionEvaluationDuration,
+		PreemptionVictims,
+		PreemptionAttempts,
+	}
 )
 
 var registerMetrics sync.Once
 
 // Register all metrics.
 func Register() {
-	// Register the metrics.
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(E2eSchedulingLatency)
-		prometheus.MustRegister(SchedulingAlgorithmLatency)
-		prometheus.MustRegister(BindingLatency)
-
-		prometheus.MustRegister(SchedulingAlgorithmPredicateEvaluationDuration)
-		prometheus.MustRegister(SchedulingAlgorithmPriorityEvaluationDuration)
-		prometheus.MustRegister(SchedulingAlgorithmPremptionEvaluationDuration)
-		prometheus.MustRegister(PreemptionVictims)
-		prometheus.MustRegister(PreemptionAttempts)
+		for _, metric := range metricsList {
+			prometheus.MustRegister(metric)
+		}
 	})
+}
+
+// Reset resets metrics
+func Reset() {
+	SchedulingLatency.Reset()
 }
 
 // SinceInMicroseconds gets the time since the specified start in microseconds.
