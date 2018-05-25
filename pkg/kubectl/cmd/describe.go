@@ -137,7 +137,10 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.BuilderArgs = args
 
-	o.Describer = f.Describer
+	o.Describer = func(mapping *meta.RESTMapping) (printers.Describer, error) {
+		return cmdutil.DescriberFn(f, mapping)
+	}
+
 	o.NewBuilder = f.NewBuilder
 
 	// include the uninitialized objects by default

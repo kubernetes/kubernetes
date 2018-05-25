@@ -52,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // +k8s:deepcopy-gen=true
@@ -238,7 +237,6 @@ type TestFactory struct {
 	Client             kubectl.RESTClient
 	ScaleGetter        scaleclient.ScalesGetter
 	UnstructuredClient kubectl.RESTClient
-	DescriberVal       printers.Describer
 	Namespace          string
 	ClientConfigVal    *restclient.Config
 	CommandVal         string
@@ -271,10 +269,17 @@ func NewTestFactory() *TestFactory {
 		WithClientConfig(clientConfig).
 		WithRESTMapper(testRESTMapper())
 
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		panic(fmt.Sprintf("unable to create a fake restclient config: %v", err))
+	}
+
 	return &TestFactory{
 		Factory:           cmdutil.NewFactory(configFlags),
 		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(legacyscheme.Scheme),
 		tempConfigFile:    tmpFile,
+
+		ClientConfigVal: restConfig,
 	}
 }
 
@@ -303,10 +308,6 @@ func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 		return f.UnstructuredClientForMappingFunc(mapping.GroupVersionKind.GroupVersion())
 	}
 	return f.UnstructuredClient, nil
-}
-
-func (f *TestFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
-	return f.DescriberVal, nil
 }
 
 func (f *TestFactory) Validator(validate bool) (validation.Schema, error) {
