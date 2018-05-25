@@ -21,6 +21,7 @@ go_library(
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/api/latest:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
+        "//pkg/scheduler/metrics:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/flag:go_default_library",
         "//pkg/version:go_default_library",
