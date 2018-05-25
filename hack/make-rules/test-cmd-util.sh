@@ -3209,18 +3209,6 @@ run_deployment_tests() {
   kubectl delete configmap test-set-env-config "${kube_flags[@]}"
   kubectl delete secret test-set-env-secret "${kube_flags[@]}"
 
-  ### Delete a deployment with initializer
-  # Pre-condition: no deployment exists
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Create a deployment
-  kubectl create --request-timeout=1 -f hack/testdata/deployment-with-initializer.yaml 2>&1 "${kube_flags[@]}" || true
-  kube::test::get_object_assert 'deployment web' "{{$id_field}}" 'web'
-  # Delete a deployment
-  kubectl delete deployment web "${kube_flags[@]}"
-  # Check Deployment web doesn't exist
-  output_message=$(! kubectl get deployment web 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" '"web" not found'
-
   set +o nounset
   set +o errexit
 }
@@ -3361,18 +3349,6 @@ run_rs_tests() {
   kubectl delete rs frontend redis-slave "${kube_flags[@]}" # delete multiple replica sets at once
   # Post-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
-
-  ### Delete a rs with initializer
-  # Pre-condition: no rs exists
-  kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Create a rs
-  kubectl create --request-timeout=1 -f hack/testdata/replicaset-with-initializer.yaml 2>&1 "${kube_flags[@]}" || true
-  kube::test::get_object_assert 'rs nginx' "{{$id_field}}" 'nginx'
-  # Delete a rs
-  kubectl delete rs nginx "${kube_flags[@]}"
-  # check rs nginx doesn't exist
-  output_message=$(! kubectl get rs nginx 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" '"nginx" not found'
 
   if kube::test::if_supports_resource "${horizontalpodautoscalers}" ; then
     ### Auto scale replica set
