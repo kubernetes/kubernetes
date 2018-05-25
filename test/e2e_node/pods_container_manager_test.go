@@ -165,7 +165,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 	})
 
-	Describe("Pod containers", func() {
+	Describe("Pod containers [NodeConformance]", func() {
 		Context("On scheduling a Guaranteed Pod", func() {
 			It("Pod containers should have been created under the cgroup-root", func() {
 				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
