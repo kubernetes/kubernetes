@@ -288,15 +288,18 @@ func (gb *GraphBuilder) IsSynced() bool {
 	defer gb.monitorLock.Unlock()
 
 	if len(gb.monitors) == 0 {
+		glog.V(2).Info("garbage controller monitor not synced: no monitors")
 		return false
 	}
 
-	for _, monitor := range gb.monitors {
+	synced := true
+	for resource, monitor := range gb.monitors {
 		if !monitor.controller.HasSynced() {
-			return false
+			glog.V(2).Infof("garbage controller monitor not yet synced: %+v", resource)
+			synced = false
 		}
 	}
-	return true
+	return synced
 }
 
 // Run sets the stop channel and starts monitor execution until stopCh is

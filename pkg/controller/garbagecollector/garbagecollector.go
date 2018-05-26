@@ -221,6 +221,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			// client. This is a leaky abstraction and assumes behavior about the REST
 			// mapper, but we'll deal with it for now.
 			gc.restMapper.Reset()
+			glog.V(2).Infof("reset restmapper")
 
 			// Perform the monitor resync and wait for controllers to report cache sync.
 			//
@@ -234,6 +235,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors, will retry (attempt %d): %v", attempt, err))
 				return false, nil
 			}
+			glog.V(2).Infof("resynced monitors")
 
 			// wait for caches to fill for a while (our sync period) before attempting to rediscover resources and retry syncing.
 			// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
