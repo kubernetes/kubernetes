@@ -51,16 +51,17 @@ var (
 		The shell code must be evaluated to provide interactive
 		completion of kubeadm commands. This can be done by sourcing it from
 		the .bash_profile.
+		
+		Note: this requires the bash-completion framework.
 
-		Note: this requires the bash-completion framework, which is not installed
-		by default on Mac. This can be installed by using homebrew:
-
+		To install it on Mac use homebrew:
 		    $ brew install bash-completion
-
 		Once installed, bash_completion must be evaluated. This can be done by adding the
 		following line to the .bash_profile
-
 		    $ source $(brew --prefix)/etc/bash_completion
+
+		If bash-completion is not installed on Linux, please install the 'bash-completion' package
+		via your distribution's package manager.
 
 		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2`)
 
