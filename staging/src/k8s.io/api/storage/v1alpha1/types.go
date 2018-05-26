@@ -153,7 +153,7 @@ const (
 	// VolumeSnapshotConditionUploading means the snapshot is cut and the application
 	// can resume accessing data if ConditionStatus is True. It corresponds
 	// to "Uploading" in GCE PD or "Pending" in AWS and ConditionStatus is True.
-	// This status is not applicable in OpenStack Cinder.
+	// This condition type is not applicable in OpenStack Cinder.
 	VolumeSnapshotConditionUploading VolumeSnapshotConditionType = "Uploading"
 	// VolumeSnapshotConditionReady is added when the snapshot has been successfully created and is ready to be used.
 	VolumeSnapshotConditionReady VolumeSnapshotConditionType = "Ready"
@@ -252,8 +252,8 @@ type VolumeSnapshotDataConditionType string
 const (
 	// VolumeSnapshotDataReady is added when the on-disk snapshot has been successfully created.
 	VolumeSnapshotDataConditionReady VolumeSnapshotDataConditionType = "Ready"
-	// VolumeSnapshotDataPending is added when the on-disk snapshot has been successfully created but is not available to use.
-	VolumeSnapshotDataConditionPending VolumeSnapshotDataConditionType = "Pending"
+	// VolumeSnapshotDataUploading is added when the on-disk snapshot has been successfully cut and is being uploaded.
+	VolumeSnapshotDataConditionUploading VolumeSnapshotDataConditionType = "Uploading"
 	// VolumeSnapshotDataError is added but the on-disk snapshot is failed to created
 	VolumeSnapshotDataConditionError VolumeSnapshotDataConditionType = "Error"
 )
