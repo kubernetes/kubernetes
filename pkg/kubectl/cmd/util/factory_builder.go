@@ -19,10 +19,8 @@ limitations under the License.
 package util
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 type ring2Factory struct {
@@ -55,21 +53,4 @@ func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
 	}
 
 	return scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
-}
-
-func (f *ring2Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
-	clientset, clientsetErr := f.clientAccessFactory.ClientSet()
-	if clientsetErr != nil {
-		return nil, clientsetErr
-	}
-	scaler, err := f.ScaleClient()
-	if err != nil {
-		return nil, err
-	}
-
-	reaper, reaperErr := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset, scaler)
-	if kubectl.IsNoSuchReaperError(reaperErr) {
-		return nil, reaperErr
-	}
-	return reaper, reaperErr
 }
