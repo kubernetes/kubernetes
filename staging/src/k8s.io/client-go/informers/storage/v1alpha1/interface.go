@@ -26,6 +26,10 @@ import (
 type Interface interface {
 	// VolumeAttachments returns a VolumeAttachmentInformer.
 	VolumeAttachments() VolumeAttachmentInformer
+	// VolumeSnapshots returns a VolumeSnapshotInformer.
+	VolumeSnapshots() VolumeSnapshotInformer
+	// VolumeSnapshotDatas returns a VolumeSnapshotDataInformer.
+	VolumeSnapshotDatas() VolumeSnapshotDataInformer
 }
 
 type version struct {
@@ -42,4 +46,14 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // VolumeAttachments returns a VolumeAttachmentInformer.
 func (v *version) VolumeAttachments() VolumeAttachmentInformer {
 	return &volumeAttachmentInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// VolumeSnapshots returns a VolumeSnapshotInformer.
+func (v *version) VolumeSnapshots() VolumeSnapshotInformer {
+	return &volumeSnapshotInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// VolumeSnapshotDatas returns a VolumeSnapshotDataInformer.
+func (v *version) VolumeSnapshotDatas() VolumeSnapshotDataInformer {
+	return &volumeSnapshotDataInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

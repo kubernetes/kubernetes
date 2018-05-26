@@ -71,6 +71,12 @@ message StorageClass {
   // the VolumeScheduling feature.
   // +optional
   optional string volumeBindingMode = 7;
+
+  // Snapshotter is the driver expected to handle the volume snapshotting.
+  // This is an optionally-prefixed name, like a label key.
+  // For example: "kubernetes.io/gce-pd" or "kubernetes.io/aws-ebs".
+  // This value may not be empty.
+  optional string snapshotter = 8;
 }
 
 // StorageClassList is a collection of storage classes.

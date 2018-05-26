@@ -36,6 +36,14 @@ func (c *FakeStorage) VolumeAttachments() internalversion.VolumeAttachmentInterf
 	return &FakeVolumeAttachments{c}
 }
 
+func (c *FakeStorage) VolumeSnapshots(namespace string) internalversion.VolumeSnapshotInterface {
+	return &FakeVolumeSnapshots{c, namespace}
+}
+
+func (c *FakeStorage) VolumeSnapshotDatas() internalversion.VolumeSnapshotDataInterface {
+	return &FakeVolumeSnapshotDatas{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeStorage) RESTClient() rest.Interface {

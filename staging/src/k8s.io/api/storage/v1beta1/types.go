@@ -66,6 +66,12 @@ type StorageClass struct {
 	// the VolumeScheduling feature.
 	// +optional
 	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
+
+	// Snapshotter is the driver expected to handle the volume snapshotting.
+	// This is an optionally-prefixed name, like a label key.
+	// For example: "kubernetes.io/gce-pd" or "kubernetes.io/aws-ebs".
+	// This value may not be empty.
+	Snapshotter string `json:"snapshotter,omitempty" protobuf:"bytes,8,opt,name=snapshotter"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
