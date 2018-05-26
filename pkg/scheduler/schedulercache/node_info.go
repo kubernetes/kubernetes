@@ -293,8 +293,8 @@ func (n *NodeInfo) UsedPorts() util.HostPortInfo {
 	return n.usedPorts
 }
 
-// Images returns the image size information on this node.
-func (n *NodeInfo) Images() map[string]int64 {
+// ImageSizes returns the image size information on this node.
+func (n *NodeInfo) ImageSizes() map[string]int64 {
 	if n == nil {
 		return nil
 	}
