@@ -28,6 +28,7 @@ go_library(
         "//vendor/github.com/cpuguy83/go-md2man/md2man:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
     ],
 )
 

@@ -343,7 +343,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	bootstrapCheckpointPath string) (*Kubelet, error) {
+	bootstrapCheckpointPath string,
+	stopCh <-chan struct{}) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -621,7 +622,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			remoteImageEndpoint)
 		glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 		server := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
-		if err := server.Start(); err != nil {
+		if err := server.Start(stopCh); err != nil {
 			return nil, err
 		}
 
