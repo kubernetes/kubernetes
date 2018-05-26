@@ -18,34 +18,35 @@ package options
 
 import (
 	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
-// DaemonSetControllerOptions holds the DaemonSetController options.
-type DaemonSetControllerOptions struct {
-	ConcurrentDaemonSetSyncs int32
+// JobControllerOptions holds the JobController options.
+type JobControllerOptions struct {
+	ConcurrentJobSyncs int32
 }
 
-// AddFlags adds flags related to DaemonSetController for controller manager to the specified FlagSet.
-func (o *DaemonSetControllerOptions) AddFlags(fs *pflag.FlagSet) {
+// AddFlags adds flags related to JobController for controller manager to the specified FlagSet.
+func (o *JobControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
 }
 
-// ApplyTo fills up DaemonSetController config with options.
-func (o *DaemonSetControllerOptions) ApplyTo(cfg *componentconfig.DaemonSetControllerConfiguration) error {
+// ApplyTo fills up JobController config with options.
+func (o *JobControllerOptions) ApplyTo(cfg *componentconfig.JobControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
 
-	cfg.ConcurrentDaemonSetSyncs = o.ConcurrentDaemonSetSyncs
+	cfg.ConcurrentJobSyncs = o.ConcurrentJobSyncs
 
 	return nil
 }
 
-// Validate checks validation of DaemonSetControllerOptions.
-func (o *DaemonSetControllerOptions) Validate() []error {
+// Validate checks validation of JobControllerOptions.
+func (o *JobControllerOptions) Validate() []error {
 	if o == nil {
 		return nil
 	}
