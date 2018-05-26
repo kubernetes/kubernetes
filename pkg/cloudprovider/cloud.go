@@ -28,6 +28,11 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+// ServiceAnnotationLoadBalancerNamePrefix is the annotation used on the service
+// of type LoadBalancer for defining a prefix of the load balancer name. The prefix
+// is limited to alphanumeric and hyphen symbols with maximal length of 8
+const ServiceAnnotationLoadBalancerNamePrefix = "service.beta.kubernetes.io/load-balancer-name-prefix"
+
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
 	// Initialize provides the cloud with a kubernetes client builder and may spawn goroutines
@@ -68,10 +73,22 @@ type Clusters interface {
 // replace this method call in GetLoadBalancerName with a provider-specific implementation that
 // is less cryptic than the Service's UUID.
 func DefaultLoadBalancerName(service *v1.Service) string {
-	//GCE requires that the name of a load balancer starts with a lower case letter.
-	ret := "a" + string(service.UID)
-	ret = strings.Replace(ret, "-", "", -1)
-	//AWS requires that the name of a load balancer is shorter than 32 bytes.
+	prefix := "a"
+	l := service.Annotations[ServiceLoadBalancerNamePrefixAnnotationKey]
+
+	// validate max prefix length
+	if len(l) > 8 {
+		l = l[:8]
+	}
+
+	// GCE requires LB name to start with a lower case letter.
+	if prefixRegexp.MatchString(l) {
+		prefix = l
+	}
+
+	ret := prefix + strings.Replace(string(service.UID), "-", "", -1)
+
+	// AWS requires LB name max length to be 32 chars.
 	if len(ret) > 32 {
 		ret = ret[:32]
 	}

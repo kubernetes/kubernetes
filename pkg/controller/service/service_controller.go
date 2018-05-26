@@ -239,7 +239,7 @@ func (s *ServiceController) init() error {
 // Returns an error if processing the service update failed.
 func (s *ServiceController) processServiceUpdate(cachedService *cachedService, service *v1.Service, key string) error {
 	if cachedService.state != nil {
-		if cachedService.state.UID != service.UID {
+		if cachedService.state.UID != service.UID || s.loadBalancerName(cachedService.state) != s.loadBalancerName(service) {
 			err := s.processLoadBalancerDelete(cachedService, key)
 			if err != nil {
 				return err
