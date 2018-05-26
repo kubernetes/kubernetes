@@ -66,6 +66,10 @@ func (n *lazyNode) intoDoc() (*partialDoc, error) {
 		return &n.doc, nil
 	}
 
+	if n.raw == nil {
+		return nil, fmt.Errorf("Unable to unmarshal nil pointer as partial document")
+	}
+
 	err := json.Unmarshal(*n.raw, &n.doc)
 
 	if err != nil {
@@ -81,6 +85,10 @@ func (n *lazyNode) intoAry() (*partialArray, error) {
 		return &n.ary, nil
 	}
 
+	if n.raw == nil {
+		return nil, fmt.Errorf("Unable to unmarshal nil pointer as partial array")
+	}
+
 	err := json.Unmarshal(*n.raw, &n.ary)
 
 	if err != nil {
@@ -94,6 +102,10 @@ func (n *lazyNode) intoAry() (*partialArray, error) {
 func (n *lazyNode) compact() []byte {
 	buf := &bytes.Buffer{}
 
+	if n.raw == nil {
+		return nil
+	}
+
 	err := json.Compact(buf, *n.raw)
 
 	if err != nil {
@@ -104,6 +116,10 @@ func (n *lazyNode) compact() []byte {
 }
 
 func (n *lazyNode) tryDoc() bool {
+	if n.raw == nil {
+		return false
+	}
+
 	err := json.Unmarshal(*n.raw, &n.doc)
 
 	if err != nil {
@@ -115,6 +131,10 @@ func (n *lazyNode) tryDoc() bool {
 }
 
 func (n *lazyNode) tryAry() bool {
+	if n.raw == nil {
+		return false
+	}
+
 	err := json.Unmarshal(*n.raw, &n.ary)
 
 	if err != nil {
@@ -377,7 +397,9 @@ func (d *partialArray) add(key string, val *lazyNode) error {
 		}
 		idx = len(ary) - idx
 	}
-
+	if idx < 0 || idx >= len(ary) || idx > len(cur) {
+		return fmt.Errorf("Unable to access invalid index: %d", idx)
+	}
 	copy(ary[0:idx], cur[0:idx])
 	ary[idx] = val
 	copy(ary[idx+1:], cur[idx:])
