@@ -32,7 +32,7 @@ import (
 func TestCreateService(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-service"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -51,7 +51,6 @@ func TestCreateService(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateServiceClusterIP(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
@@ -66,7 +65,7 @@ func TestCreateService(t *testing.T) {
 func TestCreateServiceNodePort(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-node-port-service"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -85,7 +84,6 @@ func TestCreateServiceNodePort(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateServiceNodePort(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
@@ -100,7 +98,7 @@ func TestCreateServiceNodePort(t *testing.T) {
 func TestCreateServiceExternalName(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-external-name-service"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -119,7 +117,6 @@ func TestCreateServiceExternalName(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateServiceExternalName(tf, ioStreams)
 	cmd.Flags().Set("output", "name")

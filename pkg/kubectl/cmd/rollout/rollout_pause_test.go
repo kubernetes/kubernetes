@@ -40,7 +40,7 @@ var rolloutPauseGroupVersionDecoder = schema.GroupVersion{Group: "extensions", V
 func TestRolloutPause(t *testing.T) {
 	deploymentName := "deployment/nginx-deployment"
 	ns := legacyscheme.Codecs
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	encoder := ns.EncoderForVersion(info.Serializer, rolloutPauseGroupVersionEncoder)
@@ -62,7 +62,6 @@ func TestRolloutPause(t *testing.T) {
 		},
 	}
 
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdRolloutPause(tf, streams)
 

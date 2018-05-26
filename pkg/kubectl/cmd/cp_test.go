@@ -514,8 +514,7 @@ func TestClean(t *testing.T) {
 }
 
 func TestCopyToPod(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
-	tf.Namespace = "test"
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	ns := legacyscheme.Codecs
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
