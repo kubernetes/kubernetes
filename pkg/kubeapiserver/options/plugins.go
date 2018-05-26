@@ -133,6 +133,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		serviceaccount.PluginName,           //ServiceAccount
 		label.PluginName,                    //PersistentVolumeLabel
 		setdefault.PluginName,               //DefaultStorageClass
+		resize.PluginName,                   //PersistentVolumeClaimResize
 		defaulttolerationseconds.PluginName, //DefaultTolerationSeconds
 		mutatingwebhook.PluginName,          //MutatingAdmissionWebhook
 		validatingwebhook.PluginName,        //ValidatingAdmissionWebhook
