@@ -1248,10 +1248,8 @@ func TestGetCondition(t *testing.T) {
 	tests := []struct {
 		name string
 
-		status     apps.ReplicaSetStatus
-		condType   apps.ReplicaSetConditionType
-		condStatus v1.ConditionStatus
-		condReason string
+		status   apps.ReplicaSetStatus
+		condType apps.ReplicaSetConditionType
 
 		expected bool
 	}{

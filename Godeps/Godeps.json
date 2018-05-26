@@ -1240,7 +1240,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "ed7cfbae1fffc071f71e068df27bf4f0521402d8"
+			"Rev": "94e38aa1586e8a6c8a75770bddf5ff84c48a106b"
 		},
 		{
 			"ImportPath": "github.com/exponent-io/jsonpath",
@@ -1994,6 +1994,10 @@
 			"ImportPath": "github.com/influxdata/influxdb/pkg/escape",
 			"Comment": "v1.1.1",
 			"Rev": "e47cf1f2e83a02443d7115c54f838be8ee959644"
+		},
+		{
+			"ImportPath": "github.com/jessevdk/go-flags",
+			"Rev": "1c38ed7ad0cc3d9e66649ac398c30e45f395c4eb"
 		},
 		{
 			"ImportPath": "github.com/jmespath/go-jmespath",

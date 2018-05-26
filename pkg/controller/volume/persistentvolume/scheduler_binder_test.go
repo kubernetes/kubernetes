@@ -42,7 +42,6 @@ var (
 	unboundPVC2                 = makeTestPVC("unbound-pvc2", "5G", pvcUnbound, "", "1", &waitClass)
 	preboundPVC                 = makeTestPVC("prebound-pvc", "1G", pvcPrebound, "pv-node1a", "1", &waitClass)
 	boundPVC                    = makeTestPVC("bound-pvc", "1G", pvcBound, "pv-bound", "1", &waitClass)
-	boundPVC2                   = makeTestPVC("bound-pvc2", "1G", pvcBound, "pv-bound2", "1", &waitClass)
 	badPVC                      = makeBadPVC()
 	immediateUnboundPVC         = makeTestPVC("immediate-unbound-pvc", "1G", pvcUnbound, "", "1", &immediateClass)
 	immediateBoundPVC           = makeTestPVC("immediate-bound-pvc", "1G", pvcBound, "pv-bound-immediate", "1", &immediateClass)
@@ -51,12 +50,10 @@ var (
 	provisionedPVCHigherVersion = makeTestPVC("provisioned-pvc2", "1Gi", pvcUnbound, "", "2", &waitClass)
 	noProvisionerPVC            = makeTestPVC("no-provisioner-pvc", "1Gi", pvcUnbound, "", "1", &provisionNotSupportClass)
 
-	pvNoNode                   = makeTestPV("pv-no-node", "", "1G", "1", nil, waitClass)
 	pvNode1a                   = makeTestPV("pv-node1a", "node1", "5G", "1", nil, waitClass)
 	pvNode1b                   = makeTestPV("pv-node1b", "node1", "10G", "1", nil, waitClass)
 	pvNode1c                   = makeTestPV("pv-node1b", "node1", "5G", "1", nil, waitClass)
 	pvNode2                    = makeTestPV("pv-node2", "node2", "1G", "1", nil, waitClass)
-	pvPrebound                 = makeTestPV("pv-prebound", "node1", "1G", "1", unboundPVC, waitClass)
 	pvBound                    = makeTestPV("pv-bound", "node1", "1G", "1", boundPVC, waitClass)
 	pvNode1aBound              = makeTestPV("pv-node1a", "node1", "1G", "1", unboundPVC, waitClass)
 	pvNode1bBound              = makeTestPV("pv-node1b", "node1", "5G", "1", unboundPVC2, waitClass)
@@ -66,7 +63,6 @@ var (
 
 	binding1a      = makeBinding(unboundPVC, pvNode1a)
 	binding1b      = makeBinding(unboundPVC2, pvNode1b)
-	bindingNoNode  = makeBinding(unboundPVC, pvNoNode)
 	bindingBad     = makeBinding(badPVC, pvNode1b)
 	binding1aBound = makeBinding(unboundPVC, pvNode1aBound)
 	binding1bBound = makeBinding(unboundPVC2, pvNode1bBound)
