@@ -34,6 +34,7 @@ go_library(
         "gce_networkendpointgroup.go",
         "gce_op.go",
         "gce_routes.go",
+        "gce_securitypolicy.go",
         "gce_targetpool.go",
         "gce_targetproxy.go",
         "gce_tpu.go",
