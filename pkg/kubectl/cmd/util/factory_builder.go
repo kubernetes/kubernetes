@@ -20,8 +20,6 @@ package util
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/client-go/dynamic"
-	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
@@ -39,30 +37,12 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
-	discoClient, err := f.clientAccessFactory.ToDiscoveryClient()
-	if err != nil {
-		return nil, err
-	}
-	restClient, err := f.clientAccessFactory.RESTClient()
-	if err != nil {
-		return nil, err
-	}
-	resolver := scaleclient.NewDiscoveryScaleKindResolver(discoClient)
-	mapper, err := f.clientAccessFactory.ToRESTMapper()
-	if err != nil {
-		return nil, err
-	}
-
-	return scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
-}
-
 func (f *ring2Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 	clientset, clientsetErr := f.clientAccessFactory.ClientSet()
 	if clientsetErr != nil {
 		return nil, clientsetErr
 	}
-	scaler, err := f.ScaleClient()
+	scaler, err := ScaleClientFn(f.clientAccessFactory)
 	if err != nil {
 		return nil, err
 	}
