@@ -19,6 +19,7 @@ go_library(
         "//pkg/controller/garbagecollector:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/master/ports:go_default_library",
+        "//pkg/quota/install:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

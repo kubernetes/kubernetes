@@ -1025,6 +1025,7 @@ func Convert_componentconfig_ReplicationControllerConfiguration_To_v1alpha1_Repl
 func autoConvert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_ResourceQuotaControllerConfiguration(in *ResourceQuotaControllerConfiguration, out *componentconfig.ResourceQuotaControllerConfiguration, s conversion.Scope) error {
 	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
 	out.ConcurrentResourceQuotaSyncs = in.ConcurrentResourceQuotaSyncs
+	out.RQIgnoredResources = *(*[]componentconfig.GroupResource)(unsafe.Pointer(&in.RQIgnoredResources))
 	return nil
 }
 
@@ -1036,6 +1037,7 @@ func Convert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_Re
 func autoConvert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration(in *componentconfig.ResourceQuotaControllerConfiguration, out *ResourceQuotaControllerConfiguration, s conversion.Scope) error {
 	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
 	out.ConcurrentResourceQuotaSyncs = in.ConcurrentResourceQuotaSyncs
+	out.RQIgnoredResources = *(*[]GroupResource)(unsafe.Pointer(&in.RQIgnoredResources))
 	return nil
 }
 

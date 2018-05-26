@@ -386,7 +386,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.PodGCController = in.PodGCController
 	out.ReplicaSetController = in.ReplicaSetController
 	out.ReplicationController = in.ReplicationController
-	out.ResourceQuotaController = in.ResourceQuotaController
+	in.ResourceQuotaController.DeepCopyInto(&out.ResourceQuotaController)
 	out.SAController = in.SAController
 	out.ServiceController = in.ServiceController
 	if in.Controllers != nil {
@@ -642,6 +642,11 @@ func (in *ReplicationControllerConfiguration) DeepCopy() *ReplicationControllerC
 func (in *ResourceQuotaControllerConfiguration) DeepCopyInto(out *ResourceQuotaControllerConfiguration) {
 	*out = *in
 	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
+	if in.RQIgnoredResources != nil {
+		in, out := &in.RQIgnoredResources, &out.RQIgnoredResources
+		*out = make([]GroupResource, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
