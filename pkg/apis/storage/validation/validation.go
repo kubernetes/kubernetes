@@ -366,15 +366,15 @@ func ValidateVolumeSnapshotData(vsd *storage.VolumeSnapshotData) field.ErrorList
 		}
 	}
 	if vsd.Spec.CSISnapshot != nil {
-                if numVolumeSnapshotDataSource > 0 {
-                        allErrs = append(allErrs, field.Forbidden(specPath.Child("CSISnapshot"), "may not specify more than 1 volume snapshot data source"))
-                } else {
-                        numVolumeSnapshotDataSource++
-                        if len(vsd.Spec.CSISnapshot.SnapshotHandle) == 0 {
-                                allErrs = append(allErrs, field.Required(specPath.Child("CSISnapshot", "SnapshotHandle"), ""))
-                        }
-                }
-        }
+		if numVolumeSnapshotDataSource > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("CSISnapshot"), "may not specify more than 1 volume snapshot data source"))
+		} else {
+			numVolumeSnapshotDataSource++
+			if len(vsd.Spec.CSISnapshot.SnapshotHandle) == 0 {
+				allErrs = append(allErrs, field.Required(specPath.Child("CSISnapshot", "SnapshotHandle"), ""))
+			}
+		}
+	}
 
 	if numVolumeSnapshotDataSource == 0 {
 		allErrs = append(allErrs, field.Required(specPath, "must specify a volume snapshot data source"))
