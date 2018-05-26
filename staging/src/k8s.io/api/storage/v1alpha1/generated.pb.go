@@ -25,18 +25,37 @@ limitations under the License.
 		k8s.io/kubernetes/vendor/k8s.io/api/storage/v1alpha1/generated.proto
 
 	It has these top-level messages:
+		AWSElasticBlockStoreVolumeSnapshotSource
+		CSIVolumeSnapshotSource
+		CinderVolumeSnapshotSource
+		GCEPersistentDiskSnapshotSource
+		GlusterVolumeSnapshotSource
+		HostPathVolumeSnapshotSource
 		VolumeAttachment
 		VolumeAttachmentList
 		VolumeAttachmentSource
 		VolumeAttachmentSpec
 		VolumeAttachmentStatus
 		VolumeError
+		VolumeSnapshot
+		VolumeSnapshotCondition
+		VolumeSnapshotData
+		VolumeSnapshotDataCondition
+		VolumeSnapshotDataList
+		VolumeSnapshotDataSource
+		VolumeSnapshotDataSpec
+		VolumeSnapshotDataStatus
+		VolumeSnapshotList
+		VolumeSnapshotSpec
+		VolumeSnapshotStatus
 */
 package v1alpha1
 
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
+
+import k8s_io_api_core_v1 "k8s.io/api/core/v1"
 
 import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 
@@ -56,38 +75,282 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
+func (m *AWSElasticBlockStoreVolumeSnapshotSource) Reset() {
+	*m = AWSElasticBlockStoreVolumeSnapshotSource{}
+}
+func (*AWSElasticBlockStoreVolumeSnapshotSource) ProtoMessage() {}
+func (*AWSElasticBlockStoreVolumeSnapshotSource) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{0}
+}
+
+func (m *CSIVolumeSnapshotSource) Reset()                    { *m = CSIVolumeSnapshotSource{} }
+func (*CSIVolumeSnapshotSource) ProtoMessage()               {}
+func (*CSIVolumeSnapshotSource) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{1} }
+
+func (m *CinderVolumeSnapshotSource) Reset()      { *m = CinderVolumeSnapshotSource{} }
+func (*CinderVolumeSnapshotSource) ProtoMessage() {}
+func (*CinderVolumeSnapshotSource) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{2}
+}
+
+func (m *GCEPersistentDiskSnapshotSource) Reset()      { *m = GCEPersistentDiskSnapshotSource{} }
+func (*GCEPersistentDiskSnapshotSource) ProtoMessage() {}
+func (*GCEPersistentDiskSnapshotSource) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{3}
+}
+
+func (m *GlusterVolumeSnapshotSource) Reset()      { *m = GlusterVolumeSnapshotSource{} }
+func (*GlusterVolumeSnapshotSource) ProtoMessage() {}
+func (*GlusterVolumeSnapshotSource) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{4}
+}
+
+func (m *HostPathVolumeSnapshotSource) Reset()      { *m = HostPathVolumeSnapshotSource{} }
+func (*HostPathVolumeSnapshotSource) ProtoMessage() {}
+func (*HostPathVolumeSnapshotSource) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{5}
+}
+
 func (m *VolumeAttachment) Reset()                    { *m = VolumeAttachment{} }
 func (*VolumeAttachment) ProtoMessage()               {}
-func (*VolumeAttachment) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{0} }
+func (*VolumeAttachment) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{6} }
 
 func (m *VolumeAttachmentList) Reset()                    { *m = VolumeAttachmentList{} }
 func (*VolumeAttachmentList) ProtoMessage()               {}
-func (*VolumeAttachmentList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{1} }
+func (*VolumeAttachmentList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{7} }
 
 func (m *VolumeAttachmentSource) Reset()                    { *m = VolumeAttachmentSource{} }
 func (*VolumeAttachmentSource) ProtoMessage()               {}
-func (*VolumeAttachmentSource) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{2} }
+func (*VolumeAttachmentSource) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{8} }
 
 func (m *VolumeAttachmentSpec) Reset()                    { *m = VolumeAttachmentSpec{} }
 func (*VolumeAttachmentSpec) ProtoMessage()               {}
-func (*VolumeAttachmentSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{3} }
+func (*VolumeAttachmentSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{9} }
 
 func (m *VolumeAttachmentStatus) Reset()                    { *m = VolumeAttachmentStatus{} }
 func (*VolumeAttachmentStatus) ProtoMessage()               {}
-func (*VolumeAttachmentStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{4} }
+func (*VolumeAttachmentStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{10} }
 
 func (m *VolumeError) Reset()                    { *m = VolumeError{} }
 func (*VolumeError) ProtoMessage()               {}
-func (*VolumeError) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{5} }
+func (*VolumeError) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{11} }
+
+func (m *VolumeSnapshot) Reset()                    { *m = VolumeSnapshot{} }
+func (*VolumeSnapshot) ProtoMessage()               {}
+func (*VolumeSnapshot) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{12} }
+
+func (m *VolumeSnapshotCondition) Reset()      { *m = VolumeSnapshotCondition{} }
+func (*VolumeSnapshotCondition) ProtoMessage() {}
+func (*VolumeSnapshotCondition) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{13}
+}
+
+func (m *VolumeSnapshotData) Reset()                    { *m = VolumeSnapshotData{} }
+func (*VolumeSnapshotData) ProtoMessage()               {}
+func (*VolumeSnapshotData) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{14} }
+
+func (m *VolumeSnapshotDataCondition) Reset()      { *m = VolumeSnapshotDataCondition{} }
+func (*VolumeSnapshotDataCondition) ProtoMessage() {}
+func (*VolumeSnapshotDataCondition) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{15}
+}
+
+func (m *VolumeSnapshotDataList) Reset()                    { *m = VolumeSnapshotDataList{} }
+func (*VolumeSnapshotDataList) ProtoMessage()               {}
+func (*VolumeSnapshotDataList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{16} }
+
+func (m *VolumeSnapshotDataSource) Reset()      { *m = VolumeSnapshotDataSource{} }
+func (*VolumeSnapshotDataSource) ProtoMessage() {}
+func (*VolumeSnapshotDataSource) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{17}
+}
+
+func (m *VolumeSnapshotDataSpec) Reset()                    { *m = VolumeSnapshotDataSpec{} }
+func (*VolumeSnapshotDataSpec) ProtoMessage()               {}
+func (*VolumeSnapshotDataSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{18} }
+
+func (m *VolumeSnapshotDataStatus) Reset()      { *m = VolumeSnapshotDataStatus{} }
+func (*VolumeSnapshotDataStatus) ProtoMessage() {}
+func (*VolumeSnapshotDataStatus) Descriptor() ([]byte, []int) {
+	return fileDescriptorGenerated, []int{19}
+}
+
+func (m *VolumeSnapshotList) Reset()                    { *m = VolumeSnapshotList{} }
+func (*VolumeSnapshotList) ProtoMessage()               {}
+func (*VolumeSnapshotList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{20} }
+
+func (m *VolumeSnapshotSpec) Reset()                    { *m = VolumeSnapshotSpec{} }
+func (*VolumeSnapshotSpec) ProtoMessage()               {}
+func (*VolumeSnapshotSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{21} }
+
+func (m *VolumeSnapshotStatus) Reset()                    { *m = VolumeSnapshotStatus{} }
+func (*VolumeSnapshotStatus) ProtoMessage()               {}
+func (*VolumeSnapshotStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{22} }
 
 func init() {
+	proto.RegisterType((*AWSElasticBlockStoreVolumeSnapshotSource)(nil), "k8s.io.api.storage.v1alpha1.AWSElasticBlockStoreVolumeSnapshotSource")
+	proto.RegisterType((*CSIVolumeSnapshotSource)(nil), "k8s.io.api.storage.v1alpha1.CSIVolumeSnapshotSource")
+	proto.RegisterType((*CinderVolumeSnapshotSource)(nil), "k8s.io.api.storage.v1alpha1.CinderVolumeSnapshotSource")
+	proto.RegisterType((*GCEPersistentDiskSnapshotSource)(nil), "k8s.io.api.storage.v1alpha1.GCEPersistentDiskSnapshotSource")
+	proto.RegisterType((*GlusterVolumeSnapshotSource)(nil), "k8s.io.api.storage.v1alpha1.GlusterVolumeSnapshotSource")
+	proto.RegisterType((*HostPathVolumeSnapshotSource)(nil), "k8s.io.api.storage.v1alpha1.HostPathVolumeSnapshotSource")
 	proto.RegisterType((*VolumeAttachment)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachment")
 	proto.RegisterType((*VolumeAttachmentList)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachmentList")
 	proto.RegisterType((*VolumeAttachmentSource)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachmentSource")
 	proto.RegisterType((*VolumeAttachmentSpec)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachmentSpec")
 	proto.RegisterType((*VolumeAttachmentStatus)(nil), "k8s.io.api.storage.v1alpha1.VolumeAttachmentStatus")
 	proto.RegisterType((*VolumeError)(nil), "k8s.io.api.storage.v1alpha1.VolumeError")
+	proto.RegisterType((*VolumeSnapshot)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshot")
+	proto.RegisterType((*VolumeSnapshotCondition)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotCondition")
+	proto.RegisterType((*VolumeSnapshotData)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotData")
+	proto.RegisterType((*VolumeSnapshotDataCondition)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotDataCondition")
+	proto.RegisterType((*VolumeSnapshotDataList)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotDataList")
+	proto.RegisterType((*VolumeSnapshotDataSource)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotDataSource")
+	proto.RegisterType((*VolumeSnapshotDataSpec)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotDataSpec")
+	proto.RegisterType((*VolumeSnapshotDataStatus)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotDataStatus")
+	proto.RegisterType((*VolumeSnapshotList)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotList")
+	proto.RegisterType((*VolumeSnapshotSpec)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotSpec")
+	proto.RegisterType((*VolumeSnapshotStatus)(nil), "k8s.io.api.storage.v1alpha1.VolumeSnapshotStatus")
 }
+func (m *AWSElasticBlockStoreVolumeSnapshotSource) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *AWSElasticBlockStoreVolumeSnapshotSource) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.SnapshotID)))
+	i += copy(dAtA[i:], m.SnapshotID)
+	return i, nil
+}
+
+func (m *CSIVolumeSnapshotSource) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CSIVolumeSnapshotSource) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Driver)))
+	i += copy(dAtA[i:], m.Driver)
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.SnapshotHandle)))
+	i += copy(dAtA[i:], m.SnapshotHandle)
+	dAtA[i] = 0x18
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.CreatedAt))
+	return i, nil
+}
+
+func (m *CinderVolumeSnapshotSource) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CinderVolumeSnapshotSource) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.SnapshotID)))
+	i += copy(dAtA[i:], m.SnapshotID)
+	return i, nil
+}
+
+func (m *GCEPersistentDiskSnapshotSource) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GCEPersistentDiskSnapshotSource) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.SnapshotName)))
+	i += copy(dAtA[i:], m.SnapshotName)
+	return i, nil
+}
+
+func (m *GlusterVolumeSnapshotSource) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GlusterVolumeSnapshotSource) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.SnapshotID)))
+	i += copy(dAtA[i:], m.SnapshotID)
+	return i, nil
+}
+
+func (m *HostPathVolumeSnapshotSource) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *HostPathVolumeSnapshotSource) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Path)))
+	i += copy(dAtA[i:], m.Path)
+	return i, nil
+}
+
 func (m *VolumeAttachment) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -324,6 +587,476 @@ func (m *VolumeError) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *VolumeSnapshot) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshot) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
+	n9, err := m.ObjectMeta.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n9
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Spec.Size()))
+	n10, err := m.Spec.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n10
+	dAtA[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Status.Size()))
+	n11, err := m.Status.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n11
+	return i, nil
+}
+
+func (m *VolumeSnapshotCondition) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotCondition) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Type)))
+	i += copy(dAtA[i:], m.Type)
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Status)))
+	i += copy(dAtA[i:], m.Status)
+	dAtA[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.LastTransitionTime.Size()))
+	n12, err := m.LastTransitionTime.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n12
+	dAtA[i] = 0x22
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Reason)))
+	i += copy(dAtA[i:], m.Reason)
+	dAtA[i] = 0x2a
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Message)))
+	i += copy(dAtA[i:], m.Message)
+	return i, nil
+}
+
+func (m *VolumeSnapshotData) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotData) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
+	n13, err := m.ObjectMeta.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n13
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Spec.Size()))
+	n14, err := m.Spec.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n14
+	dAtA[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Status.Size()))
+	n15, err := m.Status.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n15
+	return i, nil
+}
+
+func (m *VolumeSnapshotDataCondition) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotDataCondition) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Type)))
+	i += copy(dAtA[i:], m.Type)
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Status)))
+	i += copy(dAtA[i:], m.Status)
+	dAtA[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.LastTransitionTime.Size()))
+	n16, err := m.LastTransitionTime.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n16
+	dAtA[i] = 0x22
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Reason)))
+	i += copy(dAtA[i:], m.Reason)
+	dAtA[i] = 0x2a
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Message)))
+	i += copy(dAtA[i:], m.Message)
+	return i, nil
+}
+
+func (m *VolumeSnapshotDataList) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotDataList) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
+	n17, err := m.ListMeta.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n17
+	if len(m.Items) > 0 {
+		for _, msg := range m.Items {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *VolumeSnapshotDataSource) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotDataSource) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.HostPath != nil {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintGenerated(dAtA, i, uint64(m.HostPath.Size()))
+		n18, err := m.HostPath.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n18
+	}
+	if m.GlusterSnapshotVolume != nil {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintGenerated(dAtA, i, uint64(m.GlusterSnapshotVolume.Size()))
+		n19, err := m.GlusterSnapshotVolume.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n19
+	}
+	if m.AWSElasticBlockStore != nil {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintGenerated(dAtA, i, uint64(m.AWSElasticBlockStore.Size()))
+		n20, err := m.AWSElasticBlockStore.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n20
+	}
+	if m.GCEPersistentDiskSnapshot != nil {
+		dAtA[i] = 0x22
+		i++
+		i = encodeVarintGenerated(dAtA, i, uint64(m.GCEPersistentDiskSnapshot.Size()))
+		n21, err := m.GCEPersistentDiskSnapshot.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n21
+	}
+	if m.CinderSnapshot != nil {
+		dAtA[i] = 0x2a
+		i++
+		i = encodeVarintGenerated(dAtA, i, uint64(m.CinderSnapshot.Size()))
+		n22, err := m.CinderSnapshot.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n22
+	}
+	if m.CSISnapshot != nil {
+		dAtA[i] = 0x32
+		i++
+		i = encodeVarintGenerated(dAtA, i, uint64(m.CSISnapshot.Size()))
+		n23, err := m.CSISnapshot.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n23
+	}
+	return i, nil
+}
+
+func (m *VolumeSnapshotDataSpec) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotDataSpec) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.VolumeSnapshotDataSource.Size()))
+	n24, err := m.VolumeSnapshotDataSource.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n24
+	if m.VolumeSnapshotRef != nil {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintGenerated(dAtA, i, uint64(m.VolumeSnapshotRef.Size()))
+		n25, err := m.VolumeSnapshotRef.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n25
+	}
+	if m.PersistentVolumeRef != nil {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintGenerated(dAtA, i, uint64(m.PersistentVolumeRef.Size()))
+		n26, err := m.PersistentVolumeRef.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n26
+	}
+	return i, nil
+}
+
+func (m *VolumeSnapshotDataStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotDataStatus) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.CreationTimestamp.Size()))
+	n27, err := m.CreationTimestamp.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n27
+	if len(m.Conditions) > 0 {
+		for _, msg := range m.Conditions {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *VolumeSnapshotList) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotList) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
+	n28, err := m.ListMeta.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n28
+	if len(m.Items) > 0 {
+		for _, msg := range m.Items {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *VolumeSnapshotSpec) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotSpec) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PersistentVolumeClaimName)))
+	i += copy(dAtA[i:], m.PersistentVolumeClaimName)
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.SnapshotDataName)))
+	i += copy(dAtA[i:], m.SnapshotDataName)
+	return i, nil
+}
+
+func (m *VolumeSnapshotStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *VolumeSnapshotStatus) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.CreationTimestamp.Size()))
+	n29, err := m.CreationTimestamp.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n29
+	if len(m.Conditions) > 0 {
+		for _, msg := range m.Conditions {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
 func encodeFixed64Generated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	dAtA[offset+1] = uint8(v >> 8)
@@ -351,6 +1084,57 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+func (m *AWSElasticBlockStoreVolumeSnapshotSource) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.SnapshotID)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *CSIVolumeSnapshotSource) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Driver)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.SnapshotHandle)
+	n += 1 + l + sovGenerated(uint64(l))
+	n += 1 + sovGenerated(uint64(m.CreatedAt))
+	return n
+}
+
+func (m *CinderVolumeSnapshotSource) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.SnapshotID)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *GCEPersistentDiskSnapshotSource) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.SnapshotName)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *GlusterVolumeSnapshotSource) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.SnapshotID)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *HostPathVolumeSnapshotSource) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Path)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *VolumeAttachment) Size() (n int) {
 	var l int
 	_ = l
@@ -432,6 +1216,174 @@ func (m *VolumeError) Size() (n int) {
 	return n
 }
 
+func (m *VolumeSnapshot) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Spec.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Status.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *VolumeSnapshotCondition) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Type)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Status)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.LastTransitionTime.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Reason)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Message)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *VolumeSnapshotData) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Spec.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Status.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *VolumeSnapshotDataCondition) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Type)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Status)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.LastTransitionTime.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Reason)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Message)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *VolumeSnapshotDataList) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *VolumeSnapshotDataSource) Size() (n int) {
+	var l int
+	_ = l
+	if m.HostPath != nil {
+		l = m.HostPath.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.GlusterSnapshotVolume != nil {
+		l = m.GlusterSnapshotVolume.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.AWSElasticBlockStore != nil {
+		l = m.AWSElasticBlockStore.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.GCEPersistentDiskSnapshot != nil {
+		l = m.GCEPersistentDiskSnapshot.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.CinderSnapshot != nil {
+		l = m.CinderSnapshot.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.CSISnapshot != nil {
+		l = m.CSISnapshot.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *VolumeSnapshotDataSpec) Size() (n int) {
+	var l int
+	_ = l
+	l = m.VolumeSnapshotDataSource.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.VolumeSnapshotRef != nil {
+		l = m.VolumeSnapshotRef.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.PersistentVolumeRef != nil {
+		l = m.PersistentVolumeRef.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *VolumeSnapshotDataStatus) Size() (n int) {
+	var l int
+	_ = l
+	l = m.CreationTimestamp.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Conditions) > 0 {
+		for _, e := range m.Conditions {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *VolumeSnapshotList) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *VolumeSnapshotSpec) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.PersistentVolumeClaimName)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.SnapshotDataName)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *VolumeSnapshotStatus) Size() (n int) {
+	var l int
+	_ = l
+	l = m.CreationTimestamp.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Conditions) > 0 {
+		for _, e := range m.Conditions {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func sovGenerated(x uint64) (n int) {
 	for {
 		n++
@@ -444,6 +1396,68 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *AWSElasticBlockStoreVolumeSnapshotSource) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&AWSElasticBlockStoreVolumeSnapshotSource{`,
+		`SnapshotID:` + fmt.Sprintf("%v", this.SnapshotID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CSIVolumeSnapshotSource) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CSIVolumeSnapshotSource{`,
+		`Driver:` + fmt.Sprintf("%v", this.Driver) + `,`,
+		`SnapshotHandle:` + fmt.Sprintf("%v", this.SnapshotHandle) + `,`,
+		`CreatedAt:` + fmt.Sprintf("%v", this.CreatedAt) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CinderVolumeSnapshotSource) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CinderVolumeSnapshotSource{`,
+		`SnapshotID:` + fmt.Sprintf("%v", this.SnapshotID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *GCEPersistentDiskSnapshotSource) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&GCEPersistentDiskSnapshotSource{`,
+		`SnapshotName:` + fmt.Sprintf("%v", this.SnapshotName) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *GlusterVolumeSnapshotSource) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&GlusterVolumeSnapshotSource{`,
+		`SnapshotID:` + fmt.Sprintf("%v", this.SnapshotID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *HostPathVolumeSnapshotSource) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&HostPathVolumeSnapshotSource{`,
+		`Path:` + fmt.Sprintf("%v", this.Path) + `,`,
+		`}`,
+	}, "")
+	return s
 }
 func (this *VolumeAttachment) String() string {
 	if this == nil {
@@ -524,6 +1538,140 @@ func (this *VolumeError) String() string {
 	}, "")
 	return s
 }
+func (this *VolumeSnapshot) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshot{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "VolumeSnapshotSpec", "VolumeSnapshotSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "VolumeSnapshotStatus", "VolumeSnapshotStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotCondition) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotCondition{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_apimachinery_pkg_apis_meta_v1.Time", 1), `&`, ``, 1) + `,`,
+		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotData) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotData{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "VolumeSnapshotDataSpec", "VolumeSnapshotDataSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "VolumeSnapshotDataStatus", "VolumeSnapshotDataStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotDataCondition) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotDataCondition{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
+		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_apimachinery_pkg_apis_meta_v1.Time", 1), `&`, ``, 1) + `,`,
+		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotDataList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotDataList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "VolumeSnapshotData", "VolumeSnapshotData", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotDataSource) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotDataSource{`,
+		`HostPath:` + strings.Replace(fmt.Sprintf("%v", this.HostPath), "HostPathVolumeSnapshotSource", "HostPathVolumeSnapshotSource", 1) + `,`,
+		`GlusterSnapshotVolume:` + strings.Replace(fmt.Sprintf("%v", this.GlusterSnapshotVolume), "GlusterVolumeSnapshotSource", "GlusterVolumeSnapshotSource", 1) + `,`,
+		`AWSElasticBlockStore:` + strings.Replace(fmt.Sprintf("%v", this.AWSElasticBlockStore), "AWSElasticBlockStoreVolumeSnapshotSource", "AWSElasticBlockStoreVolumeSnapshotSource", 1) + `,`,
+		`GCEPersistentDiskSnapshot:` + strings.Replace(fmt.Sprintf("%v", this.GCEPersistentDiskSnapshot), "GCEPersistentDiskSnapshotSource", "GCEPersistentDiskSnapshotSource", 1) + `,`,
+		`CinderSnapshot:` + strings.Replace(fmt.Sprintf("%v", this.CinderSnapshot), "CinderVolumeSnapshotSource", "CinderVolumeSnapshotSource", 1) + `,`,
+		`CSISnapshot:` + strings.Replace(fmt.Sprintf("%v", this.CSISnapshot), "CSIVolumeSnapshotSource", "CSIVolumeSnapshotSource", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotDataSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotDataSpec{`,
+		`VolumeSnapshotDataSource:` + strings.Replace(strings.Replace(this.VolumeSnapshotDataSource.String(), "VolumeSnapshotDataSource", "VolumeSnapshotDataSource", 1), `&`, ``, 1) + `,`,
+		`VolumeSnapshotRef:` + strings.Replace(fmt.Sprintf("%v", this.VolumeSnapshotRef), "ObjectReference", "k8s_io_api_core_v1.ObjectReference", 1) + `,`,
+		`PersistentVolumeRef:` + strings.Replace(fmt.Sprintf("%v", this.PersistentVolumeRef), "ObjectReference", "k8s_io_api_core_v1.ObjectReference", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotDataStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotDataStatus{`,
+		`CreationTimestamp:` + strings.Replace(strings.Replace(this.CreationTimestamp.String(), "Time", "k8s_io_apimachinery_pkg_apis_meta_v1.Time", 1), `&`, ``, 1) + `,`,
+		`Conditions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Conditions), "VolumeSnapshotDataCondition", "VolumeSnapshotDataCondition", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "VolumeSnapshot", "VolumeSnapshot", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotSpec{`,
+		`PersistentVolumeClaimName:` + fmt.Sprintf("%v", this.PersistentVolumeClaimName) + `,`,
+		`SnapshotDataName:` + fmt.Sprintf("%v", this.SnapshotDataName) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *VolumeSnapshotStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&VolumeSnapshotStatus{`,
+		`CreationTimestamp:` + strings.Replace(strings.Replace(this.CreationTimestamp.String(), "Time", "k8s_io_apimachinery_pkg_apis_meta_v1.Time", 1), `&`, ``, 1) + `,`,
+		`Conditions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Conditions), "VolumeSnapshotCondition", "VolumeSnapshotCondition", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -531,6 +1679,528 @@ func valueToStringGenerated(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *AWSElasticBlockStoreVolumeSnapshotSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AWSElasticBlockStoreVolumeSnapshotSource: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AWSElasticBlockStoreVolumeSnapshotSource: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SnapshotID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SnapshotID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CSIVolumeSnapshotSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CSIVolumeSnapshotSource: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CSIVolumeSnapshotSource: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Driver", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Driver = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SnapshotHandle", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SnapshotHandle = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreatedAt", wireType)
+			}
+			m.CreatedAt = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.CreatedAt |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CinderVolumeSnapshotSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CinderVolumeSnapshotSource: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CinderVolumeSnapshotSource: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SnapshotID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SnapshotID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GCEPersistentDiskSnapshotSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GCEPersistentDiskSnapshotSource: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GCEPersistentDiskSnapshotSource: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SnapshotName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SnapshotName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GlusterVolumeSnapshotSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GlusterVolumeSnapshotSource: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GlusterVolumeSnapshotSource: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SnapshotID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SnapshotID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *HostPathVolumeSnapshotSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: HostPathVolumeSnapshotSource: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: HostPathVolumeSnapshotSource: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Path", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Path = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *VolumeAttachment) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -1362,6 +3032,1624 @@ func (m *VolumeError) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *VolumeSnapshot) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshot: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshot: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Spec.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Status.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotCondition) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotCondition: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotCondition: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Type = VolumeSnapshotConditionType(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Status = k8s_io_api_core_v1.ConditionStatus(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastTransitionTime", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.LastTransitionTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Reason = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Message = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotData) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotData: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotData: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Spec.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Status.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotDataCondition) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotDataCondition: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotDataCondition: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Type = VolumeSnapshotDataConditionType(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Status = k8s_io_api_core_v1.ConditionStatus(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastTransitionTime", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.LastTransitionTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Reason = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Message = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotDataList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotDataList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotDataList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, VolumeSnapshotData{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotDataSource) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotDataSource: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotDataSource: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HostPath", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.HostPath == nil {
+				m.HostPath = &HostPathVolumeSnapshotSource{}
+			}
+			if err := m.HostPath.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GlusterSnapshotVolume", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.GlusterSnapshotVolume == nil {
+				m.GlusterSnapshotVolume = &GlusterVolumeSnapshotSource{}
+			}
+			if err := m.GlusterSnapshotVolume.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AWSElasticBlockStore", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AWSElasticBlockStore == nil {
+				m.AWSElasticBlockStore = &AWSElasticBlockStoreVolumeSnapshotSource{}
+			}
+			if err := m.AWSElasticBlockStore.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GCEPersistentDiskSnapshot", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.GCEPersistentDiskSnapshot == nil {
+				m.GCEPersistentDiskSnapshot = &GCEPersistentDiskSnapshotSource{}
+			}
+			if err := m.GCEPersistentDiskSnapshot.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CinderSnapshot", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.CinderSnapshot == nil {
+				m.CinderSnapshot = &CinderVolumeSnapshotSource{}
+			}
+			if err := m.CinderSnapshot.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CSISnapshot", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.CSISnapshot == nil {
+				m.CSISnapshot = &CSIVolumeSnapshotSource{}
+			}
+			if err := m.CSISnapshot.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotDataSpec) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotDataSpec: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotDataSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VolumeSnapshotDataSource", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.VolumeSnapshotDataSource.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VolumeSnapshotRef", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.VolumeSnapshotRef == nil {
+				m.VolumeSnapshotRef = &k8s_io_api_core_v1.ObjectReference{}
+			}
+			if err := m.VolumeSnapshotRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PersistentVolumeRef", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PersistentVolumeRef == nil {
+				m.PersistentVolumeRef = &k8s_io_api_core_v1.ObjectReference{}
+			}
+			if err := m.PersistentVolumeRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotDataStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotDataStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotDataStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreationTimestamp", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.CreationTimestamp.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Conditions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Conditions = append(m.Conditions, VolumeSnapshotDataCondition{})
+			if err := m.Conditions[len(m.Conditions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, VolumeSnapshot{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotSpec) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotSpec: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PersistentVolumeClaimName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PersistentVolumeClaimName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SnapshotDataName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SnapshotDataName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *VolumeSnapshotStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: VolumeSnapshotStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: VolumeSnapshotStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreationTimestamp", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.CreationTimestamp.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Conditions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Conditions = append(m.Conditions, VolumeSnapshotCondition{})
+			if err := m.Conditions[len(m.Conditions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func skipGenerated(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1472,52 +4760,104 @@ func init() {
 }
 
 var fileDescriptorGenerated = []byte{
-	// 745 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x94, 0x3d, 0x6f, 0xdb, 0x46,
-	0x18, 0xc7, 0x45, 0x49, 0xb6, 0xe5, 0x53, 0x5f, 0x8c, 0x83, 0xd0, 0x0a, 0x2a, 0x40, 0x19, 0x9a,
-	0xdc, 0xa2, 0x3e, 0x56, 0x76, 0x51, 0x18, 0xdd, 0x44, 0xd8, 0x43, 0x51, 0xcb, 0x2d, 0xe8, 0xa2,
-	0x43, 0xdb, 0xa1, 0x27, 0xf2, 0x31, 0x45, 0x4b, 0x7c, 0xc1, 0xdd, 0x51, 0x88, 0xb7, 0x4c, 0x99,
-	0xb3, 0xe5, 0x1b, 0xe4, 0xb3, 0x68, 0x8b, 0x47, 0x4f, 0x42, 0xcc, 0x7c, 0x8b, 0x2c, 0x09, 0x78,
-	0x3c, 0x89, 0xb2, 0x29, 0x25, 0xb6, 0x37, 0x3e, 0xcf, 0x3d, 0xff, 0xdf, 0xf3, 0x76, 0x47, 0x74,
-	0x3c, 0x3a, 0xe2, 0xc4, 0x0b, 0x8d, 0x51, 0x3c, 0x00, 0x16, 0x80, 0x00, 0x6e, 0x4c, 0x20, 0x70,
-	0x42, 0x66, 0xa8, 0x03, 0x1a, 0x79, 0x06, 0x17, 0x21, 0xa3, 0x2e, 0x18, 0x93, 0x2e, 0x1d, 0x47,
-	0x43, 0xda, 0x35, 0x5c, 0x08, 0x80, 0x51, 0x01, 0x0e, 0x89, 0x58, 0x28, 0x42, 0xfc, 0x5d, 0x16,
-	0x4c, 0x68, 0xe4, 0x11, 0x15, 0x4c, 0xe6, 0xc1, 0xad, 0x7d, 0xd7, 0x13, 0xc3, 0x78, 0x40, 0xec,
-	0xd0, 0x37, 0xdc, 0xd0, 0x0d, 0x0d, 0xa9, 0x19, 0xc4, 0x17, 0xd2, 0x92, 0x86, 0xfc, 0xca, 0x58,
-	0xad, 0x7e, 0x9e, 0x18, 0x9e, 0x09, 0x08, 0xb8, 0x17, 0x06, 0x7c, 0x9f, 0x46, 0x1e, 0x07, 0x36,
-	0x01, 0x66, 0x44, 0x23, 0x37, 0x3d, 0xe3, 0x77, 0x03, 0x8c, 0x49, 0x77, 0x00, 0xa2, 0x58, 0x5a,
-	0xeb, 0xe7, 0x1c, 0xe7, 0x53, 0x7b, 0xe8, 0x05, 0xc0, 0xae, 0x72, 0x86, 0x0f, 0x82, 0x1a, 0x93,
-	0xa2, 0xca, 0x58, 0xa7, 0x62, 0x71, 0x20, 0x3c, 0x1f, 0x0a, 0x82, 0x5f, 0x3e, 0x27, 0xe0, 0xf6,
-	0x10, 0x7c, 0x5a, 0xd0, 0x1d, 0xae, 0xd3, 0xc5, 0xc2, 0x1b, 0x1b, 0x5e, 0x20, 0xb8, 0x60, 0xf7,
-	0x45, 0x9d, 0xd7, 0x65, 0xb4, 0xf3, 0x77, 0x38, 0x8e, 0x7d, 0xe8, 0x09, 0x41, 0xed, 0xa1, 0x0f,
-	0x81, 0xc0, 0xff, 0xa3, 0x5a, 0xda, 0x8d, 0x43, 0x05, 0x6d, 0x6a, 0xbb, 0xda, 0x5e, 0xfd, 0xe0,
-	0x27, 0x92, 0xaf, 0x65, 0x01, 0x27, 0xd1, 0xc8, 0x4d, 0x1d, 0x9c, 0xa4, 0xd1, 0x64, 0xd2, 0x25,
-	0x7f, 0x0c, 0x2e, 0xc1, 0x16, 0x7d, 0x10, 0xd4, 0xc4, 0xd3, 0x59, 0xbb, 0x94, 0xcc, 0xda, 0x28,
-	0xf7, 0x59, 0x0b, 0x2a, 0x3e, 0x47, 0x55, 0x1e, 0x81, 0xdd, 0x2c, 0x4b, 0x7a, 0x97, 0x7c, 0x62,
-	0xe9, 0xe4, 0x7e, 0x79, 0xe7, 0x11, 0xd8, 0xe6, 0x17, 0x0a, 0x5f, 0x4d, 0x2d, 0x4b, 0xc2, 0xf0,
-	0xbf, 0x68, 0x93, 0x0b, 0x2a, 0x62, 0xde, 0xac, 0x48, 0xec, 0xe1, 0xe3, 0xb0, 0x52, 0x6a, 0x7e,
-	0xa5, 0xc0, 0x9b, 0x99, 0x6d, 0x29, 0x64, 0x67, 0xaa, 0xa1, 0xc6, 0x7d, 0xc9, 0xa9, 0xc7, 0x05,
-	0xfe, 0xaf, 0x30, 0x2c, 0xf2, 0xb0, 0x61, 0xa5, 0x6a, 0x39, 0xaa, 0x1d, 0x95, 0xb2, 0x36, 0xf7,
-	0x2c, 0x0d, 0xca, 0x42, 0x1b, 0x9e, 0x00, 0x9f, 0x37, 0xcb, 0xbb, 0x95, 0xbd, 0xfa, 0xc1, 0xfe,
-	0xa3, 0x5a, 0x32, 0xbf, 0x54, 0xe4, 0x8d, 0xdf, 0x52, 0x86, 0x95, 0xa1, 0x3a, 0x17, 0xe8, 0x9b,
-	0x42, 0xf3, 0x61, 0xcc, 0x6c, 0xc0, 0xa7, 0xa8, 0x11, 0x01, 0xe3, 0x1e, 0x17, 0x10, 0x88, 0x2c,
-	0xe6, 0x8c, 0xfa, 0x20, 0xfb, 0xda, 0x36, 0x9b, 0xc9, 0xac, 0xdd, 0xf8, 0x73, 0xc5, 0xb9, 0xb5,
-	0x52, 0xd5, 0x79, 0xb3, 0x62, 0x64, 0xe9, 0xba, 0xf0, 0x8f, 0xa8, 0x46, 0xa5, 0x07, 0x98, 0x42,
-	0x2f, 0x46, 0xd0, 0x53, 0x7e, 0x6b, 0x11, 0x21, 0xd7, 0x2a, 0xcb, 0x53, 0xb7, 0xe5, 0x91, 0x6b,
-	0x95, 0xd2, 0xa5, 0xb5, 0x4a, 0xdb, 0x52, 0xc8, 0xb4, 0x94, 0x20, 0x74, 0xb2, 0x2e, 0x2b, 0x77,
-	0x4b, 0x39, 0x53, 0x7e, 0x6b, 0x11, 0xd1, 0xf9, 0x50, 0x59, 0x31, 0x3a, 0x79, 0x3f, 0x96, 0x7a,
-	0x72, 0x64, 0x4f, 0xb5, 0x42, 0x4f, 0xce, 0xa2, 0x27, 0x07, 0xbf, 0xd2, 0x10, 0xa6, 0x0b, 0x44,
-	0x7f, 0x7e, 0x7f, 0xb2, 0x25, 0xff, 0xfe, 0x84, 0x7b, 0x4b, 0x7a, 0x05, 0xda, 0x49, 0x20, 0xd8,
-	0x95, 0xd9, 0x52, 0x55, 0xe0, 0x62, 0x80, 0xb5, 0xa2, 0x04, 0x7c, 0x89, 0xea, 0x99, 0xf7, 0x84,
-	0xb1, 0x90, 0xa9, 0x97, 0xb4, 0xf7, 0x80, 0x8a, 0x64, 0xbc, 0xa9, 0x27, 0xb3, 0x76, 0xbd, 0x97,
-	0x03, 0xde, 0xcf, 0xda, 0xf5, 0xa5, 0x73, 0x6b, 0x19, 0x9e, 0xe6, 0x72, 0x20, 0xcf, 0x55, 0x7d,
-	0x4a, 0xae, 0x63, 0x58, 0x9f, 0x6b, 0x09, 0xde, 0x3a, 0x41, 0xdf, 0xae, 0x19, 0x11, 0xde, 0x41,
-	0x95, 0x11, 0x5c, 0x65, 0x37, 0xd1, 0x4a, 0x3f, 0x71, 0x03, 0x6d, 0x4c, 0xe8, 0x38, 0xce, 0x6e,
-	0xdc, 0xb6, 0x95, 0x19, 0xbf, 0x96, 0x8f, 0xb4, 0xce, 0x0b, 0x0d, 0x2d, 0xe7, 0xc0, 0xa7, 0xa8,
-	0x9a, 0xfe, 0x93, 0xd5, 0xcb, 0xff, 0xe1, 0x61, 0x2f, 0xff, 0x2f, 0xcf, 0x87, 0xfc, 0x0f, 0x96,
-	0x5a, 0x96, 0xa4, 0xe0, 0xef, 0xd1, 0x96, 0x0f, 0x9c, 0x53, 0x57, 0x65, 0x36, 0xbf, 0x56, 0x41,
-	0x5b, 0xfd, 0xcc, 0x6d, 0xcd, 0xcf, 0x4d, 0x32, 0xbd, 0xd5, 0x4b, 0xd7, 0xb7, 0x7a, 0xe9, 0xe6,
-	0x56, 0x2f, 0x3d, 0x4f, 0x74, 0x6d, 0x9a, 0xe8, 0xda, 0x75, 0xa2, 0x6b, 0x37, 0x89, 0xae, 0xbd,
-	0x4d, 0x74, 0xed, 0xe5, 0x3b, 0xbd, 0xf4, 0x4f, 0x6d, 0x3e, 0xb8, 0x8f, 0x01, 0x00, 0x00, 0xff,
-	0xff, 0x68, 0x82, 0x7b, 0x73, 0x9e, 0x07, 0x00, 0x00,
+	// 1582 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x58, 0xcf, 0x6f, 0x1b, 0xc5,
+	0x17, 0xcf, 0xda, 0x49, 0x9a, 0x8e, 0xf3, 0x4d, 0x93, 0x69, 0xda, 0x38, 0xc9, 0x17, 0x3b, 0x2c,
+	0x12, 0x0a, 0x94, 0xee, 0x92, 0x34, 0x40, 0x40, 0x08, 0x14, 0x3b, 0x51, 0x1b, 0x91, 0x94, 0x74,
+	0x5c, 0x5a, 0xf1, 0x9b, 0xc9, 0x7a, 0x62, 0x6f, 0x63, 0xef, 0xae, 0x76, 0xc6, 0x86, 0xdc, 0x38,
+	0xf1, 0xe3, 0x86, 0xd4, 0x03, 0x57, 0x4e, 0x9c, 0x38, 0x71, 0xe5, 0xca, 0x21, 0x07, 0x24, 0x7a,
+	0xec, 0xc9, 0xa2, 0xe6, 0x4f, 0x40, 0x5c, 0x8a, 0x10, 0x68, 0x67, 0x67, 0x7f, 0xef, 0xba, 0x71,
+	0x55, 0xca, 0x85, 0x9b, 0x77, 0xde, 0x7b, 0x9f, 0xf7, 0xe6, 0xcd, 0xe7, 0xbd, 0x79, 0x63, 0xb0,
+	0x79, 0xb8, 0x4e, 0x15, 0xdd, 0x54, 0x0f, 0x3b, 0xfb, 0xc4, 0x36, 0x08, 0x23, 0x54, 0xed, 0x12,
+	0xa3, 0x6e, 0xda, 0xaa, 0x10, 0x60, 0x4b, 0x57, 0x29, 0x33, 0x6d, 0xdc, 0x20, 0x6a, 0x77, 0x05,
+	0xb7, 0xac, 0x26, 0x5e, 0x51, 0x1b, 0xc4, 0x20, 0x36, 0x66, 0xa4, 0xae, 0x58, 0xb6, 0xc9, 0x4c,
+	0xb8, 0xe8, 0x2a, 0x2b, 0xd8, 0xd2, 0x15, 0xa1, 0xac, 0x78, 0xca, 0x0b, 0x17, 0x1b, 0x3a, 0x6b,
+	0x76, 0xf6, 0x15, 0xcd, 0x6c, 0xab, 0x0d, 0xb3, 0x61, 0xaa, 0xdc, 0x66, 0xbf, 0x73, 0xc0, 0xbf,
+	0xf8, 0x07, 0xff, 0xe5, 0x62, 0x2d, 0xc8, 0x21, 0xc7, 0x9a, 0x69, 0x3b, 0x5e, 0xe3, 0xfe, 0x16,
+	0x76, 0x03, 0x1d, 0xf2, 0x09, 0x23, 0x06, 0xd5, 0x4d, 0x83, 0x5e, 0xc4, 0x96, 0x4e, 0x89, 0xdd,
+	0x25, 0xb6, 0x6a, 0x1d, 0x36, 0x1c, 0x19, 0x8d, 0x2a, 0xa8, 0xdd, 0x95, 0x7d, 0xc2, 0x92, 0xe1,
+	0x2f, 0xac, 0x05, 0x70, 0x6d, 0xac, 0x35, 0x75, 0x83, 0xd8, 0x47, 0x01, 0x46, 0x9b, 0x30, 0x9c,
+	0x16, 0x84, 0x9a, 0x65, 0x65, 0x77, 0x0c, 0xa6, 0xb7, 0x49, 0xc2, 0xe0, 0xc5, 0x07, 0x19, 0x50,
+	0xad, 0x49, 0xda, 0x38, 0x61, 0x77, 0x29, 0xcb, 0xae, 0xc3, 0xf4, 0x96, 0xaa, 0x1b, 0x8c, 0x32,
+	0x3b, 0x6e, 0x24, 0x7f, 0x00, 0x96, 0x37, 0x6e, 0xd6, 0xb6, 0x5a, 0x98, 0x32, 0x5d, 0xab, 0xb4,
+	0x4c, 0xed, 0xb0, 0xc6, 0x4c, 0x9b, 0xdc, 0x30, 0x5b, 0x9d, 0x36, 0xa9, 0x19, 0xd8, 0xa2, 0x4d,
+	0x93, 0xd5, 0xcc, 0x8e, 0xad, 0x11, 0xb8, 0x0a, 0x00, 0x15, 0x2b, 0xdb, 0xf5, 0xa2, 0xb4, 0x24,
+	0x2d, 0x9f, 0xae, 0xc0, 0xe3, 0x5e, 0x79, 0xa4, 0xdf, 0x2b, 0x03, 0x4f, 0x77, 0x7b, 0x13, 0x85,
+	0xb4, 0xe4, 0xef, 0x25, 0x30, 0x57, 0xad, 0x6d, 0xa7, 0xe2, 0x3d, 0x0d, 0xc6, 0xeb, 0xb6, 0xde,
+	0x25, 0xb6, 0xc0, 0x9a, 0x12, 0x58, 0xe3, 0x9b, 0x7c, 0x15, 0x09, 0x29, 0x7c, 0x0d, 0x4c, 0x79,
+	0x88, 0x57, 0xb0, 0x51, 0x6f, 0x91, 0x62, 0x8e, 0xeb, 0x9f, 0x17, 0xfa, 0x53, 0xb5, 0x88, 0x14,
+	0xc5, 0xb4, 0xa1, 0x0a, 0x4e, 0x6b, 0x36, 0x71, 0x36, 0xbd, 0xc1, 0x8a, 0xf9, 0x25, 0x69, 0x39,
+	0x5f, 0x99, 0x11, 0xa6, 0xa7, 0xab, 0x9e, 0x00, 0x05, 0x3a, 0xf2, 0x1e, 0x58, 0xa8, 0xea, 0x46,
+	0x9d, 0xd8, 0x8f, 0x2c, 0x0d, 0x37, 0x41, 0xf9, 0x72, 0x75, 0x6b, 0x8f, 0xd8, 0x54, 0xa7, 0x8c,
+	0x18, 0x6c, 0x53, 0xa7, 0x87, 0x31, 0xd8, 0xb5, 0x14, 0xd8, 0x59, 0x01, 0x3b, 0xe9, 0xe9, 0x5e,
+	0xc5, 0x6d, 0x12, 0x01, 0xbe, 0x06, 0x16, 0x2f, 0xb7, 0x3a, 0x94, 0x3d, 0xc2, 0x58, 0xaf, 0x80,
+	0xff, 0x5f, 0x31, 0x29, 0xdb, 0xc3, 0xac, 0x99, 0x8a, 0xb9, 0x0c, 0x26, 0x3c, 0x6d, 0x81, 0x38,
+	0x29, 0x10, 0x47, 0x1d, 0x1b, 0xe4, 0x4b, 0xe5, 0x6f, 0x73, 0x60, 0xda, 0x85, 0xd8, 0x60, 0x0c,
+	0x6b, 0xcd, 0x36, 0x31, 0x18, 0xfc, 0x08, 0x4c, 0x38, 0xa5, 0x52, 0xc7, 0x0c, 0x73, 0xf3, 0xc2,
+	0xea, 0xf3, 0x4a, 0xd0, 0x17, 0x7c, 0xe6, 0x2a, 0xd6, 0x61, 0xc3, 0x59, 0xa0, 0x8a, 0xa3, 0xad,
+	0x74, 0x57, 0x94, 0x37, 0xf7, 0x6f, 0x11, 0x8d, 0xed, 0x12, 0x86, 0x83, 0x2d, 0x04, 0x6b, 0xc8,
+	0x47, 0x85, 0x35, 0x30, 0x4a, 0x2d, 0xa2, 0x71, 0x96, 0x14, 0x56, 0x57, 0x94, 0x01, 0x5d, 0x47,
+	0x89, 0x87, 0x57, 0xb3, 0x88, 0x16, 0xec, 0xc7, 0xf9, 0x42, 0x1c, 0x0c, 0xbe, 0x0b, 0xc6, 0x29,
+	0xc3, 0xac, 0x43, 0x39, 0x83, 0x0a, 0xab, 0x97, 0x86, 0x83, 0xe5, 0xa6, 0x01, 0xc3, 0xdd, 0x6f,
+	0x24, 0x20, 0xe5, 0x63, 0x09, 0xcc, 0xc6, 0x4d, 0x76, 0x74, 0xca, 0xe0, 0x7b, 0x89, 0x64, 0x29,
+	0x27, 0x4b, 0x96, 0x63, 0xcd, 0x53, 0x35, 0x2d, 0x5c, 0x4e, 0x78, 0x2b, 0xa1, 0x44, 0x21, 0x30,
+	0xa6, 0x33, 0xd2, 0xa6, 0xc5, 0xdc, 0x52, 0x7e, 0xb9, 0xb0, 0x7a, 0x71, 0xa8, 0x2d, 0x55, 0xfe,
+	0x27, 0x90, 0xc7, 0xb6, 0x1d, 0x0c, 0xe4, 0x42, 0xc9, 0x07, 0xe0, 0x7c, 0x62, 0xf3, 0x2e, 0x6f,
+	0x76, 0xc0, 0xac, 0xe5, 0x17, 0x80, 0xab, 0xe3, 0xd0, 0x59, 0x70, 0xa8, 0xd8, 0xef, 0x95, 0x67,
+	0xf7, 0x52, 0xe4, 0x28, 0xd5, 0x4a, 0xfe, 0x39, 0x25, 0x65, 0xce, 0x71, 0xc1, 0xe7, 0xc0, 0x04,
+	0xe6, 0x2b, 0x7e, 0x5f, 0xf1, 0x53, 0xb0, 0x21, 0xd6, 0x91, 0xaf, 0xc1, 0x8f, 0x95, 0x87, 0x27,
+	0xd8, 0x32, 0xe4, 0xb1, 0x72, 0xd3, 0xd0, 0xb1, 0xf2, 0x6f, 0x24, 0x20, 0x9d, 0x50, 0x0c, 0xb3,
+	0xee, 0xee, 0x32, 0x1f, 0x0d, 0xe5, 0xaa, 0x58, 0x47, 0xbe, 0x86, 0xfc, 0x57, 0x3e, 0x25, 0x75,
+	0x9c, 0x1f, 0xa1, 0x3d, 0xb9, 0x45, 0x3c, 0x91, 0xd8, 0x53, 0xdd, 0xdf, 0x53, 0x1d, 0x7e, 0x2d,
+	0x01, 0x88, 0x7d, 0x88, 0x5d, 0x8f, 0x3f, 0xee, 0x21, 0xbf, 0xf1, 0x10, 0xbc, 0x55, 0x36, 0x12,
+	0x68, 0x5b, 0x06, 0xb3, 0x8f, 0x2a, 0x0b, 0x22, 0x0a, 0x98, 0x54, 0x40, 0x29, 0x21, 0xc0, 0x5b,
+	0xa0, 0xe0, 0xae, 0x6e, 0xd9, 0xb6, 0x69, 0x8b, 0x4a, 0x5a, 0x3e, 0x41, 0x44, 0x5c, 0xbf, 0x52,
+	0xea, 0xf7, 0xca, 0x85, 0x8d, 0x00, 0xe0, 0x7e, 0xaf, 0x5c, 0x08, 0xc9, 0x51, 0x18, 0xdc, 0xf1,
+	0x55, 0x27, 0x81, 0xaf, 0xd1, 0x87, 0xf1, 0xb5, 0x49, 0xb2, 0x7d, 0x85, 0xc0, 0x17, 0xb6, 0xc0,
+	0x5c, 0x46, 0x8a, 0xe0, 0x34, 0xc8, 0x1f, 0x92, 0x23, 0x97, 0x89, 0xc8, 0xf9, 0x09, 0x67, 0xc1,
+	0x58, 0x17, 0xb7, 0x3a, 0xe2, 0x16, 0x43, 0xee, 0xc7, 0x2b, 0xb9, 0x75, 0x49, 0xfe, 0x4c, 0x02,
+	0x61, 0x1f, 0x70, 0x07, 0x8c, 0x3a, 0x17, 0xbe, 0xa8, 0xfc, 0x67, 0x4f, 0x56, 0xf9, 0xd7, 0xf5,
+	0x36, 0x09, 0x3a, 0x98, 0xf3, 0x85, 0x38, 0x0a, 0x7c, 0x06, 0x9c, 0x6a, 0x13, 0x4a, 0x71, 0xc3,
+	0xbb, 0x3f, 0xcf, 0x08, 0xa5, 0x53, 0xbb, 0xee, 0x32, 0xf2, 0xe4, 0xf2, 0x37, 0x39, 0x30, 0x15,
+	0xed, 0xfd, 0x8f, 0xa1, 0x6d, 0x5f, 0x8b, 0xb4, 0x6d, 0xf5, 0x04, 0x27, 0xe5, 0x5f, 0x4c, 0x59,
+	0x4d, 0xfb, 0xed, 0x58, 0xd3, 0x5e, 0x19, 0x06, 0x74, 0x70, 0xcb, 0xfe, 0x2d, 0x07, 0xe6, 0xa2,
+	0x06, 0x55, 0xd3, 0xa8, 0xeb, 0x4c, 0x37, 0x0d, 0xf8, 0x3a, 0x18, 0x65, 0x47, 0x96, 0xd7, 0xd9,
+	0x2e, 0xf8, 0x67, 0x71, 0x64, 0x91, 0xfb, 0xbd, 0xf2, 0x62, 0x86, 0x99, 0x23, 0x46, 0xdc, 0x10,
+	0xee, 0xf8, 0x71, 0xbb, 0x27, 0xb5, 0x16, 0x0d, 0xe2, 0x7e, 0xaf, 0x9c, 0x32, 0xfe, 0x2a, 0x3e,
+	0x52, 0x34, 0x54, 0xd8, 0x05, 0xd0, 0x99, 0xef, 0xae, 0xdb, 0xd8, 0xa0, 0xae, 0x27, 0x5d, 0x34,
+	0xa4, 0xe1, 0x48, 0xe5, 0x57, 0xfb, 0x4e, 0x02, 0x0d, 0xa5, 0x78, 0x70, 0xe6, 0x3b, 0x9b, 0x60,
+	0x6a, 0x1a, 0xbc, 0xf8, 0x42, 0xf3, 0x1d, 0xe2, 0xab, 0x48, 0x48, 0xc3, 0xc4, 0x1c, 0x7b, 0x00,
+	0x31, 0xbf, 0xcb, 0x01, 0x18, 0x4d, 0xdf, 0xa6, 0x43, 0x9d, 0x7f, 0x9e, 0x9c, 0x6f, 0x45, 0xc8,
+	0x79, 0x69, 0x08, 0x1e, 0x39, 0x01, 0x66, 0x12, 0xf4, 0xfd, 0x18, 0x41, 0x5f, 0x18, 0x16, 0x78,
+	0x30, 0x49, 0xff, 0xc8, 0x81, 0xc5, 0xa4, 0x51, 0x40, 0xd4, 0x6a, 0x84, 0xa8, 0x6a, 0x8c, 0xa8,
+	0xe5, 0x01, 0xa6, 0xff, 0x91, 0xf5, 0xc1, 0x64, 0xfd, 0x49, 0xf2, 0x2e, 0xf4, 0x70, 0x0a, 0x1f,
+	0xc3, 0x5c, 0x77, 0x3d, 0x3a, 0xd7, 0xa9, 0x43, 0x92, 0x2a, 0x63, 0xb2, 0xfb, 0x7c, 0x1c, 0x14,
+	0x53, 0x18, 0xe8, 0x8e, 0x3a, 0x1a, 0x98, 0x68, 0x8a, 0x47, 0x83, 0xd8, 0xd0, 0xcb, 0x03, 0xbd,
+	0x0e, 0x7a, 0x61, 0x54, 0x26, 0x9d, 0x7d, 0x79, 0x1a, 0xc8, 0x07, 0x86, 0x5f, 0x4a, 0xe0, 0x5c,
+	0xc3, 0x7d, 0xed, 0x78, 0x16, 0xae, 0xbd, 0x28, 0xcb, 0xf5, 0x81, 0x2e, 0x07, 0xbc, 0x93, 0x2a,
+	0xf3, 0xfd, 0x5e, 0xf9, 0xdc, 0xe5, 0x34, 0x68, 0x94, 0xee, 0x11, 0xde, 0x96, 0xc0, 0x2c, 0xfe,
+	0x98, 0x26, 0x5e, 0xce, 0x82, 0xaa, 0x5b, 0x03, 0x43, 0x39, 0xe9, 0x93, 0xdb, 0x9d, 0x8a, 0xd3,
+	0xb4, 0x51, 0xaa, 0x73, 0x27, 0x43, 0x33, 0x0d, 0x8d, 0x44, 0x1f, 0x9a, 0x62, 0xf6, 0x79, 0x75,
+	0x70, 0x76, 0x06, 0x3f, 0x4f, 0x2b, 0x4f, 0xf4, 0x7b, 0xe5, 0xf9, 0x4c, 0x25, 0x94, 0xf4, 0x0a,
+	0x4d, 0x30, 0xa9, 0x85, 0x5e, 0xd1, 0xbc, 0x5c, 0x0a, 0xab, 0x2f, 0x0d, 0x8c, 0x22, 0xfb, 0xd9,
+	0x5d, 0x81, 0xce, 0x4b, 0xdf, 0x95, 0xfb, 0x5e, 0x23, 0x0e, 0x60, 0x03, 0x14, 0x34, 0xaa, 0x7b,
+	0xc2, 0xe2, 0x38, 0xf7, 0xb7, 0x36, 0xd8, 0x5f, 0xfa, 0x5f, 0x13, 0x95, 0x33, 0xce, 0xf4, 0x57,
+	0xad, 0x6d, 0xfb, 0x9e, 0xc2, 0xc8, 0xf2, 0x17, 0xf9, 0xb4, 0xc2, 0xe6, 0xaf, 0x8f, 0xdb, 0x12,
+	0x28, 0x76, 0x33, 0x8a, 0x44, 0x14, 0xc6, 0xd0, 0x3d, 0xde, 0x0d, 0x69, 0x49, 0x14, 0x65, 0x66,
+	0x0d, 0xa2, 0x4c, 0xc7, 0xb0, 0x09, 0x66, 0xa2, 0x32, 0x44, 0x0e, 0x44, 0xcd, 0x3c, 0x15, 0x8e,
+	0xc6, 0x69, 0xce, 0xc1, 0xb5, 0x88, 0xc8, 0x01, 0xb1, 0x89, 0xa1, 0x91, 0xca, 0xb9, 0x7e, 0xaf,
+	0x3c, 0x73, 0x23, 0x8e, 0x80, 0x92, 0xa0, 0xd0, 0x00, 0x67, 0xe3, 0xcf, 0x35, 0xc7, 0x57, 0xfe,
+	0xe4, 0xbe, 0xe6, 0xfa, 0xbd, 0xf2, 0xd9, 0xbd, 0x24, 0x06, 0x4a, 0x03, 0x96, 0xff, 0x94, 0x52,
+	0x9b, 0x92, 0x7b, 0x97, 0x50, 0x30, 0xc3, 0xff, 0xd4, 0x11, 0x3d, 0x9e, 0x32, 0xdc, 0xb6, 0x1e,
+	0x62, 0x98, 0x9e, 0x17, 0x99, 0x9f, 0xa9, 0xc6, 0xc1, 0x50, 0x12, 0x1f, 0xb6, 0x00, 0xd0, 0xbc,
+	0xbb, 0xcd, 0xeb, 0xc0, 0xeb, 0x43, 0x1e, 0xb9, 0x7f, 0x39, 0x06, 0x53, 0x89, 0xbf, 0x44, 0x51,
+	0x08, 0x5f, 0xfe, 0x51, 0x8a, 0x0f, 0x44, 0x8f, 0xe1, 0x7e, 0xd9, 0x8b, 0xde, 0x2f, 0x17, 0x86,
+	0xd8, 0x5d, 0xc6, 0xdd, 0xf2, 0x43, 0x62, 0x1b, 0xbc, 0x9a, 0x3e, 0x04, 0xf3, 0xf1, 0x43, 0xaf,
+	0xb6, 0xb0, 0xde, 0x0e, 0xfd, 0x6f, 0xf0, 0xa4, 0xc0, 0x9b, 0xdf, 0xcb, 0x52, 0x44, 0xd9, 0x18,
+	0x70, 0x13, 0x4c, 0xd3, 0x50, 0xde, 0x39, 0xae, 0x3b, 0xc5, 0x14, 0x05, 0xee, 0x74, 0x2d, 0x26,
+	0x47, 0x09, 0x0b, 0xf9, 0x77, 0xff, 0xbf, 0x88, 0xe8, 0xe3, 0xe1, 0xdf, 0x21, 0x60, 0x33, 0x85,
+	0x80, 0x6b, 0x43, 0x1c, 0xd1, 0x89, 0xc9, 0x57, 0x51, 0x8e, 0xef, 0x95, 0x46, 0xee, 0xdc, 0x2b,
+	0x8d, 0xdc, 0xbd, 0x57, 0x1a, 0xf9, 0xb4, 0x5f, 0x92, 0x8e, 0xfb, 0x25, 0xe9, 0x4e, 0xbf, 0x24,
+	0xdd, 0xed, 0x97, 0xa4, 0x5f, 0xfa, 0x25, 0xe9, 0xab, 0x5f, 0x4b, 0x23, 0xef, 0x4c, 0x78, 0x7e,
+	0xfe, 0x0e, 0x00, 0x00, 0xff, 0xff, 0xa9, 0xa3, 0xc8, 0x6b, 0x46, 0x18, 0x00, 0x00,
 }

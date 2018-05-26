@@ -37,6 +37,7 @@ var map_StorageClass = map[string]string{
 	"allowVolumeExpansion": "AllowVolumeExpansion shows whether the storage class allow volume expand",
 	"volumeBindingMode":    "VolumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is alpha-level and is only honored by servers that enable the VolumeScheduling feature.",
 	"allowedTopologies":    "Restrict the node topologies where volumes can be dynamically provisioned. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is alpha-level and is only honored by servers that enable the DynamicProvisioningScheduling feature.",
+	"snapshotter":          "Snapshotter is the driver expected to handle the volume snapshotting. This is an optionally-prefixed name, like a label key. For example: \"kubernetes.io/gce-pd\" or \"kubernetes.io/aws-ebs\". This value may not be empty.",
 }
 
 func (StorageClass) SwaggerDoc() map[string]string {

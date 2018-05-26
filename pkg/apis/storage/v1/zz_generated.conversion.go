@@ -55,6 +55,7 @@ func autoConvert_v1_StorageClass_To_storage_StorageClass(in *v1.StorageClass, ou
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
 	out.VolumeBindingMode = (*storage.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
 	out.AllowedTopologies = *(*[]core.TopologySelectorTerm)(unsafe.Pointer(&in.AllowedTopologies))
+	out.Snapshotter = in.Snapshotter
 	return nil
 }
 
@@ -72,6 +73,7 @@ func autoConvert_storage_StorageClass_To_v1_StorageClass(in *storage.StorageClas
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
 	out.VolumeBindingMode = (*v1.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
 	out.AllowedTopologies = *(*[]core_v1.TopologySelectorTerm)(unsafe.Pointer(&in.AllowedTopologies))
+	out.Snapshotter = in.Snapshotter
 	return nil
 }
 

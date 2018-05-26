@@ -255,6 +255,10 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 
 	for i, term := range topologies {
 		allErrs = append(allErrs, apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))...)
+        }
+
+        return allErrs
+}
 
 // ValidateVolumeSnapshotName checks that a name is appropriate for a
 // VolumeSnapshot object.

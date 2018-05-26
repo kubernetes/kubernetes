@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.api.storage.v1alpha1;
 
+import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
@@ -29,6 +30,55 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
+
+// AWSElasticBlockStoreVolumeSnapshotSource is AWS EBS volume snapshot source
+message AWSElasticBlockStoreVolumeSnapshotSource {
+  // Unique id of the persistent disk snapshot resource. Used to identify the disk snapshot in AWS
+  optional string snapshotId = 1;
+}
+
+// CSIVolumeSnapshotSource is CSI volume snapshot source
+message CSIVolumeSnapshotSource {
+  // Driver is the name of the driver to use for this snapshot.
+  // Required.
+  optional string driver = 1;
+
+  // SnapshotHandle is the unique snapshot id returned by the CSI volume
+  // plugin’s CreateSnapshot to refer to the snapshot on all subsequent calls.
+  // Required.
+  optional string snapshotHandle = 2;
+
+  // CreatedAt is timestamp when the point-in-time snapshot is taken on the storage
+  // system. The format of this field should be a Unix nanoseconds time
+  // encoded as an int64. On Unix, the command `date +%s%N` returns
+  // the  current time in nanoseconds since 1970-01-01 00:00:00 UTC.
+  // This field is REQUIRED.
+  optional int64 createdAt = 3;
+}
+
+// CinderVolumeSnapshotSource is Cinder volume snapshot source
+message CinderVolumeSnapshotSource {
+  // Unique id of the cinder volume snapshot resource. Used to identify the snapshot in OpenStack
+  optional string snapshotId = 1;
+}
+
+// GCEPersistentDiskSnapshotSource is GCE PD volume snapshot source
+message GCEPersistentDiskSnapshotSource {
+  // Unique id of the persistent disk snapshot resource. Used to identify the disk snapshot in GCE
+  optional string snapshotId = 1;
+}
+
+// GlusterVolumeSnapshotSource is Gluster volume snapshot source
+message GlusterVolumeSnapshotSource {
+  // UniqueID represents a snapshot resource.
+  optional string snapshotId = 1;
+}
+
+// HostPathVolumeSnapshotSource is HostPath volume snapshot source
+message HostPathVolumeSnapshotSource {
+  // Path represents a tar file that stores the HostPath volume source
+  optional string snapshot = 1;
+}
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
@@ -124,5 +174,181 @@ message VolumeError {
   // information.
   // +optional
   optional string message = 2;
+}
+
+// VolumeSnapshot is the volume snapshot object accessible to the user. Upon succesful creation of the actual
+// snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through
+// the VolumeSnapshotSpec
+message VolumeSnapshot {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec represents the desired state of the snapshot
+  // +optional
+  optional VolumeSnapshotSpec spec = 2;
+
+  // Status represents the latest observer state of the snapshot
+  // +optional
+  optional VolumeSnapshotStatus status = 3;
+}
+
+// VolumeSnapshotCondition describes the state of a volume snapshot  at a certain point.
+message VolumeSnapshotCondition {
+  // Type of VolumeSnapshot condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // The last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // The reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // A human readable message indicating details about the transition.
+  // +optional
+  optional string message = 5;
+}
+
+// VolumeSnapshotData represents the actual "on-disk" snapshot object
+message VolumeSnapshotData {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec represents the desired state of the snapshot
+  // +optional
+  optional VolumeSnapshotDataSpec spec = 2;
+
+  // Status represents the latest observed state of the snapshot
+  // +optional
+  optional VolumeSnapshotDataStatus status = 3;
+}
+
+// VolumeSnapshotDataCondition describes the state of a volume snapshot  at a certain point.
+message VolumeSnapshotDataCondition {
+  // Type of volume snapshot condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // The last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // The reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // A human readable message indicating details about the transition.
+  // +optional
+  optional string message = 5;
+}
+
+// VolumeSnapshotDataList is a list of VolumeSnapshotData objects
+message VolumeSnapshotDataList {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  repeated VolumeSnapshotData items = 2;
+}
+
+// VolumeSnapshotDataSource represents the actual location and type of the snapshot. Only one of its members may be specified.
+message VolumeSnapshotDataSource {
+  // HostPath represents a directory on the host.
+  // Provisioned by a developer or tester.
+  // This is useful for single-node development and testing only!
+  // On-host storage is not supported in any way and WILL NOT WORK in a multi-node cluster.
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+  // +optional
+  optional HostPathVolumeSnapshotSource hostPath = 1;
+
+  // AWSElasticBlockStore represents an AWS Disk resource that is attached to a
+  // kubelet's host machine and then exposed to the pod.
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
+  // +optional
+  // GlusterSnapshotSource represents a gluster snapshot resource
+  optional GlusterVolumeSnapshotSource glusterSnapshotVolume = 2;
+
+  // +optional
+  optional AWSElasticBlockStoreVolumeSnapshotSource awsElasticBlockStore = 3;
+
+  // GCEPersistentDiskSnapshotSource represents an GCE PD snapshot resource
+  // +optional
+  optional GCEPersistentDiskSnapshotSource gcePersistentDisk = 4;
+
+  // CinderVolumeSnapshotSource represents Cinder snapshot resource
+  // +optional
+  optional CinderVolumeSnapshotSource cinderVolume = 5;
+
+  // CSISnapshot represents CSI snapshot resource
+  // +optional
+  optional CSIVolumeSnapshotSource csiSnapshot = 6;
+}
+
+// VolumeSnapshotDataSpec is the spec of the volume snapshot data
+message VolumeSnapshotDataSpec {
+  // Source represents the location and type of the volume snapshot
+  optional VolumeSnapshotDataSource volumeSnapshotDataSource = 1;
+
+  // VolumeSnapshotRef is part of bi-directional binding between VolumeSnapshot
+  // and VolumeSnapshotData
+  // +optional
+  optional k8s.io.api.core.v1.ObjectReference volumeSnapshotRef = 2;
+
+  // PersistentVolumeRef represents the PersistentVolume that the snapshot has been
+  // taken from
+  // +optional
+  optional k8s.io.api.core.v1.ObjectReference persistentVolumeRef = 3;
+}
+
+// VolumeSnapshotDataStatus is the actual state of the volume snapshot
+message VolumeSnapshotDataStatus {
+  // The time the snapshot was successfully created
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time creationTimestamp = 1;
+
+  // Representes the lates available observations about the volume snapshot
+  repeated VolumeSnapshotDataCondition conditions = 2;
+}
+
+// VolumeSnapshotList is a list of VolumeSnapshot objects
+message VolumeSnapshotList {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  repeated VolumeSnapshot items = 2;
+}
+
+// VolumeSnapshotSpec is the desired state of the volume snapshot
+message VolumeSnapshotSpec {
+  // PersistentVolumeClaimName is the name of the PVC being snapshotted
+  // +optional
+  optional string persistentVolumeClaimName = 1;
+
+  // SnapshotDataName binds the VolumeSnapshot object with the VolumeSnapshotData
+  // +optional
+  optional string snapshotDataName = 2;
+}
+
+// VolumeSnapshotStatus is the status of the VolumeSnapshot
+message VolumeSnapshotStatus {
+  // The time the snapshot was successfully created
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time creationTimestamp = 1;
+
+  // Represent the latest available observations about the volume snapshot
+  repeated VolumeSnapshotCondition conditions = 2;
 }
 
