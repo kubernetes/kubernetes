@@ -311,6 +311,12 @@ const (
 	//
 	// Enable probe based plugin watcher utility for discovering Kubelet plugins
 	KubeletPluginsWatcher utilfeature.Feature = "KubeletPluginsWatcher"
+
+	// owner: @xing-yang
+	// alpha: v1.12
+	//
+	// Enable volume snapshot support.
+	VolumeSnapshot utilfeature.Feature = "VolumeSnapshot"
 )
 
 func init() {
@@ -364,6 +370,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	DynamicProvisioningScheduling:               {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSnapshot:                              {Default: true, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
