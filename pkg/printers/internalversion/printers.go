@@ -35,6 +35,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -296,6 +297,24 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaim)
 	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaimList)
+
+	volumeSnapshotColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "PVC Name", Type: "string", Description: storagev1alpha1.VolumeSnapshotSpec{}.SwaggerDoc()["persistentVolumeClaimName"]},
+		{Name: "SnapshotDataName", Type: "string", Description: storagev1alpha1.VolumeSnapshotSpec{}.SwaggerDoc()["snapshotDataName"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(volumeSnapshotColumnDefinitions, printVolumeSnapshot)
+	h.TableHandler(volumeSnapshotColumnDefinitions, printVolumeSnapshotList)
+
+	volumeSnapshotDataColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Snapshot", Type: "string", Description: storagev1alpha1.VolumeSnapshotDataSpec{}.SwaggerDoc()["volumeSnapshotRef"]},
+		{Name: "Volume", Type: "string", Description: storagev1alpha1.VolumeSnapshotDataSpec{}.SwaggerDoc()["persistentVolumeRef"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(volumeSnapshotDataColumnDefinitions, printVolumeSnapshotData)
+	h.TableHandler(volumeSnapshotDataColumnDefinitions, printVolumeSnapshotDataList)
 
 	componentStatusColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -1277,6 +1296,63 @@ func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, options
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPersistentVolumeClaim(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printVolumeSnapshot(obj *storage.VolumeSnapshot, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	pvcName := obj.Spec.PersistentVolumeClaimName
+	ssdName := obj.Spec.SnapshotDataName
+
+	row.Cells = append(row.Cells, obj.Name, pvcName, ssdName, translateTimestamp(obj.CreationTimestamp))
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printVolumeSnapshotList(list *storage.VolumeSnapshotList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printVolumeSnapshot(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printVolumeSnapshotData(obj *storage.VolumeSnapshotData, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	volumeSnapshotRefUID := ""
+	if obj.Spec.VolumeSnapshotRef != nil {
+		volumeSnapshotRefUID += obj.Spec.VolumeSnapshotRef.Namespace
+		volumeSnapshotRefUID += "/"
+		volumeSnapshotRefUID += obj.Spec.VolumeSnapshotRef.Name
+	}
+
+	volumeRefUID := ""
+	if obj.Spec.PersistentVolumeRef != nil {
+		volumeRefUID = obj.Spec.PersistentVolumeRef.Name
+	}
+
+	row.Cells = append(row.Cells, obj.Name, volumeSnapshotRefUID, volumeRefUID, translateTimestamp(obj.CreationTimestamp))
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printVolumeSnapshotDataList(list *storage.VolumeSnapshotDataList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printVolumeSnapshotData(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
