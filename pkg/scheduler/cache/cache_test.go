@@ -1069,16 +1069,18 @@ func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
 	}
 }
 
-func BenchmarkExpire100Pods(b *testing.B) {
-	benchmarkExpire(b, 100)
-}
-
-func BenchmarkExpire1kPods(b *testing.B) {
-	benchmarkExpire(b, 1000)
-}
-
-func BenchmarkExpire10kPods(b *testing.B) {
-	benchmarkExpire(b, 10000)
+func BenchmarkExpirePods(b *testing.B) {
+	podNums := []int{
+		100,
+		1000,
+		10000,
+	}
+	for _, podNum := range podNums {
+		name := fmt.Sprintf("%dPods", podNum)
+		b.Run(name, func(b *testing.B) {
+			benchmarkExpire(b, podNum)
+		})
+	}
 }
 
 func benchmarkExpire(b *testing.B, podNum int) {
