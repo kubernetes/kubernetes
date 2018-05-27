@@ -105,7 +105,6 @@ func (c *csiDriverClient) NodeRequest() (*grpc.ClientConn, csipb.NodeClient, err
 		return nil, nil, err
 	}
 	nodeClient := csipb.NewNodeClient(conn)
-        c.nodeClient = nodeClient
 
 	return conn, nodeClient, nil
 }
@@ -122,7 +121,6 @@ func (c *csiDriverClient) ControllerRequest() (*grpc.ClientConn, csipb.Controlle
 		return nil, nil, err
 	}
 	ctrlClient := csipb.NewControllerClient(conn)
-        c.ctrlClient = ctrlClient
 
 	return conn, ctrlClient, nil
 }
