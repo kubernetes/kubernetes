@@ -627,6 +627,8 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 		[]schema.GroupVersionResource{
 			batch.Resource("cronjobs").WithVersion("v1beta1"),
 			storage.Resource("volumeattachments").WithVersion("v1beta1"),
+			storage.Resource("volumesnapshots").WithVersion("v1alpha1"),
+			storage.Resource("volumesnapshotdatas").WithVersion("v1alpha1"),
 			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
 		},
 		apiResourceConfig)

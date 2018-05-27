@@ -331,6 +331,10 @@ pkg/registry/settings/rest
 pkg/registry/storage/rest
 pkg/registry/storage/storageclass
 pkg/registry/storage/storageclass/storage
+pkg/registry/storage/volumesnapshot
+pkg/registry/storage/volumesnapshot/storage
+pkg/registry/storage/volumesnapshotdata
+pkg/registry/storage/volumesnapshotdata/storage
 pkg/routes
 pkg/security/apparmor
 pkg/security/podsecuritypolicy

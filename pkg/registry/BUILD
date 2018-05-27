@@ -85,6 +85,8 @@ filegroup(
         "//pkg/registry/storage/rest:all-srcs",
         "//pkg/registry/storage/storageclass:all-srcs",
         "//pkg/registry/storage/volumeattachment:all-srcs",
+        "//pkg/registry/storage/volumesnapshot:all-srcs",
+        "//pkg/registry/storage/volumesnapshotdata:all-srcs",
     ],
     tags = ["automanaged"],
 )
