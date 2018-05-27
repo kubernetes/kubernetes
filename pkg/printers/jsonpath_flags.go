@@ -26,6 +26,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
+// templates are logically optional for specifying a format.
+// this allows a user to specify a template format value
+// as --output=jsonpath=
+var jsonFormats = map[string]bool{
+	"jsonpath":      true,
+	"jsonpath-file": true,
+}
+
 // JSONPathPrintFlags provides default flags necessary for template printing.
 // Given the following flag values, a printer can be requested that knows
 // how to handle printing based on these values.
@@ -34,6 +42,14 @@ type JSONPathPrintFlags struct {
 	// an output template.
 	AllowMissingKeys *bool
 	TemplateArgument *string
+}
+
+func (f *JSONPathPrintFlags) AllowedFormats() []string {
+	formats := make([]string, 0, len(jsonFormats))
+	for format := range jsonFormats {
+		formats = append(formats, format)
+	}
+	return formats
 }
 
 // ToPrinter receives an templateFormat and returns a printer capable of
@@ -46,16 +62,8 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, 
 
 	templateValue := ""
 
-	// templates are logically optional for specifying a format.
-	// this allows a user to specify a template format value
-	// as --output=jsonpath=
-	templateFormats := map[string]bool{
-		"jsonpath":      true,
-		"jsonpath-file": true,
-	}
-
 	if f.TemplateArgument == nil || len(*f.TemplateArgument) == 0 {
-		for format := range templateFormats {
+		for format := range jsonFormats {
 			format = format + "="
 			if strings.HasPrefix(templateFormat, format) {
 				templateValue = templateFormat[len(format):]
@@ -67,8 +75,8 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, 
 		templateValue = *f.TemplateArgument
 	}
 
-	if _, supportedFormat := templateFormats[templateFormat]; !supportedFormat {
-		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
+	if _, supportedFormat := jsonFormats[templateFormat]; !supportedFormat {
+		return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &templateFormat, AllowedFormats: f.AllowedFormats()}
 	}
 
 	if len(templateValue) == 0 {
