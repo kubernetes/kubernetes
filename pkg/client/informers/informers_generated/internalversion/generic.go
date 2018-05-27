@@ -169,6 +169,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().InternalVersion().StorageClasses().Informer()}, nil
 	case storage.SchemeGroupVersion.WithResource("volumeattachments"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().InternalVersion().VolumeAttachments().Informer()}, nil
+	case storage.SchemeGroupVersion.WithResource("volumesnapshots"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().InternalVersion().VolumeSnapshots().Informer()}, nil
+	case storage.SchemeGroupVersion.WithResource("volumesnapshotdatas"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().InternalVersion().VolumeSnapshotDatas().Informer()}, nil
 
 	}
 

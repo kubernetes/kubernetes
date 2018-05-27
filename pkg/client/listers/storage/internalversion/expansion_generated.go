@@ -25,3 +25,15 @@ type StorageClassListerExpansion interface{}
 // VolumeAttachmentListerExpansion allows custom methods to be added to
 // VolumeAttachmentLister.
 type VolumeAttachmentListerExpansion interface{}
+
+// VolumeSnapshotListerExpansion allows custom methods to be added to
+// VolumeSnapshotLister.
+type VolumeSnapshotListerExpansion interface{}
+
+// VolumeSnapshotNamespaceListerExpansion allows custom methods to be added to
+// VolumeSnapshotNamespaceLister.
+type VolumeSnapshotNamespaceListerExpansion interface{}
+
+// VolumeSnapshotDataListerExpansion allows custom methods to be added to
+// VolumeSnapshotDataLister.
+type VolumeSnapshotDataListerExpansion interface{}
