@@ -88,9 +88,9 @@ func (c *csiDriverClient) IdentityRequest() (*grpc.ClientConn, csipb.IdentityCli
 	if err != nil {
 		return nil, nil, err
 	}
-	idClient := csipb.NewIdentityClient(conn)
+	c.idClient = csipb.NewIdentityClient(conn)
 
-	return conn, idClient, nil
+	return conn, c.idClient, nil
 }
 
 func (c *csiDriverClient) NodeRequest() (*grpc.ClientConn, csipb.NodeClient, error) {
@@ -104,9 +104,9 @@ func (c *csiDriverClient) NodeRequest() (*grpc.ClientConn, csipb.NodeClient, err
 	if err != nil {
 		return nil, nil, err
 	}
-	nodeClient := csipb.NewNodeClient(conn)
+	c.nodeClient = csipb.NewNodeClient(conn)
 
-	return conn, nodeClient, nil
+	return conn, c.nodeClient, nil
 }
 
 func (c *csiDriverClient) ControllerRequest() (*grpc.ClientConn, csipb.ControllerClient, error) {
@@ -120,9 +120,9 @@ func (c *csiDriverClient) ControllerRequest() (*grpc.ClientConn, csipb.Controlle
 	if err != nil {
 		return nil, nil, err
 	}
-	ctrlClient := csipb.NewControllerClient(conn)
+	c.ctrlClient = csipb.NewControllerClient(conn)
 
-	return conn, ctrlClient, nil
+	return conn, c.ctrlClient, nil
 }
 
 func (c *csiDriverClient) NodePublishVolume(
@@ -273,7 +273,6 @@ func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.Nod
 		return nil, err
 	}
 	defer conn.Close()
-
 	req := &csipb.NodeGetCapabilitiesRequest{}
 	resp, err := nodeClient.NodeGetCapabilities(ctx, req)
 	if err != nil {
