@@ -61,7 +61,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
-	"k8s.io/kubernetes/pkg/util/limitwriter"
 )
 
 const (
@@ -532,17 +531,9 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		return
 	}
 	fw := flushwriter.Wrap(response.ResponseWriter)
-	// Byte limit logic is already implemented in kuberuntime. However, we still need this for
-	// old runtime integration.
-	// TODO(random-liu): Remove this once we switch to CRI integration.
-	if logOptions.LimitBytes != nil {
-		fw = limitwriter.New(fw, *logOptions.LimitBytes)
-	}
 	response.Header().Set("Transfer-Encoding", "chunked")
 	if err := s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, logOptions, fw, fw); err != nil {
-		if err != limitwriter.ErrMaximumWrite {
-			response.WriteError(http.StatusBadRequest, err)
-		}
+		response.WriteError(http.StatusBadRequest, err)
 		return
 	}
 }
