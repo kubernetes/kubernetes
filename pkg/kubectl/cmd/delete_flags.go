@@ -39,6 +39,7 @@ type DeleteFlags struct {
 	IgnoreNotFound *bool
 	Now            *bool
 	Timeout        *time.Duration
+	Wait           *bool
 	Output         *string
 }
 
@@ -85,6 +86,9 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.Timeout != nil {
 		options.Timeout = *f.Timeout
 	}
+	if f.Wait != nil {
+		options.WaitForDeletion = *f.Wait
+	}
 
 	return options
 }
@@ -118,11 +122,12 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.IgnoreNotFound != nil {
 		cmd.Flags().BoolVar(f.IgnoreNotFound, "ignore-not-found", *f.IgnoreNotFound, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
 	}
-
+	if f.Wait != nil {
+		cmd.Flags().BoolVar(f.Wait, "wait", *f.Wait, "If true, wait for resources to be gone before returning. This waits for finalizers.")
+	}
 	if f.Output != nil {
 		cmd.Flags().StringVarP(f.Output, "output", "o", *f.Output, "Output mode. Use \"-o name\" for shorter output (resource/name).")
 	}
-
 }
 
 // NewDeleteCommandFlags provides default flags and values for use with the "delete" command
@@ -139,6 +144,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	labelSelector := ""
 	fieldSelector := ""
 	timeout := time.Duration(0)
+	wait := true
 
 	filenames := []string{}
 	recursive := false
@@ -156,6 +162,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		IgnoreNotFound: &ignoreNotFound,
 		Now:            &now,
 		Timeout:        &timeout,
+		Wait:           &wait,
 		Output:         &output,
 	}
 }
@@ -167,6 +174,7 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 
 	force := false
 	timeout := time.Duration(0)
+	wait := false
 
 	filenames := []string{}
 	recursive := false
@@ -180,5 +188,6 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 		// add non-defaults
 		Force:   &force,
 		Timeout: &timeout,
+		Wait:    &wait,
 	}
 }

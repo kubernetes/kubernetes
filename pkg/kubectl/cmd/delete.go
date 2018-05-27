@@ -139,8 +139,6 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	deleteFlags.AddFlags(cmd)
 
-	cmd.Flags().Bool("wait", true, `If true, wait for resources to be gone before returning.  This waits for finalizers.`)
-
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
@@ -165,13 +163,8 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	}
 	if o.GracePeriod == 0 && !o.ForceDeletion {
 		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
-		// into --grace-period=1 and wait until the object is successfully deleted. Users may provide --force
-		// to bypass this wait.
-		o.WaitForDeletion = true
+		// into --grace-period=1. Users may provide --force to bypass this conversion.
 		o.GracePeriod = 1
-	}
-	if b, err := cmd.Flags().GetBool("wait"); err == nil {
-		o.WaitForDeletion = b
 	}
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
@@ -216,6 +209,11 @@ func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
 	}
 	if o.DeleteAll && len(o.FieldSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
+	}
+
+	if o.GracePeriod == 0 && !o.ForceDeletion && !o.WaitForDeletion {
+		// With the explicit --wait flag we need extra validation for backward compatibility
+		return fmt.Errorf("--grace-period=0 must have either --force specified, or --wait to be set to true")
 	}
 
 	switch {
