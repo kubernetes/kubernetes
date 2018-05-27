@@ -131,6 +131,7 @@ type Instances interface {
 	// services cannot be used in this method to obtain nodeaddresses
 	NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error)
 	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
+	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 	InstanceID(ctx context.Context, nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
 	InstanceType(ctx context.Context, name types.NodeName) (string, error)
