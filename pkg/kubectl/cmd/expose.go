@@ -87,19 +87,15 @@ type ExposeServiceOptions struct {
 	PrintFlags      *genericclioptions.PrintFlags
 	PrintObj        printers.ResourcePrinterFunc
 
-	DryRun           bool
-	EnforceNamespace bool
+	DryRun bool
 
 	Generators                func(string) map[string]kubectl.Generator
 	CanBeExposed              polymorphichelpers.CanBeExposedFunc
-	ClientForMapping          func(*meta.RESTMapping) (resource.RESTClient, error)
-	MapBasedSelectorForObject func(runtime.Object) (string, error)
+	MapBasedSelectorForObject polymorphichelpers.MapBasedSelectorForObjectFunc
 	PortsForObject            polymorphichelpers.PortsForObjectFunc
-	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
+	ProtocolsForObject        polymorphichelpers.ProtocolsForObjectFunc
 
-	Namespace string
-	Mapper    meta.RESTMapper
-
+	Mapper        meta.RESTMapper
 	DynamicClient dynamic.Interface
 	Builder       *resource.Builder
 
@@ -133,8 +129,8 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Long:    exposeLong,
 		Example: exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.RunExpose(cmd, args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.RunExpose(cmd))
 		},
 		ValidArgs: validArgs,
 	}
@@ -165,7 +161,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
-func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.DryRun {
@@ -189,9 +185,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	}
 
 	o.Generators = f.Generators
-	o.Builder = f.NewBuilder()
 	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
-	o.ClientForMapping = f.ClientForMapping
 	o.MapBasedSelectorForObject = polymorphichelpers.MapBasedSelectorForObjectFn
 	o.ProtocolsForObject = polymorphichelpers.ProtocolsForObjectFn
 	o.PortsForObject = polymorphichelpers.PortsForObjectFn
@@ -201,23 +195,24 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 		return err
 	}
 
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
+	o.Builder = f.NewBuilder().
+		WithScheme(legacyscheme.Scheme).
+		ContinueOnError().
+		NamespaceParam(namespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		ResourceTypeOrNameArgs(false, args...).
+		Flatten()
+
 	return err
 }
 
-func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) error {
-	r := o.Builder.
-		WithScheme(legacyscheme.Scheme).
-		ContinueOnError().
-		NamespaceParam(o.Namespace).DefaultNamespace().
-		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
-		ResourceTypeOrNameArgs(false, args...).
-		Flatten().
-		Do()
+func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command) error {
+	r := o.Builder.Do()
 	err := r.Err()
 	if err != nil {
 		return cmdutil.UsageErrorf(cmd, err.Error())
@@ -344,8 +339,12 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		if err != nil {
 			return err
 		}
+		ns, err := meta.NewAccessor().Namespace(asUnstructured)
+		if err != nil {
+			return err
+		}
 		// Serialize the object with the annotation applied.
-		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
+		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(ns).Create(asUnstructured)
 		if err != nil {
 			return err
 		}
