@@ -220,7 +220,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.Scaler, err = f.ScaleClient()
+	o.Scaler, err = cmdutil.ScaleClientFn(f)
 	if err != nil {
 		return err
 	}
