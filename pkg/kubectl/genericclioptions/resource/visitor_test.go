@@ -21,9 +21,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestVisitorHttpGet(t *testing.T) {
@@ -99,4 +103,203 @@ func TestVisitorHttpGet(t *testing.T) {
 	assert.Nil(t, actualErr)
 	assert.NotNil(t, actualBytes)
 	assert.Equal(t, 2, i)
+}
+
+func TestVisitorRefresh(t *testing.T) {
+	testcases := []struct {
+		description   string
+		obj           runtime.Object
+		accessor      testMetadataAccessor
+		ignoreError   bool
+		expectedError bool
+		expectedInfo  Info
+	}{
+		{
+			description: "error from Name()",
+			accessor: testMetadataAccessor{
+				MockName: func(obj runtime.Object) (string, error) {
+					return "", fmt.Errorf("error getting object's name")
+				},
+			},
+			expectedError: true,
+		},
+		{
+			description: "error from Namespace()",
+			accessor: testMetadataAccessor{
+				MockNamespace: func(obj runtime.Object) (string, error) {
+					return "", fmt.Errorf("error getting object's namespace")
+				},
+			},
+			expectedError: true,
+		},
+		{
+			description: "error from ResourceVersion()",
+			accessor: testMetadataAccessor{
+				MockResourceVersion: func(obj runtime.Object) (string, error) {
+					return "", fmt.Errorf("error getting object's resource version")
+				},
+			},
+			expectedError: true,
+		},
+		{
+			description: "error from Name(), with IgnoreError",
+			accessor: testMetadataAccessor{
+				MockName: func(obj runtime.Object) (string, error) {
+					return "", fmt.Errorf("error getting object's name")
+				},
+			},
+			ignoreError:  true,
+			expectedInfo: Info{Namespace: "namespace-foo", ResourceVersion: "resourceVersion-foo"},
+		},
+		{
+			description: "error from Namespace(), with IgnoreError",
+			accessor: testMetadataAccessor{
+				MockNamespace: func(obj runtime.Object) (string, error) {
+					return "", fmt.Errorf("error getting object's name")
+				},
+			},
+			ignoreError:  true,
+			expectedInfo: Info{Name: "name-foo", ResourceVersion: "resourceVersion-foo"},
+		},
+		{
+			description: "error from ResourceVersion(), with IgnoreError",
+			accessor: testMetadataAccessor{
+				MockResourceVersion: func(obj runtime.Object) (string, error) {
+					return "", fmt.Errorf("error getting object's resource version")
+				},
+			},
+			ignoreError:  true,
+			expectedInfo: Info{Name: "name-foo", Namespace: "namespace-foo"},
+		},
+		{
+			description: "Refresh, no errors",
+			accessor:    testMetadataAccessor{},
+			obj:         &runtime.Unknown{},
+			expectedInfo: Info{
+				Object:          &runtime.Unknown{},
+				Name:            "name-foo",
+				Namespace:       "namespace-foo",
+				ResourceVersion: "resourceVersion-foo",
+			},
+		},
+	}
+
+	oldMetadataAccessor := metadataAccessor
+	defer func() {
+		metadataAccessor = oldMetadataAccessor
+	}()
+
+	for _, tc := range testcases {
+		info := Info{}
+		metadataAccessor = tc.accessor
+		err := info.Refresh(tc.obj, tc.ignoreError)
+
+		if tc.expectedError {
+			assert.NotNil(t, err)
+			continue
+		}
+		assert.True(t, reflect.DeepEqual(tc.expectedInfo, info))
+	}
+}
+
+type testMetadataAccessor struct {
+	MockNamespace       func(obj runtime.Object) (string, error)
+	MockName            func(obj runtime.Object) (string, error)
+	MockResourceVersion func(obj runtime.Object) (string, error)
+}
+
+func (m testMetadataAccessor) APIVersion(obj runtime.Object) (string, error) {
+	return "APIVersion", nil
+}
+
+func (m testMetadataAccessor) SetAPIVersion(obj runtime.Object, version string) error {
+	return nil
+}
+
+func (m testMetadataAccessor) Kind(obj runtime.Object) (string, error) {
+	return "Kind", nil
+}
+
+func (m testMetadataAccessor) SetKind(obj runtime.Object, kind string) error {
+	return nil
+}
+
+func (m testMetadataAccessor) Namespace(obj runtime.Object) (string, error) {
+	if m.MockNamespace != nil {
+		return m.MockNamespace(obj)
+	}
+	return "namespace-foo", nil
+}
+
+func (m testMetadataAccessor) SetNamespace(obj runtime.Object, namespace string) error {
+	return nil
+}
+
+func (m testMetadataAccessor) Name(obj runtime.Object) (string, error) {
+	if m.MockName != nil {
+		return m.MockName(obj)
+	}
+	return "name-foo", nil
+}
+
+func (m testMetadataAccessor) SetName(obj runtime.Object, name string) error {
+	return nil
+}
+
+func (m testMetadataAccessor) GenerateName(obj runtime.Object) (string, error) {
+	return "generatedName-foo", nil
+}
+
+func (m testMetadataAccessor) SetGenerateName(obj runtime.Object, name string) error {
+	return nil
+}
+
+func (m testMetadataAccessor) UID(obj runtime.Object) (types.UID, error) {
+	return types.UID("uid"), nil
+}
+
+func (m testMetadataAccessor) SetUID(obj runtime.Object, uid types.UID) error {
+	return nil
+}
+
+func (m testMetadataAccessor) SelfLink(obj runtime.Object) (string, error) {
+	return "selfLink", nil
+}
+func (m testMetadataAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
+	return nil
+}
+
+func (m testMetadataAccessor) Labels(obj runtime.Object) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
+func (m testMetadataAccessor) SetLabels(obj runtime.Object, labels map[string]string) error {
+	return nil
+}
+
+func (m testMetadataAccessor) Annotations(obj runtime.Object) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
+func (m testMetadataAccessor) SetAnnotations(obj runtime.Object, annotations map[string]string) error {
+	return nil
+}
+
+func (m testMetadataAccessor) Continue(obj runtime.Object) (string, error) {
+	return "continue", nil
+}
+
+func (m testMetadataAccessor) SetContinue(obj runtime.Object, c string) error {
+	return nil
+}
+
+func (m testMetadataAccessor) ResourceVersion(obj runtime.Object) (string, error) {
+	if m.MockResourceVersion != nil {
+		return m.MockResourceVersion(obj)
+	}
+	return "resourceVersion-foo", nil
+}
+
+func (m testMetadataAccessor) SetResourceVersion(obj runtime.Object, version string) error {
+	return nil
 }
