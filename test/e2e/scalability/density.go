@@ -227,7 +227,7 @@ func logPodStartupStatus(
 	expectedPods int,
 	observedLabels map[string]string,
 	period time.Duration,
-	scheduleThroughputs []float64,
+	scheduleThroughputs *[]float64,
 	stopCh chan struct{}) {
 
 	label := labels.SelectorFromSet(labels.Set(observedLabels))
@@ -250,14 +250,14 @@ func logPodStartupStatus(
 		framework.Logf(startupStatus.String("Density"))
 		// Compute scheduling throughput for the latest time period.
 		throughput := float64(startupStatus.Scheduled-lastScheduledCount) / float64(period/time.Second)
-		scheduleThroughputs = append(scheduleThroughputs, throughput)
+		*scheduleThroughputs = append(*scheduleThroughputs, throughput)
 		lastScheduledCount = startupStatus.Scheduled
 	}
 }
 
 // runDensityTest will perform a density test and return the time it took for
 // all pods to start
-func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer, scheduleThroughputs []float64) time.Duration {
+func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer, scheduleThroughputs *[]float64) time.Duration {
 	defer GinkgoRecover()
 
 	// Create all secrets, configmaps and daemons.
@@ -647,7 +647,7 @@ var _ = SIGDescribe("Density", func() {
 						LogFunc:   framework.Logf,
 					})
 			}
-			e2eStartupTime = runDensityTest(dConfig, testPhaseDurations, scheduleThroughputs)
+			e2eStartupTime = runDensityTest(dConfig, testPhaseDurations, &scheduleThroughputs)
 			if itArg.runLatencyTest {
 				By("Scheduling additional Pods to measure startup latencies")
 
