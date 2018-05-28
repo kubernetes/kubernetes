@@ -26,7 +26,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 const (
@@ -494,7 +494,7 @@ func TestBuildDaemonSet(t *testing.T) {
 		}
 		defer os.Remove(tempFile)
 
-		pod, err := volumeutil.LoadPodFromFile(tempFile)
+		pod, err := corev1helper.LoadPodFromFile(tempFile)
 		if err != nil {
 			t.Fatalf("couldn't load the specified Pod")
 		}
@@ -570,7 +570,7 @@ spec:
 		}
 		defer os.Remove(tempFile)
 
-		_, err = volumeutil.LoadPodFromFile(tempFile)
+		_, err = corev1helper.LoadPodFromFile(tempFile)
 		if (err != nil) != rt.expectError {
 			t.Errorf("failed TestLoadPodSpecFromFile:\nexpected error:\n%t\nsaw:\n%v", rt.expectError, err)
 		}

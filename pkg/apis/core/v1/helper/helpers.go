@@ -19,14 +19,17 @@ package helper
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
@@ -485,4 +488,25 @@ func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
 	}
 
 	return ""
+}
+
+// LoadPodFromFile will read, decode, and return a Pod from a file.
+func LoadPodFromFile(filePath string) (*v1.Pod, error) {
+	if filePath == "" {
+		return nil, fmt.Errorf("file path not specified")
+	}
+	podDef, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file path %s: %+v", filePath, err)
+	}
+	if len(podDef) == 0 {
+		return nil, fmt.Errorf("file was empty: %s", filePath)
+	}
+	pod := &v1.Pod{}
+
+	codec := scheme.Codecs.UniversalDecoder()
+	if err := runtime.DecodeInto(codec, podDef, pod); err != nil {
+		return nil, fmt.Errorf("failed decoding file: %v", err)
+	}
+	return pod, nil
 }

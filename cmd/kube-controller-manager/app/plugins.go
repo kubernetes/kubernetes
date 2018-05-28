@@ -51,10 +51,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/rbd"
 	"k8s.io/kubernetes/pkg/volume/scaleio"
 	"k8s.io/kubernetes/pkg/volume/storageos"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -172,7 +172,7 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 // If unsuccessful, an error is returned. Function is exported for reuse downstream.
 func AttemptToLoadRecycler(path string, config *volume.VolumeConfig) error {
 	if path != "" {
-		recyclerPod, err := volumeutil.LoadPodFromFile(path)
+		recyclerPod, err := corev1helper.LoadPodFromFile(path)
 		if err != nil {
 			return err
 		}
