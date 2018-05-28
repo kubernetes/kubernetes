@@ -156,6 +156,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]printers.Desc
 		extensions.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
 		extensions.Kind("PodSecurityPolicy"):           &PodSecurityPolicyDescriber{c},
 		autoscaling.Kind("HorizontalPodAutoscaler"):    &HorizontalPodAutoscalerDescriber{c},
+		autoscaling.Kind("VerticalPodAutoscaler"):      &VerticalPodAutoscalerDescriber{c, externalclient},
 		extensions.Kind("DaemonSet"):                   &DaemonSetDescriber{c},
 		extensions.Kind("Deployment"):                  &DeploymentDescriber{c, externalclient},
 		extensions.Kind("Ingress"):                     &IngressDescriber{c},
@@ -2970,6 +2971,128 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 			w.Write(LEVEL_1, "Type\tStatus\tReason\tMessage\n")
 			w.Write(LEVEL_1, "----\t------\t------\t-------\n")
 			for _, c := range hpa.Status.Conditions {
+				w.Write(LEVEL_1, "%v\t%v\t%v\t%v\n", c.Type, c.Status, c.Reason, c.Message)
+			}
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+
+		return nil
+	})
+}
+
+// VerticalPodAutoscalerDescriber generates information about a vertical pod autoscaler.
+type VerticalPodAutoscalerDescriber struct {
+	clientset.Interface
+	external externalclient.Interface
+}
+
+// Describe describes the vertical pod autoscaler object.
+func (d *VerticalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
+	vpa, err := d.external.AutoscalingV2beta1().VerticalPodAutoscalers(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, vpa)
+	}
+
+	internalVpa := &autoscaling.VerticalPodAutoscaler{}
+	if err := legacyscheme.Scheme.Convert(vpa, internalVpa, nil); err != nil {
+		return "", err
+	}
+
+	return describeVerticalPodAutoscaler(internalVpa, events, d)
+}
+
+func describeVerticalPodAutoscaler(vpa *autoscaling.VerticalPodAutoscaler, events *api.EventList, d *VerticalPodAutoscalerDescriber) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", vpa.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", vpa.Namespace)
+		printLabelsMultiline(w, "Labels", vpa.Labels)
+		printAnnotationsMultiline(w, "Annotations", vpa.Annotations)
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", vpa.CreationTimestamp.Time.Format(time.RFC1123Z))
+		if vpa.Spec.Selector != nil { // This should always be true for a valid object.
+			w.Write(LEVEL_0, "Selector:\t%s\n", metav1.FormatLabelSelector(vpa.Spec.Selector))
+		}
+		if vpa.Spec.UpdatePolicy != nil && vpa.Spec.UpdatePolicy.UpdateMode != nil {
+			w.Write(LEVEL_0, "UpdateMode:\t%s\n", *vpa.Spec.UpdatePolicy.UpdateMode)
+		}
+		sortedResources := []api.ResourceName{api.ResourceCPU, api.ResourceMemory}
+		resourceNames := map[api.ResourceName]string{api.ResourceCPU: "cpu", api.ResourceMemory: "memory"}
+		// Set with container names for all containers to be printed.
+		containerNames := make(map[string]bool)
+		// Map from container name to container resource policy.
+		containerPolicies := make(map[string]*autoscaling.ContainerResourcePolicy)
+		// Map from container name to container resource recommendation.
+		containerRecommendations := make(map[string]*autoscaling.RecommendedContainerResources)
+		if vpa.Spec.ResourcePolicy != nil {
+			for i, containerPolicy := range vpa.Spec.ResourcePolicy.ContainerPolicies {
+				containerNames[containerPolicy.ContainerName] = true
+				containerPolicies[containerPolicy.ContainerName] = &vpa.Spec.ResourcePolicy.ContainerPolicies[i]
+			}
+		}
+		if vpa.Status.Recommendation != nil {
+			for i, recommendation := range vpa.Status.Recommendation.ContainerRecommendations {
+				containerNames[recommendation.ContainerName] = true
+				containerRecommendations[recommendation.ContainerName] = &vpa.Status.Recommendation.ContainerRecommendations[i]
+			}
+		}
+		// Sort containers alphabetically.
+		var sortedContainerNames []string
+		for containerName := range containerNames {
+			sortedContainerNames = append(sortedContainerNames, containerName)
+		}
+		sort.Strings(sortedContainerNames)
+		// Print the recommended resources for each container, together with the resource policy, if non-default.
+		if len(sortedContainerNames) > 0 {
+			w.Write(LEVEL_0, "Recommendations:\n")
+		} else {
+			w.Write(LEVEL_0, "Recommendations:\t<none>\n")
+		}
+		for _, containerName := range sortedContainerNames {
+			policy := containerPolicies[containerName]
+			recommendation := containerRecommendations[containerName]
+			if policy != nil && policy.Mode != nil && *policy.Mode == autoscaling.ContainerScalingModeOff {
+				w.Write(LEVEL_1, "Container:\t%s (autoscaling: %s)\n", containerName, *policy.Mode)
+			} else {
+				w.Write(LEVEL_1, "Container:\t%s\n", containerName)
+				for _, resource := range sortedResources {
+					recommendationDesc := "<no recommendation>"
+					if recommendation != nil {
+						value := recommendation.Target[resource]
+						recommendationDesc = value.String()
+					}
+					if policy != nil {
+						// Print the (MinAllowed...MaxAllowed) range.
+						minAllowed, hasMinAllowed := policy.MinAllowed[resource]
+						maxAllowed, hasMaxAllowed := policy.MaxAllowed[resource]
+						if hasMinAllowed || hasMaxAllowed {
+							minAllowedStr := "0"
+							maxAllowedStr := "INF"
+							if hasMinAllowed {
+								minAllowedStr = minAllowed.String()
+							}
+							if hasMaxAllowed {
+								maxAllowedStr = maxAllowed.String()
+							}
+							recommendationDesc += fmt.Sprintf(" (allowed range: %s...%s)", minAllowedStr, maxAllowedStr)
+						}
+					}
+					w.Write(LEVEL_2, "%s:\t%s\n", resourceNames[resource], recommendationDesc)
+				}
+			}
+		}
+		if len(vpa.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t------\t-------\n")
+			for _, c := range vpa.Status.Conditions {
 				w.Write(LEVEL_1, "%v\t%v\t%v\t%v\n", c.Type, c.Status, c.Reason, c.Message)
 			}
 		}

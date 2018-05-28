@@ -516,6 +516,7 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				},
 				"v2beta1": {
 					{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
+					{Name: "verticalpodautoscalers", Namespaced: true, Kind: "VerticalPodAutoscaler"},
 				},
 			},
 		},

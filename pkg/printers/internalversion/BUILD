@@ -33,6 +33,7 @@ go_test(
         "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",
+        "//vendor/k8s.io/api/autoscaling/v2beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
