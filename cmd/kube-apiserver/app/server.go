@@ -68,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
@@ -628,6 +629,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 			batch.Resource("cronjobs").WithVersion("v1beta1"),
 			storage.Resource("volumeattachments").WithVersion("v1beta1"),
 			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
+			autoscaling.Resource("verticalpodautoscalers").WithVersion("v2beta1"),
 		},
 		apiResourceConfig)
 	if err != nil {
