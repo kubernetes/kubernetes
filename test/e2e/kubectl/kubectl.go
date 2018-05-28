@@ -1545,7 +1545,7 @@ metadata:
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
 
-			err := framework.WaitForJobGone(c, ns, jobName, 10*time.Second)
+			err := framework.WaitForJobGone(c, ns, jobName, wait.ForeverTestTimeout)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying the job " + jobName + " was deleted")
