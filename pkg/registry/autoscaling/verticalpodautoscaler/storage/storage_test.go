@@ -1,0 +1,249 @@
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package storage
+
+import (
+	"testing"
+
+	"k8s.io/api/autoscaling/v2beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
+)
+
+func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, autoscaling.GroupName)
+	restOptions := generic.RESTOptions{
+		StorageConfig:           etcdStorage,
+		Decorator:               generic.UndecoratedStorage,
+		DeleteCollectionWorkers: 1,
+		ResourcePrefix:          "verticalpodautoscalers",
+	}
+	verticalPodAutoscalerStorage, statusStorage := NewREST(restOptions)
+	return verticalPodAutoscalerStorage, statusStorage, server
+}
+
+func validNewVerticalPodAutoscaler(name string) *autoscaling.VerticalPodAutoscaler {
+	validUpdateMode := autoscaling.UpdateModeAuto
+	validContainerScalingMode := autoscaling.ContainerScalingModeAuto
+	return &autoscaling.VerticalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: autoscaling.VerticalPodAutoscalerSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+			UpdatePolicy: &autoscaling.PodUpdatePolicy{
+				UpdateMode: &validUpdateMode,
+			},
+			ResourcePolicy: &autoscaling.PodResourcePolicy{
+				ContainerPolicies: []autoscaling.ContainerResourcePolicy{{
+					ContainerName: "foo-container",
+					Mode:          &validContainerScalingMode,
+					MinAllowed: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("100m"),
+					},
+					MaxAllowed: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("200m"),
+					},
+				}},
+			},
+		},
+	}
+}
+
+func TestCreate(t *testing.T) {
+	// Vertical Pod Autoscalers should be tested only for autoscaling/v2beta1.
+	if *testapi.Autoscaling.GroupVersion() != v2beta1.SchemeGroupVersion {
+		return
+	}
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.Store)
+	autoscaler := validNewVerticalPodAutoscaler("foo")
+	autoscaler.ObjectMeta = metav1.ObjectMeta{}
+
+	test.TestCreate(
+		// valid
+		autoscaler,
+		// invalid
+		&autoscaling.VerticalPodAutoscaler{},
+	)
+}
+
+func TestUpdate(t *testing.T) {
+	// Vertical Pod Autoscalers should be tested only for autoscaling/v2beta1.
+	if *testapi.Autoscaling.GroupVersion() != v2beta1.SchemeGroupVersion {
+		return
+	}
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.Store)
+	test.TestUpdate(
+		// valid
+		validNewVerticalPodAutoscaler("foo"),
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*autoscaling.VerticalPodAutoscaler)
+			updateMode := autoscaling.UpdateModeAuto
+			object.Spec.UpdatePolicy.UpdateMode = &updateMode
+			return object
+		},
+	)
+}
+
+func TestDelete(t *testing.T) {
+	// Vertical Pod Autoscalers should be tested only for autoscaling/v2beta1.
+	if *testapi.Autoscaling.GroupVersion() != v2beta1.SchemeGroupVersion {
+		return
+	}
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.Store)
+	test.TestDelete(validNewVerticalPodAutoscaler("foo"))
+}
+
+func TestGet(t *testing.T) {
+	// Vertical Pod Autoscalers should be tested only for autoscaling/v2beta1.
+	if *testapi.Autoscaling.GroupVersion() != v2beta1.SchemeGroupVersion {
+		return
+	}
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.Store)
+	test.TestGet(validNewVerticalPodAutoscaler("foo"))
+}
+
+func TestList(t *testing.T) {
+	// Vertical Pod Autoscalers should be tested only for autoscaling/v2beta1.
+	if *testapi.Autoscaling.GroupVersion() != v2beta1.SchemeGroupVersion {
+		return
+	}
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.Store)
+	test.TestList(validNewVerticalPodAutoscaler("foo"))
+}
+
+func TestWatch(t *testing.T) {
+	// Vertical Pod Autoscalers should be tested only for autoscaling/v2beta1.
+	if *testapi.Autoscaling.GroupVersion() != v2beta1.SchemeGroupVersion {
+		return
+	}
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.Store)
+	test.TestWatch(
+		validNewVerticalPodAutoscaler("foo"),
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
+		},
+		// matching fields
+		[]fields.Set{},
+		// not matching fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+			{"name": "foo"},
+		},
+	)
+}
+
+func TestShortNames(t *testing.T) {
+	// Vertical Pod Autoscalers should be tested only for autoscaling/v2beta1.
+	if *testapi.Autoscaling.GroupVersion() != v2beta1.SchemeGroupVersion {
+		return
+	}
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"vpa"}
+	registrytest.AssertShortNames(t, storage, expected)
+}
+
+func TestCategories(t *testing.T) {
+	// Vertical Pod Autoscalers should be tested only for autoscaling/v2beta1.
+	if *testapi.Autoscaling.GroupVersion() != v2beta1.SchemeGroupVersion {
+		return
+	}
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage, expected)
+}
+
+func TestUpdateStatus(t *testing.T) {
+	// Vertical Pod Autoscalers should be tested only for autoscaling/v2beta1.
+	if *testapi.Autoscaling.GroupVersion() != v2beta1.SchemeGroupVersion {
+		return
+	}
+	storage, statusStorage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericapirequest.NewDefaultContext()
+	key, _ := storage.KeyFunc(ctx, "foo")
+	autoscalerStart := validNewVerticalPodAutoscaler("foo")
+	err := storage.Storage.Create(ctx, key, autoscalerStart, nil, 0)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	autoscalerIn := &autoscaling.VerticalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Status: autoscaling.VerticalPodAutoscalerStatus{
+			Conditions: []autoscaling.VerticalPodAutoscalerCondition{
+				{Status: "True"},
+			},
+		},
+	}
+
+	_, _, err = statusStorage.Update(ctx, autoscalerIn.Name, rest.DefaultUpdatedObjectInfo(autoscalerIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	autosclaerOut := obj.(*autoscaling.VerticalPodAutoscaler)
+	// only compare the meaningful update b/c we can't compare due to metadata
+	if !apiequality.Semantic.DeepEqual(autoscalerIn.Status, autosclaerOut.Status) {
+		t.Errorf("unexpected object: %s", diff.ObjectDiff(autoscalerIn, autosclaerOut))
+	}
+}

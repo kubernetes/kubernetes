@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
+	verticalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/verticalpodautoscaler/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -61,6 +62,11 @@ func (p RESTStorageProvider) v2beta1Storage(apiResourceConfigSource serverstorag
 	hpaStorage, hpaStatusStorage := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
 	storage["horizontalpodautoscalers"] = hpaStorage
 	storage["horizontalpodautoscalers/status"] = hpaStatusStorage
+
+	// verticalpodautoscalers
+	vpaStorage, vpaStatusStorage := verticalpodautoscalerstore.NewREST(restOptionsGetter)
+	storage["verticalpodautoscalers"] = vpaStorage
+	storage["verticalpodautoscalers/status"] = vpaStatusStorage
 
 	return storage
 }
