@@ -3030,6 +3030,8 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
+	case *extensions.DaemonSet:
+		return 0, nil
 	case *batch.Job:
 		// TODO: currently we use pause pods so that's OK. When we'll want to switch to Pods
 		// that actually finish we need a better way to do this.
