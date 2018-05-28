@@ -2079,15 +2079,27 @@ func AssertCleanup(ns string, selectors ...string) {
 	if ns != "" {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
 	}
-	for _, selector := range selectors {
-		resources := RunKubectlOrDie("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
-		if resources != "" {
-			Failf("Resources left running after stop:\n%s", resources)
+
+	var e error
+	verifyCleanupFunc := func() (bool, error) {
+		e = nil
+		for _, selector := range selectors {
+			resources := RunKubectlOrDie("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
+			if resources != "" {
+				e = fmt.Errorf("Resources left running after stop:\n%s", resources)
+				return false, nil
+			}
+			pods := RunKubectlOrDie("get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
+			if pods != "" {
+				e = fmt.Errorf("Pods left unterminated after stop:\n%s", pods)
+				return false, nil
+			}
 		}
-		pods := RunKubectlOrDie("get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
-		if pods != "" {
-			Failf("Pods left unterminated after stop:\n%s", pods)
-		}
+		return true, nil
+	}
+	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
+	if err != nil {
+		Failf(e.Error())
 	}
 }
 
