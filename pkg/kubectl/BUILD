@@ -82,7 +82,6 @@ go_library(
     srcs = [
         "apply.go",
         "autoscale.go",
-        "bash_comp_utils.go",
         "clusterrolebinding.go",
         "conditions.go",
         "configmap.go",
@@ -125,7 +124,6 @@ go_library(
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubectl/apps:go_default_library",
-        "//pkg/kubectl/genericclioptions/resource:go_default_library",
         "//pkg/kubectl/util:go_default_library",
         "//pkg/kubectl/util/hash:go_default_library",
         "//pkg/kubectl/util/slice:go_default_library",
