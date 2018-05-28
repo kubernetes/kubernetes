@@ -23,8 +23,11 @@ import (
 	"github.com/google/gofuzz"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 )
+
+var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
 // Funcs returns the fuzzer functions for the apiextensions apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
@@ -52,6 +55,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			} else if len(obj.Versions) != 0 {
 				obj.Version = obj.Versions[0].Name
+			}
+			if len(obj.AdditionalPrinterColumns) == 0 {
+				obj.AdditionalPrinterColumns = []apiextensions.CustomResourceColumnDefinition{
+					{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"], JSONPath: ".metadata.creationTimestamp"},
+				}
 			}
 		},
 		func(obj *apiextensions.CustomResourceDefinition, c fuzz.Continue) {

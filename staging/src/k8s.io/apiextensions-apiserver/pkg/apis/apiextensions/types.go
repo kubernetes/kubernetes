@@ -49,6 +49,8 @@ type CustomResourceDefinitionSpec struct {
 	// major version, then minor version. An example sorted list of versions:
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	Versions []CustomResourceDefinitionVersion
+	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	AdditionalPrinterColumns []CustomResourceColumnDefinition
 }
 
 type CustomResourceDefinitionVersion struct {
@@ -59,6 +61,28 @@ type CustomResourceDefinitionVersion struct {
 	// Storage flags the version as storage version. There must be exactly one flagged
 	// as storage version.
 	Storage bool
+}
+
+// CustomResourceColumnDefinition specifies a column for server side printing.
+type CustomResourceColumnDefinition struct {
+	// name is a human readable name for the column.
+	Name string
+	// type is an OpenAPI type definition for this column.
+	// See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
+	Type string
+	// format is an optional OpenAPI type definition for this column. The 'name' format is applied
+	// to the primary identifier column to assist in clients identifying column is the resource name.
+	// See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
+	Format string
+	// description is a human readable description of this column.
+	Description string
+	// priority is an integer defining the relative importance of this column compared to others. Lower
+	// numbers are considered higher priority. Columns that may be omitted in limited space scenarios
+	// should be given a higher priority.
+	Priority int32
+
+	// JSONPath is a simple JSON path, i.e. without array notation.
+	JSONPath string
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
