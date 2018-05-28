@@ -333,7 +333,7 @@ func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return searchMountPoints(hostpath, procMountInfoPath)
+	return searchMountPoints(hostpath, hostProcMountinfoPath)
 }
 
 func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {
@@ -345,5 +345,5 @@ func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {
 }
 
 func (mounter *NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return getSELinuxSupport(pathname, procMountInfoPath)
+	return getSELinuxSupport(pathname, hostProcMountsPath)
 }
