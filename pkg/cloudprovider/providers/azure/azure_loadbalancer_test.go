@@ -97,3 +97,116 @@ func TestFindProbe(t *testing.T) {
 		assert.Equal(t, test.expected, findResult, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
 	}
 }
+
+func TestFindRule(t *testing.T) {
+	tests := []struct {
+		msg          string
+		existingRule []network.LoadBalancingRule
+		curRule      network.LoadBalancingRule
+		expected     bool
+	}{
+		{
+			msg:      "empty existing rules should return false",
+			expected: false,
+		},
+		{
+			msg: "rule names unmatch should return false",
+			existingRule: []network.LoadBalancingRule{
+				{
+					Name: to.StringPtr("httpProbe1"),
+					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+						FrontendPort: to.Int32Ptr(1),
+					},
+				},
+			},
+			curRule: network.LoadBalancingRule{
+				Name: to.StringPtr("httpProbe2"),
+				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+					FrontendPort: to.Int32Ptr(1),
+				},
+			},
+			expected: false,
+		},
+		{
+			msg: "rule names match while frontend ports unmatch should return false",
+			existingRule: []network.LoadBalancingRule{
+				{
+					Name: to.StringPtr("httpProbe"),
+					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+						FrontendPort: to.Int32Ptr(1),
+					},
+				},
+			},
+			curRule: network.LoadBalancingRule{
+				Name: to.StringPtr("httpProbe"),
+				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+					FrontendPort: to.Int32Ptr(2),
+				},
+			},
+			expected: false,
+		},
+		{
+			msg: "rule names match while backend ports unmatch should return false",
+			existingRule: []network.LoadBalancingRule{
+				{
+					Name: to.StringPtr("httpProbe"),
+					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+						BackendPort: to.Int32Ptr(1),
+					},
+				},
+			},
+			curRule: network.LoadBalancingRule{
+				Name: to.StringPtr("httpProbe"),
+				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+					BackendPort: to.Int32Ptr(2),
+				},
+			},
+			expected: false,
+		},
+		{
+			msg: "rule names match while LoadDistribution unmatch should return false",
+			existingRule: []network.LoadBalancingRule{
+				{
+					Name: to.StringPtr("probe1"),
+					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+						LoadDistribution: network.Default,
+					},
+				},
+			},
+			curRule: network.LoadBalancingRule{
+				Name: to.StringPtr("probe2"),
+				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+					LoadDistribution: network.SourceIP,
+				},
+			},
+			expected: false,
+		},
+		{
+			msg: "both rule names and LoadBalancingRulePropertiesFormats match should return true",
+			existingRule: []network.LoadBalancingRule{
+				{
+					Name: to.StringPtr("matchName"),
+					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+						BackendPort:      to.Int32Ptr(2),
+						FrontendPort:     to.Int32Ptr(2),
+						LoadDistribution: network.SourceIP,
+					},
+				},
+			},
+			curRule: network.LoadBalancingRule{
+				Name: to.StringPtr("matchName"),
+				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+					BackendPort:      to.Int32Ptr(2),
+					FrontendPort:     to.Int32Ptr(2),
+					LoadDistribution: network.SourceIP,
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for i, test := range tests {
+		findResult := findRule(test.existingRule, test.curRule)
+		assert.Equal(t, test.expected, findResult, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
+	}
+}
