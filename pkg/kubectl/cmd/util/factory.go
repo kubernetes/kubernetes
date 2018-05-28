@@ -62,11 +62,6 @@ type Factory interface {
 	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
 
-	// Returns the default namespace to use in cases where no
-	// other namespace is specified and whether the namespace was
-	// overridden.
-	DefaultNamespace() (string, bool, error)
-
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)

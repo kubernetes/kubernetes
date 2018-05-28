@@ -58,7 +58,7 @@ func TestLog(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logContent := "test log content"
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -80,7 +80,6 @@ func TestLog(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 			oldLogFn := polymorphichelpers.LogsForObjectFn
 			defer func() {
@@ -123,6 +122,7 @@ func testPod() *api.Pod {
 func TestValidateLogFlags(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
+	f.WithNamespace("")
 
 	tests := []struct {
 		name     string

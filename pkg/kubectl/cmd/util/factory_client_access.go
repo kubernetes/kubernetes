@@ -118,10 +118,6 @@ func (f *factoryImpl) RESTClient() (*restclient.RESTClient, error) {
 	return restclient.RESTClientFor(clientConfig)
 }
 
-func (f *factoryImpl) DefaultNamespace() (string, bool, error) {
-	return f.clientGetter.ToRawKubeConfigLoader().Namespace()
-}
-
 func (f *factoryImpl) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	cfg, err := f.clientGetter.ToRESTConfig()
 	if err != nil {
