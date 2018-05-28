@@ -61,7 +61,7 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 	if err != nil {
 		t.Fatalf("Failed to install plugin %s: %v", confFile, err)
 	}
-	networkConfig := fmt.Sprintf(`{ "name": "%s", "type": "%s", "capabilities": {"portMappings": true, "bandwidth": true}  }`, confName, binName)
+	networkConfig := fmt.Sprintf(`{ "name": "%s", "type": "%s", "capabilities": {"portMappings": true, "bandwidth": true, "ipRanges": true}  }`, confName, binName)
 	_, err = f.WriteString(networkConfig)
 	if err != nil {
 		t.Fatalf("Failed to write network config file (%v)", err)
@@ -218,6 +218,19 @@ func TestCNIPlugin(t *testing.T) {
 
 	mockLoCNI.On("AddNetworkList", cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&types020.Result{IP4: &types020.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
 
+	// Check that status returns an error
+	if err := cniPlugin.Status(); err == nil {
+		t.Fatalf("cniPlugin returned non-err with no podCidr")
+	}
+
+	cniPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, map[string]interface{}{
+		network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR: "10.0.2.0/24",
+	})
+
+	if err := cniPlugin.Status(); err != nil {
+		t.Fatalf("unexpected status err: %v", err)
+	}
+
 	ports := map[string][]*hostport.PortMapping{
 		containerID.ID: {
 			{
@@ -259,8 +272,9 @@ func TestCNIPlugin(t *testing.T) {
 	// Verify the correct network configuration was passed
 	inputConfig := struct {
 		RuntimeConfig struct {
-			Bandwidth    map[string]interface{}   `json:"bandwidth"`
-			PortMappings []map[string]interface{} `json:"portMappings"`
+			PortMappings []map[string]interface{}   `json:"portMappings"`
+			Bandwidth    map[string]interface{}     `json:"bandwidth"`
+			IpRanges     [][]map[string]interface{} `json:"ipRanges"`
 		} `json:"runtimeConfig"`
 	}{}
 	inputBytes, inerr := ioutil.ReadFile(inputFile)
@@ -280,6 +294,16 @@ func TestCNIPlugin(t *testing.T) {
 	}
 	if !reflect.DeepEqual(inputConfig.RuntimeConfig.Bandwidth, expectedBandwidth) {
 		t.Errorf("mismatch in expected bandwidth. expected %v got %v", expectedBandwidth, inputConfig.RuntimeConfig.Bandwidth)
+	}
+
+	expectedIpRange := [][]map[string]interface{}{
+		{
+			{"subnet": "10.0.2.0/24"},
+		},
+	}
+
+	if !reflect.DeepEqual(inputConfig.RuntimeConfig.IpRanges, expectedIpRange) {
+		t.Errorf("mismatch in expected ipRange. expected %v got %v", expectedIpRange, inputConfig.RuntimeConfig.IpRanges)
 	}
 
 	// Get its IP address
