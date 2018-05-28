@@ -20,7 +20,6 @@ limitations under the License.
 package storage
 
 import (
-	"flag"
 	"fmt"
 	"time"
 
@@ -44,19 +43,12 @@ var csiImageVersions = map[string]string{
 	"csi-provisioner":  "v0.2.1",
 	"driver-registrar": "v0.2.0",
 }
-var csiImageVersion string
-var csiImageRegistry string
-
-func init() {
-	flag.StringVar(&csiImageVersion, "csiImageVersion", "", "overrides the default tag used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
-	flag.StringVar(&csiImageRegistry, "csiImageRegistry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
-}
 
 func csiContainerImage(image string) string {
 	var fullName string
-	fullName += csiImageRegistry + "/" + image + ":"
-	if csiImageVersion != "" {
-		fullName += csiImageVersion
+	fullName += framework.TestContext.CSIImageRegistry + "/" + image + ":"
+	if framework.TestContext.CSIImageVersion != "" {
+		fullName += framework.TestContext.CSIImageVersion
 	} else {
 		fullName += csiImageVersions[image]
 	}
