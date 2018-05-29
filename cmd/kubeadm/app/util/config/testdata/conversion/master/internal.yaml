@@ -11,7 +11,6 @@ AuditPolicyConfiguration:
   LogMaxAge: 2
   Path: ""
 CIImageRepository: ""
-CRISocket: /var/run/dockershim.sock
 CertificatesDir: /etc/kubernetes/pki
 ClusterName: kubernetes
 ControllerManagerExtraArgs: null
@@ -140,8 +139,13 @@ Networking:
   DNSDomain: cluster.local
   PodSubnet: ""
   ServiceSubnet: 10.96.0.0/12
-NoTaintMaster: false
-NodeName: master-1
+NodeRegistration:
+  CRISocket: /var/run/dockershim.sock
+  ExtraArgs: null
+  Name: master-1
+  Taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
 SchedulerExtraArgs: null
 SchedulerExtraVolumes: null
 Token: s73ybu.6tw6wnqgp5z0wb77
