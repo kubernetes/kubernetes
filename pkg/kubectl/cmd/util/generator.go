@@ -62,7 +62,6 @@ const (
 	ConfigMapV1GeneratorName                = "configmap/v1"
 	ClusterRoleBindingV1GeneratorName       = "clusterrolebinding.rbac.authorization.k8s.io/v1alpha1"
 	RoleBindingV1GeneratorName              = "rolebinding.rbac.authorization.k8s.io/v1alpha1"
-	ClusterV1Beta1GeneratorName             = "cluster/v1beta1"
 	PodDisruptionBudgetV1GeneratorName      = "poddisruptionbudget/v1beta1"
 	PodDisruptionBudgetV2GeneratorName      = "poddisruptionbudget/v1beta1/v2"
 	PriorityClassV1Alpha1GeneratorName      = "priorityclass/v1alpha1"

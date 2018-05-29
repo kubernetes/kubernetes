@@ -51,7 +51,7 @@ func (w crlfWriter) Write(b []byte) (n int, err error) {
 			}
 			return written + n, err
 		}
-		written += 1
+		written++
 		i = next + 1
 	}
 }

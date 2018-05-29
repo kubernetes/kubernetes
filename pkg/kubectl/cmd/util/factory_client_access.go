@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -187,24 +186,6 @@ func (f *factoryImpl) OpenAPISchema() (openapi.Resources, error) {
 
 	// Delegate to the OpenAPIGetter
 	return f.openAPIGetter.getter.Get()
-}
-
-func (f *factoryImpl) ScaleClient() (scaleclient.ScalesGetter, error) {
-	discoClient, err := f.clientGetter.ToDiscoveryClient()
-	if err != nil {
-		return nil, err
-	}
-	restClient, err := f.RESTClient()
-	if err != nil {
-		return nil, err
-	}
-	resolver := scaleclient.NewDiscoveryScaleKindResolver(discoClient)
-	mapper, err := f.clientGetter.ToRESTMapper()
-	if err != nil {
-		return nil, err
-	}
-
-	return scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
 }
 
 // this method exists to help us find the points still relying on internal types.
