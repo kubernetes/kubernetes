@@ -37,12 +37,7 @@ import (
 
 // WriteConfigToDisk writes the kubelet config object down to a file
 // Used at "kubeadm init" and "kubeadm upgrade" time
-func WriteConfigToDisk(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, kubeletVersion *version.Version) error {
-
-	// If the kubelet version is v1.10.x, exit
-	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletConfigVersion) {
-		return nil
-	}
+func WriteConfigToDisk(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration) error {
 
 	kubeletBytes, err := getConfigBytes(kubeletConfig)
 	if err != nil {
@@ -58,11 +53,6 @@ func CreateConfigMap(cfg *kubeadmapi.MasterConfiguration, client clientset.Inter
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
 		return err
-	}
-
-	// If Kubernetes version is v1.10.x, exit
-	if k8sVersion.LessThan(kubeadmconstants.MinimumKubeletConfigVersion) {
-		return nil
 	}
 
 	configMapName := configMapName(k8sVersion)
@@ -131,11 +121,6 @@ func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Ve
 // DownloadConfig downloads the kubelet configuration from a ConfigMap and writes it to disk.
 // Used at "kubeadm join" time
 func DownloadConfig(kubeletKubeConfig string, kubeletVersion *version.Version) error {
-
-	// If the kubelet version is v1.10.x, exit
-	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletConfigVersion) {
-		return nil
-	}
 
 	// Download the ConfigMap from the cluster based on what version the kubelet is
 	configMapName := configMapName(kubeletVersion)

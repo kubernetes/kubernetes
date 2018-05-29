@@ -44,13 +44,9 @@ type MasterConfiguration struct {
 	Networking Networking
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string
-	// NodeName is the name of the node that will host the k8s control plane.
-	// Defaults to the hostname if not provided.
-	NodeName string
-	// NoTaintMaster will, if set, suppress the tainting of the
-	// master node allowing workloads to be run on it (e.g. in
-	// single node configurations).
-	NoTaintMaster bool
+
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions
 
 	// Token is used for establishing bidirectional trust between nodes and masters.
 	// Used for joining nodes in the cluster.
@@ -61,9 +57,6 @@ type MasterConfiguration struct {
 	TokenUsages []string
 	// Extra groups that this token will authenticate as when used for authentication
 	TokenGroups []string
-
-	// CRISocket is used to retrieve container runtime info.
-	CRISocket string
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -136,6 +129,28 @@ type API struct {
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
 	BindPort int32
+}
+
+// NodeRegistrationOptions holds fields that relate to registering a new master or node to the cluster, either via "kubeadm init" or "kubeadm join"
+type NodeRegistrationOptions struct {
+
+	// Name is the `.Metadata.Name` field of the Node API object that will be created in this `kubeadm init` or `kubeadm joiń` operation.
+	// This field is also used in the CommonName field of the kubelet's client certificate to the API server.
+	// Defaults to the hostname of the node if not provided.
+	Name string
+
+	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
+	CRISocket string
+
+	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
+	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your master node, set this field to an
+	// empty slice, i.e. `taints: {}` in the YAML file. This field is solely used for Node registration.
+	Taints []v1.Taint
+
+	// ExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
+	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
+	// Flags have higher higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	ExtraArgs map[string]string
 }
 
 // TokenDiscovery contains elements needed for token discovery.
@@ -223,6 +238,9 @@ type ExternalEtcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta
 
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions
+
 	// CACertPath is the path to the SSL certificate authority used to
 	// secure comunications between node and master.
 	// Defaults to "/etc/kubernetes/pki/ca.crt".
@@ -239,16 +257,11 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string
 	// DiscoveryTimeout modifies the discovery timeout
 	DiscoveryTimeout *metav1.Duration
-	// NodeName is the name of the node to join the cluster. Defaults
-	// to the name of the host.
-	NodeName string
 	// TLSBootstrapToken is a token used for TLS bootstrapping.
 	// Defaults to Token.
 	TLSBootstrapToken string
 	// Token is used for both discovery and TLS bootstrapping.
 	Token string
-	// CRISocket is used to retrieve container runtime info.
-	CRISocket string
 	// The cluster name
 	ClusterName string
 
@@ -332,13 +345,13 @@ type CommonConfiguration interface {
 // GetCRISocket will return the CRISocket that is defined for the MasterConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
 func (cfg *MasterConfiguration) GetCRISocket() string {
-	return cfg.CRISocket
+	return cfg.NodeRegistration.CRISocket
 }
 
 // GetNodeName will return the NodeName that is defined for the MasterConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
 func (cfg *MasterConfiguration) GetNodeName() string {
-	return cfg.NodeName
+	return cfg.NodeRegistration.Name
 }
 
 // GetKubernetesVersion will return the KubernetesVersion that is defined for the MasterConfiguration.
@@ -350,13 +363,13 @@ func (cfg *MasterConfiguration) GetKubernetesVersion() string {
 // GetCRISocket will return the CRISocket that is defined for the NodeConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
 func (cfg *NodeConfiguration) GetCRISocket() string {
-	return cfg.CRISocket
+	return cfg.NodeRegistration.CRISocket
 }
 
 // GetNodeName will return the NodeName that is defined for the NodeConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
 func (cfg *NodeConfiguration) GetNodeName() string {
-	return cfg.NodeName
+	return cfg.NodeRegistration.Name
 }
 
 // GetKubernetesVersion will return an empty string since KubernetesVersion is not a

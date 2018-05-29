@@ -118,7 +118,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 		// Wait for the mirror Pod hash to be removed; otherwise we'll run into race conditions here when the kubelet hasn't had time to
 		// remove the Static Pod (or the mirror Pod respectively). This implicitly also tests that the API server endpoint is healthy,
 		// because this blocks until the API server returns a 404 Not Found when getting the Static Pod
-		staticPodName := fmt.Sprintf("%s-%s", componentName, cfg.NodeName)
+		staticPodName := fmt.Sprintf("%s-%s", componentName, cfg.NodeRegistration.Name)
 		if err := waiter.WaitForPodToDisappear(staticPodName); err != nil {
 			return err
 		}

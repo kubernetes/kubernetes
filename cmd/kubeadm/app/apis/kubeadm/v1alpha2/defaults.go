@@ -103,10 +103,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		}
 	}
 
-	if obj.CRISocket == "" {
-		obj.CRISocket = DefaultCRISocket
-	}
-
 	if len(obj.TokenUsages) == 0 {
 		obj.TokenUsages = constants.DefaultTokenUsages
 	}
@@ -123,6 +119,7 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
+	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 	SetDefaults_KubeletConfiguration(obj)
 	SetDefaults_Etcd(obj)
 	SetDefaults_ProxyConfiguration(obj)
@@ -168,9 +165,6 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if len(obj.DiscoveryToken) == 0 && len(obj.DiscoveryFile) == 0 {
 		obj.DiscoveryToken = obj.Token
 	}
-	if obj.CRISocket == "" {
-		obj.CRISocket = DefaultCRISocket
-	}
 	// Make sure file URLs become paths
 	if len(obj.DiscoveryFile) != 0 {
 		u, err := url.Parse(obj.DiscoveryFile)
@@ -186,6 +180,8 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
 	}
+
+	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 }
 
 // SetDefaults_KubeletConfiguration assigns default values to kubelet
@@ -234,6 +230,12 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	scheme, _, _ := kubeletscheme.NewSchemeAndCodecs()
 	if scheme != nil {
 		scheme.Default(obj.KubeletConfiguration.BaseConfig)
+	}
+}
+
+func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
+	if obj.CRISocket == "" {
+		obj.CRISocket = DefaultCRISocket
 	}
 }
 
