@@ -219,7 +219,7 @@ func TestWaitForDeletion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := test.fakeClient()
 			o := &WaitOptions{
-				ResourceFinder: genericclioptions.NewSimpleResourceFinder(test.info),
+				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(test.info),
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 
@@ -451,7 +451,7 @@ func TestWaitForCondition(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := test.fakeClient()
 			o := &WaitOptions{
-				ResourceFinder: genericclioptions.NewSimpleResourceFinder(test.info),
+				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(test.info),
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 

@@ -21,7 +21,7 @@ import (
 )
 
 // NewSimpleResourceFinder builds a super simple ResourceFinder that just iterates over the objects you provided
-func NewSimpleResourceFinder(infos ...*resource.Info) ResourceFinder {
+func NewSimpleFakeResourceFinder(infos ...*resource.Info) ResourceFinder {
 	return &fakeResourceFinder{
 		Infos: infos,
 	}

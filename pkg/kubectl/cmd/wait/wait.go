@@ -53,9 +53,12 @@ type WaitFlags struct {
 // NewWaitFlags returns a default WaitFlags
 func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *WaitFlags {
 	return &WaitFlags{
-		RESTClientGetter:     restClientGetter,
-		PrintFlags:           genericclioptions.NewPrintFlags("condition met"),
-		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags(),
+		RESTClientGetter: restClientGetter,
+		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
+		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
+			WithLabelSelector("").
+			WithAllNamespaces(false).
+			WithLatest(),
 
 		Timeout: 30 * time.Second,
 
