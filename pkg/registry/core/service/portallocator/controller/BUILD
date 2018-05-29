@@ -14,7 +14,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/registry/core/rangeallocation:go_default_library",
-        "//pkg/registry/core/service:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
