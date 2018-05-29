@@ -27,87 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-type fakeMounter struct{}
-
-var _ mount.Interface = &fakeMounter{}
-
-func (mounter *fakeMounter) Mount(source string, target string, fstype string, options []string) error {
-	return errors.New("not implemented")
+type fakeMounter struct {
+	mount.FakeMounter
 }
 
-func (mounter *fakeMounter) Unmount(target string) error {
-	return errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) List() ([]mount.MountPoint, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (mounter fakeMounter) DeviceOpened(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) PathIsDevice(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "", errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
-	return mp.Path == dir
-}
-
-func (mounter *fakeMounter) IsNotMountPoint(dir string) (bool, error) {
-	return mount.IsNotMountPoint(mounter, dir)
-}
-
-func (mounter *fakeMounter) GetFileType(pathname string) (mount.FileType, error) {
-	return mount.FileType("fake"), errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) MakeDir(pathname string) error {
-	return nil
-}
-
-func (mounter *fakeMounter) MakeFile(pathname string) error {
-	return nil
-}
-
-func (mounter *fakeMounter) ExistsPath(pathname string) (bool, error) {
-	return true, errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) PrepareSafeSubpath(subPath mount.Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return "", nil, nil
-}
-
-func (mounter *fakeMounter) CleanSubPaths(_, _ string) error {
-	return nil
-}
-
-func (mounter *fakeMounter) SafeMakeDir(_, _ string, _ os.FileMode) error {
-	return nil
-}
-
-func (mounter *fakeMounter) GetMountRefs(pathname string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) GetMode(pathname string) (os.FileMode, error) {
-	return 0, errors.New("not implemented")
-}
-
-func (mounter *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
+// IsLikelyNotMountPoint overrides mount.FakeMounter.IsLikelyNotMountPoint for our use.
+func (f *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	name := path.Base(file)
 	if strings.HasPrefix(name, "mount") {
 		return false, nil
@@ -116,10 +41,6 @@ func (mounter *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		return false, errors.New("mock error")
 	}
 	return true, nil
-}
-
-func (mounter *fakeMounter) MakeRShared(path string) error {
-	return nil
 }
 
 func TestRemoveAllOneFilesystem(t *testing.T) {

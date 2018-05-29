@@ -19,8 +19,6 @@ limitations under the License.
 package cm
 
 import (
-	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -32,101 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-type fakeMountInterface struct {
-	mountPoints []mount.MountPoint
-}
-
-func (mi *fakeMountInterface) Mount(source string, target string, fstype string, options []string) error {
-	return fmt.Errorf("unsupported")
-}
-
-func (mi *fakeMountInterface) Unmount(target string) error {
-	return fmt.Errorf("unsupported")
-}
-
-func (mi *fakeMountInterface) List() ([]mount.MountPoint, error) {
-	return mi.mountPoints, nil
-}
-
-func (mi *fakeMountInterface) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
-	return (mp.Path == dir)
-}
-
-func (mi *fakeMountInterface) IsNotMountPoint(dir string) (bool, error) {
-	return false, fmt.Errorf("unsupported")
-}
-
-func (mi *fakeMountInterface) IsLikelyNotMountPoint(file string) (bool, error) {
-	return false, fmt.Errorf("unsupported")
-}
-func (mi *fakeMountInterface) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "", nil
-}
-
-func (mi *fakeMountInterface) DeviceOpened(pathname string) (bool, error) {
-	for _, mp := range mi.mountPoints {
-		if mp.Device == pathname {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (mi *fakeMountInterface) PathIsDevice(pathname string) (bool, error) {
-	return true, nil
-}
-
-func (mi *fakeMountInterface) MakeRShared(path string) error {
-	return nil
-}
-
-func (mi *fakeMountInterface) GetFileType(pathname string) (mount.FileType, error) {
-	return mount.FileType("fake"), nil
-}
-
-func (mi *fakeMountInterface) MakeDir(pathname string) error {
-	return nil
-}
-
-func (mi *fakeMountInterface) MakeFile(pathname string) error {
-	return nil
-}
-
-func (mi *fakeMountInterface) ExistsPath(pathname string) (bool, error) {
-	return true, errors.New("not implemented")
-}
-
-func (mi *fakeMountInterface) PrepareSafeSubpath(subPath mount.Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return "", nil, nil
-}
-
-func (mi *fakeMountInterface) CleanSubPaths(_, _ string) error {
-	return nil
-}
-
-func (mi *fakeMountInterface) SafeMakeDir(_, _ string, _ os.FileMode) error {
-	return nil
-}
-
-func (mi *fakeMountInterface) GetMountRefs(pathname string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (mi *fakeMountInterface) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("not implemented")
-}
-
-func (mi *fakeMountInterface) GetSELinuxSupport(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
-}
-
-func (mi *fakeMountInterface) GetMode(pathname string) (os.FileMode, error) {
-	return 0, errors.New("not implemented")
-}
-
 func fakeContainerMgrMountInt() mount.Interface {
-	return &fakeMountInterface{
-		[]mount.MountPoint{
+	return &mount.FakeMounter{
+		MountPoints: []mount.MountPoint{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -158,8 +64,8 @@ func TestCgroupMountValidationSuccess(t *testing.T) {
 }
 
 func TestCgroupMountValidationMemoryMissing(t *testing.T) {
-	mountInt := &fakeMountInterface{
-		[]mount.MountPoint{
+	mountInt := &mount.FakeMounter{
+		MountPoints: []mount.MountPoint{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -182,8 +88,8 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 }
 
 func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
-	mountInt := &fakeMountInterface{
-		[]mount.MountPoint{
+	mountInt := &mount.FakeMounter{
+		MountPoints: []mount.MountPoint{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -212,8 +118,8 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_period_us"), []byte("0"), os.ModePerm))
 	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_quota_us"), []byte("0"), os.ModePerm))
-	mountInt := &fakeMountInterface{
-		[]mount.MountPoint{
+	mountInt := &mount.FakeMounter{
+		MountPoints: []mount.MountPoint{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",

@@ -17,7 +17,6 @@ limitations under the License.
 package host_path
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -319,92 +318,6 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 }
 
-type fakeFileTypeChecker struct {
-	desiredType string
-}
-
-func (fftc *fakeFileTypeChecker) Mount(source string, target string, fstype string, options []string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) Unmount(target string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) List() ([]utilmount.MountPoint, error) {
-	return nil, nil
-}
-func (fftc *fakeFileTypeChecker) IsMountPointMatch(mp utilmount.MountPoint, dir string) bool {
-	return false
-}
-
-func (fftc *fakeFileTypeChecker) IsNotMountPoint(file string) (bool, error) {
-	return false, nil
-}
-
-func (fftc *fakeFileTypeChecker) IsLikelyNotMountPoint(file string) (bool, error) {
-	return false, nil
-}
-
-func (fftc *fakeFileTypeChecker) DeviceOpened(pathname string) (bool, error) {
-	return false, nil
-}
-func (fftc *fakeFileTypeChecker) PathIsDevice(pathname string) (bool, error) {
-	return false, nil
-}
-
-func (fftc *fakeFileTypeChecker) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "fake", nil
-}
-
-func (fftc *fakeFileTypeChecker) MakeRShared(path string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) MakeFile(pathname string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) MakeDir(pathname string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) ExistsPath(pathname string) (bool, error) {
-	return true, nil
-}
-
-func (fftc *fakeFileTypeChecker) GetFileType(_ string) (utilmount.FileType, error) {
-	return utilmount.FileType(fftc.desiredType), nil
-}
-
-func (fftc *fakeFileTypeChecker) PrepareSafeSubpath(subPath utilmount.Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return "", nil, nil
-}
-
-func (fftc *fakeFileTypeChecker) CleanSubPaths(_, _ string) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) SafeMakeDir(_, _ string, _ os.FileMode) error {
-	return nil
-}
-
-func (fftc *fakeFileTypeChecker) GetMountRefs(pathname string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (fftc *fakeFileTypeChecker) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("not implemented")
-}
-
-func (fftc *fakeFileTypeChecker) GetSELinuxSupport(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
-}
-
-func (fftc *fakeFileTypeChecker) GetMode(pathname string) (os.FileMode, error) {
-	return 0, errors.New("not implemented")
-}
-
 func setUp() error {
 	err := os.MkdirAll("/tmp/ExistingFolder", os.FileMode(0755))
 	if err != nil {
@@ -473,7 +386,11 @@ func TestOSFileTypeChecker(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		fakeFTC := &fakeFileTypeChecker{desiredType: tc.desiredType}
+		fakeFTC := &utilmount.FakeMounter{
+			Filesystem: map[string]utilmount.FileType{
+				tc.path: utilmount.FileType(tc.desiredType),
+			},
+		}
 		oftc := newFileTypeChecker(tc.path, fakeFTC)
 
 		path := oftc.GetPath()
