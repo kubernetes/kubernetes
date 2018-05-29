@@ -45,15 +45,12 @@ type NodeManager struct {
 	nodeInfoMap map[string]*NodeInfo
 	// Maps node name to node structure
 	registeredNodes map[string]*v1.Node
-	// Maps node name to volume path
-	attachedDisks map[string]map[string]bool
 	//CredentialsManager
 	credentialManager *SecretCredentialManager
 
 	// Mutexes
 	registeredNodesLock   sync.RWMutex
 	nodeInfoLock          sync.RWMutex
-	attachedDisksLock     sync.RWMutex
 	credentialManagerLock sync.Mutex
 }
 
@@ -261,40 +258,6 @@ func (nm *NodeManager) removeNode(node *v1.Node) {
 	nm.nodeInfoLock.Lock()
 	delete(nm.nodeInfoMap, node.ObjectMeta.Name)
 	nm.nodeInfoLock.Unlock()
-}
-
-func (nm *NodeManager) RegisterAttachedDisk(nodeName k8stypes.NodeName, volPath string) error {
-	nm.attachedDisksLock.Lock()
-	if _, ok := nm.attachedDisks[convertToString(nodeName)]; !ok {
-		nm.attachedDisks[convertToString(nodeName)] = make(map[string]bool)
-	}
-	nm.attachedDisks[convertToString(nodeName)][volPath] = true
-	nm.attachedDisksLock.Unlock()
-	return nil
-}
-func (nm *NodeManager) UnRegisterAttachedDisk(nodeName k8stypes.NodeName, volPath string) error {
-	nm.attachedDisksLock.Lock()
-	delete(nm.attachedDisks[convertToString(nodeName)], volPath)
-	if len(nm.attachedDisks[convertToString(nodeName)]) == 0 {
-		delete(nm.attachedDisks, convertToString(nodeName))
-	}
-	nm.attachedDisksLock.Unlock()
-	return nil
-}
-func (nm *NodeManager) GetAttachedDisks(nodeName k8stypes.NodeName) ([]string, error) {
-	nm.attachedDisksLock.Lock()
-	attachedDisks := nm.attachedDisks[convertToString(nodeName)]
-	nm.attachedDisksLock.Unlock()
-	if attachedDisks == nil {
-		return []string{}, fmt.Errorf("Attached disks not found for node %q", convertToString(nodeName))
-	}
-
-	disks := []string{}
-	for disk := range attachedDisks {
-		disks = append(disks, disk)
-	}
-
-	return disks, nil
 }
 
 // GetNodeInfo returns a NodeInfo which datacenter, vm and vc server ip address.

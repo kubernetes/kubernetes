@@ -380,26 +380,30 @@ func convertVolPathToDevicePath(ctx context.Context, dc *vclib.Datacenter, volPa
 }
 
 // convertVolPathsToDevicePaths removes cluster or folder path from volPaths and convert to canonicalPath
-func (vs *VSphere) convertVolPathsToDevicePaths(ctx context.Context, nodeName k8stypes.NodeName, volPaths []string) ([]string, error) {
-	nodeInfo, err := vs.nodeManager.GetNodeInfo(nodeName)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = vs.getVSphereInstanceForServer(nodeInfo.vcServer, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	for i, volPath := range volPaths {
-		deviceVolPath, err := convertVolPathToDevicePath(ctx, nodeInfo.dataCenter, volPath)
+func (vs *VSphere) convertVolPathsToDevicePaths(ctx context.Context, nodeVolumes map[k8stypes.NodeName][]string) (map[k8stypes.NodeName][]string, error) {
+	vmVolumes := make(map[k8stypes.NodeName][]string)
+	for nodeName, volPaths := range nodeVolumes {
+		nodeInfo, err := vs.nodeManager.GetNodeInfo(nodeName)
 		if err != nil {
-			glog.Errorf("Failed to convert vsphere volume path %s to device path for volume %s. err: %+v", volPath, deviceVolPath, err)
 			return nil, err
 		}
-		volPaths[i] = deviceVolPath
+
+		_, err = vs.getVSphereInstanceForServer(nodeInfo.vcServer, ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for i, volPath := range volPaths {
+			deviceVolPath, err := convertVolPathToDevicePath(ctx, nodeInfo.dataCenter, volPath)
+			if err != nil {
+				glog.Errorf("Failed to convert vsphere volume path %s to device path for volume %s. err: %+v", volPath, deviceVolPath, err)
+				return nil, err
+			}
+			volPaths[i] = deviceVolPath
+		}
+		vmVolumes[nodeName] = volPaths
 	}
-	return volPaths, nil
+	return vmVolumes, nil
 }
 
 // checkDiskAttached verifies volumes are attached to the VMs which are in same vCenter and Datacenter
