@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package equivalence defines Pod equivalence classes and the equivalence class
+// cache.
 package equivalence
 
 import (
