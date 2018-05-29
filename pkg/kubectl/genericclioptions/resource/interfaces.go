@@ -47,6 +47,9 @@ type RequestTransform func(*rest.Request)
 // NewClientWithOptions wraps the provided RESTClient and invokes each transform on each
 // newly created request.
 func NewClientWithOptions(c RESTClient, transforms ...RequestTransform) RESTClient {
+	if len(transforms) == 0 {
+		return c
+	}
 	return &clientOptions{c: c, transforms: transforms}
 }
 
