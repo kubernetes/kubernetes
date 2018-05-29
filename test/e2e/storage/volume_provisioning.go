@@ -57,6 +57,7 @@ type storageClassTest struct {
 	pvCheck        func(volume *v1.PersistentVolume) error
 	nodeName       string
 	attach         bool
+	volumeMode     *v1.PersistentVolumeMode
 }
 
 const (
@@ -119,6 +120,10 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 	} else {
 		Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(*class.ReclaimPolicy))
 		Expect(pv.Spec.MountOptions).To(Equal(class.MountOptions))
+	}
+	if t.volumeMode != nil {
+		Expect(pv.Spec.VolumeMode).NotTo(BeNil())
+		Expect(*pv.Spec.VolumeMode).To(Equal(*t.volumeMode))
 	}
 
 	// Run the checker
@@ -816,6 +821,34 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			claim := newClaim(test, ns, suffix)
 
 			testDynamicProvisioning(test, c, claim, class)
+		})
+	})
+
+	Describe("Block volume provisioning [Feature:BlockVolume]", func() {
+		It("should create and delete block persistent volumes", func() {
+
+			// TODO: add openstack once Cinder volume plugin supports block volumes
+			framework.SkipUnlessProviderIs("gce", "aws", "gke", "vsphere", "azure")
+
+			By("creating a claim with default class")
+			block := v1.PersistentVolumeBlock
+			test := storageClassTest{
+				name:         "default",
+				claimSize:    "2Gi",
+				expectedSize: "2Gi",
+				volumeMode:   &block,
+			}
+			// gce or gke
+			if getDefaultPluginName() == "kubernetes.io/gce-pd" {
+				// using GB not GiB as e2e test unit since gce-pd returns GB,
+				// or expectedSize may be greater than claimSize.
+				test.claimSize = "2G"
+				test.expectedSize = "2G"
+			}
+
+			claim := newClaim(test, ns, "default")
+			claim.Spec.VolumeMode = &block
+			testDynamicProvisioning(test, c, claim, nil)
 		})
 	})
 })
