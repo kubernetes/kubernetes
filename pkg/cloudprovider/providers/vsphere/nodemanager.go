@@ -265,26 +265,26 @@ func (nm *NodeManager) removeNode(node *v1.Node) {
 
 func (nm *NodeManager) RegisterAttachedDisk(nodeName k8stypes.NodeName, volPath string) error {
 	nm.attachedDisksLock.Lock()
-	defer nm.attachedDisksLock.Unlock()
 	if _, ok := nm.attachedDisks[convertToString(nodeName)]; !ok {
 		nm.attachedDisks[convertToString(nodeName)] = make(map[string]bool)
 	}
 	nm.attachedDisks[convertToString(nodeName)][volPath] = true
+	nm.attachedDisksLock.Unlock()
 	return nil
 }
 func (nm *NodeManager) UnRegisterAttachedDisk(nodeName k8stypes.NodeName, volPath string) error {
 	nm.attachedDisksLock.Lock()
-	defer nm.attachedDisksLock.Unlock()
 	delete(nm.attachedDisks[convertToString(nodeName)], volPath)
 	if len(nm.attachedDisks[convertToString(nodeName)]) == 0 {
 		delete(nm.attachedDisks, convertToString(nodeName))
 	}
+	nm.attachedDisksLock.Unlock()
 	return nil
 }
 func (nm *NodeManager) GetAttachedDisks(nodeName k8stypes.NodeName) []string {
-	nm.attachedDisksLock.RLock()
-	defer nm.attachedDisksLock.RUnlock()
+	nm.attachedDisksLock.Lock()
 	attachedDisks := nm.attachedDisks[convertToString(nodeName)]
+	nm.attachedDisksLock.Unlock()
 
 	disks := []string{}
 	if attachedDisks != nil {
