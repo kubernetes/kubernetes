@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	f := framework.NewDefaultFramework("kubelet-cgroup-manager")
 	Describe("QOS containers", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {
-			It("Top level QoS containers should have been created", func() {
+			It("Top level QoS containers should have been created [NodeConformance]", func() {
 				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
