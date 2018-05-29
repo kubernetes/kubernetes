@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package env provides functions to incorporate environment variables into kubectl commands.
-package env // import "k8s.io/kubernetes/pkg/kubectl/cmd/util/env"
+// Package env provides functions to incorporate environment variables into set env.
+package env
