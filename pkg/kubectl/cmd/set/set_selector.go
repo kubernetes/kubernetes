@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,26 +39,23 @@ import (
 // SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type SetSelectorOptions struct {
-	fileOptions resource.FilenameOptions
+	// Bound
+	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
+	PrintFlags           *genericclioptions.PrintFlags
+	RecordFlags          *genericclioptions.RecordFlags
+	dryrun               bool
 
-	PrintFlags  *genericclioptions.PrintFlags
-	RecordFlags *genericclioptions.RecordFlags
-
-	local  bool
-	dryrun bool
-	all    bool
-	output string
-
+	// set by args
 	resources []string
 	selector  *metav1.LabelSelector
 
-	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	// computed
+	WriteToServer  bool
+	PrintObj       printers.ResourcePrinterFunc
+	Recorder       genericclioptions.Recorder
+	ResourceFinder genericclioptions.ResourceFinder
 
-	PrintObj printers.ResourcePrinterFunc
-	Recorder genericclioptions.Recorder
-
-	builder *resource.Builder
-
+	// set at initialization
 	genericclioptions.IOStreams
 }
 
@@ -79,6 +75,12 @@ var (
 
 func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions {
 	return &SetSelectorOptions{
+		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
+			WithScheme(scheme.Scheme).
+			WithAll(false).
+			WithLocal(false).
+			WithUninitialized(false).
+			WithLatest(),
 		PrintFlags:  genericclioptions.NewPrintFlags("selector updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
@@ -105,16 +107,12 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 		},
 	}
 
+	o.ResourceBuilderFlags.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
-	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, set selector will NOT contact api-server but run locally.")
 	cmd.Flags().String("resource-version", "", "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
-	usage := "the resource to update the selectors"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.fileOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd
 }
@@ -130,40 +128,14 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
-	o.output = cmdutil.GetFlagString(cmd, "output")
-
-	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
 		return err
 	}
 
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	o.builder = f.NewBuilder().
-		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
-		LocalParam(o.local).
-		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.fileOptions).
-		IncludeUninitialized(includeUninitialized).
-		Flatten()
-
-	if !o.local {
-		o.builder.
-			ResourceTypeOrNameArgs(o.all, o.resources...).
-			Latest()
-	} else {
-		// if a --local flag was provided, and a resource was specified in the form
-		// <resource>/<name>, fail immediately as --local cannot query the api server
-		// for the specified resource.
-		if len(o.resources) > 0 {
-			return resource.LocalResourceError
-		}
-	}
+	o.ResourceFinder = o.ResourceBuilderFlags.ToBuilder(f, o.resources)
+	o.WriteToServer = !(*o.ResourceBuilderFlags.Local || o.dryrun)
 
 	if o.dryrun {
 		o.PrintFlags.Complete("%s (dry run)")
@@ -174,17 +146,11 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 	o.PrintObj = printer.PrintObj
 
-	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-		return f.ClientForMapping(mapping)
-	}
 	return err
 }
 
 // Validate basic inputs
 func (o *SetSelectorOptions) Validate() error {
-	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.fileOptions.Filenames) {
-		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
-	}
 	if o.selector == nil {
 		return fmt.Errorf("one selector is required")
 	}
@@ -193,11 +159,7 @@ func (o *SetSelectorOptions) Validate() error {
 
 // RunSelector executes the command.
 func (o *SetSelectorOptions) RunSelector() error {
-	r := o.builder.Do()
-	err := r.Err()
-	if err != nil {
-		return err
-	}
+	r := o.ResourceFinder.Do()
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
@@ -218,7 +180,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 		if patch.Err != nil {
 			return patch.Err
 		}
-		if o.local || o.dryrun {
+		if !o.WriteToServer {
 			return o.PrintObj(info.Object, o.Out)
 		}
 
