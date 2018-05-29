@@ -3720,6 +3720,7 @@ func autoConvert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecu
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
 	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
 	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
+	out.Sysctls = *(*[]core.Sysctl)(unsafe.Pointer(&in.Sysctls))
 	return nil
 }
 
@@ -3734,6 +3735,7 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
 	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
 	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
+	out.Sysctls = *(*[]v1.Sysctl)(unsafe.Pointer(&in.Sysctls))
 	return nil
 }
 
