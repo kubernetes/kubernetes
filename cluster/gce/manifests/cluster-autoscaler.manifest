@@ -25,7 +25,7 @@
                 },
                 "command": [
                     "./run.sh",
-                    "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
+                    "--kubernetes=https://127.0.0.1:443",
                     "--v=4",
                     "--logtostderr=true",
                     "--write-status-configmap=true",
@@ -57,6 +57,11 @@
                         "mountPath": "/usr/share/ca-certificates"
                     },
                     {
+                        "name": "srvkube",
+                        "readOnly": true,
+                        "mountPath": "/etc/srv/kubernetes"
+                    },
+                    {
                         "name": "logfile",
                         "mountPath": "/var/log/cluster-autoscaler.log",
                         "readOnly": false
@@ -78,6 +83,12 @@
                 "name": "usrsharecacerts",
                 "hostPath": {
                     "path": "/usr/share/ca-certificates"
+                }
+            },
+            {
+                "name": "srvkube",
+                "hostPath": {
+                    "path": "/etc/srv/kubernetes"
                 }
             },
             {
