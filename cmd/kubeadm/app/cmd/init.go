@@ -189,7 +189,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterCon
 		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
 	)
 	flagSet.StringVar(
-		&cfg.NodeName, "node-name", cfg.NodeName,
+		&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
 	flagSet.StringVar(
@@ -201,7 +201,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterCon
 		"The duration before the bootstrap token is automatically deleted. If set to '0', the token will never expire.",
 	)
 	flagSet.StringVar(
-		&cfg.CRISocket, "cri-socket", cfg.CRISocket,
+		&cfg.NodeRegistration.CRISocket, "cri-socket", cfg.NodeRegistration.CRISocket,
 		`Specify the CRI socket to connect to.`,
 	)
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
@@ -276,8 +276,10 @@ type Init struct {
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
 
-	// Write env file with flags for the kubelet to use
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(i.cfg); err != nil {
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
+	// as we handle that ourselves in the markmaster phase
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, false); err != nil {
 		return err
 	}
 
@@ -362,7 +364,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// Write the kubelet configuration to disk.
-	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig, kubeletVersion); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig); err != nil {
 		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
 	}
 
@@ -411,7 +413,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 4: Mark the master with the right label/taint
 	glog.V(1).Infof("[init] marking the master with right label")
-	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName, !i.cfg.NoTaintMaster); err != nil {
+	if err := markmasterphase.MarkMaster(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.Taints); err != nil {
 		return fmt.Errorf("error marking master: %v", err)
 	}
 
@@ -419,7 +421,7 @@ func (i *Init) Run(out io.Writer) error {
 	// This feature is disabled by default, as it is alpha still
 	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
 		// Enable dynamic kubelet configuration for the node.
-		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeName, kubeletVersion); err != nil {
+		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
 			return fmt.Errorf("error enabling dynamic kubelet configuration: %v", err)
 		}
 	}
@@ -507,7 +509,7 @@ func (i *Init) Run(out io.Writer) error {
 func createClient(cfg *kubeadmapi.MasterConfiguration, dryRun bool) (clientset.Interface, error) {
 	if dryRun {
 		// If we're dry-running; we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
-		dryRunGetter := apiclient.NewInitDryRunGetter(cfg.NodeName, cfg.Networking.ServiceSubnet)
+		dryRunGetter := apiclient.NewInitDryRunGetter(cfg.NodeRegistration.Name, cfg.Networking.ServiceSubnet)
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 
