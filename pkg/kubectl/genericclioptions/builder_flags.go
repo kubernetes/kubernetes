@@ -18,6 +18,7 @@ package genericclioptions
 
 import (
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
@@ -29,8 +30,11 @@ type ResourceBuilderFlags struct {
 	LabelSelector *string
 	FieldSelector *string
 	AllNamespaces *bool
+	All           *bool
+	Local         *bool
 
-	All bool
+	Scheme *runtime.Scheme
+	Latest bool
 }
 
 // NewResourceBuilderFlags returns a default ResourceBuilderFlags
@@ -43,14 +47,51 @@ func NewResourceBuilderFlags() *ResourceBuilderFlags {
 			Filenames: &filenames,
 			Recursive: boolPtr(true),
 		},
-
-		LabelSelector: strPtr(""),
-		AllNamespaces: boolPtr(false),
 	}
+}
+
+func (o *ResourceBuilderFlags) WithFile(recurse bool, files ...string) *ResourceBuilderFlags {
+	o.FileNameFlags = &FileNameFlags{
+		Usage:     "identifying the resource.",
+		Filenames: &files,
+		Recursive: boolPtr(recurse),
+	}
+
+	return o
+}
+
+func (o *ResourceBuilderFlags) WithLabelSelector(selector string) *ResourceBuilderFlags {
+	o.LabelSelector = &selector
+	return o
 }
 
 func (o *ResourceBuilderFlags) WithFieldSelector(selector string) *ResourceBuilderFlags {
 	o.FieldSelector = &selector
+	return o
+}
+
+func (o *ResourceBuilderFlags) WithAllNamespaces(defaultVal bool) *ResourceBuilderFlags {
+	o.AllNamespaces = &defaultVal
+	return o
+}
+
+func (o *ResourceBuilderFlags) WithAll(defaultVal bool) *ResourceBuilderFlags {
+	o.All = &defaultVal
+	return o
+}
+
+func (o *ResourceBuilderFlags) WithLocal(defaultVal bool) *ResourceBuilderFlags {
+	o.Local = &defaultVal
+	return o
+}
+
+func (o *ResourceBuilderFlags) WithScheme(scheme *runtime.Scheme) *ResourceBuilderFlags {
+	o.Scheme = scheme
+	return o
+}
+
+func (o *ResourceBuilderFlags) WithLatest() *ResourceBuilderFlags {
+	o.Latest = true
 	return o
 }
 
@@ -67,6 +108,12 @@ func (o *ResourceBuilderFlags) AddFlags(flagset *pflag.FlagSet) {
 	if o.AllNamespaces != nil {
 		flagset.BoolVar(o.AllNamespaces, "all-namespaces", *o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	}
+	if o.All != nil {
+		flagset.BoolVar(o.All, "all", *o.All, "Select all resources in the namespace of the specified resource types")
+	}
+	if o.Local != nil {
+		flagset.BoolVar(o.Local, "local", *o.Local, "If true, annotation will NOT contact api-server but run locally.")
+	}
 }
 
 // ToBuilder gives you back a resource finder to visit resources that are located
@@ -74,24 +121,45 @@ func (o *ResourceBuilderFlags) ToBuilder(restClientGetter RESTClientGetter, reso
 	namespace, enforceNamespace, namespaceErr := restClientGetter.ToRawKubeConfigLoader().Namespace()
 
 	builder := resource.NewBuilder(restClientGetter).
-		Unstructured().
-		NamespaceParam(namespace).DefaultNamespace().
-		ResourceTypeOrNameArgs(o.All, resources...)
+		NamespaceParam(namespace).DefaultNamespace()
+
+	if o.Scheme != nil {
+		builder.WithScheme(o.Scheme, o.Scheme.PrioritizedVersionsAllGroups()...)
+	} else {
+		builder.Unstructured()
+	}
+
 	if o.FileNameFlags != nil {
 		opts := o.FileNameFlags.ToOptions()
-		builder = builder.FilenameParam(enforceNamespace, &opts)
+		builder.FilenameParam(enforceNamespace, &opts)
 	}
-	if o.LabelSelector != nil {
-		builder = builder.LabelSelectorParam(*o.LabelSelector)
-	}
-	if o.FieldSelector != nil {
-		builder = builder.FieldSelectorParam(*o.FieldSelector)
+
+	if o.Local == nil || !*o.Local {
+		// resource type/name tuples only work non-local
+		if o.All != nil {
+			builder.ResourceTypeOrNameArgs(*o.All, resources...)
+		} else {
+			builder.ResourceTypeOrNameArgs(false, resources...)
+		}
+		// label selectors only work non-local (for now)
+		if o.LabelSelector != nil {
+			builder.LabelSelectorParam(*o.LabelSelector)
+		}
+		// field selectors only work non-local (forever)
+		if o.FieldSelector != nil {
+			builder.FieldSelectorParam(*o.FieldSelector)
+		}
+		// latest only works non-local (forever)
+		if o.Latest {
+			builder.Latest()
+		}
+	} else {
+		builder.Local()
 	}
 
 	return &ResourceFindBuilderWrapper{
 		builder: builder.
-			Latest().
-			Flatten().
+			Flatten(). // I think we're going to recommend this everywhere
 			AddError(namespaceErr),
 	}
 }
