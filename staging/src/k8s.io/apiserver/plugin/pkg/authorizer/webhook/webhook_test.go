@@ -32,7 +32,7 @@ import (
 	"text/template"
 	"time"
 
-	"k8s.io/api/authorization/v1beta1"
+	authorization "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -202,7 +202,7 @@ current-context: default
 
 // Service mocks a remote service.
 type Service interface {
-	Review(*v1beta1.SubjectAccessReview)
+	Review(*authorization.SubjectAccessReview)
 	HTTPStatusCode() int
 }
 
@@ -238,7 +238,7 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 			return
 		}
 
-		var review v1beta1.SubjectAccessReview
+		var review authorization.SubjectAccessReview
 		bodyData, _ := ioutil.ReadAll(r.Body)
 		if err := json.Unmarshal(bodyData, &review); err != nil {
 			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
@@ -246,7 +246,7 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 		}
 
 		// ensure we received the serialized review as expected
-		if review.APIVersion != "authorization.k8s.io/v1beta1" {
+		if review.APIVersion != "authorization.k8s.io/authorization" {
 			http.Error(w, fmt.Sprintf("wrong api version: %s", string(bodyData)), http.StatusBadRequest)
 			return
 		}
@@ -265,7 +265,7 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 			APIVersion string `json:"apiVersion"`
 			Status     status `json:"status"`
 		}{
-			APIVersion: v1beta1.SchemeGroupVersion.String(),
+			APIVersion: authorization.SchemeGroupVersion.String(),
 			Status:     status{review.Status.Allowed, review.Status.Reason, review.Status.EvaluationError},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -291,7 +291,7 @@ type mockService struct {
 	called     int
 }
 
-func (m *mockService) Review(r *v1beta1.SubjectAccessReview) {
+func (m *mockService) Review(r *authorization.SubjectAccessReview) {
 	m.called++
 	r.Status.Allowed = m.allow
 }
@@ -427,17 +427,17 @@ func TestTLSConfig(t *testing.T) {
 
 // recorderService records all access review requests.
 type recorderService struct {
-	last v1beta1.SubjectAccessReview
+	last authorization.SubjectAccessReview
 	err  error
 }
 
-func (rec *recorderService) Review(r *v1beta1.SubjectAccessReview) {
-	rec.last = v1beta1.SubjectAccessReview{}
+func (rec *recorderService) Review(r *authorization.SubjectAccessReview) {
+	rec.last = authorization.SubjectAccessReview{}
 	rec.last = *r
 	r.Status.Allowed = true
 }
 
-func (rec *recorderService) Last() (v1beta1.SubjectAccessReview, error) {
+func (rec *recorderService) Last() (authorization.SubjectAccessReview, error) {
 	return rec.last, rec.err
 }
 
@@ -457,30 +457,30 @@ func TestWebhook(t *testing.T) {
 	}
 
 	expTypeMeta := metav1.TypeMeta{
-		APIVersion: "authorization.k8s.io/v1beta1",
+		APIVersion: "authorization.k8s.io/authorization",
 		Kind:       "SubjectAccessReview",
 	}
 
 	tests := []struct {
 		attr authorizer.Attributes
-		want v1beta1.SubjectAccessReview
+		want authorization.SubjectAccessReview
 	}{
 		{
 			attr: authorizer.AttributesRecord{User: &user.DefaultInfo{}},
-			want: v1beta1.SubjectAccessReview{
+			want: authorization.SubjectAccessReview{
 				TypeMeta: expTypeMeta,
-				Spec: v1beta1.SubjectAccessReviewSpec{
-					NonResourceAttributes: &v1beta1.NonResourceAttributes{},
+				Spec: authorization.SubjectAccessReviewSpec{
+					NonResourceAttributes: &authorization.NonResourceAttributes{},
 				},
 			},
 		},
 		{
 			attr: authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "jane"}},
-			want: v1beta1.SubjectAccessReview{
+			want: authorization.SubjectAccessReview{
 				TypeMeta: expTypeMeta,
-				Spec: v1beta1.SubjectAccessReviewSpec{
+				Spec: authorization.SubjectAccessReviewSpec{
 					User: "jane",
-					NonResourceAttributes: &v1beta1.NonResourceAttributes{},
+					NonResourceAttributes: &authorization.NonResourceAttributes{},
 				},
 			},
 		},
@@ -501,13 +501,13 @@ func TestWebhook(t *testing.T) {
 				ResourceRequest: true,
 				Path:            "/foo",
 			},
-			want: v1beta1.SubjectAccessReview{
+			want: authorization.SubjectAccessReview{
 				TypeMeta: expTypeMeta,
-				Spec: v1beta1.SubjectAccessReviewSpec{
+				Spec: authorization.SubjectAccessReviewSpec{
 					User:   "jane",
 					UID:    "1",
 					Groups: []string{"group1", "group2"},
-					ResourceAttributes: &v1beta1.ResourceAttributes{
+					ResourceAttributes: &authorization.ResourceAttributes{
 						Verb:        "GET",
 						Namespace:   "kittensandponies",
 						Group:       "group3",

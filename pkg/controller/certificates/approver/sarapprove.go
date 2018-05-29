@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"strings"
 
-	authorization "k8s.io/api/authorization/v1beta1"
+	authorization "k8s.io/api/authorization/v1"
 	capi "k8s.io/api/certificates/v1beta1"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -127,7 +127,7 @@ func (a *sarApprover) authorize(csr *capi.CertificateSigningRequest, rattrs auth
 			ResourceAttributes: &rattrs,
 		},
 	}
-	sar, err := a.client.AuthorizationV1beta1().SubjectAccessReviews().Create(sar)
+	sar, err := a.client.AuthorizationV1().SubjectAccessReviews().Create(sar)
 	if err != nil {
 		return false, err
 	}
