@@ -348,7 +348,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		"failSafeSysctlKernelPod with failNoSafeSysctlAllowedPSP": {
 			pod:           failSafeSysctlKernelPod,
 			psp:           failNoSafeSysctlAllowedPSP,
-			expectedError: "sysctls are not allowed",
+			expectedError: "sysctl \"kernel.shm_rmid_forced\" is not allowed",
 		},
 		"failSafeSysctlKernelPod with failSysctlDisallowedPSP": {
 			pod:           failSafeSysctlKernelPod,

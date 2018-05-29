@@ -35,7 +35,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
@@ -1739,20 +1738,13 @@ func TestAdmitSysctls(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		origSafeSysctls := helper.FilterSafeSysctls(v.pod.Spec.SecurityContext.Sysctls)
-		origUnsafeSysctls := helper.FilterUnsafeSysctls(v.pod.Spec.SecurityContext.Sysctls)
+		origSysctl := v.pod.Spec.SecurityContext.Sysctls
 
 		testPSPAdmit(k, v.psps, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.expectedPSP, t)
 
 		if v.shouldPassAdmit {
-			safeSysctls := helper.FilterSafeSysctls(v.pod.Spec.SecurityContext.Sysctls)
-			unsafeSysctls := helper.FilterUnsafeSysctls(v.pod.Spec.SecurityContext.Sysctls)
-
-			if !reflect.DeepEqual(safeSysctls, origSafeSysctls) {
-				t.Errorf("%s: wrong safe sysctls: expected=%v, got=%v", k, origSafeSysctls, safeSysctls)
-			}
-			if !reflect.DeepEqual(unsafeSysctls, origUnsafeSysctls) {
-				t.Errorf("%s: wrong unsafe sysctls: expected=%v, got=%v", k, origSafeSysctls, safeSysctls)
+			if !reflect.DeepEqual(v.pod.Spec.SecurityContext.Sysctls, origSysctl) {
+				t.Errorf("%s: wrong sysctls: expected=%v, got=%v", k, origSysctl, v.pod.Spec.SecurityContext.Sysctls)
 			}
 		}
 	}

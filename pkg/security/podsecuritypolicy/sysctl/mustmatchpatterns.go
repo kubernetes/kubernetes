@@ -103,7 +103,7 @@ func (s *mustMatchPatterns) Validate(pod *api.Pod) field.ErrorList {
 			if len(s.forbiddenSysctls) > 0 {
 				for _, sysctl := range safeSysctls {
 					// TODO(jchaloup): find the correct index i of the sysctl
-					allErrs = append(allErrs, s.ValidateForbiddenSysctl(sysctl.name, fieldPath.Child("forbiddenSysctls").Index(sysctl.index))...)
+					allErrs = append(allErrs, s.ValidateForbiddenSysctl(sysctl.name, fieldPath.Child("sysctls").Index(sysctl.index))...)
 				}
 			}
 		}
@@ -113,7 +113,11 @@ func (s *mustMatchPatterns) Validate(pod *api.Pod) field.ErrorList {
 			if len(s.allowedUnsafeSysctls) > 0 {
 				for _, sysctl := range unsafeSysctls {
 					// TODO(jchaloup): find the correct index i of the sysctl
-					allErrs = append(allErrs, s.ValidateSysctl(sysctl.name, fieldPath.Child("allowedUnsafeSysctls").Index(sysctl.index))...)
+					allErrs = append(allErrs, s.ValidateSysctl(sysctl.name, fieldPath.Child("sysctls").Index(sysctl.index))...)
+				}
+			} else {
+				for _, sysctl := range unsafeSysctls {
+					allErrs = append(allErrs, field.ErrorList{field.Forbidden(fieldPath.Child("sysctls").Index(sysctl.index), fmt.Sprintf("unsafe sysctl %q is not allowed", sysctl.name))}...)
 				}
 			}
 		}

@@ -16,7 +16,11 @@ limitations under the License.
 
 package sysctl
 
-import "testing"
+import (
+	"testing"
+
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
+)
 
 func TestNewWhitelist(t *testing.T) {
 	type Test struct {
@@ -31,7 +35,7 @@ func TestNewWhitelist(t *testing.T) {
 		{sysctls: []string{"net.*.foo"}, err: true},
 		{sysctls: []string{"foo"}, err: true},
 	} {
-		_, err := NewWhitelist(append(SafeSysctlWhitelist(), test.sysctls...))
+		_, err := NewWhitelist(append(sysctl.SafeSysctlWhitelist(), test.sysctls...))
 		if test.err && err == nil {
 			t.Errorf("expected an error creating a whitelist for %v", test.sysctls)
 		} else if !test.err && err != nil {
@@ -61,7 +65,7 @@ func TestWhitelist(t *testing.T) {
 		{sysctl: "kernel.sem", hostIPC: true},
 	}
 
-	w, err := NewWhitelist(append(SafeSysctlWhitelist(), "kernel.msg*", "kernel.sem"))
+	w, err := NewWhitelist(append(sysctl.SafeSysctlWhitelist(), "kernel.msg*", "kernel.sem"))
 	if err != nil {
 		t.Fatalf("failed to create whitelist: %v", err)
 	}

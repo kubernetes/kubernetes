@@ -161,19 +161,12 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 				},
 				// Unsafe parameters
 				{
-					Name:   "kernel.shmall",
-					Value:  "100000000",
-					Unsafe: true,
+					Name:  "kernel.shmall",
+					Value: "100000000",
 				},
 				{
-					Name:   "bar..",
-					Value:  "42",
-					Unsafe: true,
-				},
-				{
-					Name:   "safe-and-unsafe",
-					Value:  "100000000",
-					Unsafe: true,
+					Name:  "bar..",
+					Value: "42",
 				},
 			},
 		}
