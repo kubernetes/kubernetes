@@ -40,52 +40,52 @@ func TestMarkMaster(t *testing.T) {
 	// will need to change if strategicpatch's behavior changes in the
 	// future.
 	tests := []struct {
-		name          string
-		existingLabel string
-		existingTaint *v1.Taint
-		wantTaint     bool
-		expectedPatch string
+		name           string
+		existingLabel  string
+		existingTaints []v1.Taint
+		newTaints      []v1.Taint
+		expectedPatch  string
 	}{
 		{
 			"master label and taint missing",
 			"",
 			nil,
-			true,
+			[]v1.Taint{kubeadmconstants.MasterTaint},
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}},\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
 			"master label and taint missing but taint not wanted",
 			"",
 			nil,
-			false,
+			nil,
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
 		},
 		{
 			"master label missing",
 			"",
-			&kubeadmconstants.MasterTaint,
-			true,
+			[]v1.Taint{kubeadmconstants.MasterTaint},
+			[]v1.Taint{kubeadmconstants.MasterTaint},
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
 		},
 		{
 			"master taint missing",
 			kubeadmconstants.LabelNodeRoleMaster,
 			nil,
-			true,
+			[]v1.Taint{kubeadmconstants.MasterTaint},
 			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
 			"nothing missing",
 			kubeadmconstants.LabelNodeRoleMaster,
-			&kubeadmconstants.MasterTaint,
-			true,
+			[]v1.Taint{kubeadmconstants.MasterTaint},
+			[]v1.Taint{kubeadmconstants.MasterTaint},
 			"{}",
 		},
 		{
 			"nothing missing but taint unwanted",
 			kubeadmconstants.LabelNodeRoleMaster,
-			&kubeadmconstants.MasterTaint,
-			false,
+			[]v1.Taint{kubeadmconstants.MasterTaint},
+			nil,
 			"{\"spec\":{\"taints\":null}}",
 		},
 	}
@@ -105,8 +105,8 @@ func TestMarkMaster(t *testing.T) {
 			masterNode.ObjectMeta.Labels[tc.existingLabel] = ""
 		}
 
-		if tc.existingTaint != nil {
-			masterNode.Spec.Taints = append(masterNode.Spec.Taints, *tc.existingTaint)
+		if tc.existingTaints != nil {
+			masterNode.Spec.Taints = tc.existingTaints
 		}
 
 		jsonNode, err := json.Marshal(masterNode)
@@ -144,8 +144,7 @@ func TestMarkMaster(t *testing.T) {
 			t.Fatalf("MarkMaster(%s): unexpected error building clientset: %v", tc.name, err)
 		}
 
-		err = MarkMaster(cs, hostname, tc.wantTaint)
-		if err != nil {
+		if err := MarkMaster(cs, hostname, tc.newTaints); err != nil {
 			t.Errorf("MarkMaster(%s) returned unexpected error: %v", tc.name, err)
 		}
 

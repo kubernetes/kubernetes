@@ -838,7 +838,7 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 				KubernetesVersion: "v1.7.0",
 				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-				NodeName:          "valid-hostname",
+				NodeRegistration:  kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			},
 			caKeyPresent: false,
 			expectedArgFunc: func(tmpdir string) []string {
@@ -862,7 +862,7 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 				KubernetesVersion: "v1.7.0",
 				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-				NodeName:          "valid-hostname",
+				NodeRegistration:  kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			},
 			caKeyPresent: true,
 			expectedArgFunc: func(tmpdir string) []string {
