@@ -40,6 +40,10 @@ type azureDiskDeleter struct {
 var _ volume.Provisioner = &azureDiskProvisioner{}
 var _ volume.Deleter = &azureDiskDeleter{}
 
+// PVCAnnotationResourceGroup is the annotation used on the PVC
+// to specify the resource group of azure managed disk that are not in the same resource group as the cluster.
+const PVCAnnotationResourceGroup = "volume.beta.kubernetes.io/resource-group"
+
 func (d *azureDiskDeleter) GetPath() string {
 	return getPath(d.podUID, d.dataDisk.diskName, d.plugin.host)
 }
@@ -143,7 +147,15 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	// create disk
 	diskURI := ""
 	if kind == v1.AzureManagedDisk {
-		diskURI, err = diskController.CreateManagedDisk(name, skuName, requestGB, *(p.options.CloudTags))
+		resourceGroup := ""
+		if rg, found := p.options.PVC.Annotations[PVCAnnotationResourceGroup]; found {
+			resourceGroup = rg
+		}
+		tags := make(map[string]string)
+		if p.options.CloudTags != nil {
+			tags = *(p.options.CloudTags)
+		}
+		diskURI, err = diskController.CreateManagedDisk(name, skuName, resourceGroup, requestGB, tags)
 		if err != nil {
 			return nil, err
 		}
