@@ -63,7 +63,7 @@ go_library(
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
