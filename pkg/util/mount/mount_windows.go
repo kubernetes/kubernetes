@@ -114,16 +114,6 @@ func (mounter *Mounter) Unmount(target string) error {
 	return nil
 }
 
-// GetMountRefs finds all other references to the device(drive) referenced
-// by mountPath; returns a list of paths.
-func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	refs, err := getAllParentLinks(normalizeWindowsPath(mountPath))
-	if err != nil {
-		return nil, err
-	}
-	return refs, nil
-}
-
 // List returns a list of all mounted filesystems. todo
 func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
@@ -170,7 +160,7 @@ func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (str
 // the mount path reference should match the given plugin directory. In case no mount path reference
 // matches, returns the volume name taken from its given mountPath
 func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
-	refs, err := GetMountRefs(mounter, mountPath)
+	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		glog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
 		return "", err
@@ -458,11 +448,11 @@ func getAllParentLinks(path string) ([]string, error) {
 }
 
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	realpath, err := filepath.EvalSymlinks(pathname)
+	refs, err := getAllParentLinks(normalizeWindowsPath(pathname))
 	if err != nil {
 		return nil, err
 	}
-	return getMountRefsByDev(mounter, realpath)
+	return refs, nil
 }
 
 // Note that on windows, it always returns 0. We actually don't set FSGroup on

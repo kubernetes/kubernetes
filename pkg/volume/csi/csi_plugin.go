@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/labelmanager"
 )
@@ -309,7 +308,7 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 
 func (p *csiPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	m := p.host.GetMounter(p.GetPluginName())
-	return mount.GetMountRefs(m, deviceMountPath)
+	return m.GetMountRefs(deviceMountPath)
 }
 
 // BlockVolumePlugin methods

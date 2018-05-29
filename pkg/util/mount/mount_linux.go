@@ -155,41 +155,6 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 	return err
 }
 
-// GetMountRefs finds all other references to the device referenced
-// by mountPath; returns a list of paths.
-func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	mps, err := mounter.List()
-	if err != nil {
-		return nil, err
-	}
-	// Find the device name.
-	deviceName := ""
-	// If mountPath is symlink, need get its target path.
-	slTarget, err := filepath.EvalSymlinks(mountPath)
-	if err != nil {
-		slTarget = mountPath
-	}
-	for i := range mps {
-		if mps[i].Path == slTarget {
-			deviceName = mps[i].Device
-			break
-		}
-	}
-
-	// Find all references to the device.
-	var refs []string
-	if deviceName == "" {
-		glog.Warningf("could not determine device for path: %q", mountPath)
-	} else {
-		for i := range mps {
-			if mps[i].Device == deviceName && mps[i].Path != slTarget {
-				refs = append(refs, mps[i].Path)
-			}
-		}
-	}
-	return refs, nil
-}
-
 // detectSystemd returns true if OS runs with systemd as init. When not sure
 // (permission errors, ...), it returns false.
 // There may be different ways how to detect systemd, this one makes sure that
@@ -352,7 +317,7 @@ func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (str
 // the mount path reference should match the given plugin directory. In case no mount path reference
 // matches, returns the volume name taken from its given mountPath
 func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
-	refs, err := GetMountRefs(mounter, mountPath)
+	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		glog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
 		return "", err

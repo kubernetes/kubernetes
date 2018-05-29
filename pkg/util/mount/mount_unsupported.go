@@ -46,12 +46,6 @@ func (mounter *Mounter) Unmount(target string) error {
 	return unsupportedErr
 }
 
-// GetMountRefs finds all other references to the device referenced
-// by mountPath; returns a list of paths.
-func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	return []string{}, unsupportedErr
-}
-
 func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, unsupportedErr
 }
