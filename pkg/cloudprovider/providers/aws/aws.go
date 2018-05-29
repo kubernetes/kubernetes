@@ -1363,6 +1363,10 @@ func (c *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string
 	}
 	inst, err := c.getInstanceByNodeName(nodeName)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// The Instances interface requires that we return InstanceNotFound (without wrapping)
+			return "", err
+		}
 		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %q", nodeName, err)
 	}
 	return "/" + aws.StringValue(inst.Placement.AvailabilityZone) + "/" + aws.StringValue(inst.InstanceId), nil
