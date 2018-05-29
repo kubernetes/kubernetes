@@ -55,6 +55,9 @@ func newService(namespace, name string) *v1.Service {
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{
+				{Port: 443},
+			},
 		},
 	}
 }
@@ -108,6 +111,27 @@ func TestSync(t *testing.T) {
 				Status:  apiregistration.ConditionFalse,
 				Reason:  "ServiceNotFound",
 				Message: `service/bar in "foo" is not present`,
+			},
+		},
+		{
+			name:           "service on bad port",
+			apiServiceName: "remote.group",
+			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services: []*v1.Service{{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeClusterIP,
+					Ports: []v1.ServicePort{
+						{Port: 6443},
+					},
+				},
+			}},
+			endpoints: []*v1.Endpoints{newEndpointsWithAddress("foo", "bar")},
+			expectedAvailability: apiregistration.APIServiceCondition{
+				Type:    apiregistration.Available,
+				Status:  apiregistration.ConditionFalse,
+				Reason:  "ServicePortError",
+				Message: `service/bar in "foo" is not listening on port 443`,
 			},
 		},
 		{
