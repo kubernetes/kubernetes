@@ -26,6 +26,7 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
@@ -215,4 +216,9 @@ func (c Client) WaitForClusterAvailable(delay time.Duration, retries int, retryI
 		return resp, nil
 	}
 	return false, fmt.Errorf("timeout waiting for etcd cluster to be available")
+}
+
+// CheckConfigurationIsHA returns true if the given MasterConfiguration etcd block appears to be an HA configuration.
+func CheckConfigurationIsHA(cfg *kubeadmapi.Etcd) bool {
+	return cfg.External != nil && len(cfg.External.Endpoints) > 1
 }

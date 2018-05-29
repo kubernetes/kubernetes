@@ -203,6 +203,19 @@ func (spm *fakeStaticPodPathManager) BackupEtcdDir() string {
 	return spm.backupEtcdDir
 }
 
+func (spm *fakeStaticPodPathManager) CleanupDirs() error {
+	if err := os.RemoveAll(spm.TempManifestDir()); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(spm.BackupManifestDir()); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(spm.BackupEtcdDir()); err != nil {
+		return err
+	}
+	return nil
+}
+
 type fakeTLSEtcdClient struct{ TLS bool }
 
 func (c fakeTLSEtcdClient) HasTLS() bool {
@@ -512,4 +525,82 @@ func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.MasterConfigu
 	}
 	kubeadmscheme.Scheme.Convert(externalcfg, internalcfg, nil)
 	return internalcfg, nil
+}
+
+func getTempDir(t *testing.T, name string) (string, func()) {
+	dir, err := ioutil.TempDir(os.TempDir(), name)
+	if err != nil {
+		t.Fatalf("couldn't make temporary directory: %v", err)
+	}
+
+	return dir, func() {
+		os.RemoveAll(dir)
+	}
+}
+
+func TestCleanupDirs(t *testing.T) {
+	tests := []struct {
+		name                   string
+		keepManifest, keepEtcd bool
+	}{
+		{
+			name:         "save manifest backup",
+			keepManifest: true,
+		},
+		{
+			name:         "save both etcd and manifest",
+			keepManifest: true,
+			keepEtcd:     true,
+		},
+		{
+			name: "save nothing",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			realManifestDir, cleanup := getTempDir(t, "realManifestDir")
+			defer cleanup()
+
+			tempManifestDir, cleanup := getTempDir(t, "tempManifestDir")
+			defer cleanup()
+
+			backupManifestDir, cleanup := getTempDir(t, "backupManifestDir")
+			defer cleanup()
+
+			backupEtcdDir, cleanup := getTempDir(t, "backupEtcdDir")
+			defer cleanup()
+
+			mgr := NewKubeStaticPodPathManager(realManifestDir, tempManifestDir, backupManifestDir, backupEtcdDir, test.keepManifest, test.keepEtcd)
+			err := mgr.CleanupDirs()
+			if err != nil {
+				t.Errorf("unexpected error cleaning up: %v", err)
+			}
+
+			if _, err := os.Stat(tempManifestDir); !os.IsNotExist(err) {
+				t.Errorf("%q should not have existed", tempManifestDir)
+			}
+			_, err = os.Stat(backupManifestDir)
+			if test.keepManifest {
+				if err != nil {
+					t.Errorf("unexpected error getting backup manifest dir")
+				}
+			} else {
+				if !os.IsNotExist(err) {
+					t.Error("expected backup manifest to not exist")
+				}
+			}
+
+			_, err = os.Stat(backupEtcdDir)
+			if test.keepEtcd {
+				if err != nil {
+					t.Errorf("unexpected error getting backup etcd dir")
+				}
+			} else {
+				if !os.IsNotExist(err) {
+					t.Error("expected backup etcd dir to not exist")
+				}
+			}
+		})
+	}
 }

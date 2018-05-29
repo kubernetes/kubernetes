@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -193,5 +194,52 @@ func TestPodManifestHasTLS(t *testing.T) {
 		if hasTLS != rt.hasTLS {
 			t.Errorf("PodManifestHasTLS failed\n%s\n\texpected hasTLS: %t\n\tgot: %t", rt.description, rt.hasTLS, hasTLS)
 		}
+	}
+}
+
+func TestCheckConfigurationIsHA(t *testing.T) {
+	var tests = []struct {
+		name     string
+		cfg      *kubeadmapi.Etcd
+		expected bool
+	}{
+		{
+			name: "HA etcd",
+			cfg: &kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
+					Endpoints: []string{"10.100.0.1:2379", "10.100.0.2:2379", "10.100.0.3:2379"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "single External etcd",
+			cfg: &kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
+					Endpoints: []string{"10.100.0.1:2379"},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "local etcd",
+			cfg: &kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{},
+			},
+			expected: false,
+		},
+		{
+			name:     "empty etcd struct",
+			cfg:      &kubeadmapi.Etcd{},
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if isHA := CheckConfigurationIsHA(test.cfg); isHA != test.expected {
+				t.Errorf("expected isHA to be %v, got %v", test.expected, isHA)
+			}
+		})
 	}
 }
