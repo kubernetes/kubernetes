@@ -138,6 +138,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/mux:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/routes:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/configz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

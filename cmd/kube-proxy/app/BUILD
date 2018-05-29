@@ -76,7 +76,6 @@ go_library(
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/proxy/ipvs:go_default_library",
         "//pkg/proxy/userspace:go_default_library",
-        "//pkg/util/configz:go_default_library",
         "//pkg/util/flag:go_default_library",
         "//pkg/util/ipset:go_default_library",
         "//pkg/util/iptables:go_default_library",
@@ -103,6 +102,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/mux:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/routes:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/configz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
@@ -226,11 +226,11 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
-        "//pkg/util/configz:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/configz:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/proxy/ipvs:go_default_library",
