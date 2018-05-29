@@ -586,7 +586,11 @@ func (f *FakeDockerClient) StartContainer(id string) error {
 		return err
 	}
 	f.appendContainerTrace("Started", id)
+	timestamp := f.Clock.Now()
 	container, ok := f.ContainerMap[id]
+	if !ok {
+		container = convertFakeContainer(&FakeContainer{ID: id, Name: id, CreatedAt: timestamp})
+	}
 	if container.HostConfig.NetworkMode.IsContainer() {
 		hostContainerID := container.HostConfig.NetworkMode.ConnectedContainer()
 		found := false
@@ -598,10 +602,6 @@ func (f *FakeDockerClient) StartContainer(id string) error {
 		if !found {
 			return fmt.Errorf("failed to start container \"%s\": Error response from daemon: cannot join network of a non running container: %s", id, hostContainerID)
 		}
-	}
-	timestamp := f.Clock.Now()
-	if !ok {
-		container = convertFakeContainer(&FakeContainer{ID: id, Name: id, CreatedAt: timestamp})
 	}
 	container.State.Running = true
 	container.State.Pid = os.Getpid()
