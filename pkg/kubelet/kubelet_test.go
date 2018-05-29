@@ -31,7 +31,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -406,10 +405,6 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	fakeRuntime.AssertKilledPods([]string{"12345678"})
 }
 
-type testNodeLister struct {
-	nodes []*v1.Node
-}
-
 type testNodeInfo struct {
 	nodes []*v1.Node
 }
@@ -421,10 +416,6 @@ func (ls testNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 		}
 	}
 	return nil, fmt.Errorf("Node with name: %s does not exist", id)
-}
-
-func (ls testNodeLister) List(selector labels.Selector) ([]*v1.Node, error) {
-	return ls.nodes, nil
 }
 
 func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
