@@ -63,6 +63,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kubernetes/pkg/util/configz"
 
 	// install apis
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
@@ -587,6 +588,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
+	configz.InstallHandler(s.Handler.NonGoRestfulMux)
 }
 
 func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {

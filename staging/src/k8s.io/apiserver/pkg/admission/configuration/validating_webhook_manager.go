@@ -21,6 +21,8 @@ import (
 	"sort"
 	"sync/atomic"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/util/configz"
 )
 
 // validatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
@@ -35,6 +38,7 @@ type validatingWebhookConfigurationManager struct {
 	configuration *atomic.Value
 	lister        admissionregistrationlisters.ValidatingWebhookConfigurationLister
 	hasSynced     func() bool
+	configz       *configz.Config
 }
 
 var _ generic.Source = &validatingWebhookConfigurationManager{}
@@ -57,6 +61,13 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory)
 		DeleteFunc: func(_ interface{}) { manager.updateConfiguration() },
 	})
 
+	// setup /configz endpoint
+	if cz, err := configz.New("validatingwebhookconfigurations"); err == nil {
+		manager.configz = cz
+	} else {
+		glog.Errorf("unable to register configz: %c", err)
+	}
+
 	return manager
 }
 
@@ -77,6 +88,9 @@ func (v *validatingWebhookConfigurationManager) updateConfiguration() {
 		return
 	}
 	v.configuration.Store(mergeValidatingWebhookConfigurations(configurations))
+	if v.configz != nil {
+		v.configz.Set(configurations)
+	}
 }
 
 func mergeValidatingWebhookConfigurations(

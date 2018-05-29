@@ -98,6 +98,7 @@ func TestNewWithDelegate(t *testing.T) {
   "paths": [
     "/apis",
     "/bar",
+    "/configz",
     "/foo",
     "/healthz",
     "/healthz/delegate-health",

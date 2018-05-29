@@ -21,6 +21,8 @@ import (
 	"sort"
 	"sync/atomic"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/util/configz"
 )
 
 // mutatingWebhookConfigurationManager collects the mutating webhook objects so that they can be called.
@@ -35,6 +38,7 @@ type mutatingWebhookConfigurationManager struct {
 	configuration *atomic.Value
 	lister        admissionregistrationlisters.MutatingWebhookConfigurationLister
 	hasSynced     func() bool
+	configz       *configz.Config
 }
 
 var _ generic.Source = &mutatingWebhookConfigurationManager{}
@@ -57,6 +61,13 @@ func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) g
 		DeleteFunc: func(_ interface{}) { manager.updateConfiguration() },
 	})
 
+	// setup /configz endpoint
+	if cz, err := configz.New("mutatingwebhookconfigurations"); err == nil {
+		manager.configz = cz
+	} else {
+		glog.Errorf("unable to register configz: %c", err)
+	}
+
 	return manager
 }
 
@@ -76,6 +87,9 @@ func (m *mutatingWebhookConfigurationManager) updateConfiguration() {
 		return
 	}
 	m.configuration.Store(mergeMutatingWebhookConfigurations(configurations))
+	if m.configz != nil {
+		m.configz.Set(configurations)
+	}
 }
 
 func mergeMutatingWebhookConfigurations(configurations []*v1beta1.MutatingWebhookConfiguration) *v1beta1.MutatingWebhookConfiguration {
