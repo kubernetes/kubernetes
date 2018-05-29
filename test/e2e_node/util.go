@@ -138,7 +138,7 @@ func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
 	}
 	v, ok := cfgz.FeatureGates[string(features.DynamicKubeletConfig)]
 	if !ok {
-		return false, nil
+		return true, nil
 	}
 	return v, nil
 }
