@@ -273,9 +273,9 @@ func TestNewAPIServerCertAndKey(t *testing.T) {
 	advertiseAddresses := []string{"1.2.3.4", "1:2:3::4"}
 	for _, addr := range advertiseAddresses {
 		cfg := &kubeadmapi.MasterConfiguration{
-			API:        kubeadmapi.API{AdvertiseAddress: addr},
-			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-			NodeName:   hostname,
+			API:              kubeadmapi.API{AdvertiseAddress: addr},
+			Networking:       kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: hostname},
 		}
 		caCert, caKey, err := NewCACertAndKey()
 		if err != nil {
@@ -357,8 +357,8 @@ func TestNewEtcdPeerCertAndKey(t *testing.T) {
 	advertiseAddresses := []string{"1.2.3.4", "1:2:3::4"}
 	for _, addr := range advertiseAddresses {
 		cfg := &kubeadmapi.MasterConfiguration{
-			API:      kubeadmapi.API{AdvertiseAddress: addr},
-			NodeName: hostname,
+			API:              kubeadmapi.API{AdvertiseAddress: addr},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: hostname},
 			Etcd: kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					PeerCertSANs: []string{
@@ -481,10 +481,10 @@ func TestUsingExternalCA(t *testing.T) {
 		defer os.RemoveAll(dir)
 
 		cfg := &kubeadmapi.MasterConfiguration{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-			Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-			NodeName:        "valid-hostname",
-			CertificatesDir: dir,
+			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+			Networking:       kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
+			CertificatesDir:  dir,
 		}
 
 		for _, f := range test.setupFuncs {
@@ -564,10 +564,10 @@ func TestValidateMethods(t *testing.T) {
 		test.loc.pkiDir = dir
 
 		cfg := &kubeadmapi.MasterConfiguration{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-			Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-			NodeName:        "valid-hostname",
-			CertificatesDir: dir,
+			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+			Networking:       kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
+			CertificatesDir:  dir,
 		}
 
 		fmt.Println("Testing", test.name)
@@ -696,11 +696,11 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 
 		cfg := &kubeadmapi.MasterConfiguration{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-			Etcd:            kubeadmapi.Etcd{Local: &kubeadmapi.LocalEtcd{}},
-			Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-			NodeName:        "valid-hostname",
-			CertificatesDir: tmpdir,
+			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+			Etcd:             kubeadmapi.Etcd{Local: &kubeadmapi.LocalEtcd{}},
+			Networking:       kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
+			CertificatesDir:  tmpdir,
 		}
 
 		if test.externalEtcd {
