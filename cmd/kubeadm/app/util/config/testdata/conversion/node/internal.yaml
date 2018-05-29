@@ -1,5 +1,4 @@
 CACertPath: /etc/kubernetes/pki/ca.crt
-CRISocket: /var/run/dockershim.sock
 ClusterName: kubernetes
 DiscoveryFile: ""
 DiscoveryTimeout: 5m0s
@@ -9,6 +8,10 @@ DiscoveryTokenAPIServers:
 DiscoveryTokenCACertHashes: null
 DiscoveryTokenUnsafeSkipCAVerification: true
 FeatureGates: null
-NodeName: master-1
+NodeRegistration:
+  CRISocket: /var/run/dockershim.sock
+  ExtraArgs: null
+  Name: master-1
+  Taints: null
 TLSBootstrapToken: abcdef.0123456789abcdef
 Token: abcdef.0123456789abcdef

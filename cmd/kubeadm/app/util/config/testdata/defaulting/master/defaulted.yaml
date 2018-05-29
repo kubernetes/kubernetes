@@ -9,7 +9,6 @@ auditPolicy:
   path: ""
 certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
-criSocket: /var/run/criruntime.sock
 etcd:
   local:
     dataDir: /var/lib/etcd
@@ -127,7 +126,12 @@ networking:
   dnsDomain: cluster.global
   podSubnet: ""
   serviceSubnet: 10.196.0.0/12
-nodeName: master-1
+nodeRegistration:
+  criSocket: /var/run/criruntime.sock
+  name: master-1
+  taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
 token: s73ybu.6tw6wnqgp5z0wb77
 tokenGroups:
 - system:bootstrappers:kubeadm:default-node-token

@@ -43,8 +43,10 @@ func SetObjectDefaults_MasterConfiguration(in *MasterConfiguration) {
 	if in.KubeletConfiguration.BaseConfig != nil {
 		v1beta1.SetDefaults_KubeletConfiguration(in.KubeletConfiguration.BaseConfig)
 	}
+	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
 }
 
 func SetObjectDefaults_NodeConfiguration(in *NodeConfiguration) {
 	SetDefaults_NodeConfiguration(in)
+	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
 }
