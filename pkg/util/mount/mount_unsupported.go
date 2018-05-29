@@ -121,3 +121,7 @@ func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return nil
 }
+
+func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, errors.New("not implemented")
+}

@@ -438,6 +438,11 @@ func getAllParentLinks(path string) ([]string, error) {
 	return links, nil
 }
 
+func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+	// Windows does not support SELinux.
+	return false, nil
+}
+
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return doSafeMakeDir(pathname, base, perm)

@@ -98,3 +98,7 @@ func (*NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, 
 func (*NsenterMounter) CleanSubPaths(podDir string, volumeName string) error {
 	return nil
 }
+
+func (*NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, errors.New("not implemented")
+}
