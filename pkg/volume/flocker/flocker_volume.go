@@ -67,6 +67,10 @@ func (c *flockerVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("Provisioning failed: Specified unsupported selector")
 	}
 
+	if util.CheckPersistentVolumeClaimModeBlock(c.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", c.plugin.GetPluginName())
+	}
+
 	datasetUUID, sizeGB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
 		return nil, err

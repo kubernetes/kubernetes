@@ -28,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -505,6 +507,10 @@ func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, err
 		for k, v := range labels {
 			pv.Labels[k] = v
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		pv.Spec.VolumeMode = c.options.PVC.Spec.VolumeMode
 	}
 
 	return pv, nil

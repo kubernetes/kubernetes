@@ -266,6 +266,10 @@ type hostPathProvisioner struct {
 // Create for hostPath simply creates a local /tmp/hostpath_pv/%s directory as a new PersistentVolume.
 // This Provisioner is meant for development and testing only and WILL NOT WORK in a multi-node cluster.
 func (r *hostPathProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if util.CheckPersistentVolumeClaimModeBlock(r.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", r.plugin.GetPluginName())
+	}
+
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 
 	capacity := r.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]

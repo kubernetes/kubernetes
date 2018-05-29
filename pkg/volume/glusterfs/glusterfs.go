@@ -673,6 +673,11 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		glog.V(4).Infof("not able to parse your claim Selector")
 		return nil, fmt.Errorf("not able to parse your claim Selector")
 	}
+
+	if volutil.CheckPersistentVolumeClaimModeBlock(p.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", p.plugin.GetPluginName())
+	}
+
 	glog.V(4).Infof("Provision VolumeOptions %v", p.options)
 	scName := v1helper.GetPersistentVolumeClaimClass(p.options.PVC)
 	cfg, err := parseClassParameters(p.options.Parameters, p.plugin.host.GetKubeClient())
