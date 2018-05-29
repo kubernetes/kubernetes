@@ -27,14 +27,16 @@ import (
 type ResourceBuilderFlags struct {
 	FileNameFlags *FileNameFlags
 
-	LabelSelector *string
-	FieldSelector *string
-	AllNamespaces *bool
-	All           *bool
-	Local         *bool
+	LabelSelector        *string
+	FieldSelector        *string
+	AllNamespaces        *bool
+	All                  *bool
+	Local                *bool
+	IncludeUninitialized *bool
 
-	Scheme *runtime.Scheme
-	Latest bool
+	Scheme           *runtime.Scheme
+	Latest           bool
+	StopOnFirstError bool
 }
 
 // NewResourceBuilderFlags returns a default ResourceBuilderFlags
@@ -85,6 +87,12 @@ func (o *ResourceBuilderFlags) WithLocal(defaultVal bool) *ResourceBuilderFlags 
 	return o
 }
 
+// WithUninitialized is using an alpha feature and may be dropped
+func (o *ResourceBuilderFlags) WithUninitialized(defaultVal bool) *ResourceBuilderFlags {
+	o.IncludeUninitialized = &defaultVal
+	return o
+}
+
 func (o *ResourceBuilderFlags) WithScheme(scheme *runtime.Scheme) *ResourceBuilderFlags {
 	o.Scheme = scheme
 	return o
@@ -92,6 +100,11 @@ func (o *ResourceBuilderFlags) WithScheme(scheme *runtime.Scheme) *ResourceBuild
 
 func (o *ResourceBuilderFlags) WithLatest() *ResourceBuilderFlags {
 	o.Latest = true
+	return o
+}
+
+func (o *ResourceBuilderFlags) StopOnError() *ResourceBuilderFlags {
+	o.StopOnFirstError = true
 	return o
 }
 
@@ -113,6 +126,9 @@ func (o *ResourceBuilderFlags) AddFlags(flagset *pflag.FlagSet) {
 	}
 	if o.Local != nil {
 		flagset.BoolVar(o.Local, "local", *o.Local, "If true, annotation will NOT contact api-server but run locally.")
+	}
+	if o.IncludeUninitialized != nil {
+		flagset.BoolVar(o.IncludeUninitialized, "include-uninitialized", *o.IncludeUninitialized, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
 	}
 }
 
@@ -153,8 +169,21 @@ func (o *ResourceBuilderFlags) ToBuilder(restClientGetter RESTClientGetter, reso
 		if o.Latest {
 			builder.Latest()
 		}
+
 	} else {
 		builder.Local()
+
+		if len(resources) > 0 {
+			builder.AddError(resource.LocalResourceError)
+		}
+	}
+
+	if o.IncludeUninitialized != nil {
+		builder.IncludeUninitialized(*o.IncludeUninitialized)
+	}
+
+	if !o.StopOnFirstError {
+		builder.ContinueOnError()
 	}
 
 	return &ResourceFindBuilderWrapper{
