@@ -80,6 +80,8 @@ apiregistration.k8s.io,v1,apiservices,false,list
 apiregistration.k8s.io,v1,apiservices,false,patch
 apiregistration.k8s.io,v1,apiservices,false,update
 apiregistration.k8s.io,v1,apiservices,false,watch
+apiregistration.k8s.io,v1,apiservices/status,false,get
+apiregistration.k8s.io,v1,apiservices/status,false,patch
 apiregistration.k8s.io,v1,apiservices/status,false,update
 apiregistration.k8s.io,v1beta1,apiservices,false,create
 apiregistration.k8s.io,v1beta1,apiservices,false,delete
@@ -89,6 +91,8 @@ apiregistration.k8s.io,v1beta1,apiservices,false,list
 apiregistration.k8s.io,v1beta1,apiservices,false,patch
 apiregistration.k8s.io,v1beta1,apiservices,false,update
 apiregistration.k8s.io,v1beta1,apiservices,false,watch
+apiregistration.k8s.io,v1beta1,apiservices/status,false,get
+apiregistration.k8s.io,v1beta1,apiservices/status,false,patch
 apiregistration.k8s.io,v1beta1,apiservices/status,false,update
 apps,v1,controllerrevisions,true,create
 apps,v1,controllerrevisions,true,delete
@@ -145,6 +149,8 @@ certificates.k8s.io,v1beta1,certificatesigningrequests,false,patch
 certificates.k8s.io,v1beta1,certificatesigningrequests,false,update
 certificates.k8s.io,v1beta1,certificatesigningrequests,false,watch
 certificates.k8s.io,v1beta1,certificatesigningrequests/approval,false,update
+certificates.k8s.io,v1beta1,certificatesigningrequests/status,false,get
+certificates.k8s.io,v1beta1,certificatesigningrequests/status,false,patch
 certificates.k8s.io,v1beta1,certificatesigningrequests/status,false,update
 events.k8s.io,v1beta1,events,true,create
 events.k8s.io,v1beta1,events,true,delete
