@@ -14,6 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/*
+Data-driven E2E test that verifies a Kubernetes cluster exposes all the expected
+endpoints.
+
+This test takes a list of operations from API resource list
+  (test/e2e/testing-manifests/apiresource/resources.csv),
+and objects YAML to create/update/delete from
+  (test/e2e/testing-manifests/apiresource/yamlfiles/),
+and tries each operations in the order of
+  list, create, get, update, watch, patch, delete, deletecollection
+This test skips the verbs that doesn't appear in the API resource list.
+
+This test doesn't verify the correct behavior of API resources, but expects
+no error when operating the verbs. This test uses dynamic client for simplicity.
+
+Ref test/e2e/testing-manifests/apiresource/README.md for more information.
+*/
+
 package apimachinery
 
 import (
@@ -44,10 +62,12 @@ import (
 )
 
 const (
+	// Max number of reties used in attempt to GET & UPDATE API resource object
 	retryMax = 10
 )
 
 var (
+	// Empty patch used to test patch endpoints
 	patch, _ = json.Marshal(jsonpatch.Patch{})
 )
 
@@ -59,6 +79,8 @@ type resourceMeta struct {
 	name    string
 }
 
+// resource describes a API resource with verbs and subresources information, constructed
+// from the API resource list csv file
 type resource struct {
 	group        string
 	version      string
@@ -84,6 +106,9 @@ var _ = SIGDescribe("Coverage", func() {
 	}
 })
 
+// testResource tries operations in the order of
+//   list, create, get, update, watch, patch, delete, deletecollection
+// and skips verbs that are not supported by the resource
 func testResource(f *framework.Framework, r *resource, parentName string) {
 	var resourceName string
 	var subresourceName []string
@@ -129,7 +154,9 @@ func testResource(f *framework.Framework, r *resource, parentName string) {
 	for {
 		var unstructGot *unstructuredv1.Unstructured
 
-		// TODO(roycaihw): wait.Poll doesn't support passing variables into ConditionFunc
+		// Attempt to GET and UPDATE API resource object
+		// TODO(roycaihw): wait.Poll doesn't support passing variables into ConditionFunc, so we're
+		// using for loop to retry
 		retryTimes := 0
 		for {
 			if retryTimes > retryMax {
@@ -179,9 +206,13 @@ func testResource(f *framework.Framework, r *resource, parentName string) {
 	Expect(err).ToNot(HaveOccurred(), "failed to deletecollection resource %v", r)
 }
 
+// readTables reads the API resource list (test/e2e/testing-manifests/apiresource/resources.csv)
+// and constructs the map of API resources used for test
 func readTables() (resourceMap, error) {
 	tables := resourceMap{}
 
+	// The csv file is compiled into gobindata, and the filepath is used for indexing. The slashes
+	// work for Windows as well.
 	resourcesFile := generated.ReadOrDie(filepath.FromSlash(filepath.Join("test/e2e/testing-manifests/apiresource", "resources.csv")))
 
 	reader := csv.NewReader(bufio.NewReader(bytes.NewReader(resourcesFile)))
@@ -287,6 +318,8 @@ func (r *resource) dumpResourceYAML() *unstructuredv1.Unstructured {
 	if group == "" {
 		group = "core"
 	}
+	// The yaml file is compiled into gobindata, and the filepath is used for indexing. The slashes
+	// work for Windows as well.
 	yamlFile := generated.ReadOrDie(filepath.FromSlash(filepath.Join("test/e2e/testing-manifests/apiresource/yamlfiles/", fmt.Sprintf("%s/%s/%s", group, r.version, r.name)+".yaml")))
 
 	reader := yaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(yamlFile)))

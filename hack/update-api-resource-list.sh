@@ -14,8 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script to fetch latest api resources served by kube apiserver
-# Puts the updated list at test/e2e/testing-manifests/apiresource/resources_all.csv
+# This script fetches list of latest api resources served by kube apiserver and
+# saves the list at test/e2e/testing-manifests/apiresource/resources_all.csv.
+# This script also computes the list of api resources used for testing
+#   (test/e2e/testing-manifests/apiresource/resources.csv)
+# by removing whitelisted api resources
+#   (test/e2e/testing-manifests/apiresource/resources_whitelist.csv) from the
+# list of all resources
+#   (test/e2e/testing-manifests/apiresource/resources_all.csv)
+#
+# The result list of api resources for testing
+#   (test/e2e/testing-manifests/apiresource/resources.csv)
+# is used by the api coverage e2e test:
+#   test/e2e/apimachinery/coverage.go
+# Ref test/e2e/testing-manifests/apiresource/README.md for more information.
 
 set -o errexit
 set -o nounset
@@ -49,7 +61,7 @@ AUTH_TOKEN_HEADER="Authorization: Bearer dummy_token"
 #
 # GROUP is empty string "" for core group. RESOURCE may contain "/" to indicate
 # a subresource. NAMESPACED is either "true" or "false".
-# The output is not sorted.
+# The output is not sorted yet. We have following steps to sort the outputs.
 function fetch_api_resource()
 {
 for RESOURCE in $(curl -s --cacert $KUBE_APISERVER_CERT -H "$AUTH_TOKEN_HEADER" $APISERVER_URL/api/v1 | jq -c .resources[]); do
@@ -88,7 +100,7 @@ kube::etcd::start
 
 echo "dummy_token,admin,admin" > $TMP_DIR/tokenauth.csv
 
-# Start kube-apiserver
+# Start kube-apiserver with all apis enabled
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --bind-address="${API_HOST}" \
@@ -103,6 +115,7 @@ kube::log::status "Starting kube-apiserver"
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/openapi-api-server.log 2>&1 &
 APISERVER_PID=$!
 
+# wait for apiserver to come up
 kube::util::wait_for_url_ssl "https://${API_HOST}:${API_PORT}/healthz" "apiserver: " 1 30 1 --cacert $KUBE_APISERVER_CERT -H "$AUTH_TOKEN_HEADER"
 
 APISERVER_URL="https://${API_HOST}:${API_PORT}"
@@ -112,7 +125,7 @@ KUBE_RESOURCE_WHITELIST_FILE="${KUBE_ROOT}/test/e2e/testing-manifests/apiresourc
 KUBE_RESOURCE_TEST_FILE="${KUBE_ROOT}/test/e2e/testing-manifests/apiresource/resources.csv"
 
 # For the propose of easily comparing KUBE_RESOURCE_FILE and
-# KUBE_RESOURCE_WHITELIST_FILE in order to remove whitelisted API resource
+# KUBE_RESOURCE_WHITELIST_FILE, in order to remove whitelisted API resource
 # lines, we need to sort the files.
 #
 # The API coverage e2e test requires reading parent resource before reading
@@ -129,7 +142,8 @@ sort -t',' -k1,1 -k2,2 -k3,3 -k4 ${KUBE_RESOURCE_WHITELIST_FILE} -o ${KUBE_RESOU
 # the defaulting first, then sort the output to more readable csv format
 comm -13 <(sort ${KUBE_RESOURCE_WHITELIST_FILE}) <(sort ${KUBE_RESOURCE_FILE}) | sort -t',' -k1,1 -k2,2 -k3,3 -k4 -o ${KUBE_RESOURCE_TEST_FILE}
 
-kube::log::status "WARNING: If you are making API change that adds/updates API GROUP/VERSION/KIND, please update test/e2e/testing-manifests/apiresource/yamlfiles/GROUP/VERSION/KIND.yaml to properly pass API coverage e2e test: test/e2e/apimachinery/coverage.go"
-kube::log::status "SUCCESS"
+kube::log::status "WARNING: (please ignore if the file <test/e2e/testing-manifests/apiresource/resources.csv> is not changed)"
+kube::log::status "  If the API resource list (test/e2e/testing-manifests/apiresource/resources.csv) gets changed AND/OR if you are making API change that adds/updates some APIs in <GROUP>/<VERSION>/<KIND>, please update the corresponding yamlfiles in test/e2e/testing-manifests/apiresource/yamlfiles/<GROUP>/<VERSION>/<KIND>.yaml to properly pass the API coverage e2e test (test/e2e/apimachinery/coverage.go). For more information, please refer to test/e2e/testing-manifests/apiresource/README.md"
+kube::log::status "SUCCESS: API resource list updated"
 
 # ex: ts=2 sw=2 et filetype=sh

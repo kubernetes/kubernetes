@@ -14,9 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script to verify if we have the correct list of latest api resources
+# This script verifies whether we have the correct list of latest api resources
 # served by kube apiserver, under
-# test/e2e/testing-manifests/apiresource/resources_all.csv
+#   test/e2e/testing-manifests/apiresource/resources_all.csv
+# the list of whitelisted api resources, under
+#   test/e2e/testing-manifests/apiresource/resources_whitelist.csv
+# and the list of api resources used by API coverage e2e test
+# (test/e2e/apimachinery/coverage.go), under
+#   test/e2e/testing-manifests/apiresource/resources.csv
+#
+# The logic used to generate these api resource lists are in
+#   hack/update-api-resource-list.sh
+# Ref test/e2e/testing-manifests/apiresource/README.md for more information.
 
 set -o errexit
 set -o nounset
@@ -45,7 +54,7 @@ rm ${LISTROOT}/resources_all.csv ${LISTROOT}/resources.csv
 "${KUBE_ROOT}/hack/update-api-resource-list.sh"
 
 # For the propose of easily comparing KUBE_RESOURCE_FILE and
-# KUBE_RESOURCE_WHITELIST_FILE in order to remove whitelisted API resource
+# KUBE_RESOURCE_WHITELIST_FILE, in order to remove whitelisted API resource
 # lines, we need to sort the files.
 #
 # The API coverage e2e test requires reading parent resource before reading
@@ -70,7 +79,8 @@ function assert_equal() {
     echo "$1 up to date."
   else
     echo "ERROR: $1 is out of date. Please run hack/update-api-resource-list.sh"
-    echo "WARNING: If you are making API change that adds/updates API GROUP/VERSION/KIND, please update test/e2e/testing-manifests/apiresource/yamlfiles/GROUP/VERSION/KIND.yaml to properly pass API coverage e2e test: test/e2e/apimachinery/coverage.go"
+    echo "WARNING:"
+    echo "  If the API resource list (test/e2e/testing-manifests/apiresource/resources.csv) gets changed AND/OR if you are making API change that adds/updates some APIs in <GROUP>/<VERSION>/<KIND>, please update the corresponding yamlfiles in test/e2e/testing-manifests/apiresource/yamlfiles/<GROUP>/<VERSION>/<KIND>.yaml to properly pass the API coverage e2e test (test/e2e/apimachinery/coverage.go). For more information, please refer to test/e2e/testing-manifests/apiresource/README.md"
     exit 1
   fi
 }
