@@ -68,6 +68,7 @@ go_test(
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/genericclioptions:go_default_library",
+        "//pkg/kubectl/genericclioptions/printers:go_default_library",
         "//pkg/kubectl/genericclioptions/resource:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
