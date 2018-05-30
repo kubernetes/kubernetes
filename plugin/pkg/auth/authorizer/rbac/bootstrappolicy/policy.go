@@ -119,7 +119,7 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 		// Needed for the node to report status of pods it is running.
 		// Use the NodeRestriction admission plugin to limit a node to updating status of pods bound to itself.
-		rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+		rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 		// Needed for the node to create pod evictions.
 		// Use the NodeRestriction admission plugin to limit a node to creating evictions for pods bound to itself.
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("pods/eviction").RuleOrDie(),
