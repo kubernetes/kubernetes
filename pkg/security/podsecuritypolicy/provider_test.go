@@ -1036,7 +1036,7 @@ func defaultPod() *api.Pod {
 		},
 		Spec: api.PodSpec{
 			SecurityContext: &api.PodSecurityContext{
-			// fill in for test cases
+				// fill in for test cases
 			},
 			Containers: []api.Container{
 				{
@@ -1060,7 +1060,7 @@ func defaultV1Pod() *v1.Pod {
 		},
 		Spec: v1.PodSpec{
 			SecurityContext: &v1.PodSecurityContext{
-			// fill in for test cases
+				// fill in for test cases
 			},
 			Containers: []v1.Container{
 				{

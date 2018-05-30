@@ -29,6 +29,7 @@ go_test(
         "whitelist_test.go",
     ],
     embed = [":go_default_library"],
+    deps = ["//pkg/security/podsecuritypolicy/sysctl:go_default_library"],
 )
 
 filegroup(
