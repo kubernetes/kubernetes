@@ -90,6 +90,10 @@ func (plugin *gitRepoPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	if err := validateVolume(spec.Volume.GitRepo); err != nil {
+		return nil, err
+	}
+
 	return &gitRepoVolumeMounter{
 		gitRepoVolume: &gitRepoVolume{
 			volName: spec.Name(),
@@ -248,6 +252,19 @@ func (b *gitRepoVolumeMounter) execCommand(command string, args []string, dir st
 	return cmd.CombinedOutput()
 }
 
+func validateVolume(src *v1.GitRepoVolumeSource) error {
+	if err := validateNonFlagArgument(src.Repository, "repository"); err != nil {
+		return err
+	}
+	if err := validateNonFlagArgument(src.Revision, "revision"); err != nil {
+		return err
+	}
+	if err := validateNonFlagArgument(src.Directory, "directory"); err != nil {
+		return err
+	}
+	return nil
+}
+
 // gitRepoVolumeUnmounter cleans git repo volumes.
 type gitRepoVolumeUnmounter struct {
 	*gitRepoVolume
@@ -275,4 +292,11 @@ func getVolumeSource(spec *volume.Spec) (*v1.GitRepoVolumeSource, bool) {
 	}
 
 	return volumeSource, readOnly
+}
+
+func validateNonFlagArgument(arg, argName string) error {
+	if len(arg) > 0 && arg[0] == '-' {
+		return fmt.Errorf("%q is an invalid value for %s", arg, argName)
+	}
+	return nil
 }

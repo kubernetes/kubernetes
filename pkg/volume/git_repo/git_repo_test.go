@@ -200,6 +200,44 @@ func TestPlugin(t *testing.T) {
 			},
 			isExpectedFailure: false,
 		},
+		{
+			name: "invalid-repository",
+			vol: &v1.Volume{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GitRepo: &v1.GitRepoVolumeSource{
+						Repository: "--foo",
+					},
+				},
+			},
+			isExpectedFailure: true,
+		},
+		{
+			name: "invalid-revision",
+			vol: &v1.Volume{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GitRepo: &v1.GitRepoVolumeSource{
+						Repository: gitUrl,
+						Revision:   "--bar",
+					},
+				},
+			},
+			isExpectedFailure: true,
+		},
+		{
+			name: "invalid-directory",
+			vol: &v1.Volume{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GitRepo: &v1.GitRepoVolumeSource{
+						Repository: gitUrl,
+						Directory:  "-b",
+					},
+				},
+			},
+			isExpectedFailure: true,
+		},
 	}
 
 	for _, scenario := range scenarios {
