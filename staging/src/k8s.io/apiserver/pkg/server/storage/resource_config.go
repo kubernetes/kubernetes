@@ -62,12 +62,7 @@ func (o *ResourceConfig) EnableVersions(versions ...schema.GroupVersion) {
 }
 
 func (o *ResourceConfig) VersionEnabled(version schema.GroupVersion) bool {
-	enabled, _ := o.GroupVersionConfigs[version]
-	if enabled {
-		return true
-	}
-
-	return false
+	return o.GroupVersionConfigs[version]
 }
 
 func (o *ResourceConfig) AnyVersionForGroupEnabled(group string) bool {

@@ -371,7 +371,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 `, b.t)
 
 	if len(options) > 0 {
-		sort.Sort(sort.StringSlice(options))
+		sort.Strings(options)
 		for _, s := range options {
 			fmt.Fprintf(out, "  option %s;\n", s)
 		}
@@ -399,7 +399,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 				}
 				extras = append(extras, fmt.Sprintf("%s = %s", k, v))
 			}
-			sort.Sort(sort.StringSlice(extras))
+			sort.Strings(extras)
 			if len(extras) > 0 {
 				fmt.Fprintf(out, " [")
 				fmt.Fprint(out, strings.Join(extras, ", "))

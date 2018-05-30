@@ -47,7 +47,7 @@ func Forbidden(ctx context.Context, attributes authorizer.Attributes, w http.Res
 
 	var errMsg string
 	if len(reason) == 0 {
-		errMsg = fmt.Sprintf("%s", msg)
+		errMsg = msg
 	} else {
 		errMsg = fmt.Sprintf("%s: %s", msg, reason)
 	}
