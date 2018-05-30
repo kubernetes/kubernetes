@@ -58,10 +58,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "factory_test.go",
-        "helpers_test.go",
-    ],
+    srcs = ["helpers_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/testapi:go_default_library",
@@ -90,8 +87,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubectl/cmd/util/editor:all-srcs",
-        "//pkg/kubectl/cmd/util/env:all-srcs",
-        "//pkg/kubectl/cmd/util/jsonmerge:all-srcs",
         "//pkg/kubectl/cmd/util/openapi:all-srcs",
         "//pkg/kubectl/cmd/util/sanity:all-srcs",
     ],

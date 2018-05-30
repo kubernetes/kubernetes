@@ -19,35 +19,8 @@ package env
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 )
-
-func ExampleEnv_defaultValue() {
-	fmt.Println(Env("TESTENVVAR", "default"))
-	// Output: default
-}
-
-func ExampleEnv_variableExists() {
-	os.Setenv("TESTENVVAR", "test value")
-	defer os.Unsetenv("TESTENVVAR")
-	fmt.Println(Env("TESTENVVAR", "default"))
-	// Output: test value
-}
-
-func ExampleGetEnv_variableExists() {
-	os.Setenv("THISVAREXISTS", "value")
-	defer os.Unsetenv("THISVAREXISTS")
-	fmt.Println(GetEnv("THISVAREXISTS"))
-	// Output:
-	// value true
-}
-
-func ExampleGetEnv_variableDoesNotExist() {
-	fmt.Println(GetEnv("THISVARDOESNOTEXIST"))
-	// Output:
-	//  false
-}
 
 func ExampleIsEnvironmentArgument_true() {
 	test := "returns=true"

@@ -20,31 +20,12 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"regexp"
 	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
-
-// Env returns an environment variable if not nil, or a default value.
-func Env(key string, defaultValue string) string {
-	val := os.Getenv(key)
-	if len(val) == 0 {
-		return defaultValue
-	}
-	return val
-}
-
-// GetEnv returns an environment value if not nil, and an ok boolean.
-func GetEnv(key string) (string, bool) {
-	val := os.Getenv(key)
-	if len(val) == 0 {
-		return "", false
-	}
-	return val, true
-}
 
 var argumentEnvironment = regexp.MustCompile("(?ms)^(.+)\\=(.*)$")
 var validArgumentEnvironment = regexp.MustCompile("(?ms)^(\\w+)\\=(.*)$")

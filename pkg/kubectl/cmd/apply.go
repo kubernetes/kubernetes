@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
-	scaleclient "k8s.io/client-go/scale"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -79,7 +78,6 @@ type ApplyOptions struct {
 	Validator     validation.Schema
 	Builder       *resource.Builder
 	Mapper        meta.RESTMapper
-	Scaler        scaleclient.ScalesGetter
 	DynamicClient dynamic.Interface
 	OpenAPISchema openapi.Resources
 
@@ -216,11 +214,6 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.Validator, err = f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	o.Builder = f.NewBuilder()
 	o.Mapper, err = f.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-
-	o.Scaler, err = cmdutil.ScaleClientFn(f)
 	if err != nil {
 		return err
 	}
@@ -493,7 +486,6 @@ func (o *ApplyOptions) Run() error {
 		cascade:     o.DeleteOptions.Cascade,
 		dryRun:      o.DryRun,
 		gracePeriod: o.DeleteOptions.GracePeriod,
-		scaler:      o.Scaler,
 
 		toPrinter: o.ToPrinter,
 
@@ -582,8 +574,6 @@ type pruner struct {
 	cascade     bool
 	dryRun      bool
 	gracePeriod int
-
-	scaler scaleclient.ScalesGetter
 
 	toPrinter func(string) (printers.ResourcePrinter, error)
 

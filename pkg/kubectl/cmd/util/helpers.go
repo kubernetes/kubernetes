@@ -300,16 +300,6 @@ func IsFilenameSliceEmpty(filenames []string) bool {
 	return len(filenames) == 0
 }
 
-// Whether this cmd need watching objects.
-func isWatch(cmd *cobra.Command) bool {
-	if w, err := cmd.Flags().GetBool("watch"); err == nil && w {
-		return true
-	}
-
-	wo, err := cmd.Flags().GetBool("watch-only")
-	return err == nil && wo
-}
-
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	s, err := cmd.Flags().GetString(flag)
 	if err != nil {
@@ -334,15 +324,6 @@ func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
 		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
-}
-
-// GetWideFlag is used to determine if "-o wide" is used
-func GetWideFlag(cmd *cobra.Command) bool {
-	f := cmd.Flags().Lookup("output")
-	if f != nil && f.Value != nil && f.Value.String() == "wide" {
-		return true
-	}
-	return false
 }
 
 func GetFlagBool(cmd *cobra.Command, flag string) bool {

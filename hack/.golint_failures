@@ -148,7 +148,6 @@ pkg/kubectl/cmd/templates
 pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/util
 pkg/kubectl/cmd/util/editor
-pkg/kubectl/cmd/util/jsonmerge
 pkg/kubectl/cmd/util/sanity
 pkg/kubectl/cmd/wait
 pkg/kubectl/genericclioptions
@@ -156,7 +155,6 @@ pkg/kubectl/genericclioptions/printers
 pkg/kubectl/genericclioptions/resource
 pkg/kubectl/metricsutil
 pkg/kubectl/util
-pkg/kubectl/util/crlf
 pkg/kubectl/util/slice
 pkg/kubelet
 pkg/kubelet/apis
