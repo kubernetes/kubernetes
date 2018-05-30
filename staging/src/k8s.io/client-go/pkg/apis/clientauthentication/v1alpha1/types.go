@@ -52,12 +52,20 @@ type ExecCredentialSpec struct {
 }
 
 // ExecCredentialStatus holds credentials for the transport to use.
+//
+// Token and ClientKeyData are sensitive fields. This data should only be
+// transmitted in-memory between client and exec plugin process. Exec plugin
+// itself should at least be protected via file permissions.
 type ExecCredentialStatus struct {
 	// ExpirationTimestamp indicates a time when the provided credentials expire.
 	// +optional
 	ExpirationTimestamp *metav1.Time `json:"expirationTimestamp,omitempty"`
 	// Token is a bearer token used by the client for request authentication.
 	Token string `json:"token,omitempty"`
+	// PEM-encoded client TLS certificates (including intermediates, if any).
+	ClientCertificateData string `json:"clientCertificateData,omitempty"`
+	// PEM-encoded private key for the above certificate.
+	ClientKeyData string `json:"clientKeyData,omitempty"`
 }
 
 // Response defines metadata about a failed request, including HTTP status code and
