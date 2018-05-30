@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
+	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
 	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/apiserver/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
@@ -95,10 +96,10 @@ func newEtcdTestStorage(t *testing.T, prefix string) (*etcdtesting.EtcdTestServe
 	return server, storage
 }
 
-func newTestCacher(s storage.Interface, cap int) (*storage.Cacher, storage.Versioner) {
+func newTestCacher(s storage.Interface, cap int) (*cacherstorage.Cacher, storage.Versioner) {
 	prefix := "pods"
 	v := etcdstorage.APIObjectVersioner{}
-	config := storage.CacherConfig{
+	config := cacherstorage.Config{
 		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      v,
@@ -109,7 +110,7 @@ func newTestCacher(s storage.Interface, cap int) (*storage.Cacher, storage.Versi
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 	}
-	return storage.NewCacherFromConfig(config), v
+	return cacherstorage.NewCacherFromConfig(config), v
 }
 
 func makeTestPod(name string) *example.Pod {

@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package cacher
 
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
 )
@@ -138,14 +138,14 @@ type watchCache struct {
 	clock clock.Clock
 
 	// An underlying storage.Versioner.
-	versioner Versioner
+	versioner storage.Versioner
 }
 
 func newWatchCache(
 	capacity int,
 	keyFunc func(runtime.Object) (string, error),
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error),
-	versioner Versioner) *watchCache {
+	versioner storage.Versioner) *watchCache {
 	wc := &watchCache{
 		capacity:        capacity,
 		keyFunc:         keyFunc,

@@ -49,6 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
+	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
 	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -1849,7 +1850,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		server.Terminate(t)
 	}
 	if hasCacheEnabled {
-		config := storage.CacherConfig{
+		config := cacherstorage.Config{
 			CacheCapacity:  10,
 			Storage:        s,
 			Versioner:      etcdstorage.APIObjectVersioner{},
@@ -1860,7 +1861,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			NewListFunc:    func() runtime.Object { return &example.PodList{} },
 			Codec:          sc.Codec,
 		}
-		cacher := storage.NewCacherFromConfig(config)
+		cacher := cacherstorage.NewCacherFromConfig(config)
 		d := destroyFunc
 		s = cacher
 		destroyFunc = func() {
