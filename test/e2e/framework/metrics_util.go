@@ -463,7 +463,7 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 			Context(ctx).
 			Namespace(metav1.NamespaceSystem).
 			Resource("pods").
-			Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).
+			Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.InsecureSchedulerPort)).
 			SubResource("proxy").
 			Suffix("metrics").
 			Do().Raw()

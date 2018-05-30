@@ -127,7 +127,7 @@ func (g *MetricsGrabber) GrabFromScheduler() (SchedulerMetrics, error) {
 	if !g.registeredMaster {
 		return SchedulerMetrics{}, fmt.Errorf("Master's Kubelet is not registered. Skipping Scheduler's metrics gathering.")
 	}
-	output, err := g.getMetricsFromPod(g.client, fmt.Sprintf("%v-%v", "kube-scheduler", g.masterName), metav1.NamespaceSystem, ports.SchedulerPort)
+	output, err := g.getMetricsFromPod(g.client, fmt.Sprintf("%v-%v", "kube-scheduler", g.masterName), metav1.NamespaceSystem, ports.InsecureSchedulerPort)
 	if err != nil {
 		return SchedulerMetrics{}, err
 	}

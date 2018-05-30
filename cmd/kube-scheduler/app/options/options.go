@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
 
@@ -82,7 +83,7 @@ func NewOptions() (*Options, error) {
 
 	o := &Options{
 		ComponentConfig: *cfg,
-		SecureServing:   nil, // TODO: enable with apiserveroptions.NewSecureServingOptions()
+		SecureServing:   apiserveroptions.NewSecureServingOptions(),
 		CombinedInsecureServing: &CombinedInsecureServingOptions{
 			Healthz: &controlleroptions.InsecureServingOptions{
 				BindNetwork: "tcp",
@@ -93,13 +94,17 @@ func NewOptions() (*Options, error) {
 			BindPort:    hport,
 			BindAddress: hhost,
 		},
-		Authentication: nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
-		Authorization:  nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
+		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
+		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Deprecated: &DeprecatedOptions{
 			UseLegacyPolicyConfig:    false,
 			PolicyConfigMapNamespace: metav1.NamespaceSystem,
 		},
 	}
+
+	o.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
+	o.SecureServing.ServerCert.PairName = "kube-scheduler"
+	o.SecureServing.BindPort = ports.SchedulerPort
 
 	return o, nil
 }
@@ -176,10 +181,16 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 	if err := o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
-	if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
-		return err
+	if o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil {
+		if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+			return err
+		}
+		if err := o.Authorization.ApplyTo(&c.Authorization); err != nil {
+			return err
+		}
 	}
-	return o.Authorization.ApplyTo(&c.Authorization)
+
+	return nil
 }
 
 // Validate validates all the required options.
