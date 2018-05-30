@@ -417,11 +417,11 @@ func TestAuthorizeV1beta1(t *testing.T) {
 		{User: uChuck, Verb: "get", Path: "/", Resource: "", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
 		// but can access /api
 		{User: uChuck, Verb: "get", Path: "/api", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
-		// though he cannot write to it
+		// though they cannot write to it
 		{User: uChuck, Verb: "create", Path: "/api", Resource: "", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
-		// while he can write to /custom
+		// while they can write to /custom
 		{User: uChuck, Verb: "update", Path: "/custom", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
-		// he cannot get "/root"
+		// they cannot get "/root"
 		{User: uChuck, Verb: "get", Path: "/root", Resource: "", NS: "", ExpectDecision: authorizer.DecisionNoOpinion},
 		// but can get any subpath
 		{User: uChuck, Verb: "get", Path: "/root/", Resource: "", NS: "", ExpectDecision: authorizer.DecisionAllow},
