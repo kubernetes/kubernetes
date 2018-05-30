@@ -1091,6 +1091,10 @@ type Kubelet struct {
 	// handlers called during the tryUpdateNodeStatus cycle
 	setNodeStatusFuncs []func(*v1.Node) error
 
+	lastNodeUnschedulableLock sync.Mutex
+	// maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
+	lastNodeUnschedulable bool
+
 	// TODO: think about moving this to be centralized in PodWorkers in follow-on.
 	// the list of handlers to call during pod admission.
 	admitHandlers lifecycle.PodAdmitHandlers
