@@ -539,6 +539,7 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"", "v1", "Secret", true},
 			{"", "v1", "Service", true},
 			{"batch", "v1", "Job", true},
+			{"batch", "v1beta1", "CronJob", true},
 			{"extensions", "v1beta1", "DaemonSet", true},
 			{"extensions", "v1beta1", "Deployment", true},
 			{"extensions", "v1beta1", "Ingress", true},
