@@ -43,7 +43,6 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/node"
 )
 
 // ValidateMasterConfiguration validates master configuration and collects all encountered errors
@@ -369,7 +368,8 @@ func ValidateAbsolutePath(path string, fldPath *field.Path) field.ErrorList {
 // ValidateNodeName validates the name of a node
 func ValidateNodeName(nodename string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if node.GetHostname(nodename) != nodename {
+	loweredNodeName := strings.ToLower(strings.TrimSpace(nodename))
+	if nodename == "" || loweredNodeName != nodename {
 		allErrs = append(allErrs, field.Invalid(fldPath, nodename, "nodename is not valid, must be lower case"))
 	}
 	return allErrs
