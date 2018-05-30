@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// HorizontalPodAutoscalers returns a HorizontalPodAutoscalerInformer.
 	HorizontalPodAutoscalers() HorizontalPodAutoscalerInformer
+	// VerticalPodAutoscalers returns a VerticalPodAutoscalerInformer.
+	VerticalPodAutoscalers() VerticalPodAutoscalerInformer
 }
 
 type version struct {
@@ -42,4 +44,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // HorizontalPodAutoscalers returns a HorizontalPodAutoscalerInformer.
 func (v *version) HorizontalPodAutoscalers() HorizontalPodAutoscalerInformer {
 	return &horizontalPodAutoscalerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// VerticalPodAutoscalers returns a VerticalPodAutoscalerInformer.
+func (v *version) VerticalPodAutoscalers() VerticalPodAutoscalerInformer {
+	return &verticalPodAutoscalerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
