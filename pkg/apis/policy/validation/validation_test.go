@@ -323,8 +323,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + ",not-good",
 	}
 
-	invalidSysctlPattern := validPSP()
-	invalidSysctlPattern.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
+	invalidAllowedUnsafeSysctlPattern := validPSP()
+	invalidAllowedUnsafeSysctlPattern.Spec.AllowedUnsafeSysctls = []string{"a.*.b"}
+
+	invalidForbiddenSysctlPattern := validPSP()
+	invalidForbiddenSysctlPattern.Spec.ForbiddenSysctls = []string{"a.*.b"}
 
 	invalidSeccompDefault := validPSP()
 	invalidSeccompDefault.Annotations = map[string]string{
@@ -456,8 +459,13 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "invalid AppArmor profile name: \"not-good\"",
 		},
-		"invalid sysctl pattern": {
-			psp:         invalidSysctlPattern,
+		"invalid allowed unsafe sysctl pattern": {
+			psp:         invalidAllowedUnsafeSysctlPattern,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+		},
+		"invalid forbidden sysctl pattern": {
+			psp:         invalidForbiddenSysctlPattern,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
 		},
@@ -561,8 +569,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
 	}
 
-	withSysctl := validPSP()
-	withSysctl.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "net.*"
+	withForbiddenSysctl := validPSP()
+	withForbiddenSysctl.Spec.ForbiddenSysctls = []string{"net.*"}
+
+	withAllowedUnsafeSysctl := validPSP()
+	withAllowedUnsafeSysctl.Spec.AllowedUnsafeSysctls = []string{"net.ipv4.tcp_max_syn_backlog"}
 
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
@@ -607,8 +618,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"valid AppArmor annotations": {
 			psp: validAppArmor,
 		},
-		"with network sysctls": {
-			psp: withSysctl,
+		"with network sysctls forbidden": {
+			psp: withForbiddenSysctl,
+		},
+		"with unsafe net.ipv4.tcp_max_syn_backlog sysctl allowed": {
+			psp: withAllowedUnsafeSysctl,
 		},
 		"valid seccomp annotations": {
 			psp: validSeccomp,

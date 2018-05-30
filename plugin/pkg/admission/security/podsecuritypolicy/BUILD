@@ -39,7 +39,6 @@ go_test(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/controller:go_default_library",

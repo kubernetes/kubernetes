@@ -201,6 +201,12 @@ type PodSecurityPolicySpec struct {
 	// is allowed in the "volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
+	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none, * means all
+	// +optional
+	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty" protobuf:"bytes,19,rep,name=allowedUnsafeSysctls"`
+	// forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none, * means all
+	// +optional
+	ForbiddenSysctls []string `json:"forbiddenSysctls,omitempty" protobuf:"bytes,20,rep,name=forbiddenSysctls"`
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy

@@ -118,6 +118,8 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
 	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 	allErrs = append(allErrs, validatePSPAllowedFlexVolumes(fldPath.Child("allowedFlexVolumes"), spec.AllowedFlexVolumes)...)
+	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("allowedUnsafeSysctls"), spec.AllowedUnsafeSysctls)...)
+	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("forbiddenSysctls"), spec.ForbiddenSysctls)...)
 
 	return allErrs
 }
@@ -136,15 +138,6 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 				allErrs = append(allErrs, field.Invalid(fldPath.Key(apparmor.AllowedProfilesAnnotationKey), allowed, err.Error()))
 			}
 		}
-	}
-
-	sysctlAnnotation := annotations[policy.SysctlsPodSecurityPolicyAnnotationKey]
-	sysctlFldPath := fldPath.Key(policy.SysctlsPodSecurityPolicyAnnotationKey)
-	sysctls, err := policy.SysctlsFromPodSecurityPolicyAnnotation(sysctlAnnotation)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(sysctlFldPath, sysctlAnnotation, err.Error()))
-	} else {
-		allErrs = append(allErrs, validatePodSecurityPolicySysctls(sysctlFldPath, sysctls)...)
 	}
 
 	if p := annotations[seccomp.DefaultProfileAnnotationKey]; p != "" {
@@ -310,11 +303,14 @@ func IsValidSysctlPattern(name string) bool {
 // validatePodSecurityPolicySysctls validates the sysctls fields of PodSecurityPolicy.
 func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if sysctls == nil {
+		return allErrs
+	}
 	for i, s := range sysctls {
 		if !IsValidSysctlPattern(string(s)) {
 			allErrs = append(
 				allErrs,
-				field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("must have at most %d characters and match regex %s",
+				field.Invalid(fldPath.Child("items").Index(i), sysctls[i], fmt.Sprintf("must have at most %d characters and match regex %s",
 					apivalidation.SysctlMaxLength,
 					SysctlPatternFmt,
 				)),
