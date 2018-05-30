@@ -211,20 +211,6 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 	})
 }
 
-// getStaticPodControlPlaneHashes computes hashes for all the control plane's Static Pod resources
-func getStaticPodControlPlaneHashes(client clientset.Interface, nodeName string) (map[string]string, error) {
-
-	mirrorPodHashes := map[string]string{}
-	for _, component := range constants.MasterComponents {
-		hash, err := getStaticPodSingleHash(client, nodeName, component)
-		if err != nil {
-			return nil, err
-		}
-		mirrorPodHashes[component] = hash
-	}
-	return mirrorPodHashes, nil
-}
-
 // getStaticSinglePodHash computes hashes for a single Static Pod resource
 func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
 
