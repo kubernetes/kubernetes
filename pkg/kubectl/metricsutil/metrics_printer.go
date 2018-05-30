@@ -179,8 +179,12 @@ func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo) {
 
 func printMissingMetricsNodeLine(out io.Writer, nodeName string) {
 	printValue(out, nodeName)
+	unknownMetricsStatus := "<unknown>"
 	for i := 0; i < len(MeasuredResources); i++ {
-		printValue(out, "-\t-\t")
+		printValue(out, unknownMetricsStatus)
+		printValue(out, "\t")
+		printValue(out, unknownMetricsStatus)
+		printValue(out, "\t")
 	}
 	fmt.Fprint(out, "\n")
 }
