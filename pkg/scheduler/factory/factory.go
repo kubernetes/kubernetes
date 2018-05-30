@@ -63,6 +63,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
+	"k8s.io/kubernetes/pkg/scheduler/volumeplugins"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -131,6 +133,9 @@ type configFactory struct {
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
 
+	// handles volume plugin managaer
+	volumePluginMgr *volume.VolumePluginMgr
+
 	// always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
 
@@ -184,6 +189,16 @@ func NewConfigFactory(
 		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
 		enableEquivalenceClassCache:    enableEquivalenceClassCache,
 		disablePreemption:              disablePreemption,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicVolumeThreshold) {
+		volumePlugins := volumeplugins.ProbeVolumePlugins()
+		c.volumePluginMgr = &volume.VolumePluginMgr{}
+		volumeHost := &volumeplugins.SchedulerVolumeHost{}
+		if err := c.volumePluginMgr.InitPlugins(volumePlugins, nil /* prober */, volumeHost); err != nil {
+			glog.Fatalf("Unable to initialize volume plugins %v", err)
+			return nil
+		}
 	}
 
 	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -1171,6 +1186,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
 		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},
 		VolumeBinder:                   c.volumeBinder,
+		VolumePluginMgr:                c.volumePluginMgr,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
 	}, nil
 }

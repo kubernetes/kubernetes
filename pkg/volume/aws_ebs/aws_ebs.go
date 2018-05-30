@@ -17,9 +17,11 @@ limitations under the License.
 package aws_ebs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -51,6 +53,7 @@ var _ volume.ProvisionableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 const (
 	awsElasticBlockStorePluginName = "kubernetes.io/aws-ebs"
+	ebsVolumeLimitKey              = "storage-limits-aws-ebs"
 	awsURLNamePrefix               = "aws://"
 )
 
@@ -91,6 +94,39 @@ func (plugin *awsElasticBlockStorePlugin) SupportsMountOption() bool {
 
 func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool {
 	return true
+}
+
+func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, error) {
+	cloud := plugin.host.GetCloudProvider()
+
+	if cloud.ProviderName() != aws.ProviderName {
+		return nil, fmt.Errorf("Expected aws cloud, found %s", cloud.ProviderName())
+	}
+
+	volumeLimits := map[string]int64{
+		ebsVolumeLimitKey: 39,
+	}
+	instances, ok := cloud.Instances()
+	if !ok {
+		glog.V(3).Infof("Failed to get instances from cloud provider")
+		return volumeLimits, nil
+	}
+
+	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
+	if err != nil {
+		glog.Errorf("Failed to get instance type from AWS cloud provider")
+		return volumeLimits, nil
+	}
+
+	if ok, _ := regexp.MatchString("^[cm]5.*", instanceType); ok {
+		volumeLimits[ebsVolumeLimitKey] = 25
+	}
+
+	return volumeLimits, nil
+}
+
+func (plugin *awsElasticBlockStorePlugin) VolumeLimitKey(spec *volume.Spec) string {
+	return ebsVolumeLimitKey
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -265,6 +301,7 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 }
 
 var _ volume.ExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
 
 // Abstract interface to PD operations.
 type ebsManager interface {

@@ -3974,6 +3974,8 @@ const (
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
 	// Name prefix for huge page resources (alpha).
 	ResourceHugePagesPrefix = "hugepages-"
+	// Name prefix for storage resource limits
+	ResourceStorageLimitPrefix = "storage-limits-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

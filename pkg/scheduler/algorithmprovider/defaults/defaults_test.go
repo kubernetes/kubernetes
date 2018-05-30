@@ -69,6 +69,7 @@ func TestDefaultPredicates(t *testing.T) {
 	result := sets.NewString(
 		"NoVolumeZoneConflict",
 		"MaxEBSVolumeCount",
+		"MaxAttachableVolumeCount",
 		"MaxGCEPDVolumeCount",
 		"MaxAzureDiskVolumeCount",
 		"MatchInterPodAffinity",

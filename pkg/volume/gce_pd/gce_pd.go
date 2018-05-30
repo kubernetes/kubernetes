@@ -17,16 +17,19 @@ limitations under the License.
 package gce_pd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -47,10 +50,25 @@ var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.ExpandableVolumePlugin = &gcePersistentDiskPlugin{}
+var _ volume.VolumePluginWithAttachLimits = &gcePersistentDiskPlugin{}
 
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
+	gceVolumeLimitKey           = "storage-limits-gce-pd"
 )
+
+// The constants and DiskAttachLimit are used to map from the machine type (number of CPUs) to the limit of
+// persistant disks that can be attached to an instance. Please refer to gcloud doc
+// https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+const (
+	Default = iota
+	OneCpu
+	TwotoFourCPUs
+	EightCPUsandAbove
+	EightCPUs = 8
+)
+
+var DiskAttachLimit = []int64{16, 32, 64, 128}
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
@@ -96,6 +114,47 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 		v1.ReadWriteOnce,
 		v1.ReadOnlyMany,
 	}
+}
+
+func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
+	cloud := plugin.host.GetCloudProvider()
+
+	if cloud.ProviderName() != gcecloud.ProviderName {
+		return nil, fmt.Errorf("Expected gce cloud got %s", cloud.ProviderName())
+	}
+
+	volumeLimits := map[string]int64{
+		gceVolumeLimitKey: DiskAttachLimit[Default],
+	}
+	instances, ok := cloud.Instances()
+	if !ok {
+		glog.Warning("Failed to get instances from cloud provider")
+		return volumeLimits, nil
+	}
+
+	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
+	if err != nil {
+		glog.Errorf("Failed to get instance type from GCE cloud provider")
+		return volumeLimits, nil
+	}
+	if strings.HasPrefix(instanceType, "n1-standard-") || strings.HasPrefix(instanceType, "n1-highmem-") || strings.HasPrefix(instanceType, "n1-highcpu-") {
+		splits := strings.Split(instanceType, "-")
+		last := splits[len(splits)-1]
+		if num, err := strconv.Atoi(last); err == nil {
+			if num == OneCpu {
+				volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[OneCpu]
+			} else if num < EightCPUs {
+				volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[TwotoFourCPUs]
+			} else {
+				volumeLimits[gceVolumeLimitKey] =  DiskAttachLimit[EightCPUsandAbove]
+			}
+		}
+	}
+	return volumeLimits, nil
+}
+
+func (plugin *gcePersistentDiskPlugin) VolumeLimitKey(spec *volume.Spec) string {
+	return gceVolumeLimitKey
 }
 
 func (plugin *gcePersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {

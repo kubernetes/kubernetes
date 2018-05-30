@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
+	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
 )
@@ -46,6 +47,7 @@ type PluginFactoryArgs struct {
 	PVCInfo                        predicates.PersistentVolumeClaimInfo
 	StorageClassInfo               predicates.StorageClassInfo
 	VolumeBinder                   *volumebinder.VolumeBinder
+	VolumePluginMgr                *volume.VolumePluginMgr
 	HardPodAffinitySymmetricWeight int32
 }
 
