@@ -58,12 +58,12 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/util/configz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-	"k8s.io/kubernetes/pkg/util/configz"
 
 	// install apis
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"

@@ -27,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/apiserver/pkg/util/configz"
 	"k8s.io/client-go/informers"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/util/configz"
 )
 
 // validatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
@@ -61,11 +61,11 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory)
 		DeleteFunc: func(_ interface{}) { manager.updateConfiguration() },
 	})
 
-	// setup /configz endpoint
+	// setup /configz Config
 	if cz, err := configz.New("validatingwebhookconfigurations"); err == nil {
 		manager.configz = cz
 	} else {
-		glog.Errorf("unable to register configz: %c", err)
+		glog.Errorf("unable to register configz: %v", err)
 	}
 
 	return manager

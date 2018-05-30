@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/configz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -42,7 +43,6 @@ import (
 	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
-	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version/verflag"
 )
@@ -115,7 +115,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	if cz, err := configz.New("componentconfig"); err == nil {
 		cz.Set(c.ComponentConfig)
 	} else {
-		glog.Errorf("unable to register configz: %c", err)
+		glog.Errorf("unable to register configz: %v", err)
 	}
 
 	// Start the controller manager HTTP server
