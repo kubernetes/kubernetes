@@ -57,6 +57,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	auditroute "k8s.io/apiserver/pkg/server/routes/audit"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -595,6 +596,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	}
 
 	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
+	auditroute.AuditHandler{}.Install(s.Handler.NonGoRestfulMux, c.AuditBackend, c.Authorization.Authorizer)
 
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
