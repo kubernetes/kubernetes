@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 var (
@@ -78,7 +78,6 @@ func TestMounterGetPath(t *testing.T) {
 		csiMounter := mounter.(*csiMountMgr)
 
 		path := csiMounter.GetPath()
-		t.Logf("*** GetPath: %s", path)
 
 		if tc.path != path {
 			t.Errorf("expecting path %s, got %s", tc.path, path)
@@ -114,7 +113,7 @@ func TestMounterSetUp(t *testing.T) {
 	}
 
 	csiMounter := mounter.(*csiMountMgr)
-	csiMounter.csiClient = setupClient(t, false)
+	csiMounter.csiClient = setupClient(t, true)
 
 	attachID := getAttachmentName(csiMounter.volumeID, csiMounter.driverName, string(plug.host.GetNodeName()))
 
@@ -155,7 +154,7 @@ func TestMounterSetUp(t *testing.T) {
 	}
 
 	// ensure call went all the way
-	pubs := csiMounter.csiClient.(*csiDriverClient).nodeClient.(*fake.NodeClient).GetNodePublishedVolumes()
+	pubs := csiMounter.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
 	if pubs[csiMounter.volumeID] != csiMounter.GetPath() {
 		t.Error("csi server may not have received NodePublishVolume call")
 	}
@@ -164,8 +163,31 @@ func TestMounterSetUp(t *testing.T) {
 func TestUnmounterTeardown(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t)
 	defer os.RemoveAll(tmpDir)
-
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
+
+	// save the data file prior to unmount
+	dir := path.Join(getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host), "/mount")
+	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
+		t.Errorf("failed to create dir [%s]: %v", dir, err)
+	}
+
+	// do a fake local mount
+	diskMounter := util.NewSafeFormatAndMountFromHost(plug.GetPluginName(), plug.host)
+	if err := diskMounter.FormatAndMount("/fake/device", dir, "testfs", nil); err != nil {
+		t.Errorf("failed to mount dir [%s]: %v", dir, err)
+	}
+
+	if err := saveVolumeData(
+		path.Dir(dir),
+		volDataFileName,
+		map[string]string{
+			volDataKey.specVolID:  pv.ObjectMeta.Name,
+			volDataKey.driverName: testDriver,
+			volDataKey.volHandle:  testVol,
+		},
+	); err != nil {
+		t.Fatalf("failed to save volume data: %v", err)
+	}
 
 	unmounter, err := plug.NewUnmounter(pv.ObjectMeta.Name, testPodUID)
 	if err != nil {
@@ -173,30 +195,14 @@ func TestUnmounterTeardown(t *testing.T) {
 	}
 
 	csiUnmounter := unmounter.(*csiMountMgr)
-	csiUnmounter.csiClient = setupClient(t, false)
-
-	dir := csiUnmounter.GetPath()
-
-	// save the data file prior to unmount
-	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
-		t.Errorf("failed to create dir [%s]: %v", dir, err)
-	}
-	if err := saveVolumeData(
-		plug,
-		testPodUID,
-		"test-pv",
-		map[string]string{volDataKey.specVolID: "test-pv", volDataKey.driverName: "driver", volDataKey.volHandle: "vol-handle"},
-	); err != nil {
-		t.Fatalf("failed to save volume data: %v", err)
-	}
-
+	csiUnmounter.csiClient = setupClient(t, true)
 	err = csiUnmounter.TearDownAt(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// ensure csi client call
-	pubs := csiUnmounter.csiClient.(*csiDriverClient).nodeClient.(*fake.NodeClient).GetNodePublishedVolumes()
+	pubs := csiUnmounter.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
 	if _, ok := pubs[csiUnmounter.volumeID]; ok {
 		t.Error("csi server may not have received NodeUnpublishVolume call")
 	}
@@ -223,7 +229,7 @@ func TestSaveVolumeData(t *testing.T) {
 			t.Errorf("failed to create dir [%s]: %v", mountDir, err)
 		}
 
-		err := saveVolumeData(plug, testPodUID, specVolID, tc.data)
+		err := saveVolumeData(path.Dir(mountDir), volDataFileName, tc.data)
 
 		if !tc.shouldFail && err != nil {
 			t.Errorf("unexpected failure: %v", err)
