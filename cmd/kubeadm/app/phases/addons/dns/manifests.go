@@ -121,7 +121,7 @@ spec:
         - --
         - -k
         - --cache-size=1000
-        - --no-negcache
+        - --neg-ttl=5
         - --log-facility=-
         - --server=/{{ .DNSDomain }}/{{ .DNSBindAddr }}#10053
         - --server=/in-addr.arpa/{{ .DNSBindAddr }}#10053
