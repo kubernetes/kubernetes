@@ -152,6 +152,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	kc.SerializeImagePulls = false
 	kubeletConfigFlags = append(kubeletConfigFlags, "serialize-image-pulls")
 
+	kc.EnableDebuggingHandlers = true
+	kubeletConfigFlags = append(kubeletConfigFlags, "enable-debugging-handlers")
+
 	kc.StaticPodPath = podPath
 	kubeletConfigFlags = append(kubeletConfigFlags, "pod-manifest-path")
 

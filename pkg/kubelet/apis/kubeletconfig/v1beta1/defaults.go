@@ -89,7 +89,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.EventBurst = 10
 	}
 	if obj.EnableDebuggingHandlers == nil {
-		obj.EnableDebuggingHandlers = utilpointer.BoolPtr(true)
+		obj.EnableDebuggingHandlers = utilpointer.BoolPtr(false)
 	}
 	if obj.HealthzPort == nil {
 		obj.HealthzPort = utilpointer.Int32Ptr(10248)

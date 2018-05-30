@@ -81,7 +81,7 @@ kubeletConfiguration:
     cpuManagerPolicy: none
     cpuManagerReconcilePeriod: 10s
     enableControllerAttachDetach: true
-    enableDebuggingHandlers: true
+    enableDebuggingHandlers: false
     enforceNodeAllocatable:
     - pods
     eventBurst: 10

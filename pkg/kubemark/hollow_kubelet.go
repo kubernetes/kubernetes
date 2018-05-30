@@ -145,7 +145,7 @@ func GetHollowKubeletConfig(
 	c.CgroupRoot = ""
 	c.CPUCFSQuota = true
 	c.EnableControllerAttachDetach = false
-	c.EnableDebuggingHandlers = true
+	c.EnableDebuggingHandlers = false
 	c.CgroupsPerQOS = false
 	// hairpin-veth is used to allow hairpin packets. Note that this deviates from
 	// what the "real" kubelet currently does, because there's no way to
