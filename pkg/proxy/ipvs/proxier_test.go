@@ -805,7 +805,7 @@ func TestLoadBalancer(t *testing.T) {
 
 func TestOnlyLocalNodePorts(t *testing.T) {
 	nodeIP := net.ParseIP("100.101.102.103")
-	ipt, fp := buildFakeProxier([]net.IP{nodeIP})
+	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
 	svcPort := 80
@@ -889,8 +889,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	checkIptables(t, ipt, epIpt)
 }
 func TestLoadBalanceSourceRanges(t *testing.T) {
-	nodeIP := net.ParseIP("100.101.102.103")
-	ipt, fp := buildFakeProxier([]net.IP{nodeIP})
+	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
 	svcPort := 80
@@ -988,7 +987,7 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 }
 
 func TestAcceptIPVSTraffic(t *testing.T) {
-	ipt, fp := buildFakeProxier(nil)
+	ipt, fp := buildFakeProxier()
 
 	ingressIP := "1.2.3.4"
 	externalIP := []string{"5.6.7.8"}
@@ -1053,7 +1052,7 @@ func TestAcceptIPVSTraffic(t *testing.T) {
 }
 
 func TestOnlyLocalLoadBalancing(t *testing.T) {
-	ipt, fp := buildFakeProxier(nil)
+	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
 	svcPort := 80
@@ -2548,7 +2547,7 @@ func Test_cleanLegacyService(t *testing.T) {
 	}
 }
 
-func buildFakeProxier(nodeIP []net.IP) (*iptablestest.FakeIPTables, *Proxier) {
+func buildFakeProxier() (*iptablestest.FakeIPTables, *Proxier) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
