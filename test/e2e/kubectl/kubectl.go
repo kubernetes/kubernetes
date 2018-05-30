@@ -1444,8 +1444,11 @@ metadata:
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
 
+			err := framework.WaitForJobGone(c, ns, jobName, wait.ForeverTestTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
 			By("verifying the job " + jobName + " was deleted")
-			_, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+			_, err = c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 			Expect(err).To(HaveOccurred())
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		})
