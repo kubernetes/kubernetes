@@ -119,13 +119,16 @@ var AllServices = []*ServiceInfo{
 		},
 	},
 	{
-		Object:            "BackendService",
-		Service:           "BackendServices",
-		Resource:          "backendServices",
-		version:           VersionAlpha,
-		keyType:           Global,
-		serviceType:       reflect.TypeOf(&alpha.BackendServicesService{}),
-		additionalMethods: []string{"Update"},
+		Object:      "BackendService",
+		Service:     "BackendServices",
+		Resource:    "backendServices",
+		version:     VersionAlpha,
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&alpha.BackendServicesService{}),
+		additionalMethods: []string{
+			"Update",
+			"SetSecurityPolicy",
+		},
 	},
 	{
 		Object:      "BackendService",
