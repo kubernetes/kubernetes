@@ -99,6 +99,8 @@ func Convert_clientauthentication_ExecCredentialSpec_To_v1alpha1_ExecCredentialS
 func autoConvert_v1alpha1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(in *ExecCredentialStatus, out *clientauthentication.ExecCredentialStatus, s conversion.Scope) error {
 	out.ExpirationTimestamp = (*v1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
 	out.Token = in.Token
+	out.ClientCertificateData = in.ClientCertificateData
+	out.ClientKeyData = in.ClientKeyData
 	return nil
 }
 
@@ -110,6 +112,8 @@ func Convert_v1alpha1_ExecCredentialStatus_To_clientauthentication_ExecCredentia
 func autoConvert_clientauthentication_ExecCredentialStatus_To_v1alpha1_ExecCredentialStatus(in *clientauthentication.ExecCredentialStatus, out *ExecCredentialStatus, s conversion.Scope) error {
 	out.ExpirationTimestamp = (*v1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
 	out.Token = in.Token
+	out.ClientCertificateData = in.ClientCertificateData
+	out.ClientKeyData = in.ClientKeyData
 	return nil
 }
 
