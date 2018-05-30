@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strings"
 
 	"github.com/golang/glog"
@@ -30,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -43,6 +45,7 @@ import (
 )
 
 const (
+	// TODO: Figure out how to get these constants from the API machinery
 	masterConfig = "MasterConfiguration"
 	nodeConfig   = "NodeConfiguration"
 	sillyToken   = "abcdef.0123456789abcdef"
@@ -74,6 +77,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster.")
 
 	cmd.AddCommand(NewCmdConfigPrintDefault(out))
+	cmd.AddCommand(NewCmdConfigMigrate(out))
 	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigImages(out))
@@ -136,6 +140,71 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
 	return []byte{}, fmt.Errorf("--api-object needs to be one of %v", availableAPIObjects)
+}
+
+// NewCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
+func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
+	var oldCfgPath, newCfgPath string
+	cmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Read an older version of the kubeadm configuration API types from a file, and output the similar config object for the newer version.",
+		Long: fmt.Sprintf(dedent.Dedent(`
+			This command lets you convert configuration objects of older versions to the latest supported version,
+			locally in the CLI tool without ever touching anything in the cluster.
+			In this version of kubeadm, the following API versions are supported:
+			- %s
+			- %s
+
+			Further, kubeadm can only write out config of version %q, but read both types.
+			So regardless of what version you pass to the --old-config parameter here, the API object will be
+			read, deserialized, defaulted, converted, validated, and re-serialized when written to stdout or
+			--new-config if specified.
+
+			In other words, the output of this command is what kubeadm actually would read internally if you
+			submitted this file to "kubeadm init"
+		`), kubeadmapiv1alpha2.SchemeGroupVersion.String(), kubeadmapiv1alpha1.SchemeGroupVersion.String(), kubeadmapiv1alpha2.SchemeGroupVersion.String()),
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(oldCfgPath) == 0 {
+				kubeadmutil.CheckErr(fmt.Errorf("The --old-config flag is mandatory"))
+			}
+
+			b, err := ioutil.ReadFile(oldCfgPath)
+			kubeadmutil.CheckErr(err)
+
+			var outputBytes []byte
+			gvk, err := kubeadmutil.GroupVersionKindFromBytes(b, kubeadmscheme.Codecs)
+			kubeadmutil.CheckErr(err)
+
+			switch gvk.Kind {
+			case masterConfig:
+				internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(oldCfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
+				kubeadmutil.CheckErr(err)
+
+				outputBytes, err = kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
+				kubeadmutil.CheckErr(err)
+			case nodeConfig:
+				internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(oldCfgPath, &kubeadmapiv1alpha2.NodeConfiguration{})
+				kubeadmutil.CheckErr(err)
+
+				// TODO: In the future we might not want to duplicate these two lines of code for every case here.
+				outputBytes, err = kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
+				kubeadmutil.CheckErr(err)
+			default:
+				kubeadmutil.CheckErr(fmt.Errorf("Didn't recognize type with GroupVersionKind: %v", gvk))
+			}
+
+			if newCfgPath == "" {
+				fmt.Fprintf(out, string(outputBytes))
+			} else {
+				if err := ioutil.WriteFile(newCfgPath, outputBytes, 0644); err != nil {
+					kubeadmutil.CheckErr(fmt.Errorf("failed to write the new configuration to the file %q: %v", newCfgPath, err))
+				}
+			}
+		},
+	}
+	cmd.Flags().StringVar(&oldCfgPath, "old-config", "", "Path to the kubeadm config file that is using an old API version and should be converted. This flag is mandatory.")
+	cmd.Flags().StringVar(&newCfgPath, "new-config", "", "Path to the resulting equivalent kubeadm config file using the new API version. Optional, if not specified output will be sent to STDOUT.")
+	return cmd
 }
 
 // NewCmdConfigUpload returns cobra.Command for "kubeadm config upload" command
