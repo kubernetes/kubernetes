@@ -416,6 +416,13 @@ func (sched *Scheduler) scheduleOne() {
 			metrics.PreemptionAttempts.Inc()
 			metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
 			metrics.SchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
+			// Pod did not fit anywhere, so it is counted as a failure. If preemption
+			// succeeds, the pod should get counted as a success the next time we try to
+			// schedule it. (hopefully)
+			metrics.PodScheduleFailures.Inc()
+		} else {
+			glog.Errorf("error selecting node for pod: %v", err)
+			metrics.PodScheduleErrors.Inc()
 		}
 		return
 	}
@@ -433,20 +440,26 @@ func (sched *Scheduler) scheduleOne() {
 	// This function modifies 'assumedPod' if volume binding is required.
 	allBound, err := sched.assumeVolumes(assumedPod, suggestedHost)
 	if err != nil {
+		glog.Errorf("error assuming volumes: %v", err)
+		metrics.PodScheduleErrors.Inc()
 		return
 	}
 
 	// assume modifies `assumedPod` by setting NodeName=suggestedHost
 	err = sched.assume(assumedPod, suggestedHost)
 	if err != nil {
+		glog.Errorf("error assuming pod: %v", err)
+		metrics.PodScheduleErrors.Inc()
 		return
 	}
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
 		// Bind volumes first before Pod
 		if !allBound {
-			err = sched.bindVolumes(assumedPod)
+			err := sched.bindVolumes(assumedPod)
 			if err != nil {
+				glog.Errorf("error binding volumes: %v", err)
+				metrics.PodScheduleErrors.Inc()
 				return
 			}
 		}
@@ -460,7 +473,10 @@ func (sched *Scheduler) scheduleOne() {
 		})
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 		if err != nil {
-			glog.Errorf("Internal error binding pod: (%v)", err)
+			glog.Errorf("error binding pod: %v", err)
+			metrics.PodScheduleErrors.Inc()
+		} else {
+			metrics.PodScheduleSuccesses.Inc()
 		}
 	}()
 }
