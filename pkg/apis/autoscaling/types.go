@@ -420,3 +420,210 @@ type HorizontalPodAutoscalerList struct {
 	// Items is the list of horizontal pod autoscaler objects.
 	Items []HorizontalPodAutoscaler
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VerticalPodAutoscalerList is a list of VerticalPodAutoscaler objects.
+type VerticalPodAutoscalerList struct {
+	metav1.TypeMeta
+	// metadata is the standard list metadata.
+	// +optional
+	metav1.ListMeta
+
+	// items is the list of vertical pod autoscaler objects.
+	Items []VerticalPodAutoscaler
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VerticalPodAutoscaler is the configuration for a vertical pod
+// autoscaler, which automatically manages pod resources based on historical and
+// real time resource utilization.
+type VerticalPodAutoscaler struct {
+	metav1.TypeMeta
+	// Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Specification of the behavior of the autoscaler.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+	Spec VerticalPodAutoscalerSpec
+
+	// Current information about the autoscaler.
+	// +optional
+	Status VerticalPodAutoscalerStatus
+}
+
+// VerticalPodAutoscalerSpec is the specification of the behavior of the autoscaler.
+type VerticalPodAutoscalerSpec struct {
+	// A label query that determines the set of pods controlled by the Autoscaler.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+	Selector *metav1.LabelSelector
+
+	// Describes the rules on how changes are applied to the pods.
+	// If not specified, all fields in the `PodUpdatePolicy` are set to their
+	// default values.
+	// +optional
+	UpdatePolicy *PodUpdatePolicy
+
+	// Controls how the autoscaler computes recommended resources.
+	// The resource policy may be used to set constraints on the recommendations
+	// for individual containers. If not specified, the autoscaler computes recommended
+	// resources for all containers in the pod, without additional constraints.
+	// +optional
+	ResourcePolicy *PodResourcePolicy
+}
+
+// PodUpdatePolicy describes the rules on how changes are applied to the pods.
+type PodUpdatePolicy struct {
+	// Controls when autoscaler applies changes to the pod resources.
+	// The default is 'Auto'.
+	// +optional
+	UpdateMode *UpdateMode
+}
+
+// UpdateMode controls when autoscaler applies changes to the pod resoures.
+type UpdateMode string
+
+const (
+	// UpdateModeOff means that autoscaler never changes Pod resources.
+	// The recommender still sets the recommended resources in the
+	// VerticalPodAutoscaler object. This can be used for a "dry run".
+	UpdateModeOff UpdateMode = "Off"
+	// UpdateModeInitial means that autoscaler only assigns resources on pod
+	// creation and does not change them during the lifetime of the pod.
+	UpdateModeInitial UpdateMode = "Initial"
+	// UpdateModeRecreate means that autoscaler assigns resources on pod
+	// creation and additionally can update them during the lifetime of the
+	// pod by deleting and recreating the pod.
+	UpdateModeRecreate UpdateMode = "Recreate"
+	// UpdateModeAuto means that autoscaler assigns resources on pod creation
+	// and additionally can update them during the lifetime of the pod,
+	// using any available update method. Currently this is equivalent to
+	// Recreate, which is the only available update method.
+	UpdateModeAuto UpdateMode = "Auto"
+)
+
+// PodResourcePolicy controls how autoscaler computes the recommended resources
+// for containers belonging to the pod. There can be at most one entry for every
+// named container and optionally a single wildcard entry with `containerName` = '*',
+// which handles all containers that don't have individual policies.
+type PodResourcePolicy struct {
+	// Per-container resource policies.
+	// +optional
+	// +patchMergeKey=containerName
+	// +patchStrategy=merge
+	ContainerPolicies []ContainerResourcePolicy
+}
+
+// ContainerResourcePolicy controls how autoscaler computes the recommended
+// resources for a specific container.
+type ContainerResourcePolicy struct {
+	// Name of the container or DefaultContainerResourcePolicy, in which
+	// case the policy is used by the containers that don't have their own
+	// policy specified.
+	ContainerName string
+	// Whether autoscaler is enabled for the container. The default is "Auto".
+	// +optional
+	Mode *ContainerScalingMode
+	// Specifies the minimal amount of resources that will be recommended
+	// for the container. The default is no minimum.
+	// +optional
+	MinAllowed api.ResourceList
+	// Specifies the maximum amount of resources that will be recommended
+	// for the container. The default is no maximum.
+	// +optional
+	MaxAllowed api.ResourceList
+}
+
+const (
+	// DefaultContainerResourcePolicy can be passed as
+	// ContainerResourcePolicy.ContainerName to specify the default policy.
+	DefaultContainerResourcePolicy = "*"
+)
+
+// ContainerScalingMode controls whether autoscaler is enabled for a specific
+// container.
+type ContainerScalingMode string
+
+const (
+	// ContainerScalingModeAuto means autoscaling is enabled for a container.
+	ContainerScalingModeAuto ContainerScalingMode = "Auto"
+	// ContainerScalingModeOff means autoscaling is disabled for a container.
+	ContainerScalingModeOff ContainerScalingMode = "Off"
+)
+
+// VerticalPodAutoscalerStatus describes the runtime state of the autoscaler.
+type VerticalPodAutoscalerStatus struct {
+	// The most recently computed amount of resources recommended by the
+	// autoscaler for the controlled pods.
+	// +optional
+	Recommendation *RecommendedPodResources
+
+	// Conditions is the set of conditions required for this autoscaler to scale its target,
+	// and indicates whether or not those conditions are met.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []VerticalPodAutoscalerCondition
+}
+
+// RecommendedPodResources is the recommendation of resources computed by
+// autoscaler. It contains a recommendation for each container in the pod
+// (except for those with `ContainerScalingMode` set to 'Off').
+type RecommendedPodResources struct {
+	// Resources recommended by the autoscaler for each container.
+	// +optional
+	ContainerRecommendations []RecommendedContainerResources
+}
+
+// RecommendedContainerResources is the recommendation of resources computed by
+// autoscaler for a specific container. Respects the container resource policy
+// if present in the spec. In particular the recommendation is not produced for
+// containers with `ContainerScalingMode` set to 'Off'.
+type RecommendedContainerResources struct {
+	// Name of the container.
+	ContainerName string
+	// Recommended amount of resources.
+	Target api.ResourceList
+	// Minimum recommended amount of resources.
+	// This amount is not guaranteed to be sufficient for the application to operate in a stable way, however
+	// running with less resources is likely to have significant impact on performance/availability.
+	// +optional
+	LowerBound api.ResourceList
+	// Maximum recommended amount of resources.
+	// Any resources allocated beyond this value are likely wasted. This value may be larger than the maximum
+	// amount of application is actually capable of consuming.
+	// +optional
+	UpperBound api.ResourceList
+}
+
+// VerticalPodAutoscalerConditionType are the valid conditions of
+// a VerticalPodAutoscaler.
+type VerticalPodAutoscalerConditionType string
+
+var (
+	// RecommendationProvided indicates whether the VPA recommender was able to calculate a recommendation.
+	RecommendationProvided VerticalPodAutoscalerConditionType = "RecommendationProvided"
+)
+
+// VerticalPodAutoscalerCondition describes the state of
+// a VerticalPodAutoscaler at a certain point.
+type VerticalPodAutoscalerCondition struct {
+	// type describes the current condition
+	Type VerticalPodAutoscalerConditionType
+	// status is the status of the condition (True, False, Unknown)
+	Status api.ConditionStatus
+	// lastTransitionTime is the last time the condition transitioned from
+	// one status to another
+	// +optional
+	LastTransitionTime metav1.Time
+	// reason is the reason for the condition's last transition.
+	// +optional
+	Reason string
+	// message is a human-readable explanation containing details about
+	// the transition
+	// +optional
+	Message string
+}
