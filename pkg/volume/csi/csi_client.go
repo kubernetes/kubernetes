@@ -77,29 +77,52 @@ func newCsiDriverClient(network, addr string) *csiDriverClient {
 	return &csiDriverClient{network: network, addr: addr}
 }
 
-// assertConnection ensures a valid connection has been established
-// if not, it creates a new connection and associated clients
-func (c *csiDriverClient) assertConnection() error {
-	if c.conn == nil {
-		conn, err := grpc.Dial(
-			c.addr,
-			grpc.WithInsecure(),
-			grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
-				return net.Dial(c.network, target)
-			}),
-		)
-		if err != nil {
-			return err
-		}
-		c.conn = conn
-		c.idClient = csipb.NewIdentityClient(conn)
-		c.nodeClient = csipb.NewNodeClient(conn)
-		c.ctrlClient = csipb.NewControllerClient(conn)
-
-		// set supported version
+func (c *csiDriverClient) IdentityRequest() (*grpc.ClientConn, csipb.IdentityClient, error) {
+	conn, err := grpc.Dial(
+		c.addr,
+		grpc.WithInsecure(),
+		grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
+			return net.Dial(c.network, target)
+		}),
+	)
+	if err != nil {
+		return nil, nil, err
 	}
+	c.idClient = csipb.NewIdentityClient(conn)
 
-	return nil
+	return conn, c.idClient, nil
+}
+
+func (c *csiDriverClient) NodeRequest() (*grpc.ClientConn, csipb.NodeClient, error) {
+	conn, err := grpc.Dial(
+		c.addr,
+		grpc.WithInsecure(),
+		grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
+			return net.Dial(c.network, target)
+		}),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	c.nodeClient = csipb.NewNodeClient(conn)
+
+	return conn, c.nodeClient, nil
+}
+
+func (c *csiDriverClient) ControllerRequest() (*grpc.ClientConn, csipb.ControllerClient, error) {
+	conn, err := grpc.Dial(
+		c.addr,
+		grpc.WithInsecure(),
+		grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
+			return net.Dial(c.network, target)
+		}),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	c.ctrlClient = csipb.NewControllerClient(conn)
+
+	return conn, c.ctrlClient, nil
 }
 
 func (c *csiDriverClient) NodePublishVolume(
@@ -121,10 +144,12 @@ func (c *csiDriverClient) NodePublishVolume(
 	if targetPath == "" {
 		return errors.New("missing target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+
+	conn, nodeClient, err := c.NodeRequest()
+	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	req := &csipb.NodePublishVolumeRequest{
 		VolumeId:           volID,
@@ -148,7 +173,7 @@ func (c *csiDriverClient) NodePublishVolume(
 		req.StagingTargetPath = stagingTargetPath
 	}
 
-	_, err := c.nodeClient.NodePublishVolume(ctx, req)
+	_, err = nodeClient.NodePublishVolume(ctx, req)
 	return err
 }
 
@@ -160,17 +185,18 @@ func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string,
 	if targetPath == "" {
 		return errors.New("missing target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Error(log("failed to assert a connection: %v", err))
+	conn, nodeClient, err := c.NodeRequest()
+	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	req := &csipb.NodeUnpublishVolumeRequest{
 		VolumeId:   volID,
 		TargetPath: targetPath,
 	}
 
-	_, err := c.nodeClient.NodeUnpublishVolume(ctx, req)
+	_, err = nodeClient.NodeUnpublishVolume(ctx, req)
 	return err
 }
 
@@ -190,10 +216,11 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	if stagingTargetPath == "" {
 		return errors.New("missing staging target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+	conn, nodeClient, err := c.NodeRequest()
+	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	req := &csipb.NodeStageVolumeRequest{
 		VolumeId:          volID,
@@ -213,7 +240,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 		VolumeAttributes: volumeAttribs,
 	}
 
-	_, err := c.nodeClient.NodeStageVolume(ctx, req)
+	_, err = nodeClient.NodeStageVolume(ctx, req)
 	return err
 }
 
@@ -225,27 +252,29 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 	if stagingTargetPath == "" {
 		return errors.New("missing staging target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+	conn, nodeClient, err := c.NodeRequest()
+	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	req := &csipb.NodeUnstageVolumeRequest{
 		VolumeId:          volID,
 		StagingTargetPath: stagingTargetPath,
 	}
-	_, err := c.nodeClient.NodeUnstageVolume(ctx, req)
+	_, err = nodeClient.NodeUnstageVolume(ctx, req)
 	return err
 }
 
 func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {
 	glog.V(4).Info(log("calling NodeGetCapabilities rpc"))
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+	conn, nodeClient, err := c.NodeRequest()
+	if err != nil {
 		return nil, err
 	}
+	defer conn.Close()
 	req := &csipb.NodeGetCapabilitiesRequest{}
-	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
+	resp, err := nodeClient.NodeGetCapabilities(ctx, req)
 	if err != nil {
 		return nil, err
 	}
