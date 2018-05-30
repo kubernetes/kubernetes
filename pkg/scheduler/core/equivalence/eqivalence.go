@@ -162,7 +162,7 @@ func (c *Cache) updateResult(
 				equivalenceHash: predicateItem,
 			}
 	}
-	glog.V(5).Infof("Updated cached predicate: %v for pod: %v on node: %s, with item %v", predicateKey, podName, nodeName, predicateItem)
+	glog.V(5).Infof("Cache update: node=%s,predicate=%s,pod=%s,value=%v", nodeName, predicateKey, podName, predicateItem)
 }
 
 // lookupResult returns cached predicate results and a bool saying whether a
@@ -173,8 +173,7 @@ func (c *Cache) lookupResult(
 ) (value predicateResult, ok bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache",
-		predicateKey, podName, nodeName)
+	glog.V(5).Infof("Cache lookup: node=%s,predicate=%s,pod=%s", nodeName, predicateKey, podName)
 	value, ok = c.cache[nodeName][predicateKey][equivalenceHash]
 	return value, ok
 }
@@ -192,7 +191,7 @@ func (c *Cache) InvalidatePredicates(predicateKeys sets.String) {
 			delete(predicates, predicateKey)
 		}
 	}
-	glog.V(5).Infof("Done invalidating cached predicates: %v on all node", predicateKeys)
+	glog.V(5).Infof("Cache invalidation: node=*,predicates=%v", predicateKeys)
 }
 
 // InvalidatePredicatesOnNode clears cached results for the given predicates on one node.
@@ -205,7 +204,7 @@ func (c *Cache) InvalidatePredicatesOnNode(nodeName string, predicateKeys sets.S
 	for predicateKey := range predicateKeys {
 		delete(c.cache[nodeName], predicateKey)
 	}
-	glog.V(5).Infof("Done invalidating cached predicates: %v on node: %s", predicateKeys, nodeName)
+	glog.V(5).Infof("Cache invalidation: node=%s,predicates=%v", nodeName, predicateKeys)
 }
 
 // InvalidateAllPredicatesOnNode clears all cached results for one node.
@@ -213,7 +212,7 @@ func (c *Cache) InvalidateAllPredicatesOnNode(nodeName string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.cache, nodeName)
-	glog.V(5).Infof("Done invalidating all cached predicates on node: %s", nodeName)
+	glog.V(5).Infof("Cache invalidation: node=%s,predicates=*", nodeName)
 }
 
 // InvalidateCachedPredicateItemForPodAdd is a wrapper of
