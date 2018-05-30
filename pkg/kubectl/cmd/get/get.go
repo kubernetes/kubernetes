@@ -207,10 +207,10 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
 
-	// TODO (soltysh): currently we don't support sorting and custom columns
+	// TODO (soltysh): currently we don't support custom columns
 	// with server side print. So in these cases force the old behavior.
 	outputOption := cmd.Flags().Lookup("output").Value.String()
-	if o.Sort && outputOption == "custom-columns" {
+	if outputOption == "custom-columns" {
 		o.ServerPrint = false
 	}
 
@@ -296,6 +296,96 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
+type OriginalPositioner interface {
+	OriginalPosition(int) int
+}
+
+type NopPositioner struct{}
+
+func (t *NopPositioner) OriginalPosition(ix int) int {
+	return ix
+}
+
+type RuntimeSorter struct {
+	field      string
+	decoder    runtime.Decoder
+	objects    []runtime.Object
+	positioner OriginalPositioner
+}
+
+func (r *RuntimeSorter) Sort() error {
+	if len(r.objects) <= 1 {
+		// a list is only considered "sorted" if there are 0 or 1 items in it
+		// AND (if 1 item) the item is not a Table object
+		_, isTable := r.objects[0].(*metav1beta1.Table)
+		if len(r.objects) == 0 || !isTable {
+			return nil
+		}
+	}
+
+	includesTable := false
+	includesRuntimeObjs := false
+
+	for _, obj := range r.objects {
+		switch t := obj.(type) {
+		case *metav1beta1.Table:
+			includesTable = true
+
+			if err := kubectl.NewTableSorter(t, r.field).Sort(); err != nil {
+				continue
+			}
+		default:
+			includesRuntimeObjs = true
+		}
+	}
+
+	// we use a NopPositioner when dealing with Table objects
+	// because the objects themselves are not swapped, but rather
+	// the rows in each object are swapped / sorted.
+	r.positioner = &NopPositioner{}
+
+	if includesRuntimeObjs && includesTable {
+		return fmt.Errorf("sorting is not supported on mixed Table and non-Table object lists")
+	}
+	if includesTable {
+		return nil
+	}
+
+	// if not dealing with a Table response from the server, assume
+	// all objects are runtime.Object as usual, and sort using old method.
+	var err error
+	if r.positioner, err = kubectl.SortObjects(r.decoder, r.objects, r.field); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *RuntimeSorter) OriginalPosition(ix int) int {
+	if r.positioner == nil {
+		return 0
+	}
+	return r.positioner.OriginalPosition(ix)
+}
+
+// allows custom decoder to be set for testing
+func (r *RuntimeSorter) WithDecoder(decoder runtime.Decoder) *RuntimeSorter {
+	r.decoder = decoder
+	return r
+}
+
+func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
+	parsedField, err := printers.RelaxedJSONPathExpression(sortBy)
+	if err != nil {
+		parsedField = sortBy
+	}
+
+	return &RuntimeSorter{
+		field:   parsedField,
+		decoder: cmdutil.InternalVersionDecoder(),
+		objects: objects,
+	}
+}
+
 // Run performs the get operation.
 // TODO: remove the need to pass these arguments, like other commands.
 func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
@@ -311,6 +401,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		fmt.Fprintf(o.IOStreams.ErrOut, "warning: --%s requested, --%s will be ignored\n", useOpenAPIPrintColumnFlagLabel, useServerPrintColumns)
 	}
 
+	chunkSize := o.ChunkSize
+	if o.Sort {
+		// TODO(juanvallejo): in the future, we could have the client use chunking
+		// to gather all results, then sort them all at the end to reduce server load.
+		chunkSize = 0
+	}
+
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
@@ -318,7 +415,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
 		ExportParam(o.Export).
-		RequestChunksOf(o.ChunkSize).
+		RequestChunksOf(chunkSize).
 		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
@@ -329,12 +426,19 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			if o.PrintWithOpenAPICols {
 				return
 			}
-			if o.ServerPrint && o.IsHumanReadablePrinter && !o.Sort {
-				group := metav1beta1.GroupName
-				version := metav1beta1.SchemeGroupVersion.Version
+			if !o.ServerPrint || !o.IsHumanReadablePrinter {
+				return
+			}
 
-				tableParam := fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", version, group)
-				req.SetHeader("Accept", tableParam)
+			group := metav1beta1.GroupName
+			version := metav1beta1.SchemeGroupVersion.Version
+
+			tableParam := fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", version, group)
+			req.SetHeader("Accept", tableParam)
+
+			// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath
+			if o.Sort {
+				req.Param("includeObject", "Object")
 			}
 		}).
 		Do()
@@ -378,12 +482,14 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if err != nil {
 		return err
 	}
-	var sorter *kubectl.RuntimeSort
-	if o.Sort && len(objs) > 1 {
-		// TODO: questionable
-		if sorter, err = kubectl.SortObjects(cmdutil.InternalVersionDecoder(), objs, sorting); err != nil {
+
+	var positioner OriginalPositioner
+	if o.Sort {
+		sorter := NewRuntimeSorter(objs, sorting)
+		if err := sorter.Sort(); err != nil {
 			return err
 		}
+		positioner = sorter
 	}
 
 	var printer printers.ResourcePrinter
@@ -393,8 +499,8 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var info *resource.Info
-		if sorter != nil {
-			info = infos[sorter.OriginalPosition(ix)]
+		if positioner != nil {
+			info = infos[positioner.OriginalPosition(ix)]
 			mapping = info.Mapping
 		} else {
 			info = infos[ix]

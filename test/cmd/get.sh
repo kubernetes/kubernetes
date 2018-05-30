@@ -240,6 +240,11 @@ run_kubectl_sort_by_tests() {
   # Check output of sort-by
   output_message=$(kubectl get pods --sort-by="{metadata.name}")
   kube::test::if_has_string "${output_message}" "valid-pod"
+  # ensure sort-by receivers objects as Table
+  output_message=$(kubectl get pods --v=8 --sort-by="{metadata.name}" 2>&1)
+  kube::test::if_has_string "${output_message}" "as=Table"
+  # ensure sort-by requests the full object
+  kube::test::if_has_string "${output_message}" "includeObject=Object"
   ### Clean up
   # Pre-condition: valid-pod exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
@@ -272,6 +277,19 @@ run_kubectl_sort_by_tests() {
   # Check output of sort-by '{metadata.labels.name}'
   output_message=$(kubectl get pods --sort-by="{metadata.labels.name}")
   kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod3:sorted-pod2:sorted-pod1:"
+
+  # if sorting, we should be able to use any field in our objects
+  output_message=$(kubectl get pods --sort-by="{spec.containers[0].name}")
+  kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod2:sorted-pod1:sorted-pod3:"
+
+  # ensure sorting by creation timestamps works
+  output_message=$(kubectl get pods --sort-by="{metadata.creationTimestamp}")
+  kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod1:sorted-pod2:sorted-pod3:"
+
+  # ensure sorting using fallback codepath still works
+  output_message=$(kubectl get pods --sort-by="{spec.containers[0].name}" --server-print=false --v=8 2>&1)
+  kube::test::if_sort_by_has_correct_order "${output_message}" "sorted-pod2:sorted-pod1:sorted-pod3:"
+  kube::test::if_has_not_string "${output_message}" "Table"
 
   ### Clean up
   # Pre-condition: valid-pod exists
