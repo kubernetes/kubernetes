@@ -165,8 +165,8 @@ const (
 	APICallRetryInterval = 500 * time.Millisecond
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
-	// MarkMasterTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
-	MarkMasterTimeout = 2 * time.Minute
+	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
+	PatchNodeTimeout = 2 * time.Minute
 	// UpdateNodeTimeout specifies how long kubeadm should wait for updating node with the initial remote configuration of kubelet before timing out
 	UpdateNodeTimeout = 2 * time.Minute
 
@@ -294,9 +294,6 @@ var (
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
 	MinimumKubeletVersion = version.MustParseSemantic("v1.10.0")
-
-	// MinimumKubeletConfigVersion specifies the minimum version of Kubernetes where kubeadm supports specifying --config to the kubelet
-	MinimumKubeletConfigVersion = version.MustParseSemantic("v1.11.0-alpha.1")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{

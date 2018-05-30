@@ -20,15 +20,20 @@ import (
 	"reflect"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
 		Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration,
+		Convert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration,
+		Convert_v1alpha1_NodeConfiguration_To_kubeadm_NodeConfiguration,
+		Convert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration,
 		Convert_v1alpha1_Etcd_To_kubeadm_Etcd,
 		Convert_kubeadm_Etcd_To_v1alpha1_Etcd,
 	)
@@ -39,6 +44,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Upgrades below
+
 func Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in *MasterConfiguration, out *kubeadm.MasterConfiguration, s conversion.Scope) error {
 	if err := autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in, out, s); err != nil {
 		return err
@@ -46,8 +53,22 @@ func Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 
 	UpgradeCloudProvider(in, out)
 	UpgradeAuthorizationModes(in, out)
+	UpgradeNodeRegistrationOptionsForMaster(in, out)
 	// We don't support migrating information from the .PrivilegedPods field which was removed in v1alpha2
 	// We don't support migrating information from the .ImagePullPolicy field which was removed in v1alpha2
+
+	return nil
+}
+
+func Convert_v1alpha1_NodeConfiguration_To_kubeadm_NodeConfiguration(in *NodeConfiguration, out *kubeadm.NodeConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1alpha1_NodeConfiguration_To_kubeadm_NodeConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	// .NodeName has moved to .NodeRegistration.Name
+	out.NodeRegistration.Name = in.NodeName
+	// .CRISocket has moved to .NodeRegistration.CRISocket
+	out.NodeRegistration.CRISocket = in.CRISocket
 
 	return nil
 }
@@ -122,4 +143,46 @@ func UpgradeAuthorizationModes(in *MasterConfiguration, out *kubeadm.MasterConfi
 		}
 		out.APIServerExtraArgs["authorization-mode"] = strings.Join(in.AuthorizationModes, ",")
 	}
+}
+
+func UpgradeNodeRegistrationOptionsForMaster(in *MasterConfiguration, out *kubeadm.MasterConfiguration) {
+	// .NodeName has moved to .NodeRegistration.Name
+	out.NodeRegistration.Name = in.NodeName
+
+	// .CRISocket has moved to .NodeRegistration.CRISocket
+	out.NodeRegistration.CRISocket = in.CRISocket
+
+	// Transfer the information from .NoTaintMaster to the new layout
+	if in.NoTaintMaster {
+		out.NodeRegistration.Taints = []v1.Taint{}
+	} else {
+		out.NodeRegistration.Taints = []v1.Taint{constants.MasterTaint}
+	}
+}
+
+// Downgrades below
+
+func Convert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in *kubeadm.MasterConfiguration, out *MasterConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	// Converting from newer API version to an older API version isn't supported. This is here only for the roundtrip tests meanwhile.
+	out.NodeName = in.NodeRegistration.Name
+	out.CRISocket = in.NodeRegistration.CRISocket
+	out.NoTaintMaster = in.NodeRegistration.Taints != nil && len(in.NodeRegistration.Taints) == 0
+
+	return nil
+}
+
+func Convert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in *kubeadm.NodeConfiguration, out *NodeConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	// Converting from newer API version to an older API version isn't supported. This is here only for the roundtrip tests meanwhile.
+	out.NodeName = in.NodeRegistration.Name
+	out.CRISocket = in.NodeRegistration.CRISocket
+
+	return nil
 }

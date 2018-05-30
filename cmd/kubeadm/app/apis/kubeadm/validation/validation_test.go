@@ -119,7 +119,7 @@ func TestValidateNodeName(t *testing.T) {
 		actual := ValidateNodeName(rt.s, rt.f)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed ValidateNodeName:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateNodeRegistration: kubeadm.NodeRegistrationOptions{Name:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
 			)
@@ -407,8 +407,8 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
 				},
-				CertificatesDir: "/some/cert/dir",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/cert/dir",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.MasterConfiguration{
@@ -420,8 +420,8 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					ServiceSubnet: "2001:db8::1/98",
 					DNSDomain:     "cluster.local",
 				},
-				CertificatesDir: "/some/cert/dir",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/cert/dir",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.MasterConfiguration{
@@ -447,9 +447,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					DNSDomain:     "cluster.local",
 					PodSubnet:     "10.0.1.15",
 				},
-				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/other/cert/dir",
+				Token:            "abcdef.0123456789abcdef",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"valid master configuration with IPv4 service subnet",
 			&kubeadm.MasterConfiguration{
@@ -493,9 +493,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					DNSDomain:     "cluster.local",
 					PodSubnet:     "10.0.1.15/16",
 				},
-				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/other/cert/dir",
+				Token:            "abcdef.0123456789abcdef",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 		{"valid master configuration using IPv6 service subnet",
 			&kubeadm.MasterConfiguration{
@@ -538,9 +538,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					ServiceSubnet: "2001:db8::1/98",
 					DNSDomain:     "cluster.local",
 				},
-				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/other/cert/dir",
+				Token:            "abcdef.0123456789abcdef",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 	}
 	for _, rt := range tests {

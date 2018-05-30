@@ -40,15 +40,12 @@ type MasterConfiguration struct {
 	KubeletConfiguration KubeletConfiguration `json:"kubeletConfiguration"`
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking `json:"networking"`
+
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration"`
+
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string `json:"kubernetesVersion"`
-	// NodeName is the name of the node that will host the k8s control plane.
-	// Defaults to the hostname if not provided.
-	NodeName string `json:"nodeName"`
-	// NoTaintMaster will, if set, suppress the tainting of the
-	// master node allowing workloads to be run on it (e.g. in
-	// single node configurations).
-	NoTaintMaster bool `json:"noTaintMaster,omitempty"`
 
 	// Token is used for establishing bidirectional trust between nodes and masters.
 	// Used for joining nodes in the cluster.
@@ -59,9 +56,6 @@ type MasterConfiguration struct {
 	TokenUsages []string `json:"tokenUsages,omitempty"`
 	// Extra groups that this token will authenticate as when used for authentication
 	TokenGroups []string `json:"tokenGroups,omitempty"`
-
-	// CRISocket is used to retrieve container runtime info.
-	CRISocket string `json:"criSocket,omitempty"`
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -127,6 +121,28 @@ type API struct {
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
 	BindPort int32 `json:"bindPort"`
+}
+
+// NodeRegistrationOptions holds fields that relate to registering a new master or node to the cluster, either via "kubeadm init" or "kubeadm join"
+type NodeRegistrationOptions struct {
+
+	// Name is the `.Metadata.Name` field of the Node API object that will be created in this `kubeadm init` or `kubeadm joiń` operation.
+	// This field is also used in the CommonName field of the kubelet's client certificate to the API server.
+	// Defaults to the hostname of the node if not provided.
+	Name string `json:"name"`
+
+	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
+	CRISocket string `json:"criSocket"`
+
+	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
+	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your master node, set this field to an
+	// empty slice, i.e. `taints: {}` in the YAML file. This field is solely used for Node registration.
+	Taints []v1.Taint `json:"taints,omitempty"`
+
+	// ExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
+	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
+	// Flags have higher higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	ExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 }
 
 // TokenDiscovery contains elements needed for token discovery.
@@ -206,6 +222,9 @@ type ExternalEtcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration"`
+
 	// CACertPath is the path to the SSL certificate authority used to
 	// secure comunications between node and master.
 	// Defaults to "/etc/kubernetes/pki/ca.crt".
@@ -222,16 +241,12 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers,omitempty"`
 	// DiscoveryTimeout modifies the discovery timeout
 	DiscoveryTimeout *metav1.Duration `json:"discoveryTimeout,omitempty"`
-	// NodeName is the name of the node to join the cluster. Defaults
-	// to the name of the host.
-	NodeName string `json:"nodeName"`
 	// TLSBootstrapToken is a token used for TLS bootstrapping.
 	// Defaults to Token.
 	TLSBootstrapToken string `json:"tlsBootstrapToken"`
 	// Token is used for both discovery and TLS bootstrapping.
 	Token string `json:"token"`
-	// CRISocket is used to retrieve container runtime info.
-	CRISocket string `json:"criSocket,omitempty"`
+
 	// ClusterName is the name for the cluster in kubeconfig.
 	ClusterName string `json:"clusterName,omitempty"`
 

@@ -401,5 +401,5 @@ func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.M
 
 // AddImagesPullFlags adds flags related to the `kubeadm config images pull` command
 func AddImagesPullFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterConfiguration) {
-	flagSet.StringVar(&cfg.CRISocket, "cri-socket-path", cfg.CRISocket, "Path to the CRI socket.")
+	flagSet.StringVar(&cfg.NodeRegistration.CRISocket, "cri-socket-path", cfg.NodeRegistration.CRISocket, "Path to the CRI socket.")
 }

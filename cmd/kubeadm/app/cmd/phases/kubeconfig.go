@@ -184,7 +184,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 		cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, "The port the API server is accessible on")
 		cmd.Flags().StringVar(&outDir, "kubeconfig-dir", outDir, "The path where to save the kubeconfig file")
 		if properties.use == "all" || properties.use == "kubelet" {
-			cmd.Flags().StringVar(&cfg.NodeName, "node-name", cfg.NodeName, `The node name that should be used for the kubelet client certificate`)
+			cmd.Flags().StringVar(&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name, `The node name that should be used for the kubelet client certificate`)
 		}
 		if properties.use == "user" {
 			cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig, instead of client certificates")
