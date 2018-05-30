@@ -14,6 +14,7 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
+        "//pkg/controller/volume/attachdetach/metrics:go_default_library",
         "//pkg/controller/volume/attachdetach/populator:go_default_library",
         "//pkg/controller/volume/attachdetach/reconciler:go_default_library",
         "//pkg/controller/volume/attachdetach/statusupdater:go_default_library",
@@ -69,6 +70,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/controller/volume/attachdetach/cache:all-srcs",
+        "//pkg/controller/volume/attachdetach/metrics:all-srcs",
         "//pkg/controller/volume/attachdetach/populator:all-srcs",
         "//pkg/controller/volume/attachdetach/reconciler:all-srcs",
         "//pkg/controller/volume/attachdetach/statusupdater:all-srcs",
