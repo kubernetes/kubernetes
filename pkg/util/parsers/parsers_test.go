@@ -49,3 +49,50 @@ func TestParseImageName(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyDefaultImageTag(t *testing.T) {
+	for _, testCase := range []struct {
+		Input  string
+		Output string
+	}{
+		{Input: "root", Output: "root:latest"},
+		{Input: "root:tag", Output: "root:tag"},
+		{Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+		{Input: "docker.io/root:tag", Output: "docker.io/root:tag"},
+		{Input: "docker.io/root", Output: "docker.io/root:latest"},
+		{Input: "gcr.io/root:tag", Output: "gcr.io/root:tag"},
+	} {
+		image, err := ApplyDefaultImageTag(testCase.Input)
+		if err != nil {
+			t.Errorf("ApplyDefaultImageTag(%s) failed: %v", testCase.Input, err)
+		} else if image != testCase.Output {
+			t.Errorf("Expected image reference: %q, got %q", testCase.Output, image)
+		}
+	}
+}
+
+func TestGetFullImageName(t *testing.T) {
+	testCases := []struct {
+		Input  string
+		Output string
+	}{
+		{Input: "root", Output: "docker.io/library/root:latest"},
+		{Input: "root:tag", Output: "docker.io/library/root:tag"},
+		{Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "docker.io/library/root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+		{Input: "user/repo", Output: "docker.io/user/repo:latest"},
+		{Input: "k8s.gcr.io/root:tag", Output: "k8s.gcr.io/root:tag"},
+		{Input: "user/repo:tag", Output: "docker.io/user/repo:tag"},
+		{Input: "user/repo@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "docker.io/user/repo@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+		{Input: "url:5000/repo", Output: "url:5000/repo:latest"},
+		{Input: "url:5000/repo:tag", Output: "url:5000/repo:tag"},
+		{Input: "url:5000/repo@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "url:5000/repo@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+	}
+	for _, testCase := range testCases {
+		fullImageName, err := GetFullImageName(testCase.Input)
+		if err != nil {
+			t.Errorf("GetFullImageName(%s) failed: %v", testCase.Input, err)
+		} else if testCase.Output != fullImageName {
+			t.Errorf("Expected output: %q, got: %q", testCase.Output, fullImageName)
+		}
+	}
+}

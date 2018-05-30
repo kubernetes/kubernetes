@@ -19,7 +19,6 @@ package images
 import (
 	"fmt"
 
-	dockerref "github.com/docker/distribution/reference"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -91,7 +90,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	}
 
 	// If the image contains no tag or digest, a default tag should be applied.
-	image, err := applyDefaultImageTag(container.Image)
+	image, err := parsers.ApplyDefaultImageTag(container.Image)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to apply default image tag %q: %v", container.Image, err)
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, glog.Warning)
@@ -142,24 +141,4 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
-}
-
-// applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
-// a default tag will be applied.
-func applyDefaultImageTag(image string) (string, error) {
-	named, err := dockerref.ParseNormalizedNamed(image)
-	if err != nil {
-		return "", fmt.Errorf("couldn't parse image reference %q: %v", image, err)
-	}
-	_, isTagged := named.(dockerref.Tagged)
-	_, isDigested := named.(dockerref.Digested)
-	if !isTagged && !isDigested {
-		// we just concatenate the image name with the default tag here instead
-		// of using dockerref.WithTag(named, ...) because that would cause the
-		// image to be fully qualified as docker.io/$name if it's a short name
-		// (e.g. just busybox). We don't want that to happen to keep the CRI
-		// agnostic wrt image names and default hostnames.
-		image = image + ":" + parsers.DefaultImageTag
-	}
-	return image, nil
 }

@@ -56,3 +56,38 @@ func ParseImageName(image string) (string, string, string, error) {
 	}
 	return repoToPull, tag, digest, nil
 }
+
+// ApplyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
+// a default tag will be applied.
+func ApplyDefaultImageTag(image string) (string, error) {
+	named, err := dockerref.ParseNormalizedNamed(image)
+	if err != nil {
+		return "", fmt.Errorf("couldn't parse image reference %q: %v", image, err)
+	}
+	_, isTagged := named.(dockerref.Tagged)
+	_, isDigested := named.(dockerref.Digested)
+	if !isTagged && !isDigested {
+		// we just concatenate the image name with the default tag here instead
+		// of using dockerref.WithTag(named, ...) because that would cause the
+		// image to be fully qualified as docker.io/$name if it's a short name
+		// (e.g. just busybox). We don't want that to happen to keep the CRI
+		// agnostic wrt image names and default hostnames.
+		image = image + ":" + DefaultImageTag
+	}
+	return image, nil
+}
+
+// GetFullImageName parses a docker image string to its fully qualified name.
+func GetFullImageName(image string) (string, error) {
+	repo, tag, digest, err := ParseImageName(image)
+
+	if err != nil {
+		return "", err
+	}
+
+	if len(tag) != 0 {
+		return repo + ":" + tag, nil
+	}
+
+	return repo + "@" + digest, nil
+}

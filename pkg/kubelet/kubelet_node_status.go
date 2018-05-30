@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,10 +41,12 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/kubernetes/pkg/version"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -726,7 +729,13 @@ func (kl *Kubelet) setNodeStatusImages(node *v1.Node) {
 	}
 
 	for _, image := range containerImages {
-		names := append(image.RepoDigests, image.RepoTags...)
+		fullDigests, fullTags, err := getFullImageNames(image)
+		if err != nil {
+			glog.Errorf("failed to get full image names for : %v, %v", image, err)
+			node.Status.Images = imagesOnNode
+			return
+		}
+		names := append(fullDigests, fullTags...)
 		// Report up to maxNamesPerImageInNodeStatus names per image.
 		if len(names) > maxNamesPerImageInNodeStatus {
 			names = names[0:maxNamesPerImageInNodeStatus]
@@ -738,6 +747,29 @@ func (kl *Kubelet) setNodeStatusImages(node *v1.Node) {
 	}
 
 	node.Status.Images = imagesOnNode
+}
+
+// getFullImageNames returns full qualified tags and digests for given image.
+func getFullImageNames(image kubecontainer.Image) ([]string, []string, error) {
+	// set the full qualified name of digests and tags to eliminate inconsistency image
+	// names returned by different container runtimes.
+	fullDigests := []string{}
+	for _, digest := range image.RepoDigests {
+		if d, err := parsers.GetFullImageName(digest); err != nil {
+			return nil, nil, err
+		} else {
+			fullDigests = append(fullDigests, d)
+		}
+	}
+	fullTags := []string{}
+	for _, tag := range image.RepoTags {
+		if t, err := parsers.GetFullImageName(tag); err != nil {
+			return nil, nil, err
+		} else {
+			fullTags = append(fullTags, t)
+		}
+	}
+	return fullDigests, fullTags, nil
 }
 
 // Set the GOOS and GOARCH for this node

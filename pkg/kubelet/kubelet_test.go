@@ -124,12 +124,12 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 	imageList := []kubecontainer.Image{
 		{
 			ID:       "abc",
-			RepoTags: []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
+			RepoTags: []string{"k8s.gcr.io/test-image:v1", "k8s.gcr.io/test-image:v2"},
 			Size:     123,
 		},
 		{
 			ID:       "efg",
-			RepoTags: []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
+			RepoTags: []string{"k8s.gcr.io/test-image:v3", "k8s.gcr.io/test-image:v4"},
 			Size:     456,
 		},
 	}
