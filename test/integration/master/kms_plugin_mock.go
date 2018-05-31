@@ -23,9 +23,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
-	"os"
 
-	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 
 	"github.com/golang/glog"
@@ -34,7 +32,7 @@ import (
 
 const (
 	kmsAPIVersion = "v1beta1"
-	sockFile      = "/tmp/kms-provider.sock"
+	sockFile      = "@kms-provider.sock"
 	unixProtocol  = "unix"
 )
 
@@ -49,10 +47,6 @@ type base64Plugin struct {
 }
 
 func NewBase64Plugin() (*base64Plugin, error) {
-	if err := cleanSockFile(); err != nil {
-		return nil, err
-	}
-
 	listener, err := net.Listen(unixProtocol, sockFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on the unix socket, error: %v", err)
@@ -75,7 +69,6 @@ func NewBase64Plugin() (*base64Plugin, error) {
 func (s *base64Plugin) cleanUp() {
 	s.grpcServer.Stop()
 	s.listener.Close()
-	cleanSockFile()
 }
 
 var testProviderAPIVersion = kmsAPIVersion
@@ -104,12 +97,4 @@ func (s *base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptReque
 	base64.StdEncoding.Encode(buf, request.Plain)
 
 	return &kmsapi.EncryptResponse{Cipher: buf}, nil
-}
-
-func cleanSockFile() error {
-	err := unix.Unlink(sockFile)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to delete the socket file, error: %v", err)
-	}
-	return nil
 }
