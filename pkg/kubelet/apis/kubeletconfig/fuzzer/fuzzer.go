@@ -49,7 +49,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.EventBurst = 10
 			obj.EventRecordQPS = 5
 			obj.EnableControllerAttachDetach = true
-			obj.EnableDebuggingHandlers = true
+			obj.EnableDebuggingHandlers = false
 			obj.FileCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
 			obj.HealthzBindAddress = "127.0.0.1"
 			obj.HealthzPort = 10248
