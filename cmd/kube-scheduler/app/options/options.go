@@ -225,6 +225,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 		Broadcaster:     eventBroadcaster,
 		LeaderElection:  leaderElectionConfig,
 	}
+
 	if err := o.ApplyTo(c); err != nil {
 		return nil, err
 	}

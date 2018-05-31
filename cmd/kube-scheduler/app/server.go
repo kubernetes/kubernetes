@@ -101,6 +101,15 @@ through the API as necessary.`,
 				return
 			}
 
+			if len(opts.ConfigFile) > 0 {
+				cfg, err := options.LoadConfigFile(opts.ConfigFile)
+				if err != nil {
+					glog.Errorf("load configfile %v error\n", opts.ConfigFile)
+					os.Exit(1)
+				}
+				opts.ComponentConfig = *cfg
+			}
+
 			c, err := opts.Config()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
