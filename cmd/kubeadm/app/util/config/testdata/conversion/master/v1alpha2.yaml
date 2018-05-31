@@ -9,6 +9,14 @@ auditPolicy:
   logDir: /var/log/kubernetes/audit
   logMaxAge: 2
   path: ""
+bootstrapTokens:
+- groups:
+  - system:bootstrappers:kubeadm:default-node-token
+  token: s73ybu.6tw6wnqgp5z0wb77
+  ttl: 24h0m0s
+  usages:
+  - signing
+  - authentication
 certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
 etcd:
@@ -137,11 +145,4 @@ nodeRegistration:
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
-token: s73ybu.6tw6wnqgp5z0wb77
-tokenGroups:
-- system:bootstrappers:kubeadm:default-node-token
-tokenTTL: 24h0m0s
-tokenUsages:
-- signing
-- authentication
 unifiedControlPlaneImage: ""
