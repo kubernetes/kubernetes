@@ -10,6 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "compact_test.go",
+        "lease_manager_test.go",
         "store_test.go",
         "watcher_test.go",
     ],
@@ -46,6 +47,7 @@ go_library(
         "compact.go",
         "errors.go",
         "event.go",
+        "lease_manager.go",
         "store.go",
         "watcher.go",
     ],
