@@ -554,7 +554,7 @@ func Rename(c coreclient.ReplicationControllersGetter, rc *api.ReplicationContro
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
-	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	err = wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
 		_, err := c.ReplicationControllers(rc.Namespace).Get(oldName, metav1.GetOptions{})
 		if err == nil {
 			return false, nil
