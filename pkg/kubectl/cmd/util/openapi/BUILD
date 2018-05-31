@@ -36,6 +36,7 @@ go_test(
     deps = [
         ":go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
+        "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
