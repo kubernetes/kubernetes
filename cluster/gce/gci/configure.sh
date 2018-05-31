@@ -265,7 +265,7 @@ EOF
 }
 
 function install-exec-auth-plugin {
-  if [[ ! ${EXEC_AUTH_PLUGIN_URL:-} ]]; then
+  if [[ ! "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
       return
   fi
   local -r plugin_url="${EXEC_AUTH_PLUGIN_URL}"
