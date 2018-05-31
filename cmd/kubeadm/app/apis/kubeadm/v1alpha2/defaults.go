@@ -97,20 +97,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.CertificatesDir = DefaultCertificatesDir
 	}
 
-	if obj.TokenTTL == nil {
-		obj.TokenTTL = &metav1.Duration{
-			Duration: constants.DefaultTokenDuration,
-		}
-	}
-
-	if len(obj.TokenUsages) == 0 {
-		obj.TokenUsages = constants.DefaultTokenUsages
-	}
-
-	if len(obj.TokenGroups) == 0 {
-		obj.TokenGroups = constants.DefaultTokenGroups
-	}
-
 	if obj.ImageRepository == "" {
 		obj.ImageRepository = DefaultImageRepository
 	}
@@ -120,6 +106,7 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	}
 
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
+	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_KubeletConfiguration(obj)
 	SetDefaults_Etcd(obj)
 	SetDefaults_ProxyConfiguration(obj)
@@ -246,5 +233,37 @@ func SetDefaults_AuditPolicyConfiguration(obj *MasterConfiguration) {
 	}
 	if obj.AuditPolicyConfiguration.LogMaxAge == nil {
 		obj.AuditPolicyConfiguration.LogMaxAge = &DefaultAuditPolicyLogMaxAge
+	}
+}
+
+// SetDefaults_BootstrapTokens sets the defaults for the .BootstrapTokens field
+// If the slice is empty, it's defaulted with one token. Otherwise it just loops
+// through the slice and sets the defaults for the omitempty fields that are TTL,
+// Usages and Groups. Token is NOT defaulted with a random one in the API defaulting
+// layer, but set to a random value later at runtime if not set before.
+func SetDefaults_BootstrapTokens(obj *MasterConfiguration) {
+
+	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
+		obj.BootstrapTokens = []BootstrapToken{{}}
+	}
+
+	for _, bt := range obj.BootstrapTokens {
+		SetDefaults_BootstrapToken(&bt)
+	}
+}
+
+// SetDefaults_BootstrapToken sets the defaults for an individual Bootstrap Token
+func SetDefaults_BootstrapToken(bt *BootstrapToken) {
+	if bt.TTL == nil {
+		bt.TTL = &metav1.Duration{
+			Duration: constants.DefaultTokenDuration,
+		}
+	}
+	if len(bt.Usages) == 0 {
+		bt.Usages = constants.DefaultTokenUsages
+	}
+
+	if len(bt.Groups) == 0 {
+		bt.Groups = constants.DefaultTokenGroups
 	}
 }

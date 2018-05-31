@@ -41,7 +41,7 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 	kubeadmscheme.Scheme.Convert(cfg, externalcfg, nil)
 
 	// Removes sensitive info from the data that will be stored in the config map
-	externalcfg.Token = ""
+	externalcfg.BootstrapTokens = nil
 
 	cfgYaml, err := util.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, scheme.Codecs)
 	if err != nil {

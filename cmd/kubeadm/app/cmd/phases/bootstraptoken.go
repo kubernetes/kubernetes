@@ -18,7 +18,6 @@ package phases
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -30,8 +29,8 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -111,14 +110,15 @@ func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 	cfg := &kubeadmapiv1alpha2.MasterConfiguration{
 		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.9.0",
+		KubernetesVersion: "v1.10.0",
 	}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
-	var cfgPath, description string
+	var cfgPath string
 	var skipTokenPrint bool
+	bto := options.NewBootstrapTokenOptions()
 
 	cmd := &cobra.Command{
 		Use:     "all",
@@ -129,11 +129,14 @@ func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 			err := validation.ValidateMixedArguments(cmd.Flags())
 			kubeadmutil.CheckErr(err)
 
+			err = bto.ApplyTo(cfg)
+			kubeadmutil.CheckErr(err)
+
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
 			// Creates the bootstap token
-			err = createBootstrapToken(*kubeConfigFile, client, cfgPath, cfg, description, skipTokenPrint)
+			err = createBootstrapToken(*kubeConfigFile, client, cfgPath, cfg, skipTokenPrint)
 			kubeadmutil.CheckErr(err)
 
 			// Create the cluster-info ConfigMap or update if it already exists
@@ -159,7 +162,12 @@ func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 	}
 
 	// Adds flags to the command
-	addBootstrapTokenFlags(cmd.Flags(), cfg, &cfgPath, &description, &skipTokenPrint)
+	addGenericFlags(cmd.Flags(), &cfgPath, &skipTokenPrint)
+	bto.AddTokenFlag(cmd.Flags())
+	bto.AddTTLFlag(cmd.Flags())
+	bto.AddUsagesFlag(cmd.Flags())
+	bto.AddGroupsFlag(cmd.Flags())
+	bto.AddDescriptionFlag(cmd.Flags())
 
 	return cmd
 }
@@ -169,14 +177,15 @@ func NewSubCmdBootstrapToken(kubeConfigFile *string) *cobra.Command {
 	cfg := &kubeadmapiv1alpha2.MasterConfiguration{
 		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.9.0",
+		KubernetesVersion: "v1.10.0",
 	}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
-	var cfgPath, description string
+	var cfgPath string
 	var skipTokenPrint bool
+	bto := options.NewBootstrapTokenOptions()
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -186,16 +195,24 @@ func NewSubCmdBootstrapToken(kubeConfigFile *string) *cobra.Command {
 			err := validation.ValidateMixedArguments(cmd.Flags())
 			kubeadmutil.CheckErr(err)
 
+			err = bto.ApplyTo(cfg)
+			kubeadmutil.CheckErr(err)
+
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			err = createBootstrapToken(*kubeConfigFile, client, cfgPath, cfg, description, skipTokenPrint)
+			err = createBootstrapToken(*kubeConfigFile, client, cfgPath, cfg, skipTokenPrint)
 			kubeadmutil.CheckErr(err)
 		},
 	}
 
 	// Adds flags to the command
-	addBootstrapTokenFlags(cmd.Flags(), cfg, &cfgPath, &description, &skipTokenPrint)
+	addGenericFlags(cmd.Flags(), &cfgPath, &skipTokenPrint)
+	bto.AddTokenFlag(cmd.Flags())
+	bto.AddTTLFlag(cmd.Flags())
+	bto.AddUsagesFlag(cmd.Flags())
+	bto.AddGroupsFlag(cmd.Flags())
+	bto.AddDescriptionFlag(cmd.Flags())
 
 	return cmd
 }
@@ -278,30 +295,10 @@ func NewSubCmdNodeBootstrapTokenAutoApprove(kubeConfigFile *string) *cobra.Comma
 	return cmd
 }
 
-func addBootstrapTokenFlags(flagSet *pflag.FlagSet, cfg *kubeadmapiv1alpha2.MasterConfiguration, cfgPath, description *string, skipTokenPrint *bool) {
+func addGenericFlags(flagSet *pflag.FlagSet, cfgPath *string, skipTokenPrint *bool) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental",
-	)
-	flagSet.StringVar(
-		&cfg.Token, "token", cfg.Token,
-		"The token to use for establishing bidirectional trust between nodes and masters",
-	)
-	flagSet.DurationVar(
-		&cfg.TokenTTL.Duration, "ttl", cfg.TokenTTL.Duration,
-		"The duration before the token is automatically deleted (e.g. 1s, 2m, 3h). If set to '0', the token will never expire",
-	)
-	flagSet.StringSliceVar(
-		&cfg.TokenUsages, "usages", cfg.TokenUsages,
-		fmt.Sprintf("Describes the ways in which this token can be used. You can pass --usages multiple times or provide a comma separated list of options. Valid options: [%s]", strings.Join(kubeadmconstants.DefaultTokenUsages, ",")),
-	)
-	flagSet.StringSliceVar(
-		&cfg.TokenGroups, "groups", cfg.TokenGroups,
-		fmt.Sprintf("Extra groups that this token will authenticate as when used for authentication. Must match %q", bootstrapapi.BootstrapGroupPattern),
-	)
-	flagSet.StringVar(
-		description, "description", "The default bootstrap token generated by 'kubeadm init'.",
-		"A human friendly description of how this token is used.",
 	)
 	flagSet.BoolVar(
 		skipTokenPrint, "skip-token-print", *skipTokenPrint,
@@ -309,7 +306,7 @@ func addBootstrapTokenFlags(flagSet *pflag.FlagSet, cfg *kubeadmapiv1alpha2.Mast
 	)
 }
 
-func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1alpha2.MasterConfiguration, description string, skipTokenPrint bool) error {
+func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1alpha2.MasterConfiguration, skipTokenPrint bool) error {
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -319,18 +316,19 @@ func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfg
 
 	glog.V(1).Infoln("[bootstraptoken] creating/updating token")
 	// Creates or updates the token
-	if err := node.UpdateOrCreateToken(client, internalcfg.Token, false, internalcfg.TokenTTL.Duration, internalcfg.TokenUsages, internalcfg.TokenGroups, description); err != nil {
+	if err := node.UpdateOrCreateTokens(client, false, internalcfg.BootstrapTokens); err != nil {
 		return err
 	}
 
 	glog.Infoln("[bootstraptoken] bootstrap token created")
 	glog.Infoln("[bootstraptoken] you can now join any number of machines by running:")
 
-	joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.Token, skipTokenPrint)
-	if err != nil {
-		return fmt.Errorf("failed to get join command: %v", err)
+	if len(internalcfg.BootstrapTokens) > 0 {
+		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), skipTokenPrint)
+		if err != nil {
+			return fmt.Errorf("failed to get join command: %v", err)
+		}
+		glog.Infoln(joinCommand)
 	}
-	glog.Infoln(joinCommand)
-
 	return nil
 }
