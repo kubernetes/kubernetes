@@ -102,7 +102,7 @@ const (
 	// owner: @mlmhl
 	// alpha: v1.11
 	// Ability to expand persistent volumes' file system without unmounting volumes.
-	ExpandPersistentVolumesFSWithoutUnmounting utilfeature.Feature = "ExpandPersistentVolumesFSWithoutUnmounting"
+	ExpandInUsePersistentVolumes utilfeature.Feature = "ExpandInUsePersistentVolumes"
 
 	// owner: @verb
 	// alpha: v1.10
@@ -333,29 +333,29 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
-	ExpandPersistentVolumesFSWithoutUnmounting:  {Default: false, PreRelease: utilfeature.Alpha},
-	CPUManager:                     {Default: true, PreRelease: utilfeature.Beta},
-	ServiceNodeExclusion:           {Default: false, PreRelease: utilfeature.Alpha},
-	MountContainers:                {Default: false, PreRelease: utilfeature.Alpha},
-	VolumeScheduling:               {Default: true, PreRelease: utilfeature.Beta},
-	CSIPersistentVolume:            {Default: true, PreRelease: utilfeature.Beta},
-	CustomPodDNS:                   {Default: true, PreRelease: utilfeature.Beta},
-	BlockVolume:                    {Default: false, PreRelease: utilfeature.Alpha},
-	StorageObjectInUseProtection:   {Default: true, PreRelease: utilfeature.GA},
-	ResourceLimitsPriorityFunction: {Default: false, PreRelease: utilfeature.Alpha},
-	SupportIPVSProxyMode:           {Default: true, PreRelease: utilfeature.GA},
-	SupportPodPidsLimit:            {Default: false, PreRelease: utilfeature.Alpha},
-	HyperVContainer:                {Default: false, PreRelease: utilfeature.Alpha},
-	ScheduleDaemonSetPods:          {Default: false, PreRelease: utilfeature.Alpha},
-	TokenRequest:                   {Default: false, PreRelease: utilfeature.Alpha},
-	TokenRequestProjection:         {Default: false, PreRelease: utilfeature.Alpha},
-	CRIContainerLogRotation:        {Default: true, PreRelease: utilfeature.Beta},
-	GCERegionalPersistentDisk:      {Default: true, PreRelease: utilfeature.Beta},
-	RunAsGroup:                     {Default: false, PreRelease: utilfeature.Alpha},
-	VolumeSubpath:                  {Default: true, PreRelease: utilfeature.GA},
-	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: utilfeature.Alpha},
-	DynamicProvisioningScheduling:  {Default: false, PreRelease: utilfeature.Alpha},
-	VolumeSubpathEnvExpansion:      {Default: false, PreRelease: utilfeature.Alpha},
+	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: utilfeature.Alpha},
+	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
+	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
+	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
+	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
+	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
+	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
+	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
+	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
+	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
+	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
+	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
+	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
+	TokenRequestProjection:                      {Default: false, PreRelease: utilfeature.Alpha},
+	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
+	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
+	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
+	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
+	DynamicProvisioningScheduling:               {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
