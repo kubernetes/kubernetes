@@ -55,7 +55,7 @@ func (t *dnsFederationsConfigMapTest) run() {
 	t.init()
 
 	defer t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
-	t.createUtilPod()
+	t.createUtilPodLabel("e2e-dns-configmap")
 	defer t.deleteUtilPod()
 
 	t.validate()
@@ -149,7 +149,7 @@ type dnsNameserverTest struct {
 func (t *dnsNameserverTest) run() {
 	t.init()
 
-	t.createUtilPod()
+	t.createUtilPodLabel("e2e-dns-configmap")
 	defer t.deleteUtilPod()
 	originalConfigMapData := t.fetchDNSConfigMapData()
 	defer t.restoreDNSConfigMap(originalConfigMapData)
@@ -187,17 +187,17 @@ func (t *dnsNameserverTest) run() {
 	t.checkDNSRecordFrom(
 		"abc.acme.local",
 		func(actual []string) bool { return len(actual) == 1 && actual[0] == "1.1.1.1" },
-		"dnsmasq",
+		"cluster-dns",
 		moreForeverTestTimeout)
 	t.checkDNSRecordFrom(
 		"def.acme.local",
 		func(actual []string) bool { return len(actual) == 1 && actual[0] == "2.2.2.2" },
-		"dnsmasq",
+		"cluster-dns",
 		moreForeverTestTimeout)
 	t.checkDNSRecordFrom(
 		"widget.local",
 		func(actual []string) bool { return len(actual) == 1 && actual[0] == "3.3.3.3" },
-		"dnsmasq",
+		"cluster-dns",
 		moreForeverTestTimeout)
 
 	t.restoreDNSConfigMap(originalConfigMapData)
@@ -206,7 +206,7 @@ func (t *dnsNameserverTest) run() {
 	t.checkDNSRecordFrom(
 		"abc.acme.local",
 		func(actual []string) bool { return len(actual) == 0 },
-		"dnsmasq",
+		"cluster-dns",
 		moreForeverTestTimeout)
 }
 
@@ -217,7 +217,7 @@ type dnsPtrFwdTest struct {
 func (t *dnsPtrFwdTest) run() {
 	t.init()
 
-	t.createUtilPod()
+	t.createUtilPodLabel("e2e-dns-configmap")
 	defer t.deleteUtilPod()
 	originalConfigMapData := t.fetchDNSConfigMapData()
 	defer t.restoreDNSConfigMap(originalConfigMapData)
@@ -229,7 +229,7 @@ func (t *dnsPtrFwdTest) run() {
 	t.checkDNSRecordFrom(
 		"8.8.8.8.in-addr.arpa",
 		func(actual []string) bool { return len(actual) == 1 && actual[0] == googleDnsHostname+"." },
-		"dnsmasq",
+		"cluster-dns",
 		moreForeverTestTimeout)
 
 	if t.name == "coredns" {
@@ -254,14 +254,14 @@ func (t *dnsPtrFwdTest) run() {
 	t.checkDNSRecordFrom(
 		"123.2.0.192.in-addr.arpa",
 		func(actual []string) bool { return len(actual) == 1 && actual[0] == "my.test." },
-		"dnsmasq",
+		"cluster-dns",
 		moreForeverTestTimeout)
 
 	t.restoreDNSConfigMap(originalConfigMapData)
 	t.checkDNSRecordFrom(
 		"123.2.0.192.in-addr.arpa",
 		func(actual []string) bool { return len(actual) == 0 },
-		"dnsmasq",
+		"cluster-dns",
 		moreForeverTestTimeout)
 }
 
@@ -272,7 +272,7 @@ type dnsExternalNameTest struct {
 func (t *dnsExternalNameTest) run() {
 	t.init()
 
-	t.createUtilPod()
+	t.createUtilPodLabel("e2e-dns-configmap")
 	defer t.deleteUtilPod()
 	originalConfigMapData := t.fetchDNSConfigMapData()
 	defer t.restoreDNSConfigMap(originalConfigMapData)
@@ -306,7 +306,7 @@ func (t *dnsExternalNameTest) run() {
 		func(actual []string) bool {
 			return len(actual) >= 1 && actual[0] == googleDnsHostname+"."
 		},
-		"dnsmasq",
+		"cluster-dns",
 		moreForeverTestTimeout)
 
 	if t.name == "coredns" {
@@ -333,7 +333,7 @@ func (t *dnsExternalNameTest) run() {
 		func(actual []string) bool {
 			return len(actual) == 2 && actual[0] == fooHostname+"." && actual[1] == "192.0.2.123"
 		},
-		"dnsmasq",
+		"cluster-dns",
 		moreForeverTestTimeout)
 
 	t.restoreDNSConfigMap(originalConfigMapData)
