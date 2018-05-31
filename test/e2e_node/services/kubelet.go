@@ -219,7 +219,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 
 			// if we will generate a kubelet config file, we need to mount that path into the container too
 			if genKubeletConfigFile {
-				cmdArgs = append(cmdArgs, "-v", filepath.Dir(kubeletConfigPath)+":"+filepath.Dir(kubeletConfigPath)+":ro")
+				cmdArgs = append(cmdArgs, "-v", filepath.Dir(kubeletConfigPath)+":"+filepath.Dir(kubeletConfigPath)+":rw")
 			}
 
 			cmdArgs = append(cmdArgs, hyperkubeImage, "/hyperkube", "kubelet", "--containerized")
