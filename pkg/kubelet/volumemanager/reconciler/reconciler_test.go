@@ -973,7 +973,7 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 // Mark volume as fsResizeRequired in ASW.
 // Verifies volume's fsResizeRequired flag is cleared later.
 func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.ExpandPersistentVolumesFSWithoutUnmounting))
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.ExpandInUsePersistentVolumes))
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pv",

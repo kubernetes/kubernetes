@@ -255,7 +255,7 @@ func (rc *reconciler) reconcile() {
 				}
 			}
 		} else if cache.IsFSResizeRequiredError(err) &&
-			utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumesFSWithoutUnmounting) {
+			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
 			glog.V(4).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandVolumeFSWithoutUnmounting", ""))
 			err := rc.operationExecutor.ExpandVolumeFSWithoutUnmounting(
 				volumeToMount.VolumeToMount,
