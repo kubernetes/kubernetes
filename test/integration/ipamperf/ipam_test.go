@@ -95,7 +95,7 @@ func runTest(t *testing.T, apiURL string, config *Config, clusterCIDR, serviceCI
 func logResults(allResults []*Results) {
 	jStr, err := json.MarshalIndent(allResults, "", "  ")
 	if err != nil {
-		glog.Errorf("Error formating results: %v", err)
+		glog.Errorf("Error formatting results: %v", err)
 		return
 	}
 	if resultsLogFile != "" {
