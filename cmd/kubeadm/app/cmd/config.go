@@ -43,6 +43,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -407,9 +408,9 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
-			puller, err := images.NewCRInterfacer(utilsexec.New(), internalcfg.GetCRISocket())
+			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.GetCRISocket())
 			kubeadmutil.CheckErr(err)
-			imagesPull := NewImagesPull(puller, images.GetAllImages(internalcfg))
+			imagesPull := NewImagesPull(containerRuntime, images.GetAllImages(internalcfg))
 			kubeadmutil.CheckErr(imagesPull.PullAll())
 		},
 	}
@@ -421,22 +422,22 @@ func NewCmdConfigImagesPull() *cobra.Command {
 
 // ImagesPull is the struct used to hold information relating to image pulling
 type ImagesPull struct {
-	puller images.Puller
-	images []string
+	runtime utilruntime.ContainerRuntime
+	images  []string
 }
 
 // NewImagesPull initializes and returns the `kubeadm config images pull` command
-func NewImagesPull(puller images.Puller, images []string) *ImagesPull {
+func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *ImagesPull {
 	return &ImagesPull{
-		puller: puller,
-		images: images,
+		runtime: runtime,
+		images:  images,
 	}
 }
 
 // PullAll pulls all images that the ImagesPull knows about
 func (ip *ImagesPull) PullAll() error {
 	for _, image := range ip.images {
-		if err := ip.puller.Pull(image); err != nil {
+		if err := ip.runtime.PullImage(image); err != nil {
 			return fmt.Errorf("failed to pull image %q: %v", image, err)
 		}
 		fmt.Printf("[config/images] Pulled %s\n", image)
