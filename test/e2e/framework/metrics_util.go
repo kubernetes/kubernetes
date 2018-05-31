@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
+	schedulermetric "k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
@@ -130,6 +131,8 @@ func (m *MetricsForE2E) SummaryKind() string {
 	return "MetricsForE2E"
 }
 
+var SchedulingLatencyMetricName = model.LabelValue(schedulermetric.SchedulerSubsystem + "_" + schedulermetric.SchedulingLatencyName)
+
 var InterestingApiServerMetrics = []string{
 	"apiserver_request_count",
 	"apiserver_request_latencies_summary",
@@ -206,21 +209,22 @@ func (l *PodStartupLatency) PrintJSON() string {
 	return PrettyPrintJSON(PodStartupLatencyToPerfData(l))
 }
 
-type SchedulingLatency struct {
-	Scheduling LatencyMetric `json:"scheduling"`
-	Binding    LatencyMetric `json:"binding"`
-	Total      LatencyMetric `json:"total"`
+type SchedulingMetrics struct {
+	SchedulingLatency LatencyMetric `json:"schedulingLatency"`
+	BindingLatency    LatencyMetric `json:"bindingLatency"`
+	E2ELatency        LatencyMetric `json:"e2eLatency"`
+	ThroughputSamples []float64     `json:"throughputSamples"`
 }
 
-func (l *SchedulingLatency) SummaryKind() string {
-	return "SchedulingLatency"
+func (l *SchedulingMetrics) SummaryKind() string {
+	return "SchedulingMetrics"
 }
 
-func (l *SchedulingLatency) PrintHumanReadable() string {
+func (l *SchedulingMetrics) PrintHumanReadable() string {
 	return PrettyPrintJSON(l)
 }
 
-func (l *SchedulingLatency) PrintJSON() string {
+func (l *SchedulingMetrics) PrintJSON() string {
 	return PrettyPrintJSON(l)
 }
 
@@ -438,27 +442,29 @@ func getMetrics(c clientset.Interface) (string, error) {
 	return string(body), nil
 }
 
-// Retrieves scheduler metrics information.
-func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
-	result := SchedulingLatency{}
+// Sends REST request to kube scheduler metrics
+func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error) {
+	opUpper := strings.ToUpper(op)
+	if opUpper != "GET" && opUpper != "DELETE" {
+		return "", fmt.Errorf("Unknown REST request")
+	}
 
-	// Check if master Node is registered
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	ExpectNoError(err)
 
-	var data string
 	var masterRegistered = false
 	for _, node := range nodes.Items {
 		if system.IsMasterNode(node.Name) {
 			masterRegistered = true
 		}
 	}
+
+	var responseText string
 	if masterRegistered {
 		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
 		defer cancel()
 
-		var rawData []byte
-		rawData, err = c.CoreV1().RESTClient().Get().
+		body, err := c.CoreV1().RESTClient().Verb(opUpper).
 			Context(ctx).
 			Namespace(metav1.NamespaceSystem).
 			Resource("pods").
@@ -468,34 +474,47 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 			Do().Raw()
 
 		ExpectNoError(err)
-		data = string(rawData)
+		responseText = string(body)
 	} else {
 		// If master is not registered fall back to old method of using SSH.
 		if TestContext.Provider == "gke" {
 			Logf("Not grabbing scheduler metrics through master SSH: unsupported for gke")
-			return nil, nil
+			return "", nil
 		}
-		cmd := "curl http://localhost:10251/metrics"
+
+		cmd := "curl -X " + opUpper + " http://localhost:10251/metrics"
 		sshResult, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
 		if err != nil || sshResult.Code != 0 {
-			return &result, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
+			return "", fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
 		}
-		data = sshResult.Stdout
+		responseText = sshResult.Stdout
 	}
+	return responseText, nil
+}
+
+// Retrieves scheduler latency metrics.
+func getSchedulingLatency(c clientset.Interface) (*SchedulingMetrics, error) {
+	result := SchedulingMetrics{}
+	data, err := sendRestRequestToScheduler(c, "GET")
+
 	samples, err := extractMetricSamples(data)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, sample := range samples {
+		if sample.Metric[model.MetricNameLabel] != SchedulingLatencyMetricName {
+			continue
+		}
+
 		var metric *LatencyMetric = nil
-		switch sample.Metric[model.MetricNameLabel] {
-		case "scheduler_scheduling_algorithm_latency_microseconds":
-			metric = &result.Scheduling
-		case "scheduler_binding_latency_microseconds":
-			metric = &result.Binding
-		case "scheduler_e2e_scheduling_latency_microseconds":
-			metric = &result.Total
+		switch sample.Metric[schedulermetric.OperationLabel] {
+		case schedulermetric.SchedulingAlgorithm:
+			metric = &result.SchedulingLatency
+		case schedulermetric.Binding:
+			metric = &result.BindingLatency
+		case schedulermetric.E2eScheduling:
+			metric = &result.E2ELatency
 		}
 		if metric == nil {
 			continue
@@ -506,18 +525,26 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 		if err != nil {
 			return nil, err
 		}
-		setQuantile(metric, quantile, time.Duration(int64(latency))*time.Microsecond)
+		setQuantile(metric, quantile, time.Duration(int64(latency)))
 	}
 	return &result, nil
 }
 
 // Verifies (currently just by logging them) the scheduling latencies.
-func VerifySchedulerLatency(c clientset.Interface) (*SchedulingLatency, error) {
+func VerifySchedulerLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 	latency, err := getSchedulingLatency(c)
 	if err != nil {
 		return nil, err
 	}
 	return latency, nil
+}
+
+func ResetSchedulerMetrics(c clientset.Interface) error {
+	responseText, err := sendRestRequestToScheduler(c, "DELETE")
+	if err != nil || responseText != "metrics reset\n" {
+		return fmt.Errorf("Unexpected response: %q", responseText)
+	}
+	return nil
 }
 
 func PrettyPrintJSON(metrics interface{}) string {

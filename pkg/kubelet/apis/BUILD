@@ -41,6 +41,7 @@ filegroup(
         "//pkg/kubelet/apis/deviceplugin/v1alpha:all-srcs",
         "//pkg/kubelet/apis/deviceplugin/v1beta1:all-srcs",
         "//pkg/kubelet/apis/kubeletconfig:all-srcs",
+        "//pkg/kubelet/apis/pluginregistration/v1alpha1:all-srcs",
         "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],

@@ -51,8 +51,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		CreateAPIServerEtcdClientCertAndKeyFiles,
 	}
 
-	// Currently this is the only way we have to identify static pod etcd vs external etcd
-	if len(cfg.Etcd.Endpoints) == 0 {
+	if cfg.Etcd.Local != nil {
 		certActions = append(certActions, etcdCertActions...)
 	}
 

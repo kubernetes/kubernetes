@@ -18,6 +18,7 @@ package transport
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"net/http"
 )
@@ -84,7 +85,12 @@ func (c *Config) HasTokenAuth() bool {
 
 // HasCertAuth returns whether the configuration has certificate authentication or not.
 func (c *Config) HasCertAuth() bool {
-	return len(c.TLS.CertData) != 0 || len(c.TLS.CertFile) != 0
+	return (len(c.TLS.CertData) != 0 || len(c.TLS.CertFile) != 0) && (len(c.TLS.KeyData) != 0 || len(c.TLS.KeyFile) != 0)
+}
+
+// HasCertCallbacks returns whether the configuration has certificate callback or not.
+func (c *Config) HasCertCallback() bool {
+	return c.TLS.GetCert != nil
 }
 
 // TLSConfig holds the information needed to set up a TLS transport.
@@ -99,4 +105,6 @@ type TLSConfig struct {
 	CAData   []byte // Bytes of the PEM-encoded server trusted root certificates. Supercedes CAFile.
 	CertData []byte // Bytes of the PEM-encoded client certificate. Supercedes CertFile.
 	KeyData  []byte // Bytes of the PEM-encoded client key. Supercedes KeyFile.
+
+	GetCert func() (*tls.Certificate, error) // Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
 }

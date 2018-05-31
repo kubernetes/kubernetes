@@ -42,7 +42,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		    Description: Ensure that downward API can provide pod's name, namespace
 			and IP address as environment variables.
 	*/
-	framework.ConformanceIt("should provide pod name, namespace and IP address as env vars ", func() {
+	framework.ConformanceIt("should provide pod name, namespace and IP address as env vars [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -88,7 +88,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		    Description: Ensure that downward API can provide an IP address for
 			host node as an environment variable.
 	*/
-	framework.ConformanceIt("should provide host IP as an env var ", func() {
+	framework.ConformanceIt("should provide host IP as an env var [NodeConformance]", func() {
 		framework.SkipUnlessServerVersionGTE(hostIPVersion, f.ClientSet.Discovery())
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
@@ -115,7 +115,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		    Description: Ensure that downward API can provide CPU/memory limit
 			and CPU/memory request as environment variables.
 	*/
-	framework.ConformanceIt("should provide container's limits.cpu/memory and requests.cpu/memory as env vars ", func() {
+	framework.ConformanceIt("should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -167,7 +167,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 			allocatable values for CPU and memory as environment variables if CPU
 			and memory limits are not specified for a container.
 	*/
-	framework.ConformanceIt("should provide default limits.cpu/memory from node allocatable ", func() {
+	framework.ConformanceIt("should provide default limits.cpu/memory from node allocatable [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -217,7 +217,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		    Description: Ensure that downward API can provide pod UID as an
 			environment variable.
 	*/
-	framework.ConformanceIt("should provide pod UID as env vars ", func() {
+	framework.ConformanceIt("should provide pod UID as env vars [NodeConformance]", func() {
 		framework.SkipUnlessServerVersionGTE(podUIDVersion, f.ClientSet.Discovery())
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
@@ -240,7 +240,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage]", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	Context("Downward API tests for local ephemeral storage", func() {

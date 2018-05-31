@@ -133,7 +133,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		    Description: Make sure when a pod is created that it is assigned a host IP
 			Address.
 	*/
-	framework.ConformanceIt("should get a host IP ", func() {
+	framework.ConformanceIt("should get a host IP [NodeConformance]", func() {
 		name := "pod-hostip-" + string(uuid.NewUUID())
 		testHostIP(podClient, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -155,7 +155,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		    Description: Makes sure a pod is created, a watch can be setup for the pod,
 			pod creation was observed, pod is deleted, and pod deletion is observed.
 	*/
-	framework.ConformanceIt("should be submitted and removed ", func() {
+	framework.ConformanceIt("should be submitted and removed [NodeConformance]", func() {
 		By("creating the pod")
 		name := "pod-submit-remove-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -280,7 +280,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	   Testname: pods-updated-successfully
 	   Description: Make sure it is possible to successfully update a pod's labels.
 	*/
-	framework.ConformanceIt("should be updated ", func() {
+	framework.ConformanceIt("should be updated [NodeConformance]", func() {
 		By("creating the pod")
 		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -335,7 +335,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			activeDeadlineSecondsValue, and then waits for the deadline to pass
 			and verifies the pod is terminated.
 	*/
-	framework.ConformanceIt("should allow activeDeadlineSeconds to be updated ", func() {
+	framework.ConformanceIt("should allow activeDeadlineSeconds to be updated [NodeConformance]", func() {
 		By("creating the pod")
 		name := "pod-update-activedeadlineseconds-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -381,7 +381,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		    Description: Make sure that when a pod is created it contains environment
 			variables for each active service.
 	*/
-	framework.ConformanceIt("should contain environment variables for services ", func() {
+	framework.ConformanceIt("should contain environment variables for services [NodeConformance]", func() {
 		// Make a pod that will be a service.
 		// This pod serves its hostname via HTTP.
 		serverName := "server-envvars-" + string(uuid.NewUUID())
@@ -467,7 +467,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}, maxRetries, "Container should have service environment variables set")
 	})
 
-	It("should support remote command execution over websockets", func() {
+	It("should support remote command execution over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred(), "unable to get base config")
 
@@ -543,7 +543,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}, time.Minute, 10*time.Second).Should(BeNil())
 	})
 
-	It("should support retrieving logs from the container over websockets", func() {
+	It("should support retrieving logs from the container over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred(), "unable to get base config")
 
@@ -600,7 +600,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 	})
 
-	It("should have their auto-restart back-off timer reset on image update [Slow]", func() {
+	It("should have their auto-restart back-off timer reset on image update [Slow][NodeConformance]", func() {
 		podName := "pod-back-off-image"
 		containerName := "back-off"
 		pod := &v1.Pod{
@@ -641,7 +641,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	// Slow issue #19027 (20 mins)
-	It("should cap back-off at MaxContainerBackOff [Slow]", func() {
+	It("should cap back-off at MaxContainerBackOff [Slow][NodeConformance]", func() {
 		podName := "back-off-cap"
 		containerName := "back-off-cap"
 		pod := &v1.Pod{

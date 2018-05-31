@@ -38,6 +38,7 @@ go_test(
     srcs = ["reconciler_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

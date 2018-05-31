@@ -119,7 +119,7 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 		// Needed for the node to report status of pods it is running.
 		// Use the NodeRestriction admission plugin to limit a node to updating status of pods bound to itself.
-		rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+		rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 		// Needed for the node to create pod evictions.
 		// Use the NodeRestriction admission plugin to limit a node to creating evictions for pods bound to itself.
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("pods/eviction").RuleOrDie(),
@@ -506,12 +506,16 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		rules := []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
+			rules = append(rules, rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie())
+		}
 		roles = append(roles, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:volume-scheduler"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-				rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-			},
+			Rules:      rules,
 		})
 	}
 

@@ -131,7 +131,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.PrintObj = printer.PrintObj
 
 	var enforceNamespace bool
-	o.namespace, enforceNamespace, err = f.DefaultNamespace()
+	o.namespace, enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (o *SubjectOptions) Validate() error {
 }
 
 func (o *SubjectOptions) Run(fn updateSubjects) error {
-	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
 		subjects := []rbacv1.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
 			subject := rbacv1.Subject{
@@ -227,10 +227,10 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			subjects = append(subjects, subject)
 		}
 
-		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
+		transformed, err := updateSubjectForObject(obj, subjects, fn)
 		if transformed && err == nil {
 			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
-			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
+			return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 		}
 		return nil, err
 	})
@@ -251,7 +251,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 
 		if o.Local || o.DryRun {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
-				return err
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
@@ -262,7 +262,9 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		return o.PrintObj(actual, o.Out)
+		if err := o.PrintObj(actual, o.Out); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

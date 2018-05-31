@@ -155,7 +155,7 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.NodeConfi
 		&cfg.DiscoveryToken, "discovery-token", "",
 		"A token used to validate cluster information fetched from the master.")
 	flagSet.StringVar(
-		&cfg.NodeName, "node-name", "",
+		&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name,
 		"Specify the node name.")
 	flagSet.StringVar(
 		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
@@ -174,7 +174,7 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.NodeConfi
 		"A set of key=value pairs that describe feature gates for various features. "+
 			"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 	flagSet.StringVar(
-		&cfg.CRISocket, "cri-socket", cfg.CRISocket,
+		&cfg.NodeRegistration.CRISocket, "cri-socket", cfg.NodeRegistration.CRISocket,
 		`Specify the CRI socket to connect to.`,
 	)
 }
@@ -204,7 +204,7 @@ type Join struct {
 // NewJoin instantiates Join struct with given arguments
 func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1alpha2.NodeConfiguration, ignorePreflightErrors sets.String) (*Join, error) {
 
-	if defaultcfg.NodeName == "" {
+	if defaultcfg.NodeRegistration.Name == "" {
 		glog.V(1).Infoln("[join] found NodeName empty")
 		glog.V(1).Infoln("[join] considered OS hostname as NodeName")
 	}
@@ -231,6 +231,12 @@ func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1alpha2.NodeC
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
+
+	// Write env file with flags for the kubelet to use. Also register taints
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&j.cfg.NodeRegistration, true); err != nil {
+		return err
+	}
+
 	glog.V(1).Infoln("[join] retrieving KubeConfig objects")
 	cfg, err := discovery.For(j.cfg)
 	if err != nil {
@@ -273,7 +279,7 @@ func (j *Join) Run(out io.Writer) error {
 			return err
 		}
 
-		if err := kubeletphase.EnableDynamicConfigForNode(client, j.cfg.NodeName, kubeletVersion); err != nil {
+		if err := kubeletphase.EnableDynamicConfigForNode(client, j.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
 			return fmt.Errorf("error consuming base kubelet configuration: %v", err)
 		}
 	}

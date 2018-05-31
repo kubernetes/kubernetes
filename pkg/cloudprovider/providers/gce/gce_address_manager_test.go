@@ -26,95 +26,104 @@ import (
 )
 
 const testSvcName = "my-service"
-const testRegion = "us-central1"
 const testSubnet = "/projects/x/testRegions/us-central1/testSubnetworks/customsub"
 const testLBName = "a111111111111111"
 
+var vals = DefaultTestClusterValues()
+
 // TestAddressManagerNoRequestedIP tests the typical case of passing in no requested IP
 func TestAddressManagerNoRequestedIP(t *testing.T) {
-	svc := NewFakeCloudAddressService()
+	svc, err := fakeGCECloud(vals)
+	require.NoError(t, err)
 	targetIP := ""
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
-	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(cloud.SchemeInternal))
-	testReleaseAddress(t, mgr, svc, testLBName, testRegion)
+	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	testHoldAddress(t, mgr, svc, testLBName, vals.Region, targetIP, string(cloud.SchemeInternal))
+	testReleaseAddress(t, mgr, svc, testLBName, vals.Region)
 }
 
 // TestAddressManagerBasic tests the typical case of reserving and unreserving an address.
 func TestAddressManagerBasic(t *testing.T) {
-	svc := NewFakeCloudAddressService()
+	svc, err := fakeGCECloud(vals)
+	require.NoError(t, err)
 	targetIP := "1.1.1.1"
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
-	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(cloud.SchemeInternal))
-	testReleaseAddress(t, mgr, svc, testLBName, testRegion)
+	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	testHoldAddress(t, mgr, svc, testLBName, vals.Region, targetIP, string(cloud.SchemeInternal))
+	testReleaseAddress(t, mgr, svc, testLBName, vals.Region)
 }
 
 // TestAddressManagerOrphaned tests the case where the address exists with the IP being equal
 // to the requested address (forwarding rule or loadbalancer IP).
 func TestAddressManagerOrphaned(t *testing.T) {
-	svc := NewFakeCloudAddressService()
+	svc, err := fakeGCECloud(vals)
+	require.NoError(t, err)
 	targetIP := "1.1.1.1"
 
 	addr := &compute.Address{Name: testLBName, Address: targetIP, AddressType: string(cloud.SchemeInternal)}
-	err := svc.ReserveRegionAddress(addr, testRegion)
+	err = svc.ReserveRegionAddress(addr, vals.Region)
 	require.NoError(t, err)
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
-	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(cloud.SchemeInternal))
-	testReleaseAddress(t, mgr, svc, testLBName, testRegion)
+	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	testHoldAddress(t, mgr, svc, testLBName, vals.Region, targetIP, string(cloud.SchemeInternal))
+	testReleaseAddress(t, mgr, svc, testLBName, vals.Region)
 }
 
 // TestAddressManagerOutdatedOrphan tests the case where an address exists but points to
 // an IP other than the forwarding rule or loadbalancer IP.
 func TestAddressManagerOutdatedOrphan(t *testing.T) {
-	svc := NewFakeCloudAddressService()
+	svc, err := fakeGCECloud(vals)
+	require.NoError(t, err)
 	previousAddress := "1.1.0.0"
 	targetIP := "1.1.1.1"
 
 	addr := &compute.Address{Name: testLBName, Address: previousAddress, AddressType: string(cloud.SchemeExternal)}
-	err := svc.ReserveRegionAddress(addr, testRegion)
+	err = svc.ReserveRegionAddress(addr, vals.Region)
 	require.NoError(t, err)
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
-	testHoldAddress(t, mgr, svc, testLBName, testRegion, targetIP, string(cloud.SchemeInternal))
-	testReleaseAddress(t, mgr, svc, testLBName, testRegion)
+	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	testHoldAddress(t, mgr, svc, testLBName, vals.Region, targetIP, string(cloud.SchemeInternal))
+	testReleaseAddress(t, mgr, svc, testLBName, vals.Region)
 }
 
 // TestAddressManagerExternallyOwned tests the case where the address exists but isn't
 // owned by the controller.
 func TestAddressManagerExternallyOwned(t *testing.T) {
-	svc := NewFakeCloudAddressService()
+	svc, err := fakeGCECloud(vals)
+	require.NoError(t, err)
 	targetIP := "1.1.1.1"
 
 	addr := &compute.Address{Name: "my-important-address", Address: targetIP, AddressType: string(cloud.SchemeInternal)}
-	err := svc.ReserveRegionAddress(addr, testRegion)
+	err = svc.ReserveRegionAddress(addr, vals.Region)
 	require.NoError(t, err)
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
 	ipToUse, err := mgr.HoldAddress()
 	require.NoError(t, err)
 	assert.NotEmpty(t, ipToUse)
 
-	_, err = svc.GetRegionAddress(testLBName, testRegion)
+	ad, err := svc.GetRegionAddress(testLBName, vals.Region)
 	assert.True(t, isNotFound(err))
+	require.Nil(t, ad)
 
-	testReleaseAddress(t, mgr, svc, testLBName, testRegion)
+	testReleaseAddress(t, mgr, svc, testLBName, vals.Region)
 }
 
 // TestAddressManagerExternallyOwned tests the case where the address exists but isn't
 // owned by the controller. However, this address has the wrong type.
 func TestAddressManagerBadExternallyOwned(t *testing.T) {
-	svc := NewFakeCloudAddressService()
+	svc, err := fakeGCECloud(vals)
+	require.NoError(t, err)
 	targetIP := "1.1.1.1"
 
 	addr := &compute.Address{Name: "my-important-address", Address: targetIP, AddressType: string(cloud.SchemeExternal)}
-	err := svc.ReserveRegionAddress(addr, testRegion)
+	err = svc.ReserveRegionAddress(addr, vals.Region)
 	require.NoError(t, err)
 
-	mgr := newAddressManager(svc, testSvcName, testRegion, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
-	_, err = mgr.HoldAddress()
-	assert.NotNil(t, err)
+	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
+	ad, err := mgr.HoldAddress()
+	assert.NotNil(t, err) // FIXME
+	require.Equal(t, ad, "")
 }
 
 func testHoldAddress(t *testing.T, mgr *addressManager, svc CloudAddressService, name, region, targetIP, scheme string) {

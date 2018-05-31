@@ -46,6 +46,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
@@ -76,8 +77,14 @@ type Error struct {
 	Msg string
 }
 
+// Error implements the standard error interface
 func (e *Error) Error() string {
 	return fmt.Sprintf("[preflight] Some fatal errors occurred:\n%s%s", e.Msg, "[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`")
+}
+
+// Preflight identifies this error as a preflight error
+func (e *Error) Preflight() bool {
+	return true
 }
 
 // Checker validates the state of the system to ensure kubeadm will be
@@ -689,8 +696,15 @@ func (ExternalEtcdVersionCheck) Name() string {
 }
 
 // Check validates external etcd version
+// TODO: Use the official etcd Golang client for this instead?
 func (evc ExternalEtcdVersionCheck) Check() (warnings, errors []error) {
 	glog.V(1).Infoln("validating the external etcd version")
+
+	// Return quickly if the user isn't using external etcd
+	if evc.Etcd.External.Endpoints == nil {
+		return nil, nil
+	}
+
 	var config *tls.Config
 	var err error
 	if config, err = evc.configRootCAs(config); err != nil {
@@ -703,7 +717,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errors []error) {
 	}
 
 	client := evc.getHTTPClient(config)
-	for _, endpoint := range evc.Etcd.Endpoints {
+	for _, endpoint := range evc.Etcd.External.Endpoints {
 		if _, err := url.Parse(endpoint); err != nil {
 			errors = append(errors, fmt.Errorf("failed to parse external etcd endpoint %s : %v", endpoint, err))
 			continue
@@ -739,10 +753,10 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errors []error) {
 // configRootCAs configures and returns a reference to tls.Config instance if CAFile is provided
 func (evc ExternalEtcdVersionCheck) configRootCAs(config *tls.Config) (*tls.Config, error) {
 	var CACertPool *x509.CertPool
-	if evc.Etcd.CAFile != "" {
-		CACert, err := ioutil.ReadFile(evc.Etcd.CAFile)
+	if evc.Etcd.External.CAFile != "" {
+		CACert, err := ioutil.ReadFile(evc.Etcd.External.CAFile)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't load external etcd's server certificate %s: %v", evc.Etcd.CAFile, err)
+			return nil, fmt.Errorf("couldn't load external etcd's server certificate %s: %v", evc.Etcd.External.CAFile, err)
 		}
 		CACertPool = x509.NewCertPool()
 		CACertPool.AppendCertsFromPEM(CACert)
@@ -759,11 +773,11 @@ func (evc ExternalEtcdVersionCheck) configRootCAs(config *tls.Config) (*tls.Conf
 // configCertAndKey configures and returns a reference to tls.Config instance if CertFile and KeyFile pair is provided
 func (evc ExternalEtcdVersionCheck) configCertAndKey(config *tls.Config) (*tls.Config, error) {
 	var cert tls.Certificate
-	if evc.Etcd.CertFile != "" && evc.Etcd.KeyFile != "" {
+	if evc.Etcd.External.CertFile != "" && evc.Etcd.External.KeyFile != "" {
 		var err error
-		cert, err = tls.LoadX509KeyPair(evc.Etcd.CertFile, evc.Etcd.KeyFile)
+		cert, err = tls.LoadX509KeyPair(evc.Etcd.External.CertFile, evc.Etcd.External.KeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't load external etcd's certificate and key pair %s, %s: %v", evc.Etcd.CertFile, evc.Etcd.KeyFile, err)
+			return nil, fmt.Errorf("couldn't load external etcd's certificate and key pair %s, %s: %v", evc.Etcd.External.CertFile, evc.Etcd.External.KeyFile, err)
 		}
 		if config == nil {
 			config = &tls.Config{}
@@ -843,6 +857,30 @@ func (ResolveCheck) Check() (warnings, errors []error) {
 	return warnings, errors
 }
 
+// ImagePullCheck will pull container images used by kubeadm
+type ImagePullCheck struct {
+	Images    images.Images
+	ImageList []string
+}
+
+// Name returns the label for ImagePullCheck
+func (ImagePullCheck) Name() string {
+	return "ImagePull"
+}
+
+// Check pulls images required by kubeadm. This is a mutating check
+func (i ImagePullCheck) Check() (warnings, errors []error) {
+	for _, image := range i.ImageList {
+		if err := i.Images.Exists(image); err == nil {
+			continue
+		}
+		if err := i.Images.Pull(image); err != nil {
+			errors = append(errors, fmt.Errorf("failed to pull image [%s]: %v", image, err))
+		}
+	}
+	return warnings, errors
+}
+
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
 func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
@@ -868,32 +906,32 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 	checks = addCommonChecks(execer, cfg, checks)
 
 	// Check ipvs required kernel module once we use ipvs kube-proxy mode
-	if cfg.KubeProxy.Config.Mode == ipvsutil.IPVSProxyMode {
+	if cfg.KubeProxy.Config != nil && cfg.KubeProxy.Config.Mode == ipvsutil.IPVSProxyMode {
 		checks = append(checks,
 			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 		)
 	}
 
-	if len(cfg.Etcd.Endpoints) == 0 {
+	if cfg.Etcd.Local != nil {
 		// Only do etcd related checks when no external endpoints were specified
 		checks = append(checks,
 			PortOpenCheck{port: 2379},
-			DirAvailableCheck{Path: cfg.Etcd.DataDir},
+			DirAvailableCheck{Path: cfg.Etcd.Local.DataDir},
 		)
-	} else {
+	}
+
+	if cfg.Etcd.External != nil {
 		// Only check etcd version when external endpoints are specified
-		if cfg.Etcd.CAFile != "" {
-			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.CAFile})
+		if cfg.Etcd.External.CAFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.CAFile, Label: "ExternalEtcdClientCertificates"})
 		}
-		if cfg.Etcd.CertFile != "" {
-			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.CertFile})
+		if cfg.Etcd.External.CertFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.CertFile, Label: "ExternalEtcdClientCertificates"})
 		}
-		if cfg.Etcd.KeyFile != "" {
-			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.KeyFile})
+		if cfg.Etcd.External.KeyFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.KeyFile, Label: "ExternalEtcdClientCertificates"})
 		}
-		checks = append(checks,
-			ExternalEtcdVersionCheck{Etcd: cfg.Etcd},
-		)
+		checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
 	}
 
 	if ip := net.ParseIP(cfg.API.AdvertiseAddress); ip != nil {
@@ -952,15 +990,6 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 // addCommonChecks is a helper function to deplicate checks that are common between both the
 // kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfiguration, checks []Checker) []Checker {
-	// check if we can use crictl to perform checks via the CRI
-	glog.V(1).Infoln("checking if we can use crictl to perform checks via the CRI")
-	criCtlChecker := InPathCheck{
-		executable: "crictl",
-		mandatory:  false,
-		exec:       execer,
-		suggestion: fmt.Sprintf("go get %v", kubeadmconstants.CRICtlPackage),
-	}
-
 	// Check whether or not the CRI socket defined is the default
 	if cfg.GetCRISocket() != kubeadmdefaults.DefaultCRISocket {
 		checks = append(checks, CRICheck{socket: cfg.GetCRISocket(), exec: execer})
@@ -983,7 +1012,6 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 			InPathCheck{executable: "socat", mandatory: false, exec: execer},
 			InPathCheck{executable: "tc", mandatory: false, exec: execer},
 			InPathCheck{executable: "touch", mandatory: false, exec: execer},
-			criCtlChecker,
 			ResolveCheck{})
 	}
 	checks = append(checks,
@@ -1002,6 +1030,19 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 		IsPrivilegedUserCheck{},
 	}
 
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
+
+// RunPullImagesCheck will pull images kubeadm needs if the are not found on the system
+func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
+	criInterfacer, err := images.NewCRInterfacer(execer, cfg.GetCRISocket())
+	if err != nil {
+		return err
+	}
+
+	checks := []Checker{
+		ImagePullCheck{Images: criInterfacer, ImageList: images.GetAllImages(cfg)},
+	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 

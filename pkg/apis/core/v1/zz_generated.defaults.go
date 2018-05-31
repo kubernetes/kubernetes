@@ -213,6 +213,9 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 						}
 					}
 				}
+				if b.ServiceAccountToken != nil {
+					SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
@@ -355,6 +358,9 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 							SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
+				}
+				if b.ServiceAccountToken != nil {
+					SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
 				}
 			}
 		}
@@ -500,6 +506,9 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 								SetDefaults_ObjectFieldSelector(c.FieldRef)
 							}
 						}
+					}
+					if b.ServiceAccountToken != nil {
+						SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
 					}
 				}
 			}

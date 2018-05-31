@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -92,7 +91,7 @@ type ExposeServiceOptions struct {
 	EnforceNamespace bool
 
 	Generators                func(string) map[string]kubectl.Generator
-	CanBeExposed              func(kind schema.GroupKind) error
+	CanBeExposed              polymorphichelpers.CanBeExposedFunc
 	ClientForMapping          func(*meta.RESTMapping) (resource.RESTClient, error)
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
 	PortsForObject            polymorphichelpers.PortsForObjectFunc
@@ -178,7 +177,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	}
 	o.PrintObj = printer.PrintObj
 
-	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
@@ -189,19 +188,20 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 		return err
 	}
 
-	o.Generators = f.Generators
+	o.Generators = cmdutil.GeneratorFn
 	o.Builder = f.NewBuilder()
-	o.CanBeExposed = f.CanBeExposed
+	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
 	o.ClientForMapping = f.ClientForMapping
-	o.MapBasedSelectorForObject = f.MapBasedSelectorForObject
+	o.MapBasedSelectorForObject = polymorphichelpers.MapBasedSelectorForObjectFn
+	o.ProtocolsForObject = polymorphichelpers.ProtocolsForObjectFn
 	o.PortsForObject = polymorphichelpers.PortsForObjectFn
-	o.ProtocolsForObject = f.ProtocolsForObject
+
 	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}
 
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

@@ -24,19 +24,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const (
-	node_v1alpha1YAML          = "testdata/conversion/node/v1alpha1.yaml"
-	node_v1alpha2YAML          = "testdata/conversion/node/v1alpha2.yaml"
-	node_internalYAML          = "testdata/conversion/node/internal.yaml"
-	node_incompleteYAML        = "testdata/defaulting/node/incomplete.yaml"
-	node_defaultedv1alpha1YAML = "testdata/defaulting/node/defaulted_v1alpha1.yaml"
-	node_defaultedv1alpha2YAML = "testdata/defaulting/node/defaulted_v1alpha2.yaml"
-	node_invalidYAML           = "testdata/validation/invalid_nodecfg.yaml"
+	node_v1alpha1YAML   = "testdata/conversion/node/v1alpha1.yaml"
+	node_v1alpha2YAML   = "testdata/conversion/node/v1alpha2.yaml"
+	node_internalYAML   = "testdata/conversion/node/internal.yaml"
+	node_incompleteYAML = "testdata/defaulting/node/incomplete.yaml"
+	node_defaultedYAML  = "testdata/defaulting/node/defaulted.yaml"
+	node_invalidYAML    = "testdata/validation/invalid_nodecfg.yaml"
 )
 
 func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
@@ -67,16 +65,10 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using NodeConfigFileAndDefaultsToInternalConfig,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha1 -> default -> validate -> internal -> v1alpha1
-			name:         "incompleteYAMLToDefaulted",
-			in:           node_incompleteYAML,
-			out:          node_defaultedv1alpha1YAML,
-			groupVersion: v1alpha1.SchemeGroupVersion,
-		},
 		{ // v1alpha1 -> default -> validate -> internal -> v1alpha2
 			name:         "incompleteYAMLToDefaulted",
 			in:           node_incompleteYAML,
-			out:          node_defaultedv1alpha2YAML,
+			out:          node_defaultedYAML,
 			groupVersion: v1alpha2.SchemeGroupVersion,
 		},
 		{ // v1alpha1 (faulty) -> validation should fail

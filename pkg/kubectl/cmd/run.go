@@ -193,7 +193,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 
-	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
@@ -227,7 +227,6 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	deleteOpts.IgnoreNotFound = true
 	deleteOpts.WaitForDeletion = false
 	deleteOpts.GracePeriod = -1
-	deleteOpts.Reaper = f.Reaper
 
 	o.DeleteOptions = deleteOpts
 
@@ -266,7 +265,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return cmdutil.UsageErrorf(cmd, "--port must be set when exposing a service")
 	}
 
-	namespace, _, err := f.DefaultNamespace()
+	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -322,7 +321,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 	}
 
-	generators := f.Generators("run")
+	generators := cmdutil.GeneratorFn("run")
 	generator, found := generators[generatorName]
 	if !found {
 		return cmdutil.UsageErrorf(cmd, "generator %q not found", generatorName)
@@ -459,14 +458,7 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 			ResourceNames(obj.Mapping.Resource.Resource+"."+obj.Mapping.Resource.Group, name).
 			Flatten().
 			Do()
-		// Note: we pass in "true" for the "quiet" parameter because
-		// ReadResult will only print one thing based on the "quiet"
-		// flag, and that's the "pod xxx deleted" message. If they
-		// asked for us to remove the pod (via --rm) then telling them
-		// its been deleted is unnecessary since that's what they asked
-		// for. We should only print something if the "rm" fails.
-		err = o.DeleteOptions.ReapResult(r, true, true)
-		if err != nil {
+		if err := o.DeleteOptions.DeleteResult(r); err != nil {
 			return err
 		}
 	}
@@ -581,7 +573,7 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 }
 
 func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}, namespace string) (*RunObject, error) {
-	generators := f.Generators("expose")
+	generators := cmdutil.GeneratorFn("expose")
 	generator, found := generators[serviceGenerator]
 	if !found {
 		return nil, fmt.Errorf("missing service generator: %s", serviceGenerator)

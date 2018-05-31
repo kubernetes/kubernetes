@@ -39,6 +39,9 @@ func NewMapStringBool(m *map[string]bool) *MapStringBool {
 
 // String implements github.com/spf13/pflag.Value
 func (m *MapStringBool) String() string {
+	if m == nil || m.Map == nil {
+		return ""
+	}
 	pairs := []string{}
 	for k, v := range *m.Map {
 		pairs = append(pairs, fmt.Sprintf("%s=%t", k, v))

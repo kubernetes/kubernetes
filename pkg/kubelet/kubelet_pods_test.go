@@ -273,7 +273,7 @@ func TestMakeMounts(t *testing.T) {
 				return
 			}
 
-			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm)
+			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, nil)
 
 			// validate only the error if we expect an error
 			if tc.expectErr {
@@ -296,7 +296,7 @@ func TestMakeMounts(t *testing.T) {
 				t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
 				return
 			}
-			mounts, _, err = makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm)
+			mounts, _, err = makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, nil)
 			if !tc.expectErr {
 				expectedPrivateMounts := []kubecontainer.Mount{}
 				for _, mount := range tc.expectedMounts {
@@ -357,7 +357,7 @@ func TestDisabledSubpath(t *testing.T) {
 	defer utilfeature.DefaultFeatureGate.Set("VolumeSubpath=true")
 
 	for name, test := range cases {
-		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", "", podVolumes, fm)
+		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", "", podVolumes, fm, nil)
 		if err != nil && !test.expectError {
 			t.Errorf("test %v failed: %v", name, err)
 		}
