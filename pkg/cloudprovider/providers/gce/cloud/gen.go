@@ -3420,6 +3420,7 @@ type AlphaBackendServices interface {
 	List(ctx context.Context, fl *filter.F) ([]*alpha.BackendService, error)
 	Insert(ctx context.Context, key *meta.Key, obj *alpha.BackendService) error
 	Delete(ctx context.Context, key *meta.Key) error
+	SetSecurityPolicy(context.Context, *meta.Key, *alpha.SecurityPolicyReference) error
 	Update(context.Context, *meta.Key, *alpha.BackendService) error
 }
 
@@ -3456,11 +3457,12 @@ type MockAlphaBackendServices struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(ctx context.Context, key *meta.Key, m *MockAlphaBackendServices) (bool, *alpha.BackendService, error)
-	ListHook   func(ctx context.Context, fl *filter.F, m *MockAlphaBackendServices) (bool, []*alpha.BackendService, error)
-	InsertHook func(ctx context.Context, key *meta.Key, obj *alpha.BackendService, m *MockAlphaBackendServices) (bool, error)
-	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAlphaBackendServices) (bool, error)
-	UpdateHook func(context.Context, *meta.Key, *alpha.BackendService, *MockAlphaBackendServices) error
+	GetHook               func(ctx context.Context, key *meta.Key, m *MockAlphaBackendServices) (bool, *alpha.BackendService, error)
+	ListHook              func(ctx context.Context, fl *filter.F, m *MockAlphaBackendServices) (bool, []*alpha.BackendService, error)
+	InsertHook            func(ctx context.Context, key *meta.Key, obj *alpha.BackendService, m *MockAlphaBackendServices) (bool, error)
+	DeleteHook            func(ctx context.Context, key *meta.Key, m *MockAlphaBackendServices) (bool, error)
+	SetSecurityPolicyHook func(context.Context, *meta.Key, *alpha.SecurityPolicyReference, *MockAlphaBackendServices) error
+	UpdateHook            func(context.Context, *meta.Key, *alpha.BackendService, *MockAlphaBackendServices) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -3604,6 +3606,14 @@ func (m *MockAlphaBackendServices) Delete(ctx context.Context, key *meta.Key) er
 // Obj wraps the object for use in the mock.
 func (m *MockAlphaBackendServices) Obj(o *alpha.BackendService) *MockBackendServicesObj {
 	return &MockBackendServicesObj{o}
+}
+
+// SetSecurityPolicy is a mock for the corresponding method.
+func (m *MockAlphaBackendServices) SetSecurityPolicy(ctx context.Context, key *meta.Key, arg0 *alpha.SecurityPolicyReference) error {
+	if m.SetSecurityPolicyHook != nil {
+		return m.SetSecurityPolicyHook(ctx, key, arg0, m)
+	}
+	return nil
 }
 
 // Update is a mock for the corresponding method.
@@ -3753,6 +3763,39 @@ func (g *GCEAlphaBackendServices) Delete(ctx context.Context, key *meta.Key) err
 
 	err = g.s.WaitForCompletion(ctx, op)
 	glog.V(4).Infof("GCEAlphaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
+	return err
+}
+
+// SetSecurityPolicy is a method on GCEAlphaBackendServices.
+func (g *GCEAlphaBackendServices) SetSecurityPolicy(ctx context.Context, key *meta.Key, arg0 *alpha.SecurityPolicyReference) error {
+	glog.V(5).Infof("GCEAlphaBackendServices.SetSecurityPolicy(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEAlphaBackendServices.SetSecurityPolicy(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "BackendServices")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "SetSecurityPolicy",
+		Version:   meta.Version("alpha"),
+		Service:   "BackendServices",
+	}
+	glog.V(5).Infof("GCEAlphaBackendServices.SetSecurityPolicy(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.SetSecurityPolicy(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Alpha.BackendServices.SetSecurityPolicy(projectID, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEAlphaBackendServices.SetSecurityPolicy(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEAlphaBackendServices.SetSecurityPolicy(%v, %v, ...) = %+v", ctx, key, err)
 	return err
 }
 
