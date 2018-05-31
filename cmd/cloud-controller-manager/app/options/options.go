@@ -72,8 +72,11 @@ type CloudControllerManagerOptions struct {
 }
 
 // NewCloudControllerManagerOptions creates a new ExternalCMServer with a default config.
-func NewCloudControllerManagerOptions() *CloudControllerManagerOptions {
-	componentConfig := NewDefaultComponentConfig(ports.InsecureCloudControllerManagerPort)
+func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) {
+	componentConfig, err := NewDefaultComponentConfig(ports.InsecureCloudControllerManagerPort)
+	if err != nil {
+		return nil, err
+	}
 
 	s := CloudControllerManagerOptions{
 		CloudProvider:    &cmoptions.CloudProviderOptions{},
@@ -101,11 +104,11 @@ func NewCloudControllerManagerOptions() *CloudControllerManagerOptions {
 	// TODO: enable HTTPS by default
 	s.SecureServing.BindPort = 0
 
-	return &s
+	return &s, nil
 }
 
 // NewDefaultComponentConfig returns cloud-controller manager configuration object.
-func NewDefaultComponentConfig(insecurePort int32) componentconfig.CloudControllerManagerConfiguration {
+func NewDefaultComponentConfig(insecurePort int32) (componentconfig.CloudControllerManagerConfiguration, error) {
 	scheme := runtime.NewScheme()
 	componentconfigv1alpha1.AddToScheme(scheme)
 	componentconfig.AddToScheme(scheme)
@@ -114,9 +117,11 @@ func NewDefaultComponentConfig(insecurePort int32) componentconfig.CloudControll
 	scheme.Default(&versioned)
 
 	internal := componentconfig.CloudControllerManagerConfiguration{}
-	scheme.Convert(&versioned, &internal, nil)
+	if err := scheme.Convert(&versioned, &internal, nil); err != nil {
+		return internal, err
+	}
 	internal.KubeCloudShared.Port = insecurePort
-	return internal
+	return internal, nil
 }
 
 // AddFlags adds flags for a specific ExternalCMServer to the specified FlagSet
