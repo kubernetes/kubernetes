@@ -18,6 +18,7 @@ go_library(
     srcs = ["requestheader.go"],
     importpath = "k8s.io/apiserver/pkg/authentication/request/headerrequest",
     deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/request/x509:go_default_library",

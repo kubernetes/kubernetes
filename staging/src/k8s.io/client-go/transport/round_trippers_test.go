@@ -125,6 +125,19 @@ func TestImpersonationRoundTripper(t *testing.T) {
 				ImpersonateUserExtraHeaderPrefix + "Second": {"B", "b"},
 			},
 		},
+		{
+			name: "escape handling",
+			impersonationConfig: ImpersonationConfig{
+				UserName: "user",
+				Extra: map[string][]string{
+					"test.example.com/thing.thing": {"A", "a"},
+				},
+			},
+			expected: map[string][]string{
+				ImpersonateUserHeader:                                               {"user"},
+				ImpersonateUserExtraHeaderPrefix + `Test.example.com%2fthing.thing`: {"A", "a"},
+			},
+		},
 	}
 
 	for _, tc := range tcs {

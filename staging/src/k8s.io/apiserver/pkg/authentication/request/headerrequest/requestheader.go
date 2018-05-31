@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
@@ -170,7 +172,11 @@ func newExtra(h http.Header, headerPrefixes []string) map[string][]string {
 				continue
 			}
 
-			extraKey := strings.ToLower(headerName[len(prefix):])
+			encodedKey := strings.ToLower(headerName[len(prefix):])
+			extraKey, err := url.PathUnescape(encodedKey)
+			if err != nil {
+				glog.Errorf("Failed to path decode extra info header %q", encodedKey)
+			}
 			ret[extraKey] = append(ret[extraKey], vv...)
 		}
 	}
