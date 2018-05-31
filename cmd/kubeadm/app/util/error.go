@@ -33,10 +33,6 @@ const (
 	ValidationExitCode = 3
 )
 
-type debugError interface {
-	DebugError() (msg string, args []interface{})
-}
-
 // fatal prints the message if set and then exits.
 func fatal(msg string, code int) {
 	if len(msg) > 0 {
@@ -56,7 +52,7 @@ func fatal(msg string, code int) {
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func CheckErr(err error) {
-	checkErr("", err, fatal)
+	checkErr(err, fatal)
 }
 
 // preflightError allows us to know if the error is a preflight error or not
@@ -66,8 +62,8 @@ type preflightError interface {
 }
 
 // checkErr formats a given error as a string and calls the passed handleErr
-// func with that string and an kubectl exit code.
-func checkErr(prefix string, err error, handleErr func(string, int)) {
+// func with that string and an exit code.
+func checkErr(err error, handleErr func(string, int)) {
 	switch err.(type) {
 	case nil:
 		return

@@ -42,7 +42,7 @@ func TestCheckErr(t *testing.T) {
 
 	for _, rt := range tokenTest {
 		codeReturned = 0
-		checkErr("", rt.e, errHandle)
+		checkErr(rt.e, errHandle)
 		if codeReturned != rt.expected {
 			t.Errorf(
 				"failed checkErr:\n\texpected: %d\n\t  actual: %d",
