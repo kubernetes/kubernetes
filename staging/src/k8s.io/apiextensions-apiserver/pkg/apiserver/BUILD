@@ -15,6 +15,7 @@ go_library(
         "customresource_handler.go",
     ],
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/go-openapi/strfmt:go_default_library",
@@ -75,6 +76,30 @@ go_library(
     ],
 )
 
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "customresource_handler_test.go",
+        "jsonpath_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/testing/fuzzer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/fuzzer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
+    ],
+)
+
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -90,14 +115,5 @@ filegroup(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["customresource_handler_test.go"],
-    embed = [":go_default_library"],
-    deps = [
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion:go_default_library",
-    ],
+    visibility = ["//visibility:public"],
 )
