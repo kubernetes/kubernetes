@@ -212,7 +212,7 @@ const (
 	ResourceLimitsPriorityFunction utilfeature.Feature = "ResourceLimitsPriorityFunction"
 
 	// owner: @m1093782566
-	// beta: v1.9
+	// GA: v1.11
 	//
 	// Implement IPVS-based in-cluster service load balancing
 	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
@@ -331,7 +331,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
-	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.Beta},
+	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
