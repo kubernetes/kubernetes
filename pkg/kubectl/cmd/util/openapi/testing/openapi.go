@@ -65,33 +65,6 @@ func (f *Fake) OpenAPISchema() (*openapi_v2.Document, error) {
 	return f.document, f.err
 }
 
-// FakeClient implements a dummy OpenAPISchemaInterface that uses the
-// fake OpenAPI schema given as a parameter, and count the number of
-// call to the function.
-type FakeClient struct {
-	Calls int
-	Err   error
-
-	fake *Fake
-}
-
-// NewFakeClient creates a new FakeClient from the given Fake.
-func NewFakeClient(f *Fake) *FakeClient {
-	return &FakeClient{fake: f}
-}
-
-// OpenAPISchema returns a OpenAPI Document as returned by the fake, but
-// it also counts the number of calls.
-func (f *FakeClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	f.Calls = f.Calls + 1
-
-	if f.Err != nil {
-		return nil, f.Err
-	}
-
-	return f.fake.OpenAPISchema()
-}
-
 // FakeResources is a wrapper to directly load the openapi schema from a
 // file, and get the schema for given GVK. This is only for test since
 // it's assuming that the file is there and everything will go fine.
