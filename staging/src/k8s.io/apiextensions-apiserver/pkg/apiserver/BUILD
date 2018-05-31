@@ -93,10 +93,24 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["customresource_handler_test.go"],
+    srcs = [
+        "customresource_handler_test.go",
+        "jsonpath_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/testing/fuzzer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/fuzzer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ],
 )

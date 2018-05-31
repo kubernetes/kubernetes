@@ -10,6 +10,7 @@ go_test(
     srcs = [
         "basic_test.go",
         "finalization_test.go",
+        "objectmeta_test.go",
         "registration_test.go",
         "subresources_test.go",
         "validation_test.go",
@@ -19,6 +20,7 @@ go_test(
     tags = ["integration"],
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
+        "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
@@ -33,8 +35,10 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
     ],
 )
