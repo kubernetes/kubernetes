@@ -498,12 +498,11 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		glog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
 		return nil, false, nil
 	}
-	privateKey, err := certutil.PrivateKeyFromFile(ctx.ComponentConfig.SAController.ServiceAccountKeyFile)
-	if err != nil {
-		return nil, true, fmt.Errorf("error reading key for service account token controller: %v", err)
-	}
 
-	var rootCA []byte
+	var (
+		rootCA []byte
+		err    error
+	)
 	if ctx.ComponentConfig.SAController.RootCAFile != "" {
 		rootCA, err = ioutil.ReadFile(ctx.ComponentConfig.SAController.RootCAFile)
 		if err != nil {
@@ -516,12 +515,21 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		rootCA = c.rootClientBuilder.ConfigOrDie("tokens-controller").CAData
 	}
 
+	privateKey, err := certutil.PrivateKeyFromFile(ctx.ComponentConfig.SAController.ServiceAccountKeyFile)
+	if err != nil {
+		return nil, true, fmt.Errorf("error reading key for service account token controller: %v", err)
+	}
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, privateKey)
+	if err != nil {
+		return nil, true, fmt.Errorf("error create jwt token generator: %v", err)
+	}
+
 	controller, err := serviceaccountcontroller.NewTokensController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Secrets(),
 		c.rootClientBuilder.ClientOrDie("tokens-controller"),
 		serviceaccountcontroller.TokensControllerOptions{
-			TokenGenerator: serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, privateKey),
+			TokenGenerator: tokenGenerator,
 			RootCA:         rootCA,
 		},
 	)

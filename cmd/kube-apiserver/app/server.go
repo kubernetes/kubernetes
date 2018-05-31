@@ -360,7 +360,10 @@ func CreateKubeAPIServerConfig(
 			}
 		}
 
-		issuer = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		issuer, lastErr = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		if lastErr != nil {
+			return
+		}
 		apiAudiences = s.Authentication.ServiceAccounts.APIAudiences
 		maxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}

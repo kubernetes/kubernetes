@@ -54,25 +54,13 @@ type TokenGenerator interface {
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
 // privateKey is a PEM-encoded byte array of a private RSA key.
 // JWTTokenAuthenticator()
-func JWTTokenGenerator(iss string, privateKey interface{}) TokenGenerator {
-	return &jwtTokenGenerator{
-		iss:        iss,
-		privateKey: privateKey,
-	}
-}
-
-type jwtTokenGenerator struct {
-	iss        string
-	privateKey interface{}
-}
-
-func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims interface{}) (string, error) {
+func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, error) {
 	var alg jose.SignatureAlgorithm
-	switch privateKey := j.privateKey.(type) {
+	switch keyType := privateKey.(type) {
 	case *rsa.PrivateKey:
 		alg = jose.RS256
 	case *ecdsa.PrivateKey:
-		switch privateKey.Curve {
+		switch keyType.Curve {
 		case elliptic.P256():
 			alg = jose.ES256
 		case elliptic.P384():
@@ -80,15 +68,29 @@ func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims inte
 		case elliptic.P521():
 			alg = jose.ES512
 		default:
-			return "", fmt.Errorf("unknown private key curve, must be 256, 384, or 521")
+			return nil, fmt.Errorf("unknown private key curve, must be 256, 384, or 521")
 		}
 	default:
-		return "", fmt.Errorf("unknown private key type %T, must be *rsa.PrivateKey or *ecdsa.PrivateKey", j.privateKey)
+		return nil, fmt.Errorf("unknown private key type %T, must be *rsa.PrivateKey or *ecdsa.PrivateKey", privateKey)
 	}
 
+	return &jwtTokenGenerator{
+		iss:        iss,
+		privateKey: privateKey,
+		algorithm:  alg,
+	}, nil
+}
+
+type jwtTokenGenerator struct {
+	iss        string
+	privateKey interface{}
+	algorithm  jose.SignatureAlgorithm
+}
+
+func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims interface{}) (string, error) {
 	signer, err := jose.NewSigner(
 		jose.SigningKey{
-			Algorithm: alg,
+			Algorithm: j.algorithm,
 			Key:       j.privateKey,
 		},
 		nil,
