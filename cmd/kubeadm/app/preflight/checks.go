@@ -990,15 +990,6 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 // addCommonChecks is a helper function to deplicate checks that are common between both the
 // kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfiguration, checks []Checker) []Checker {
-	// check if we can use crictl to perform checks via the CRI
-	glog.V(1).Infoln("checking if we can use crictl to perform checks via the CRI")
-	criCtlChecker := InPathCheck{
-		executable: "crictl",
-		mandatory:  false,
-		exec:       execer,
-		suggestion: fmt.Sprintf("go get %v", kubeadmconstants.CRICtlPackage),
-	}
-
 	// Check whether or not the CRI socket defined is the default
 	if cfg.GetCRISocket() != kubeadmdefaults.DefaultCRISocket {
 		checks = append(checks, CRICheck{socket: cfg.GetCRISocket(), exec: execer})
@@ -1021,7 +1012,6 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 			InPathCheck{executable: "socat", mandatory: false, exec: execer},
 			InPathCheck{executable: "tc", mandatory: false, exec: execer},
 			InPathCheck{executable: "touch", mandatory: false, exec: execer},
-			criCtlChecker,
 			ResolveCheck{})
 	}
 	checks = append(checks,
