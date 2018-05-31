@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -201,7 +200,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			}(nodeName, nameHint, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
-			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+			_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 			if condition == nil || condition.Status != v1.ConditionFalse {
 				rc.updateNetworkingCondition(types.NodeName(node.Name), true)
 			}
