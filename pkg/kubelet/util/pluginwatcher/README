@@ -13,17 +13,22 @@ communication with any API version supported by the plugin.
 Here are the general rules that Kubelet plugin developers should follow:
 - Run as 'root' user. Currently creating socket under PluginsSockDir, a root owned directory, requires
   plugin process to be running as 'root'.
+
 - Implements the Registration service specified in
   pkg/kubelet/apis/pluginregistration/v*/api.proto.
+
 - The plugin name sent during Registration.GetInfo grpc should be unique
   for the given plugin type (CSIPlugin or DevicePlugin).
-- The socket path needs to be unique and doesn't conflict with the path chosen
-  by any other potential plugins. Currently we only support flat fs namespace
-  under PluginsSockDir but will soon support recursive inotify watch for
-  hierarchical socket paths.
+
+- The socket path needs to be unique within one directory, in normal case, 
+  each plugin type has its own sub directory, but the design does support socket file
+  under any sub directory of PluginSockDir.
+ 
 - A plugin should clean up its own socket upon exiting or when a new instance
   comes up. A plugin should NOT remove any sockets belonging to other plugins.
+
 - A plugin should make sure it has service ready for any supported service API
   version listed in the PluginInfo.
+
 - For an example plugin implementation, take a look at example_plugin.go
   included in this directory.

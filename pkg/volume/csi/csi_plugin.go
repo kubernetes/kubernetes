@@ -84,7 +84,7 @@ var lm labelmanager.Interface
 
 // RegistrationCallback is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
-func RegistrationCallback(pluginName string, endpoint string, versions []string, socketPath string) (error, chan bool) {
+func RegistrationCallback(pluginName string, endpoint string, versions []string, socketPath string) (chan bool, error) {
 
 	glog.Infof(log("Callback from kubelet with plugin name: %s endpoint: %s versions: %s socket path: %s",
 		pluginName, endpoint, strings.Join(versions, ","), socketPath))
@@ -95,7 +95,7 @@ func RegistrationCallback(pluginName string, endpoint string, versions []string,
 	// Calling nodeLabelManager to update label for newly registered CSI driver
 	err := lm.AddLabels(pluginName)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
 	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
