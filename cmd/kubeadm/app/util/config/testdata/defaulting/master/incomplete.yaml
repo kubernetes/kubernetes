@@ -1,3 +1,5 @@
+# This file _should_ set TypeMeta, but at some point earlier we supported deserializing MasterConfigurations without TypeMeta, so we need to support that as long as we
+# support the v1alpha1 API. In the meantime kubeadm will treat this as v1alpha1 automatically when unmarshalling.
 api:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
