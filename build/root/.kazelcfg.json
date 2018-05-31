@@ -5,6 +5,5 @@
 		"/_",
 		"^third_party/etcd.*"
 	],
-	"AddSourcesRules": true,
-	"K8sOpenAPIGen": true
+	"AddSourcesRules": true
 }

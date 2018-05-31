@@ -2,6 +2,9 @@ package(default_visibility = ["//visibility:public"])
 
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_bundle")
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
+load(":code_generation_test.bzl", "code_generation_test_suite")
+
+code_generation_test_suite()
 
 filegroup(
     name = "package-srcs",
