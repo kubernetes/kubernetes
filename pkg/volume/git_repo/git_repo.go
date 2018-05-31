@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -194,7 +195,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	args := []string{"clone", b.source}
+	args := []string{"clone", "--", b.source}
 
 	if len(b.target) != 0 {
 		args = append(args, b.target)
@@ -218,7 +219,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	var subdir string
 
 	switch {
-	case b.target == ".":
+	case len(b.target) != 0 && filepath.Clean(b.target) == ".":
 		// if target dir is '.', use the current dir
 		subdir = path.Join(dir)
 	case len(files) == 1:
