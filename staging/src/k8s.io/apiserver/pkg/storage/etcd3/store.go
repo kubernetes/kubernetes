@@ -70,6 +70,7 @@ type store struct {
 	pathPrefix    string
 	watcher       *watcher
 	pagingEnabled bool
+	leaseManager  *leaseManager
 }
 
 type elemForDecode struct {
@@ -107,8 +108,9 @@ func newStore(c *clientv3.Client, quorumRead, pagingEnabled bool, codec runtime.
 		// for compatibility with etcd2 impl.
 		// no-op for default prefix of '/registry'.
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
-		pathPrefix: path.Join("/", prefix),
-		watcher:    newWatcher(c, codec, versioner, transformer),
+		pathPrefix:   path.Join("/", prefix),
+		watcher:      newWatcher(c, codec, versioner, transformer),
+		leaseManager: newDefaultLeaseManager(c),
 	}
 	if !quorumRead {
 		// In case of non-quorum reads, we can set WithSerializable()
@@ -758,13 +760,11 @@ func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, er
 	if ttl == 0 {
 		return nil, nil
 	}
-	// TODO: one lease per ttl key is expensive. Based on current use case, we can have a long window to
-	// put keys within into same lease. We shall benchmark this and optimize the performance.
-	lcr, err := s.client.Lease.Grant(ctx, ttl)
+	id, err := s.leaseManager.GetLease(ctx, ttl)
 	if err != nil {
 		return nil, err
 	}
-	return []clientv3.OpOption{clientv3.WithLease(clientv3.LeaseID(lcr.ID))}, nil
+	return []clientv3.OpOption{clientv3.WithLease(id)}, nil
 }
 
 // decode decodes value of bytes into object. It will also set the object resource version to rev.
