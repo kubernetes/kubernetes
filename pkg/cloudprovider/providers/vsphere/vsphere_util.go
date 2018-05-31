@@ -101,7 +101,7 @@ func getAccessibleDatastores(ctx context.Context, nodeVmDetail *NodeDetails, nod
 		// If so, rediscover the node and retry.
 		if vclib.IsManagedObjectNotFoundError(err) {
 			glog.V(4).Infof("error %q ManagedObjectNotFound for node %q. Rediscovering...", err, nodeVmDetail.NodeName)
-			err = nodeManager.RediscoverNode(convertToK8sType(nodeVmDetail.NodeName))
+			err = nodeManager.DiscoverNode(nodeVmDetail.NodeName)
 			if err == nil {
 				glog.V(4).Infof("Discovered node %s successfully", nodeVmDetail.NodeName)
 				nodeInfo, err := nodeManager.GetNodeInfo(convertToK8sType(nodeVmDetail.NodeName))
@@ -469,13 +469,9 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 	glog.V(9).Infof("vmMoMap: +%v", vmMoMap)
 
 	for _, nodeName := range nodes {
-		node, err := vs.nodeManager.GetNode(nodeName)
+		nodeUUID, err := vs.nodeManager.GetVMUUID(convertToString(nodeName))
 		if err != nil {
-			return nodesToRetry, err
-		}
-		nodeUUID, err := GetNodeUUID(&node)
-		if err != nil {
-			glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, err)
+			glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", nodeName, err)
 			return nodesToRetry, err
 		}
 		nodeUUID = strings.ToLower(nodeUUID)
