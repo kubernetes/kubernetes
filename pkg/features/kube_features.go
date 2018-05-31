@@ -248,6 +248,12 @@ const (
 	// Implement TokenRequest endpoint on service account resources.
 	TokenRequest utilfeature.Feature = "TokenRequest"
 
+	// owner: @mikedanese
+	// alpha: v1.11
+	//
+	// Enable ServiceAccountTokenVolumeProjection support in ProjectedVolumes.
+	TokenRequestProjection utilfeature.Feature = "TokenRequestProjection"
+
 	// owner: @Random-Liu
 	// beta: v1.11
 	//
@@ -336,6 +342,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
 	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
+	TokenRequestProjection:                      {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
