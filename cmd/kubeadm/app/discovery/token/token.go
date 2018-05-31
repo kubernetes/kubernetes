@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
-	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
 )
 
@@ -45,7 +44,7 @@ const BootstrapUser = "token-bootstrap-client"
 // It then makes sure it can trust the API Server by looking at the JWS-signed tokens and (if cfg.DiscoveryTokenCACertHashes is not empty)
 // validating the cluster CA against a set of pinned public keys
 func RetrieveValidatedClusterInfo(cfg *kubeadmapi.NodeConfiguration) (*clientcmdapi.Cluster, error) {
-	tokenID, tokenSecret, err := tokenutil.ParseToken(cfg.DiscoveryToken)
+	token, err := kubeadmapi.NewBootstrapTokenString(cfg.DiscoveryToken)
 	if err != nil {
 		return nil, err
 	}
@@ -88,11 +87,11 @@ func RetrieveValidatedClusterInfo(cfg *kubeadmapi.NodeConfiguration) (*clientcmd
 		if !ok || len(insecureKubeconfigString) == 0 {
 			return nil, fmt.Errorf("there is no %s key in the %s ConfigMap. This API Server isn't set up for token bootstrapping, can't connect", bootstrapapi.KubeConfigKey, bootstrapapi.ConfigMapClusterInfo)
 		}
-		detachedJWSToken, ok := insecureClusterInfo.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenID]
+		detachedJWSToken, ok := insecureClusterInfo.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]
 		if !ok || len(detachedJWSToken) == 0 {
-			return nil, fmt.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the master node to creating a new valid token", tokenID)
+			return nil, fmt.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the master node to creating a new valid token", token.ID)
 		}
-		if !bootstrap.DetachedTokenIsValid(detachedJWSToken, insecureKubeconfigString, tokenID, tokenSecret) {
+		if !bootstrap.DetachedTokenIsValid(detachedJWSToken, insecureKubeconfigString, token.ID, token.Secret) {
 			return nil, fmt.Errorf("failed to verify JWS signature of received cluster info object, can't trust this API Server")
 		}
 		insecureKubeconfigBytes := []byte(insecureKubeconfigString)
