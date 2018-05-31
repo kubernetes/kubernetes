@@ -167,6 +167,62 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func TestGetToList(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage, 10)
+	defer cacher.Stop()
+
+	storedObj := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
+	key := "pods/" + storedObj.Namespace + "/" + storedObj.Name
+
+	tests := []struct {
+		key         string
+		pred        storage.SelectionPredicate
+		expectedOut []*example.Pod
+	}{{ // test GetToList on existing key
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{storedObj},
+	}, { // test GetToList on non-existing key
+		key:         "/non-existing",
+		pred:        storage.Everything,
+		expectedOut: nil,
+	}, { // test GetToList with matching pod name
+		key: "/non-existing",
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+				pod := obj.(*example.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+			},
+		},
+		expectedOut: nil,
+	}}
+
+	for i, tt := range tests {
+		out := &example.PodList{}
+		err := cacher.GetToList(context.TODO(), tt.key, "", tt.pred, out)
+		if err != nil {
+			t.Fatalf("GetToList failed: %v", err)
+		}
+		if len(out.ResourceVersion) == 0 {
+			t.Errorf("#%d: unset resourceVersion", i)
+		}
+		if len(out.Items) != len(tt.expectedOut) {
+			t.Errorf("#%d: length of list want=%d, get=%d", i, len(tt.expectedOut), len(out.Items))
+			continue
+		}
+		for j, wantPod := range tt.expectedOut {
+			getPod := &out.Items[j]
+			if !reflect.DeepEqual(wantPod, getPod) {
+				t.Errorf("#%d: pod want=%#v, get=%#v", i, wantPod, getPod)
+			}
+		}
+	}
+}
+
 func TestList(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)
