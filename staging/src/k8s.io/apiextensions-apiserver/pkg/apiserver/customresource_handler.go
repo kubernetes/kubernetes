@@ -34,8 +34,10 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -44,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
@@ -823,6 +826,16 @@ func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*met
 	accumulatedObjectMeta := &metav1.ObjectMeta{}
 	testObjectMeta := &metav1.ObjectMeta{}
 	for k, v := range metadataMap {
+		// annotations and labels we preserve key by key
+		if labels, ok := v.(map[string]interface{}); ok && k == "labels" {
+			accumulatedObjectMeta.Labels = validKVs(labels, metav1validation.ValidateLabels)
+			continue
+		}
+		if annotations, ok := v.(map[string]interface{}); ok && k == "annotations" {
+			accumulatedObjectMeta.Annotations = validKVs(annotations, apivalidation.ValidateAnnotations)
+			continue
+		}
+
 		// serialize a single field
 		if singleFieldBytes, err := encodingjson.Marshal(map[string]interface{}{k: v}); err == nil {
 			// do a test unmarshal
@@ -833,6 +846,32 @@ func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*met
 		}
 	}
 	return accumulatedObjectMeta, true, nil
+}
+
+func validKVs(m map[string]interface{}, validate func(labels map[string]string, fldPath *field.Path) field.ErrorList) map[string]string {
+	ret := make(map[string]string, len(m))
+	dropped := false
+	for k, v := range m {
+		switch v := v.(type) {
+		case string:
+			ret[k] = v
+		case nil:
+			ret[k] = ""
+		default:
+			dropped = true
+		}
+	}
+	if dropped {
+		for k, v := range ret {
+			if len(validate(map[string]string{k: v}, field.NewPath(k))) > 0 {
+				delete(ret, k)
+			}
+		}
+	}
+	if len(ret) == 0 {
+		return nil
+	}
+	return ret
 }
 
 func setObjectMeta(u *unstructured.Unstructured, objectMeta *metav1.ObjectMeta) error {

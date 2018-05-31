@@ -205,6 +205,12 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 
 					// we expect this logic for the different fields:
 					switch {
+					case strings.HasPrefix(pth.String(), ".labels."):
+						// delete invalid labels individually
+						DeleteJsonPath(truncatedMetaMap, pth[:2], 0)
+					case strings.HasPrefix(pth.String(), ".annotations."):
+						// delete invalid annotations individually
+						DeleteJsonPath(truncatedMetaMap, pth[:2], 0)
 					default:
 						// delete complete top-level field by default
 						DeleteJsonPath(truncatedMetaMap, pth[:1], 0)
@@ -234,6 +240,36 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestGetObjectMetaShadowedMalformedLabelsAndAnnotations(t *testing.T) {
+	u := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]interface{}{
+					"bla.k8s.io/one":  1,
+					"bla.k8s.io/ok":   "ok",
+					"bla.k8s.io/huge": strings.Repeat("a", validation.LabelValueMaxLength+1),
+				},
+				"annotations": map[string]interface{}{
+					"bla.k8s.io/one":  1,
+					"bla.k8s.io/ok":   "ok",
+					"bla.k8s.io/huge": strings.Repeat("a", 256*(1<<10)+1),
+				},
+			},
+		},
+	}
+
+	o, _, err := getObjectMeta(u, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expected, got := map[string]string{"bla.k8s.io/ok": "ok"}, o.Labels; !reflect.DeepEqual(expected, got) {
+		t.Fatalf("Expected only ok label, got: %v", got)
+	}
+	if expected, got := map[string]string{"bla.k8s.io/ok": "ok"}, o.Annotations; !reflect.DeepEqual(expected, got) {
+		t.Fatalf("Expected only ok annotation, got: %v", got)
 	}
 }
 
