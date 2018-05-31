@@ -63,8 +63,15 @@ func TestUploadConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &kubeadmapi.MasterConfiguration{
-				KubernetesVersion: "1.7.3",
-				Token:             "1234567",
+				KubernetesVersion: "v1.10.3",
+				BootstrapTokens: []kubeadmapi.BootstrapToken{
+					{
+						Token: &kubeadmapi.BootstrapTokenString{
+							ID:     "abcdef",
+							Secret: "abcdef0123456789",
+						},
+					},
+				},
 			}
 			client := clientsetfake.NewSimpleClientset()
 			if tt.errOnCreate != nil {
@@ -110,8 +117,9 @@ func TestUploadConfiguration(t *testing.T) {
 					t.Errorf("Decoded value doesn't match, decoded = %#v, expected = %#v", decodedCfg.KubernetesVersion, cfg.KubernetesVersion)
 				}
 
-				if decodedCfg.Token != "" {
-					t.Errorf("Decoded value contains token (sensitive info), decoded = %#v, expected = empty", decodedCfg.Token)
+				// If the decoded cfg has a BootstrapTokens array, verify the sensitive information we had isn't still there.
+				if len(decodedCfg.BootstrapTokens) > 0 && decodedCfg.BootstrapTokens[0].Token != nil && decodedCfg.BootstrapTokens[0].Token.String() == cfg.BootstrapTokens[0].Token.String() {
+					t.Errorf("Decoded value contains .BootstrapTokens (sensitive info), decoded = %#v, expected = empty", decodedCfg.BootstrapTokens)
 				}
 
 				if decodedExtCfg.Kind != "MasterConfiguration" {
