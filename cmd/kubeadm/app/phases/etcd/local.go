@@ -17,7 +17,6 @@ limitations under the License.
 package etcd
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/golang/glog"
@@ -45,7 +44,7 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 		return err
 	}
 
-	fmt.Printf("[etcd] Wrote Static Pod manifest for a local etcd instance to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
+	glog.V(1).Infof("[etcd] Wrote Static Pod manifest for a local etcd instance to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
 	return nil
 }
 

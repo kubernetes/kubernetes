@@ -81,7 +81,7 @@ func buildKubeletArgMap(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, registe
 
 // writeKubeletFlagBytesToDisk writes a byte slice down to disk at the specific location of the kubelet flag overrides file
 func writeKubeletFlagBytesToDisk(b []byte) error {
-	fmt.Printf("[kubelet] Writing kubelet environment file with flags to file %q\n", constants.KubeletEnvFile)
+	glog.V(1).Infof("[kubelet] Writing kubelet environment file with flags to file %q\n", constants.KubeletEnvFile)
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(filepath.Dir(constants.KubeletEnvFile), 0700); err != nil {

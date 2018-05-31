@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/golang/glog"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -91,7 +93,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 		return fmt.Errorf("error when creating kube-proxy RBAC rules: %v", err)
 	}
 
-	fmt.Println("[addons] Applied essential addon: kube-proxy")
+	glog.V(1).Infoln("[addons] Applied essential addon: kube-proxy")
 	return nil
 }
 
