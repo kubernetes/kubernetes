@@ -85,9 +85,16 @@ func GetFullImageName(image string) (string, error) {
 		return "", err
 	}
 
+	// busybox:tag@digest == busybox:digest
+	if len(tag) != 0 && len(digest) != 0 {
+		return repo + "@" + digest, nil
+	}
+
+	// only has tag
 	if len(tag) != 0 {
 		return repo + ":" + tag, nil
 	}
 
+	// only has digest
 	return repo + "@" + digest, nil
 }

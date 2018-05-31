@@ -78,7 +78,11 @@ func TestGetFullImageName(t *testing.T) {
 	}{
 		{Input: "root", Output: "docker.io/library/root:latest"},
 		{Input: "root:tag", Output: "docker.io/library/root:tag"},
+		{Input: "library/root", Output: "docker.io/library/root:latest"},
+		{Input: "docker.io/root", Output: "docker.io/library/root:latest"},
+		{Input: "docker.io/library/root", Output: "docker.io/library/root:latest"},
 		{Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "docker.io/library/root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+		{Input: "root:tag@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "docker.io/library/root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
 		{Input: "user/repo", Output: "docker.io/user/repo:latest"},
 		{Input: "k8s.gcr.io/root:tag", Output: "k8s.gcr.io/root:tag"},
 		{Input: "user/repo:tag", Output: "docker.io/user/repo:tag"},
