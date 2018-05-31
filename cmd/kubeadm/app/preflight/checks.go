@@ -19,6 +19,8 @@ package preflight
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,20 +28,16 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
-	"crypto/tls"
-	"crypto/x509"
-
 	"github.com/PuerkitoBio/purell"
 	"github.com/blang/semver"
 	"github.com/golang/glog"
-
-	"net/url"
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -565,7 +563,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 
 	if len(errs) != 0 {
 		// Only print the output from the system verification check if the check failed
-		fmt.Println("[preflight] The system verification failed. Printing the output from the verification:")
+		glog.V(1).Infoln("[preflight] The system verification failed. Printing the output from the verification:")
 		bufw.Flush()
 		return warns, errs
 	}
@@ -942,7 +940,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 			)
 		}
 	}
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+	return RunChecks(checks, &Log{os.Stderr}, ignorePreflightErrors)
 }
 
 // RunJoinNodeChecks executes all individual, applicable to node checks.
@@ -984,7 +982,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		)
 	}
 
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+	return RunChecks(checks, &Log{os.Stderr}, ignorePreflightErrors)
 }
 
 // addCommonChecks is a helper function to deplicate checks that are common between both the
@@ -1030,7 +1028,7 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 		IsPrivilegedUserCheck{},
 	}
 
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+	return RunChecks(checks, &Log{os.Stderr}, ignorePreflightErrors)
 }
 
 // RunPullImagesCheck will pull images kubeadm needs if the are not found on the system
@@ -1043,18 +1041,29 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfig
 	checks := []Checker{
 		ImagePullCheck{Images: criInterfacer, ImageList: images.GetAllImages(cfg)},
 	}
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+	return RunChecks(checks, &Log{os.Stderr}, ignorePreflightErrors)
+}
+
+type Log struct {
+	io.Writer
+}
+
+func (l *Log) Warningf(format string, args ...interface{}) {
+	l.Writer.Write([]byte(fmt.Sprintf("\t[WARNING] "+format, args...)))
+}
+
+type logger interface {
+	Warningf(string, ...interface{})
 }
 
 // RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String) error {
+func RunChecks(checks []Checker, log logger, ignorePreflightErrors sets.String) error {
 	type checkErrors struct {
 		Name   string
 		Errors []error
 	}
 	found := []checkErrors{}
-
 	for _, c := range checks {
 		name := c.Name()
 		warnings, errs := c.Check()
@@ -1066,7 +1075,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 		}
 
 		for _, w := range warnings {
-			io.WriteString(ww, fmt.Sprintf("\t[WARNING %s]: %v\n", name, w))
+			log.Warningf("%s: %v\n", name, w)
 		}
 		if len(errs) > 0 {
 			found = append(found, checkErrors{Name: name, Errors: errs})
@@ -1076,7 +1085,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 		var errs bytes.Buffer
 		for _, c := range found {
 			for _, i := range c.Errors {
-				errs.WriteString(fmt.Sprintf("\t[ERROR %s]: %v\n", c.Name, i.Error()))
+				errs.WriteString(fmt.Sprintf("\t[ERROR] %s: %v\n", c.Name, i.Error()))
 			}
 		}
 		return &Error{Msg: errs.String()}

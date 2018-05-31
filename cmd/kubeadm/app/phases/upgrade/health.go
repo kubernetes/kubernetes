@@ -89,7 +89,7 @@ func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.Stri
 		})
 	}
 
-	return preflight.RunChecks(healthChecks, os.Stderr, ignoreChecksErrors)
+	return preflight.RunChecks(healthChecks, &preflight.Log{os.Stderr}, ignoreChecksErrors)
 }
 
 // apiServerHealthy checks whether the API server's /healthz endpoint is healthy

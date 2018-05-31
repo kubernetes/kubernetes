@@ -487,7 +487,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	// Exit earlier if we're dryrunning
 	if i.dryRun {
-		fmt.Println("[dryrun] finished dry-running successfully. Above are the resources that would be created")
+		glog.V(1).Infoln("[dryrun] finished dry-running successfully. Above are the resources that would be created")
 		return nil
 	}
 

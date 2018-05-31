@@ -22,6 +22,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/mholt/caddy/caddyfile"
 
 	apps "k8s.io/api/apps/v1"
@@ -128,7 +129,7 @@ func kubeDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interfac
 	if err := createKubeDNSAddon(dnsDeploymentBytes, dnsServiceBytes, client); err != nil {
 		return err
 	}
-	fmt.Println("[addons] Applied essential addon: kube-dns")
+	glog.V(1).Infoln("[addons] Applied essential addon: kube-dns")
 	return nil
 }
 
@@ -217,7 +218,7 @@ func coreDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interfac
 	if err := createCoreDNSAddon(coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client); err != nil {
 		return err
 	}
-	fmt.Println("[addons] Applied essential addon: CoreDNS")
+	glog.V(1).Infoln("[addons] Applied essential addon: CoreDNS")
 	return nil
 }
 

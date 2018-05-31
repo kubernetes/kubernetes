@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,7 +81,7 @@ func (w *KubeWaiter) WaitForAPI() error {
 			return false, nil
 		}
 
-		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
+		glog.V(1).Infof("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
 }

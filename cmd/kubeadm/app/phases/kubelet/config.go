@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +57,7 @@ func CreateConfigMap(cfg *kubeadmapi.MasterConfiguration, client clientset.Inter
 	}
 
 	configMapName := configMapName(k8sVersion)
-	fmt.Printf("[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", configMapName, metav1.NamespaceSystem)
+	glog.V(1).Infof("[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", configMapName, metav1.NamespaceSystem)
 
 	kubeletBytes, err := getConfigBytes(cfg.KubeletConfiguration.BaseConfig)
 	if err != nil {
@@ -163,7 +164,7 @@ func getConfigBytes(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration) ([
 
 // writeConfigBytesToDisk writes a byte slice down to disk at the specific location of the kubelet config file
 func writeConfigBytesToDisk(b []byte) error {
-	fmt.Printf("[kubelet] Writing kubelet configuration to file %q\n", kubeadmconstants.KubeletConfigurationFile)
+	glog.V(1).Infof("[kubelet] Writing kubelet configuration to file %q\n", kubeadmconstants.KubeletConfigurationFile)
 
 	if err := ioutil.WriteFile(kubeadmconstants.KubeletConfigurationFile, b, 0644); err != nil {
 		return fmt.Errorf("failed to write kubelet configuration to the file %q: %v", kubeadmconstants.KubeletConfigurationFile, err)
