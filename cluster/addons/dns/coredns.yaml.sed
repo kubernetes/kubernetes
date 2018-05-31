@@ -66,6 +66,7 @@ data:
         prometheus :9153
         proxy . /etc/resolv.conf
         cache 30
+        reload
     }
 ---
 apiVersion: extensions/v1beta1
@@ -94,6 +95,8 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: coredns
       tolerations:
@@ -103,7 +106,7 @@ spec:
           operator: "Exists"
       containers:
       - name: coredns
-        image: coredns/coredns:1.0.6
+        image: coredns/coredns:1.1.3
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -121,6 +124,9 @@ spec:
           protocol: UDP
         - containerPort: 53
           name: dns-tcp
+          protocol: TCP
+        - containerPort: 9153
+          name: metrics
           protocol: TCP
         livenessProbe:
           httpGet:
@@ -145,6 +151,8 @@ kind: Service
 metadata:
   name: kube-dns
   namespace: kube-system
+  annotations:
+    prometheus.io/scrape: "true"
   labels:
     k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"

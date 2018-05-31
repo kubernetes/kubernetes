@@ -43,7 +43,7 @@ type OSInterface interface {
 // RealOS is used to dispatch the real system level operations.
 type RealOS struct{}
 
-// MkDir will will call os.Mkdir to create a directory.
+// MkdirAll will call os.MkdirAll to create a directory.
 func (RealOS) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
 }

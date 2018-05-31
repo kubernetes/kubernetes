@@ -80569,6 +80569,27 @@
      }
     ]
    },
+   "io.k8s.api.core.v1.ServiceAccountTokenProjection": {
+    "description": "ServiceAccountTokenProjection represents a projected service account token volume. This projection can be used to insert a service account token into the pods runtime filesystem for use against APIs (Kubernetes API Server or otherwise).",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "audience": {
+      "description": "Audience is the intended audience of the token. A recipient of a token must identify itself with an identifier specified in the audience of the token, and otherwise should reject the token. The audience defaults to the identifier of the apiserver.",
+      "type": "string"
+     },
+     "expirationSeconds": {
+      "description": "ExpirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "path": {
+      "description": "Path is the path relative to the mount point of the file to project the token into.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.ServiceList": {
     "description": "ServiceList holds a list of services.",
     "required": [
@@ -81029,6 +81050,10 @@
      "secret": {
       "description": "information about the secret data to project",
       "$ref": "#/definitions/io.k8s.api.core.v1.SecretProjection"
+     },
+     "serviceAccountToken": {
+      "description": "information about the serviceAccountToken data to project",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ServiceAccountTokenProjection"
      }
     }
    },
@@ -85067,6 +85092,41 @@
      }
     }
    },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition": {
+    "description": "CustomResourceColumnDefinition specifies a column for server side printing.",
+    "required": [
+     "name",
+     "type",
+     "JSONPath"
+    ],
+    "properties": {
+     "JSONPath": {
+      "description": "JSONPath is a simple JSON path, i.e. with array notation.",
+      "type": "string"
+     },
+     "description": {
+      "description": "description is a human readable description of this column.",
+      "type": "string"
+     },
+     "format": {
+      "description": "format is an optional OpenAPI type definition for this column. The 'name' format is applied to the primary identifier column to assist in clients identifying column is the resource name. See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.",
+      "type": "string"
+     },
+     "name": {
+      "description": "name is a human readable name for the column.",
+      "type": "string"
+     },
+     "priority": {
+      "description": "priority is an integer defining the relative importance of this column compared to others. Lower numbers are considered higher priority. Columns that may be omitted in limited space scenarios should be given a higher priority.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "type": {
+      "description": "type is an OpenAPI type definition for this column. See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition": {
     "description": "CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format \u003c.spec.name\u003e.\u003c.spec.group\u003e.",
     "properties": {
@@ -85089,7 +85149,14 @@
       "description": "Status indicates the actual state of the CustomResourceDefinition",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionStatus"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinition",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionCondition": {
     "description": "CustomResourceDefinitionCondition contains details for the current condition of this pod.",
@@ -85144,7 +85211,14 @@
      "metadata": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinitionList",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionNames": {
     "description": "CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition",
@@ -85193,6 +85267,13 @@
      "scope"
     ],
     "properties": {
+     "additionalPrinterColumns": {
+      "description": "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
+      }
+     },
      "group": {
       "description": "Group is the group this resource belongs in",
       "type": "string"
@@ -85218,7 +85299,7 @@
       "type": "string"
      },
      "versions": {
-      "description": "Versions is the list of all supported versions for this resource. If Version field is provided, this field is optional. Validation: All versions must use the same validation schema for now. i.e., top level Validation field is applied to all of these versions. Order: The version name will be used to compute the order. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha, and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
+      "description": "Versions is the list of all supported versions for this resource. If Version field is provided, this field is optional. Validation: All versions must use the same validation schema for now. i.e., top level Validation field is applied to all of these versions. Order: The version name will be used to compute the order. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionVersion"
@@ -85551,8 +85632,7 @@
     "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
     "required": [
      "name",
-     "versions",
-     "serverAddressByClientCIDRs"
+     "versions"
     ],
     "properties": {
      "apiVersion": {
@@ -85801,6 +85881,21 @@
      },
      {
       "group": "admissionregistration.k8s.io",
+      "kind": "DeleteOptions",
+      "version": "v1beta1"
+     },
+     {
+      "group": "apiextensions.k8s.io",
+      "kind": "DeleteOptions",
+      "version": "v1beta1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "DeleteOptions",
+      "version": "v1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
       "kind": "DeleteOptions",
       "version": "v1beta1"
      },
@@ -86343,6 +86438,21 @@
       "version": "v1beta1"
      },
      {
+      "group": "apiextensions.k8s.io",
+      "kind": "WatchEvent",
+      "version": "v1beta1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "WatchEvent",
+      "version": "v1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "WatchEvent",
+      "version": "v1beta1"
+     },
+     {
       "group": "apps",
       "kind": "WatchEvent",
       "version": "v1"
@@ -86561,7 +86671,14 @@
       "description": "Status contains derived information about an API server",
       "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceStatus"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceCondition": {
     "required": [
@@ -86614,7 +86731,14 @@
      "metadata": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIServiceList",
+      "version": "v1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec": {
     "description": "APIServiceSpec contains information for locating and communicating with a server. Only https is supported, though you are able to disable certificate verification.",
@@ -86651,7 +86775,7 @@
       "type": "string"
      },
      "versionPriority": {
-      "description": "VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero. The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10). Since it's inside of a group, the number can be small, probably in the 10s. In case of equal version priorities, the version string will be used to compute the order inside a group. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha, and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
+      "description": "VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero. The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10). Since it's inside of a group, the number can be small, probably in the 10s. In case of equal version priorities, the version string will be used to compute the order inside a group. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
       "type": "integer",
       "format": "int32"
      }
@@ -86706,7 +86830,14 @@
       "description": "Status contains derived information about an API server",
       "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceStatus"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceCondition": {
     "required": [
@@ -86759,7 +86890,14 @@
      "metadata": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIServiceList",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceSpec": {
     "description": "APIServiceSpec contains information for locating and communicating with a server. Only https is supported, though you are able to disable certificate verification.",
@@ -86796,7 +86934,7 @@
       "type": "string"
      },
      "versionPriority": {
-      "description": "VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero. The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10). Since it's inside of a group, the number can be small, probably in the 10s. In case of equal version priorities, the version string will be used to compute the order inside a group. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha, and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
+      "description": "VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero. The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10). Since it's inside of a group, the number can be small, probably in the 10s. In case of equal version priorities, the version string will be used to compute the order inside a group. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
       "type": "integer",
       "format": "int32"
      }

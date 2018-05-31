@@ -131,7 +131,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.PrintObj = printer.PrintObj
 
 	var enforceNamespace bool
-	o.namespace, enforceNamespace, err = f.DefaultNamespace()
+	o.namespace, enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 
 		if o.Local || o.DryRun {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
-				return err
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
@@ -262,7 +262,9 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		return o.PrintObj(actual, o.Out)
+		if err := o.PrintObj(actual, o.Out); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

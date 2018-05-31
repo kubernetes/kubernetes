@@ -134,9 +134,6 @@ func NewCmdKubeletWriteConfigToDisk(kubeConfigFile *string) *cobra.Command {
 				kubeadmutil.CheckErr(fmt.Errorf("The --kubelet-version argument is required"))
 			}
 
-			kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)
-			kubeadmutil.CheckErr(err)
-
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
@@ -144,7 +141,7 @@ func NewCmdKubeletWriteConfigToDisk(kubeConfigFile *string) *cobra.Command {
 			internalcfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "kubelet", cfgPath)
 			kubeadmutil.CheckErr(err)
 
-			err = kubeletphase.WriteConfigToDisk(internalcfg.KubeletConfiguration.BaseConfig, kubeletVersion)
+			err = kubeletphase.WriteConfigToDisk(internalcfg.KubeletConfiguration.BaseConfig)
 			kubeadmutil.CheckErr(err)
 		},
 	}

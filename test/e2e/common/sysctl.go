@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Sysctls", func() {
+var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 	f := framework.NewDefaultFramework("sysctl")
 	var podClient *framework.PodClient
 

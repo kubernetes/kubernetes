@@ -18,6 +18,7 @@ package preflight
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -196,21 +197,21 @@ func TestRunInitMasterChecks(t *testing.T) {
 		{
 			name: "Test CA file exists if specfied",
 			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{CAFile: "/foo"},
+				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Cert file exists if specfied",
 			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
+				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Key file exists if specfied",
 			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
+				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
 			},
 			expected: false,
 		},
@@ -319,7 +320,7 @@ func TestConfigRootCAs(t *testing.T) {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed writing contents to temp CA file %s\n\tactual:%v", f.Name(), err)
 	}
 
-	c := ExternalEtcdVersionCheck{Etcd: kubeadmapi.Etcd{CAFile: f.Name()}}
+	c := ExternalEtcdVersionCheck{Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: f.Name()}}}
 
 	config, err := c.configRootCAs(nil)
 	if err != nil {
@@ -367,10 +368,14 @@ func TestConfigCertAndKey(t *testing.T) {
 			err,
 		)
 	}
-	c := ExternalEtcdVersionCheck{Etcd: kubeadmapi.Etcd{
-		CertFile: certFile.Name(),
-		KeyFile:  keyFile.Name(),
-	}}
+	c := ExternalEtcdVersionCheck{
+		Etcd: kubeadmapi.Etcd{
+			External: &kubeadmapi.ExternalEtcd{
+				CertFile: certFile.Name(),
+				KeyFile:  keyFile.Name(),
+			},
+		},
+	}
 
 	config, err := c.configCertAndKey(nil)
 	if err != nil {
@@ -690,5 +695,34 @@ func TestSetHasItemOrAll(t *testing.T) {
 				rt.testString,
 			)
 		}
+	}
+}
+
+type imgs struct{}
+
+func (i *imgs) Pull(image string) error {
+	if image == "bad pull" {
+		return errors.New("pull error")
+	}
+	return nil
+}
+func (i *imgs) Exists(image string) error {
+	if image == "found" {
+		return nil
+	}
+	return errors.New("error")
+}
+
+func TestImagePullCheck(t *testing.T) {
+	i := ImagePullCheck{
+		Images:    &imgs{},
+		ImageList: []string{"found", "not found", "bad pull"},
+	}
+	warnings, errors := i.Check()
+	if len(warnings) != 0 {
+		t.Fatalf("did not expect any warnings but got %q", warnings)
+	}
+	if len(errors) != 1 {
+		t.Fatalf("expected 1 errors but got %d: %q", len(errors), errors)
 	}
 }

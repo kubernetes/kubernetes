@@ -28,10 +28,8 @@ import (
 )
 
 func TestValidate(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-
-	tf.Namespace = "test"
 
 	tests := map[string]struct {
 		options   *SubjectOptions

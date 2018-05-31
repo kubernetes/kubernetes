@@ -164,7 +164,7 @@ func TestTopPod(t *testing.T) {
 				}
 			}
 
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
 			ns := legacyscheme.Codecs
@@ -190,7 +190,6 @@ func TestTopPod(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = testNS
 			tf.ClientConfigVal = defaultClientConfig()
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -309,7 +308,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 				})
 			}
 
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
 			ns := legacyscheme.Codecs
@@ -329,7 +328,6 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = testNS
 			tf.ClientConfigVal = defaultClientConfig()
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -508,7 +506,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 				}
 			}
 
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
 			ns := legacyscheme.Codecs
@@ -534,7 +532,6 @@ func TestTopPodCustomDefaults(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = testNS
 			tf.ClientConfigVal = defaultClientConfig()
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 

@@ -43,6 +43,7 @@ type tlsCacheKey struct {
 	caData     string
 	certData   string
 	keyData    string
+	getCert    string
 	serverName string
 	dial       string
 }
@@ -52,7 +53,7 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, dial:%s", t.insecure, t.caData, t.certData, keyText, t.serverName, t.dial)
+	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, getCert: %s, serverName:%s, dial:%s", t.insecure, t.caData, t.certData, keyText, t.getCert, t.serverName, t.dial)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -109,6 +110,7 @@ func tlsConfigKey(c *Config) (tlsCacheKey, error) {
 		caData:     string(c.TLS.CAData),
 		certData:   string(c.TLS.CertData),
 		keyData:    string(c.TLS.KeyData),
+		getCert:    fmt.Sprintf("%p", c.TLS.GetCert),
 		serverName: c.TLS.ServerName,
 		dial:       fmt.Sprintf("%p", c.Dial),
 	}, nil

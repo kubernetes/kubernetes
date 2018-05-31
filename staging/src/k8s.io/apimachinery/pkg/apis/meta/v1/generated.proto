@@ -49,6 +49,7 @@ message APIGroup {
   // The server returns only those CIDRs that it thinks that the client can match.
   // For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
   // Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
+  // +optional
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 4;
 }
 

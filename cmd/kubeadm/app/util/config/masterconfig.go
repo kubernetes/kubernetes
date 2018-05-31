@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -72,7 +73,12 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		}
 	}
 
-	cfg.NodeName = node.GetHostname(cfg.NodeName)
+	cfg.NodeRegistration.Name = node.GetHostname(cfg.NodeRegistration.Name)
+
+	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
+	if cfg.NodeRegistration.Taints == nil {
+		cfg.NodeRegistration.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
+	}
 
 	return nil
 }

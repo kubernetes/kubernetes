@@ -119,13 +119,16 @@ var AllServices = []*ServiceInfo{
 		},
 	},
 	{
-		Object:            "BackendService",
-		Service:           "BackendServices",
-		Resource:          "backendServices",
-		version:           VersionAlpha,
-		keyType:           Global,
-		serviceType:       reflect.TypeOf(&alpha.BackendServicesService{}),
-		additionalMethods: []string{"Update"},
+		Object:      "BackendService",
+		Service:     "BackendServices",
+		Resource:    "backendServices",
+		version:     VersionAlpha,
+		keyType:     Global,
+		serviceType: reflect.TypeOf(&alpha.BackendServicesService{}),
+		additionalMethods: []string{
+			"Update",
+			"SetSecurityPolicy",
+		},
 	},
 	{
 		Object:      "BackendService",
@@ -345,6 +348,13 @@ var AllServices = []*ServiceInfo{
 		version:     VersionBeta,
 		keyType:     Global,
 		serviceType: reflect.TypeOf(&beta.SecurityPoliciesService{}),
+		additionalMethods: []string{
+			"AddRule",
+			"GetRule",
+			"Patch",
+			"PatchRule",
+			"RemoveRule",
+		},
 	},
 	{
 		Object:      "SslCertificate",

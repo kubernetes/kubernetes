@@ -45,7 +45,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				UnavailableReplicas: 0,
 			},
 
-			msg:  "Waiting for rollout to finish: 0 out of 1 new replicas have been updated...\n",
+			msg:  "Waiting for deployment \"foo\" rollout to finish: 0 out of 1 new replicas have been updated...\n",
 			done: false,
 		},
 		{
@@ -59,7 +59,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				UnavailableReplicas: 0,
 			},
 
-			msg:  "Waiting for rollout to finish: 1 old replicas are pending termination...\n",
+			msg:  "Waiting for deployment \"foo\" rollout to finish: 1 old replicas are pending termination...\n",
 			done: false,
 		},
 		{
@@ -73,7 +73,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				UnavailableReplicas: 1,
 			},
 
-			msg:  "Waiting for rollout to finish: 1 of 2 updated replicas are available...\n",
+			msg:  "Waiting for deployment \"foo\" rollout to finish: 1 of 2 updated replicas are available...\n",
 			done: false,
 		},
 		{
@@ -155,7 +155,7 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 				NumberAvailable:        0,
 			},
 
-			msg:  "Waiting for rollout to finish: 0 out of 1 new pods have been updated...\n",
+			msg:  "Waiting for daemon set \"foo\" rollout to finish: 0 out of 1 new pods have been updated...\n",
 			done: false,
 		},
 		{
@@ -167,7 +167,7 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 				NumberAvailable:        1,
 			},
 
-			msg:  "Waiting for rollout to finish: 1 of 2 updated pods are available...\n",
+			msg:  "Waiting for daemon set \"foo\" rollout to finish: 1 of 2 updated pods are available...\n",
 			done: false,
 		},
 		{

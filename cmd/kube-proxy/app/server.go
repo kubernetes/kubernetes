@@ -51,7 +51,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -353,9 +352,13 @@ with the apiserver API to configure the proxy.`,
 				glog.Fatalf("failed OS init: %v", err)
 			}
 
-			cmdutil.CheckErr(opts.Complete())
-			cmdutil.CheckErr(opts.Validate(args))
-			cmdutil.CheckErr(opts.Run())
+			if err := opts.Complete(); err != nil {
+				glog.Fatalf("failed complete: %v", err)
+			}
+			if err := opts.Validate(args); err != nil {
+				glog.Fatalf("failed validate: %v", err)
+			}
+			glog.Fatal(opts.Run())
 		},
 	}
 

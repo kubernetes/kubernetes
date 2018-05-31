@@ -156,7 +156,7 @@ func (r *Reset) Run(out io.Writer) error {
 	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
-	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
+	// provided external etcd endpoints. In that case, it is their own responsibility to reset etcd
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	glog.V(1).Infof("[reset] checking for etcd manifest")
 	if _, err := os.Stat(etcdManifestPath); err == nil {
@@ -215,7 +215,7 @@ func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, 
 			resetWithDocker(execer, dockerCheck)
 			return
 		}
-		sandboxes := strings.Split(string(output), " ")
+		sandboxes := strings.Fields(string(output))
 		glog.V(1).Infoln("[reset] Stopping and removing running containers using crictl")
 		for _, s := range sandboxes {
 			if strings.TrimSpace(s) == "" {

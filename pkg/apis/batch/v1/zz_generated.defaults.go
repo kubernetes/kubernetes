@@ -80,6 +80,9 @@ func SetObjectDefaults_Job(in *v1.Job) {
 						}
 					}
 				}
+				if b.ServiceAccountToken != nil {
+					core_v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {

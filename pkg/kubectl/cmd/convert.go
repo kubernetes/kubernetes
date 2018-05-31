@@ -139,7 +139,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 		o.builder.Schema(schema)
 	}
 
-	cmdNamespace, _, err := f.DefaultNamespace()
+	cmdNamespace, _, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

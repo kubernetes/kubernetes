@@ -56,15 +56,9 @@ apiServerExtraArgs: null
 certificatesDir: %s
 controllerManagerExtraArgs: null
 etcd:
-  caFile: ""
-  certFile: ""
-  dataDir: %s
-  endpoints: null
-  extraArgs: null
-  image: ""
-  keyFile: ""
-  serverCertSANs: null
-  peerCertSANs: null
+  local:
+    dataDir: %s
+    image: ""
 featureFlags: null
 imageRepository: k8s.gcr.io
 kubernetesVersion: %s
@@ -72,7 +66,9 @@ networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-nodeName: thegopher
+nodeRegistration:
+  name: foo
+  criSocket: ""
 schedulerExtraArgs: null
 token: ce3aa5.5ec8455bb76b379f
 tokenTTL: 24h

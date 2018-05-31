@@ -129,7 +129,8 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 }
 
 // makeMounts determines the mount points for the given container.
-func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap, mounter mountutil.Interface) ([]kubecontainer.Mount, func(), error) {
+func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap, mounter mountutil.Interface, expandEnvs []kubecontainer.EnvVar) ([]kubecontainer.Mount, func(), error) {
+
 	// Kubernetes only mounts on /etc/hosts if:
 	// - container is not an infrastructure (pause) container
 	// - container is not already mounting on /etc/hosts
@@ -164,6 +165,11 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		if mount.SubPath != "" {
 			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) {
 				return nil, cleanupAction, fmt.Errorf("volume subpaths are disabled")
+			}
+
+			// Expand subpath variables
+			if utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion) {
+				mount.SubPath = kubecontainer.ExpandContainerVolumeMounts(mount, expandEnvs)
 			}
 
 			if filepath.IsAbs(mount.SubPath) {
@@ -454,17 +460,17 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		opts.Devices = append(opts.Devices, blkVolumes...)
 	}
 
-	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes, kl.mounter)
+	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
+	if err != nil {
+		return nil, nil, err
+	}
+	opts.Envs = append(opts.Envs, envs...)
+
+	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes, kl.mounter, opts.Envs)
 	if err != nil {
 		return nil, cleanupAction, err
 	}
 	opts.Mounts = append(opts.Mounts, mounts...)
-
-	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
-	if err != nil {
-		return nil, cleanupAction, err
-	}
-	opts.Envs = append(opts.Envs, envs...)
 
 	// Disabling adding TerminationMessagePath on Windows as these files would be mounted as docker volume and
 	// Docker for Windows has a bug where only directories can be mounted

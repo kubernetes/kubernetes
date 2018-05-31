@@ -35,7 +35,7 @@ const (
 	checkContName = "checker-container"
 )
 
-var _ = framework.KubeDescribe("ContainerLogPath", func() {
+var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	Describe("Pod with a container", func() {
 		Context("printed log to stdout", func() {

@@ -18,11 +18,10 @@ package set
 
 import (
 	"fmt"
-	"strings"
-
-	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -108,16 +107,11 @@ func NewResourcesOptions(streams genericclioptions.IOStreams) *SetResourcesOptio
 func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewResourcesOptions(streams)
 
-	resourceTypesWithPodTemplate := []string{}
-	for _, resource := range f.SuggestedPodTemplateResources() {
-		resourceTypesWithPodTemplate = append(resourceTypesWithPodTemplate, resource.Resource)
-	}
-
 	cmd := &cobra.Command{
 		Use: "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Update resource requests/limits on objects with pod templates"),
-		Long:    fmt.Sprintf(resources_long, strings.Join(resourceTypesWithPodTemplate, ", ")),
+		Long:    fmt.Sprintf(resources_long, cmdutil.SuggestApiResources("kubectl")),
 		Example: resources_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
@@ -166,7 +160,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	}
 	o.PrintObj = printer.PrintObj
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -277,7 +271,7 @@ func (o *SetResourcesOptions) Run() error {
 
 		if o.Local || o.DryRun {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
-				return err
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
@@ -289,7 +283,7 @@ func (o *SetResourcesOptions) Run() error {
 		}
 
 		if err := o.PrintObj(actual, o.Out); err != nil {
-			return err
+			allErrs = append(allErrs, err)
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)

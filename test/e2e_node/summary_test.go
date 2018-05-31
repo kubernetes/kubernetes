@@ -36,7 +36,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-var _ = framework.KubeDescribe("Summary API", func() {
+var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	Context("when querying /stats/summary", func() {
 		AfterEach(func() {

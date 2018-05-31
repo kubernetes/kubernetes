@@ -116,10 +116,8 @@ func (dtc *DensityTestConfig) deleteConfigMaps(testPhase *timer.Phase) {
 func (dtc *DensityTestConfig) deleteDaemonSets(numberOfClients int, testPhase *timer.Phase) {
 	defer testPhase.End()
 	for i := range dtc.DaemonConfigs {
-		framework.ExpectNoError(framework.DeleteResourceAndPods(
+		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(
 			dtc.ClientSets[i%numberOfClients],
-			dtc.InternalClientsets[i%numberOfClients],
-			dtc.ScaleClients[i%numberOfClients],
 			extensions.Kind("DaemonSet"),
 			dtc.DaemonConfigs[i].Namespace,
 			dtc.DaemonConfigs[i].Name,
@@ -224,32 +222,42 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	return constraints
 }
 
-func logPodStartupStatus(c clientset.Interface, expectedPods int, observedLabels map[string]string, period time.Duration, stopCh chan struct{}) {
+func logPodStartupStatus(
+	c clientset.Interface,
+	expectedPods int,
+	observedLabels map[string]string,
+	period time.Duration,
+	scheduleThroughputs *[]float64,
+	stopCh chan struct{}) {
+
 	label := labels.SelectorFromSet(labels.Set(observedLabels))
 	podStore, err := testutils.NewPodStore(c, metav1.NamespaceAll, label, fields.Everything())
 	framework.ExpectNoError(err)
 	defer podStore.Stop()
 
 	ticker := time.NewTicker(period)
+	startupStatus := testutils.ComputeRCStartupStatus(podStore.List(), expectedPods)
+	lastScheduledCount := startupStatus.Scheduled
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			pods := podStore.List()
-			startupStatus := testutils.ComputeRCStartupStatus(pods, expectedPods)
-			framework.Logf(startupStatus.String("Density"))
 		case <-stopCh:
-			pods := podStore.List()
-			startupStatus := testutils.ComputeRCStartupStatus(pods, expectedPods)
-			framework.Logf(startupStatus.String("Density"))
 			return
 		}
+		// Log status of the pods.
+		startupStatus := testutils.ComputeRCStartupStatus(podStore.List(), expectedPods)
+		framework.Logf(startupStatus.String("Density"))
+		// Compute scheduling throughput for the latest time period.
+		throughput := float64(startupStatus.Scheduled-lastScheduledCount) / float64(period/time.Second)
+		*scheduleThroughputs = append(*scheduleThroughputs, throughput)
+		lastScheduledCount = startupStatus.Scheduled
 	}
 }
 
 // runDensityTest will perform a density test and return the time it took for
 // all pods to start
-func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer) time.Duration {
+func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer, scheduleThroughputs *[]float64) time.Duration {
 	defer GinkgoRecover()
 
 	// Create all secrets, configmaps and daemons.
@@ -274,7 +282,7 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 		}()
 	}
 	logStopCh := make(chan struct{})
-	go logPodStartupStatus(dtc.ClientSets[0], dtc.PodCount, map[string]string{"type": "densityPod"}, dtc.PollInterval, logStopCh)
+	go logPodStartupStatus(dtc.ClientSets[0], dtc.PodCount, map[string]string{"type": "densityPod"}, dtc.PollInterval, scheduleThroughputs, logStopCh)
 	wg.Wait()
 	startupTime := time.Since(startTime)
 	close(logStopCh)
@@ -320,15 +328,9 @@ func cleanupDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPha
 		name := dtc.Configs[i].GetName()
 		namespace := dtc.Configs[i].GetNamespace()
 		kind := dtc.Configs[i].GetKind()
-		if framework.TestContext.GarbageCollectorEnabled && kindSupportsGarbageCollector(kind) {
-			By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
-			err := framework.DeleteResourceAndWaitForGC(dtc.ClientSets[i%numberOfClients], kind, namespace, name)
-			framework.ExpectNoError(err)
-		} else {
-			By(fmt.Sprintf("Cleaning up the %v and pods", kind))
-			err := framework.DeleteResourceAndPods(dtc.ClientSets[i%numberOfClients], dtc.InternalClientsets[i%numberOfClients], dtc.ScaleClients[i%numberOfClients], kind, namespace, name)
-			framework.ExpectNoError(err)
-		}
+		By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
+		err := framework.DeleteResourceAndWaitForGC(dtc.ClientSets[i%numberOfClients], kind, namespace, name)
+		framework.ExpectNoError(err)
 	}
 	podCleanupPhase.End()
 
@@ -355,6 +357,7 @@ var _ = SIGDescribe("Density", func() {
 	var nodeCpuCapacity int64
 	var nodeMemCapacity int64
 	var nodes *v1.NodeList
+	var scheduleThroughputs []float64
 
 	testCaseBaseName := "density"
 	missingMeasurements := 0
@@ -392,11 +395,10 @@ var _ = SIGDescribe("Density", func() {
 		}
 
 		// Verify scheduler metrics.
-		// TODO: Reset metrics at the beginning of the test.
-		// We should do something similar to how we do it for APIserver.
 		latency, err := framework.VerifySchedulerLatency(c)
 		framework.ExpectNoError(err)
 		if err == nil {
+			latency.ThroughputSamples = scheduleThroughputs
 			summaries = append(summaries, latency)
 		}
 		summaries = append(summaries, testPhaseDurations)
@@ -438,6 +440,7 @@ var _ = SIGDescribe("Density", func() {
 
 		uuid = string(utiluuid.NewUUID())
 
+		framework.ExpectNoError(framework.ResetSchedulerMetrics(c))
 		framework.ExpectNoError(framework.ResetMetrics(c))
 		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(framework.TestContext.OutputDir+"/%s", uuid), 0777))
 
@@ -643,7 +646,7 @@ var _ = SIGDescribe("Density", func() {
 						LogFunc:   framework.Logf,
 					})
 			}
-			e2eStartupTime = runDensityTest(dConfig, testPhaseDurations)
+			e2eStartupTime = runDensityTest(dConfig, testPhaseDurations, &scheduleThroughputs)
 			if itArg.runLatencyTest {
 				By("Scheduling additional Pods to measure startup latencies")
 
@@ -921,8 +924,4 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 	framework.ExpectNoError(testutils.CreateRCWithRetries(c, ns, rc))
 	framework.ExpectNoError(framework.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
 	framework.Logf("Found pod '%s' running", name)
-}
-
-func kindSupportsGarbageCollector(kind schema.GroupKind) bool {
-	return kind != extensions.Kind("Deployment") && kind != batch.Kind("Job")
 }

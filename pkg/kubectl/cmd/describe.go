@@ -122,7 +122,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 
 func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,10 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.BuilderArgs = args
 
-	o.Describer = f.Describer
+	o.Describer = func(mapping *meta.RESTMapping) (printers.Describer, error) {
+		return cmdutil.DescriberFn(f, mapping)
+	}
+
 	o.NewBuilder = f.NewBuilder
 
 	// include the uninitialized objects by default

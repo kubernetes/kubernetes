@@ -93,6 +93,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
@@ -218,7 +219,9 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	bootstrapCheckpointPath string) (Bootstrap, error)
+	bootstrapCheckpointPath string,
+	nodeStatusMaxImages int32,
+	stopCh <-chan struct{}) (Bootstrap, error)
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -343,7 +346,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	bootstrapCheckpointPath string) (*Kubelet, error) {
+	bootstrapCheckpointPath string,
+	nodeStatusMaxImages int32,
+	stopCh <-chan struct{}) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -533,6 +538,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
+		nodeStatusMaxImages:                     nodeStatusMaxImages,
 	}
 
 	if klet.cloud != nil {
@@ -621,7 +627,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			remoteImageEndpoint)
 		glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 		server := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
-		if err := server.Start(); err != nil {
+		if err := server.Start(stopCh); err != nil {
 			return nil, err
 		}
 
@@ -774,6 +780,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if err != nil {
 		return nil, err
 	}
+	klet.pluginWatcher = pluginwatcher.NewWatcher(klet.getPluginsDir())
 
 	// If the experimentalMounterPathFlag is set, we do not want to
 	// check node capabilities since the mount path is not the default
@@ -1149,6 +1156,14 @@ type Kubelet struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	keepTerminatedPodVolumes bool // DEPRECATED
+
+	// pluginwatcher is a utility for Kubelet to register different types of node-level plugins
+	// such as device plugins or CSI plugins. It discovers plugins by monitoring inotify events under the
+	// directory returned by kubelet.getPluginsDir()
+	pluginWatcher pluginwatcher.Watcher
+
+	// This flag sets a maximum number of images to report in the node status.
+	nodeStatusMaxImages int32
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1261,6 +1276,11 @@ func (kl *Kubelet) initializeModules() error {
 		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
 			glog.Errorf("Failed to create directory %q: %v", ContainerLogsDir, err)
 		}
+	}
+
+	// Start the plugin watcher
+	if err := kl.pluginWatcher.Start(); err != nil {
+		return fmt.Errorf("failed to start Plugin Watcher. err: %v", err)
 	}
 
 	// Start the image manager.

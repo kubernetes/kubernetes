@@ -49,9 +49,7 @@ type Builder struct {
 	categoryExpander restmapper.CategoryExpander
 
 	// mapper is set explicitly by resource builders
-	mapper       *mapper
-	internal     *mapper
-	unstructured *mapper
+	mapper *mapper
 
 	// clientConfigFn is a function to produce a client, *if* you need one
 	clientConfigFn ClientConfigFunc
@@ -829,7 +827,6 @@ func (b *Builder) visitBySelector() *Result {
 			result.err = err
 			return result
 		}
-		client = NewClientWithOptions(client, b.requestTransforms...)
 		selectorNamespace := b.namespace
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
@@ -846,15 +843,25 @@ func (b *Builder) visitBySelector() *Result {
 }
 
 func (b *Builder) getClient(gv schema.GroupVersion) (RESTClient, error) {
-	if b.fakeClientFn != nil {
-		return b.fakeClientFn(gv)
+	var (
+		client RESTClient
+		err    error
+	)
+
+	switch {
+	case b.fakeClientFn != nil:
+		client, err = b.fakeClientFn(gv)
+	case b.negotiatedSerializer != nil:
+		client, err = b.clientConfigFn.clientForGroupVersion(gv, b.negotiatedSerializer)
+	default:
+		client, err = b.clientConfigFn.unstructuredClientForGroupVersion(gv)
 	}
 
-	if b.negotiatedSerializer != nil {
-		return b.clientConfigFn.clientForGroupVersion(gv, b.negotiatedSerializer)
+	if err != nil {
+		return nil, err
 	}
 
-	return b.clientConfigFn.unstructuredClientForGroupVersion(gv)
+	return NewClientWithOptions(client, b.requestTransforms...), nil
 }
 
 func (b *Builder) visitByResource() *Result {
@@ -891,7 +898,6 @@ func (b *Builder) visitByResource() *Result {
 			result.err = err
 			return result
 		}
-		client = NewClientWithOptions(client, b.requestTransforms...)
 		clients[s] = client
 	}
 

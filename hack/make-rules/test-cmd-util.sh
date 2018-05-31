@@ -1453,6 +1453,7 @@ run_kubectl_old_print_tests() {
   "spec": {
     "group": "company.com",
     "version": "v1",
+    "scope": "Namespaced",
     "names": {
       "plural": "foos",
       "kind": "Foo"
@@ -1467,7 +1468,7 @@ __EOF__
   # Test that we can list this new CustomResource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
   # Compare "old" output with experimental output and ensure both are the same
-  expected_output=$(kubectl get foos "${kube_flags[@]}")
+  expected_output=$(kubectl get foos "${kube_flags[@]}" | awk 'NF{NF--};1')
   actual_output=$(kubectl get foos --server-print=false "${kube_flags[@]}" | awk 'NF{NF--};1')
   kube::test::if_has_string "${actual_output}" "${expected_output}"
 
@@ -1479,6 +1480,9 @@ __EOF__
   kubectl delete rc frontend "${kube_flags[@]}"
   kubectl delete ds bind "${kube_flags[@]}"
   kubectl delete pod valid-pod "${kube_flags[@]}"
+
+  set +o nounset
+  set +o errexit
 }
 
 run_kubectl_get_tests() {
@@ -1712,6 +1716,7 @@ run_crd_tests() {
   "spec": {
     "group": "company.com",
     "version": "v1",
+    "scope": "Namespaced",
     "names": {
       "plural": "foos",
       "kind": "Foo"
@@ -1733,6 +1738,7 @@ __EOF__
   "spec": {
     "group": "company.com",
     "version": "v1",
+    "scope": "Namespaced",
     "names": {
       "plural": "bars",
       "kind": "Bar"
@@ -3203,18 +3209,6 @@ run_deployment_tests() {
   kubectl delete configmap test-set-env-config "${kube_flags[@]}"
   kubectl delete secret test-set-env-secret "${kube_flags[@]}"
 
-  ### Delete a deployment with initializer
-  # Pre-condition: no deployment exists
-  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Create a deployment
-  kubectl create --request-timeout=1 -f hack/testdata/deployment-with-initializer.yaml 2>&1 "${kube_flags[@]}" || true
-  kube::test::get_object_assert 'deployment web' "{{$id_field}}" 'web'
-  # Delete a deployment
-  kubectl delete deployment web "${kube_flags[@]}"
-  # Check Deployment web doesn't exist
-  output_message=$(! kubectl get deployment web 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" '"web" not found'
-
   set +o nounset
   set +o errexit
 }
@@ -3355,18 +3349,6 @@ run_rs_tests() {
   kubectl delete rs frontend redis-slave "${kube_flags[@]}" # delete multiple replica sets at once
   # Post-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
-
-  ### Delete a rs with initializer
-  # Pre-condition: no rs exists
-  kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Create a rs
-  kubectl create --request-timeout=1 -f hack/testdata/replicaset-with-initializer.yaml 2>&1 "${kube_flags[@]}" || true
-  kube::test::get_object_assert 'rs nginx' "{{$id_field}}" 'nginx'
-  # Delete a rs
-  kubectl delete rs nginx "${kube_flags[@]}"
-  # check rs nginx doesn't exist
-  output_message=$(! kubectl get rs nginx 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" '"nginx" not found'
 
   if kube::test::if_supports_resource "${horizontalpodautoscalers}" ; then
     ### Auto scale replica set
@@ -3842,6 +3824,12 @@ run_clusterroles_tests() {
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
 
+  # test `kubectl set subject clusterrolebinding --all`
+  kubectl set subject "${kube_flags[@]}" clusterrolebinding --all --user=test-all-user
+  kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:foo:test-all-user:'
+  kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
+  kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'
+
   # test `kubectl create rolebinding`
   # test `kubectl set subject rolebinding`
   kubectl create "${kube_flags[@]}" rolebinding admin --clusterrole=admin --user=default-admin
@@ -3862,6 +3850,12 @@ run_clusterroles_tests() {
   kubectl set subject "${kube_flags[@]}" rolebinding sarole --serviceaccount=otherfoo:foo
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
+
+  # test `kubectl set subject rolebinding --all`
+  kubectl set subject "${kube_flags[@]}" rolebinding --all --user=test-all-user
+  kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:foo:test-all-user:'
+  kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
+  kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'
 
   set +o nounset
   set +o errexit

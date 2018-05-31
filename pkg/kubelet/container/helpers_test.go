@@ -138,6 +138,114 @@ func TestExpandCommandAndArgs(t *testing.T) {
 	}
 }
 
+func TestExpandVolumeMountsWithSubpath(t *testing.T) {
+	cases := []struct {
+		name              string
+		container         *v1.Container
+		envs              []EnvVar
+		expectedSubPath   string
+		expectedMountPath string
+	}{
+		{
+			name: "subpath with no expansion",
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{{SubPath: "foo"}},
+			},
+			expectedSubPath:   "foo",
+			expectedMountPath: "",
+		},
+		{
+			name: "volumes with expanded subpath",
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{{SubPath: "foo/$(POD_NAME)"}},
+			},
+			envs: []EnvVar{
+				{
+					Name:  "POD_NAME",
+					Value: "bar",
+				},
+			},
+			expectedSubPath:   "foo/bar",
+			expectedMountPath: "",
+		},
+		{
+			name: "volumes expanded with empty subpath",
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{{SubPath: ""}},
+			},
+			envs: []EnvVar{
+				{
+					Name:  "POD_NAME",
+					Value: "bar",
+				},
+			},
+			expectedSubPath:   "",
+			expectedMountPath: "",
+		},
+		{
+			name: "volumes expanded with no envs subpath",
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{{SubPath: "/foo/$(POD_NAME)"}},
+			},
+			expectedSubPath:   "/foo/$(POD_NAME)",
+			expectedMountPath: "",
+		},
+		{
+			name: "volumes expanded with leading environment variable",
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{{SubPath: "$(POD_NAME)/bar"}},
+			},
+			envs: []EnvVar{
+				{
+					Name:  "POD_NAME",
+					Value: "foo",
+				},
+			},
+			expectedSubPath:   "foo/bar",
+			expectedMountPath: "",
+		},
+		{
+			name: "volumes with volume and subpath",
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{{MountPath: "/foo", SubPath: "$(POD_NAME)/bar"}},
+			},
+			envs: []EnvVar{
+				{
+					Name:  "POD_NAME",
+					Value: "foo",
+				},
+			},
+			expectedSubPath:   "foo/bar",
+			expectedMountPath: "/foo",
+		},
+		{
+			name: "volumes with volume and no subpath",
+			container: &v1.Container{
+				VolumeMounts: []v1.VolumeMount{{MountPath: "/foo"}},
+			},
+			envs: []EnvVar{
+				{
+					Name:  "POD_NAME",
+					Value: "foo",
+				},
+			},
+			expectedSubPath:   "",
+			expectedMountPath: "/foo",
+		},
+	}
+
+	for _, tc := range cases {
+		actualSubPath := ExpandContainerVolumeMounts(tc.container.VolumeMounts[0], tc.envs)
+		if e, a := tc.expectedSubPath, actualSubPath; !reflect.DeepEqual(e, a) {
+			t.Errorf("%v: unexpected subpath; expected %v, got %v", tc.name, e, a)
+		}
+		if e, a := tc.expectedMountPath, tc.container.VolumeMounts[0].MountPath; !reflect.DeepEqual(e, a) {
+			t.Errorf("%v: unexpected mountpath; expected %v, got %v", tc.name, e, a)
+		}
+	}
+
+}
+
 func TestShouldContainerBeRestarted(t *testing.T) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

@@ -293,8 +293,8 @@ func (n *NodeInfo) UsedPorts() util.HostPortInfo {
 	return n.usedPorts
 }
 
-// Images returns the image size information on this node.
-func (n *NodeInfo) Images() map[string]int64 {
+// ImageSizes returns the image size information on this node.
+func (n *NodeInfo) ImageSizes() map[string]int64 {
 	if n == nil {
 		return nil
 	}
@@ -603,18 +603,18 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 	}
 	filtered := make([]*v1.Pod, 0, len(pods))
 	for _, p := range pods {
-		if p.Spec.NodeName == node.Name {
-			// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
-			podKey, _ := getPodKey(p)
-			for _, np := range n.Pods() {
-				npodkey, _ := getPodKey(np)
-				if npodkey == podKey {
-					filtered = append(filtered, p)
-					break
-				}
-			}
-		} else {
+		if p.Spec.NodeName != node.Name {
 			filtered = append(filtered, p)
+			continue
+		}
+		// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
+		podKey, _ := getPodKey(p)
+		for _, np := range n.Pods() {
+			npodkey, _ := getPodKey(np)
+			if npodkey == podKey {
+				filtered = append(filtered, p)
+				break
+			}
 		}
 	}
 	return filtered

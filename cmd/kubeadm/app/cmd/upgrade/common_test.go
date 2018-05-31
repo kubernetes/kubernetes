@@ -36,43 +36,10 @@ func TestPrintConfiguration(t *testing.T) {
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
 				KubernetesVersion: "v1.7.1",
-			},
-			expectedBytes: []byte(`[upgrade/config] Configuration used:
-	api:
-	  advertiseAddress: ""
-	  bindPort: 0
-	  controlPlaneEndpoint: ""
-	apiVersion: kubeadm.k8s.io/v1alpha2
-	auditPolicy:
-	  logDir: ""
-	  path: ""
-	certificatesDir: ""
-	etcd:
-	  caFile: ""
-	  certFile: ""
-	  dataDir: ""
-	  endpoints: null
-	  image: ""
-	  keyFile: ""
-	imageRepository: ""
-	kind: MasterConfiguration
-	kubeProxy: {}
-	kubeletConfiguration: {}
-	kubernetesVersion: v1.7.1
-	networking:
-	  dnsDomain: ""
-	  podSubnet: ""
-	  serviceSubnet: ""
-	nodeName: ""
-	token: ""
-	unifiedControlPlaneImage: ""
-`),
-		},
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				KubernetesVersion: "v1.7.1",
-				Networking: kubeadmapi.Networking{
-					ServiceSubnet: "10.96.0.1/12",
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						DataDir: "/some/path",
+					},
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
@@ -86,12 +53,54 @@ func TestPrintConfiguration(t *testing.T) {
 	  path: ""
 	certificatesDir: ""
 	etcd:
-	  caFile: ""
-	  certFile: ""
-	  dataDir: ""
-	  endpoints: null
-	  image: ""
-	  keyFile: ""
+	  local:
+	    dataDir: /some/path
+	    image: ""
+	imageRepository: ""
+	kind: MasterConfiguration
+	kubeProxy: {}
+	kubeletConfiguration: {}
+	kubernetesVersion: v1.7.1
+	networking:
+	  dnsDomain: ""
+	  podSubnet: ""
+	  serviceSubnet: ""
+	nodeRegistration:
+	  criSocket: ""
+	  name: ""
+	token: ""
+	unifiedControlPlaneImage: ""
+`),
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				KubernetesVersion: "v1.7.1",
+				Networking: kubeadmapi.Networking{
+					ServiceSubnet: "10.96.0.1/12",
+				},
+				Etcd: kubeadmapi.Etcd{
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{"https://one-etcd-instance:2379"},
+					},
+				},
+			},
+			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	api:
+	  advertiseAddress: ""
+	  bindPort: 0
+	  controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1alpha2
+	auditPolicy:
+	  logDir: ""
+	  path: ""
+	certificatesDir: ""
+	etcd:
+	  external:
+	    caFile: ""
+	    certFile: ""
+	    endpoints:
+	    - https://one-etcd-instance:2379
+	    keyFile: ""
 	imageRepository: ""
 	kind: MasterConfiguration
 	kubeProxy: {}
@@ -101,7 +110,9 @@ func TestPrintConfiguration(t *testing.T) {
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
-	nodeName: ""
+	nodeRegistration:
+	  criSocket: ""
+	  name: ""
 	token: ""
 	unifiedControlPlaneImage: ""
 `),

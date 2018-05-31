@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
 const (
@@ -60,13 +59,19 @@ func CheckErr(err error) {
 	checkErr("", err, fatal)
 }
 
+// preflightError allows us to know if the error is a preflight error or not
+// defining the interface here avoids an import cycle of pulling in preflight into the util package
+type preflightError interface {
+	Preflight() bool
+}
+
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
 func checkErr(prefix string, err error, handleErr func(string, int)) {
 	switch err.(type) {
 	case nil:
 		return
-	case *preflight.Error:
+	case preflightError:
 		handleErr(err.Error(), PreFlightExitCode)
 	case utilerrors.Aggregate:
 		handleErr(err.Error(), ValidationExitCode)

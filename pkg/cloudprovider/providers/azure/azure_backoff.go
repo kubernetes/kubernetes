@@ -55,10 +55,10 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 			return true, cloudprovider.InstanceNotFound
 		}
 		if retryErr != nil {
-			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
+			glog.Errorf("GetVirtualMachineWithRetry(%s): backoff failure, will retry, err=%v", name, retryErr)
 			return false, nil
 		}
-		glog.V(2).Info("backoff: success")
+		glog.V(2).Infof("GetVirtualMachineWithRetry(%s): backoff success", name)
 		return true, nil
 	})
 	if err == wait.ErrWaitTimeout {
@@ -99,10 +99,10 @@ func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, string, 
 		var retryErr error
 		ip, publicIP, retryErr = az.getIPForMachine(name)
 		if retryErr != nil {
-			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
+			glog.Errorf("GetIPForMachineWithRetry(%s): backoff failure, will retry,err=%v", name, retryErr)
 			return false, nil
 		}
-		glog.V(2).Info("backoff: success")
+		glog.V(2).Infof("GetIPForMachineWithRetry(%s): backoff success", name)
 		return true, nil
 	})
 	return ip, publicIP, err
@@ -304,11 +304,11 @@ func (az *Cloud) UpdateVmssVMWithRetry(ctx context.Context, resourceGroupName st
 // A wait.ConditionFunc function to deal with common HTTP backoff response conditions
 func processRetryResponse(resp autorest.Response, err error) (bool, error) {
 	if isSuccessHTTPResponse(resp) {
-		glog.V(2).Infof("backoff: success, HTTP response=%d", resp.StatusCode)
+		glog.V(2).Infof("processRetryResponse: backoff success, HTTP response=%d", resp.StatusCode)
 		return true, nil
 	}
 	if shouldRetryAPIRequest(resp, err) {
-		glog.Errorf("backoff: failure, will retry, HTTP response=%d, err=%v", resp.StatusCode, err)
+		glog.Errorf("processRetryResponse: backoff failure, will retry, HTTP response=%d, err=%v", resp.StatusCode, err)
 		// suppress the error object so that backoff process continues
 		return false, nil
 	}
@@ -361,7 +361,7 @@ func processHTTPRetryResponse(resp *http.Response, err error) (bool, error) {
 	}
 
 	if shouldRetryHTTPRequest(resp, err) {
-		glog.Errorf("backoff: failure, will retry, HTTP response=%d, err=%v", resp.StatusCode, err)
+		glog.Errorf("processHTTPRetryResponse: backoff failure, will retry, HTTP response=%d, err=%v", resp.StatusCode, err)
 		// suppress the error object so that backoff process continues
 		return false, nil
 	}
