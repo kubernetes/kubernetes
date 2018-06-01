@@ -2235,6 +2235,19 @@ EOF
   fi
 }
 
+# Sets up the manifests of netd for k8s addons.
+function setup-netd-manifest {
+  local -r netd_file="${dst_dir}/netd/netd.yaml"
+  mkdir -p "${dst_dir}/netd"
+  touch "${netd_file}"
+  if [ -n "${CUSTOM_NETD_YAML:-}" ]; then
+    # Replace with custom GKE netd deployment.
+    cat > "${netd_file}" <<EOF
+$(echo "$CUSTOM_NETD_YAML")
+EOF
+  fi
+}
+
 # Prepares the manifests of k8s addons, and starts the addon manager.
 # Vars assumed:
 #   CLUSTER_NAME
@@ -2347,6 +2360,9 @@ EOF
     else
       setup-kube-dns-manifest
     fi
+  fi
+  if [[ "${ENABLE_NETD:-}" == "true" ]]; then
+    setup-netd-manifest
   fi
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \

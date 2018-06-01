@@ -349,6 +349,9 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-}
 # Networking plugin specific settings.
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, kubenet
 
+# Optional: Enable netd.
+ENABLE_NETD="${KUBE_ENABLE_NETD:-false}"
+
 # Network Policy plugin specific settings.
 NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
 
