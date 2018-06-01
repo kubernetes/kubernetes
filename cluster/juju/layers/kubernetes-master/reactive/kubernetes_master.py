@@ -1592,3 +1592,4 @@ def _write_gcp_snap_config(component):
         daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
         daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
         daemon_env_path.write_text(daemon_env)
+        
