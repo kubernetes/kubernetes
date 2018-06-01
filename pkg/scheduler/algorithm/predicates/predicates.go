@@ -924,7 +924,7 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 
 // checkServiceAffinity is a predicate which matches nodes in such a way to force that
 // ServiceAffinity.labels are homogenous for pods that are scheduled to a node.
-// (i.e. it returns true IFF this pod can be added to this node such that all other pods in
+// (i.e. it returns true IF this pod can be added to this node such that all other pods in
 // the same service are running on nodes with the exact same ServiceAffinity.label values).
 //
 // For example:
