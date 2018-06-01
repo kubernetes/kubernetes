@@ -1545,7 +1545,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test container error overwrites pod phase
@@ -1560,7 +1560,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test the same as the above but with Terminated state and the first container overwrites the rest
@@ -1575,7 +1575,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1590,7 +1590,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1606,7 +1606,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod has 2 containers, one is running and the other is completed.
@@ -1622,7 +1622,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", int64(6), "<unknown>"}}},
 		},
 	}
 
@@ -1663,7 +1663,7 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "1.1.1.1", "test1", "node1"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are none
@@ -1682,7 +1682,7 @@ func TestPrintPodwide(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", 6, "<unknown>", "<none>", "<none>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>"}}},
 		},
 	}
 
@@ -1732,7 +1732,7 @@ func TestPrintPodList(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", 6, "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", 1, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", int64(6), "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", int64(1), "<unknown>"}}},
 		},
 	}
 
@@ -1769,7 +1769,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Pending should be printed
@@ -1784,7 +1784,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Unknown should be printed
@@ -1799,7 +1799,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Succeeded shouldn't be printed
@@ -1814,7 +1814,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "Succeeded", 6, "<unknown>"}, Conditions: podSuccessConditions}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "Succeeded", int64(6), "<unknown>"}, Conditions: podSuccessConditions}},
 		},
 		{
 			// Test pod phase Failed shouldn't be printed
@@ -1829,7 +1829,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "Failed", 6, "<unknown>"}, Conditions: podFailedConditions}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "Failed", int64(6), "<unknown>"}, Conditions: podFailedConditions}},
 		},
 	}
 
@@ -1871,7 +1871,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{"col1", "COL2"},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "asd", "zxc"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "asd", "zxc"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1890,7 +1890,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 	}
 
@@ -2654,7 +2654,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			true,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "COL2=zxc,col1=asd"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "COL2=zxc,col1=asd"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -2673,7 +2673,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			false,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 	}
 

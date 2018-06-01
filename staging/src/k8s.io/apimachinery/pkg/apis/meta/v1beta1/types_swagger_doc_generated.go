@@ -80,7 +80,7 @@ func (TableOptions) SwaggerDoc() map[string]string {
 
 var map_TableRow = map[string]string{
 	"":           "TableRow is an individual row in a table.",
-	"cells":      "cells will be as wide as headers and may contain strings, numbers, booleans, simple maps, or lists, or null. See the type field of the column definition for a more detailed description.",
+	"cells":      "cells will be as wide as headers and may contain strings, numbers (float64 or int64), booleans, simple maps, or lists, or null. See the type field of the column definition for a more detailed description.",
 	"conditions": "conditions describe additional status of a row that are relevant for a human user.",
 	"object":     "This field contains the requested additional information about each object based on the includeObject policy when requesting the Table. If \"None\", this field is empty, if \"Object\" this will be the default serialization of the object for the current API version, and if \"Metadata\" (the default) will contain the object metadata. Check the returned kind and apiVersion of the object before parsing.",
 }
