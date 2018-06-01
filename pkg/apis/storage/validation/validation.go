@@ -162,8 +162,12 @@ func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
 // validateSource tests if the source is valid for VolumeAttachment.
 func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if source.PersistentVolumeName == nil || len(*source.PersistentVolumeName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+	pvNameNotExist := source.PersistentVolumeName == nil || len(*source.PersistentVolumeName) == 0
+	if source.InlineVolumeSource == nil && pvNameNotExist {
+		allErrs = append(allErrs, field.Required(fldPath, "must specify exactly one of InlineVolumeSource and PersistentVolumeName"))
+	}
+	if source.InlineVolumeSource != nil && !pvNameNotExist {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "must specify exactly one of InlineVolumeSource and PersistentVolumeName"))
 	}
 	return allErrs
 }

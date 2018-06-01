@@ -160,7 +160,9 @@ type VolumeAttachmentSource struct {
 	// +optional
 	PersistentVolumeName *string `json:"persistentVolumeName,omitempty" protobuf:"bytes,1,opt,name=persistentVolumeName"`
 
-	// Placeholder for *VolumeSource to accommodate inline volumes in pods.
+	// Copy of VolumeSource to accommodate inline volumes in pods.
+	// +optional
+	InlineVolumeSource *v1.CSIPersistentVolumeSource `json:"inlineVolumeSource,omitempty" protobuf:"bytes,2,opt,name=inlineVolumeSource"`
 }
 
 // VolumeAttachmentStatus is the status of a VolumeAttachment request.
