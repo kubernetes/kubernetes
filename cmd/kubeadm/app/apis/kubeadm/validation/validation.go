@@ -178,6 +178,7 @@ func ValidateDiscoveryFile(discoveryFile string, fldPath *field.Path) field.Erro
 	return allErrs
 }
 
+// ValidateBootstrapTokens validates a slice of BootstrapToken objects
 func ValidateBootstrapTokens(bts []kubeadm.BootstrapToken, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, bt := range bts {

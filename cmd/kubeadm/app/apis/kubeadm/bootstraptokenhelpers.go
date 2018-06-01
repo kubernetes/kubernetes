@@ -84,24 +84,24 @@ func BootstrapTokenFromSecret(secret *v1.Secret) (*BootstrapToken, error) {
 	// Get the Token ID field from the Secret data
 	tokenID := getSecretString(secret, bootstrapapi.BootstrapTokenIDKey)
 	if len(tokenID) == 0 {
-		return nil, fmt.Errorf("Bootstrap Token Secret has no token-id data: %s\n", secret.Name)
+		return nil, fmt.Errorf("Bootstrap Token Secret has no token-id data: %s", secret.Name)
 	}
 
 	// Enforce the right naming convention
 	if secret.Name != bootstraputil.BootstrapTokenSecretName(tokenID) {
-		return nil, fmt.Errorf("bootstrap token name is not of the form '%s(token-id)'. Actual: %q. Expected: %q\n",
+		return nil, fmt.Errorf("bootstrap token name is not of the form '%s(token-id)'. Actual: %q. Expected: %q",
 			bootstrapapi.BootstrapTokenSecretPrefix, secret.Name, bootstraputil.BootstrapTokenSecretName(tokenID))
 	}
 
 	tokenSecret := getSecretString(secret, bootstrapapi.BootstrapTokenSecretKey)
 	if len(tokenSecret) == 0 {
-		return nil, fmt.Errorf("Bootstrap Token Secret has no token-secret data: %s\n", secret.Name)
+		return nil, fmt.Errorf("Bootstrap Token Secret has no token-secret data: %s", secret.Name)
 	}
 
 	// Create the BootstrapTokenString object based on the ID and Secret
 	bts, err := NewBootstrapTokenStringFromIDAndSecret(tokenID, tokenSecret)
 	if err != nil {
-		return nil, fmt.Errorf("Bootstrap Token Secret is invalid and couldn't be parsed: %v\n", err)
+		return nil, fmt.Errorf("Bootstrap Token Secret is invalid and couldn't be parsed: %v", err)
 	}
 
 	// Get the description (if any) from the Secret
@@ -116,7 +116,7 @@ func BootstrapTokenFromSecret(secret *v1.Secret) (*BootstrapToken, error) {
 		if err != nil {
 			return nil, fmt.Errorf("can't parse expiration time of bootstrap token %q: %v", secret.Name, err)
 		}
-		expires = &metav1.Time{expTime}
+		expires = &metav1.Time{Time: expTime}
 	}
 
 	// Build an usages string slice from the Secret data
