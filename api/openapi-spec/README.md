@@ -21,11 +21,11 @@ For example:
     "/api/v1/namespaces/{namespace}/pods/{name}": {
         ...
         "get": {
-        ...
+            ...
             "x-kubernetes-group-version-kind": {
-            "group": "",
-            "version": "v1",
-            "kind": "Pod"
+                "group": "",
+                "version": "v1",
+                "kind": "Pod"
             }
         }
     }
@@ -47,7 +47,7 @@ For example:
     "/api/v1/namespaces/{namespace}/pods/{name}": {
         ...
         "get": {
-        ...
+            ...
             "x-kubernetes-action": "list"
         }
     }
