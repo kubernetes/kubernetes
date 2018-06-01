@@ -174,13 +174,16 @@ type ObjectVersioner interface {
 
 // ObjectConvertor converts an object to a different version.
 type ObjectConvertor interface {
-	// Convert attempts to convert one object into another, or returns an error. This method does
-	// not guarantee the in object is not mutated. The context argument will be passed to
-	// all nested conversions.
+	// Convert attempts to convert one object into another, or returns an error. This
+	// method does not mutate the in object, but the in and out object might share data structures,
+	// i.e. the out object cannot be mutated without mutating the in object as well.
+	// The context argument will be passed to all nested conversions.
 	Convert(in, out, context interface{}) error
 	// ConvertToVersion takes the provided object and converts it the provided version. This
-	// method does not guarantee that the in object is not mutated. This method is similar to
-	// Convert() but handles specific details of choosing the correct output version.
+	// method does not mutate the in object, but the in and out object might share data structures,
+	// i.e. the out object cannot be mutated without mutating the in object as well.
+	// This method is similar to Convert() but handles specific details of choosing the correct
+	// output version.
 	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
 	ConvertFieldLabel(version, kind, label, value string) (string, string, error)
 }
