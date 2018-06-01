@@ -335,7 +335,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
 		auditregistrationrest.RESTStorageProvider{},
-		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator},
+		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
