@@ -141,7 +141,7 @@ func (sp SyncPodType) String() string {
 }
 
 // IsCriticalPod returns true if the pod bears the critical pod annotation key or if pod's priority is greater than
-// or equal to SystemCriticalPriority. Both the default scheduler and the kubelet use this function
+// or equal to SystemCriticalPriority. Both the rescheduler(deprecated in 1.10) and the kubelet use this function
 // to make admission and scheduling decisions.
 func IsCriticalPod(pod *v1.Pod) bool {
 	return IsCritical(pod.Namespace, pod.Annotations) || (pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority))
