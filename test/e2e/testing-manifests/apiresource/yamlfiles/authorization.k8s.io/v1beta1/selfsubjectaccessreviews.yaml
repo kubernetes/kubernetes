@@ -1,0 +1,8 @@
+apiVersion: authorization.k8s.io/v1beta1
+kind: SelfSubjectAccessReview
+spec:
+  resourceAttributes:
+    group: apps
+    name: deployments
+    verb: create
+    namespace: dev

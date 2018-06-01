@@ -43,6 +43,45 @@ kube::util::wait_for_url() {
   return 1
 }
 
+# wait_for_url_ssl implements the SSL (TLS) version of wait_for_url. This util
+# function drops the "curl -k" (insecure) flag to enable SSL. It takes arguments
+# from 6th position to the end as arguments passed to curl. You can specify TLS
+# related arguments (e.g. --cacert, --oauth2-bearer) there, example:
+#
+#     kube::util::wait_for_url_ssl "https://${API_HOST}:${API_PORT}/healthz" \
+#     "apiserver: " 1 30 1 --cacert $KUBE_APISERVER_CERT -H "$AUTH_TOKEN_HEADER"
+#
+# performs a normal wait_for_url with additional "--cacert" and "-H" flags
+# against an https secure port.
+#
+# We have this util function separate from the wait_for_url util function to
+# keep the current behavior of wait_for_url safely.
+kube::util::wait_for_url_ssl() {
+  local url=$1
+  local prefix=${2:-}
+  local wait=${3:-1}
+  local times=${4:-30}
+  local maxtime=${5:-1}
+  shift 5
+
+  which curl >/dev/null || {
+    kube::log::usage "curl must be installed"
+    exit 1
+  }
+
+  local i
+  for i in $(seq 1 "$times"); do
+    local out
+    if out=$(curl --max-time "$maxtime" -gfs "$url" "$@" 2>/dev/null); then
+      kube::log::status "On try ${i}, ${prefix}: ${out}"
+      return 0
+    fi
+    sleep "${wait}"
+  done
+  kube::log::error "Timed out waiting for ${prefix} to answer at ${url}; tried ${times} waiting ${wait} between each"
+  return 1
+}
+
 # Example:  kube::util::trap_add 'echo "in trap DEBUG"' DEBUG
 # See: http://stackoverflow.com/questions/3338030/multiple-bash-traps-for-the-same-signal
 kube::util::trap_add() {
