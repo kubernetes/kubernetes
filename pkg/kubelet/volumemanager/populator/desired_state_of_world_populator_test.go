@@ -562,9 +562,9 @@ func volumeCapacity(size int) v1.ResourceList {
 }
 
 func setExpandOnlinePersistentVolumesFeatureGate(value string, t *testing.T) {
-	err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%s", features.ExpandPersistentVolumesFSWithoutUnmounting, value))
+	err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%s", features.ExpandInUsePersistentVolumes, value))
 	if err != nil {
-		t.Fatalf("Set ExpandPersistentVolumesFSWithoutUnmounting feature gate to %s failed: %v", value, err)
+		t.Fatalf("Set ExpandInUsePersistentVolumes feature gate to %s failed: %v", value, err)
 	}
 }
 

@@ -185,7 +185,7 @@ func (dswp *desiredStateOfWorldPopulator) isPodTerminated(pod *v1.Pod) bool {
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 	// Map unique pod name to outer volume name to MountedVolume.
 	mountedVolumesForPod := make(map[volumetypes.UniquePodName]map[string]cache.MountedVolume)
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumesFSWithoutUnmounting) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
 		for _, mountedVolume := range dswp.actualStateOfWorld.GetMountedVolumes() {
 			mountedVolumes, exist := mountedVolumesForPod[mountedVolume.PodName]
 			if !exist {
@@ -323,7 +323,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 			volumeSpec.Name(),
 			uniquePodName)
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumesFSWithoutUnmounting) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
 			dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec,
 				uniquePodName, mountedVolumesForPod, processedVolumesForFSResize)
 		}

@@ -630,7 +630,7 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 			return true, volumeObj.devicePath, newRemountRequiredError(volumeObj.volumeName, podObj.podName)
 		}
 		if podObj.fsResizeRequired &&
-			utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumesFSWithoutUnmounting) {
+			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
 			return true, volumeObj.devicePath, newFsResizeRequiredError(volumeObj.volumeName, podObj.podName)
 		}
 	}
