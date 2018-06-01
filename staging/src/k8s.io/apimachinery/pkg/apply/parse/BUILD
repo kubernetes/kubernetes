@@ -13,10 +13,10 @@ go_library(
         "util.go",
         "visitor.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/apply/parse",
+    importpath = "k8s.io/apimachinery/pkg/apply/parse",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/apply:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apply:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )

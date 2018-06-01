@@ -20,9 +20,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/apply/strategy"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	tst "k8s.io/kube-openapi/pkg/util/proto/testing"
-	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 )
 
 var _ = Describe("Merging fields of type list-of-map with openapi", func() {

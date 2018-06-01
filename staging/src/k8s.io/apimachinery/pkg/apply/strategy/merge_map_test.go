@@ -19,7 +19,7 @@ package strategy_test
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
+	"k8s.io/apimachinery/pkg/apply/strategy"
 )
 
 var _ = Describe("Merging fields of type map with openapi for some fields", func() {
