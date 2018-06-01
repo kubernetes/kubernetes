@@ -60,12 +60,13 @@ func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttach
 func TestAttacherAttach(t *testing.T) {
 
 	testCases := []struct {
-		name       string
-		nodeName   string
-		driverName string
-		volumeName string
-		attachID   string
-		shouldFail bool
+		name                string
+		nodeName            string
+		driverName          string
+		volumeName          string
+		attachID            string
+		injectAttacherError bool
+		shouldFail          bool
 	}{
 		{
 			name:       "test ok 1",
@@ -105,6 +106,15 @@ func TestAttacherAttach(t *testing.T) {
 			attachID:   getAttachmentName("vol02", "driver02", "node02"),
 			shouldFail: true,
 		},
+		{
+			name:                "attacher error",
+			nodeName:            "node02",
+			driverName:          "driver02",
+			volumeName:          "vol02",
+			attachID:            getAttachmentName("vol02", "driver02", "node02"),
+			injectAttacherError: true,
+			shouldFail:          true,
+		},
 	}
 
 	// attacher loop
@@ -127,6 +137,9 @@ func TestAttacherAttach(t *testing.T) {
 			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 			if !fail && err != nil {
 				t.Errorf("expecting no failure, but got err: %v", err)
+			}
+			if fail && err == nil {
+				t.Errorf("expecting failure, but got no err")
 			}
 			if attachID != id && !fail {
 				t.Errorf("expecting attachID %v, got %v", id, attachID)
@@ -155,7 +168,14 @@ func TestAttacherAttach(t *testing.T) {
 		if attach == nil {
 			t.Logf("attachment not found for id:%v", tc.attachID)
 		} else {
-			attach.Status.Attached = true
+			if tc.injectAttacherError {
+				attach.Status.Attached = false
+				attach.Status.AttachError = &storage.VolumeError{
+					Message: "attacher error",
+				}
+			} else {
+				attach.Status.Attached = true
+			}
 			_, err = csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Update(attach)
 			if err != nil {
 				t.Error(err)
