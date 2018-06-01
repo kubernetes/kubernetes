@@ -31,6 +31,7 @@ import (
 
 	"github.com/emicklei/go-restful-swagger12"
 	"github.com/go-openapi/spec"
+	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -65,7 +66,6 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	// install apis
-	"github.com/golang/glog"
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
