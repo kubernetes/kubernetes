@@ -25,11 +25,11 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/apply"
+	"k8s.io/apimachinery/pkg/apply/parse"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	tst "k8s.io/kube-openapi/pkg/util/proto/testing"
-	"k8s.io/kubernetes/pkg/kubectl/apply"
-	"k8s.io/kubernetes/pkg/kubectl/apply/parse"
 )
 
 const (

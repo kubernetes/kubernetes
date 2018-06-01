@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/apply"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/kubectl/apply"
 )
 
 // CreateElement returns an Element by collating the recorded, local and remote field values

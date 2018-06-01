@@ -10,9 +10,9 @@ go_library(
         "retain_keys_visitor.go",
         "strategic_visitor.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/apply/strategy",
+    importpath = "k8s.io/apimachinery/pkg/apply/strategy",
     visibility = ["//visibility:public"],
-    deps = ["//pkg/kubectl/apply:go_default_library"],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/apply:go_default_library"],
 )
 
 go_test(
@@ -35,14 +35,14 @@ go_test(
         "//api/openapi-spec:swagger-spec",
     ],
     deps = [
-        ":go_default_library",
-        "//pkg/kubectl/apply:go_default_library",
-        "//pkg/kubectl/apply/parse:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apply:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apply/parse:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apply/strategy:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto/testing:go_default_library",

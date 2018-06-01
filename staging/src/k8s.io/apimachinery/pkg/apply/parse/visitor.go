@@ -17,7 +17,7 @@ limitations under the License.
 package parse
 
 import (
-	"k8s.io/kubernetes/pkg/kubectl/apply"
+	"k8s.io/apimachinery/pkg/apply"
 )
 
 // ItemVisitor provides an interface for Items to Accept and call

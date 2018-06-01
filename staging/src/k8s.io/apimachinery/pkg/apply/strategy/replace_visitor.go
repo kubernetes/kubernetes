@@ -17,7 +17,7 @@ limitations under the License.
 package strategy
 
 import (
-	"k8s.io/kubernetes/pkg/kubectl/apply"
+	"k8s.io/apimachinery/pkg/apply"
 )
 
 // replaceVisitor creates a patch to replace a remote field value with a local field value
