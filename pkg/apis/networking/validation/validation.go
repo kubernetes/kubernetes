@@ -72,6 +72,10 @@ func ValidateNetworkPolicyPeer(peer *networking.NetworkPolicyPeer, peerPath *fie
 		numPeers++
 		allErrs = append(allErrs, ValidateIPBlock(peer.IPBlock, peerPath.Child("ipBlock"))...)
 	}
+	if peer.Domain != nil {
+		numPeers++
+		allErrs = append(allErrs, ValidateDomain(peer.Domain, peerPath.Child("domain"))...)
+	}
 
 	if numPeers == 0 {
 		allErrs = append(allErrs, field.Required(peerPath, "must specify a peer"))
@@ -166,6 +170,15 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 		if !cidrIPNet.Contains(exceptCIDR.IP) {
 			allErrs = append(allErrs, field.Invalid(exceptPath, exceptCIDR.IP, "not within CIDR range"))
 		}
+	}
+	return allErrs
+}
+
+// ValidateDomain validates the domain field of an Domain NetworkPolicyPeer
+func ValidateDomain(domain *string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsDNS1123Subdomain(*domain) {
+		allErrs = append(allErrs, field.Required(fldPath, msg))
 	}
 	return allErrs
 }

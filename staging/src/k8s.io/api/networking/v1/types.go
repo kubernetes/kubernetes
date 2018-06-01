@@ -186,6 +186,11 @@ type NetworkPolicyPeer struct {
 	// neither of the other fields can be.
 	// +optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
+
+	// Domain defines policy on a particular Domain. If this field is set then
+	// neither of the other fields can be.
+	// +optional
+	Domain *string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
