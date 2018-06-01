@@ -540,6 +540,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
+		enablePluginsWatcher:                    utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher),
 	}
 
 	if klet.cloud != nil {
@@ -1172,6 +1173,9 @@ type Kubelet struct {
 
 	// This flag sets a maximum number of images to report in the node status.
 	nodeStatusMaxImages int32
+
+	//  This flag indicates that kubelet should start plugin watcher utility server for discovering Kubelet plugins
+	enablePluginsWatcher bool
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1285,10 +1289,11 @@ func (kl *Kubelet) initializeModules() error {
 			glog.Errorf("Failed to create directory %q: %v", ContainerLogsDir, err)
 		}
 	}
-
-	// Start the plugin watcher
-	if err := kl.pluginWatcher.Start(); err != nil {
-		return fmt.Errorf("failed to start Plugin Watcher. err: %v", err)
+	if kl.enablePluginsWatcher {
+		// Start the plugin watcher
+		if err := kl.pluginWatcher.Start(); err != nil {
+			return fmt.Errorf("failed to start Plugin Watcher. err: %v", err)
+		}
 	}
 
 	// Start the image manager.
