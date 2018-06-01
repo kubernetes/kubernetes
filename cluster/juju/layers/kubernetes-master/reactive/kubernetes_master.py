@@ -1000,16 +1000,10 @@ def build_kubeconfig(server):
     if ca_exists and client_pass:
         # Create an absolute path for the kubeconfig file.
         kubeconfig_path = os.path.join(os.sep, 'home', 'ubuntu', 'config')
-        # set context_name based on combination of modelname and userinput
-        context_name =  hookenv.config('cluster-context')
-        if not context_name:
-          context_name = 'cdk-'+os.environ['JUJU_MODEL_NAME'] 
-        else:
-          context_name = 'cdk-'+context_name
         # Create the kubeconfig on this system so users can access the cluster.
-        create_kubeconfig(kubeconfig_path, server, ca, user=context_name+'-admin', 
-                          context=context_name+'-context',
-                          cluster=context_name,password=client_pass)
+
+        create_kubeconfig(kubeconfig_path, server, ca,
+                          user='admin', password=client_pass)
         # Make the config file readable by the ubuntu users so juju scp works.
         cmd = ['chown', 'ubuntu:ubuntu', kubeconfig_path]
         check_call(cmd)
