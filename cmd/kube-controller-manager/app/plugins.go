@@ -110,6 +110,32 @@ func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	return allPlugins
 }
 
+// ProbeSnapshottableVolumePlugins returns volume plugins which are snapshottable
+func ProbeSnapshottableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+	allPlugins := []volume.VolumePlugin{}
+
+	// The list of plugins to probe is decided by this binary, not
+	// by dynamic linking or other "magic".  Plugins will be analyzed and
+	// initialized later.
+
+	// Each plugin can make use of VolumeConfig.  The single arg to this func contains *all* enumerated
+	// options meant to configure volume plugins.  From that single config, create an instance of volume.VolumeConfig
+	// for a specific plugin and pass that instance to the plugin's ProbeVolumePlugins(config) func.
+
+	// HostPath recycling is for testing and development purposes only!
+	hostPathConfig := volume.VolumeConfig{
+		RecyclerMinimumTimeout:   int(config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutHostPath),
+		RecyclerTimeoutIncrement: int(config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutHostPath),
+		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
+		ProvisioningEnabled:      config.EnableHostPathProvisioning,
+	}
+	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
+		glog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
+	}
+	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(hostPathConfig)...)
+	return allPlugins
+}
+
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
 // easy to use list. Only volume plugins that implement any of
 // provisioner/recycler/deleter interface should be returned.

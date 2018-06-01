@@ -124,6 +124,7 @@ pkg/controller/volume/events
 pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/options
+pkg/controller/volume/snapshot
 pkg/credentialprovider
 pkg/credentialprovider/gcp
 pkg/credentialprovider/rancher
