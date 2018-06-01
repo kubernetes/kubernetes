@@ -134,7 +134,7 @@ var ipsetInfo = []struct {
 // ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
 // `iptables -t nat -A <from> -m set --match-set <name> <matchType> -j <to>`
 // example: iptables -t nat -A KUBE-SERVICES -m set --match-set KUBE-NODE-PORT-TCP dst -j KUBE-NODE-PORT
-// ipsets with ohter match rules will be create Individually.
+// ipsets with other match rules will be created Individually.
 var ipsetWithIptablesChain = []struct {
 	name      string
 	from      string
@@ -366,6 +366,7 @@ func NewProxier(ipt utiliptables.Interface,
 		endpointsChanges:  proxy.NewEndpointChangeTracker(hostname, nil, &isIPv6, recorder),
 		syncPeriod:        syncPeriod,
 		minSyncPeriod:     minSyncPeriod,
+		excludeCIDRs:      excludeCIDRs,
 		iptables:          ipt,
 		masqueradeAll:     masqueradeAll,
 		masqueradeMark:    masqueradeMark,
