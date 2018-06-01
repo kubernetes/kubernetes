@@ -197,14 +197,14 @@ func RunApply(flags *applyFlags) error {
 	}
 
 	if flags.dryRun {
-		glog.Infoln("[dryrun] Finished dryrunning successfully!")
+		fmt.Println("[dryrun] Finished dryrunning successfully!")
 		return nil
 	}
 
-	glog.Infoln("")
-	glog.Infof("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", flags.newK8sVersionStr)
-	glog.Infoln("")
-	glog.Infoln("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.")
+	fmt.Println("")
+	fmt.Printf("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", flags.newK8sVersionStr)
+	fmt.Println("")
+	fmt.Println("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.")
 
 	return nil
 }
@@ -226,7 +226,7 @@ func SetImplicitFlags(flags *applyFlags) error {
 // EnforceVersionPolicies makes sure that the version the user specified is valid to upgrade to
 // There are both fatal and skippable (with --force) errors
 func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGetter) error {
-	glog.Infof("[upgrade/version] You have chosen to change the cluster version to %q\n", flags.newK8sVersionStr)
+	fmt.Printf("[upgrade/version] You have chosen to change the cluster version to %q\n", flags.newK8sVersionStr)
 
 	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, flags.newK8sVersionStr, flags.newK8sVersion, flags.parent.allowExperimentalUpgrades, flags.parent.allowRCUpgrades)
 	if versionSkewErrs != nil {
@@ -241,7 +241,7 @@ func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGett
 				return fmt.Errorf("The --version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag", kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 			}
 			// Soft errors found, but --force was specified
-			glog.Infof("[upgrade/version] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
+			fmt.Printf("[upgrade/version] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 		}
 	}
 	return nil
