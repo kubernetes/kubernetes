@@ -43,6 +43,7 @@ type ViewOptions struct {
 	Minify       bool
 	RawByteData  bool
 
+	Context      string
 	OutputFormat string
 
 	genericclioptions.IOStreams
@@ -110,6 +111,7 @@ func (o *ViewOptions) Complete(cmd *cobra.Command) error {
 		return err
 	}
 	o.PrintObject = printer.PrintObj
+	o.Context = cmdutil.GetFlagString(cmd, "context")
 
 	return nil
 }
@@ -129,6 +131,9 @@ func (o ViewOptions) Run() error {
 	}
 
 	if o.Minify {
+		if len(o.Context) > 0 {
+			config.CurrentContext = o.Context
+		}
 		if err := clientcmdapi.MinifyConfig(config); err != nil {
 			return err
 		}
