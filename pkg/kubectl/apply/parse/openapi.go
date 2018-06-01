@@ -132,8 +132,9 @@ func (v *kindSchemaVisitor) VisitReference(reference proto.Reference) {
 func copyExtensions(field string, from, to map[string]interface{}) error {
 	// Copy extensions from field to type for references
 	for key, val := range from {
-		if curr, found := to[key]; found {
-			// Don't allow the same extension to be defined both on the field and on the type
+		if curr, found := to[key]; found && curr != val {
+			// Don't allow the same extension to be defined both on the field and on the type,
+			// especially if they have a different value.
 			return fmt.Errorf("Cannot override value for extension %s on field %s from %v to %v",
 				key, field, curr, val)
 		}

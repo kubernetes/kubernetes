@@ -18,10 +18,11 @@ package strategy_test
 
 import (
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
+	"k8s.io/kube-openapi/pkg/util/proto"
+	tst "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
 var _ = Describe("Merging fields of type list-of-map with openapi", func() {
@@ -64,7 +65,7 @@ spec:
   template:
     spec:
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -114,7 +115,8 @@ spec:
       - name: item-keep
         image: image-keep
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -162,7 +164,7 @@ spec:
         - name: item
           image: image
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -206,7 +208,7 @@ spec:
         - name: item
           image: image:2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -252,7 +254,7 @@ spec:
         - name: item
           image: image:2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -296,7 +298,7 @@ spec:
         - name: item
           image: image:2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -339,7 +341,7 @@ spec:
         - name: item
           image: image:2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -427,15 +429,20 @@ spec:
           image: remote:a
           imagePullPolicy: Always
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })
 
 var _ = Describe("Merging fields of type list-of-map with openapi containing a multi-field mergekey", func() {
-	var resources openapi.Resources
+	var model proto.Schema
 	BeforeEach(func() {
-		resources = tst.NewFakeResources("test_swagger.json")
+		fake := tst.Fake{Path: "test_swagger.json"}
+		doc, err := fake.OpenAPISchema()
+		Expect(err).ToNot(HaveOccurred())
+		models, err := proto.NewOpenAPIData(doc)
+		Expect(err).ToNot(HaveOccurred())
+		model = models.LookupModel("io.k8s.api.apps.v1beta1.Deployment")
 	})
 
 	Context("where one of the items has been deleted", func() {
@@ -499,7 +506,7 @@ spec:
           protocol: TCP
           hostPort: 2020
 `)
-			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, resources)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, model)
 		})
 	})
 
@@ -571,7 +578,7 @@ spec:
           hostPort: 2022
           hostIP: "127.0.0.1"
 `)
-			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, resources)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, model)
 		})
 	})
 
@@ -637,7 +644,7 @@ spec:
           protocol: UDP
           hostPort: 2022
 `)
-			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, resources)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, model)
 		})
 	})
 })

@@ -59,7 +59,7 @@ metadata:
   - "a"
   - "c"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -99,7 +99,7 @@ metadata:
   - "b"
   - "c"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -138,7 +138,7 @@ metadata:
   - "a"
   - "b"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -183,7 +183,7 @@ metadata:
   - "d"
   - "e"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })

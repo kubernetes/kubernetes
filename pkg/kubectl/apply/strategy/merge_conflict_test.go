@@ -46,7 +46,7 @@ spec:
 
 			expect := hasConflict
 			// map fields have conflict : recorded {foo1 : "key1"}, remote {foo1 : "baz1-0"}
-			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, expect)
+			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, deploymentAppsModel, expect)
 		})
 	})
 
@@ -80,7 +80,7 @@ metadata:
 `)
 			expect := hasConflict
 			// primatie lists have conflicts: recorded [a, b, d], remote [a, b, c]
-			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, expect)
+			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, deploymentAppsModel, expect)
 		})
 	})
 
@@ -118,7 +118,7 @@ spec:
 `)
 			expect := hasConflict
 			// map list has conflict :  recorded {containers: [ {name: item1, image: image1} ]} , remote {containers: [ {name: item1, image: image3} ]}
-			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, expect)
+			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, deploymentAppsModel, expect)
 		})
 	})
 
@@ -147,7 +147,7 @@ spec:
 `)
 			expect := hasConflict
 			// nested map has conflict : recorded {foo1: {name: "key1"}}, remote {foo1: {name : "baz1-1"}}
-			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, expect)
+			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, deploymentAppsModel, expect)
 		})
 	})
 
@@ -200,7 +200,7 @@ spec:
           hostIP: "127.0.0.1"
 `)
 			expect := noConflict
-			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, expect)
+			runConflictTest(strategy.Create(strategy.Options{FailOnConflict: true}), recorded, local, remote, deploymentAppsModel, expect)
 		})
 	})
 })

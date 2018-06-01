@@ -19,15 +19,14 @@ package strategy_test
 import (
 	. "github.com/onsi/ginkgo"
 
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
 var _ = Describe("Replacing fields of type map with openapi for some fields", func() {
-	var resources openapi.Resources
+	var m proto.Models
 	BeforeEach(func() {
-		resources = tst.NewFakeResources("test_swagger.json")
+		m = buildModelsOrDie("test_swagger.json")
 	})
 
 	Context("where a field is has been updated", func() {
@@ -74,7 +73,8 @@ spec:
 `)
 
 			// Use modified swagger for ReplicaSet spec
-			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, resources)
+			rs := m.LookupModel("io.k8s.api.extensions.v1beta1.ReplicaSet")
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, rs)
 		})
 	})
 })

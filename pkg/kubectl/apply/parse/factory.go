@@ -22,29 +22,15 @@ import (
 
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
-// Factory creates an Element by combining object values from recorded, local and remote sources with
-// the metadata from an openapi schema.
-type Factory struct {
-	// Resources contains the openapi field metadata for the object models
-	Resources openapi.Resources
-}
-
 // CreateElement returns an Element by collating the recorded, local and remote field values
-func (b *Factory) CreateElement(recorded, local, remote map[string]interface{}) (apply.Element, error) {
+func CreateElement(recorded, local, remote map[string]interface{}, schema proto.Schema) (apply.Element, error) {
 	// Create an Item from the 3 values.  Use empty name for field
-	visitor := &ElementBuildingVisitor{b.Resources}
-
-	gvk, err := getCommonGroupVersionKind(recorded, local, remote)
-	if err != nil {
-		return nil, err
-	}
+	visitor := &ElementBuildingVisitor{}
 
 	// Get the openapi object metadata
-	s := visitor.resources.LookupResource(gvk)
-	oapiKind, err := getKind(s)
+	oapiKind, err := getKind(schema)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +89,7 @@ func (v *ElementBuildingVisitor) getItem(s proto.Schema, name string, data apply
 				},
 			}, nil
 		}
+
 		// If it looks like a map, and no openapi type is found, default to mapItem
 		m, err := getMap(s)
 		if err != nil {
