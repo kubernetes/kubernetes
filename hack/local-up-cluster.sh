@@ -126,13 +126,11 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     fi
 fi
 
-# set feature gates if using ipvs mode
+# load required kernel modules if proxy mode is set to "ipvs".
 if [ "${KUBE_PROXY_MODE}" == "ipvs" ]; then
     # If required kernel modules are not available, fall back to iptables.
     sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
-    if [[ $? -eq 0 ]]; then
-      FEATURE_GATES="${FEATURE_GATES},SupportIPVSProxyMode=true"
-    else
+    if [[ $? -ne 0 ]]; then
       echo "Required kernel modules for ipvs not found. Falling back to iptables mode."
       KUBE_PROXY_MODE=iptables
     fi
@@ -219,6 +217,7 @@ API_SECURE_PORT=${API_SECURE_PORT:-6443}
 API_HOST=${API_HOST:-localhost}
 API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
 ADVERTISE_ADDRESS=${ADVERTISE_ADDRESS:-""}
+NODE_PORT_RANGE=${NODE_PORT_RANGE:-""}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
 EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 
@@ -533,6 +532,10 @@ function start_apiserver {
     if [[ "${ADVERTISE_ADDRESS}" != "" ]] ; then
         advertise_address="--advertise-address=${ADVERTISE_ADDRESS}"
     fi
+    node_port_range=""
+    if [[ "${NODE_PORT_RANGE}" != "" ]] ; then
+        node_port_range="--service-node-port-range=${NODE_PORT_RANGE}"
+    fi
 
     # Create CA signers
     if [[ "${ENABLE_SINGLE_CA_SIGNER:-}" = true ]]; then
@@ -574,6 +577,7 @@ function start_apiserver {
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${authorizer_arg} ${priv_arg} ${runtime_config} \
       ${cloud_config_arg} \
       ${advertise_address} \
+      ${node_port_range} \
       --v=${LOG_LEVEL} \
       --vmodule="${LOG_SPEC}" \
       --cert-dir="${CERT_DIR}" \

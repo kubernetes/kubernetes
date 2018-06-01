@@ -31,7 +31,6 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -92,12 +91,13 @@ var (
 		This error is likely caused by:
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-			- Either there is no internet connection, or imagePullPolicy is set to "Never",
-			  so the kubelet cannot pull or find the following control plane images:
+			- No internet connection is available so the kubelet cannot pull or find the following control plane images:
 				- {{ .APIServerImage }}
 				- {{ .ControllerManagerImage }}
 				- {{ .SchedulerImage }}
-				- {{ .EtcdImage }} (only if no external etcd endpoints are configured)
+{{ .EtcdImage }}
+				- You can check or miligate this in beforehand with "kubeadm config images pull" to make sure the images
+				  are downloaded locally and cached.
 
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
@@ -189,7 +189,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterCon
 		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
 	)
 	flagSet.StringVar(
-		&cfg.NodeName, "node-name", cfg.NodeName,
+		&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
 	flagSet.StringVar(
@@ -201,7 +201,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterCon
 		"The duration before the bootstrap token is automatically deleted. If set to '0', the token will never expire.",
 	)
 	flagSet.StringVar(
-		&cfg.CRISocket, "cri-socket", cfg.CRISocket,
+		&cfg.NodeRegistration.CRISocket, "cri-socket", cfg.NodeRegistration.CRISocket,
 		`Specify the CRI socket to connect to.`,
 	)
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
@@ -252,30 +252,41 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha2.MasterConfiguration
 	}
 
 	glog.Infof("[init] using Kubernetes version: %s\n", cfg.KubernetesVersion)
-	glog.Infof("[init] using Authorization modes: %v\n", cfg.AuthorizationModes)
 
 	glog.Infoln("[preflight] running pre-flight checks")
 
 	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
+	if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
+		return nil, err
+	}
 
-	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infof("Starting kubelet")
-	preflight.TryStartKubelet(ignorePreflightErrors)
-
-	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun}, nil
+	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun, ignorePreflightErrors: ignorePreflightErrors}, nil
 }
 
 // Init defines struct used by "kubeadm init" command
 type Init struct {
-	cfg            *kubeadmapi.MasterConfiguration
-	skipTokenPrint bool
-	dryRun         bool
+	cfg                   *kubeadmapi.MasterConfiguration
+	skipTokenPrint        bool
+	dryRun                bool
+	ignorePreflightErrors sets.String
 }
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
+
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
+	// as we handle that ourselves in the markmaster phase
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, false); err != nil {
+		return err
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	glog.V(1).Infof("Starting kubelet")
+	preflight.TryStartKubelet(i.ignorePreflightErrors)
+
 	// Get directories to write files to; can be faked if we're dry-running
 	glog.V(1).Infof("[init] Getting certificates directory from configuration")
 	realCertsDir := i.cfg.CertificatesDir
@@ -332,7 +343,7 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}
 	// Add etcd static pod spec only if external etcd is not configured
-	if len(i.cfg.Etcd.Endpoints) == 0 {
+	if i.cfg.Etcd.External == nil {
 		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
 		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
 			return fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
@@ -347,14 +358,14 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		glog.V(1).Infof("[init] feature --dynamic-config-dir is enabled")
-		glog.V(1).Infof("[init] writing base kubelet configuration to disk on master")
-		// Write base kubelet configuration for dynamic kubelet configuration feature.
-		if err := kubeletphase.WriteInitKubeletConfigToDiskOnMaster(i.cfg); err != nil {
-			return fmt.Errorf("error writing base kubelet configuration to disk: %v", err)
-		}
+	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
+	if err != nil {
+		return err
+	}
+
+	// Write the kubelet configuration to disk.
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig); err != nil {
+		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
 	}
 
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
@@ -374,21 +385,17 @@ func (i *Init) Run(out io.Writer) error {
 			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"ControllerManagerImage": images.GetCoreImage(kubeadmconstants.KubeControllerManager, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"SchedulerImage":         images.GetCoreImage(kubeadmconstants.KubeScheduler, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
-			"EtcdImage":              images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.Image),
+		}
+		// Set .EtcdImage conditionally
+		if i.cfg.Etcd.Local != nil {
+			ctx["EtcdImage"] = fmt.Sprintf("				- %s", images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.Local.Image))
+		} else {
+			ctx["EtcdImage"] = ""
 		}
 
 		kubeletFailTempl.Execute(out, ctx)
 
 		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
-	}
-
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		// Create base kubelet configuration for dynamic kubelet configuration feature.
-		glog.V(1).Infof("[init] creating base kubelet configuration")
-		if err := kubeletphase.CreateBaseKubeletConfiguration(i.cfg, client); err != nil {
-			return fmt.Errorf("error creating base kubelet configuration: %v", err)
-		}
 	}
 
 	// Upload currently used configuration to the cluster
@@ -399,10 +406,24 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error uploading configuration: %v", err)
 	}
 
+	glog.V(1).Infof("[init] creating kubelet configuration configmap")
+	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
+		return fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err)
+	}
+
 	// PHASE 4: Mark the master with the right label/taint
 	glog.V(1).Infof("[init] marking the master with right label")
-	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName, !i.cfg.NoTaintMaster); err != nil {
+	if err := markmasterphase.MarkMaster(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.Taints); err != nil {
 		return fmt.Errorf("error marking master: %v", err)
+	}
+
+	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+	// This feature is disabled by default, as it is alpha still
+	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		// Enable dynamic kubelet configuration for the node.
+		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
+			return fmt.Errorf("error enabling dynamic kubelet configuration: %v", err)
+		}
 	}
 
 	// PHASE 5: Set up the node bootstrap tokens
@@ -488,7 +509,7 @@ func (i *Init) Run(out io.Writer) error {
 func createClient(cfg *kubeadmapi.MasterConfiguration, dryRun bool) (clientset.Interface, error) {
 	if dryRun {
 		// If we're dry-running; we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
-		dryRunGetter := apiclient.NewInitDryRunGetter(cfg.NodeName, cfg.Networking.ServiceSubnet)
+		dryRunGetter := apiclient.NewInitDryRunGetter(cfg.NodeRegistration.Name, cfg.Networking.ServiceSubnet)
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 
@@ -538,12 +559,9 @@ func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
 		return dryrunutil.NewWaiter()
 	}
 
+	// TODO: List images locally using `crictl` and pull in preflight checks if not available
+	// When we do that, we can always assume the images exist at this point and have a shorter timeout.
 	timeout := 30 * time.Minute
-
-	// No need for a large timeout if we don't expect downloads
-	if i.cfg.ImagePullPolicy == v1.PullNever {
-		timeout = 60 * time.Second
-	}
 	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 

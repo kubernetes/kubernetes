@@ -25,6 +25,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -40,18 +41,18 @@ var (
 // checkExistsFromError inspects an error and returns a true if err is nil,
 // false if error is an autorest.Error with StatusCode=404 and will return the
 // error back if error is another status code or another type of error.
-func checkResourceExistsFromError(err error) (bool, error) {
+func checkResourceExistsFromError(err error) (bool, string, error) {
 	if err == nil {
-		return true, nil
+		return true, "", nil
 	}
 	v, ok := err.(autorest.DetailedError)
 	if !ok {
-		return false, err
+		return false, "", err
 	}
 	if v.StatusCode == http.StatusNotFound {
-		return false, nil
+		return false, err.Error(), nil
 	}
-	return false, v
+	return false, "", v
 }
 
 // If it is StatusNotFound return nil,
@@ -104,15 +105,17 @@ func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pi
 	}
 
 	var realErr error
+	var message string
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 	pip, err = az.PublicIPAddressesClient.Get(ctx, resourceGroup, pipName, "")
-	exists, realErr = checkResourceExistsFromError(err)
+	exists, message, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return pip, false, realErr
 	}
 
 	if !exists {
+		glog.V(2).Infof("Public IP %q not found with message: %q", pipName, message)
 		return pip, false, nil
 	}
 
@@ -121,6 +124,7 @@ func (az *Cloud) getPublicIPAddress(pipResourceGroup string, pipName string) (pi
 
 func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet network.Subnet, exists bool, err error) {
 	var realErr error
+	var message string
 	var rg string
 
 	if len(az.VnetResourceGroup) > 0 {
@@ -132,12 +136,13 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 	subnet, err = az.SubnetsClient.Get(ctx, rg, virtualNetworkName, subnetName, "")
-	exists, realErr = checkResourceExistsFromError(err)
+	exists, message, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
 		return subnet, false, realErr
 	}
 
 	if !exists {
+		glog.V(2).Infof("Subnet %q not found with message: %q", subnetName, message)
 		return subnet, false, nil
 	}
 
@@ -181,12 +186,13 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 		vm, err := az.VirtualMachinesClient.Get(ctx, az.ResourceGroup, key, compute.InstanceView)
-		exists, realErr := checkResourceExistsFromError(err)
+		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
 		}
 
 		if !exists {
+			glog.V(2).Infof("Virtual machine %q not found with message: %q", key, message)
 			return nil, nil
 		}
 
@@ -202,12 +208,13 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 		defer cancel()
 
 		lb, err := az.LoadBalancerClient.Get(ctx, az.ResourceGroup, key, "")
-		exists, realErr := checkResourceExistsFromError(err)
+		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
 		}
 
 		if !exists {
+			glog.V(2).Infof("Load balancer %q not found with message: %q", key, message)
 			return nil, nil
 		}
 
@@ -222,12 +229,13 @@ func (az *Cloud) newNSGCache() (*timedCache, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 		nsg, err := az.SecurityGroupsClient.Get(ctx, az.ResourceGroup, key, "")
-		exists, realErr := checkResourceExistsFromError(err)
+		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
 		}
 
 		if !exists {
+			glog.V(2).Infof("Security group %q not found with message: %q", key, message)
 			return nil, nil
 		}
 
@@ -242,12 +250,13 @@ func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 		rt, err := az.RouteTablesClient.Get(ctx, az.ResourceGroup, key, "")
-		exists, realErr := checkResourceExistsFromError(err)
+		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
 		}
 
 		if !exists {
+			glog.V(2).Infof("Route table %q not found with message: %q", key, message)
 			return nil, nil
 		}
 

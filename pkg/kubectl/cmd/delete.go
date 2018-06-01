@@ -21,16 +21,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	kubectlwait "k8s.io/kubernetes/pkg/kubectl/cmd/wait"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -99,15 +107,14 @@ type DeleteOptions struct {
 	ForceDeletion   bool
 	WaitForDeletion bool
 
-	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
-
 	GracePeriod int
 	Timeout     time.Duration
 
 	Output string
 
-	Mapper meta.RESTMapper
-	Result *resource.Result
+	DynamicClient dynamic.Interface
+	Mapper        meta.RESTMapper
+	Result        *resource.Result
 
 	genericclioptions.IOStreams
 }
@@ -122,16 +129,10 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Long:    delete_long,
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			o := deleteFlags.ToOptions(streams)
-			if err := o.Complete(f, args, cmd); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := o.Validate(cmd); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
-			}
-			if err := o.RunDelete(); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			o := deleteFlags.ToOptions(nil, streams)
+			cmdutil.CheckErr(o.Complete(f, args, cmd))
+			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.RunDelete())
 		},
 		SuggestFor: []string{"rm"},
 	}
@@ -143,7 +144,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 }
 
 func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Command) error {
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -162,13 +163,9 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	}
 	if o.GracePeriod == 0 && !o.ForceDeletion {
 		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
-		// into --grace-period=1 and wait until the object is successfully deleted. Users may provide --force
-		// to bypass this wait.
-		o.WaitForDeletion = true
+		// into --grace-period=1. Users may provide --force to bypass this conversion.
 		o.GracePeriod = 1
 	}
-
-	o.Reaper = f.Reaper
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	r := f.NewBuilder().
@@ -194,6 +191,11 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		return err
 	}
 
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -209,6 +211,11 @@ func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
 	}
 
+	if o.GracePeriod == 0 && !o.ForceDeletion && !o.WaitForDeletion {
+		// With the explicit --wait flag we need extra validation for backward compatibility
+		return fmt.Errorf("--grace-period=0 must have either --force specified, or --wait to be set to true")
+	}
+
 	switch {
 	case o.GracePeriod == 0 && o.ForceDeletion:
 		fmt.Fprintf(o.ErrOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n")
@@ -219,60 +226,7 @@ func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
 }
 
 func (o *DeleteOptions) RunDelete() error {
-	// By default use a reaper to delete all related resources.
-	if o.Cascade {
-		// TODO(juanvallejo): although o.Result can be accessed from the options
-		// it is also passed here so that callers of this method outside of the "delete"
-		// command do not have to tack it to the "delete" options as well.
-		// Find a cleaner way to approach this.
-		return o.ReapResult(o.Result, true, false)
-	}
 	return o.DeleteResult(o.Result)
-}
-
-func (o *DeleteOptions) ReapResult(r *resource.Result, isDefaultDelete, quiet bool) error {
-	found := 0
-	if o.IgnoreNotFound {
-		r = r.IgnoreErrors(errors.IsNotFound)
-	}
-	err := r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-		found++
-		reaper, err := o.Reaper(info.Mapping)
-		if err != nil {
-			// If there is no reaper for this resources and the user didn't explicitly ask for stop.
-			if kubectl.IsNoSuchReaperError(err) && isDefaultDelete {
-				// No client side reaper found. Let the server do cascading deletion.
-				return o.cascadingDeleteResource(info)
-			}
-			return cmdutil.AddSourceToErr("reaping", info.Source, err)
-		}
-		var options *metav1.DeleteOptions
-		if o.GracePeriod >= 0 {
-			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
-		}
-		if err := reaper.Stop(info.Namespace, info.Name, o.Timeout, options); err != nil {
-			return cmdutil.AddSourceToErr("stopping", info.Source, err)
-		}
-		if o.WaitForDeletion {
-			if err := waitForObjectDeletion(info, o.Timeout); err != nil {
-				return cmdutil.AddSourceToErr("stopping", info.Source, err)
-			}
-		}
-		if !quiet {
-			o.PrintObj(info)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	if found == 0 {
-		fmt.Fprintf(o.Out, "No resources found\n")
-	}
-	return nil
 }
 
 func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
@@ -286,13 +240,15 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		}
 		found++
 
-		// if we're here, it means that cascade=false (not the default), so we should orphan as requested
-		orphan := true
 		options := &metav1.DeleteOptions{}
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		options.OrphanDependents = &orphan
+		policy := metav1.DeletePropagationForeground
+		if !o.Cascade {
+			policy = metav1.DeletePropagationOrphan
+		}
+		options.PropagationPolicy = &policy
 		return o.deleteResource(info, options)
 	})
 	if err != nil {
@@ -300,21 +256,103 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	}
 	if found == 0 {
 		fmt.Fprintf(o.Out, "No resources found\n")
+		return nil
 	}
-	return nil
-}
+	if !o.WaitForDeletion {
+		return nil
+	}
+	// if we don't have a dynamic client, we don't want to wait.  Eventually when delete is cleaned up, this will likely
+	// drop out.
+	if o.DynamicClient == nil {
+		return nil
+	}
 
-func (o *DeleteOptions) cascadingDeleteResource(info *resource.Info) error {
-	falseVar := false
-	return o.deleteResource(info, &metav1.DeleteOptions{OrphanDependents: &falseVar})
+	effectiveTimeout := o.Timeout
+	if effectiveTimeout == 0 {
+		// if we requested to wait forever, set it to a week.
+		effectiveTimeout = 168 * time.Hour
+	}
+	waitOptions := kubectlwait.WaitOptions{
+		ResourceFinder: genericclioptions.ResourceFinderForResult(r),
+		DynamicClient:  o.DynamicClient,
+		Timeout:        effectiveTimeout,
+
+		Printer:     printers.NewDiscardingPrinter(),
+		ConditionFn: kubectlwait.IsDeleted,
+		IOStreams:   o.IOStreams,
+	}
+	err = waitOptions.RunWait()
+	if errors.IsForbidden(err) {
+		// if we're forbidden from waiting, we shouldn't fail.
+		glog.V(1).Info(err)
+		return nil
+	}
+	return err
 }
 
 func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) error {
+	// TODO: this should be removed as soon as DaemonSet controller properly handles object deletion
+	// see https://github.com/kubernetes/kubernetes/issues/64313 for details
+	mapping := info.ResourceMapping()
+	if mapping.Resource.GroupResource() == (schema.GroupResource{Group: "extensions", Resource: "daemonsets"}) ||
+		mapping.Resource.GroupResource() == (schema.GroupResource{Group: "apps", Resource: "daemonsets"}) {
+		if err := updateDaemonSet(info.Namespace, info.Name, o.DynamicClient); err != nil {
+			return err
+		}
+	}
+
 	if err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions); err != nil {
 		return cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
 	o.PrintObj(info)
+	return nil
+}
+
+func updateDaemonSet(namespace, name string, dynamicClient dynamic.Interface) error {
+	dsClient := dynamicClient.Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}).Namespace(namespace)
+	obj, err := dsClient.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	ds := &appsv1.DaemonSet{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ds); err != nil {
+		return err
+	}
+
+	// We set the nodeSelector to a random label. This label is nearly guaranteed
+	// to not be set on any node so the DameonSetController will start deleting
+	// daemon pods. Once it's done deleting the daemon pods, it's safe to delete
+	// the DaemonSet.
+	ds.Spec.Template.Spec.NodeSelector = map[string]string{
+		string(uuid.NewUUID()): string(uuid.NewUUID()),
+	}
+	// force update to avoid version conflict
+	ds.ResourceVersion = ""
+
+	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ds)
+	if err != nil {
+		return err
+	}
+	if _, err = dsClient.Update(&unstructured.Unstructured{Object: out}); err != nil {
+		return err
+	}
+
+	// Wait for the daemon set controller to kill all the daemon pods.
+	if err := wait.Poll(1*time.Second, 5*time.Minute, func() (bool, error) {
+		updatedObj, err := dsClient.Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		updatedDS := &appsv1.DaemonSet{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(updatedObj.Object, ds); err != nil {
+			return false, nil
+		}
+
+		return updatedDS.Status.CurrentNumberScheduled+updatedDS.Status.NumberMisscheduled == 0, nil
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -340,25 +378,4 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 
 	// understandable output by default
 	fmt.Fprintf(o.Out, "%s \"%s\" %s\n", kindString, info.Name, operation)
-}
-
-// objectDeletionWaitInterval is the interval to wait between checks for deletion.
-var objectDeletionWaitInterval = time.Second
-
-// waitForObjectDeletion refreshes the object, waiting until it is deleted, a timeout is reached, or
-// an error is encountered. It checks once a second.
-func waitForObjectDeletion(info *resource.Info, timeout time.Duration) error {
-	copied := *info
-	info = &copied
-	// TODO: refactor Reaper so that we can pass the "wait" option into it, and then check for UID change.
-	return wait.PollImmediate(objectDeletionWaitInterval, timeout, func() (bool, error) {
-		switch err := info.Get(); {
-		case err == nil:
-			return false, nil
-		case errors.IsNotFound(err):
-			return true, nil
-		default:
-			return false, err
-		}
-	})
 }

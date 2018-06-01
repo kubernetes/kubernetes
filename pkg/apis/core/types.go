@@ -75,6 +75,9 @@ type VolumeSource struct {
 	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource
 	// GitRepo represents a git repository at a particular revision.
+	// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+	// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+	// into the Pod's container.
 	// +optional
 	GitRepo *GitRepoVolumeSource
 	// Secret represents a secret that should populate this volume.
@@ -790,6 +793,10 @@ type AWSElasticBlockStoreVolumeSource struct {
 // Represents a volume that is populated with the contents of a git repository.
 // Git repo volumes do not support ownership management.
 // Git repo volumes support SELinux relabeling.
+//
+// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+// into the Pod's container.
 type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string
@@ -1391,6 +1398,28 @@ type ConfigMapProjection struct {
 	Optional *bool
 }
 
+// ServiceAccountTokenProjection represents a projected service account token
+// volume. This projection can be used to insert a service account token into
+// the pods runtime filesystem for use against APIs (Kubernetes API Server or
+// otherwise).
+type ServiceAccountTokenProjection struct {
+	// Audience is the intended audience of the token. A recipient of a token
+	// must identify itself with an identifier specified in the audience of the
+	// token, and otherwise should reject the token. The audience defaults to the
+	// identifier of the apiserver.
+	Audience string
+	// ExpirationSeconds is the requested duration of validity of the service
+	// account token. As the token approaches expiration, the kubelet volume
+	// plugin will proactively rotate the service account token. The kubelet will
+	// start trying to rotate the token if the token is older than 80 percent of
+	// its time to live or if the token is older than 24 hours.Defaults to 1 hour
+	// and must be at least 10 minutes.
+	ExpirationSeconds int64
+	// Path is the path relative to the mount point of the file to project the
+	// token into.
+	Path string
+}
+
 // Represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
@@ -1414,6 +1443,8 @@ type VolumeProjection struct {
 	DownwardAPI *DownwardAPIProjection
 	// information about the configMap data to project
 	ConfigMap *ConfigMapProjection
+	// information about the serviceAccountToken data to project
+	ServiceAccountToken *ServiceAccountTokenProjection
 }
 
 // Maps a string key to a path within a volume.
@@ -3269,27 +3300,12 @@ type ConfigMapNodeConfigSource struct {
 	Name string
 
 	// UID is the metadata.UID of the referenced ConfigMap.
-	// This field is currently reqired in Node.Spec.
-	// TODO(#61643): This field will be forbidden in Node.Spec when #61643 is resolved.
-	//               #61643 changes the behavior of dynamic Kubelet config to respect
-	//               ConfigMap updates, and thus removes the ability to pin the Spec to a given UID.
-	// TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
-	//               #63314 (the PR that resolves #56896) adds a structured status to the Node
-	//               object for reporting information about the config. This status requires UID
-	//               and ResourceVersion, so that it represents a fully-explicit description of
-	//               the configuration in use, while (see previous TODO) the Spec will be
-	//               restricted to namespace/name in #61643.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
 	// +optional
 	UID types.UID
 
 	// ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap.
-	// This field is forbidden in Node.Spec.
-	// TODO(#56896): This field will be required in Node.Status when #56896 is resolved.
-	//               #63314 (the PR that resolves #56896) adds a structured status to the Node
-	//               object for reporting information about the config. This status requires UID
-	//               and ResourceVersion, so that it represents a fully-explicit description of
-	//               the configuration in use, while (see previous TODO) the Spec will be
-	//               restricted to namespace/name in #61643.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
 	// +optional
 	ResourceVersion string
 

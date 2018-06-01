@@ -56,7 +56,7 @@ func TestAddonsSubCommandsHasFlags(t *testing.T) {
 			},
 		},
 		{
-			command: "kube-dns",
+			command: "coredns",
 			additionalFlags: []string{
 				"service-dns-domain",
 				"service-cidr",

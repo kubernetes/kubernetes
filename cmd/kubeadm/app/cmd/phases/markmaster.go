@@ -75,14 +75,14 @@ func NewCmdMarkMaster() *cobra.Command {
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			err = markmasterphase.MarkMaster(client, internalcfg.NodeName, !internalcfg.NoTaintMaster)
+			err = markmasterphase.MarkMaster(client, internalcfg.NodeRegistration.Name, internalcfg.NodeRegistration.Taints)
 			kubeadmutil.CheckErr(err)
 		},
 	}
 
 	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
 	cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental")
-	cmd.Flags().StringVar(&cfg.NodeName, "node-name", cfg.NodeName, `The node name to which label and taints should apply`)
+	cmd.Flags().StringVar(&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name, `The node name to which label and taints should apply`)
 
 	return cmd
 }

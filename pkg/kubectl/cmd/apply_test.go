@@ -31,19 +31,17 @@ import (
 
 	"github.com/spf13/cobra"
 
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
+	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	fakescale "k8s.io/client-go/scale/fake"
-	testcore "k8s.io/client-go/testing"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -275,7 +273,7 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 	cmBytes := readConfigMapList(t, filenameCM)
 	pathCM := "/namespaces/test/configmaps"
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -294,7 +292,6 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -395,7 +392,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -421,7 +418,6 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -455,7 +451,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	nameRC, rcBytes := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -474,7 +470,6 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -501,7 +496,7 @@ func TestApplyObject(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply when a local object is specified", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -522,7 +517,7 @@ func TestApplyObject(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -565,7 +560,7 @@ func TestApplyObjectOutput(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply returns correct output", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -586,7 +581,7 @@ func TestApplyObjectOutput(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -617,7 +612,7 @@ func TestApplyRetry(t *testing.T) {
 			firstPatch := true
 			retry := false
 			getCount := 0
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -647,7 +642,7 @@ func TestApplyRetry(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -676,7 +671,7 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -696,7 +691,7 @@ func TestApplyNonExistObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -721,7 +716,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 
 	var body []byte
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -748,7 +743,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 
 	// 1. apply non exist object
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -794,7 +789,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply on multiple objects", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -822,7 +817,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -880,7 +875,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply preserves NULL fields", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -922,7 +917,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -955,7 +950,7 @@ func TestUnstructuredApply(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply works correctly with unstructured objects", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -988,7 +983,7 @@ func TestUnstructuredApply(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -1023,7 +1018,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test repeated apply operations on an unstructured object", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -1053,7 +1048,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -1124,7 +1119,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -1154,7 +1149,6 @@ func TestRunApplySetLastApplied(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -1202,27 +1196,28 @@ func checkPatchString(t *testing.T, req *http.Request) {
 
 func TestForceApply(t *testing.T) {
 	initTestErrorHandler(t)
+	scheme := runtime.NewScheme()
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 	pathRCList := "/namespaces/test/replicationcontrollers"
 	expected := map[string]int{
-		"getOk":       7,
+		"getOk":       6,
 		"getNotFound": 1,
-		"getList":     1,
+		"getList":     0,
 		"patch":       6,
 		"delete":      1,
 		"post":        1,
 	}
-	scaleClientExpected := []string{"get", "update", "get", "get"}
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply with --force", func(t *testing.T) {
 			deleted := false
 			isScaledDownToZero := false
 			counts := map[string]int{}
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
+			tf.ClientConfigVal = defaultClientConfig()
 			tf.UnstructuredClient = &fake.RESTClient{
 				NegotiatedSerializer: unstructuredSerializer,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -1272,10 +1267,6 @@ func TestForceApply(t *testing.T) {
 						}
 						t.Fatalf("unexpected request: %#v after %v tries\n%#v", req.URL, counts["patch"], req)
 						return nil, nil
-					case strings.HasSuffix(p, pathRC) && m == "DELETE":
-						counts["delete"]++
-						deleted = true
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte{}))}, nil
 					case strings.HasSuffix(p, pathRC) && m == "PUT":
 						counts["put"]++
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
@@ -1293,47 +1284,21 @@ func TestForceApply(t *testing.T) {
 					}
 				}),
 			}
-			newReplicas := int32(3)
-			scaleClient := &fakescale.FakeScaleClient{}
-			scaleClient.AddReactor("get", "replicationcontrollers", func(rawAction testcore.Action) (handled bool, ret runtime.Object, err error) {
-				action := rawAction.(testcore.GetAction)
-				if action.GetName() != "test-rc" {
-					return true, nil, fmt.Errorf("expected = test-rc, got = %s", action.GetName())
+			fakeDynamicClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+			fakeDynamicClient.PrependReactor("delete", "replicationcontrollers", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				if deleteAction, ok := action.(clienttesting.DeleteAction); ok {
+					if deleteAction.GetName() == nameRC {
+						counts["delete"]++
+						deleted = true
+						return true, nil, nil
+					}
 				}
-				obj := &autoscalingv1.Scale{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      action.GetName(),
-						Namespace: action.GetNamespace(),
-					},
-					Spec: autoscalingv1.ScaleSpec{
-						Replicas: newReplicas,
-					},
-				}
-				return true, obj, nil
+				return false, nil, nil
 			})
-			scaleClient.AddReactor("update", "replicationcontrollers", func(rawAction testcore.Action) (handled bool, ret runtime.Object, err error) {
-				action := rawAction.(testcore.UpdateAction)
-				obj := action.GetObject().(*autoscalingv1.Scale)
-				if obj.Name != "test-rc" {
-					return true, nil, fmt.Errorf("expected = test-rc, got = %s", obj.Name)
-				}
-				newReplicas = obj.Spec.Replicas
-				return true, &autoscalingv1.Scale{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      obj.Name,
-						Namespace: action.GetNamespace(),
-					},
-					Spec: autoscalingv1.ScaleSpec{
-						Replicas: newReplicas,
-					},
-				}, nil
-			})
-
-			tf.ScaleGetter = scaleClient
+			tf.FakeDynamicClient = fakeDynamicClient
 			tf.OpenAPISchemaFunc = fn
 			tf.Client = tf.UnstructuredClient
 			tf.ClientConfigVal = &restclient.Config{}
-			tf.Namespace = "test"
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
@@ -1353,22 +1318,6 @@ func TestForceApply(t *testing.T) {
 			}
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
-			}
-
-			scale, err := scaleClient.Scales(tf.Namespace).Get(schema.GroupResource{Group: "", Resource: "replicationcontrollers"}, nameRC)
-			if err != nil {
-				t.Error(err)
-			}
-			if scale.Spec.Replicas != 0 {
-				t.Errorf("a scale subresource has unexpected number of replicas, got %d expected 0", scale.Spec.Replicas)
-			}
-			if len(scaleClient.Actions()) != len(scaleClientExpected) {
-				t.Fatalf("a fake scale client has unexpected amout of API calls, wanted = %d, got = %d", len(scaleClientExpected), len(scaleClient.Actions()))
-			}
-			for index, action := range scaleClient.Actions() {
-				if scaleClientExpected[index] != action.GetVerb() {
-					t.Errorf("unexpected API method called on a fake scale client, wanted = %s, got = %s at index = %d", scaleClientExpected[index], action.GetVerb(), index)
-				}
 			}
 		})
 	}

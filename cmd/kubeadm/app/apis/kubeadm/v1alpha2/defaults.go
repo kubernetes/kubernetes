@@ -18,17 +18,16 @@ package v1alpha2
 
 import (
 	"net/url"
-	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -42,8 +41,6 @@ const (
 	DefaultKubernetesVersion = "stable-1.10"
 	// DefaultAPIBindPort defines default API port
 	DefaultAPIBindPort = 6443
-	// DefaultAuthorizationModes defines default authorization modes
-	DefaultAuthorizationModes = "Node,RBAC"
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
@@ -96,10 +93,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.Networking.DNSDomain = DefaultServiceDNSDomain
 	}
 
-	if len(obj.AuthorizationModes) == 0 {
-		obj.AuthorizationModes = strings.Split(DefaultAuthorizationModes, ",")
-	}
-
 	if obj.CertificatesDir == "" {
 		obj.CertificatesDir = DefaultCertificatesDir
 	}
@@ -108,10 +101,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.TokenTTL = &metav1.Duration{
 			Duration: constants.DefaultTokenDuration,
 		}
-	}
-
-	if obj.CRISocket == "" {
-		obj.CRISocket = DefaultCRISocket
 	}
 
 	if len(obj.TokenUsages) == 0 {
@@ -126,19 +115,27 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.ImageRepository = DefaultImageRepository
 	}
 
-	if obj.Etcd.DataDir == "" {
-		obj.Etcd.DataDir = DefaultEtcdDataDir
-	}
-
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
 	}
 
-	if features.Enabled(obj.FeatureGates, features.DynamicKubeletConfig) {
-		SetDefaults_KubeletConfiguration(obj)
-	}
+	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
+	SetDefaults_KubeletConfiguration(obj)
+	SetDefaults_Etcd(obj)
 	SetDefaults_ProxyConfiguration(obj)
 	SetDefaults_AuditPolicyConfiguration(obj)
+}
+
+// SetDefaults_Etcd assigns default values for the Proxy
+func SetDefaults_Etcd(obj *MasterConfiguration) {
+	if obj.Etcd.External == nil && obj.Etcd.Local == nil {
+		obj.Etcd.Local = &LocalEtcd{}
+	}
+	if obj.Etcd.Local != nil {
+		if obj.Etcd.Local.DataDir == "" {
+			obj.Etcd.Local.DataDir = DefaultEtcdDataDir
+		}
+	}
 }
 
 // SetDefaults_ProxyConfiguration assigns default values for the Proxy
@@ -168,9 +165,6 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if len(obj.DiscoveryToken) == 0 && len(obj.DiscoveryFile) == 0 {
 		obj.DiscoveryToken = obj.Token
 	}
-	if obj.CRISocket == "" {
-		obj.CRISocket = DefaultCRISocket
-	}
 	// Make sure file URLs become paths
 	if len(obj.DiscoveryFile) != 0 {
 		u, err := url.Parse(obj.DiscoveryFile)
@@ -186,6 +180,8 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
 	}
+
+	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 }
 
 // SetDefaults_KubeletConfiguration assigns default values to kubelet
@@ -205,18 +201,41 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 		}
 	}
 	if obj.KubeletConfiguration.BaseConfig.ClusterDomain == "" {
-		obj.KubeletConfiguration.BaseConfig.ClusterDomain = DefaultServiceDNSDomain
+		obj.KubeletConfiguration.BaseConfig.ClusterDomain = obj.Networking.DNSDomain
 	}
-	if obj.KubeletConfiguration.BaseConfig.Authorization.Mode == "" {
-		obj.KubeletConfiguration.BaseConfig.Authorization.Mode = kubeletconfigv1beta1.KubeletAuthorizationModeWebhook
-	}
-	if obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile == "" {
-		obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile = DefaultCACertPath
-	}
+
+	// Enforce security-related kubelet options
+
+	// Require all clients to the kubelet API to have client certs signed by the cluster CA
+	obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile = DefaultCACertPath
+	obj.KubeletConfiguration.BaseConfig.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
+
+	// On every client request to the kubelet API, execute a webhook (SubjectAccessReview request) to the API server
+	// and ask it whether the client is authorized to access the kubelet API
+	obj.KubeletConfiguration.BaseConfig.Authorization.Mode = kubeletconfigv1beta1.KubeletAuthorizationModeWebhook
+
+	// Let clients using other authentication methods like ServiceAccount tokens also access the kubelet API
+	obj.KubeletConfiguration.BaseConfig.Authentication.Webhook.Enabled = utilpointer.BoolPtr(true)
+
+	// Disable the readonly port of the kubelet, in order to not expose unnecessary information
+	obj.KubeletConfiguration.BaseConfig.ReadOnlyPort = 0
+
+	// Enables client certificate rotation for the kubelet
+	obj.KubeletConfiguration.BaseConfig.RotateCertificates = true
+
+	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
+	obj.KubeletConfiguration.BaseConfig.HealthzBindAddress = "127.0.0.1"
+	obj.KubeletConfiguration.BaseConfig.HealthzPort = utilpointer.Int32Ptr(10248)
 
 	scheme, _, _ := kubeletscheme.NewSchemeAndCodecs()
 	if scheme != nil {
 		scheme.Default(obj.KubeletConfiguration.BaseConfig)
+	}
+}
+
+func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
+	if obj.CRISocket == "" {
+		obj.CRISocket = DefaultCRISocket
 	}
 }
 

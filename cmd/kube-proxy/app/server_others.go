@@ -30,9 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -92,9 +90,11 @@ func newProxyServer(
 
 	dbus = utildbus.New()
 	iptInterface = utiliptables.New(execer, dbus, protocol)
-	ipvsInterface = utilipvs.New(execer)
 	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
+	if canUse, _ := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface); canUse {
+		ipvsInterface = utilipvs.New(execer)
+	}
 
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
@@ -276,21 +276,13 @@ func newProxyServer(
 }
 
 func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
-	if proxyMode == proxyModeUserspace {
+	switch proxyMode {
+	case proxyModeUserspace:
 		return proxyModeUserspace
-	}
-
-	if len(proxyMode) > 0 && proxyMode == proxyModeIPTables {
+	case proxyModeIPTables:
 		return tryIPTablesProxy(iptver, kcompat)
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.SupportIPVSProxyMode) {
-		if proxyMode == proxyModeIPVS {
-			return tryIPVSProxy(iptver, khandle, ipsetver, kcompat)
-		} else {
-			glog.Warningf("Can't use ipvs proxier, trying iptables proxier")
-			return tryIPTablesProxy(iptver, kcompat)
-		}
+	case proxyModeIPVS:
+		return tryIPVSProxy(iptver, khandle, ipsetver, kcompat)
 	}
 	glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
 	return tryIPTablesProxy(iptver, kcompat)

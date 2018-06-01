@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
@@ -222,36 +222,36 @@ var _ = SIGDescribe("Advanced Audit", func() {
 			{
 				func() {
 					podLabels := map[string]string{"name": "audit-deployment-pod"}
-					d := framework.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), extensions.RecreateDeploymentStrategyType)
+					d := framework.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), apps.RecreateDeploymentStrategyType)
 
-					_, err := f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Create(d)
+					_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(d)
 					framework.ExpectNoError(err, "failed to create audit-deployment")
 
-					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Get(d.Name, metav1.GetOptions{})
+					_, err = f.ClientSet.AppsV1().Deployments(namespace).Get(d.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "failed to get audit-deployment")
 
-					deploymentChan, err := f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Watch(watchOptions)
+					deploymentChan, err := f.ClientSet.AppsV1().Deployments(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for deployments")
 					for range deploymentChan.ResultChan() {
 					}
 
-					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Update(d)
+					_, err = f.ClientSet.AppsV1().Deployments(namespace).Update(d)
 					framework.ExpectNoError(err, "failed to update audit-deployment")
 
-					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Patch(d.Name, types.JSONPatchType, patch)
+					_, err = f.ClientSet.AppsV1().Deployments(namespace).Patch(d.Name, types.JSONPatchType, patch)
 					framework.ExpectNoError(err, "failed to patch deployment")
 
-					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).List(metav1.ListOptions{})
+					_, err = f.ClientSet.AppsV1().Deployments(namespace).List(metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to create list deployments")
 
-					err = f.ClientSet.ExtensionsV1beta1().Deployments(namespace).Delete("audit-deployment", &metav1.DeleteOptions{})
+					err = f.ClientSet.AppsV1().Deployments(namespace).Delete("audit-deployment", &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete deployments")
 				},
 				[]auditEvent{
 					{
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", namespace),
 						"create",
 						201,
 						auditTestUser,
@@ -263,7 +263,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments/audit-deployment", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
 						"get",
 						200,
 						auditTestUser,
@@ -275,7 +275,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", namespace),
 						"list",
 						200,
 						auditTestUser,
@@ -287,7 +287,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseStarted,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 						"watch",
 						200,
 						auditTestUser,
@@ -299,7 +299,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequest,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 						"watch",
 						200,
 						auditTestUser,
@@ -311,7 +311,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments/audit-deployment", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
 						"update",
 						200,
 						auditTestUser,
@@ -323,7 +323,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments/audit-deployment", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
 						"patch",
 						200,
 						auditTestUser,
@@ -335,7 +335,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						v1beta1.LevelRequestResponse,
 						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/extensions/v1beta1/namespaces/%s/deployments/audit-deployment", namespace),
+						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
 						"delete",
 						200,
 						auditTestUser,
@@ -619,7 +619,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 			// Create and delete custom resource definition.
 			{
 				func() {
-					err = testserver.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+					crd, err = testserver.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
 					framework.ExpectNoError(err, "failed to create custom resource definition")
 					testserver.DeleteCustomResourceDefinition(crd, apiExtensionClient)
 				},

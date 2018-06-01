@@ -29,10 +29,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -40,7 +41,7 @@ import (
 type SetImageOptions struct {
 	resource.FilenameOptions
 
-	PrintFlags  *printers.PrintFlags
+	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
 	Infos        []*resource.Info
@@ -49,12 +50,12 @@ type SetImageOptions struct {
 	All          bool
 	Output       string
 	Local        bool
-	ResolveImage func(in string) (string, error)
+	ResolveImage ImageResolver
 
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
 
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
+	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
 	ContainerImages        map[string]string
 
@@ -87,7 +88,7 @@ var (
 
 func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 	return &SetImageOptions{
-		PrintFlags:  printers.NewPrintFlags("image updated").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("image updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -128,16 +129,16 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
-	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
 	}
 
-	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
+	o.UpdatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.ResolveImage = f.ResolveImage
+	o.ResolveImage = resolveImageFunc
 
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")
@@ -149,7 +150,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.PrintObj = printer.PrintObj
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -209,9 +210,9 @@ func (o *SetImageOptions) Validate() error {
 func (o *SetImageOptions) Run() error {
 	allErrs := []error{}
 
-	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
 		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
+		_, err := o.UpdatePodSpecForObject(obj, func(spec *v1.PodSpec) error {
 			for name, image := range o.ContainerImages {
 				var (
 					containerFound bool
@@ -254,11 +255,11 @@ func (o *SetImageOptions) Run() error {
 			return nil, nil
 		}
 		// record this change (for rollout history)
-		if err := o.Recorder.Record(info.Object); err != nil {
+		if err := o.Recorder.Record(obj); err != nil {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
+		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 	})
 
 	for _, patch := range patches {
@@ -275,7 +276,7 @@ func (o *SetImageOptions) Run() error {
 
 		if o.Local || o.DryRun {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
-				return err
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
@@ -288,7 +289,7 @@ func (o *SetImageOptions) Run() error {
 		}
 
 		if err := o.PrintObj(actual, o.Out); err != nil {
-			return err
+			allErrs = append(allErrs, err)
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)
@@ -308,4 +309,14 @@ func getResourcesAndImages(args []string) (resources []string, containerImages m
 func hasWildcardKey(containerImages map[string]string) bool {
 	_, ok := containerImages["*"]
 	return ok
+}
+
+// ImageResolver is a func that receives an image name, and
+// resolves it to an appropriate / compatible image name.
+// Adds flexibility for future image resolving methods.
+type ImageResolver func(in string) (string, error)
+
+// implements ImageResolver
+func resolveImageFunc(in string) (string, error) {
+	return in, nil
 }

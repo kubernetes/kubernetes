@@ -43,11 +43,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestImageLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
@@ -58,7 +57,6 @@ func TestImageLocal(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
@@ -70,7 +68,7 @@ func TestImageLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetImageOptions{
-		PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Local:     true,
@@ -92,7 +90,7 @@ func TestImageLocal(t *testing.T) {
 }
 
 func TestSetImageValidation(t *testing.T) {
-	printFlags := printers.NewPrintFlags("").WithTypeSetter(scheme.Scheme)
+	printFlags := genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme)
 
 	testCases := []struct {
 		name         string
@@ -160,7 +158,7 @@ func TestSetImageValidation(t *testing.T) {
 }
 
 func TestSetMultiResourcesImageLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
@@ -171,7 +169,6 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
@@ -183,7 +180,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetImageOptions{
-		PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		Local:     true,
@@ -533,15 +530,14 @@ func TestSetImageRemote(t *testing.T) {
 		t.Run(input.name, func(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
 				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
+					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", "test", input.args[1])
 					switch p, m := req.URL.Path, req.Method; {
 					case p == resourcePath && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
@@ -570,7 +566,7 @@ func TestSetImageRemote(t *testing.T) {
 			cmd := NewCmdImage(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			opts := SetImageOptions{
-				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
 				Local:     false,
 				IOStreams: streams,

@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -29,6 +30,11 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+)
+
+var (
+	printerColumnDatatypes                = sets.NewString("integer", "number", "string", "boolean", "date")
+	customResourceColumnDefinitionFormats = sets.NewString("int32", "int64", "float", "double", "byte", "date", "date-time", "password")
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -45,6 +51,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpec(&obj.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
 	return allErrs
 }
 
@@ -53,6 +60,34 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpecUpdate(&obj.Spec, &oldObj.Spec, apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established), field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
+	return allErrs
+}
+
+// ValidateCustomResourceDefinitionStoredVersions statically validates
+func ValidateCustomResourceDefinitionStoredVersions(storedVersions []string, versions []apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path) field.ErrorList {
+	if len(storedVersions) == 0 {
+		return field.ErrorList{field.Invalid(fldPath, storedVersions, "must have at least one stored version")}
+	}
+	allErrs := field.ErrorList{}
+	storedVersionsMap := map[string]int{}
+	for i, v := range storedVersions {
+		storedVersionsMap[v] = i
+	}
+	for _, v := range versions {
+		_, ok := storedVersionsMap[v.Name]
+		if v.Storage && !ok {
+			allErrs = append(allErrs, field.Invalid(fldPath, v, "must have the storage version "+v.Name))
+		}
+		if ok {
+			delete(storedVersionsMap, v.Name)
+		}
+	}
+
+	for v, i := range storedVersionsMap {
+		allErrs = append(allErrs, field.Invalid(fldPath.Index(i), v, "must appear in spec.versions"))
+	}
+
 	return allErrs
 }
 
@@ -75,18 +110,43 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), spec.Group, "should be a domain with at least one dot"))
 	}
 
-	if len(spec.Version) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("version"), ""))
-	} else if errs := validationutil.IsDNS1035Label(spec.Version); len(errs) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, strings.Join(errs, ",")))
-	}
-
 	switch spec.Scope {
 	case "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
 	case apiextensions.ClusterScoped, apiextensions.NamespaceScoped:
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), spec.Scope, []string{string(apiextensions.ClusterScoped), string(apiextensions.NamespaceScoped)}))
+	}
+
+	storageFlagCount := 0
+	versionsMap := map[string]bool{}
+	uniqueNames := true
+	for i, version := range spec.Versions {
+		if version.Storage {
+			storageFlagCount++
+		}
+		if versionsMap[version.Name] {
+			uniqueNames = false
+		} else {
+			versionsMap[version.Name] = true
+		}
+		if errs := validationutil.IsDNS1035Label(version.Name); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i).Child("name"), spec.Versions[i].Name, strings.Join(errs, ",")))
+		}
+	}
+	if !uniqueNames {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), spec.Versions, "must contain unique version names"))
+	}
+	if storageFlagCount != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), spec.Versions, "must have exactly one version marked as storage version"))
+	}
+	if len(spec.Version) != 0 {
+		if errs := validationutil.IsDNS1035Label(spec.Version); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, strings.Join(errs, ",")))
+		}
+		if len(spec.Versions) >= 1 && spec.Versions[0].Name != spec.Version {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, "must match the first version in spec.versions"))
+		}
 	}
 
 	// in addition to the basic name restrictions, some names are required for spec, but not for status
@@ -121,6 +181,12 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("subresources"), "disabled by feature-gate CustomResourceSubresources"))
 	}
 
+	for i := range spec.AdditionalPrinterColumns {
+		if errs := ValidateCustomResourceColumnDefinition(&spec.AdditionalPrinterColumns[i], fldPath.Child("columns").Index(i)); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
+		}
+	}
+
 	return allErrs
 }
 
@@ -130,7 +196,6 @@ func ValidateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.Cus
 
 	if established {
 		// these effect the storage and cannot be changed therefore
-		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Version, oldSpec.Version, fldPath.Child("version"))...)
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Scope, oldSpec.Scope, fldPath.Child("scope"))...)
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Names.Kind, oldSpec.Names.Kind, fldPath.Child("names", "kind"))...)
 	}
@@ -180,6 +245,33 @@ func ValidateCustomResourceDefinitionNames(names *apiextensions.CustomResourceDe
 		if errs := validationutil.IsDNS1035Label(category); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("categories").Index(i), category, strings.Join(errs, ",")))
 		}
+	}
+
+	return allErrs
+}
+
+// ValidateCustomResourceColumnDefinition statically validates a printer column.
+func ValidateCustomResourceColumnDefinition(col *apiextensions.CustomResourceColumnDefinition, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(col.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("header"), ""))
+	}
+
+	if len(col.Type) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), fmt.Sprintf("must be one of %s", strings.Join(printerColumnDatatypes.List(), ","))))
+	} else if !printerColumnDatatypes.Has(col.Type) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), col.Type, fmt.Sprintf("must be one of %s", strings.Join(printerColumnDatatypes.List(), ","))))
+	}
+
+	if len(col.Format) > 0 && !customResourceColumnDefinitionFormats.Has(col.Format) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("format"), col.Format, fmt.Sprintf("must be one of %s", strings.Join(customResourceColumnDefinitionFormats.List(), ","))))
+	}
+
+	if len(col.JSONPath) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	} else if errs := validateSimpleJSONPath(col.JSONPath, fldPath.Child("path")); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
 	}
 
 	return allErrs

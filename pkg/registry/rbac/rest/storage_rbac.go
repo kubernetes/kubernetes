@@ -35,11 +35,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/policybased"
 	clusterrolestore "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/storage"
@@ -124,10 +124,10 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 }
 
 type PolicyData struct {
-	ClusterRoles        []rbac.ClusterRole
-	ClusterRoleBindings []rbac.ClusterRoleBinding
-	Roles               map[string][]rbac.Role
-	RoleBindings        map[string][]rbac.RoleBinding
+	ClusterRoles        []rbacapiv1.ClusterRole
+	ClusterRoleBindings []rbacapiv1.ClusterRoleBinding
+	Roles               map[string][]rbacapiv1.Role
+	RoleBindings        map[string][]rbacapiv1.RoleBinding
 	// ClusterRolesToAggregate maps from previous clusterrole name to the new clusterrole name
 	ClusterRolesToAggregate map[string]string
 }
@@ -138,13 +138,13 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 		// starts, the roles don't initialize, and nothing works.
 		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
 
-			coreclientset, err := coreclient.NewForConfig(hookContext.LoopbackClientConfig)
+			coreclientset, err := corev1client.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))
 				return false, nil
 			}
 
-			clientset, err := rbacclient.NewForConfig(hookContext.LoopbackClientConfig)
+			clientset, err := rbacv1client.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))
 				return false, nil
@@ -303,7 +303,7 @@ func (p RESTStorageProvider) GroupName() string {
 
 // primeAggregatedClusterRoles copies roles that have transitioned to aggregated roles and may need to pick up changes
 // that were done to the legacy roles.
-func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clusterRoleClient rbacclient.ClusterRolesGetter) error {
+func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clusterRoleClient rbacv1client.ClusterRolesGetter) error {
 	for oldName, newName := range clusterRolesToAggregate {
 		_, err := clusterRoleClient.ClusterRoles().Get(newName, metav1.GetOptions{})
 		if err == nil {

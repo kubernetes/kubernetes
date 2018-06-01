@@ -37,7 +37,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
@@ -49,31 +48,21 @@ import (
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
-// Describes the authorization modes that are enforced by kubeadm
-var requiredAuthzModes = []string{
-	authzmodes.ModeRBAC,
-	authzmodes.ModeNode,
-}
-
 // ValidateMasterConfiguration validates master configuration and collects all encountered errors
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateAuthorizationModes(c.AuthorizationModes, field.NewPath("authorizationModes"))...)
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("apiServerCertSANs"))...)
-	allErrs = append(allErrs, ValidateCertSANs(c.Etcd.ServerCertSANs, field.NewPath("etcd").Child("serverCertSANs"))...)
-	allErrs = append(allErrs, ValidateCertSANs(c.Etcd.PeerCertSANs, field.NewPath("etcd").Child("peerCertSANs"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
-	allErrs = append(allErrs, ValidateNodeName(c.NodeName, field.NewPath("nodeName"))...)
+	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
 	allErrs = append(allErrs, ValidateTokenUsages(c.TokenUsages, field.NewPath("tokenUsages"))...)
 	allErrs = append(allErrs, ValidateTokenGroups(c.TokenUsages, c.TokenGroups, field.NewPath("tokenGroups"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.API, field.NewPath("api"))...)
 	allErrs = append(allErrs, ValidateProxy(c.KubeProxy.Config, field.NewPath("kubeProxy").Child("config"))...)
-	if features.Enabled(c.FeatureGates, features.DynamicKubeletConfig) {
-		allErrs = append(allErrs, ValidateKubeletConfiguration(&c.KubeletConfiguration, field.NewPath("kubeletConfiguration"))...)
-	}
+	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
+	allErrs = append(allErrs, ValidateKubeletConfiguration(&c.KubeletConfiguration, field.NewPath("kubeletConfiguration"))...)
 	return allErrs
 }
 
@@ -95,6 +84,7 @@ func ValidateProxy(c *kubeproxyconfigv1alpha1.KubeProxyConfiguration, fldPath *f
 func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(c)...)
+	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
 
 	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
@@ -102,26 +92,12 @@ func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 	return allErrs
 }
 
-// ValidateAuthorizationModes  validates authorization modes and collects all encountered errors
-func ValidateAuthorizationModes(authzModes []string, fldPath *field.Path) field.ErrorList {
+// ValidateNodeRegistrationOptions validates the NodeRegistrationOptions object
+func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	found := map[string]bool{}
-	for _, authzMode := range authzModes {
-		if !authzmodes.IsValidAuthorizationMode(authzMode) {
-			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "invalid authorization mode"))
-		}
-
-		if found[authzMode] {
-			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "duplicate authorization mode"))
-			continue
-		}
-		found[authzMode] = true
-	}
-	for _, requiredMode := range requiredAuthzModes {
-		if !found[requiredMode] {
-			allErrs = append(allErrs, field.Required(fldPath, fmt.Sprintf("authorization mode %s must be enabled", requiredMode)))
-		}
-	}
+	allErrs = append(allErrs, ValidateNodeName(nro.Name, fldPath.Child("name"))...)
+	allErrs = append(allErrs, ValidateAbsolutePath(nro.CRISocket, fldPath.Child("criSocket"))...)
+	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
 	return allErrs
 }
 
@@ -253,12 +229,75 @@ func ValidateTokenUsages(usages []string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateEtcd validates the .Etcd sub-struct.
+func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	localPath := fldPath.Child("local")
+	externalPath := fldPath.Child("external")
+
+	if e.Local == nil && e.External == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "either .Etcd.Local or .Etcd.External is required"))
+		return allErrs
+	}
+	if e.Local != nil && e.External != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", ".Etcd.Local and .Etcd.External are mutually exclusive"))
+		return allErrs
+	}
+	if e.Local != nil {
+		allErrs = append(allErrs, ValidateAbsolutePath(e.Local.DataDir, localPath.Child("dataDir"))...)
+		allErrs = append(allErrs, ValidateCertSANs(e.Local.ServerCertSANs, localPath.Child("serverCertSANs"))...)
+		allErrs = append(allErrs, ValidateCertSANs(e.Local.PeerCertSANs, localPath.Child("peerCertSANs"))...)
+	}
+	if e.External != nil {
+		requireHTTPS := true
+		// Only allow the http scheme if no certs/keys are passed
+		if e.External.CAFile == "" && e.External.CertFile == "" && e.External.KeyFile == "" {
+			requireHTTPS = false
+		}
+		// Require either none or both of the cert/key pair
+		if (e.External.CertFile == "" && e.External.KeyFile != "") || (e.External.CertFile != "" && e.External.KeyFile == "") {
+			allErrs = append(allErrs, field.Invalid(externalPath, "", "either both or none of .Etcd.External.CertFile and .Etcd.External.KeyFile must be set"))
+		}
+		// If the cert and key are specified, require the VA as well
+		if e.External.CertFile != "" && e.External.KeyFile != "" && e.External.CAFile == "" {
+			allErrs = append(allErrs, field.Invalid(externalPath, "", "setting .Etcd.External.CertFile and .Etcd.External.KeyFile requires .Etcd.External.CAFile"))
+		}
+
+		allErrs = append(allErrs, ValidateURLs(e.External.Endpoints, requireHTTPS, externalPath.Child("endpoints"))...)
+		if e.External.CAFile != "" {
+			allErrs = append(allErrs, ValidateAbsolutePath(e.External.CAFile, externalPath.Child("caFile"))...)
+		}
+		if e.External.CertFile != "" {
+			allErrs = append(allErrs, ValidateAbsolutePath(e.External.CertFile, externalPath.Child("certFile"))...)
+		}
+		if e.External.KeyFile != "" {
+			allErrs = append(allErrs, ValidateAbsolutePath(e.External.KeyFile, externalPath.Child("keyFile"))...)
+		}
+	}
+	return allErrs
+}
+
 // ValidateCertSANs validates alternative names
 func ValidateCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, altname := range altnames {
 		if len(validation.IsDNS1123Subdomain(altname)) != 0 && net.ParseIP(altname) == nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, altname, "altname is not a valid dns label or ip address"))
+		}
+	}
+	return allErrs
+}
+
+// ValidateURLs validates the URLs given in the string slice, makes sure they are parseable. Optionally, it can enforcs HTTPS usage.
+func ValidateURLs(urls []string, requireHTTPS bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, urlstr := range urls {
+		u, err := url.Parse(urlstr)
+		if err != nil || u.Scheme == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, "not a valid URL"))
+		}
+		if requireHTTPS && u.Scheme != "https" {
+			allErrs = append(allErrs, field.Invalid(fldPath, urlstr, "the URL must be using the HTTPS scheme"))
 		}
 	}
 	return allErrs
@@ -390,6 +429,10 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflight
 // ValidateKubeletConfiguration validates kubelet configuration and collects all encountered errors
 func ValidateKubeletConfiguration(c *kubeadm.KubeletConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	if c.BaseConfig == nil {
+		return allErrs
+	}
 
 	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
 	if err != nil {

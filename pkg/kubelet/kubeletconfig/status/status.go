@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -36,10 +37,6 @@ const (
 	// AllNilSubfieldsError is used when no subfields are set
 	// This could happen in the case that an old client tries to read an object from a newer API server with a set subfield it does not know about
 	AllNilSubfieldsError = "invalid NodeConfigSource, exactly one subfield must be non-nil, but all were nil"
-	// UIDMismatchErrorFmt is used when there is a UID mismatch between the referenced and downloaded ConfigMaps,
-	// this can happen because objects must be downloaded by namespace/name, rather than by UID
-	// TODO(mtaufen): remove this in #63221
-	UIDMismatchErrorFmt = "invalid ConfigSource.ConfigMap.UID: %s does not match %s.UID: %s"
 	// DownloadError is used when the download fails, e.g. due to network issues
 	DownloadError = "failed to download config, see Kubelet log for details"
 	// InternalError indicates that some internal error happened while trying to sync config, e.g. filesystem issues
@@ -80,9 +77,12 @@ type nodeConfigStatus struct {
 
 // NewNodeConfigStatus returns a new NodeConfigStatus interface
 func NewNodeConfigStatus() NodeConfigStatus {
+	// channels must have capacity at least 1, since we signal with non-blocking writes
+	syncCh := make(chan bool, 1)
+	// prime new status managers to sync with the API server on the first call to Sync
+	syncCh <- true
 	return &nodeConfigStatus{
-		// channels must have capacity at least 1, since we signal with non-blocking writes
-		syncCh: make(chan bool, 1),
+		syncCh: syncCh,
 	}
 }
 
@@ -142,6 +142,8 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 		return
 	}
 
+	utillog.Infof("updating Node.Status.Config")
+
 	// grab the lock
 	s.mux.Lock()
 	defer s.mux.Unlock()
@@ -169,6 +171,24 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 		// with the override
 		status = status.DeepCopy()
 		status.Error = s.errorOverride
+	}
+
+	// update metrics based on the status we will sync
+	metrics.SetConfigError(len(status.Error) > 0)
+	err = metrics.SetAssignedConfig(status.Assigned)
+	if err != nil {
+		err = fmt.Errorf("failed to update Assigned config metric, error: %v", err)
+		return
+	}
+	err = metrics.SetActiveConfig(status.Active)
+	if err != nil {
+		err = fmt.Errorf("failed to update Active config metric, error: %v", err)
+		return
+	}
+	err = metrics.SetLastKnownGoodConfig(status.LastKnownGood)
+	if err != nil {
+		err = fmt.Errorf("failed to update LastKnownGood config metric, error: %v", err)
+		return
 	}
 
 	// apply the status to a copy of the node so we don't modify the object in the informer's store

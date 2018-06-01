@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -117,7 +116,6 @@ type FakeExtender struct {
 
 	// Cached node information for fake extender
 	cachedNodeNameToInfo map[string]*schedulercache.NodeInfo
-	cachedPDBs           []*policy.PodDisruptionBudget
 }
 
 func (f *FakeExtender) IsIgnorable() bool {
@@ -137,7 +135,7 @@ func (f *FakeExtender) ProcessPreemption(
 	nodeToVictimsCopy := map[*v1.Node]*schedulerapi.Victims{}
 	// We don't want to change the original nodeToVictims
 	for k, v := range nodeToVictims {
-		// In real world implementation, extender's user should have his own way to get node object
+		// In real world implementation, extender's user should have their own way to get node object
 		// by name if needed (e.g. query kube-apiserver etc).
 		//
 		// For test purpose, we just use node from parameters directly.
@@ -332,15 +330,13 @@ var _ algorithm.SchedulerExtender = &FakeExtender{}
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
-		name                 string
-		predicates           map[string]algorithm.FitPredicate
-		prioritizers         []algorithm.PriorityConfig
-		extenders            []FakeExtender
-		extenderPredicates   []fitPredicate
-		extenderPrioritizers []priorityConfig
-		nodes                []string
-		expectedHost         string
-		expectsErr           bool
+		name         string
+		predicates   map[string]algorithm.FitPredicate
+		prioritizers []algorithm.PriorityConfig
+		extenders    []FakeExtender
+		nodes        []string
+		expectedHost string
+		expectsErr   bool
 	}{
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},

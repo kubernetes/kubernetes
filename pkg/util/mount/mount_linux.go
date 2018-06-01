@@ -42,6 +42,8 @@ const (
 	maxListTries = 3
 	// Number of fields per line in /proc/mounts as per the fstab man page.
 	expectedNumFieldsPerLine = 6
+	// At least number of fields per line in /proc/<pid>/mountinfo.
+	expectedAtLeastNumFieldsPerMountInfo = 10
 	// Location of the mount file to use
 	procMountsPath = "/proc/mounts"
 	// Location of the mountinfo file
@@ -511,7 +513,11 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			}
 
 			if fstype == "ext4" || fstype == "ext3" {
-				args = []string{"-F", source}
+				args = []string{
+					"-F",  // Force flag
+					"-m0", // Zero blocks reserved for super-user
+					source,
+				}
 			}
 			glog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
 			_, err := mounter.Exec.Run("mkfs."+fstype, args...)
@@ -591,27 +597,14 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 
 // isShared returns true, if given path is on a mount point that has shared
 // mount propagation.
-func isShared(path string, filename string) (bool, error) {
-	infos, err := parseMountInfo(filename)
+func isShared(mount string, mountInfoPath string) (bool, error) {
+	info, err := findMountInfo(mount, mountInfoPath)
 	if err != nil {
 		return false, err
 	}
 
-	// process /proc/xxx/mountinfo in backward order and find the first mount
-	// point that is prefix of 'path' - that's the mount where path resides
-	var info *mountInfo
-	for i := len(infos) - 1; i >= 0; i-- {
-		if strings.HasPrefix(path, infos[i].mountPoint) {
-			info = &infos[i]
-			break
-		}
-	}
-	if info == nil {
-		return false, fmt.Errorf("cannot find mount point for %q", path)
-	}
-
 	// parse optional parameters
-	for _, opt := range info.optional {
+	for _, opt := range info.optionalFields {
 		if strings.HasPrefix(opt, "shared:") {
 			return true, nil
 		}
@@ -619,11 +612,28 @@ func isShared(path string, filename string) (bool, error) {
 	return false, nil
 }
 
+// This represents a single line in /proc/<pid>/mountinfo.
 type mountInfo struct {
-	// Path of the mount point
+	// Unique ID for the mount (maybe reused after umount).
+	id int
+	// The ID of the parent mount (or of self for the root of this mount namespace's mount tree).
+	parentID int
+	// The value of `st_dev` for files on this filesystem.
+	majorMinor string
+	// The pathname of the directory in the filesystem which forms the root of this mount.
+	root string
+	// Mount source, filesystem-specific information. e.g. device, tmpfs name.
+	source string
+	// Mount point, the pathname of the mount point.
 	mountPoint string
-	// list of "optional parameters", mount propagation is one of them
-	optional []string
+	// Optional fieds, zero or more fields of the form "tag[:value]".
+	optionalFields []string
+	// The filesystem type in the form "type[.subtype]".
+	fsType string
+	// Per-mount options.
+	mountOptions []string
+	// Per-superblock options.
+	superOptions []string
 }
 
 // parseMountInfo parses /proc/xxx/mountinfo.
@@ -642,20 +652,62 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 		}
 		// See `man proc` for authoritative description of format of the file.
 		fields := strings.Fields(line)
-		if len(fields) < 7 {
-			return nil, fmt.Errorf("wrong number of fields in (expected %d, got %d): %s", 8, len(fields), line)
+		if len(fields) < expectedAtLeastNumFieldsPerMountInfo {
+			return nil, fmt.Errorf("wrong number of fields in (expected at least %d, got %d): %s", expectedAtLeastNumFieldsPerMountInfo, len(fields), line)
+		}
+		id, err := strconv.Atoi(fields[0])
+		if err != nil {
+			return nil, err
+		}
+		parentID, err := strconv.Atoi(fields[1])
+		if err != nil {
+			return nil, err
 		}
 		info := mountInfo{
-			mountPoint: fields[4],
-			optional:   []string{},
+			id:           id,
+			parentID:     parentID,
+			majorMinor:   fields[2],
+			root:         fields[3],
+			mountPoint:   fields[4],
+			mountOptions: strings.Split(fields[5], ","),
 		}
 		// All fields until "-" are "optional fields".
-		for i := 6; i < len(fields) && fields[i] != "-"; i++ {
-			info.optional = append(info.optional, fields[i])
+		i := 6
+		for ; i < len(fields) && fields[i] != "-"; i++ {
+			info.optionalFields = append(info.optionalFields, fields[i])
 		}
+		// Parse the rest 3 fields.
+		i += 1
+		if len(fields)-i < 3 {
+			return nil, fmt.Errorf("expect 3 fields in %s, got %d", line, len(fields)-i)
+		}
+		info.fsType = fields[i]
+		info.source = fields[i+1]
+		info.superOptions = strings.Split(fields[i+2], ",")
 		infos = append(infos, info)
 	}
 	return infos, nil
+}
+
+func findMountInfo(path, mountInfoPath string) (mountInfo, error) {
+	infos, err := parseMountInfo(mountInfoPath)
+	if err != nil {
+		return mountInfo{}, err
+	}
+
+	// process /proc/xxx/mountinfo in backward order and find the first mount
+	// point that is prefix of 'path' - that's the mount where path resides
+	var info *mountInfo
+	for i := len(infos) - 1; i >= 0; i-- {
+		if pathWithinBase(path, infos[i].mountPoint) {
+			info = &infos[i]
+			break
+		}
+	}
+	if info == nil {
+		return mountInfo{}, fmt.Errorf("cannot find mount point for %q", path)
+	}
+	return *info, nil
 }
 
 // doMakeRShared is common implementation of MakeRShared on Linux. It checks if
@@ -684,6 +736,27 @@ func doMakeRShared(path string, mountInfoFilename string) error {
 	}
 
 	return nil
+}
+
+// getSELinuxSupport is common implementation of GetSELinuxSupport on Linux.
+func getSELinuxSupport(path string, mountInfoFilename string) (bool, error) {
+	info, err := findMountInfo(path, mountInfoFilename)
+	if err != nil {
+		return false, err
+	}
+
+	// "seclabel" can be both in mount options and super options.
+	for _, opt := range info.superOptions {
+		if opt == "seclabel" {
+			return true, nil
+		}
+	}
+	for _, opt := range info.mountOptions {
+		if opt == "seclabel" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
@@ -931,7 +1004,11 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return getMountRefsByDev(mounter, realpath)
+	return searchMountPoints(realpath, procMountInfoPath)
+}
+
+func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return getSELinuxSupport(pathname, procMountInfoPath)
 }
 
 func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
@@ -1175,4 +1252,52 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	parentFD = -1
 
 	return finalFD, nil
+}
+
+// searchMountPoints finds all mount references to the source, returns a list of
+// mountpoints.
+// This function assumes source cannot be device.
+// Some filesystems may share a source name, e.g. tmpfs. And for bind mounting,
+// it's possible to mount a non-root path of a filesystem, so we need to use
+// root path and major:minor to represent mount source uniquely.
+// This implementation is shared between Linux and NsEnterMounter
+func searchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
+	mis, err := parseMountInfo(mountInfoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	mountID := 0
+	rootPath := ""
+	majorMinor := ""
+
+	// Finding the underlying root path and major:minor if possible.
+	// We need search in backward order because it's possible for later mounts
+	// to overlap earlier mounts.
+	for i := len(mis) - 1; i >= 0; i-- {
+		if hostSource == mis[i].mountPoint || pathWithinBase(hostSource, mis[i].mountPoint) {
+			// If it's a mount point or path under a mount point.
+			mountID = mis[i].id
+			rootPath = filepath.Join(mis[i].root, strings.TrimPrefix(hostSource, mis[i].mountPoint))
+			majorMinor = mis[i].majorMinor
+			break
+		}
+	}
+
+	if rootPath == "" || majorMinor == "" {
+		return nil, fmt.Errorf("failed to get root path and major:minor for %s", hostSource)
+	}
+
+	var refs []string
+	for i := range mis {
+		if mis[i].id == mountID {
+			// Ignore mount entry for mount source itself.
+			continue
+		}
+		if mis[i].root == rootPath && mis[i].majorMinor == majorMinor {
+			refs = append(refs, mis[i].mountPoint)
+		}
+	}
+
+	return refs, nil
 }

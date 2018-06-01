@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers_test
+package printers
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestPrinterSupportsExpectedTemplateFormats(t *testing.T) {
@@ -99,18 +99,18 @@ func TestPrinterSupportsExpectedTemplateFormats(t *testing.T) {
 				templateArg = nil
 			}
 
-			printFlags := printers.GoTemplatePrintFlags{
+			printFlags := GoTemplatePrintFlags{
 				TemplateArgument: templateArg,
 			}
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
-				if !printers.IsNoCompatiblePrinterError(err) {
+				if !genericclioptions.IsNoCompatiblePrinterError(err) {
 					t.Fatalf("expected no printer matches for output format %q", tc.outputFormat)
 				}
 				return
 			}
-			if printers.IsNoCompatiblePrinterError(err) {
+			if genericclioptions.IsNoCompatiblePrinterError(err) {
 				t.Fatalf("expected to match template printer for output format %q", tc.outputFormat)
 			}
 
@@ -171,14 +171,14 @@ func TestTemplatePrinterDefaultsAllowMissingKeysToTrue(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := printers.GoTemplatePrintFlags{
+			printFlags := GoTemplatePrintFlags{
 				TemplateArgument: &tc.templateArg,
 				AllowMissingKeys: tc.allowMissingKeys,
 			}
 
 			outputFormat := "template"
 			p, err := printFlags.ToPrinter(outputFormat)
-			if printers.IsNoCompatiblePrinterError(err) {
+			if genericclioptions.IsNoCompatiblePrinterError(err) {
 				t.Fatalf("expected to match template printer for output format %q", outputFormat)
 			}
 			if err != nil {

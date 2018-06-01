@@ -34,19 +34,46 @@ func TestNewConfigMapPayload(t *testing.T) {
 		cm   *apiv1.ConfigMap
 		err  string
 	}{
-		{"nil v1/ConfigMap", nil, "must be non-nil"},
-		{"empty v1/ConfigMap", &apiv1.ConfigMap{}, "must have a UID"},
-		{"populated v1/ConfigMap",
-			&apiv1.ConfigMap{
+		{
+			desc: "nil",
+			cm:   nil,
+			err:  "ConfigMap must be non-nil",
+		},
+		{
+			desc: "missing uid",
+			cm: &apiv1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "name",
+					ResourceVersion: "rv",
+				},
+			},
+			err: "ConfigMap must have a non-empty UID",
+		},
+		{
+			desc: "missing resourceVersion",
+			cm: &apiv1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 					UID:  "uid",
+				},
+			},
+			err: "ConfigMap must have a non-empty ResourceVersion",
+		},
+		{
+			desc: "populated v1/ConfigMap",
+			cm: &apiv1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "name",
+					UID:             "uid",
+					ResourceVersion: "rv",
 				},
 				Data: map[string]string{
 					"key1": "value1",
 					"key2": "value2",
 				},
-			}, ""},
+			},
+			err: "",
+		},
 	}
 
 	for _, c := range cases {
@@ -66,13 +93,25 @@ func TestNewConfigMapPayload(t *testing.T) {
 
 func TestConfigMapPayloadUID(t *testing.T) {
 	const expect = "uid"
-	payload, err := NewConfigMapPayload(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: expect}})
+	payload, err := NewConfigMapPayload(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: expect, ResourceVersion: "rv"}})
 	if err != nil {
 		t.Fatalf("error constructing payload: %v", err)
 	}
 	uid := payload.UID()
 	if expect != uid {
 		t.Errorf("expect %q, but got %q", expect, uid)
+	}
+}
+
+func TestConfigMapPayloadResourceVersion(t *testing.T) {
+	const expect = "rv"
+	payload, err := NewConfigMapPayload(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: "uid", ResourceVersion: expect}})
+	if err != nil {
+		t.Fatalf("error constructing payload: %v", err)
+	}
+	resourceVersion := payload.ResourceVersion()
+	if expect != resourceVersion {
+		t.Errorf("expect %q, but got %q", expect, resourceVersion)
 	}
 }
 
@@ -96,7 +135,7 @@ func TestConfigMapPayloadFiles(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			payload, err := NewConfigMapPayload(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: "uid"}, Data: c.data})
+			payload, err := NewConfigMapPayload(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: "uid", ResourceVersion: "rv"}, Data: c.data})
 			if err != nil {
 				t.Fatalf("error constructing payload: %v", err)
 			}

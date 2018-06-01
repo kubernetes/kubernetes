@@ -75,32 +75,46 @@ func (s *fsStore) Initialize() error {
 	return utilfiles.EnsureDir(s.fs, filepath.Join(s.dir, checkpointsDir))
 }
 
-func (s *fsStore) Exists(c checkpoint.RemoteConfigSource) (bool, error) {
+func (s *fsStore) Exists(source checkpoint.RemoteConfigSource) (bool, error) {
+	const errfmt = "failed to determine whether checkpoint exists for source %s, UID: %s, ResourceVersion: %s exists, error: %v"
+	if len(source.UID()) == 0 {
+		return false, fmt.Errorf(errfmt, source.APIPath(), source.UID(), source.ResourceVersion(), "empty UID is ambiguous")
+	}
+	if len(source.ResourceVersion()) == 0 {
+		return false, fmt.Errorf(errfmt, source.APIPath(), source.UID(), source.ResourceVersion(), "empty ResourceVersion is ambiguous")
+	}
+
 	// we check whether the directory was created for the resource
-	uid := c.UID()
-	ok, err := utilfiles.DirExists(s.fs, s.checkpointPath(uid))
+	ok, err := utilfiles.DirExists(s.fs, s.checkpointPath(source.UID(), source.ResourceVersion()))
 	if err != nil {
-		return false, fmt.Errorf("failed to determine whether checkpoint %q exists, error: %v", uid, err)
+		return false, fmt.Errorf(errfmt, source.APIPath(), source.UID(), source.ResourceVersion(), err)
 	}
 	return ok, nil
 }
 
-func (s *fsStore) Save(c checkpoint.Payload) error {
+func (s *fsStore) Save(payload checkpoint.Payload) error {
+	// Note: Payload interface guarantees UID() and ResourceVersion() to be non-empty
+	path := s.checkpointPath(payload.UID(), payload.ResourceVersion())
+	// ensure the parent dir (checkpoints/uid) exists, since ReplaceDir requires the parent of the replacee
+	// to exist, and we checkpoint as checkpoints/uid/resourceVersion/files-from-configmap
+	if err := utilfiles.EnsureDir(s.fs, filepath.Dir(path)); err != nil {
+		return err
+	}
 	// save the checkpoint's files in the appropriate checkpoint dir
-	return utilfiles.ReplaceDir(s.fs, s.checkpointPath(c.UID()), c.Files())
+	return utilfiles.ReplaceDir(s.fs, path, payload.Files())
 }
 
 func (s *fsStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.KubeletConfiguration, error) {
-	sourceFmt := fmt.Sprintf("%s:%s", source.APIPath(), source.UID())
+	sourceFmt := fmt.Sprintf("%s, UID: %s, ResourceVersion: %s", source.APIPath(), source.UID(), source.ResourceVersion())
 	// check if a checkpoint exists for the source
 	if ok, err := s.Exists(source); err != nil {
-		return nil, fmt.Errorf("failed to determine if a checkpoint exists for source %s", sourceFmt)
+		return nil, err
 	} else if !ok {
 		return nil, fmt.Errorf("no checkpoint for source %s", sourceFmt)
 	}
 	// load the kubelet config file
-	utillog.Infof("loading kubelet configuration checkpoint for source %s", sourceFmt)
-	loader, err := configfiles.NewFsLoader(s.fs, filepath.Join(s.checkpointPath(source.UID()), source.KubeletFilename()))
+	utillog.Infof("loading Kubelet configuration checkpoint for source %s", sourceFmt)
+	loader, err := configfiles.NewFsLoader(s.fs, filepath.Join(s.checkpointPath(source.UID(), source.ResourceVersion()), source.KubeletFilename()))
 	if err != nil {
 		return nil, err
 	}
@@ -140,8 +154,8 @@ func (s *fsStore) Reset() (bool, error) {
 	return reset(s)
 }
 
-func (s *fsStore) checkpointPath(uid string) string {
-	return filepath.Join(s.dir, checkpointsDir, uid)
+func (s *fsStore) checkpointPath(uid, resourceVersion string) string {
+	return filepath.Join(s.dir, checkpointsDir, uid, resourceVersion)
 }
 
 func (s *fsStore) metaPath(name string) string {
@@ -162,6 +176,14 @@ func writeRemoteConfigSource(fs utilfs.Filesystem, path string, source checkpoin
 	// if nil, reset the file
 	if source == nil {
 		return utilfiles.ReplaceFile(fs, path, []byte{})
+	}
+	// check that UID and ResourceVersion are non-empty,
+	// error to save reference if the checkpoint can't be fully resolved
+	if source.UID() == "" {
+		return fmt.Errorf("failed to write RemoteConfigSource, empty UID is ambiguous")
+	}
+	if source.ResourceVersion() == "" {
+		return fmt.Errorf("failed to write RemoteConfigSource, empty ResourceVersion is ambiguous")
 	}
 	// encode the source and save it to the file
 	data, err := source.Encode()

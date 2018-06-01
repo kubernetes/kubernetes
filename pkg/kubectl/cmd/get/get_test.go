@@ -172,7 +172,7 @@ func testComponentStatusData() *api.ComponentStatusList {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
 	t.Skip("This test is completely broken.  The first thing it does is add the object to the scheme!")
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
 	tf.OpenAPISchemaFunc = openapitesting.CreateOpenAPISchemaFunc(openapiSchemaPath)
@@ -190,7 +190,6 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 			Body: objBody(codec, obj),
 		},
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -225,7 +224,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetSchemaObject(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	t.Logf("%v", string(runtime.EncodeOrDie(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})))
@@ -234,7 +233,6 @@ func TestGetSchemaObject(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -249,7 +247,7 @@ func TestGetSchemaObject(t *testing.T) {
 func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -260,7 +258,6 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -306,7 +303,7 @@ func testOpenAPISchemaData() (openapi.Resources, error) {
 func TestGetObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -314,7 +311,6 @@ func TestGetObjects(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -323,6 +319,58 @@ func TestGetObjects(t *testing.T) {
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
 foo       0/0                 0          <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestGetObjectsShowKind(t *testing.T) {
+	pods, _, _ := testData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("show-kind", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME      READY     STATUS    RESTARTS   AGE
+pod/foo   0/0                 0          <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestGetObjectsShowLabels(t *testing.T) {
+	pods, _, _ := testData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("show-labels", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME      READY     STATUS    RESTARTS   AGE         LABELS
+foo       0/0                 0          <unknown>   <none>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -344,7 +392,7 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -362,7 +410,6 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -397,7 +444,7 @@ func TestGetSortedObjects(t *testing.T) {
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -405,7 +452,6 @@ func TestGetSortedObjects(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -429,7 +475,7 @@ c         0/0                 0          <unknown>
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -437,7 +483,6 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -456,7 +501,7 @@ foo       0/0                 0          <unknown>
 func TestGetListObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -464,34 +509,6 @@ func TestGetListObjects(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
-	tf.Namespace = "test"
-
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
-	cmd.Run(cmd, []string{"pods"})
-
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
-`
-	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetAllListObjects(t *testing.T) {
-	pods, _, _ := testData()
-
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
-	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -510,7 +527,7 @@ bar       0/0                 0          <unknown>
 func TestGetListComponentStatus(t *testing.T) {
 	statuses := testComponentStatusData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -518,7 +535,6 @@ func TestGetListComponentStatus(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, statuses)},
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -551,7 +567,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 		Code:    0,
 	}
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -567,7 +583,6 @@ func TestGetMixedGenericObjects(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -601,7 +616,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 func TestGetMultipleTypeObjects(t *testing.T) {
 	pods, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -619,7 +634,6 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -640,7 +654,7 @@ service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	pods, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -658,7 +672,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -740,7 +753,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -761,7 +774,6 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -784,7 +796,7 @@ service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -805,7 +817,6 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -833,7 +844,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -851,7 +862,6 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -942,7 +952,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 func TestWatchLabelSelector(t *testing.T) {
 	pods, events := watchTestData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -970,7 +980,6 @@ func TestWatchLabelSelector(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -994,7 +1003,7 @@ foo       0/0                 0         <unknown>
 func TestWatchFieldSelector(t *testing.T) {
 	pods, events := watchTestData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -1022,7 +1031,6 @@ func TestWatchFieldSelector(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -1046,7 +1054,7 @@ foo       0/0                 0         <unknown>
 func TestWatchResource(t *testing.T) {
 	pods, events := watchTestData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -1068,7 +1076,6 @@ func TestWatchResource(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -1090,7 +1097,7 @@ foo       0/0                 0         <unknown>
 func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	pods, events := watchTestData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -1112,7 +1119,6 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -1135,7 +1141,7 @@ foo       0/0                 0         <unknown>
 func TestWatchOnlyResource(t *testing.T) {
 	pods, events := watchTestData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -1157,7 +1163,6 @@ func TestWatchOnlyResource(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -1178,7 +1183,7 @@ foo       0/0                 0         <unknown>
 func TestWatchOnlyList(t *testing.T) {
 	pods, events := watchTestData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -1203,7 +1208,6 @@ func TestWatchOnlyList(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)

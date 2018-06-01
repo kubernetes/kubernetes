@@ -1039,6 +1039,21 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				}
 			}
 		}
+		if projPath := fldPath.Child("serviceAccountToken"); source.ServiceAccountToken != nil {
+			numSources++
+			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+				allErrs = append(allErrs, field.Forbidden(projPath, "TokenRequestProjection feature is not enabled"))
+			}
+			if source.ServiceAccountToken.ExpirationSeconds < 10*60 {
+				allErrs = append(allErrs, field.Invalid(projPath.Child("expirationSeconds"), source.ServiceAccountToken.ExpirationSeconds, "may not specify a duration less than 10 minutes"))
+			}
+			if source.ServiceAccountToken.ExpirationSeconds > 1<<32 {
+				allErrs = append(allErrs, field.Invalid(projPath.Child("expirationSeconds"), source.ServiceAccountToken.ExpirationSeconds, "may not specify a duration larger than 2^32 seconds"))
+			}
+			if source.ServiceAccountToken.Path == "" {
+				allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+			}
+		}
 		if numSources > 1 {
 			allErrs = append(allErrs, field.Forbidden(srcPath, "may not specify more than 1 volume type"))
 		}
@@ -2749,7 +2764,7 @@ func validateTaintEffect(effect *core.TaintEffect, allowEmpty bool, fldPath *fie
 			// TODO: Uncomment this block when implement TaintEffectNoScheduleNoAdmit.
 			// string(core.TaintEffectNoScheduleNoAdmit),
 		}
-		allErrors = append(allErrors, field.NotSupported(fldPath, effect, validValues))
+		allErrors = append(allErrors, field.NotSupported(fldPath, *effect, validValues))
 	}
 	return allErrors
 }
@@ -4150,11 +4165,10 @@ func validateNodeConfigSourceSpec(source *core.NodeConfigSource, fldPath *field.
 // validation specific to Node.Spec.ConfigSource.ConfigMap
 func validateConfigMapNodeConfigSourceSpec(source *core.ConfigMapNodeConfigSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// TODO(#61643): Prevent ref.UID from being set here when we switch from requiring UID to respecting all ConfigMap updates
-	if string(source.UID) == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), "uid must be set in spec"))
+	// uid and resourceVersion must not be set in spec
+	if string(source.UID) != "" {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("uid"), "uid must not be set in spec"))
 	}
-	// resourceVersion must not be set in spec
 	if source.ResourceVersion != "" {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("resourceVersion"), "resourceVersion must not be set in spec"))
 	}
@@ -4196,12 +4210,13 @@ func validateNodeConfigSourceStatus(source *core.NodeConfigSource, fldPath *fiel
 // validation specific to Node.Status.Config.(Active|Assigned|LastKnownGood).ConfigMap
 func validateConfigMapNodeConfigSourceStatus(source *core.ConfigMapNodeConfigSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
+	// uid and resourceVersion must be set in status
 	if string(source.UID) == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), "uid must be set in status"))
 	}
-	// TODO(#63221): require ResourceVersion in status when we start respecting ConfigMap mutations (the Kubelet isn't tracking it internally until
-	// that PR, which makes it difficult to report for now).
+	if source.ResourceVersion == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceVersion"), "resourceVersion must be set in status"))
+	}
 	return append(allErrs, validateConfigMapNodeConfigSource(source, fldPath)...)
 }
 

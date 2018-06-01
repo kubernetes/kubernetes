@@ -61,7 +61,18 @@ const (
 	FlagPersistent = 0x1
 	// FlagHashed specify IPVS service hash flag
 	FlagHashed = 0x2
+	// IPVSProxyMode is match set up cluster with ipvs proxy model
+	IPVSProxyMode = "ipvs"
 )
+
+// Sets of IPVS required kernel modules.
+var ipvsModules = []string{
+	"ip_vs",
+	"ip_vs_rr",
+	"ip_vs_wrr",
+	"ip_vs_sh",
+	"nf_conntrack_ipv4",
+}
 
 // Equal check the equality of virtual server.
 // We don't use struct == since it doesn't work because of slice.

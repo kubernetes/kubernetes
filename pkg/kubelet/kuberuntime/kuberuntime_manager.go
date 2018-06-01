@@ -120,7 +120,7 @@ type kubeGenericRuntimeManager struct {
 
 type KubeGenericRuntime interface {
 	kubecontainer.Runtime
-	kubecontainer.IndirectStreamingRuntime
+	kubecontainer.StreamingRuntime
 	kubecontainer.ContainerCommandRunner
 }
 

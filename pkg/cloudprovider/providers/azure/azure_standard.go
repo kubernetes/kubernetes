@@ -173,7 +173,7 @@ func getProtocolsFromKubernetesProtocol(protocol v1.Protocol) (*network.Transpor
 		securityProto = network.SecurityRuleProtocolUDP
 		return &transportProto, &securityProto, nil, nil
 	default:
-		return &transportProto, &securityProto, &probeProto, fmt.Errorf("Only TCP and UDP are supported for Azure LoadBalancers")
+		return &transportProto, &securityProto, &probeProto, fmt.Errorf("only TCP and UDP are supported for Azure LoadBalancers")
 	}
 
 }
@@ -285,7 +285,7 @@ outer:
 		return smallest, nil
 	}
 
-	return -1, fmt.Errorf("SecurityGroup priorities are exhausted")
+	return -1, fmt.Errorf("securityGroup priorities are exhausted")
 }
 
 func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error) {
@@ -372,10 +372,10 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	}
 	if err != nil {
 		if as.CloudProviderBackoff {
-			glog.V(2).Infof("InstanceID(%s) backing off", name)
+			glog.V(2).Infof("GetInstanceIDByNodeName(%s) backing off", name)
 			machine, err = as.GetVirtualMachineWithRetry(types.NodeName(name))
 			if err != nil {
-				glog.V(2).Infof("InstanceID(%s) abort backoff", name)
+				glog.V(2).Infof("GetInstanceIDByNodeName(%s) abort backoff", name)
 				return "", err
 			}
 		} else {
@@ -400,7 +400,7 @@ func (as *availabilitySet) GetNodeNameByProviderID(providerID string) (types.Nod
 func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error) {
 	machine, err := as.getVirtualMachine(types.NodeName(name))
 	if err != nil {
-		glog.Errorf("error: as.GetInstanceTypeByNodeName(%s), as.getVirtualMachine(%s) err=%v", name, name, err)
+		glog.Errorf("as.GetInstanceTypeByNodeName(%s) failed: as.getVirtualMachine(%s) err=%v", name, name, err)
 		return "", err
 	}
 
@@ -437,7 +437,7 @@ func (as *availabilitySet) GetIPByNodeName(name string) (string, string, error) 
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
-		glog.Errorf("error: as.GetIPByNodeName(%s), getPrimaryIPConfig(%v), err=%v", name, nic, err)
+		glog.Errorf("as.GetIPByNodeName(%s) failed: getPrimaryIPConfig(%v), err=%v", name, nic, err)
 		return "", "", err
 	}
 

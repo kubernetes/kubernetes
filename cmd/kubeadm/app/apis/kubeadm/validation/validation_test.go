@@ -104,34 +104,6 @@ func TestValidateTokenGroups(t *testing.T) {
 	}
 }
 
-func TestValidateAuthorizationModes(t *testing.T) {
-	var tests = []struct {
-		s        []string
-		f        *field.Path
-		expected bool
-	}{
-		{[]string{""}, nil, false},
-		{[]string{"rBAC"}, nil, false},                               // mode not supported
-		{[]string{"rBAC", "Webhook"}, nil, false},                    // mode not supported
-		{[]string{"RBAC", "Webhook"}, nil, false},                    // mode Node required
-		{[]string{"Node", "RBAC", "Webhook", "Webhook"}, nil, false}, // no duplicates allowed
-		{[]string{"not valid"}, nil, false},                          // invalid mode
-		{[]string{"Node", "RBAC"}, nil, true},                        // supported
-		{[]string{"RBAC", "Node"}, nil, true},                        // supported
-		{[]string{"Node", "RBAC", "Webhook", "ABAC"}, nil, true},     // supported
-	}
-	for _, rt := range tests {
-		actual := ValidateAuthorizationModes(rt.s, rt.f)
-		if (len(actual) == 0) != rt.expected {
-			t.Errorf(
-				"failed ValidateAuthorizationModes:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(len(actual) == 0),
-			)
-		}
-	}
-}
-
 func TestValidateNodeName(t *testing.T) {
 	var tests = []struct {
 		s        string
@@ -147,7 +119,7 @@ func TestValidateNodeName(t *testing.T) {
 		actual := ValidateNodeName(rt.s, rt.f)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed ValidateNodeName:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateNodeRegistration: kubeadm.NodeRegistrationOptions{Name:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
 			)
@@ -431,13 +403,12 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
 				},
-				CertificatesDir: "/some/cert/dir",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/cert/dir",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.MasterConfiguration{
@@ -445,13 +416,12 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "2001:db8::1/98",
 					DNSDomain:     "cluster.local",
 				},
-				CertificatesDir: "/some/cert/dir",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/cert/dir",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.MasterConfiguration{
@@ -459,7 +429,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
@@ -473,15 +442,14 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
 					PodSubnet:     "10.0.1.15",
 				},
-				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/other/cert/dir",
+				Token:            "abcdef.0123456789abcdef",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"valid master configuration with IPv4 service subnet",
 			&kubeadm.MasterConfiguration{
@@ -489,6 +457,11 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
+				Etcd: kubeadm.Etcd{
+					Local: &kubeadm.LocalEtcd{
+						DataDir: "/some/path",
+					},
+				},
 				KubeProxy: kubeadm.KubeProxy{
 					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 						BindAddress:        "192.168.59.103",
@@ -515,15 +488,14 @@ func TestValidateMasterConfiguration(t *testing.T) {
 						},
 					},
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
 					PodSubnet:     "10.0.1.15/16",
 				},
-				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/other/cert/dir",
+				Token:            "abcdef.0123456789abcdef",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 		{"valid master configuration using IPv6 service subnet",
 			&kubeadm.MasterConfiguration{
@@ -531,6 +503,11 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
 				},
+				Etcd: kubeadm.Etcd{
+					Local: &kubeadm.LocalEtcd{
+						DataDir: "/some/path",
+					},
+				},
 				KubeProxy: kubeadm.KubeProxy{
 					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 						BindAddress:        "192.168.59.103",
@@ -557,14 +534,13 @@ func TestValidateMasterConfiguration(t *testing.T) {
 						},
 					},
 				},
-				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "2001:db8::1/98",
 					DNSDomain:     "cluster.local",
 				},
-				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/other/cert/dir",
+				Token:            "abcdef.0123456789abcdef",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 	}
 	for _, rt := range tests {

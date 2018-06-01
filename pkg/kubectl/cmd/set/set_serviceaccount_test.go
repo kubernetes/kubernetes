@@ -25,8 +25,6 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/printers"
-
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -70,7 +68,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 	for i, input := range inputs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.Client = &fake.RESTClient{
@@ -83,14 +81,13 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			tf.Namespace = "test"
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdServiceAccount(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			cmd.Flags().Set("local", "true")
 			testapi.Default = testapi.Groups[input.apiGroup]
 			saConfig := SetServiceAccountOptions{
-				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 				fileNameOptions: resource.FilenameOptions{
 					Filenames: []string{input.yaml}},
 				local:     true,
@@ -107,7 +104,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 func TestSetServiceAccountMultiLocal(t *testing.T) {
 	testapi.Default = testapi.Groups[""]
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
@@ -118,7 +115,6 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
@@ -128,7 +124,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 	opts := SetServiceAccountOptions{
-		PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		fileNameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		local:     true,
@@ -328,15 +324,14 @@ func TestSetServiceAccountRemote(t *testing.T) {
 		t.Run(input.apiPrefix, func(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
 				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
+					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", "test", input.args[1])
 					switch p, m := req.URL.Path, req.Method; {
 					case p == resourcePath && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
@@ -365,7 +360,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 			cmd := NewCmdServiceAccount(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			saConfig := SetServiceAccountOptions{
-				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
 				local:     false,
 				IOStreams: streams,
@@ -389,7 +384,7 @@ func TestServiceAccountValidation(t *testing.T) {
 	}
 	for _, input := range inputs {
 		t.Run(input.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.Client = &fake.RESTClient{
@@ -402,12 +397,11 @@ func TestServiceAccountValidation(t *testing.T) {
 
 			outputFormat := ""
 
-			tf.Namespace = "test"
 			streams := genericclioptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdServiceAccount(tf, streams)
 
 			saConfig := &SetServiceAccountOptions{
-				PrintFlags: printers.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 				IOStreams:  streams,
 			}
 			err := saConfig.Complete(tf, cmd, input.args)

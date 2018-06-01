@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -38,7 +39,8 @@ const (
 	// ManifestsSubDirName defines directory name to store manifests
 	ManifestsSubDirName = "manifests"
 	// TempDirForKubeadm defines temporary directory for kubeadm
-	TempDirForKubeadm = "/etc/kubernetes/tmp"
+	// should be joined with KubernetesDir.
+	TempDirForKubeadm = "tmp"
 
 	// CACertAndKeyBaseName defines certificate authority base name
 	CACertAndKeyBaseName = "ca"
@@ -161,15 +163,12 @@ const (
 	// system:nodes group subject is removed if present.
 	NodesClusterRoleBinding = "system:node"
 
-	// KubeletBaseConfigMapRoleName defines the base kubelet configuration ConfigMap.
-	KubeletBaseConfigMapRoleName = "kubeadm:kubelet-base-configmap"
-
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
-	// MarkMasterTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
-	MarkMasterTimeout = 2 * time.Minute
+	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
+	PatchNodeTimeout = 2 * time.Minute
 	// UpdateNodeTimeout specifies how long kubeadm should wait for updating node with the initial remote configuration of kubelet before timing out
 	UpdateNodeTimeout = 2 * time.Minute
 
@@ -191,17 +190,17 @@ const (
 	// MasterConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
 	MasterConfigurationConfigMapKey = "MasterConfiguration"
 
-	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
-	KubeletBaseConfigurationConfigMap = "kubelet-base-config-1.9"
+	// KubeletBaseConfigurationConfigMapPrefix specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
+	KubeletBaseConfigurationConfigMapPrefix = "kubelet-config-"
 
 	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration of kubelet should be stored
 	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
-	// KubeletBaseConfigurationDir specifies the directory on the node where stores the initial remote configuration of kubelet
-	KubeletBaseConfigurationDir = "/var/lib/kubelet/config/init"
+	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	KubeletBaseConfigMapRolePrefix = "kubeadm:kubelet-config-"
 
-	// KubeletBaseConfigurationFile specifies the file name on the node which stores initial remote configuration of kubelet
-	KubeletBaseConfigurationFile = "kubelet"
+	// KubeletConfigurationFile specifies the file name on the node which stores initial remote configuration of kubelet
+	KubeletConfigurationFile = "/var/lib/kubelet/config.yaml"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.2.17"
@@ -260,6 +259,14 @@ const (
 	// Copied from pkg/master/reconcilers to avoid pulling extra dependencies
 	// TODO: Import this constant from a consts only package, that does not pull any further dependencies.
 	LeaseEndpointReconcilerType = "lease"
+
+	// KubeletEnvFile is a file "kubeadm init" writes at runtime. Using that interface, kubeadm can customize certain
+	// kubelet flags conditionally based on the environment at runtime. Also, parameters given to the configuration file
+	// might be passed through this file. "kubeadm init" writes one variable, with the name ${KubeletEnvFileVariableName}.
+	KubeletEnvFile = "/var/lib/kubelet/kubeadm-flags.env"
+
+	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
+	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"
 )
 
 var (
@@ -274,11 +281,6 @@ var (
 		Key:    LabelNodeRoleMaster,
 		Effect: v1.TaintEffectNoSchedule,
 	}
-
-	// AuthorizationPolicyPath defines the supported location of authorization policy file
-	AuthorizationPolicyPath = filepath.Join(KubernetesDir, "abac_policy.json")
-	// AuthorizationWebhookConfigPath defines the supported location of webhook config file
-	AuthorizationWebhookConfigPath = filepath.Join(KubernetesDir, "webhook_authz.conf")
 
 	// DefaultTokenUsages specifies the default functions a token will get
 	DefaultTokenUsages = bootstrapapi.KnownTokenUsages
@@ -343,16 +345,34 @@ func AddSelfHostedPrefix(componentName string) string {
 
 // CreateTempDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp (not using /tmp as that would potentially be dangerous)
 func CreateTempDirForKubeadm(dirName string) (string, error) {
+	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
 	// creates target folder if not already exists
-	if err := os.MkdirAll(TempDirForKubeadm, 0700); err != nil {
-		return "", fmt.Errorf("failed to create directory %q: %v", TempDirForKubeadm, err)
+	if err := os.MkdirAll(tempDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
 	}
 
-	tempDir, err := ioutil.TempDir(TempDirForKubeadm, dirName)
+	tempDir, err := ioutil.TempDir(tempDir, dirName)
 	if err != nil {
 		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
 	}
 	return tempDir, nil
+}
+
+// CreateTimestampDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp formatted with the current date
+func CreateTimestampDirForKubeadm(dirName string) (string, error) {
+	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
+	// creates target folder if not already exists
+	if err := os.MkdirAll(tempDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
+	}
+
+	timestampDirName := fmt.Sprintf("%s-%s", dirName, time.Now().Format("2006-01-02-15-04-05"))
+	timestampDir := path.Join(tempDir, timestampDirName)
+	if err := os.Mkdir(timestampDir, 0700); err != nil {
+		return "", fmt.Errorf("could not create timestamp directory: %v", err)
+	}
+
+	return timestampDir, nil
 }
 
 // GetDNSIP returns a dnsIP, which is 10th IP in svcSubnet CIDR range

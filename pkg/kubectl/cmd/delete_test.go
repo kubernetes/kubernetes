@@ -23,19 +23,15 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -56,7 +52,7 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -81,7 +77,6 @@ func TestDeleteObjectByTuple(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
@@ -104,17 +99,17 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	}
 }
 
-func hasExpectedOrphanDependents(body io.ReadCloser, expectedOrphanDependents *bool) bool {
-	if body == nil || expectedOrphanDependents == nil {
-		return body == nil && expectedOrphanDependents == nil
+func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPropagation) bool {
+	if body == nil || policy == nil {
+		return body == nil && policy == nil
 	}
 	var parsedBody metav1.DeleteOptions
 	rawBody, _ := ioutil.ReadAll(body)
 	json.Unmarshal(rawBody, &parsedBody)
-	if parsedBody.OrphanDependents == nil {
+	if parsedBody.PropagationPolicy == nil {
 		return false
 	}
-	return *expectedOrphanDependents == *parsedBody.OrphanDependents
+	return *policy == *parsedBody.PropagationPolicy
 }
 
 // Tests that DeleteOptions.OrphanDependents is appropriately set while deleting objects.
@@ -122,18 +117,18 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	var expectedOrphanDependents *bool
+	var policy *metav1.DeletionPropagation
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m, b := req.URL.Path, req.Method, req.Body; {
 
-			case p == "/namespaces/test/secrets/mysecret" && m == "DELETE" && hasExpectedOrphanDependents(b, expectedOrphanDependents):
+			case p == "/namespaces/test/secrets/mysecret" && m == "DELETE" && hasExpectedPropagationPolicy(b, policy):
 
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
@@ -141,11 +136,10 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
-	// DeleteOptions.OrphanDependents should be false, when cascade is true (default).
-	falseVar := false
-	expectedOrphanDependents = &falseVar
+	// DeleteOptions.PropagationPolicy should be Foreground, when cascade is true (default).
+	foregroundPolicy := metav1.DeletePropagationForeground
+	policy = &foregroundPolicy
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
 	cmd.Flags().Set("namespace", "test")
@@ -156,8 +150,8 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	}
 
 	// Test that delete options should be set to orphan when cascade is false.
-	trueVar := true
-	expectedOrphanDependents = &trueVar
+	orphanPolicy := metav1.DeletePropagationOrphan
+	policy = &orphanPolicy
 	streams, _, buf, _ = genericclioptions.NewTestIOStreams()
 	cmd = NewCmdDelete(tf, streams)
 	cmd.Flags().Set("namespace", "test")
@@ -174,7 +168,7 @@ func TestDeleteNamedObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -199,7 +193,6 @@ func TestDeleteNamedObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
@@ -227,7 +220,7 @@ func TestDeleteObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -244,7 +237,6 @@ func TestDeleteObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
@@ -259,36 +251,12 @@ func TestDeleteObject(t *testing.T) {
 	}
 }
 
-type fakeReaper struct {
-	namespace, name string
-	timeout         time.Duration
-	deleteOptions   *metav1.DeleteOptions
-	err             error
-}
-
-func (r *fakeReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
-	r.namespace, r.name = namespace, name
-	r.timeout = timeout
-	r.deleteOptions = gracePeriod
-	return r.err
-}
-
-type fakeReaperFactory struct {
-	cmdutil.Factory
-	reaper kubectl.Reaper
-}
-
-func (f *fakeReaperFactory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
-	return f.reaper, nil
-}
-
 func TestDeleteObjectGraceZero(t *testing.T) {
 	initTestErrorHandler(t)
 	pods, _, _ := testData()
 
-	objectDeletionWaitInterval = time.Millisecond
 	count := 0
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -316,12 +284,9 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
-	reaper := &fakeReaper{}
-	fake := &fakeReaperFactory{Factory: tf, reaper: reaper}
 	streams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdDelete(fake, streams)
+	cmd := NewCmdDelete(tf, streams)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("grace-period", "0")
 	cmd.Run(cmd, []string{"pods/nginx"})
@@ -330,17 +295,14 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 	if buf.String() != "pod/nginx\n" {
 		t.Errorf("unexpected output: %s\n---\n%s", buf.String(), errBuf.String())
 	}
-	if reaper.deleteOptions == nil || reaper.deleteOptions.GracePeriodSeconds == nil || *reaper.deleteOptions.GracePeriodSeconds != 1 {
-		t.Errorf("unexpected reaper options: %#v", reaper)
-	}
-	if count != 4 {
+	if count != 0 {
 		t.Errorf("unexpected calls to GET: %d", count)
 	}
 }
 
 func TestDeleteObjectNotFound(t *testing.T) {
 	initTestErrorHandler(t)
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -355,7 +317,6 @@ func TestDeleteObjectNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	options := &DeleteOptions{
 		FilenameOptions: resource.FilenameOptions{
@@ -378,7 +339,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -393,7 +354,6 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -415,7 +375,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -436,7 +396,6 @@ func TestDeleteAllNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	// Make sure we can explicitly choose to fail on NotFound errors, even with --all
 	options := &DeleteOptions{
@@ -462,7 +421,7 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -487,7 +446,6 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -505,7 +463,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -524,7 +482,6 @@ func TestDeleteMultipleObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -543,7 +500,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -562,7 +519,6 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	options := &DeleteOptions{
@@ -591,7 +547,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -615,7 +571,6 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -632,7 +587,7 @@ func TestDeleteDirectory(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -649,7 +604,6 @@ func TestDeleteDirectory(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -667,7 +621,7 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	initTestErrorHandler(t)
 	pods, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -696,7 +650,6 @@ func TestDeleteMultipleSelector(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -736,10 +689,9 @@ func TestResourceErrors(t *testing.T) {
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()

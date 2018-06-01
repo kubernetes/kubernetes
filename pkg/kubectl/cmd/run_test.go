@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // This init should be removed after switching this command and its tests to user external types.
@@ -171,7 +170,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -191,14 +190,13 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				}),
 			}
 
-			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{}
 
 			cmd := NewCmdRun(tf, genericclioptions.NewTestIOStreamsDiscard())
 			cmd.Flags().Set("image", "nginx")
 			cmd.Flags().Set("generator", "run/v1")
 
-			printFlags := printers.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
+			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -208,7 +206,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(genericclioptions.NewTestIOStreamsDiscard()),
+				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
 
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
@@ -366,7 +364,7 @@ func TestGenerateService(t *testing.T) {
 				}),
 			}
 
-			printFlags := printers.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
+			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -377,7 +375,7 @@ func TestGenerateService(t *testing.T) {
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(genericclioptions.NewTestIOStreamsDiscard()),
+				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
 
 				IOStreams: ioStreams,
 
@@ -506,7 +504,7 @@ func TestRunValidations(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			_, _, codec := cmdtesting.NewExternalScheme()
@@ -514,7 +512,6 @@ func TestRunValidations(t *testing.T) {
 				NegotiatedSerializer: scheme.Codecs,
 				Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()

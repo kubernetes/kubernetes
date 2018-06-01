@@ -50,6 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	genericprinters "k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -255,11 +257,11 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 }
 
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.YAMLPrinter{}), yaml.Unmarshal)
+	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}), yaml.Unmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.JSONPrinter{}), json.Unmarshal)
+	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}), json.Unmarshal)
 }
 
 func TestFormatResourceName(t *testing.T) {
@@ -385,7 +387,7 @@ func TestNamePrinter(t *testing.T) {
 			"pod/bar\n"},
 	}
 
-	printFlags := printers.NewPrintFlags("").WithTypeSetter(legacyscheme.Scheme).WithDefaultOutput("name")
+	printFlags := genericclioptions.NewPrintFlags("").WithTypeSetter(legacyscheme.Scheme).WithDefaultOutput("name")
 	printer, err := printFlags.ToPrinter()
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -548,8 +550,9 @@ func TestPrinters(t *testing.T) {
 	}
 
 	genericPrinters := map[string]printers.ResourcePrinter{
-		"json":      printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.JSONPrinter{}),
-		"yaml":      printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.YAMLPrinter{}),
+		// TODO(juanvallejo): move "generic printer" tests to pkg/kubectl/genericclioptions/printers
+		"json":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}),
+		"yaml":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}),
 		"template":  templatePrinter,
 		"template2": templatePrinter2,
 		"jsonpath":  jsonpathPrinter,

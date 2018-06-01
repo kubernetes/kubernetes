@@ -200,8 +200,7 @@ DNAT       tcp  --  0.0.0.0/0            0.0.0.0/0            /* default/nginx-s
 Currently, local-up scripts, GCE scripts and kubeadm support switching IPVS proxy mode via exporting environment variables or specifying flags.  
 
 ### Prerequisite
-Ensure the following kernel modules required by IPVS-based kube-proxy have been compiled into the node kernel (use `lsmod` to check):
-
+Ensure IPVS required kernel modules
 ```shell
 ip_vs
 ip_vs_rr
@@ -209,6 +208,46 @@ ip_vs_wrr
 ip_vs_sh
 nf_conntrack_ipv4
 ```
+1. have been compiled into the node kernel. Use
+
+`grep -e ipvs -e nf_conntrack_ipv4 /lib/modules/$(uname -r)/modules.builtin`
+
+and get results like the followings if compiled into kernel.
+```
+kernel/net/ipv4/netfilter/nf_conntrack_ipv4.ko
+kernel/net/netfilter/ipvs/ip_vs.ko
+kernel/net/netfilter/ipvs/ip_vs_rr.ko
+kernel/net/netfilter/ipvs/ip_vs_wrr.ko
+kernel/net/netfilter/ipvs/ip_vs_lc.ko
+kernel/net/netfilter/ipvs/ip_vs_wlc.ko
+kernel/net/netfilter/ipvs/ip_vs_fo.ko
+kernel/net/netfilter/ipvs/ip_vs_ovf.ko
+kernel/net/netfilter/ipvs/ip_vs_lblc.ko
+kernel/net/netfilter/ipvs/ip_vs_lblcr.ko
+kernel/net/netfilter/ipvs/ip_vs_dh.ko
+kernel/net/netfilter/ipvs/ip_vs_sh.ko
+kernel/net/netfilter/ipvs/ip_vs_sed.ko
+kernel/net/netfilter/ipvs/ip_vs_nq.ko
+kernel/net/netfilter/ipvs/ip_vs_ftp.ko
+```
+
+OR
+
+2. have been loaded.
+```shell
+# load module <module_name>
+modprobe -- ip_vs
+modprobe -- ip_vs_rr
+modprobe -- ip_vs_wrr
+modprobe -- ip_vs_sh
+modprobe -- nf_conntrack_ipv4
+
+# to check loaded modules, use
+lsmod | grep -e ipvs -e nf_conntrack_ipv4
+# or
+cut -f1 -d " "  /proc/modules | grep -e ip_vs -e nf_conntrack_ipv4
+ ```
+
 Packages such as `ipset` should also be installed on the node before using IPVS mode.  
 
 Kube-proxy will fall back to IPTABLES mode if those requirements are not met.
@@ -219,7 +258,7 @@ Kube-proxy will run in iptables mode by default in a [local-up cluster](https://
 
 To use IPVS mode, users should export the env `KUBE_PROXY_MODE=ipvs` to specify the ipvs mode before [starting the cluster](https://github.com/kubernetes/community/blob/master/contributors/devel/running-locally.md#starting-the-cluster):
 ```shell
-#before running `hack/local-up-cluster.sh`
+# before running `hack/local-up-cluster.sh`
 export KUBE_PROXY_MODE=ipvs
 ```
 

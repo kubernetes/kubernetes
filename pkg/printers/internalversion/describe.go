@@ -34,7 +34,8 @@ import (
 
 	"github.com/fatih/camelcase"
 
-	versionedextension "k8s.io/api/extensions/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -63,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
@@ -166,10 +168,10 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]printers.Desc
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 		policy.Kind("PodDisruptionBudget"):             &PodDisruptionBudgetDescriber{c},
-		rbac.Kind("Role"):                              &RoleDescriber{c},
-		rbac.Kind("ClusterRole"):                       &ClusterRoleDescriber{c},
-		rbac.Kind("RoleBinding"):                       &RoleBindingDescriber{c},
-		rbac.Kind("ClusterRoleBinding"):                &ClusterRoleBindingDescriber{c},
+		rbac.Kind("Role"):                              &RoleDescriber{externalclient},
+		rbac.Kind("ClusterRole"):                       &ClusterRoleDescriber{externalclient},
+		rbac.Kind("RoleBinding"):                       &RoleBindingDescriber{externalclient},
+		rbac.Kind("ClusterRoleBinding"):                &ClusterRoleBindingDescriber{externalclient},
 		networking.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
 		scheduling.Kind("PriorityClass"):               &PriorityClassDescriber{c},
 	}
@@ -2443,7 +2445,7 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 
 // RoleDescriber generates information about a node.
 type RoleDescriber struct {
-	clientset.Interface
+	externalclient.Interface
 }
 
 func (d *RoleDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
@@ -2452,7 +2454,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings print
 		return "", err
 	}
 
-	breakdownRules := []rbac.PolicyRule{}
+	breakdownRules := []rbacv1.PolicyRule{}
 	for _, rule := range role.Rules {
 		breakdownRules = append(breakdownRules, validation.BreakdownRule(rule)...)
 	}
@@ -2461,7 +2463,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings print
 	if err != nil {
 		return "", err
 	}
-	sort.Stable(rbac.SortableRuleSlice(compactRules))
+	sort.Stable(rbacv1helpers.SortableRuleSlice(compactRules))
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
@@ -2482,7 +2484,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings print
 
 // ClusterRoleDescriber generates information about a node.
 type ClusterRoleDescriber struct {
-	clientset.Interface
+	externalclient.Interface
 }
 
 func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
@@ -2491,7 +2493,7 @@ func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSetting
 		return "", err
 	}
 
-	breakdownRules := []rbac.PolicyRule{}
+	breakdownRules := []rbacv1.PolicyRule{}
 	for _, rule := range role.Rules {
 		breakdownRules = append(breakdownRules, validation.BreakdownRule(rule)...)
 	}
@@ -2500,7 +2502,7 @@ func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	sort.Stable(rbac.SortableRuleSlice(compactRules))
+	sort.Stable(rbacv1helpers.SortableRuleSlice(compactRules))
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
@@ -2538,7 +2540,7 @@ func combineResourceGroup(resource, group []string) string {
 
 // RoleBindingDescriber generates information about a node.
 type RoleBindingDescriber struct {
-	clientset.Interface
+	externalclient.Interface
 }
 
 func (d *RoleBindingDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
@@ -2570,7 +2572,7 @@ func (d *RoleBindingDescriber) Describe(namespace, name string, describerSetting
 
 // ClusterRoleBindingDescriber generates information about a node.
 type ClusterRoleBindingDescriber struct {
-	clientset.Interface
+	externalclient.Interface
 }
 
 func (d *ClusterRoleBindingDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
@@ -3082,7 +3084,7 @@ type DeploymentDescriber struct {
 }
 
 func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	d, err := dd.external.ExtensionsV1beta1().Deployments(namespace).Get(name, metav1.GetOptions{})
+	d, err := dd.external.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3103,7 +3105,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	return describeDeployment(d, selector, internalDeployment, events, dd)
 }
 
-func describeDeployment(d *versionedextension.Deployment, selector labels.Selector, internalDeployment *extensions.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
+func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *extensions.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)
@@ -3127,10 +3129,10 @@ func describeDeployment(d *versionedextension.Deployment, selector labels.Select
 				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
-		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.external.ExtensionsV1beta1())
+		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.external.AppsV1())
 		if err == nil {
 			w.Write(LEVEL_0, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
-			var newRSs []*versionedextension.ReplicaSet
+			var newRSs []*appsv1.ReplicaSet
 			if newRS != nil {
 				newRSs = append(newRSs, newRS)
 			}
@@ -3144,7 +3146,7 @@ func describeDeployment(d *versionedextension.Deployment, selector labels.Select
 	})
 }
 
-func printReplicaSetsByLabels(matchingRSs []*versionedextension.ReplicaSet) string {
+func printReplicaSetsByLabels(matchingRSs []*appsv1.ReplicaSet) string {
 	// Format the matching ReplicaSets into strings.
 	rsStrings := make([]string, 0, len(matchingRSs))
 	for _, rs := range matchingRSs {

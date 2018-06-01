@@ -133,7 +133,7 @@ const (
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
 	return &GetOptions{
-		PrintFlags: NewGetPrintFlags(legacyscheme.Scheme),
+		PrintFlags: NewGetPrintFlags(),
 		CmdParent:  parent,
 
 		IOStreams:   streams,
@@ -189,7 +189,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 
 	var err error
-	o.Namespace, o.ExplicitNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.ExplicitNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -219,6 +219,9 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 
+	if resource.MultipleTypesRequested(args) {
+		o.PrintFlags.EnsureWithKind()
+	}
 	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
 		printFlags := o.PrintFlags.Copy()
@@ -229,9 +232,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 					printFlags.UseOpenAPIColumns(apiSchema, mapping)
 				}
 			}
-			if resource.MultipleTypesRequested(args) {
-				printFlags.EnsureWithKind(mapping.GroupVersionKind.GroupKind())
-			}
+			printFlags.SetKind(mapping.GroupVersionKind.GroupKind())
 		}
 		if withNamespace {
 			printFlags.EnsureWithNamespace()
@@ -343,7 +344,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
 		if o.ServerPrint {
-			table, err := o.decodeIntoTable(cmdutil.InternalVersionJSONEncoder(), infos[ix].Object)
+			table, err := o.decodeIntoTable(infos[ix].Object)
 			if err == nil {
 				infos[ix].Object = table
 			} else {
@@ -596,34 +597,28 @@ func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConv
 	return internalObject
 }
 
-func (o *GetOptions) decodeIntoTable(encoder runtime.Encoder, obj runtime.Object) (runtime.Object, error) {
+func (o *GetOptions) decodeIntoTable(obj runtime.Object) (runtime.Object, error) {
 	if obj.GetObjectKind().GroupVersionKind().Kind != "Table" {
 		return nil, fmt.Errorf("attempt to decode non-Table object into a v1beta1.Table")
 	}
 
-	b, err := runtime.Encode(encoder, obj)
-	if err != nil {
-		return nil, err
+	unstr, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("attempt to decode non-Unstructured object")
 	}
-
 	table := &metav1beta1.Table{}
-	err = json.Unmarshal(b, table)
-	if err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, table); err != nil {
 		return nil, err
 	}
 
 	for i := range table.Rows {
 		row := &table.Rows[i]
 		if row.Object.Raw == nil || row.Object.Object != nil {
-			//if row already has Object.Object
-			//we don't change it
 			continue
 		}
-
 		converted, err := runtime.Decode(unstructured.UnstructuredJSONScheme, row.Object.Raw)
 		if err != nil {
-			//if error happens, we just continue
-			continue
+			return nil, err
 		}
 		row.Object.Object = converted
 	}

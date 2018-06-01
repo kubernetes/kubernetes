@@ -266,8 +266,8 @@ var map_ConfigMapNodeConfigSource = map[string]string{
 	"":                 "ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.",
 	"namespace":        "Namespace is the metadata.namespace of the referenced ConfigMap. This field is required in all cases.",
 	"name":             "Name is the metadata.name of the referenced ConfigMap. This field is required in all cases.",
-	"uid":              "UID is the metadata.UID of the referenced ConfigMap. This field is currently reqired in Node.Spec.",
-	"resourceVersion":  "ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap. This field is forbidden in Node.Spec.",
+	"uid":              "UID is the metadata.UID of the referenced ConfigMap. This field is forbidden in Node.Spec, and required in Node.Status.",
+	"resourceVersion":  "ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap. This field is forbidden in Node.Spec, and required in Node.Status.",
 	"kubeletConfigKey": "KubeletConfigKey declares which key of the referenced ConfigMap corresponds to the KubeletConfiguration structure This field is required in all cases.",
 }
 
@@ -672,7 +672,7 @@ func (GCEPersistentDiskVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_GitRepoVolumeSource = map[string]string{
-	"":           "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.",
+	"":           "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.\n\nDEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
 	"repository": "Repository URL",
 	"revision":   "Commit hash for the specified revision.",
 	"directory":  "Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.",
@@ -1988,6 +1988,17 @@ func (ServiceAccountList) SwaggerDoc() map[string]string {
 	return map_ServiceAccountList
 }
 
+var map_ServiceAccountTokenProjection = map[string]string{
+	"":                  "ServiceAccountTokenProjection represents a projected service account token volume. This projection can be used to insert a service account token into the pods runtime filesystem for use against APIs (Kubernetes API Server or otherwise).",
+	"audience":          "Audience is the intended audience of the token. A recipient of a token must identify itself with an identifier specified in the audience of the token, and otherwise should reject the token. The audience defaults to the identifier of the apiserver.",
+	"expirationSeconds": "ExpirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes.",
+	"path":              "Path is the path relative to the mount point of the file to project the token into.",
+}
+
+func (ServiceAccountTokenProjection) SwaggerDoc() map[string]string {
+	return map_ServiceAccountTokenProjection
+}
+
 var map_ServiceList = map[string]string{
 	"":         "ServiceList holds a list of services.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -2172,10 +2183,11 @@ func (VolumeNodeAffinity) SwaggerDoc() map[string]string {
 }
 
 var map_VolumeProjection = map[string]string{
-	"":            "Projection that may be projected along with other supported volume types",
-	"secret":      "information about the secret data to project",
-	"downwardAPI": "information about the downwardAPI data to project",
-	"configMap":   "information about the configMap data to project",
+	"":                    "Projection that may be projected along with other supported volume types",
+	"secret":              "information about the secret data to project",
+	"downwardAPI":         "information about the downwardAPI data to project",
+	"configMap":           "information about the configMap data to project",
+	"serviceAccountToken": "information about the serviceAccountToken data to project",
 }
 
 func (VolumeProjection) SwaggerDoc() map[string]string {
@@ -2188,7 +2200,7 @@ var map_VolumeSource = map[string]string{
 	"emptyDir":              "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
 	"gcePersistentDisk":     "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
 	"awsElasticBlockStore":  "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
-	"gitRepo":               "GitRepo represents a git repository at a particular revision.",
+	"gitRepo":               "GitRepo represents a git repository at a particular revision. DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
 	"secret":                "Secret represents a secret that should populate this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
 	"nfs":                   "NFS represents an NFS mount on the host that shares a pod's lifetime More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
 	"iscsi":                 "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",

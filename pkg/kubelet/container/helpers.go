@@ -17,11 +17,9 @@ limitations under the License.
 package container
 
 import (
-	"bytes"
 	"fmt"
 	"hash/fnv"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 
@@ -32,7 +30,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
@@ -133,6 +130,11 @@ func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVa
 	return command
 }
 
+func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (expandedSubpath string) {
+	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
+	return expansion.Expand(mount.SubPath, mapping)
+}
+
 func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {
 	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
 
@@ -193,6 +195,13 @@ func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp
 	}
 }
 
+func (irecorder *innerEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	if ref, ok := irecorder.shouldRecordEvent(object); ok {
+		irecorder.recorder.AnnotatedEventf(ref, annotations, eventtype, reason, messageFmt, args...)
+	}
+
+}
+
 // Pod must not be nil.
 func IsHostNetworkPod(pod *v1.Pod) bool {
 	return pod.Spec.HostNetwork
@@ -251,22 +260,6 @@ func FormatPod(pod *Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format), while allowed in the container name format.
 	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.ID)
-}
-
-type containerCommandRunnerWrapper struct {
-	DirectStreamingRuntime
-}
-
-var _ ContainerCommandRunner = &containerCommandRunnerWrapper{}
-
-func (r *containerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
-	var buffer bytes.Buffer
-	output := ioutils.WriteCloserWrapper(&buffer)
-	err := r.ExecInContainer(id, cmd, nil, output, output, false, nil, timeout)
-	// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
-	// the command returned a nonzero exit code). Therefore, always return the output along with the
-	// error.
-	return buffer.Bytes(), err
 }
 
 // GetContainerSpec gets the container spec by containerName.

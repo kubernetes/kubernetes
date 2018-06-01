@@ -31,7 +31,7 @@ import (
 	"testing"
 	"time"
 
-	// "github.com/go-openapi/spec"
+	openapi "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,11 +45,13 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 )
 
 const (
@@ -77,6 +79,48 @@ func init() {
 	examplev1.AddToScheme(scheme)
 }
 
+func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
+	return kubeopenapi.OpenAPIDefinition{
+		Schema: openapi.Schema{
+			SchemaProps: openapi.SchemaProps{
+				Description: "Description",
+				Properties:  map[string]openapi.Schema{},
+			},
+			VendorExtensible: openapi.VendorExtensible{
+				Extensions: openapi.Extensions{
+					"x-kubernetes-group-version-kind": []map[string]string{
+						{
+							"group":   "",
+							"version": "v1",
+							"kind":    "Getter",
+						},
+						{
+							"group":   "batch",
+							"version": "v1",
+							"kind":    "Getter",
+						},
+						{
+							"group":   "extensions",
+							"version": "v1",
+							"kind":    "Getter",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeopenapi.OpenAPIDefinition {
+	return map[string]kubeopenapi.OpenAPIDefinition{
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":          {},
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":     {},
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":    {},
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":        buildTestOpenAPIDefinition(),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList": {},
+	}
+}
+
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
@@ -89,14 +133,8 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 		t.Fatal("unable to create fake client set")
 	}
 
-	// TODO restore this test, but right now, eliminate our cycle
-	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
-	// config.OpenAPIConfig.Info = &spec.Info{
-	// 	InfoProps: spec.InfoProps{
-	// 		Title:   "Kubernetes",
-	// 		Version: "unversioned",
-	// 	},
-	// }
+	config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
+	config.OpenAPIConfig.Info.Version = "unversioned"
 	config.SwaggerConfig = DefaultSwaggerConfig()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
 	config.Complete(sharedInformers)
@@ -385,6 +423,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 		{"/"},
 		{"/swagger-ui/"},
 		{"/debug/pprof/"},
+		{"/debug/flags/"},
 		{"/version"},
 	} {
 		resp := httptest.NewRecorder()

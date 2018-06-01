@@ -18,12 +18,12 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubectl/cmd/util/editor/crlf:go_default_library",
         "//pkg/kubectl/genericclioptions:go_default_library",
+        "//pkg/kubectl/genericclioptions/printers:go_default_library",
         "//pkg/kubectl/genericclioptions/resource:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
-        "//pkg/kubectl/util/crlf:go_default_library",
         "//pkg/kubectl/util/term:go_default_library",
-        "//pkg/printers:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -57,7 +57,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubectl/cmd/util/editor/crlf:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",

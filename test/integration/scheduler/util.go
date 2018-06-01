@@ -24,9 +24,11 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -42,6 +44,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
@@ -194,6 +198,7 @@ func initTestSchedulerWithOptions(
 	// set setPodInformer if provided.
 	if setPodInformer {
 		go podInformer.Informer().Run(context.schedulerConfig.StopEverything)
+		controller.WaitForCacheSync("scheduler", context.schedulerConfig.StopEverything, podInformer.Informer().HasSynced)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -216,6 +221,26 @@ func initTestSchedulerWithOptions(
 	}
 	context.scheduler.Run()
 	return context
+}
+
+// initDisruptionController initializes and runs a Disruption Controller to properly
+// update PodDisuptionBudget objects.
+func initDisruptionController(context *TestContext) *disruption.DisruptionController {
+	informers := informers.NewSharedInformerFactory(context.clientSet, 12*time.Hour)
+
+	dc := disruption.NewDisruptionController(
+		informers.Core().V1().Pods(),
+		informers.Policy().V1beta1().PodDisruptionBudgets(),
+		informers.Core().V1().ReplicationControllers(),
+		informers.Extensions().V1beta1().ReplicaSets(),
+		informers.Extensions().V1beta1().Deployments(),
+		informers.Apps().V1beta1().StatefulSets(),
+		context.clientSet)
+
+	informers.Start(context.schedulerConfig.StopEverything)
+	informers.WaitForCacheSync(context.schedulerConfig.StopEverything)
+	go dc.Run(context.schedulerConfig.StopEverything)
+	return dc
 }
 
 // initTest initializes a test environment and creates master and scheduler with default
@@ -512,6 +537,59 @@ func waitForPodUnschedulableWithTimeout(cs clientset.Interface, pod *v1.Pod, tim
 // an error if it does not become unschedulable within the timeout duration (30 seconds).
 func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 	return waitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
+}
+
+// waitCachedPDBsStable waits for PDBs in scheduler cache to have "CurrentHealthy" status equal to
+// the expected values.
+func waitCachedPDBsStable(context *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
+	return wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
+		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		if err != nil {
+			return false, err
+		}
+		if len(cachedPDBs) != len(pdbs) {
+			return false, nil
+		}
+		for i, pdb := range pdbs {
+			found := false
+			for _, cpdb := range cachedPDBs {
+				if pdb.Name == cpdb.Name && pdb.Namespace == cpdb.Namespace {
+					found = true
+					if cpdb.Status.CurrentHealthy != pdbPodNum[i] {
+						return false, nil
+					}
+				}
+			}
+			if !found {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+}
+
+// waitCachedPodsStable waits until scheduler cache has the given pods.
+func waitCachedPodsStable(context *TestContext, pods []*v1.Pod) error {
+	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
+		cachedPods, err := context.scheduler.Config().SchedulerCache.List(labels.Everything())
+		if err != nil {
+			return false, err
+		}
+		if len(pods) != len(cachedPods) {
+			return false, nil
+		}
+		for _, p := range pods {
+			actualPod, err1 := context.clientSet.CoreV1().Pods(p.Namespace).Get(p.Name, metav1.GetOptions{})
+			if err1 != nil {
+				return false, err1
+			}
+			cachedPod, err2 := context.scheduler.Config().SchedulerCache.GetPod(actualPod)
+			if err2 != nil || cachedPod == nil {
+				return false, err2
+			}
+		}
+		return true, nil
+	})
 }
 
 // deletePod deletes the given pod in the given namespace.

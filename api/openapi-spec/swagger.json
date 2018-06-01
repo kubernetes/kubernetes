@@ -20984,6 +20984,41 @@
     ]
    },
    "/apis/apiregistration.k8s.io/v1/apiservices/{name}/status": {
+    "get": {
+     "description": "read status of the specified APIService",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiregistration_v1"
+     ],
+     "operationId": "readApiregistrationV1APIServiceStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1"
+     }
+    },
     "put": {
      "description": "replace status of the specified APIService",
      "consumes": [
@@ -21029,6 +21064,53 @@
       }
      },
      "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1"
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified APIService",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiregistration_v1"
+     ],
+     "operationId": "patchApiregistrationV1APIServiceStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
       "group": "apiregistration.k8s.io",
       "kind": "APIService",
@@ -21793,6 +21875,41 @@
     ]
    },
    "/apis/apiregistration.k8s.io/v1beta1/apiservices/{name}/status": {
+    "get": {
+     "description": "read status of the specified APIService",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiregistration_v1beta1"
+     ],
+     "operationId": "readApiregistrationV1beta1APIServiceStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1beta1"
+     }
+    },
     "put": {
      "description": "replace status of the specified APIService",
      "consumes": [
@@ -21838,6 +21955,53 @@
       }
      },
      "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1beta1"
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified APIService",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apiregistration_v1beta1"
+     ],
+     "operationId": "patchApiregistrationV1beta1APIServiceStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
       "group": "apiregistration.k8s.io",
       "kind": "APIService",
@@ -44754,6 +44918,41 @@
     ]
    },
    "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/{name}/status": {
+    "get": {
+     "description": "read status of the specified CertificateSigningRequest",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "certificates_v1beta1"
+     ],
+     "operationId": "readCertificatesV1beta1CertificateSigningRequestStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "certificates.k8s.io",
+      "kind": "CertificateSigningRequest",
+      "version": "v1beta1"
+     }
+    },
     "put": {
      "description": "replace status of the specified CertificateSigningRequest",
      "consumes": [
@@ -44799,6 +44998,53 @@
       }
      },
      "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "certificates.k8s.io",
+      "kind": "CertificateSigningRequest",
+      "version": "v1beta1"
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified CertificateSigningRequest",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "certificates_v1beta1"
+     ],
+     "operationId": "patchCertificatesV1beta1CertificateSigningRequestStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
       "group": "certificates.k8s.io",
       "kind": "CertificateSigningRequest",
@@ -76513,11 +76759,11 @@
       "type": "string"
      },
      "resourceVersion": {
-      "description": "ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap. This field is forbidden in Node.Spec.",
+      "description": "ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap. This field is forbidden in Node.Spec, and required in Node.Status.",
       "type": "string"
      },
      "uid": {
-      "description": "UID is the metadata.UID of the referenced ConfigMap. This field is currently reqired in Node.Spec.",
+      "description": "UID is the metadata.UID of the referenced ConfigMap. This field is forbidden in Node.Spec, and required in Node.Status.",
       "type": "string"
      }
     }
@@ -77429,7 +77675,7 @@
     }
    },
    "io.k8s.api.core.v1.GitRepoVolumeSource": {
-    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.",
+    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.\n\nDEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
     "required": [
      "repository"
     ],
@@ -80323,6 +80569,27 @@
      }
     ]
    },
+   "io.k8s.api.core.v1.ServiceAccountTokenProjection": {
+    "description": "ServiceAccountTokenProjection represents a projected service account token volume. This projection can be used to insert a service account token into the pods runtime filesystem for use against APIs (Kubernetes API Server or otherwise).",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "audience": {
+      "description": "Audience is the intended audience of the token. A recipient of a token must identify itself with an identifier specified in the audience of the token, and otherwise should reject the token. The audience defaults to the identifier of the apiserver.",
+      "type": "string"
+     },
+     "expirationSeconds": {
+      "description": "ExpirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "path": {
+      "description": "Path is the path relative to the mount point of the file to project the token into.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.ServiceList": {
     "description": "ServiceList holds a list of services.",
     "required": [
@@ -80649,7 +80916,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.GCEPersistentDiskVolumeSource"
      },
      "gitRepo": {
-      "description": "GitRepo represents a git repository at a particular revision.",
+      "description": "GitRepo represents a git repository at a particular revision. DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
       "$ref": "#/definitions/io.k8s.api.core.v1.GitRepoVolumeSource"
      },
      "glusterfs": {
@@ -80783,6 +81050,10 @@
      "secret": {
       "description": "information about the secret data to project",
       "$ref": "#/definitions/io.k8s.api.core.v1.SecretProjection"
+     },
+     "serviceAccountToken": {
+      "description": "information about the serviceAccountToken data to project",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ServiceAccountTokenProjection"
      }
     }
    },
@@ -84821,6 +85092,41 @@
      }
     }
    },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition": {
+    "description": "CustomResourceColumnDefinition specifies a column for server side printing.",
+    "required": [
+     "name",
+     "type",
+     "JSONPath"
+    ],
+    "properties": {
+     "JSONPath": {
+      "description": "JSONPath is a simple JSON path, i.e. with array notation.",
+      "type": "string"
+     },
+     "description": {
+      "description": "description is a human readable description of this column.",
+      "type": "string"
+     },
+     "format": {
+      "description": "format is an optional OpenAPI type definition for this column. The 'name' format is applied to the primary identifier column to assist in clients identifying column is the resource name. See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.",
+      "type": "string"
+     },
+     "name": {
+      "description": "name is a human readable name for the column.",
+      "type": "string"
+     },
+     "priority": {
+      "description": "priority is an integer defining the relative importance of this column compared to others. Lower numbers are considered higher priority. Columns that may be omitted in limited space scenarios should be given a higher priority.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "type": {
+      "description": "type is an OpenAPI type definition for this column. See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition": {
     "description": "CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format \u003c.spec.name\u003e.\u003c.spec.group\u003e.",
     "properties": {
@@ -84843,7 +85149,14 @@
       "description": "Status indicates the actual state of the CustomResourceDefinition",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionStatus"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinition",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionCondition": {
     "description": "CustomResourceDefinitionCondition contains details for the current condition of this pod.",
@@ -84898,7 +85211,14 @@
      "metadata": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiextensions.k8s.io",
+      "kind": "CustomResourceDefinitionList",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionNames": {
     "description": "CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition",
@@ -84943,11 +85263,17 @@
     "description": "CustomResourceDefinitionSpec describes how a user wants their resource to appear",
     "required": [
      "group",
-     "version",
      "names",
      "scope"
     ],
     "properties": {
+     "additionalPrinterColumns": {
+      "description": "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
+      }
+     },
      "group": {
       "description": "Group is the group this resource belongs in",
       "type": "string"
@@ -84969,8 +85295,15 @@
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation"
      },
      "version": {
-      "description": "Version is the version this resource belongs in",
+      "description": "Version is the version this resource belongs in Should be always first item in Versions field if provided. Optional, but at least one of Version or Versions must be set. Deprecated: Please use `Versions`.",
       "type": "string"
+     },
+     "versions": {
+      "description": "Versions is the list of all supported versions for this resource. If Version field is provided, this field is optional. Validation: All versions must use the same validation schema for now. i.e., top level Validation field is applied to all of these versions. Order: The version name will be used to compute the order. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionVersion"
+      }
      }
     }
    },
@@ -84978,7 +85311,8 @@
     "description": "CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition",
     "required": [
      "conditions",
-     "acceptedNames"
+     "acceptedNames",
+     "storedVersions"
     ],
     "properties": {
      "acceptedNames": {
@@ -84991,6 +85325,34 @@
       "items": {
        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionCondition"
       }
+     },
+     "storedVersions": {
+      "description": "StoredVersions are all versions of CustomResources that were ever persisted. Tracking these versions allows a migration path for stored versions in etcd. The field is mutable so the migration controller can first finish a migration to another version (i.e. that no old objects are left in the storage), and then remove the rest of the versions from this list. None of the versions in this list can be removed from the spec.Versions field.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionVersion": {
+    "required": [
+     "name",
+     "served",
+     "storage"
+    ],
+    "properties": {
+     "name": {
+      "description": "Name is the version name, e.g. “v1”, “v2beta1”, etc.",
+      "type": "string"
+     },
+     "served": {
+      "description": "Served is a flag enabling/disabling this version from being served via REST APIs",
+      "type": "boolean"
+     },
+     "storage": {
+      "description": "Storage flags the version as storage version. There must be exactly one flagged as storage version.",
+      "type": "boolean"
      }
     }
    },
@@ -85270,8 +85632,7 @@
     "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
     "required": [
      "name",
-     "versions",
-     "serverAddressByClientCIDRs"
+     "versions"
     ],
     "properties": {
      "apiVersion": {
@@ -85520,6 +85881,21 @@
      },
      {
       "group": "admissionregistration.k8s.io",
+      "kind": "DeleteOptions",
+      "version": "v1beta1"
+     },
+     {
+      "group": "apiextensions.k8s.io",
+      "kind": "DeleteOptions",
+      "version": "v1beta1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "DeleteOptions",
+      "version": "v1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
       "kind": "DeleteOptions",
       "version": "v1beta1"
      },
@@ -86062,6 +86438,21 @@
       "version": "v1beta1"
      },
      {
+      "group": "apiextensions.k8s.io",
+      "kind": "WatchEvent",
+      "version": "v1beta1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "WatchEvent",
+      "version": "v1"
+     },
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "WatchEvent",
+      "version": "v1beta1"
+     },
+     {
       "group": "apps",
       "kind": "WatchEvent",
       "version": "v1"
@@ -86280,7 +86671,14 @@
       "description": "Status contains derived information about an API server",
       "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceStatus"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceCondition": {
     "required": [
@@ -86333,7 +86731,14 @@
      "metadata": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIServiceList",
+      "version": "v1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec": {
     "description": "APIServiceSpec contains information for locating and communicating with a server. Only https is supported, though you are able to disable certificate verification.",
@@ -86370,7 +86775,7 @@
       "type": "string"
      },
      "versionPriority": {
-      "description": "VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero. The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10). Since it's inside of a group, the number can be small, probably in the 10s. In case of equal version priorities, the version string will be used to compute the order inside a group. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha, and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
+      "description": "VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero. The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10). Since it's inside of a group, the number can be small, probably in the 10s. In case of equal version priorities, the version string will be used to compute the order inside a group. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
       "type": "integer",
       "format": "int32"
      }
@@ -86425,7 +86830,14 @@
       "description": "Status contains derived information about an API server",
       "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceStatus"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIService",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceCondition": {
     "required": [
@@ -86478,7 +86890,14 @@
      "metadata": {
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "apiregistration.k8s.io",
+      "kind": "APIServiceList",
+      "version": "v1beta1"
+     }
+    ]
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceSpec": {
     "description": "APIServiceSpec contains information for locating and communicating with a server. Only https is supported, though you are able to disable certificate verification.",
@@ -86515,7 +86934,7 @@
       "type": "string"
      },
      "versionPriority": {
-      "description": "VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero. The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10). Since it's inside of a group, the number can be small, probably in the 10s. In case of equal version priorities, the version string will be used to compute the order inside a group. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha, and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
+      "description": "VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero. The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10). Since it's inside of a group, the number can be small, probably in the 10s. In case of equal version priorities, the version string will be used to compute the order inside a group. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA \u003e beta \u003e alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
       "type": "integer",
       "format": "int32"
      }

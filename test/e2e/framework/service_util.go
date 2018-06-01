@@ -47,7 +47,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	scaleclient "k8s.io/client-go/scale"
 )
 
 const (
@@ -1261,8 +1260,8 @@ func StartServeHostnameService(c clientset.Interface, internalClient internalcli
 	return podNames, serviceIP, nil
 }
 
-func StopServeHostnameService(clientset clientset.Interface, internalClientset internalclientset.Interface, scaleClient scaleclient.ScalesGetter, ns, name string) error {
-	if err := DeleteRCAndPods(clientset, internalClientset, scaleClient, ns, name); err != nil {
+func StopServeHostnameService(clientset clientset.Interface, ns, name string) error {
+	if err := DeleteRCAndWaitForGC(clientset, ns, name); err != nil {
 		return err
 	}
 	if err := clientset.CoreV1().Services(ns).Delete(name, nil); err != nil {

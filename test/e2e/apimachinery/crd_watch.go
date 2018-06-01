@@ -64,7 +64,7 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 			}
 
 			noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-			err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, f.DynamicClient)
+			noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
 				framework.Failf("failed to create CustomResourceDefinition: %v", err)
 			}
