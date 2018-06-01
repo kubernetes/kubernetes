@@ -401,6 +401,23 @@ func (plugin *rbdPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, 
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(rbdPluginName)
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
+	devicePath, err := filepath.EvalSymlinks(mapPath)
+	if err != nil {
+		return nil, fmt.Errorf("Can't get device from the map path:%s volume: %s err:%v", mapPath, volumeName, err)
+	}
+	if _, err = os.Stat(devicePath); os.IsNotExist(err) {
+		block := v1.PersistentVolumeBlock
+		rbdVolume := &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					RBD: &v1.RBDPersistentVolumeSource{},
+				},
+				VolumeMode: &block,
+			},
+		}
+		return volume.NewSpecFromPersistentVolume(rbdVolume, true), nil
+	}
+
 	globalMapPathUUID, err := blkutil.FindGlobalMapPathUUIDFromPod(pluginDir, mapPath, podUID)
 	if err != nil {
 		return nil, err
