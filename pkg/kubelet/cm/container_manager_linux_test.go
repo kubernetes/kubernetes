@@ -19,6 +19,7 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -105,6 +106,10 @@ func (mi *fakeMountInterface) CleanSubPaths(_, _ string) error {
 
 func (mi *fakeMountInterface) SafeMakeDir(_, _ string, _ os.FileMode) error {
 	return nil
+}
+
+func (mi *fakeMountInterface) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, errors.New("not implemented")
 }
 
 func fakeContainerMgrMountInt() mount.Interface {

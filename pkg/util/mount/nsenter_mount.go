@@ -323,3 +323,7 @@ func (mounter *NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath 
 func (mounter *NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return doSafeMakeDir(pathname, base, perm)
 }
+
+func (mounter *NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return getSELinuxSupport(pathname, procMountInfoPath)
+}
