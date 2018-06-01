@@ -214,7 +214,7 @@ func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1alpha2.NodeC
 		return nil, err
 	}
 
-	glog.Infoln("[preflight] running pre-flight checks")
+	fmt.Println("[preflight] running pre-flight checks")
 
 	// Then continue with the others...
 	glog.V(1).Infoln("[preflight] running various checks on all nodes")
