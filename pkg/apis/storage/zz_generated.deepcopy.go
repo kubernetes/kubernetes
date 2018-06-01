@@ -196,6 +196,15 @@ func (in *VolumeAttachmentSource) DeepCopyInto(out *VolumeAttachmentSource) {
 			**out = **in
 		}
 	}
+	if in.InlineVolumeSource != nil {
+		in, out := &in.InlineVolumeSource, &out.InlineVolumeSource
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(core.CSIPersistentVolumeSource)
+			(*in).DeepCopyInto(*out)
+		}
+	}
 	return
 }
 

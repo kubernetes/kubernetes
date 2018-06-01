@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -95,6 +96,15 @@ func (in *VolumeAttachmentSource) DeepCopyInto(out *VolumeAttachmentSource) {
 		} else {
 			*out = new(string)
 			**out = **in
+		}
+	}
+	if in.InlineVolumeSource != nil {
+		in, out := &in.InlineVolumeSource, &out.InlineVolumeSource
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.CSIPersistentVolumeSource)
+			(*in).DeepCopyInto(*out)
 		}
 	}
 	return
