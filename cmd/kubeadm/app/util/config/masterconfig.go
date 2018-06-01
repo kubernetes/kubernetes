@@ -66,7 +66,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Populate the .Token field with a random value if unset
 	// We do this at this layer, and not the API defaulting layer
-	// because of possible security concerns, and more practially
+	// because of possible security concerns, and more practically
 	// because we can't return errors in the API object defaulting
 	// process but here we can.
 	for i, bt := range cfg.BootstrapTokens {

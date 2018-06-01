@@ -27,6 +27,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
+// NewBootstrapTokenOptions creates a new BootstrapTokenOptions object with the default values
 func NewBootstrapTokenOptions() *BootstrapTokenOptions {
 	bto := &BootstrapTokenOptions{&kubeadmapiv1alpha2.BootstrapToken{}, ""}
 	kubeadmapiv1alpha2.SetDefaults_BootstrapToken(bto.BootstrapToken)
@@ -41,6 +42,7 @@ type BootstrapTokenOptions struct {
 	TokenStr string
 }
 
+// AddTokenFlag adds the --token flag to the given flagset
 func (bto *BootstrapTokenOptions) AddTokenFlag(fs *pflag.FlagSet) {
 	fs.StringVar(
 		&bto.TokenStr, "token", "",
@@ -48,13 +50,15 @@ func (bto *BootstrapTokenOptions) AddTokenFlag(fs *pflag.FlagSet) {
 	)
 }
 
+// AddTTLFlag adds the --token-ttl flag to the given flagset
 func (bto *BootstrapTokenOptions) AddTTLFlag(fs *pflag.FlagSet) {
 	fs.DurationVar(
-		&bto.TTL.Duration, "ttl", bto.TTL.Duration,
+		&bto.TTL.Duration, "token-ttl", bto.TTL.Duration,
 		"The duration before the token is automatically deleted (e.g. 1s, 2m, 3h). If set to '0', the token will never expire",
 	)
 }
 
+// AddUsagesFlag adds the --usages flag to the given flagset
 func (bto *BootstrapTokenOptions) AddUsagesFlag(fs *pflag.FlagSet) {
 	fs.StringSliceVar(
 		&bto.Usages, "usages", bto.Usages,
@@ -62,6 +66,7 @@ func (bto *BootstrapTokenOptions) AddUsagesFlag(fs *pflag.FlagSet) {
 	)
 }
 
+// AddGroupsFlag adds the --groups flag to the given flagset
 func (bto *BootstrapTokenOptions) AddGroupsFlag(fs *pflag.FlagSet) {
 	fs.StringSliceVar(
 		&bto.Groups, "groups", bto.Groups,
@@ -69,6 +74,7 @@ func (bto *BootstrapTokenOptions) AddGroupsFlag(fs *pflag.FlagSet) {
 	)
 }
 
+// AddDescriptionFlag adds the --description flag to the given flagset
 func (bto *BootstrapTokenOptions) AddDescriptionFlag(fs *pflag.FlagSet) {
 	fs.StringVar(
 		&bto.Description, "description", bto.Description,
@@ -76,6 +82,8 @@ func (bto *BootstrapTokenOptions) AddDescriptionFlag(fs *pflag.FlagSet) {
 	)
 }
 
+// ApplyTo applies the values set internally in the BootstrapTokenOptions object to a MasterConfiguration object at runtime
+// If --token was specified in the CLI (as a string), it's parsed and validated before it's added to the BootstrapToken object.
 func (bto *BootstrapTokenOptions) ApplyTo(cfg *kubeadmapiv1alpha2.MasterConfiguration) error {
 	if len(bto.TokenStr) > 0 {
 		var err error

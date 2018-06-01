@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package kubeadm holds the internal kubeadm API types
 // Note: This file should be kept in sync with the similar one for the external API
 // TODO: The BootstrapTokenString object should move out to either k8s.io/client-go or k8s.io/api in the future
 // (probably as part of Bootstrap Tokens going GA). It should not be staged under the kubeadm API as it is now.
@@ -28,7 +29,7 @@ import (
 )
 
 // BootstrapTokenString is a token of the format abcdef.abcdef0123456789 that is used
-// for both validation of the authenticy of the API server from a joining node's point
+// for both validation of the practically of the API server from a joining node's point
 // of view and as an authentication method for the node in the bootstrap phase of
 // "kubeadm join". This token is and should be short-lived
 type BootstrapTokenString struct {
