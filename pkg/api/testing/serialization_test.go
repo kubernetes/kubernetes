@@ -299,6 +299,9 @@ func TestObjectWatchFraming(t *testing.T) {
 	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs)
 	secret := &api.Secret{}
 	f.Fuzz(secret)
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
+	}
 	secret.Data["binary"] = []byte{0x00, 0x10, 0x30, 0x55, 0xff, 0x00}
 	secret.Data["utf8"] = []byte("a string with \u0345 characters")
 	secret.Data["long"] = bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x00}, 1000)
