@@ -18,6 +18,7 @@ package rest
 
 import (
 	"crypto/tls"
+	"errors"
 	"net/http"
 
 	"k8s.io/client-go/plugin/pkg/client/auth/exec"
@@ -83,6 +84,11 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		},
 		Dial: c.Dial,
 	}
+
+	if c.ExecProvider != nil && c.AuthProvider != nil {
+		return nil, errors.New("execProvider and authProvider cannot be used in combination")
+	}
+
 	if c.ExecProvider != nil {
 		provider, err := exec.GetAuthenticator(c.ExecProvider)
 		if err != nil {
