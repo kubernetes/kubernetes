@@ -55,7 +55,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 spec:
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should delete the field when there are other fields in the map", func() {
@@ -93,7 +93,7 @@ kind: Deployment
 spec:
   revisionHistoryLimit: 1
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -130,7 +130,7 @@ spec:
   paused: true
   progressDeadlineSeconds: 2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -170,7 +170,7 @@ spec:
   paused: true
   progressDeadlineSeconds: 2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should update the field", func() {
@@ -199,7 +199,7 @@ kind: Deployment
 spec:
   replicas: 3
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })
@@ -237,7 +237,7 @@ apiVersion: apps/v1beta1
 kind: Foo
 spec:
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should delete the field when there are other fields in the map", func() {
@@ -275,7 +275,7 @@ kind: Foo
 spec:
   revisionHistoryLimit: 1
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -312,7 +312,7 @@ spec:
   paused: true
   progressDeadlineSeconds: 2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -352,7 +352,7 @@ spec:
   paused: true
   progressDeadlineSeconds: 2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should update the field", func() {
@@ -381,7 +381,7 @@ kind: Foo
 spec:
   replicas: 3
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })
@@ -419,7 +419,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 spec:
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should delete the field when there are other fields in the map", func() {
@@ -457,7 +457,7 @@ kind: Deployment
 spec:
   biz: 1
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -494,7 +494,7 @@ spec:
   foo: true
   biz: 2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -534,7 +534,7 @@ spec:
   foo: true
   baz: 2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })

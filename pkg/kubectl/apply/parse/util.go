@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 )
@@ -126,56 +125,4 @@ func getFieldMeta(s proto.Schema, name string) (apply.FieldMetaImpl, error) {
 	}
 	m.Name = name
 	return m, nil
-}
-
-// getCommonGroupVersionKind verifies that the recorded, local and remote all share
-// the same GroupVersionKind and returns the value
-func getCommonGroupVersionKind(recorded, local, remote map[string]interface{}) (schema.GroupVersionKind, error) {
-	recordedGVK, err := getGroupVersionKind(recorded)
-	if err != nil {
-		return schema.GroupVersionKind{}, err
-	}
-	localGVK, err := getGroupVersionKind(local)
-	if err != nil {
-		return schema.GroupVersionKind{}, err
-	}
-	remoteGVK, err := getGroupVersionKind(remote)
-	if err != nil {
-		return schema.GroupVersionKind{}, err
-	}
-
-	if !reflect.DeepEqual(recordedGVK, localGVK) || !reflect.DeepEqual(localGVK, remoteGVK) {
-		return schema.GroupVersionKind{},
-			fmt.Errorf("group version kinds do not match (recorded: %v local: %v remote: %v)",
-				recordedGVK, localGVK, remoteGVK)
-	}
-	return recordedGVK, nil
-}
-
-// getGroupVersionKind returns the GroupVersionKind of the object
-func getGroupVersionKind(config map[string]interface{}) (schema.GroupVersionKind, error) {
-	gvk := schema.GroupVersionKind{}
-	if gv, found := config["apiVersion"]; found {
-		casted, ok := gv.(string)
-		if !ok {
-			return gvk, fmt.Errorf("Expected string for apiVersion, found %T", gv)
-		}
-		s := strings.Split(casted, "/")
-		if len(s) != 1 {
-			gvk.Group = s[0]
-		}
-		gvk.Version = s[len(s)-1]
-	} else {
-		return gvk, fmt.Errorf("Missing apiVersion in Kind %v", config)
-	}
-	if k, found := config["kind"]; found {
-		casted, ok := k.(string)
-		if !ok {
-			return gvk, fmt.Errorf("Expected string for kind, found %T", k)
-		}
-		gvk.Kind = casted
-	} else {
-		return gvk, fmt.Errorf("Missing kind in Kind %v", config)
-	}
-	return gvk, nil
 }

@@ -18,7 +18,6 @@ package parse
 
 import (
 	"k8s.io/kubernetes/pkg/kubectl/apply"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 // ItemVisitor provides an interface for Items to Accept and call
@@ -39,9 +38,7 @@ type ItemVisitor interface {
 
 // ElementBuildingVisitor creates an Elements from Items
 // An Element combines the values from the Item with the field metadata.
-type ElementBuildingVisitor struct {
-	resources openapi.Resources
-}
+type ElementBuildingVisitor struct{}
 
 // CreatePrimitiveElement creates a primitiveElement
 func (v ElementBuildingVisitor) CreatePrimitiveElement(item *primitiveItem) (apply.Element, error) {

@@ -26,10 +26,10 @@ import (
 	"github.com/ghodss/yaml"
 
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/kube-openapi/pkg/util/proto"
+	tst "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 	"k8s.io/kubernetes/pkg/kubectl/apply/parse"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
 const (
@@ -37,17 +37,26 @@ const (
 	noConflict  = false
 )
 
-var fakeResources = tst.NewFakeResources(filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json"))
+var models = buildModelsOrDie(filepath.Join("api", "openapi-spec", "swagger.json"))
+var deploymentAppsModel = models.LookupModel("io.k8s.api.apps.v1beta1.Deployment")
+var deploymentModel = models.LookupModel("io.k8s.api.extensions.v1beta1.Deployment")
 
-// run parses the openapi and runs the tests
-func run(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}) {
-	runWith(instance, recorded, local, remote, expected, fakeResources)
+func buildModelsOrDie(path string) proto.Models {
+	fake := tst.Fake{Path: path}
+	doc, err := fake.OpenAPISchema()
+	if err != nil {
+		panic(fmt.Errorf("Error while trying to read OpenAPISchema: %v", err))
+	}
+	m, err := proto.NewOpenAPIData(doc)
+	if err != nil {
+		panic(fmt.Errorf("Error while trying to parse openapi: %v", err))
+	}
+	return m
 }
 
-func runWith(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}, resources openapi.Resources) {
-	parseFactory := parse.Factory{Resources: resources}
-
-	parsed, err := parseFactory.CreateElement(recorded, local, remote)
+// run parses the openapi and runs the tests
+func run(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}, schema proto.Schema) {
+	parsed, err := parse.CreateElement(recorded, local, remote, schema)
 	Expect(err).Should(Not(HaveOccurred()))
 
 	merged, err := parsed.Merge(instance)
@@ -70,9 +79,8 @@ func create(config string) map[string]interface{} {
 	return result
 }
 
-func runConflictTest(instance apply.Strategy, recorded, local, remote map[string]interface{}, isConflict bool) {
-	parseFactory := parse.Factory{Resources: fakeResources}
-	parsed, err := parseFactory.CreateElement(recorded, local, remote)
+func runConflictTest(instance apply.Strategy, recorded, local, remote map[string]interface{}, schema proto.Schema, isConflict bool) {
+	parsed, err := parse.CreateElement(recorded, local, remote, schema)
 	Expect(err).Should(Not(HaveOccurred()))
 
 	merged, err := parsed.Merge(instance)

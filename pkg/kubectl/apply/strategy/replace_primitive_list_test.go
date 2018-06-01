@@ -70,7 +70,7 @@ spec:
       containers:
       - name: container
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should delete the field if missing in recorded and set to null in local.", func() {
@@ -117,7 +117,7 @@ spec:
       containers:
       - name: container
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -163,7 +163,7 @@ spec:
         - b
         - c
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should add the field when even when present in recorded", func() {
@@ -213,7 +213,7 @@ spec:
         - b
         - c
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should add the field when the parent field is missing as well", func() {
@@ -253,7 +253,7 @@ spec:
         - b
         - c
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -314,7 +314,7 @@ spec:
         - e
         - f
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should replace the field even if recorded matches", func() {
@@ -373,7 +373,7 @@ spec:
         - e
         - f
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 
 		It("should replace the field even if the only change is ordering", func() {
@@ -430,7 +430,7 @@ spec:
         - e
         - f
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })
@@ -521,7 +521,7 @@ spec:
         - f
         - g
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })
@@ -580,7 +580,7 @@ spec:
     - z
     - "y"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, nil)
 		})
 	})
 
@@ -636,7 +636,7 @@ spec:
     - q
     - w
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, nil)
 		})
 	})
 
@@ -717,7 +717,7 @@ spec:
     - "t"
     - u
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, nil)
 		})
 	})
 })

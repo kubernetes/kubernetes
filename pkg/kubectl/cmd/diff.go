@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -265,10 +266,10 @@ type Object interface {
 // InfoObject is an implementation of the Object interface. It gets all
 // the information from the Info object.
 type InfoObject struct {
-	Remote  runtime.Unstructured
-	Info    *resource.Info
-	Encoder runtime.Encoder
-	Parser  *parse.Factory
+	Remote    runtime.Unstructured
+	Info      *resource.Info
+	Encoder   runtime.Encoder
+	Resources openapi.Resources
 }
 
 var _ Object = &InfoObject{}
@@ -317,7 +318,8 @@ func (obj InfoObject) Merged() (map[string]interface{}, error) {
 		return local, nil // We probably don't have a live version, merged is local.
 	}
 
-	elmt, err := obj.Parser.CreateElement(last, local, live)
+	model := obj.Resources.LookupResource(obj.Info.Object.GetObjectKind().GroupVersionKind())
+	elmt, err := parse.CreateElement(last, local, live, model)
 	if err != nil {
 		return nil, err
 	}
@@ -437,11 +439,10 @@ func (d *Downloader) Download(info *resource.Info) (*unstructured.Unstructured, 
 // diff, and find each Info object for each files, and runs against the
 // differ.
 func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, to string) error {
-	openapi, err := f.OpenAPISchema()
+	resources, err := f.OpenAPISchema()
 	if err != nil {
 		return err
 	}
-	parser := &parse.Factory{Resources: openapi}
 
 	differ, err := NewDiffer(from, to)
 	if err != nil {
@@ -479,10 +480,10 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 
 		remote, _ := dl.Download(info)
 		obj := InfoObject{
-			Remote:  remote,
-			Info:    info,
-			Parser:  parser,
-			Encoder: cmdutil.InternalVersionJSONEncoder(),
+			Remote:    remote,
+			Info:      info,
+			Resources: resources,
+			Encoder:   cmdutil.InternalVersionJSONEncoder(),
 		}
 
 		return differ.Diff(obj, printer)

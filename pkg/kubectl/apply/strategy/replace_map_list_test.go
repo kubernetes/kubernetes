@@ -67,7 +67,7 @@ spec:
   - name: bar2
     value: 2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, nil)
 		})
 	})
 })
