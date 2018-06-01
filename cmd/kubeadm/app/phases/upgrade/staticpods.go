@@ -51,6 +51,8 @@ type StaticPodPathManager interface {
 	BackupManifestDir() string
 	// BackupEtcdDir should point to the backup directory used for backuping manifests during the transition
 	BackupEtcdDir() string
+	// CleanupDirs cleans up all temporary directories
+	CleanupDirs() error
 }
 
 // KubeStaticPodPathManager is a real implementation of StaticPodPathManager that is used when upgrading a static pod cluster
@@ -59,34 +61,39 @@ type KubeStaticPodPathManager struct {
 	tempManifestDir   string
 	backupManifestDir string
 	backupEtcdDir     string
+
+	keepManifestDir bool
+	keepEtcdDir     bool
 }
 
 // NewKubeStaticPodPathManager creates a new instance of KubeStaticPodPathManager
-func NewKubeStaticPodPathManager(realDir, tempDir, backupDir, backupEtcdDir string) StaticPodPathManager {
+func NewKubeStaticPodPathManager(realDir, tempDir, backupDir, backupEtcdDir string, keepManifestDir, keepEtcdDir bool) StaticPodPathManager {
 	return &KubeStaticPodPathManager{
 		realManifestDir:   realDir,
 		tempManifestDir:   tempDir,
 		backupManifestDir: backupDir,
 		backupEtcdDir:     backupEtcdDir,
+		keepManifestDir:   keepManifestDir,
+		keepEtcdDir:       keepEtcdDir,
 	}
 }
 
 // NewKubeStaticPodPathManagerUsingTempDirs creates a new instance of KubeStaticPodPathManager with temporary directories backing it
-func NewKubeStaticPodPathManagerUsingTempDirs(realManifestDir string) (StaticPodPathManager, error) {
+func NewKubeStaticPodPathManagerUsingTempDirs(realManifestDir string, saveManifestsDir, saveEtcdDir bool) (StaticPodPathManager, error) {
 	upgradedManifestsDir, err := constants.CreateTempDirForKubeadm("kubeadm-upgraded-manifests")
 	if err != nil {
 		return nil, err
 	}
-	backupManifestsDir, err := constants.CreateTempDirForKubeadm("kubeadm-backup-manifests")
+	backupManifestsDir, err := constants.CreateTimestampDirForKubeadm("kubeadm-backup-manifests")
 	if err != nil {
 		return nil, err
 	}
-	backupEtcdDir, err := constants.CreateTempDirForKubeadm("kubeadm-backup-etcd")
+	backupEtcdDir, err := constants.CreateTimestampDirForKubeadm("kubeadm-backup-etcd")
 	if err != nil {
 		return nil, err
 	}
 
-	return NewKubeStaticPodPathManager(realManifestDir, upgradedManifestsDir, backupManifestsDir, backupEtcdDir), nil
+	return NewKubeStaticPodPathManager(realManifestDir, upgradedManifestsDir, backupManifestsDir, backupEtcdDir, saveManifestsDir, saveEtcdDir), nil
 }
 
 // MoveFile should move a file from oldPath to newPath
@@ -127,6 +134,26 @@ func (spm *KubeStaticPodPathManager) BackupManifestDir() string {
 // BackupEtcdDir should point to the backup directory used for backuping manifests during the transition
 func (spm *KubeStaticPodPathManager) BackupEtcdDir() string {
 	return spm.backupEtcdDir
+}
+
+// CleanupDirs cleans up all temporary directories except those the user has requested to keep around
+func (spm *KubeStaticPodPathManager) CleanupDirs() error {
+	if err := os.RemoveAll(spm.TempManifestDir()); err != nil {
+		return err
+	}
+	if !spm.keepManifestDir {
+		if err := os.RemoveAll(spm.BackupManifestDir()); err != nil {
+			return err
+		}
+	}
+
+	if !spm.keepEtcdDir {
+		if err := os.RemoveAll(spm.BackupEtcdDir()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, beforePodHash string, recoverManifests map[string]string, isTLSUpgrade bool) error {
@@ -449,11 +476,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 	// Remove the temporary directories used on a best-effort (don't fail if the calls error out)
 	// The calls are set here by design; we should _not_ use "defer" above as that would remove the directories
 	// even in the "fail and rollback" case, where we want the directories preserved for the user.
-	os.RemoveAll(pathMgr.TempManifestDir())
-	os.RemoveAll(pathMgr.BackupManifestDir())
-	os.RemoveAll(pathMgr.BackupEtcdDir())
-
-	return nil
+	return pathMgr.CleanupDirs()
 }
 
 // rollbackOldManifests rolls back the backed-up manifests if something went wrong.

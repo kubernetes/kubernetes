@@ -319,7 +319,16 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	})
 	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", "v1alpha1.wardle.k8s.io", namespace)
 
+	var (
+		currentAPIService *apiregistrationv1beta1.APIService
+		currentPods       *v1.PodList
+	)
+
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+
+		currentAPIService, _ = aggrclient.ApiregistrationV1beta1().APIServices().Get("v1alpha1.wardle.k8s.io", metav1.GetOptions{})
+		currentPods, _ = client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+
 		request := restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders")
 		request.SetHeader("Accept", "application/json")
 		_, err := request.DoRaw()
@@ -338,6 +347,22 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 		}
 		return true, nil
 	})
+	if err != nil {
+		currentAPIServiceJSON, _ := json.Marshal(currentAPIService)
+		framework.Logf("current APIService: %s", string(currentAPIServiceJSON))
+
+		currentPodsJSON, _ := json.Marshal(currentPods)
+		framework.Logf("current pods: %s", string(currentPodsJSON))
+
+		if currentPods != nil {
+			for _, pod := range currentPods.Items {
+				for _, container := range pod.Spec.Containers {
+					logs, err := framework.GetPodLogs(client, namespace, pod.Name, container.Name)
+					framework.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
+				}
+			}
+		}
+	}
 	framework.ExpectNoError(err, "gave up waiting for apiservice wardle to come up successfully")
 
 	flunderName := generateFlunderName("rest-flunder")

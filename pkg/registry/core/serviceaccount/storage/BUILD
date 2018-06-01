@@ -32,6 +32,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage",
     deps = [
         "//pkg/apis/authentication:go_default_library",
+        "//pkg/apis/authentication/validation:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",

@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -71,6 +72,7 @@ type Config struct {
 	Addr string
 	// The optional base URL for constructing streaming URLs. If empty, the baseURL will be
 	// constructed from the serve address.
+	// Note that for port "0", the URL port will be set to actual port in use.
 	BaseURL *url.URL
 
 	// How long to leave idle connections open for.
@@ -233,10 +235,16 @@ func (s *server) Start(stayUp bool) error {
 		return errors.New("stayUp=false is not yet implemented")
 	}
 
+	listener, err := net.Listen("tcp", s.config.Addr)
+	if err != nil {
+		return err
+	}
+	// Use the actual address as baseURL host. This handles the "0" port case.
+	s.config.BaseURL.Host = listener.Addr().String()
 	if s.config.TLSConfig != nil {
-		return s.server.ListenAndServeTLS("", "") // Use certs from TLSConfig.
+		return s.server.ServeTLS(listener, "", "") // Use certs from TLSConfig.
 	} else {
-		return s.server.ListenAndServe()
+		return s.server.Serve(listener)
 	}
 }
 
