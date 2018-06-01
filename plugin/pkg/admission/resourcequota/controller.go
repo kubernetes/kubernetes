@@ -583,6 +583,11 @@ func (e *quotaEvaluator) completeWork(ns string) {
 	e.inProgress.Delete(ns)
 }
 
+// getWork returns a namespace, a list of work items in that
+// namespace, and a shutdown boolean.  If not shutdown then the return
+// must eventually be followed by a call on completeWork for the
+// returned namespace (regardless of whether the work item list is
+// empty).
 func (e *quotaEvaluator) getWork() (string, []*admissionWaiter, bool) {
 	uncastNS, shutdown := e.queue.Get()
 	if shutdown {
@@ -599,15 +604,8 @@ func (e *quotaEvaluator) getWork() (string, []*admissionWaiter, bool) {
 	work := e.work[ns]
 	delete(e.work, ns)
 	delete(e.dirtyWork, ns)
-
-	if len(work) != 0 {
-		e.inProgress.Insert(ns)
-		return ns, work, false
-	}
-
-	e.queue.Done(ns)
-	e.inProgress.Delete(ns)
-	return ns, []*admissionWaiter{}, false
+	e.inProgress.Insert(ns)
+	return ns, work, false
 }
 
 // prettyPrint formats a resource list for usage in errors
