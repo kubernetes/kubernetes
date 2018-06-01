@@ -247,6 +247,23 @@ func newFakeDockerChecker(warnings, errors []error) preflight.Checker {
 	return &fakeDockerChecker{warnings: warnings, errors: errors}
 }
 
+type fakeCRIChecker struct {
+	warnings []error
+	errors   []error
+}
+
+func (c *fakeCRIChecker) Check() (warnings, errors []error) {
+	return c.warnings, c.errors
+}
+
+func (c *fakeCRIChecker) Name() string {
+	return "FakeCRI"
+}
+
+func newFakeCRIChecker(warnings, errors []error) preflight.Checker {
+	return &fakeCRIChecker{warnings: warnings, errors: errors}
+}
+
 func TestResetWithDocker(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		RunScript: []fakeexec.FakeRunAction{
@@ -309,7 +326,7 @@ func TestResetWithCrictl(t *testing.T) {
 	}
 
 	// 1: socket path not provided, running with docker
-	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "", "crictl")
+	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), newFakeCRIChecker(nil, nil), "", "crictl")
 	if fcmd.RunCalls != 1 {
 		t.Errorf("expected 1 call to Run, got %d", fcmd.RunCalls)
 	}
@@ -318,7 +335,7 @@ func TestResetWithCrictl(t *testing.T) {
 	}
 
 	// 2: socket path provided, now running with crictl (1x CombinedOutput, 2x Run)
-	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "/test.sock", "crictl")
+	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), newFakeCRIChecker(nil, nil), "/test.sock", "crictl")
 	if fcmd.RunCalls != 3 {
 		t.Errorf("expected 3 calls to Run, got %d", fcmd.RunCalls)
 	}
@@ -330,7 +347,7 @@ func TestResetWithCrictl(t *testing.T) {
 	}
 
 	// 3: socket path provided, crictl fails, reset with docker
-	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "/test.sock", "crictl")
+	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), newFakeCRIChecker(nil, nil), "/test.sock", "crictl")
 	if fcmd.RunCalls != 4 {
 		t.Errorf("expected 4 calls to Run, got %d", fcmd.RunCalls)
 	}
@@ -339,7 +356,7 @@ func TestResetWithCrictl(t *testing.T) {
 	}
 
 	// 4: running with no socket and docker fails (1x Run)
-	resetWithCrictl(&fexec, newFakeDockerChecker(nil, []error{errors.New("test error")}), "", "crictl")
+	resetWithCrictl(&fexec, newFakeDockerChecker(nil, []error{errors.New("test error")}), newFakeCRIChecker(nil, nil), "", "crictl")
 	if fcmd.RunCalls != 4 {
 		t.Errorf("expected 4 calls to Run, got %d", fcmd.RunCalls)
 	}
@@ -370,7 +387,7 @@ func TestReset(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 
-	reset(&fexec, newFakeDockerChecker(nil, nil), "/test.sock")
+	reset(&fexec, newFakeDockerChecker(nil, nil), newFakeCRIChecker(nil, nil), "/test.sock")
 	if fcmd.RunCalls != 2 {
 		t.Errorf("expected 2 call to Run, got %d", fcmd.RunCalls)
 	}
@@ -379,7 +396,7 @@ func TestReset(t *testing.T) {
 	}
 
 	fexec.LookPathFunc = func(cmd string) (string, error) { return "", errors.New("no crictl") }
-	reset(&fexec, newFakeDockerChecker(nil, nil), "/test.sock")
+	reset(&fexec, newFakeDockerChecker(nil, nil), newFakeCRIChecker(nil, nil), "/test.sock")
 	if fcmd.RunCalls != 3 {
 		t.Errorf("expected 3 calls to Run, got %d", fcmd.RunCalls)
 	}
