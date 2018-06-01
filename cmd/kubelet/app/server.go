@@ -91,10 +91,12 @@ import (
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/util/nsenter"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/utils/exec"
 )
 
 const (
@@ -361,11 +363,12 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode")
-		mounter, err = mount.NewNsenterMounter()
+		ne, err := nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
 		if err != nil {
 			return nil, err
 		}
-		writer = &kubeio.NsenterWriter{}
+		mounter = mount.NewNsenterMounter(s.RootDirectory, ne)
+		writer = kubeio.NewNsenterWriter(ne)
 	}
 
 	var dockerClientConfig *dockershim.ClientConfig

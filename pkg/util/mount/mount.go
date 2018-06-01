@@ -84,16 +84,18 @@ type Interface interface {
 	// MakeDir creates a new directory.
 	// Will operate in the host mount namespace if kubelet is running in a container
 	MakeDir(pathname string) error
-	// SafeMakeDir makes sure that the created directory does not escape given
-	// base directory mis-using symlinks. The directory is created in the same
-	// mount namespace as where kubelet is running. Note that the function makes
-	// sure that it creates the directory somewhere under the base, nothing
-	// else. E.g. if the directory already exists, it may exists outside of the
-	// base due to symlinks.
-	SafeMakeDir(pathname string, base string, perm os.FileMode) error
-	// ExistsPath checks whether the path exists.
-	// Will operate in the host mount namespace if kubelet is running in a container
-	ExistsPath(pathname string) bool
+	// SafeMakeDir creates subdir within given base. It makes sure that the
+	// created directory does not escape given base directory mis-using
+	// symlinks. Note that the function makes sure that it creates the directory
+	// somewhere under the base, nothing else. E.g. if the directory already
+	// exists, it may exist outside of the base due to symlinks.
+	// This method should be used if the directory to create is inside volume
+	// that's under user control. User must not be able to use symlinks to
+	// escape the volume to create directories somewhere else.
+	SafeMakeDir(subdir string, base string, perm os.FileMode) error
+	// Will operate in the host mount namespace if kubelet is running in a container.
+	// Error is returned on any other error than "file not found".
+	ExistsPath(pathname string) (bool, error)
 	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
 	// pod volume directory.
 	CleanSubPaths(podDir string, volumeName string) error
@@ -117,6 +119,8 @@ type Interface interface {
 	// GetSELinuxSupport returns true if given path is on a mount that supports
 	// SELinux.
 	GetSELinuxSupport(pathname string) (bool, error)
+	// GetMode returns permissions of the path.
+	GetMode(pathname string) (os.FileMode, error)
 }
 
 type Subpath struct {
