@@ -288,11 +288,13 @@ func (gb *GraphBuilder) IsSynced() bool {
 	defer gb.monitorLock.Unlock()
 
 	if len(gb.monitors) == 0 {
+		glog.V(4).Info("garbage controller monitor not synced: no monitors")
 		return false
 	}
 
-	for _, monitor := range gb.monitors {
+	for resource, monitor := range gb.monitors {
 		if !monitor.controller.HasSynced() {
+			glog.V(4).Infof("garbage controller monitor not yet synced: %+v", resource)
 			return false
 		}
 	}
