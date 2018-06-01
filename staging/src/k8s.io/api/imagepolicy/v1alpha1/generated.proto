@@ -65,7 +65,7 @@ message ImageReviewSpec {
   optional string namespace = 3;
 }
 
-// ImageReviewStatus is the result of the token authentication request.
+// ImageReviewStatus is the result of the review for the pod creation request.
 message ImageReviewStatus {
   // Allowed indicates that all images were allowed to be run.
   optional bool allowed = 1;
@@ -75,5 +75,12 @@ message ImageReviewStatus {
   // may truncate excessively long errors when displaying to the user.
   // +optional
   optional string reason = 2;
+
+  // AuditAnnotations will be added to the attributes object of the
+  // admission controller request using 'AddAnnotation'.  The keys should
+  // be prefix-less (i.e., the admission controller will add an
+  // appropriate prefix).
+  // +optional
+  map<string, string> auditAnnotations = 3;
 }
 

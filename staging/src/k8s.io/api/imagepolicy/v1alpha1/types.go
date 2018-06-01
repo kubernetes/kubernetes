@@ -62,7 +62,7 @@ type ImageReviewContainerSpec struct {
 	// In future, we may add command line overrides, exec health check command lines, and so on.
 }
 
-// ImageReviewStatus is the result of the token authentication request.
+// ImageReviewStatus is the result of the review for the pod creation request.
 type ImageReviewStatus struct {
 	// Allowed indicates that all images were allowed to be run.
 	Allowed bool `json:"allowed" protobuf:"varint,1,opt,name=allowed"`
@@ -71,4 +71,10 @@ type ImageReviewStatus struct {
 	// may truncate excessively long errors when displaying to the user.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
+	// AuditAnnotations will be added to the attributes object of the
+	// admission controller request using 'AddAnnotation'.  The keys should
+	// be prefix-less (i.e., the admission controller will add an
+	// appropriate prefix).
+	// +optional
+	AuditAnnotations map[string]string `json:"auditAnnotations,omitempty" protobuf:"bytes,3,rep,name=auditAnnotations"`
 }
