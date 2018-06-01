@@ -48,7 +48,9 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/util/flushwriter"
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
@@ -407,6 +409,10 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		handlePprofEndpoint(req, resp)
 	})).Doc("pprof endpoint")
 	s.restfulCont.Add(ws)
+
+	// Setup flags handlers.
+	// so far, only logging related endpoints are considered valid to add for these debug flags.
+	s.restfulCont.Handle("/debug/flags/v", routes.StringFlagPutHandler(logs.GlogSetter))
 
 	// The /runningpods endpoint is used for testing only.
 	ws = new(restful.WebService)
