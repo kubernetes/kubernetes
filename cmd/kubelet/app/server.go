@@ -1173,30 +1173,13 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
 
+	// Standalone dockershim will always start the local streaming server.
 	ds, err := dockershim.NewDockerService(dockerClientConfig, r.PodSandboxImage, streamingConfig, &pluginSettings,
-		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID)
+		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID, true /*startLocalStreamingServer*/)
 	if err != nil {
 		return err
 	}
 	glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 	server := dockerremote.NewDockerServer(f.RemoteRuntimeEndpoint, ds)
-	if err := server.Start(stopCh); err != nil {
-		return err
-	}
-
-	streamingServer := &http.Server{
-		Addr:    net.JoinHostPort(c.Address, strconv.Itoa(int(c.Port))),
-		Handler: ds,
-	}
-
-	go func() {
-		<-stopCh
-		streamingServer.Shutdown(context.Background())
-	}()
-
-	// Start the streaming server
-	if err := streamingServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return err
-	}
-	return nil
+	return server.Start(stopCh)
 }
