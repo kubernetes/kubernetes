@@ -90,9 +90,11 @@ func newProxyServer(
 
 	dbus = utildbus.New()
 	iptInterface = utiliptables.New(execer, dbus, protocol)
-	ipvsInterface = utilipvs.New(execer)
 	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
+	if canUse, _ := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface); canUse {
+		ipvsInterface = utilipvs.New(execer)
+	}
 
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
