@@ -2596,8 +2596,8 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Comment": "v1.0.0-10-g4c012f6",
-			"Rev": "4c012f6dcd9546820e378d0bdda4d8fc772cdfea"
+			"Comment": "v1.0.1",
+			"Rev": "583c0c0531f06d5278b7d917446061adc344b5cd"
 		},
 		{
 			"ImportPath": "github.com/spf13/viper",
