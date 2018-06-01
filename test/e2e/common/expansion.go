@@ -25,7 +25,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 // These tests exercise the Kubernetes expansion syntax $(VAR).
@@ -318,7 +317,7 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod, errorText string) {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
 
-	err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, 30*time.Second)
+	err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
 
 	selector := fields.Set{
