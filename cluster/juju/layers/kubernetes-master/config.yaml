@@ -23,14 +23,14 @@ options:
     description: CIDR to user for Kubernetes services. Cannot be changed after deployment.
   allow-privileged:
     type: string
-    default: "auto"
+    default: "true"
     description: |
       Allow kube-apiserver to run in privileged mode. Supported values are
       "true", "false", and "auto". If "true", kube-apiserver will run in
       privileged mode by default. If "false", kube-apiserver will never run in
       privileged mode. If "auto", kube-apiserver will not run in privileged
       mode by default, but will switch to privileged mode if gpu hardware is
-      detected on a worker node.
+      detected on a worker node. 
   enable-nvidia-plugin:
     type: string
     default: "auto"
@@ -82,6 +82,11 @@ options:
     description: |
       Comma separated authorization modes. Allowed values are
       "RBAC", "Node", "Webhook", "ABAC", "AlwaysDeny" and "AlwaysAllow".
+  cluster-context:
+    type: string
+    default: ""
+    description: |
+      When specified, the juju model name will be overridden in the kube config. 
   require-manual-upgrade:
     type: boolean
     default: true
