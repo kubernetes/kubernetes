@@ -227,21 +227,20 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 	containerStatus.Ready = ready
 
 	// Update pod condition.
-	readyConditionIndex := -1
+	podReadyConditionIndex := -1
 	for i, condition := range status.Conditions {
 		if condition.Type == v1.PodReady {
-			readyConditionIndex = i
+			podReadyConditionIndex = i
 			break
 		}
 	}
-	readyCondition := GeneratePodReadyCondition(&pod.Spec, status.ContainerStatuses, status.Phase)
-	if readyConditionIndex != -1 {
-		status.Conditions[readyConditionIndex] = readyCondition
+	podReady := GeneratePodReadyCondition(&pod.Spec, status.Conditions, status.ContainerStatuses, status.Phase)
+	if podReadyConditionIndex != -1 {
+		status.Conditions[podReadyConditionIndex] = podReady
 	} else {
 		glog.Warningf("PodStatus missing PodReady condition: %+v", status)
-		status.Conditions = append(status.Conditions, readyCondition)
+		status.Conditions = append(status.Conditions, podReady)
 	}
-
 	m.updateStatusInternal(pod, status, false)
 }
 
@@ -651,4 +650,18 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus) v1.PodStatus {
 	}
 	newPodStatus.Conditions = podConditions
 	return newPodStatus
+}
+
+// NeedToReconcilePodReadiness returns if the pod "Ready" condition need to be reconcile
+func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
+	if len(pod.Spec.ReadinessGates) == 0 {
+		return false
+	}
+	podReadyCondition := GeneratePodReadyCondition(&pod.Spec, pod.Status.Conditions, pod.Status.ContainerStatuses, pod.Status.Phase)
+	i, curCondition := podutil.GetPodConditionFromList(pod.Status.Conditions, v1.PodReady)
+	// Only reconcile if "Ready" condition is present
+	if i >= 0 && curCondition.Status != podReadyCondition.Status {
+		return true
+	}
+	return false
 }
