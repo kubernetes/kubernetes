@@ -1353,7 +1353,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(spec, s.InitContainerStatuses, s.Phase))
-	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.ContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.Conditions, s.ContainerStatuses, s.Phase))
 	// Status manager will take care of the LastTransitionTimestamp, either preserve
 	// the timestamp from apiserver, or set a new one. When kubelet sees the pod,
 	// `PodScheduled` condition must be true.
@@ -1406,6 +1406,12 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		true,
 	)
 
+	// Preserves conditions not controlled by kubelet
+	for _, c := range pod.Status.Conditions {
+		if !kubetypes.PodConditionByKubelet(c.Type) {
+			apiPodStatus.Conditions = append(apiPodStatus.Conditions, c)
+		}
+	}
 	return &apiPodStatus
 }
 
