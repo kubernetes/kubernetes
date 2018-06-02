@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"testing"
@@ -88,4 +89,100 @@ func TestStatus(t *testing.T) {
 		},
 	}
 	assert.Equal(t, expected, actural)
+}
+
+func TestInstrumentedListContainer(t *testing.T) {
+	fakeRuntime, _, _, _ := createTestRuntimeManager()
+	irs := newInstrumentedRuntimeService(fakeRuntime)
+	podName, namespace := "foo", "bar"
+	containerName, image := "sidecar", "logger"
+	configs := []*runtimeapi.ContainerConfig{}
+	sConfigs := []*runtimeapi.PodSandboxConfig{}
+	for i := 0; i < 3; i++ {
+		s := &runtimeapi.PodSandboxConfig{
+			Metadata: &runtimeapi.PodSandboxMetadata{
+				Name:      fmt.Sprintf("%s%d", podName, i),
+				Namespace: fmt.Sprintf("%s%d", namespace, i),
+				Uid:       fmt.Sprintf("%d", i),
+				Attempt:   0,
+			},
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		}
+		labels := map[string]string{"abc.xyz": fmt.Sprintf("label%d", i)}
+		annotations := map[string]string{"foo.bar.baz": fmt.Sprintf("annotation%d", i)}
+		c := &runtimeapi.ContainerConfig{
+			Metadata: &runtimeapi.ContainerMetadata{
+				Name:    fmt.Sprintf("%s%d", containerName, i),
+				Attempt: uint32(i),
+			},
+			Image:       &runtimeapi.ImageSpec{Image: fmt.Sprintf("%s:v%d", image, i)},
+			Labels:      labels,
+			Annotations: annotations,
+		}
+		sConfigs = append(sConfigs, s)
+		configs = append(configs, c)
+	}
+
+	expected := make(map[string]*runtimeapi.Container, 0)
+	expectedStatus := make(map[string]*runtimeapi.ContainerStatus, 0)
+	actual := make(map[string]*runtimeapi.Container, 0)
+	state := runtimeapi.ContainerState_CONTAINER_RUNNING
+	createdAt := int64(0)
+	for i := range configs {
+		// We don't care about the sandbox id; pass a bogus one.
+		sandboxID := fmt.Sprintf("sandboxid%d", i)
+		id, err := irs.CreateContainer(sandboxID, configs[i], sConfigs[i])
+		assert.NoError(t, err)
+		err = irs.StartContainer(id)
+		assert.NoError(t, err)
+		expected[id] = &runtimeapi.Container{
+			Metadata:     configs[i].Metadata,
+			Id:           id,
+			PodSandboxId: sandboxID,
+			State:        state,
+			CreatedAt:    createdAt,
+			Image:        configs[i].Image,
+			ImageRef:     configs[i].Image.Image,
+			Labels:       configs[i].Labels,
+			Annotations:  configs[i].Annotations,
+		}
+
+		expectedStatus[id] = &runtimeapi.ContainerStatus{
+			Metadata:    configs[i].Metadata,
+			State:       runtimeapi.ContainerState_CONTAINER_EXITED,
+			Id:          id,
+			ExitCode:    0,
+			Image:       configs[i].Image,
+			ImageRef:    configs[i].Image.Image,
+			Labels:      configs[i].Labels,
+			Annotations: configs[i].Annotations,
+		}
+	}
+	containers, err := irs.ListContainers(nil)
+	assert.NoError(t, err)
+	// CreateContainer of FakeRuntimeService will use time.Now().UnixNano() for createdAt.
+	// We are not able to know a real time before run this method and setting CreatedAt to 0 for easily testing.
+	for _, c := range containers {
+		c.CreatedAt = createdAt
+		actual[c.Id] = c
+	}
+	assert.Equal(t, actual, expected)
+	for id := range expected {
+		err = irs.StopContainer(id, 0)
+		assert.NoError(t, err)
+		status, err := irs.ContainerStatus(id)
+		assert.NoError(t, err)
+		// ContainerStatus of FakeRuntimeService will use time.Now().UnixNano() for CreatedAt and StartedAt.
+		// We are not able to know a real time before run this method and setting this explicitly just for easily testing.
+		expectedStatus[id].CreatedAt = status.CreatedAt
+		expectedStatus[id].StartedAt = status.StartedAt
+		expectedStatus[id].FinishedAt = status.FinishedAt
+		assert.Equal(t, expectedStatus[id], status)
+		err = irs.RemoveContainer(id)
+		assert.NoError(t, err)
+	}
+	containers, err = irs.ListContainers(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(containers))
 }
