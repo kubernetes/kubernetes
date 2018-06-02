@@ -292,6 +292,12 @@ const (
 	// while making decisions.
 	BalanceAttachedNodeVolumes utilfeature.Feature = "BalanceAttachedNodeVolumes"
 
+	// owner @freehan
+	// beta: v1.11
+	//
+	// Support Pod Ready++
+	PodReadinessGates utilfeature.Feature = "PodReadinessGates"
+
 	// owner: @lichuqiang
 	// alpha: v1.11
 	//
@@ -362,6 +368,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	DynamicProvisioningScheduling:               {Default: false, PreRelease: utilfeature.Alpha},
+	PodReadinessGates:                           {Default: false, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
 
