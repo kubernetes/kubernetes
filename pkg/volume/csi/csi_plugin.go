@@ -19,6 +19,7 @@ package csi
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -67,7 +68,7 @@ func (p *csiPlugin) GetPluginName() string {
 	return csiPluginName
 }
 
-// GetvolumeName returns a concatenated string of CSIVolumeSource.Driver<volNameSe>CSIVolumeSource.VolumeHandle
+// GetvolumeName returns a concatenated string of CSIVolumeSource.Driver<volNameSep>CSIVolumeSource.VolumeHandle
 // That string value is used in Detach() to extract driver name and volumeName.
 func (p *csiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	csi, err := getCSISourceFromSpec(spec)
@@ -164,7 +165,9 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 		},
 	}
 
-	return volume.NewSpecFromPersistentVolume(pv, false), nil
+	readOnly, _ := strconv.ParseBool(volData[volDataKey.readOnly])
+
+	return volume.NewSpecFromPersistentVolume(pv, readOnly), nil
 }
 
 func (p *csiPlugin) SupportsMountOption() bool {
