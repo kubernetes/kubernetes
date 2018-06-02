@@ -2570,6 +2570,7 @@ spec:
         istio: statsd-prom-bridge
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-mixer-service-account
       volumes:
@@ -2578,7 +2579,7 @@ spec:
           name: istio-statsd-prom-bridge
       containers:
       - name: statsd-prom-bridge
-        image: "prom/statsd-exporter:latest"
+        image: "gcr.io/istio-release/prom/statsd-exporter:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9102
@@ -2714,6 +2715,7 @@ spec:
         istio: egressgateway
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-egressgateway-service-account
       containers:
@@ -2835,6 +2837,7 @@ spec:
         istio: ingress
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-ingress-service-account
       containers:
@@ -2960,6 +2963,7 @@ spec:
         istio: ingressgateway
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-ingressgateway-service-account
       containers:
@@ -3090,6 +3094,7 @@ spec:
         istio-mixer-type: policy
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-mixer-service-account
       volumes:
@@ -3207,6 +3212,7 @@ spec:
         istio-mixer-type: telemetry
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-mixer-service-account
       volumes:
@@ -3298,6 +3304,7 @@ spec:
         istio: pilot
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-pilot-service-account
       containers:
@@ -3448,6 +3455,7 @@ spec:
         app: prometheus
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: prometheus
 
@@ -3536,6 +3544,7 @@ spec:
         istio: citadel
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-citadel-service-account
       containers:
@@ -3605,6 +3614,8 @@ spec:
     metadata:
       labels:
         istio: sidecar-injector
+      annotations:
+         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-sidecar-injector-service-account
       containers:
@@ -3886,6 +3897,7 @@ spec:
         app: grafana
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: grafana
       containers:
