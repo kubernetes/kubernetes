@@ -19,10 +19,13 @@ package validation
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -234,4 +237,299 @@ func ValidateControllerRevisionUpdate(newHistory, oldHistory *apps.ControllerRev
 	errs = append(errs, ValidateControllerRevision(newHistory)...)
 	errs = append(errs, apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
 	return errs
+}
+
+// Validates that the given name can be used as a deployment name.
+var ValidateDeploymentName = apivalidation.NameIsDNSSubdomain
+
+func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch intOrPercent.Type {
+	case intstr.String:
+		for _, msg := range validation.IsValidPercent(intOrPercent.StrVal) {
+			allErrs = append(allErrs, field.Invalid(fldPath, intOrPercent, msg))
+		}
+	case intstr.Int:
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(intOrPercent.IntValue()), fldPath)...)
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, intOrPercent, "must be an integer or percentage (e.g '5%%')"))
+	}
+	return allErrs
+}
+
+func getPercentValue(intOrStringValue intstr.IntOrString) (int, bool) {
+	if intOrStringValue.Type != intstr.String {
+		return 0, false
+	}
+	if len(validation.IsValidPercent(intOrStringValue.StrVal)) != 0 {
+		return 0, false
+	}
+	value, _ := strconv.Atoi(intOrStringValue.StrVal[:len(intOrStringValue.StrVal)-1])
+	return value, true
+}
+
+func getIntOrPercentValue(intOrStringValue intstr.IntOrString) int {
+	value, isPercent := getPercentValue(intOrStringValue)
+	if isPercent {
+		return value
+	}
+	return intOrStringValue.IntValue()
+}
+
+func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	value, isPercent := getPercentValue(intOrStringValue)
+	if !isPercent || value <= 100 {
+		return nil
+	}
+	allErrs = append(allErrs, field.Invalid(fldPath, intOrStringValue, "must not be greater than 100%"))
+	return allErrs
+}
+
+func ValidateRollingUpdateDeployment(rollingUpdate *apps.RollingUpdateDeployment, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
+	if getIntOrPercentValue(rollingUpdate.MaxUnavailable) == 0 && getIntOrPercentValue(rollingUpdate.MaxSurge) == 0 {
+		// Both MaxSurge and MaxUnavailable cannot be zero.
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), rollingUpdate.MaxUnavailable, "may not be 0 when `maxSurge` is 0"))
+	}
+	// Validate that MaxUnavailable is not more than 100%.
+	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	return allErrs
+}
+
+func ValidateDeploymentStrategy(strategy *apps.DeploymentStrategy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch strategy.Type {
+	case apps.RecreateDeploymentStrategyType:
+		if strategy.RollingUpdate != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("rollingUpdate"), "may not be specified when strategy `type` is '"+string(apps.RecreateDeploymentStrategyType+"'")))
+		}
+	case apps.RollingUpdateDeploymentStrategyType:
+		// This should never happen since it's set and checked in defaults.go
+		if strategy.RollingUpdate == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), "this should be defaulted and never be nil"))
+		} else {
+			allErrs = append(allErrs, ValidateRollingUpdateDeployment(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
+		}
+	default:
+		validValues := []string{string(apps.RecreateDeploymentStrategyType), string(apps.RollingUpdateDeploymentStrategyType)}
+		allErrs = append(allErrs, field.NotSupported(fldPath, strategy, validValues))
+	}
+	return allErrs
+}
+
+func ValidateRollback(rollback *apps.RollbackConfig, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	v := rollback.Revision
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(v), fldPath.Child("version"))...)
+	return allErrs
+}
+
+// Validates given deployment spec.
+func ValidateDeploymentSpec(spec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+
+	if spec.Selector == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
+	} else {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is not valid for deployment."))
+		}
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector."))
+	} else {
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
+	}
+
+	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, fldPath.Child("strategy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+	if spec.RevisionHistoryLimit != nil {
+		// zero is a valid RevisionHistoryLimit
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.RevisionHistoryLimit), fldPath.Child("revisionHistoryLimit"))...)
+	}
+	if spec.RollbackTo != nil {
+		allErrs = append(allErrs, ValidateRollback(spec.RollbackTo, fldPath.Child("rollback"))...)
+	}
+	if spec.ProgressDeadlineSeconds != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ProgressDeadlineSeconds), fldPath.Child("progressDeadlineSeconds"))...)
+		if *spec.ProgressDeadlineSeconds <= spec.MinReadySeconds {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("progressDeadlineSeconds"), spec.ProgressDeadlineSeconds, "must be greater than minReadySeconds."))
+		}
+	}
+	return allErrs
+}
+
+// Validates given deployment status.
+func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(status.ObservedGeneration, fldPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fldPath.Child("updatedReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
+	if status.CollisionCount != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fldPath.Child("collisionCount"))...)
+	}
+	msg := "cannot be greater than status.replicas"
+	if status.UpdatedReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("updatedReplicas"), status.UpdatedReplicas, msg))
+	}
+	if status.ReadyReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), status.ReadyReplicas, msg))
+	}
+	if status.AvailableReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
+	}
+	if status.AvailableReplicas > status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
+	}
+	return allErrs
+}
+
+func ValidateDeploymentUpdate(update, old *apps.Deployment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateDeploymentStatusUpdate(update, old *apps.Deployment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	fldPath := field.NewPath("status")
+	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, fldPath)...)
+	if apivalidation.IsDecremented(update.Status.CollisionCount, old.Status.CollisionCount) {
+		value := int32(0)
+		if update.Status.CollisionCount != nil {
+			value = *update.Status.CollisionCount
+		}
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("collisionCount"), value, "cannot be decremented"))
+	}
+	return allErrs
+}
+
+func ValidateDeployment(obj *apps.Deployment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateDeploymentName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDeploymentSpec(&obj.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateDeploymentRollback(obj *apps.DeploymentRollback) field.ErrorList {
+	allErrs := apivalidation.ValidateAnnotations(obj.UpdatedAnnotations, field.NewPath("updatedAnnotations"))
+	if len(obj.Name) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("name"), "name is required"))
+	}
+	allErrs = append(allErrs, ValidateRollback(&obj.RollbackTo, field.NewPath("rollback"))...)
+	return allErrs
+}
+
+// ValidateReplicaSetName can be used to check whether the given ReplicaSet
+// name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+var ValidateReplicaSetName = apivalidation.NameIsDNSSubdomain
+
+// ValidateReplicaSet tests if required fields in the ReplicaSet are set.
+func ValidateReplicaSet(rs *apps.ReplicaSet) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&rs.ObjectMeta, true, ValidateReplicaSetName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateReplicaSetUpdate tests if required fields in the ReplicaSet are set.
+func ValidateReplicaSetUpdate(rs, oldRs *apps.ReplicaSet) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateReplicaSetStatusUpdate tests if required fields in the ReplicaSet are set.
+func ValidateReplicaSetStatusUpdate(rs, oldRs *apps.ReplicaSet) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidateReplicaSetStatus(rs.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+func ValidateReplicaSetStatus(status apps.ReplicaSetStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.FullyLabeledReplicas), fldPath.Child("fullyLabeledReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ObservedGeneration), fldPath.Child("observedGeneration"))...)
+	msg := "cannot be greater than status.replicas"
+	if status.FullyLabeledReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("fullyLabeledReplicas"), status.FullyLabeledReplicas, msg))
+	}
+	if status.ReadyReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("readyReplicas"), status.ReadyReplicas, msg))
+	}
+	if status.AvailableReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
+	}
+	if status.AvailableReplicas > status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
+	}
+	return allErrs
+}
+
+// ValidateReplicaSetSpec tests if required fields in the ReplicaSet spec are set.
+func ValidateReplicaSetSpec(spec *apps.ReplicaSetSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+
+	if spec.Selector == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
+	} else {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is not valid for deployment."))
+		}
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector."))
+	} else {
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
+	}
+	return allErrs
+}
+
+// Validates the given template and ensures that it is in accordance with the desired selector and replicas.
+func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selector labels.Selector, replicas int32, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if template == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else {
+		if !selector.Empty() {
+			// Verify that the ReplicaSet selector matches the labels in template.
+			labels := labels.Set(template.Labels)
+			if !selector.Matches(labels) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
+			}
+		}
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
+		if replicas > 1 {
+			allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(template.Spec.Volumes, fldPath.Child("spec", "volumes"))...)
+		}
+		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
+		if template.Spec.RestartPolicy != api.RestartPolicyAlways {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "restartPolicy"), template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+		}
+		if template.Spec.ActiveDeadlineSeconds != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "activeDeadlineSeconds"), template.Spec.ActiveDeadlineSeconds, "must not be specified"))
+		}
+	}
+	return allErrs
 }

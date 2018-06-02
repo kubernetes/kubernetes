@@ -50,16 +50,16 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&extensions.DaemonSet{},
 		&extensions.DaemonSetList{},
-		&extensions.Deployment{},
-		&extensions.DeploymentList{},
-		&extensions.DeploymentRollback{},
+		&Deployment{},
+		&DeploymentList{},
+		&DeploymentRollback{},
 		&autoscaling.Scale{},
 		&StatefulSet{},
 		&StatefulSetList{},
 		&ControllerRevision{},
 		&ControllerRevisionList{},
-		&extensions.ReplicaSet{},
-		&extensions.ReplicaSetList{},
+		&ReplicaSet{},
+		&ReplicaSetList{},
 	)
 	return nil
 }

@@ -9,7 +9,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "controllerrevision.go",
+        "deployment.go",
         "interface.go",
+        "replicaset.go",
         "statefulset.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/apps/internalversion",

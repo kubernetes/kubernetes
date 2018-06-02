@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,9 +41,9 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	apps "k8s.io/kubernetes/pkg/apis/apps"
 	appsconversion "k8s.io/kubernetes/pkg/apis/apps/v1"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -77,7 +77,7 @@ type conversionLister struct {
 	rcLister v1listers.ReplicationControllerLister
 }
 
-func (l conversionLister) List(selector labels.Selector) ([]*apps.ReplicaSet, error) {
+func (l conversionLister) List(selector labels.Selector) ([]*appsv1.ReplicaSet, error) {
 	rcList, err := l.rcLister.List(selector)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (l conversionLister) ReplicaSets(namespace string) appslisters.ReplicaSetNa
 	return conversionNamespaceLister{l.rcLister.ReplicationControllers(namespace)}
 }
 
-func (l conversionLister) GetPodReplicaSets(pod *v1.Pod) ([]*apps.ReplicaSet, error) {
+func (l conversionLister) GetPodReplicaSets(pod *v1.Pod) ([]*appsv1.ReplicaSet, error) {
 	rcList, err := l.rcLister.GetPodControllers(pod)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ type conversionNamespaceLister struct {
 	rcLister v1listers.ReplicationControllerNamespaceLister
 }
 
-func (l conversionNamespaceLister) List(selector labels.Selector) ([]*apps.ReplicaSet, error) {
+func (l conversionNamespaceLister) List(selector labels.Selector) ([]*appsv1.ReplicaSet, error) {
 	rcList, err := l.rcLister.List(selector)
 	if err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ func (l conversionNamespaceLister) List(selector labels.Selector) ([]*apps.Repli
 	return convertSlice(rcList)
 }
 
-func (l conversionNamespaceLister) Get(name string) (*apps.ReplicaSet, error) {
+func (l conversionNamespaceLister) Get(name string) (*appsv1.ReplicaSet, error) {
 	rc, err := l.rcLister.Get(name)
 	if err != nil {
 		return nil, err
@@ -201,19 +201,19 @@ type conversionClient struct {
 	v1client.ReplicationControllerInterface
 }
 
-func (c conversionClient) Create(rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+func (c conversionClient) Create(rs *appsv1.ReplicaSet) (*appsv1.ReplicaSet, error) {
 	return convertCall(c.ReplicationControllerInterface.Create, rs)
 }
 
-func (c conversionClient) Update(rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+func (c conversionClient) Update(rs *appsv1.ReplicaSet) (*appsv1.ReplicaSet, error) {
 	return convertCall(c.ReplicationControllerInterface.Update, rs)
 }
 
-func (c conversionClient) UpdateStatus(rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+func (c conversionClient) UpdateStatus(rs *appsv1.ReplicaSet) (*appsv1.ReplicaSet, error) {
 	return convertCall(c.ReplicationControllerInterface.UpdateStatus, rs)
 }
 
-func (c conversionClient) Get(name string, options metav1.GetOptions) (*apps.ReplicaSet, error) {
+func (c conversionClient) Get(name string, options metav1.GetOptions) (*appsv1.ReplicaSet, error) {
 	rc, err := c.ReplicationControllerInterface.Get(name, options)
 	if err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func (c conversionClient) Get(name string, options metav1.GetOptions) (*apps.Rep
 	return convertRCtoRS(rc, nil)
 }
 
-func (c conversionClient) List(opts metav1.ListOptions) (*apps.ReplicaSetList, error) {
+func (c conversionClient) List(opts metav1.ListOptions) (*appsv1.ReplicaSetList, error) {
 	rcList, err := c.ReplicationControllerInterface.List(opts)
 	if err != nil {
 		return nil, err
@@ -234,13 +234,13 @@ func (c conversionClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 	return nil, errors.New("Watch() is not implemented for conversionClient")
 }
 
-func (c conversionClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.ReplicaSet, err error) {
+func (c conversionClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *appsv1.ReplicaSet, err error) {
 	// This is not used by RSC.
 	return nil, errors.New("Patch() is not implemented for conversionClient")
 }
 
-func convertSlice(rcList []*v1.ReplicationController) ([]*apps.ReplicaSet, error) {
-	rsList := make([]*apps.ReplicaSet, 0, len(rcList))
+func convertSlice(rcList []*v1.ReplicationController) ([]*appsv1.ReplicaSet, error) {
+	rsList := make([]*appsv1.ReplicaSet, 0, len(rcList))
 	for _, rc := range rcList {
 		rs, err := convertRCtoRS(rc, nil)
 		if err != nil {
@@ -251,8 +251,8 @@ func convertSlice(rcList []*v1.ReplicationController) ([]*apps.ReplicaSet, error
 	return rsList, nil
 }
 
-func convertList(rcList *v1.ReplicationControllerList) (*apps.ReplicaSetList, error) {
-	rsList := &apps.ReplicaSetList{Items: make([]apps.ReplicaSet, len(rcList.Items))}
+func convertList(rcList *v1.ReplicationControllerList) (*appsv1.ReplicaSetList, error) {
+	rsList := &appsv1.ReplicaSetList{Items: make([]appsv1.ReplicaSet, len(rcList.Items))}
 	for i := range rcList.Items {
 		rc := &rcList.Items[i]
 		_, err := convertRCtoRS(rc, &rsList.Items[i])
@@ -263,7 +263,7 @@ func convertList(rcList *v1.ReplicationControllerList) (*apps.ReplicaSetList, er
 	return rsList, nil
 }
 
-func convertCall(fn func(*v1.ReplicationController) (*v1.ReplicationController, error), rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+func convertCall(fn func(*v1.ReplicationController) (*v1.ReplicationController, error), rs *appsv1.ReplicaSet) (*appsv1.ReplicaSet, error) {
 	rc, err := convertRStoRC(rs)
 	if err != nil {
 		return nil, err
@@ -275,27 +275,27 @@ func convertCall(fn func(*v1.ReplicationController) (*v1.ReplicationController, 
 	return convertRCtoRS(result, nil)
 }
 
-func convertRCtoRS(rc *v1.ReplicationController, out *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	var rsInternal extensions.ReplicaSet
-	if err := apiv1.Convert_v1_ReplicationController_to_extensions_ReplicaSet(rc, &rsInternal, nil); err != nil {
+func convertRCtoRS(rc *v1.ReplicationController, out *appsv1.ReplicaSet) (*appsv1.ReplicaSet, error) {
+	var rsInternal apps.ReplicaSet
+	if err := apiv1.Convert_v1_ReplicationController_to_apps_ReplicaSet(rc, &rsInternal, nil); err != nil {
 		return nil, fmt.Errorf("can't convert ReplicationController %v/%v to ReplicaSet: %v", rc.Namespace, rc.Name, err)
 	}
 	if out == nil {
-		out = new(apps.ReplicaSet)
+		out = new(appsv1.ReplicaSet)
 	}
-	if err := appsconversion.Convert_extensions_ReplicaSet_To_v1_ReplicaSet(&rsInternal, out, nil); err != nil {
+	if err := appsconversion.Convert_apps_ReplicaSet_To_v1_ReplicaSet(&rsInternal, out, nil); err != nil {
 		return nil, fmt.Errorf("can't convert ReplicaSet (converted from ReplicationController %v/%v) from internal to extensions/v1beta1: %v", rc.Namespace, rc.Name, err)
 	}
 	return out, nil
 }
 
-func convertRStoRC(rs *apps.ReplicaSet) (*v1.ReplicationController, error) {
-	var rsInternal extensions.ReplicaSet
-	if err := appsconversion.Convert_v1_ReplicaSet_To_extensions_ReplicaSet(rs, &rsInternal, nil); err != nil {
+func convertRStoRC(rs *appsv1.ReplicaSet) (*v1.ReplicationController, error) {
+	var rsInternal apps.ReplicaSet
+	if err := appsconversion.Convert_v1_ReplicaSet_To_apps_ReplicaSet(rs, &rsInternal, nil); err != nil {
 		return nil, fmt.Errorf("can't convert ReplicaSet (converting to ReplicationController %v/%v) from extensions/v1beta1 to internal: %v", rs.Namespace, rs.Name, err)
 	}
 	var rc v1.ReplicationController
-	if err := apiv1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(&rsInternal, &rc, nil); err != nil {
+	if err := apiv1.Convert_apps_ReplicaSet_to_v1_ReplicationController(&rsInternal, &rc, nil); err != nil {
 		return nil, fmt.Errorf("can't convert ReplicaSet to ReplicationController %v/%v: %v", rs.Namespace, rs.Name, err)
 	}
 	return &rc, nil
@@ -316,7 +316,7 @@ func (pc podControlAdapter) CreatePodsOnNode(nodeName, namespace string, templat
 }
 
 func (pc podControlAdapter) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
+	rc, err := convertRStoRC(object.(*appsv1.ReplicaSet))
 	if err != nil {
 		return err
 	}
@@ -324,7 +324,7 @@ func (pc podControlAdapter) CreatePodsWithControllerRef(namespace string, templa
 }
 
 func (pc podControlAdapter) DeletePod(namespace string, podID string, object runtime.Object) error {
-	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
+	rc, err := convertRStoRC(object.(*appsv1.ReplicaSet))
 	if err != nil {
 		return err
 	}
