@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -656,8 +657,8 @@ func TestDoesExternalLoadBalancerNeedsUpdate(t *testing.T) {
 			updateFn: func() {
 				oldSvc = defaultExternalService()
 				newSvc = defaultExternalService()
-				oldSvc.Annotations = map[string]string{ServiceLoadBalancerNamePrefixAnnotationKey: "old"}
-				newSvc.Annotations = map[string]string{ServiceLoadBalancerNamePrefixAnnotationKey: "new"}
+				oldSvc.Annotations = map[string]string{cloudprovider.ServiceLoadBalancerNamePrefixAnnotationKey: "old"}
+				newSvc.Annotations = map[string]string{cloudprovider.ServiceLoadBalancerNamePrefixAnnotationKey: "new"}
 			},
 			expectedNeedsUpdate: true,
 		},
