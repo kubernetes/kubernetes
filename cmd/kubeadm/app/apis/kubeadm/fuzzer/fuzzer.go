@@ -43,10 +43,17 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
 
-			obj.Token = "foo"
-			obj.TokenTTL = &metav1.Duration{Duration: 1 * time.Hour}
-			obj.TokenUsages = []string{"foo"}
-			obj.TokenGroups = []string{"foo"}
+			obj.BootstrapTokens = []kubeadm.BootstrapToken{
+				{
+					Token: &kubeadm.BootstrapTokenString{
+						ID:     "abcdef",
+						Secret: "abcdef0123456789",
+					},
+					TTL:    &metav1.Duration{Duration: 1 * time.Hour},
+					Usages: []string{"foo"},
+					Groups: []string{"foo"},
+				},
+			}
 			obj.ImageRepository = "foo"
 			obj.CIImageRepository = ""
 			obj.UnifiedControlPlaneImage = "foo"

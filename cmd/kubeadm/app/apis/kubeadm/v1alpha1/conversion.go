@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -54,6 +55,9 @@ func Convert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 	UpgradeCloudProvider(in, out)
 	UpgradeAuthorizationModes(in, out)
 	UpgradeNodeRegistrationOptionsForMaster(in, out)
+	if err := UpgradeBootstrapTokens(in, out); err != nil {
+		return err
+	}
 	// We don't support migrating information from the .PrivilegedPods field which was removed in v1alpha2
 	// We don't support migrating information from the .ImagePullPolicy field which was removed in v1alpha2
 
@@ -100,25 +104,6 @@ func Convert_v1alpha1_Etcd_To_kubeadm_Etcd(in *Etcd, out *kubeadm.Etcd, s conver
 	return nil
 }
 
-// no-op, as we don't support converting from newer API to old alpha API
-func Convert_kubeadm_Etcd_To_v1alpha1_Etcd(in *kubeadm.Etcd, out *Etcd, s conversion.Scope) error {
-
-	if in.External != nil {
-		out.Endpoints = in.External.Endpoints
-		out.CAFile = in.External.CAFile
-		out.CertFile = in.External.CertFile
-		out.KeyFile = in.External.KeyFile
-	} else {
-		out.Image = in.Local.Image
-		out.DataDir = in.Local.DataDir
-		out.ExtraArgs = in.Local.ExtraArgs
-		out.ServerCertSANs = in.Local.ServerCertSANs
-		out.PeerCertSANs = in.Local.PeerCertSANs
-	}
-
-	return nil
-}
-
 // UpgradeCloudProvider handles the removal of .CloudProvider as smoothly as possible
 func UpgradeCloudProvider(in *MasterConfiguration, out *kubeadm.MasterConfiguration) {
 	if len(in.CloudProvider) != 0 {
@@ -160,8 +145,30 @@ func UpgradeNodeRegistrationOptionsForMaster(in *MasterConfiguration, out *kubea
 	}
 }
 
+func UpgradeBootstrapTokens(in *MasterConfiguration, out *kubeadm.MasterConfiguration) error {
+	if len(in.Token) == 0 {
+		return nil
+	}
+
+	bts, err := kubeadm.NewBootstrapTokenString(in.Token)
+	if err != nil {
+		return fmt.Errorf("can't parse .Token, and hence can't convert v1alpha1 API to a newer version: %v", err)
+	}
+
+	out.BootstrapTokens = []kubeadm.BootstrapToken{
+		{
+			Token:  bts,
+			TTL:    in.TokenTTL,
+			Usages: in.TokenUsages,
+			Groups: in.TokenGroups,
+		},
+	}
+	return nil
+}
+
 // Downgrades below
 
+// This downgrade path IS NOT SUPPORTED. This is just here for roundtripping purposes at the moment.
 func Convert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in *kubeadm.MasterConfiguration, out *MasterConfiguration, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in, out, s); err != nil {
 		return err
@@ -172,9 +179,17 @@ func Convert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in *kub
 	out.CRISocket = in.NodeRegistration.CRISocket
 	out.NoTaintMaster = in.NodeRegistration.Taints != nil && len(in.NodeRegistration.Taints) == 0
 
+	if len(in.BootstrapTokens) > 0 {
+		out.Token = in.BootstrapTokens[0].Token.String()
+		out.TokenTTL = in.BootstrapTokens[0].TTL
+		out.TokenUsages = in.BootstrapTokens[0].Usages
+		out.TokenGroups = in.BootstrapTokens[0].Groups
+	}
+
 	return nil
 }
 
+// This downgrade path IS NOT SUPPORTED. This is just here for roundtripping purposes at the moment.
 func Convert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in *kubeadm.NodeConfiguration, out *NodeConfiguration, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in, out, s); err != nil {
 		return err
@@ -183,6 +198,27 @@ func Convert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in *kubeadm
 	// Converting from newer API version to an older API version isn't supported. This is here only for the roundtrip tests meanwhile.
 	out.NodeName = in.NodeRegistration.Name
 	out.CRISocket = in.NodeRegistration.CRISocket
+	return nil
+}
+
+// This downgrade path IS NOT SUPPORTED. This is just here for roundtripping purposes at the moment.
+func Convert_kubeadm_Etcd_To_v1alpha1_Etcd(in *kubeadm.Etcd, out *Etcd, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_Etcd_To_v1alpha1_Etcd(in, out, s); err != nil {
+		return err
+	}
+
+	if in.External != nil {
+		out.Endpoints = in.External.Endpoints
+		out.CAFile = in.External.CAFile
+		out.CertFile = in.External.CertFile
+		out.KeyFile = in.External.KeyFile
+	} else {
+		out.Image = in.Local.Image
+		out.DataDir = in.Local.DataDir
+		out.ExtraArgs = in.Local.ExtraArgs
+		out.ServerCertSANs = in.Local.ServerCertSANs
+		out.PeerCertSANs = in.Local.PeerCertSANs
+	}
 
 	return nil
 }

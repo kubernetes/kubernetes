@@ -86,14 +86,26 @@ const (
 	// authenticate as. The full username given is "system:bootstrap:<token-id>".
 	BootstrapUserPrefix = "system:bootstrap:"
 
-	// BootstrapGroupPattern is the valid regex pattern that all groups
-	// assigned to a bootstrap token by BootstrapTokenExtraGroupsKey must match.
-	// See also ValidateBootstrapGroupName().
-	BootstrapGroupPattern = "system:bootstrappers:[a-z0-9:-]{0,255}[a-z0-9]"
-
 	// BootstrapDefaultGroup is the default group for bootstrapping bearer
 	// tokens (in addition to any groups from BootstrapTokenExtraGroupsKey).
 	BootstrapDefaultGroup = "system:bootstrappers"
+
+	// BootstrapGroupPattern is the valid regex pattern that all groups
+	// assigned to a bootstrap token by BootstrapTokenExtraGroupsKey must match.
+	// See also util.ValidateBootstrapGroupName()
+	BootstrapGroupPattern = `\Asystem:bootstrappers:[a-z0-9:-]{0,255}[a-z0-9]\z`
+
+	// BootstrapTokenPattern defines the {id}.{secret} regular expression pattern
+	BootstrapTokenPattern = `\A([a-z0-9]{6})\.([a-z0-9]{16})\z`
+
+	// BootstrapTokenIDPattern defines token's id regular expression pattern
+	BootstrapTokenIDPattern = `\A([a-z0-9]{6})\z`
+
+	// BootstrapTokenIDBytes defines the number of bytes used for the Bootstrap Token's ID field
+	BootstrapTokenIDBytes = 6
+
+	// BootstrapTokenSecretBytes defines the number of bytes used the Bootstrap Token's Secret field
+	BootstrapTokenSecretBytes = 16
 )
 
 // KnownTokenUsages specifies the known functions a token will get.
