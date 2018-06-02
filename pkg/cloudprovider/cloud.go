@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,10 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-// ServiceAnnotationLoadBalancerNamePrefix is the annotation used on the service
+// ServiceLoadBalancerNamePrefixAnnotationKey is the annotation used on the service
 // of type LoadBalancer for defining a prefix of the load balancer name. The prefix
 // is limited to alphanumeric and hyphen symbols with maximal length of 8
-const ServiceAnnotationLoadBalancerNamePrefix = "service.beta.kubernetes.io/load-balancer-name-prefix"
+const ServiceLoadBalancerNamePrefixAnnotationKey = "service.beta.kubernetes.io/load-balancer-name-prefix"
 
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
@@ -76,14 +77,13 @@ func DefaultLoadBalancerName(service *v1.Service) string {
 	prefix := "a"
 	l := service.Annotations[ServiceLoadBalancerNamePrefixAnnotationKey]
 
-	// validate max prefix length
-	if len(l) > 8 {
-		l = l[:8]
-	}
-
-	// GCE requires LB name to start with a lower case letter.
-	if prefixRegexp.MatchString(l) {
-		prefix = l
+	// set custom prefix (max lenght 8) if defined
+	if len(l) > 0 && unicode.IsLetter(l[0]) {
+		if len(l) > 8 {
+			prefix = l[:8]
+		} else {
+			prefix = l
+		}
 	}
 
 	ret := prefix + strings.Replace(string(service.UID), "-", "", -1)
