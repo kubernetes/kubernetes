@@ -556,8 +556,10 @@ func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config,
 		}
 		glog.Warning("error creating inClusterConfig, falling back to default config: ", err)
 	}
+	loadingRules := NewDefaultClientConfigLoadingRules()
+	loadingRules.ExplicitPath = kubeconfigPath
 	return NewNonInteractiveDeferredLoadingClientConfig(
-		&ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		loadingRules,
 		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}}).ClientConfig()
 }
 
