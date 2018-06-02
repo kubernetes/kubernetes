@@ -20,8 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
-	"unicode"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +33,8 @@ import (
 // of type LoadBalancer for defining a prefix of the load balancer name. The prefix
 // is limited to alphanumeric and hyphen symbols with maximal length of 8
 const ServiceLoadBalancerNamePrefixAnnotationKey = "service.beta.kubernetes.io/load-balancer-name-prefix"
+
+var prefixRegexp = regexp.MustCompile(`^[a-z]([a-z0-9\-])*$`)
 
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
@@ -69,23 +71,24 @@ type Clusters interface {
 }
 
 // GetLoadBalancerName generates unique LB name considering different providers' limits:
-// (1) GCE requires LB name to start with a lower case letter.
-// (2) AWS requires LB name max length to be 32 chars.
+// (1) GCP limits LB name to have low case letters digits and hypens and start with a lower case letter.
+// (2) AWS limits LB name max length to be 32 chars.
 func GetLoadBalancerName(service *v1.Service) string {
 	prefix := "a"
 	l := service.Annotations[ServiceLoadBalancerNamePrefixAnnotationKey]
 
-	// set custom prefix (max lenght 8) if defined
-	if len(l) > 0 && unicode.IsLetter(l[0]) {
-		if len(l) > 8 {
-			prefix = l[:8]
-		} else {
-			prefix = l
-		}
+	// validate max prefix length
+	if len(l) > 8 {
+		l = l[:8]
+	}
+
+	// validate GCP limitations
+	if prefixRegexp.MatchString(l) {
+		prefix = l
 	}
 
 	ret := prefix + strings.Replace(string(service.UID), "-", "", -1)
-	// limit length
+	// validate AWS limitations
 	if len(ret) > 32 {
 		ret = ret[:32]
 	}
