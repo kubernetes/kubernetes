@@ -41,13 +41,17 @@ func ResizeGroup(group string, size int32) error {
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
+		zone, err := getGCEZoneForGroup(group)
+		if err != nil {
+			return err
+		}
 		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "resize",
 			group, fmt.Sprintf("--size=%v", size),
-			"--project="+TestContext.CloudConfig.ProjectID, "--zone="+TestContext.CloudConfig.Zone).CombinedOutput()
+			"--project="+TestContext.CloudConfig.ProjectID, "--zone="+zone).CombinedOutput()
 		if err != nil {
-			Logf("Failed to resize node instance group: %v", string(output))
+			return fmt.Errorf("Failed to resize node instance group %s: %s", group, output)
 		}
-		return err
+		return nil
 	} else if TestContext.Provider == "aws" {
 		client := autoscaling.New(session.New())
 		return awscloud.ResizeInstanceGroup(client, group, int(size))
@@ -62,12 +66,15 @@ func GetGroupNodes(group string) ([]string, error) {
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
+		zone, err := getGCEZoneForGroup(group)
+		if err != nil {
+			return nil, err
+		}
 		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
 			"list-instances", group, "--project="+TestContext.CloudConfig.ProjectID,
-			"--zone="+TestContext.CloudConfig.Zone).CombinedOutput()
+			"--zone="+zone).CombinedOutput()
 		if err != nil {
-			Logf("Failed to get nodes in instance group: %v", string(output))
-			return nil, err
+			return nil, fmt.Errorf("Failed to get nodes in instance group %s: %s", group, output)
 		}
 		re := regexp.MustCompile(".*RUNNING")
 		lines := re.FindAllString(string(output), -1)
@@ -86,11 +93,15 @@ func GroupSize(group string) (int, error) {
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
-		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
-			"list-instances", group, "--project="+TestContext.CloudConfig.ProjectID,
-			"--zone="+TestContext.CloudConfig.Zone).CombinedOutput()
+		zone, err := getGCEZoneForGroup(group)
 		if err != nil {
 			return -1, err
+		}
+		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
+			"list-instances", group, "--project="+TestContext.CloudConfig.ProjectID,
+			"--zone="+zone).CombinedOutput()
+		if err != nil {
+			return -1, fmt.Errorf("Failed to get group size for group %s: %s", group, output)
 		}
 		re := regexp.MustCompile("RUNNING")
 		return len(re.FindAllString(string(output), -1)), nil
@@ -127,4 +138,17 @@ func WaitForGroupSize(group string, size int32) error {
 		return nil
 	}
 	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)
+}
+
+func getGCEZoneForGroup(group string) (string, error) {
+	zone := TestContext.CloudConfig.Zone
+	if TestContext.CloudConfig.MultiZone {
+		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "list",
+			"--project="+TestContext.CloudConfig.ProjectID, "--format=value(zone)", "--filter=name="+group).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("Failed to get zone for node group %s: %s", group, output)
+		}
+		zone = strings.TrimSpace(string(output))
+	}
+	return zone, nil
 }
