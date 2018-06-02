@@ -651,6 +651,16 @@ func TestDoesExternalLoadBalancerNeedsUpdate(t *testing.T) {
 			},
 			expectedNeedsUpdate: true,
 		},
+		{
+			testName: "If LoadBalancer prefix annotation is different",
+			updateFn: func() {
+				oldSvc = defaultExternalService()
+				newSvc = defaultExternalService()
+				oldSvc.Annotations = map[string]string{ServiceLoadBalancerNamePrefixAnnotationKey: "old"}
+				newSvc.Annotations = map[string]string{ServiceLoadBalancerNamePrefixAnnotationKey: "new"}
+			},
+			expectedNeedsUpdate: true,
+		},
 	}
 
 	controller, _, _ := newController()
