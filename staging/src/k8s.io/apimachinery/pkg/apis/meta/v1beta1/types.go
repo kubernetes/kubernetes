@@ -66,8 +66,8 @@ type TableColumnDefinition struct {
 // TableRow is an individual row in a table.
 // +protobuf=false
 type TableRow struct {
-	// cells will be as wide as headers and may contain strings, numbers, booleans, simple maps, or lists, or
-	// null. See the type field of the column definition for a more detailed description.
+	// cells will be as wide as headers and may contain strings, numbers (float64 or int64), booleans, simple
+	// maps, or lists, or null. See the type field of the column definition for a more detailed description.
 	Cells []interface{} `json:"cells"`
 	// conditions describe additional status of a row that are relevant for a human user.
 	// +optional
