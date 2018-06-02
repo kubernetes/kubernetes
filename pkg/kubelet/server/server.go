@@ -631,6 +631,13 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
+// proxyStream proxies stream to url.
+func proxyStream(w http.ResponseWriter, r *http.Request, url *url.URL) {
+	// TODO(random-liu): Set MaxBytesPerSec to throttle the stream.
+	handler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+	handler.ServeHTTP(w, r)
+}
+
 // getAttach handles requests to attach to a container.
 func (s *Server) getAttach(request *restful.Request, response *restful.Response) {
 	params := getExecRequestParams(request)
@@ -657,8 +664,7 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
 		return
 	}
-	handler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, false /*upgradeRequired*/, &responder{})
-	handler.ServeHTTP(response.ResponseWriter, request.Request)
+	proxyStream(response.ResponseWriter, request.Request, url)
 }
 
 // getExec handles requests to run a command inside a container.
@@ -686,8 +692,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
 		return
 	}
-	handler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, false /*upgradeRequired*/, &responder{})
-	handler.ServeHTTP(response.ResponseWriter, request.Request)
+	proxyStream(response.ResponseWriter, request.Request, url)
 }
 
 // getRun handles requests to run a command inside a container.
@@ -753,8 +758,7 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
 		return
 	}
-	handler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, false /*upgradeRequired*/, &responder{})
-	handler.ServeHTTP(response.ResponseWriter, request.Request)
+	proxyStream(response.ResponseWriter, request.Request, url)
 }
 
 // ServeHTTP responds to HTTP requests on the Kubelet.
