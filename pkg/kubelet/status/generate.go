@@ -29,11 +29,13 @@ const (
 	PodCompleted             = "PodCompleted"
 	ContainersNotReady       = "ContainersNotReady"
 	ContainersNotInitialized = "ContainersNotInitialized"
+	ReadinessGatesNotReady   = "ReadinessGatesNotReady"
 )
 
-// GeneratePodReadyCondition returns ready condition if all containers in a pod are ready, else it
-// returns an unready condition.
-func GeneratePodReadyCondition(spec *v1.PodSpec, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
+// GeneratePodReadyCondition returns "Ready" condition of a pod.
+// The status of "Ready" condition is "True", if all containers in a pod are ready
+// AND all matching conditions specified in the ReadinessGates have status equal to "True".
+func GeneratePodReadyCondition(spec *v1.PodSpec, conditions []v1.PodCondition, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
 	// Find if all containers are ready or not.
 	if containerStatuses == nil {
 		return v1.PodCondition{
@@ -63,6 +65,7 @@ func GeneratePodReadyCondition(spec *v1.PodSpec, containerStatuses []v1.Containe
 		}
 	}
 
+	// Generate message for containers in unknown condition.
 	unreadyMessages := []string{}
 	if len(unknownContainers) > 0 {
 		unreadyMessages = append(unreadyMessages, fmt.Sprintf("containers with unknown status: %s", unknownContainers))
@@ -76,6 +79,29 @@ func GeneratePodReadyCondition(spec *v1.PodSpec, containerStatuses []v1.Containe
 			Type:    v1.PodReady,
 			Status:  v1.ConditionFalse,
 			Reason:  ContainersNotReady,
+			Message: unreadyMessage,
+		}
+	}
+
+	// Evaluate corresponding conditions specified in readiness gate
+	// Generate message if any readiness gate is not satisfied.
+	unreadyMessages = []string{}
+	for _, rg := range spec.ReadinessGates {
+		_, c := podutil.GetPodConditionFromList(conditions, rg.ConditionType)
+		if c == nil {
+			unreadyMessages = append(unreadyMessages, fmt.Sprintf("corresponding condition of pod readiness gate %q does not exist.", string(rg.ConditionType)))
+		} else if c.Status != v1.ConditionTrue {
+			unreadyMessages = append(unreadyMessages, fmt.Sprintf("the status of pod readiness gate %q is not \"True\", but %v", string(rg.ConditionType), c.Status))
+		}
+	}
+
+	// Set "Ready" condition to "False" if any readiness gate is not ready.
+	if len(unreadyMessages) != 0 {
+		unreadyMessage := strings.Join(unreadyMessages, ", ")
+		return v1.PodCondition{
+			Type:    v1.PodReady,
+			Status:  v1.ConditionFalse,
+			Reason:  ReadinessGatesNotReady,
 			Message: unreadyMessage,
 		}
 	}

@@ -27,21 +27,24 @@ import (
 func TestGeneratePodReadyCondition(t *testing.T) {
 	tests := []struct {
 		spec              *v1.PodSpec
+		conditions        []v1.PodCondition
 		containerStatuses []v1.ContainerStatus
 		podPhase          v1.PodPhase
-		expected          v1.PodCondition
+		expectReady       v1.PodCondition
 	}{
 		{
 			spec:              nil,
+			conditions:        nil,
 			containerStatuses: nil,
 			podPhase:          v1.PodRunning,
-			expected:          getReadyCondition(false, UnknownContainerStatuses, ""),
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionFalse, UnknownContainerStatuses, ""),
 		},
 		{
 			spec:              &v1.PodSpec{},
+			conditions:        nil,
 			containerStatuses: []v1.ContainerStatus{},
 			podPhase:          v1.PodRunning,
-			expected:          getReadyCondition(true, "", ""),
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionTrue, "", ""),
 		},
 		{
 			spec: &v1.PodSpec{
@@ -49,9 +52,10 @@ func TestGeneratePodReadyCondition(t *testing.T) {
 					{Name: "1234"},
 				},
 			},
+			conditions:        nil,
 			containerStatuses: []v1.ContainerStatus{},
 			podPhase:          v1.PodRunning,
-			expected:          getReadyCondition(false, ContainersNotReady, "containers with unknown status: [1234]"),
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionFalse, ContainersNotReady, "containers with unknown status: [1234]"),
 		},
 		{
 			spec: &v1.PodSpec{
@@ -60,12 +64,13 @@ func TestGeneratePodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
+			conditions: nil,
 			containerStatuses: []v1.ContainerStatus{
 				getReadyStatus("1234"),
 				getReadyStatus("5678"),
 			},
-			podPhase: v1.PodRunning,
-			expected: getReadyCondition(true, "", ""),
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.PodReady, v1.ConditionTrue, "", ""),
 		},
 		{
 			spec: &v1.PodSpec{
@@ -74,11 +79,12 @@ func TestGeneratePodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
+			conditions: nil,
 			containerStatuses: []v1.ContainerStatus{
 				getReadyStatus("1234"),
 			},
-			podPhase: v1.PodRunning,
-			expected: getReadyCondition(false, ContainersNotReady, "containers with unknown status: [5678]"),
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.PodReady, v1.ConditionFalse, ContainersNotReady, "containers with unknown status: [5678]"),
 		},
 		{
 			spec: &v1.PodSpec{
@@ -87,12 +93,13 @@ func TestGeneratePodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
+			conditions: nil,
 			containerStatuses: []v1.ContainerStatus{
 				getReadyStatus("1234"),
 				getNotReadyStatus("5678"),
 			},
-			podPhase: v1.PodRunning,
-			expected: getReadyCondition(false, ContainersNotReady, "containers with unready status: [5678]"),
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.PodReady, v1.ConditionFalse, ContainersNotReady, "containers with unready status: [5678]"),
 		},
 		{
 			spec: &v1.PodSpec{
@@ -100,18 +107,116 @@ func TestGeneratePodReadyCondition(t *testing.T) {
 					{Name: "1234"},
 				},
 			},
+			conditions: nil,
 			containerStatuses: []v1.ContainerStatus{
 				getNotReadyStatus("1234"),
 			},
-			podPhase: v1.PodSucceeded,
-			expected: getReadyCondition(false, PodCompleted, ""),
+			podPhase:    v1.PodSucceeded,
+			expectReady: getPodCondition(v1.PodReady, v1.ConditionFalse, PodCompleted, ""),
+		},
+		{
+			spec: &v1.PodSpec{
+				ReadinessGates: []v1.PodReadinessGate{
+					{ConditionType: v1.PodConditionType("gate1")},
+				},
+			},
+			conditions:        nil,
+			containerStatuses: []v1.ContainerStatus{},
+			podPhase:          v1.PodRunning,
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionFalse, ReadinessGatesNotReady, `corresponding condition of pod readiness gate "gate1" does not exist.`),
+		},
+		{
+			spec: &v1.PodSpec{
+				ReadinessGates: []v1.PodReadinessGate{
+					{ConditionType: v1.PodConditionType("gate1")},
+				},
+			},
+			conditions: []v1.PodCondition{
+				getPodCondition("gate1", v1.ConditionFalse, "", ""),
+			},
+			containerStatuses: []v1.ContainerStatus{},
+			podPhase:          v1.PodRunning,
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionFalse, ReadinessGatesNotReady, `the status of pod readiness gate "gate1" is not "True", but False`),
+		},
+		{
+			spec: &v1.PodSpec{
+				ReadinessGates: []v1.PodReadinessGate{
+					{ConditionType: v1.PodConditionType("gate1")},
+				},
+			},
+			conditions: []v1.PodCondition{
+				getPodCondition("gate1", v1.ConditionTrue, "", ""),
+			},
+			containerStatuses: []v1.ContainerStatus{},
+			podPhase:          v1.PodRunning,
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionTrue, "", ""),
+		},
+		{
+			spec: &v1.PodSpec{
+				ReadinessGates: []v1.PodReadinessGate{
+					{ConditionType: v1.PodConditionType("gate1")},
+					{ConditionType: v1.PodConditionType("gate2")},
+				},
+			},
+			conditions: []v1.PodCondition{
+				getPodCondition("gate1", v1.ConditionTrue, "", ""),
+			},
+			containerStatuses: []v1.ContainerStatus{},
+			podPhase:          v1.PodRunning,
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionFalse, ReadinessGatesNotReady, `corresponding condition of pod readiness gate "gate2" does not exist.`),
+		},
+		{
+			spec: &v1.PodSpec{
+				ReadinessGates: []v1.PodReadinessGate{
+					{ConditionType: v1.PodConditionType("gate1")},
+					{ConditionType: v1.PodConditionType("gate2")},
+				},
+			},
+			conditions: []v1.PodCondition{
+				getPodCondition("gate1", v1.ConditionTrue, "", ""),
+				getPodCondition("gate2", v1.ConditionFalse, "", ""),
+			},
+			containerStatuses: []v1.ContainerStatus{},
+			podPhase:          v1.PodRunning,
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionFalse, ReadinessGatesNotReady, `the status of pod readiness gate "gate2" is not "True", but False`),
+		},
+		{
+			spec: &v1.PodSpec{
+				ReadinessGates: []v1.PodReadinessGate{
+					{ConditionType: v1.PodConditionType("gate1")},
+					{ConditionType: v1.PodConditionType("gate2")},
+				},
+			},
+			conditions: []v1.PodCondition{
+				getPodCondition("gate1", v1.ConditionTrue, "", ""),
+				getPodCondition("gate2", v1.ConditionTrue, "", ""),
+			},
+			containerStatuses: []v1.ContainerStatus{},
+			podPhase:          v1.PodRunning,
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionTrue, "", ""),
+		},
+		{
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "1234"},
+				},
+				ReadinessGates: []v1.PodReadinessGate{
+					{ConditionType: v1.PodConditionType("gate1")},
+				},
+			},
+			conditions: []v1.PodCondition{
+				getPodCondition("gate1", v1.ConditionTrue, "", ""),
+			},
+			containerStatuses: []v1.ContainerStatus{getNotReadyStatus("1234")},
+			podPhase:          v1.PodRunning,
+			expectReady:       getPodCondition(v1.PodReady, v1.ConditionFalse, ContainersNotReady, "containers with unready status: [1234]"),
 		},
 	}
 
 	for i, test := range tests {
-		condition := GeneratePodReadyCondition(test.spec, test.containerStatuses, test.podPhase)
-		if !reflect.DeepEqual(condition, test.expected) {
-			t.Errorf("On test case %v, expected:\n%+v\ngot\n%+v\n", i, test.expected, condition)
+		ready := GeneratePodReadyCondition(test.spec, test.conditions, test.containerStatuses, test.podPhase)
+		if !reflect.DeepEqual(ready, test.expectReady) {
+			t.Errorf("On test case %v, expectReady:\n%+v\ngot\n%+v\n", i, test.expectReady, ready)
 		}
 	}
 }
@@ -220,13 +325,9 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 	}
 }
 
-func getReadyCondition(ready bool, reason, message string) v1.PodCondition {
-	status := v1.ConditionFalse
-	if ready {
-		status = v1.ConditionTrue
-	}
+func getPodCondition(conditionType v1.PodConditionType, status v1.ConditionStatus, reason, message string) v1.PodCondition {
 	return v1.PodCondition{
-		Type:    v1.PodReady,
+		Type:    conditionType,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
