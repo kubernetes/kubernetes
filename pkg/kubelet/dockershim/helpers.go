@@ -172,6 +172,12 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (dockernat.PortSet, map[
 			// No need to do port binding when HostPort is not specified
 			continue
 		}
+		// added by gaogao start
+		// add an extension, "1" is just as a sign, it will not be actually used
+		if exteriorPort == 1 {
+			exteriorPort = 0
+		}
+		// added by gaogao end
 		interiorPort := port.ContainerPort
 		// Some of this port stuff is under-documented voodoo.
 		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api

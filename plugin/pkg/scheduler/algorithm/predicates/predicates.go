@@ -856,7 +856,8 @@ func PodFitsHostPorts(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 
 	existingPorts := nodeInfo.UsedPorts()
 	for wport := range wantPorts {
-		if wport != 0 && existingPorts[wport] {
+		// when wport is 1, do not throw Error and continue to scheduler
+		if wport != 0 && wport != 1 && existingPorts[wport] {
 			return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
 		}
 	}

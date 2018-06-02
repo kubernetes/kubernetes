@@ -30,6 +30,8 @@ import (
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"strings"
+	"strconv"
 )
 
 // ListContainers lists all containers matching the filter.
@@ -141,6 +143,28 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 			Binds: generateMountBindings(config.GetMounts()),
 		},
 	}
+
+	// added by gaogao start
+	podSandbox,boxErr := ds.client.InspectContainer(podSandboxID)
+	if boxErr!=nil {
+		panic(boxErr.Error())
+	}
+	oldEnv := createConfig.Config.Env
+	for key,value := range podSandbox.NetworkSettings.Ports {
+		for index,v := range value{
+			env :=""
+			if index == 0{
+				// first item do not append index
+				env = "KUBE_PORT_"+strings.ToUpper(strings.Replace(string(key),"/","_",-1))+"="+strings.ToUpper(v.HostPort)
+			}else{
+				// other item will append index
+				env = "KUBE_PORT"+strconv.Itoa(index)+"_"+strings.ToUpper(strings.Replace(string(key),"/","_",-1))+"="+strings.ToUpper(v.HostPort)
+			}
+			oldEnv = append(oldEnv,env)
+		}
+	}
+	createConfig.Config.Env = oldEnv
+	// added by gaogao end
 
 	hc := createConfig.HostConfig
 	ds.updateCreateConfig(&createConfig, config, sandboxConfig, podSandboxID, securityOptSep, apiVersion)
