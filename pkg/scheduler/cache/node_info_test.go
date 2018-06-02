@@ -84,7 +84,11 @@ func TestResourceList(t *testing.T) {
 				Memory:           2000,
 				EphemeralStorage: 5000,
 				AllowedPodNumber: 80,
-				ScalarResources:  map[v1.ResourceName]int64{"scalar.test/scalar1": 1, "hugepages-test": 2},
+				ScalarResources: map[v1.ResourceName]int64{
+					"scalar.test/scalar1":        1,
+					"hugepages-test":             2,
+					"attachable-volumes-aws-ebs": 39,
+				},
 			},
 			expected: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:                      *resource.NewScaledQuantity(4, -3),
@@ -92,6 +96,7 @@ func TestResourceList(t *testing.T) {
 				v1.ResourcePods:                     *resource.NewQuantity(80, resource.BinarySI),
 				v1.ResourceEphemeralStorage:         *resource.NewQuantity(5000, resource.BinarySI),
 				"scalar.test/" + "scalar1":          *resource.NewQuantity(1, resource.DecimalSI),
+				"attachable-volumes-aws-ebs":        *resource.NewQuantity(39, resource.DecimalSI),
 				v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(2, resource.BinarySI),
 			},
 		},

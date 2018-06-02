@@ -5549,6 +5549,19 @@ func TestValidateContainers(t *testing.T) {
 				TerminationMessagePolicy: "File",
 			},
 		},
+		"Invalid storage limit request": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceName("attachable-volumes-aws-ebs"): *resource.NewQuantity(10, resource.DecimalSI),
+					},
+				},
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+			},
+		},
 		"Request limit multiple invalid": {
 			{
 				Name:  "abc-123",
