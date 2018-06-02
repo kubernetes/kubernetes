@@ -202,9 +202,17 @@ type ProvisionableVolumePlugin interface {
 // AttachableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that require attachment
 // to a node before mounting.
 type AttachableVolumePlugin interface {
-	VolumePlugin
+	DeviceMountableVolumePlugin
 	NewAttacher() (Attacher, error)
 	NewDetacher() (Detacher, error)
+}
+
+// DeviceMountableVolumePlugin is an extended interface of VolumePlugin and is used
+// for volumes that requires mount device to a node before binding to volume to pod.
+type DeviceMountableVolumePlugin interface {
+	VolumePlugin
+	NewDeviceMounter() (DeviceMounter, error)
+	NewDeviceUmounter() (DeviceUmounter, error)
 	GetDeviceMountRefs(deviceMountPath string) ([]string, error)
 }
 
@@ -702,6 +710,32 @@ func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVo
 	}
 	if attachablePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
 		return attachablePlugin, nil
+	}
+	return nil, nil
+}
+
+// FindDeviceMountablePluginBySpec fetches a device mountable volume
+// plugin by spec. This does not return error if no plugin is found.
+func (pm *VolumePluginMgr) FindDeviceMountablePluginBySpec(spec *Spec) (DeviceMountableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if deviceMountablePlugin, ok := volumePlugin.(DeviceMountableVolumePlugin); ok {
+		return deviceMountablePlugin, nil
+	}
+	return nil, nil
+}
+
+// FindDeviceMountablePluginByName fetches a device mountable volume
+// plugin by spec. This does not return error if no plugin is found.
+func (pm *VolumePluginMgr) FindDeviceMountablePluginByName(name string) (DeviceMountableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if deviceMountablePlugin, ok := volumePlugin.(DeviceMountableVolumePlugin); ok {
+		return deviceMountablePlugin, nil
 	}
 	return nil, nil
 }

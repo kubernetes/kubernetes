@@ -55,6 +55,11 @@ func (plugin *vsphereVolumePlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
+// NewDeviceMounter initializes a DeviceMounter. For vsphere, this is an Attacher.
+func (plugin *vsphereVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 // Attaches the volume specified by the given spec to the given host.
 // On success, returns the device path where the device was attached on the
 // node.
@@ -195,24 +200,29 @@ func (plugin *vsphereVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([
 }
 
 // MountDevice mounts device to global mount point.
-func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, _ *v1.Pod) (string, string, error) {
+	deviceMountPath, err := attacher.GetDeviceMountPath(spec)
+	if err != nil {
+		return devicePath, deviceMountPath, err
+	}
+
 	mounter := attacher.host.GetMounter(vsphereVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
 				glog.Errorf("Failed to create directory at %#v. err: %s", deviceMountPath, err)
-				return err
+				return devicePath, deviceMountPath, err
 			}
 			notMnt = true
 		} else {
-			return err
+			return devicePath, deviceMountPath, err
 		}
 	}
 
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
-		return err
+		return devicePath, deviceMountPath, err
 	}
 
 	options := []string{}
@@ -223,11 +233,11 @@ func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath s
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
-			return err
+			return devicePath, deviceMountPath, err
 		}
 		glog.V(4).Infof("formatting spec %v devicePath %v deviceMountPath %v fs %v with options %+v", spec.Name(), devicePath, deviceMountPath, volumeSource.FSType, options)
 	}
-	return nil
+	return devicePath, deviceMountPath, nil
 }
 
 type vsphereVMDKDetacher struct {
@@ -247,6 +257,11 @@ func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
 		mounter:        plugin.host.GetMounter(plugin.GetPluginName()),
 		vsphereVolumes: vsphereCloud,
 	}, nil
+}
+
+// NewDeviceUmounter initializes a DeviceUmounter. For vsphere, this is a Detacher.
+func (plugin *vsphereVolumePlugin) NewDeviceUmounter() (volume.DeviceUmounter, error) {
+	return plugin.NewDetacher()
 }
 
 // Detach the given device from the given node.

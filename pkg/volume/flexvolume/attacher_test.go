@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
+	"path"
 )
 
 func TestAttach(t *testing.T) {
@@ -53,14 +54,15 @@ func TestWaitForAttach(t *testing.T) {
 func TestMountDevice(t *testing.T) {
 	spec := fakeVolumeSpec()
 
-	plugin, rootDir := testPlugin()
+	plugin, _ := testPlugin()
+	deviceMountPath := path.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts", spec.Name())
 	plugin.runner = fakeRunner(
-		assertDriverCall(t, notSupportedOutput(), mountDeviceCmd, rootDir+"/mount-dir", "/dev/sdx",
+		assertDriverCall(t, notSupportedOutput(), getVolumeNameCmd, specJson(plugin, spec, nil)),
+		assertDriverCall(t, notSupportedOutput(), mountDeviceCmd, deviceMountPath, "/dev/sdx",
 			specJson(plugin, spec, nil)),
 	)
-
 	a, _ := plugin.NewAttacher()
-	a.MountDevice(spec, "/dev/sdx", rootDir+"/mount-dir")
+	a.MountDevice(spec, "/dev/sdx", nil)
 }
 
 func TestIsVolumeAttached(t *testing.T) {

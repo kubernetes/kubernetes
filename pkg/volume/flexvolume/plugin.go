@@ -218,9 +218,19 @@ func (plugin *flexVolumeAttachablePlugin) NewAttacher() (volume.Attacher, error)
 	return &flexVolumeAttacher{plugin}, nil
 }
 
+// NewDeviceMounter initializes a DeviceMounter. For flex, this is an Attacher.
+func (plugin *flexVolumeAttachablePlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 // NewDetacher is part of the volume.AttachableVolumePlugin interface.
 func (plugin *flexVolumeAttachablePlugin) NewDetacher() (volume.Detacher, error) {
 	return &flexVolumeDetacher{plugin}, nil
+}
+
+// NewDeviceUmounter initializes a DeviceUmounter. For flex, this is a Detacher.
+func (plugin *flexVolumeAttachablePlugin) NewDeviceUmounter() (volume.DeviceUmounter, error) {
+	return plugin.NewDetacher()
 }
 
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.
@@ -273,7 +283,6 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 	if err != nil {
 		return "", fmt.Errorf("GetVolumeName failed from getDeviceMountPath: %s", err)
 	}
-
 	mountsDir := path.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
 	return path.Join(mountsDir, volumeName), nil
 }

@@ -201,6 +201,8 @@ type Deleter interface {
 
 // Attacher can attach a volume to a node.
 type Attacher interface {
+	DeviceMounter
+
 	// Attaches the volume specified by the given spec to the node with the given Name.
 	// On success, returns the device path where the device was attached on the
 	// node.
@@ -216,15 +218,19 @@ type Attacher interface {
 	// is returned. Otherwise, if the device does not attach after
 	// the given timeout period, an error will be returned.
 	WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error)
+}
 
+// DeviceMounter can mount a volume to node.
+type DeviceMounter interface {
 	// GetDeviceMountPath returns a path where the device should
 	// be mounted after it is attached. This is a global mount
 	// point which should be bind mounted for individual volumes.
 	GetDeviceMountPath(spec *Spec) (string, error)
 
-	// MountDevice mounts the disk to a global path which
-	// individual pods can then bind mount
-	MountDevice(spec *Spec, devicePath string, deviceMountPath string) error
+	// MountDevice mounts the disk to a global path which individual pods
+	// can then bind mount. Returns the device path and global mount path if succeeded,
+	// otherwise returns an error.
+	MountDevice(spec *Spec, devicePath string, pod *v1.Pod) (string, string, error)
 }
 
 type BulkVolumeVerifier interface {
@@ -237,11 +243,15 @@ type BulkVolumeVerifier interface {
 
 // Detacher can detach a volume from a node.
 type Detacher interface {
+	DeviceUmounter
 	// Detach the given volume from the node with the given Name.
 	// volumeName is name of the volume as returned from plugin's
 	// GetVolumeName().
 	Detach(volumeName string, nodeName types.NodeName) error
+}
 
+// Deviceumounter can umount a volume from a node.
+type DeviceUmounter interface {
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been
 	// unmounted.

@@ -67,6 +67,11 @@ func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
+// NewDeviceMounter initializes a DeviceMounter. For cinder, this is an Attacher.
+func (plugin *cinderPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	return mount.GetMountRefs(mounter, deviceMountPath)
@@ -261,23 +266,28 @@ func (attacher *cinderDiskAttacher) GetDeviceMountPath(
 }
 
 // FIXME: this method can be further pruned.
-func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, _ *v1.Pod) (string, string, error) {
+	deviceMountPath, err := attacher.GetDeviceMountPath(spec)
+	if err != nil {
+		return devicePath, deviceMountPath, err
+	}
+
 	mounter := attacher.host.GetMounter(cinderVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-				return err
+				return devicePath, deviceMountPath, err
 			}
 			notMnt = true
 		} else {
-			return err
+			return devicePath, deviceMountPath, err
 		}
 	}
 
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
-		return err
+		return devicePath, deviceMountPath, err
 	}
 
 	options := []string{}
@@ -290,10 +300,10 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
-			return err
+			return devicePath, deviceMountPath, err
 		}
 	}
-	return nil
+	return devicePath, deviceMountPath, nil
 }
 
 type cinderDiskDetacher struct {
@@ -312,6 +322,11 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 		mounter:        plugin.host.GetMounter(plugin.GetPluginName()),
 		cinderProvider: cinder,
 	}, nil
+}
+
+// NewDeviceUmounter initializes a DeviceUmounter. For cinder, this is a Detacher.
+func (plugin *cinderPlugin) NewDeviceUmounter() (volume.DeviceUmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error {

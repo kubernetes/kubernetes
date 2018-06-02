@@ -217,7 +217,12 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 	return makeGlobalPDPath(a.plugin.host, volumeSource.DataDiskURI, isManagedDisk)
 }
 
-func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, _ *v1.Pod) (string, string, error) {
+	deviceMountPath, err := attacher.GetDeviceMountPath(spec)
+	if err != nil {
+		return devicePath, deviceMountPath, err
+	}
+
 	mounter := attacher.plugin.host.GetMounter(azureDataDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 
@@ -229,11 +234,11 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 				dir = filepath.Dir(deviceMountPath)
 			}
 			if err := os.MkdirAll(dir, 0750); err != nil {
-				return fmt.Errorf("azureDisk - mountDevice:CreateDirectory failed with %s", err)
+				return devicePath, deviceMountPath, fmt.Errorf("azureDisk - mountDevice:CreateDirectory failed with %s", err)
 			}
 			notMnt = true
 		} else {
-			return fmt.Errorf("azureDisk - mountDevice:IsLikelyNotMountPoint failed with %s", err)
+			return devicePath, deviceMountPath, fmt.Errorf("azureDisk - mountDevice:IsLikelyNotMountPoint failed with %s", err)
 		}
 	}
 
@@ -244,7 +249,7 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 			glog.Warningf("azureDisk - ReadDir %s failed with %v, unmount this directory", deviceMountPath, err)
 			if err := mounter.Unmount(deviceMountPath); err != nil {
 				glog.Errorf("azureDisk - Unmount deviceMountPath %s failed with %v", deviceMountPath, err)
-				return err
+				return devicePath, deviceMountPath, err
 			}
 			notMnt = true
 		}
@@ -252,7 +257,7 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
-		return err
+		return devicePath, deviceMountPath, err
 	}
 
 	options := []string{}
@@ -262,12 +267,12 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, mountOptions)
 		if err != nil {
 			if cleanErr := os.Remove(deviceMountPath); cleanErr != nil {
-				return fmt.Errorf("azureDisk - mountDevice:FormatAndMount failed with %s and clean up failed with :%v", err, cleanErr)
+				return devicePath, deviceMountPath, fmt.Errorf("azureDisk - mountDevice:FormatAndMount failed with %s and clean up failed with :%v", err, cleanErr)
 			}
-			return fmt.Errorf("azureDisk - mountDevice:FormatAndMount failed with %s", err)
+			return devicePath, deviceMountPath, fmt.Errorf("azureDisk - mountDevice:FormatAndMount failed with %s", err)
 		}
 	}
-	return nil
+	return devicePath, deviceMountPath, nil
 }
 
 // Detach detaches disk from Azure VM.
