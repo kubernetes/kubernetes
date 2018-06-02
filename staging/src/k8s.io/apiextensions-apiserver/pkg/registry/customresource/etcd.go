@@ -91,7 +91,8 @@ func newREST(resource schema.GroupResource, listKind schema.GroupVersionKind, st
 		UpdateStrategy: strategy,
 		DeleteStrategy: strategy,
 
-		TableConvertor: tableConvertor,
+		TableConvertor:      tableConvertor,
+		ReturnDeletedObject: true,
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: strategy.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {

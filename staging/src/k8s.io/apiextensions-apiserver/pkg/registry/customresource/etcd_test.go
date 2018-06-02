@@ -178,7 +178,8 @@ func TestDelete(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.CustomResource.Store.DestroyFunc()
 	test := registrytest.New(t, storage.CustomResource.Store)
-	test.TestDelete(validNewCustomResource())
+	test = test.SkipDefaultGrace()
+	test.TestDeleteGraceful(validNewCustomResource(), 30)
 }
 
 func TestGenerationNumber(t *testing.T) {

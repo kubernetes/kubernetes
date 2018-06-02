@@ -344,11 +344,8 @@ values:
 		if err != nil {
 			t.Fatal(err)
 		}
-		if obj.GetAPIVersion() != "v1" || obj.GetKind() != "Status" {
-			t.Fatalf("unexpected response: %s", string(result))
-		}
-		if v, ok, err := unstructured.NestedString(obj.Object, "status"); v != "Success" || !ok || err != nil {
-			t.Fatal(v, ok, err, string(result))
+		if obj.GetUID() != uid {
+			t.Fatalf("delete expected to give deleted object. expected uid %v got %v", uid, obj.GetUID())
 		}
 	}
 }

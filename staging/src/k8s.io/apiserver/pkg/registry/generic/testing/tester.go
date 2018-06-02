@@ -75,6 +75,11 @@ func (t *Tester) ReturnDeletedObject() *Tester {
 	return t
 }
 
+func (t *Tester) SkipDefaultGrace() *Tester {
+	t.tester = t.tester.SkipDefaultGrace()
+	return t
+}
+
 func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.tester.TestCreate(
 		valid,
