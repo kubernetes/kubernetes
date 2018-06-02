@@ -762,7 +762,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *apps.DaemonSet) ([]*v1.Pod, e
 	return cm.ClaimPods(pods)
 }
 
-// getNodesToDaemonPods returns a map from nodes to daemon pods (corresponding to ds) running on the nodes.
+// getNodesToDaemonPods returns a map from nodes to daemon pods (corresponding to ds) created for the nodes.
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned Pods are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
@@ -774,9 +774,16 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *apps.DaemonSet) (map[s
 	// Group Pods by Node name.
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
 	for _, pod := range claimedPods {
-		nodeName := pod.Spec.NodeName
+		nodeName, err := util.GetTargetNodeName(pod)
+		if err != nil {
+			glog.Warningf("Failed to get target node name of Pod %v/%v in DaemonSet %v/%v",
+				pod.Namespace, pod.Name, ds.Namespace, ds.Name)
+			continue
+		}
+
 		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
 	}
+
 	return nodeToDaemonPods, nil
 }
 
@@ -850,7 +857,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 		// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
 		// Sort the daemon pods by creation time, so the oldest is preserved.
 		if len(daemonPodsRunning) > 1 {
-			sort.Sort(podByCreationTimestamp(daemonPodsRunning))
+			sort.Sort(podByCreationTimestampAndPhase(daemonPodsRunning))
 			for i := 1; i < len(daemonPodsRunning); i++ {
 				podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)
 			}
@@ -870,7 +877,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 // which nodes should not run a Pod of ds but currently running one, it calls function
 // syncNodes with a list of pods to remove and a list of nodes to run a Pod of ds.
 func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, hash string) error {
-	// Find out which nodes are running the daemon pods controlled by ds.
+	// Find out the pods which are created for the nodes by DaemonSet.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
@@ -962,9 +969,12 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 
 				podTemplate := &template
 
-				if false /*disabled for 1.10*/ && utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 					podTemplate = template.DeepCopy()
-					podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodHostnameNodeAffinity(
+					// The pod's NodeAffinity will be updated to make sure the Pod is bound
+					// to the target node by default scheduler. It is safe to do so because there
+					// should be no conflicting node affinity with the target node.
+					podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodNodeNameNodeAffinity(
 						podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
 					podTemplate.Spec.Tolerations = util.AppendNoScheduleTolerationIfNotExist(podTemplate.Spec.Tolerations)
 
@@ -1098,7 +1108,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, hash 
 				currentNumberScheduled++
 				// Sort the daemon pods by creation time, so that the oldest is first.
 				daemonPods, _ := nodeToDaemonPods[node.Name]
-				sort.Sort(podByCreationTimestamp(daemonPods))
+				sort.Sort(podByCreationTimestampAndPhase(daemonPods))
 				pod := daemonPods[0]
 				if podutil.IsPodReady(pod) {
 					numberReady++
@@ -1414,7 +1424,7 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	var predicateFails []algorithm.PredicateFailureReason
 
 	// If ScheduleDaemonSetPods is enabled, only check nodeSelector and nodeAffinity.
-	if false /*disabled for 1.10*/ && utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 		fit, reasons, err := nodeSelectionPredicates(pod, nil, nodeInfo)
 		if err != nil {
 			return false, predicateFails, err
@@ -1466,12 +1476,21 @@ func (o byCreationTimestamp) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
-type podByCreationTimestamp []*v1.Pod
+type podByCreationTimestampAndPhase []*v1.Pod
 
-func (o podByCreationTimestamp) Len() int      { return len(o) }
-func (o podByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o podByCreationTimestampAndPhase) Len() int      { return len(o) }
+func (o podByCreationTimestampAndPhase) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
-func (o podByCreationTimestamp) Less(i, j int) bool {
+func (o podByCreationTimestampAndPhase) Less(i, j int) bool {
+	// Scheduled Pod first
+	if len(o[i].Spec.NodeName) != 0 && len(o[j].Spec.NodeName) == 0 {
+		return true
+	}
+
+	if len(o[i].Spec.NodeName) == 0 && len(o[j].Spec.NodeName) != 0 {
+		return false
+	}
+
 	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
