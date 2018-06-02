@@ -1098,6 +1098,7 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	verifyTable(t, table)
 	if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -1227,6 +1228,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			verifyTable(t, table)
 			if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
 				t.Fatal(err)
 			}
@@ -1505,6 +1507,7 @@ func TestPrintPodTable(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		buf := &bytes.Buffer{}
 		p := printers.NewHumanReadablePrinter(nil, test.opts).With(AddHandlers).AddTabWriter(false)
 		if err := p.PrintObj(table, buf); err != nil {
@@ -1838,6 +1841,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		rows := table.Rows
 		for i := range rows {
 			rows[i].Object.Object = nil
@@ -1899,6 +1903,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		rows := table.Rows
 		for i := range rows {
 			rows[i].Object.Object = nil
@@ -1982,6 +1987,7 @@ func TestPrintDeployment(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -1990,6 +1996,7 @@ func TestPrintDeployment(t *testing.T) {
 		}
 		buf.Reset()
 		table, err = printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.deployment, printers.PrintOptions{Wide: true})
+		verifyTable(t, table)
 		// print deployment with '-o wide' option
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{Wide: true, NoHeaders: true}); err != nil {
 			t.Fatal(err)
@@ -2035,6 +2042,7 @@ func TestPrintDaemonSet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2089,6 +2097,7 @@ func TestPrintJob(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2620,6 +2629,7 @@ func TestPrintHPA(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2682,6 +2692,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		rows := table.Rows
 		for i := range rows {
 			rows[i].Object.Object = nil
@@ -2848,6 +2859,7 @@ func TestPrintService(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2905,6 +2917,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2985,6 +2998,7 @@ func TestPrintControllerRevision(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3045,6 +3059,7 @@ func TestPrintReplicaSet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3057,6 +3072,7 @@ func TestPrintReplicaSet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true, Wide: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3155,6 +3171,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3227,6 +3244,7 @@ func TestPrintCronJob(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3270,6 +3288,7 @@ func TestPrintStorageClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3277,5 +3296,19 @@ func TestPrintStorageClass(t *testing.T) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
+	}
+}
+
+func verifyTable(t *testing.T, table *metav1beta1.Table) {
+	var panicErr interface{}
+	func() {
+		defer func() {
+			panicErr = recover()
+		}()
+		table.DeepCopyObject() // cells are untyped, better check that types are JSON types and can be deep copied
+	}()
+
+	if panicErr != nil {
+		t.Errorf("unexpected panic during deepcopy of table %#v: %v", table, panicErr)
 	}
 }
