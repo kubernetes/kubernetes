@@ -530,6 +530,9 @@ function build-node-labels {
   if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
     node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
   fi
+  if [[ "${ENABLE_NETD:-}" == "true" && "${master}" != "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}beta.kubernetes.io/kube-netd-ready=true"
+  fi
   echo $node_labels
 }
 
@@ -652,11 +655,19 @@ function construct-kubelet-flags {
       fi
     else
       # Otherwise use the configured value.
-      flags+=" --network-plugin=${NETWORK_PROVIDER}"
+      if [[ "${ENABLE_NETD:-}" == "true" && "${master}" != "true" ]]; then
+        flags+=" --network-plugin=cni"
+      else
+        flags+=" --network-plugin=${NETWORK_PROVIDER}"
+      fi
     fi
   fi
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
-    flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
+    if [[ "${ENABLE_NETD:-}" == "true" && "${master}" != "true" ]]; then
+      flags+=" --non-masquerade-cidr=0.0.0.0/0"
+    else
+      flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
+    fi
   fi
   flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
   if [[ -n "${ENABLE_CUSTOM_METRICS:-}" ]]; then
@@ -850,7 +861,6 @@ RUNTIME_CONFIG: $(yaml-quote ${RUNTIME_CONFIG})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
 KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
 KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
-NETWORK_PROVIDER: $(yaml-quote ${NETWORK_PROVIDER:-})
 NETWORK_POLICY_PROVIDER: $(yaml-quote ${NETWORK_POLICY_PROVIDER:-})
 PREPULL_E2E_IMAGES: $(yaml-quote ${PREPULL_E2E_IMAGES:-})
 HAIRPIN_MODE: $(yaml-quote ${HAIRPIN_MODE:-})
@@ -858,7 +868,6 @@ E2E_STORAGE_TEST_ENVIRONMENT: $(yaml-quote ${E2E_STORAGE_TEST_ENVIRONMENT:-})
 KUBE_DOCKER_REGISTRY: $(yaml-quote ${KUBE_DOCKER_REGISTRY:-})
 KUBE_ADDON_REGISTRY: $(yaml-quote ${KUBE_ADDON_REGISTRY:-})
 MULTIZONE: $(yaml-quote ${MULTIZONE:-})
-NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
 ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
 ENABLE_APISERVER_BASIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_BASIC_AUDIT:-})
 ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
@@ -899,7 +908,20 @@ VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR})
 KUBELET_ARGS: $(yaml-quote ${KUBELET_ARGS})
 REQUIRE_METADATA_KUBELET_CONFIG_FILE: $(yaml-quote true)
 ENABLE_NETD: $(yaml-quote ${ENABLE_NETD:-false})
+CUSTOM_NETD_YAML: |
+$(echo "${CUSTOM_NETD_YAML:-}" | sed -e "s/'/''/g")
 EOF
+  if [[ ${ENABLE_NETD:-} == "true" &&  "${master}" == "false" ]]; then
+    cat >>$file <<EOF
+NETWORK_PROVIDER: $(yaml-quote "cni")
+NON_MASQUERADE_CIDR: $(yaml-quote "0.0.0.0/0")
+EOF
+  else
+    cat >>$file <<EOF
+NETWORK_PROVIDER: $(yaml-quote ${NETWORK_PROVIDER:-})
+NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
+EOF
+  fi
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \
      [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "cos" ]] || \
