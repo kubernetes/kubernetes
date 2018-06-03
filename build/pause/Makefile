@@ -21,7 +21,7 @@ IMAGE = $(REGISTRY)/pause
 IMAGE_WITH_ARCH = $(IMAGE)-$(ARCH)
 
 TAG = 3.1
-REV = $(shell git describe --contains --always --match='v*')
+REV := $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64

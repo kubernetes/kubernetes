@@ -16,7 +16,7 @@ SRCS = fakegitserver
 ARCH ?= amd64
 TARGET ?= $(CURDIR)
 GOLANG_VERSION ?= latest
-SRC_DIR = $(notdir $(shell pwd))
+SRC_DIR := $(notdir $(shell pwd))
 export
 
 IGNORE := $(shell git rev-parse HEAD > $(TARGET)/GITHASH.txt)

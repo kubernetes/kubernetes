@@ -16,7 +16,7 @@ SRCS=portforwardtester
 ARCH ?= amd64
 TARGET ?= $(CURDIR)
 GOLANG_VERSION ?= latest
-SRC_DIR = $(notdir $(shell pwd))
+SRC_DIR := $(notdir $(shell pwd))
 export
 
 bin:

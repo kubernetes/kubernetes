@@ -16,7 +16,7 @@ SRCS=controller
 ARCH ?= amd64
 TARGET ?= $(CURDIR)
 GOLANG_VERSION ?= latest
-SRC_DIR = resource-consumer/$(notdir $(shell pwd))
+SRC_DIR := resource-consumer/$(notdir $(shell pwd))
 export
 
 bin:

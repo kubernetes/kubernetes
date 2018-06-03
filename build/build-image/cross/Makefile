@@ -15,7 +15,7 @@
 .PHONY:	build push
 
 IMAGE=kube-cross
-TAG=$(shell cat VERSION)
+TAG:=$(shell cat VERSION)
 
 
 all: push
