@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -54,8 +55,8 @@ var (
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

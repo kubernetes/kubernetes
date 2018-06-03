@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -96,18 +97,12 @@ func NewScheme() *Scheme {
 	}
 	s.converter = conversion.NewConverter(s.nameFunc)
 
-	s.AddConversionFuncs(DefaultEmbeddedConversions()...)
+	utilruntime.Must(s.AddConversionFuncs(DefaultEmbeddedConversions()...))
 
 	// Enable map[string][]string conversions by default
-	if err := s.AddConversionFuncs(DefaultStringConversions...); err != nil {
-		panic(err)
-	}
-	if err := s.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
-		panic(err)
-	}
-	if err := s.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
-		panic(err)
-	}
+	utilruntime.Must(s.AddConversionFuncs(DefaultStringConversions...))
+	utilruntime.Must(s.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields))
+	utilruntime.Must(s.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields))
 	return s
 }
 

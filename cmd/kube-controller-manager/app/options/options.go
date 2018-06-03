@@ -208,8 +208,12 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 // NewDefaultComponentConfig returns kube-controller manager configuration object.
 func NewDefaultComponentConfig(insecurePort int32) (componentconfig.KubeControllerManagerConfiguration, error) {
 	scheme := runtime.NewScheme()
-	componentconfigv1alpha1.AddToScheme(scheme)
-	componentconfig.AddToScheme(scheme)
+	if err := componentconfigv1alpha1.AddToScheme(scheme); err != nil {
+		return componentconfig.KubeControllerManagerConfiguration{}, err
+	}
+	if err := componentconfig.AddToScheme(scheme); err != nil {
+		return componentconfig.KubeControllerManagerConfiguration{}, err
+	}
 
 	versioned := componentconfigv1alpha1.KubeControllerManagerConfiguration{}
 	scheme.Default(&versioned)

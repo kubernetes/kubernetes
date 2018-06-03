@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -65,8 +66,8 @@ const validInitializerName = "test.k8s.io"
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
 type testGracefulStrategy struct {

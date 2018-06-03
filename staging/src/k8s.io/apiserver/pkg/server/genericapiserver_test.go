@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -75,8 +76,8 @@ func init() {
 		&metav1.APIGroup{},
 		&metav1.APIResourceList{},
 	)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
 func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {

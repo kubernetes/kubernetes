@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
@@ -42,8 +43,8 @@ import (
 var configScheme = runtime.NewScheme()
 
 func init() {
-	apiserverapi.AddToScheme(configScheme)
-	apiserverapiv1alpha1.AddToScheme(configScheme)
+	utilruntime.Must(apiserverapi.AddToScheme(configScheme))
+	utilruntime.Must(apiserverapiv1alpha1.AddToScheme(configScheme))
 }
 
 // AdmissionOptions holds the admission options
