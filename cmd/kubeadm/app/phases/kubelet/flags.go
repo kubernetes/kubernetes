@@ -28,6 +28,7 @@ import (
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -72,8 +73,12 @@ func buildKubeletArgMap(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, registe
 		kubeletFlags["register-with-taints"] = strings.Join(taintStrs, ",")
 	}
 
+	if pids, _ := procfs.PidOf("systemd-resolved"); len(pids) > 0 {
+		// procfs.PidOf only returns an error if the regex is empty or doesn't compile, so we can ignore it
+		kubeletFlags["resolv-conf"] = "/run/systemd/resolve/resolv.conf"
+	}
+
 	// TODO: Pass through --hostname-override if a custom name is used?
-	// TODO: Check if `systemd-resolved` is running, and set `--resolv-conf` based on that
 	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs` for CRI other than Docker
 
 	return kubeletFlags
