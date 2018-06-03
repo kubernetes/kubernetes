@@ -898,6 +898,7 @@ REGION: $(yaml-quote ${REGION})
 VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR})
 KUBELET_ARGS: $(yaml-quote ${KUBELET_ARGS})
 REQUIRE_METADATA_KUBELET_CONFIG_FILE: $(yaml-quote true)
+ENABLE_NETD: $(yaml-quote ${ENABLE_NETD:-false})
 EOF
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \

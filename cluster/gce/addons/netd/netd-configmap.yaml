@@ -1,0 +1,33 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: netd-cni-config
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+data:
+  cni_network_config: |-
+    {
+      "name": "k8s-pod-network",
+      "cniVersion": "0.3.1",
+      "plugins": [
+        {
+          "type": "ptp",
+          "mtu": 1460,
+          "ipam": {
+              "type": "host-local",
+              "subnet": "%s",
+              "routes": [
+                {"dst": "0.0.0.0/0"}
+              ]
+          }
+        },
+        {
+          "type": "portmap",
+          "capabilities": {
+            "portMappings": true
+          },
+          "noSnat": true
+        }
+      ]
+    }
