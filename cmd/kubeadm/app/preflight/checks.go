@@ -51,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
-	"k8s.io/kubernetes/pkg/util/procfs"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -830,33 +829,6 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 	return err
 }
 
-// ResolveCheck tests for potential issues related to the system resolver configuration
-type ResolveCheck struct{}
-
-// Name returns label for ResolveCheck
-func (ResolveCheck) Name() string {
-	return "Resolve"
-}
-
-// Check validates the system resolver configuration
-func (ResolveCheck) Check() (warnings, errors []error) {
-	glog.V(1).Infoln("validating the system resolver configuration")
-
-	warnings = []error{}
-
-	// procfs.PidOf only returns an error if the string passed is empty
-	// or there is an issue compiling the regex, so we can ignore it here
-	pids, _ := procfs.PidOf("systemd-resolved")
-	if len(pids) > 0 {
-		warnings = append(warnings, fmt.Errorf(
-			"systemd-resolved was detected, for cluster dns resolution to work "+
-				"properly --resolv-conf=/run/systemd/resolve/resolv.conf must be set "+
-				"for the kubelet. (/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)\n"))
-	}
-
-	return warnings, errors
-}
-
 // ImagePullCheck will pull container images used by kubeadm
 type ImagePullCheck struct {
 	Images    images.Images
@@ -1011,8 +983,7 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 			InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
 			InPathCheck{executable: "socat", mandatory: false, exec: execer},
 			InPathCheck{executable: "tc", mandatory: false, exec: execer},
-			InPathCheck{executable: "touch", mandatory: false, exec: execer},
-			ResolveCheck{})
+			InPathCheck{executable: "touch", mandatory: false, exec: execer})
 	}
 	checks = append(checks,
 		SystemVerificationCheck{CRISocket: cfg.GetCRISocket()},
