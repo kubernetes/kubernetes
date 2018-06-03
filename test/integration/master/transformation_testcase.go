@@ -43,12 +43,12 @@ import (
 )
 
 const (
-	secretKey                   = "api_key"
-	secretVal                   = "086a7ffc-0225-11e8-ba89-0ed5f89f718b"
-	encryptionConfigFileName    = "encryption.conf"
-	testNamespace               = "secret-encryption-test"
-	testSecret                  = "test-secret"
-	latencySummaryMetricsFamily = "apiserver_storage_transformation_latencies_microseconds"
+	secretKey                = "api_key"
+	secretVal                = "086a7ffc-0225-11e8-ba89-0ed5f89f718b"
+	encryptionConfigFileName = "encryption.conf"
+	testNamespace            = "secret-encryption-test"
+	testSecret               = "test-secret"
+	metricsPrefix            = "apiserver_storage_"
 )
 
 type unSealSecret func(cipherText []byte, ctx value.Context, config encryptionconfig.ProviderConfig) ([]byte, error)
@@ -247,9 +247,9 @@ func (e *transformTest) printMetrics() error {
 		return fmt.Errorf("failed to gather metrics: %s", err)
 	}
 
-	metricsOfInterest := []string{latencySummaryMetricsFamily}
 	for _, mf := range metrics {
-		if contains(metricsOfInterest, *mf.Name) {
+		if strings.HasPrefix(*mf.Name, metricsPrefix) {
+			e.logger.Logf("%s", *mf.Name)
 			for _, metric := range mf.GetMetric() {
 				e.logger.Logf("%v", metric)
 			}
