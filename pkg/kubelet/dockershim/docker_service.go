@@ -411,7 +411,7 @@ func (ds *dockerService) Start(stopCh <-chan struct{}) error {
 		}()
 		go func() {
 			if err := ds.streamingServer.Start(true); err != nil && err != http.ErrServerClosed {
-				glog.Fatalf("Failed to start streaming server: %v", err)
+				glog.Fatalf("Streaming server stopped unexpectedly: %v", err)
 			}
 		}()
 	}
