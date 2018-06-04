@@ -584,7 +584,7 @@ filename | sha256 hash
 * Fixes server name verification of aggregated API servers and webhook admission endpoints ([#56415](https://github.com/kubernetes/kubernetes/pull/56415), [@liggitt](https://github.com/liggitt))
 * Fix a typo in prometheus-to-sd configuration, that drops some stackdriver metrics. ([#56473](https://github.com/kubernetes/kubernetes/pull/56473), [@loburm](https://github.com/loburm))
 * Update jquery and bootstrap dependencies ([#56447](https://github.com/kubernetes/kubernetes/pull/56447), [@dashpole](https://github.com/dashpole))
-
+* Fix bug in container lifecycle event messaging ([#56959](https://github.com/kubernetes/kubernetes/pull/56959),[@lichuqiang](https://github.com/lichuqiang))
 
 
 # v1.7.11

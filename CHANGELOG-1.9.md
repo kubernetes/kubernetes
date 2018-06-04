@@ -1395,6 +1395,7 @@ This release passes 129/145 Kubernetes e2e conformance tests.
 *   Kubelet no longer removes unregistered extended resource capacities from node status; cluster admins will have to manually remove extended resources exposed via device plugins when they the remove plugins themselves. ([#53353](https://github.com/kubernetes/kubernetes/pull/53353),[ @jiayingz](https://github.com/jiayingz))
 *   The stats summary network value now takes into account multiple network interfaces, and not just eth0. ([#52144](https://github.com/kubernetes/kubernetes/pull/52144),[ @andyxning](https://github.com/andyxning))
 *   Base images have been bumped to Debian Stretch (9). ([#52744](https://github.com/kubernetes/kubernetes/pull/52744),[ @rphillips](https://github.com/rphillips))
+*   Fix bug in container lifecycle event messaging ([#56959](https://github.com/kubernetes/kubernetes/pull/56959),[@lichuqiang](https://github.com/lichuqiang))
 
 ### **OpenStack**
 

@@ -729,6 +729,7 @@ filename | sha256 hash
 * fix azure disk storage account init issue ([#55927](https://github.com/kubernetes/kubernetes/pull/55927), [@andyzhangx](https://github.com/andyzhangx))
 * falls back to parse Docker runtime version as generic if not semver ([#54040](https://github.com/kubernetes/kubernetes/pull/54040), [@dixudx](https://github.com/dixudx))
 * BUG FIX: Check both name and ports for azure health probes ([#56918](https://github.com/kubernetes/kubernetes/pull/56918), [@feiskyer](https://github.com/feiskyer))
+* Fix bug in container lifecycle event messaging ([#56959](https://github.com/kubernetes/kubernetes/pull/56959),[@lichuqiang](https://github.com/lichuqiang))
 
 
 
