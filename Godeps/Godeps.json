@@ -490,8 +490,8 @@
 		},
 		{
 			"ImportPath": "github.com/container-storage-interface/spec/lib/go/csi/v0",
-			"Comment": "v0.2.0",
-			"Rev": "35d9f9d77954980e449e52c3f3e43c21bd8171f5"
+			"Comment": "v0.3.0",
+			"Rev": "2178fdeea87f1150a17a63252eee28d4d8141f72"
 		},
 		{
 			"ImportPath": "github.com/containerd/console",
@@ -1489,6 +1489,10 @@
 			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
 		},
 		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/wrappers",
+			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+		},
+		{
 			"ImportPath": "github.com/google/btree",
 			"Rev": "7d79101e329e5a3adf994758c578dab82b90c017"
 		},
@@ -1709,34 +1713,42 @@
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go",
+			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/asn1",
+			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/client",
+			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/client/configpb",
+			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/jsonclient",
+			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/tls",
+			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/x509",
+			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/x509/pkix",
+			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
