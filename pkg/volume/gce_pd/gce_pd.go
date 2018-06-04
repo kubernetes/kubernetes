@@ -103,15 +103,23 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 }
 
 func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
+	volumeLimits := map[string]int64{
+		util.GCEVolumeLimitKey: 16,
+	}
 	cloud := plugin.host.GetCloudProvider()
+
+	// if we can't fetch cloudprovider we return an error
+	// hoping external CCM or admin can set it. Returning
+	// default values from here will mean, no one can
+	// override them.
+	if cloud == nil {
+		return nil, fmt.Errorf("No cloudprovider present")
+	}
 
 	if cloud.ProviderName() != gcecloud.ProviderName {
 		return nil, fmt.Errorf("Expected gce cloud got %s", cloud.ProviderName())
 	}
 
-	volumeLimits := map[string]int64{
-		util.GCEVolumeLimitKey: 16,
-	}
 	return volumeLimits, nil
 }
 

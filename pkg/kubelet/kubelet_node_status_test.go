@@ -1648,6 +1648,12 @@ func TestSetVolumeLimits(t *testing.T) {
 			expectedVolumeKey: util.AzureVolumeLimitKey,
 			expectedLimit:     16,
 		},
+		{
+			name:              "when no cloudprovider is present",
+			cloudProviderName: "",
+			expectedVolumeKey: util.AzureVolumeLimitKey,
+			expectedLimit:     -1,
+		},
 	}
 	for _, test := range testcases {
 		node := &v1.Node{
@@ -1655,28 +1661,42 @@ func TestSetVolumeLimits(t *testing.T) {
 			Spec:       v1.NodeSpec{},
 		}
 
-		fakeCloud := &fakecloud.FakeCloud{
-			Provider: test.cloudProviderName,
-			Err:      nil,
+		if test.cloudProviderName != "" {
+			fakeCloud := &fakecloud.FakeCloud{
+				Provider: test.cloudProviderName,
+				Err:      nil,
+			}
+			kubelet.cloud = fakeCloud
+			kubelet.cloudproviderRequestParallelism = make(chan int, 1)
+			kubelet.cloudproviderRequestSync = make(chan int)
+			kubelet.cloudproviderRequestTimeout = 10 * time.Second
+		} else {
+			kubelet.cloud = nil
 		}
-		kubelet.cloud = fakeCloud
-		kubelet.cloudproviderRequestParallelism = make(chan int, 1)
-		kubelet.cloudproviderRequestSync = make(chan int)
-		kubelet.cloudproviderRequestTimeout = 10 * time.Second
+
 		kubelet.setVolumeLimits(node)
 		nodeLimits := []v1.ResourceList{}
 		nodeLimits = append(nodeLimits, node.Status.Allocatable)
 		nodeLimits = append(nodeLimits, node.Status.Capacity)
 		for _, volumeLimits := range nodeLimits {
-			fl, ok := volumeLimits[v1.ResourceName(test.expectedVolumeKey)]
-			if !ok {
-				t.Errorf("Expected to found volume limit for %s found none", test.expectedVolumeKey)
+			if test.expectedLimit == -1 {
+				_, ok := volumeLimits[v1.ResourceName(test.expectedVolumeKey)]
+				if ok {
+					t.Errorf("Expected no volume limit found for %s", test.expectedVolumeKey)
+				}
+			} else {
+				fl, ok := volumeLimits[v1.ResourceName(test.expectedVolumeKey)]
+
+				if !ok {
+					t.Errorf("Expected to found volume limit for %s found none", test.expectedVolumeKey)
+				}
+				foundLimit, _ := fl.AsInt64()
+				expectedValue := resource.NewQuantity(test.expectedLimit, resource.DecimalSI)
+				if expectedValue.Cmp(fl) != 0 {
+					t.Errorf("Expected volume limit for %s to be %v found %v", test.expectedVolumeKey, test.expectedLimit, foundLimit)
+				}
 			}
-			foundLimit, _ := fl.AsInt64()
-			expectedValue := resource.NewQuantity(test.expectedLimit, resource.DecimalSI)
-			if expectedValue.Cmp(fl) != 0 {
-				t.Errorf("Expected volume limit for %s to be %v found %v", test.expectedVolumeKey, test.expectedLimit, foundLimit)
-			}
+
 		}
 
 	}

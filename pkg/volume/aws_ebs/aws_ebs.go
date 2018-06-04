@@ -98,15 +98,23 @@ func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool 
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, error) {
+	volumeLimits := map[string]int64{
+		util.EBSVolumeLimitKey: 39,
+	}
 	cloud := plugin.host.GetCloudProvider()
+
+	// if we can't fetch cloudprovider we return an error
+	// hoping external CCM or admin can set it. Returning
+	// default values from here will mean, no one can
+	// override them.
+	if cloud == nil {
+		return nil, fmt.Errorf("No cloudprovider present")
+	}
 
 	if cloud.ProviderName() != aws.ProviderName {
 		return nil, fmt.Errorf("Expected aws cloud, found %s", cloud.ProviderName())
 	}
 
-	volumeLimits := map[string]int64{
-		util.EBSVolumeLimitKey: 39,
-	}
 	instances, ok := cloud.Instances()
 	if !ok {
 		glog.V(3).Infof("Failed to get instances from cloud provider")
