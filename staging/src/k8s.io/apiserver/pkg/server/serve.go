@@ -58,6 +58,9 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 			// enable HTTP2 for go's 1.7 HTTP Server
 			NextProtos: []string{"h2", "http/1.1"},
 		},
+		// TODO: make these configurable
+		ReadTimeout: 30 * time.Second,
+		IdleTimeout: 5 * time.Minute,
 	}
 
 	if s.MinTLSVersion > 0 {

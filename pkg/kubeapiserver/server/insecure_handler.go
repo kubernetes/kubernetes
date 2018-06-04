@@ -115,6 +115,9 @@ func serveInsecurely(insecureServingInfo *InsecureServingInfo, insecureHandler h
 		Addr:           insecureServingInfo.BindAddress,
 		Handler:        insecureHandler,
 		MaxHeaderBytes: 1 << 20,
+		// TODO: make these configurable
+		ReadTimeout: 30 * time.Second,
+		IdleTimeout: 5 * time.Minute,
 	}
 	glog.Infof("Serving insecurely on %s", insecureServingInfo.BindAddress)
 	ln, _, err := options.CreateListener(insecureServingInfo.BindNetwork, insecureServingInfo.BindAddress)
