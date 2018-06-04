@@ -31,13 +31,14 @@ import (
 )
 
 func TestForProperValidationErrors(t *testing.T) {
+	group := "validation-test.example.com"
 	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
 
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped, group)
 	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +55,7 @@ func TestForProperValidationErrors(t *testing.T) {
 		{
 			name: "bad version",
 			instanceFn: func() *unstructured.Unstructured {
-				instance := testserver.NewVersionedNoxuInstance(ns, "foo", "v2")
+				instance := testserver.NewVersionedNoxuInstance(ns, "foo", "mygroup.example.com", "v2")
 				return instance
 			},
 			expectedError: "the API version in the data (mygroup.example.com/v2) does not match the expected API version (mygroup.example.com/v1beta1)",
@@ -62,7 +63,7 @@ func TestForProperValidationErrors(t *testing.T) {
 		{
 			name: "bad kind",
 			instanceFn: func() *unstructured.Unstructured {
-				instance := testserver.NewNoxuInstance(ns, "foo")
+				instance := testserver.NewNoxuInstance(ns, "foo", group)
 				instance.Object["kind"] = "SomethingElse"
 				return instance
 			},

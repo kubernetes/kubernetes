@@ -31,11 +31,12 @@ import (
 )
 
 func TestFinalization(t *testing.T) {
+	group := "finilizer-test.example.com"
 	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	require.NoError(t, err)
 	defer close(stopCh)
 
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped, group)
 	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
@@ -43,7 +44,7 @@ func TestFinalization(t *testing.T) {
 	name := "foo123"
 	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
-	instance := testserver.NewNoxuInstance(ns, name)
+	instance := testserver.NewNoxuInstance(ns, name, group)
 	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
 	createdNoxuInstance, err := instantiateCustomResource(t, instance, noxuResourceClient, noxuDefinition)
 	require.NoError(t, err)
@@ -94,12 +95,13 @@ func TestFinalization(t *testing.T) {
 }
 
 func TestFinalizationAndDeletion(t *testing.T) {
+	group := "finilization-and-delete-test.example.com"
 	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	require.NoError(t, err)
 	defer close(stopCh)
 
 	// Create a CRD.
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped, group)
 	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
@@ -108,7 +110,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	name := "foo123"
 	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
-	instance := testserver.NewNoxuInstance(ns, name)
+	instance := testserver.NewNoxuInstance(ns, name, group)
 	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
 	createdNoxuInstance, err := instantiateCustomResource(t, instance, noxuResourceClient, noxuDefinition)
 	require.NoError(t, err)

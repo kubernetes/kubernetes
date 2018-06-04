@@ -37,13 +37,14 @@ import (
 )
 
 func TestPostInvalidObjectMeta(t *testing.T) {
+	group := "invalid-meta-test.example.com"
 	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
 
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped, group)
 	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +52,7 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 
 	noxuResourceClient := newNamespacedCustomResourceClient("default", dynamicClient, noxuDefinition)
 
-	obj := testserver.NewNoxuInstance("default", "foo")
+	obj := testserver.NewNoxuInstance("default", "foo", group)
 	unstructured.SetNestedField(obj.UnstructuredContent(), int64(42), "metadata", "unknown")
 	unstructured.SetNestedField(obj.UnstructuredContent(), map[string]interface{}{"foo": int64(42), "bar": "abc"}, "metadata", "labels")
 	_, err = instantiateCustomResource(t, obj, noxuResourceClient, noxuDefinition)
@@ -80,6 +81,7 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 }
 
 func TestInvalidObjectMetaInStorage(t *testing.T) {
+	group := "invalid-meta-in-storage-test.example.com"
 	serverConfig, err := testserver.DefaultServerConfig()
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +103,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped, group)
 	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +133,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 
 	t.Logf("Creating object with invalid labels manually in etcd")
 
-	original := testserver.NewNoxuInstance("default", "foo")
+	original := testserver.NewNoxuInstance("default", "foo", group)
 	unstructured.SetNestedField(original.UnstructuredContent(), int64(42), "metadata", "unknown")
 	unstructured.SetNestedField(original.UnstructuredContent(), map[string]interface{}{"foo": int64(42), "bar": "abc"}, "metadata", "labels")
 
