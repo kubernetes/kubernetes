@@ -200,9 +200,13 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			if len(j.Labels) == 0 {
 				j.Labels = nil
+			} else {
+				delete(j.Labels, "")
 			}
 			if len(j.Annotations) == 0 {
 				j.Annotations = nil
+			} else {
+				delete(j.Annotations, "")
 			}
 			if len(j.OwnerReferences) == 0 {
 				j.OwnerReferences = nil
