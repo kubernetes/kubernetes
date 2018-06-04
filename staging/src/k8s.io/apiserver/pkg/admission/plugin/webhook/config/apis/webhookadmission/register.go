@@ -19,7 +19,7 @@ package webhookadmission
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeconfig "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig"
+	kubecfg "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig"
 )
 
 var (
@@ -46,7 +46,7 @@ func Resource(resource string) schema.GroupResource {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&kubeconfig.EncryptionConfiguration{},
+		&kubecfg.EncryptionConfiguration{},
 		&WebhookAdmission{},
 	)
 	return nil
