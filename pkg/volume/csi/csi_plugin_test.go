@@ -160,7 +160,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			if err := os.MkdirAll(mountDir, 0755); err != nil && !os.IsNotExist(err) {
 				t.Errorf("failed to create dir [%s]: %v", mountDir, err)
 			}
-			if err := saveVolumeData(plug, testPodUID, tc.specVolID, tc.data); err != nil {
+			if err := saveVolumeData(path.Dir(mountDir), volDataFileName, tc.data); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -225,6 +225,25 @@ func TestPluginNewUnmounter(t *testing.T) {
 
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
+	// save the data file to re-create client
+	dir := path.Join(getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host), "/mount")
+	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
+		t.Errorf("failed to create dir [%s]: %v", dir, err)
+	}
+
+	if err := saveVolumeData(
+		path.Dir(dir),
+		volDataFileName,
+		map[string]string{
+			volDataKey.specVolID:  pv.ObjectMeta.Name,
+			volDataKey.driverName: testDriver,
+			volDataKey.volHandle:  testVol,
+		},
+	); err != nil {
+		t.Fatalf("failed to save volume data: %v", err)
+	}
+
+	// test unmounter
 	unmounter, err := plug.NewUnmounter(pv.ObjectMeta.Name, testPodUID)
 	csiUnmounter := unmounter.(*csiMountMgr)
 

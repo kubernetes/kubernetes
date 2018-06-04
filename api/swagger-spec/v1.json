@@ -19325,7 +19325,7 @@
       "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. Provisioned by an admin."
      },
      "cinder": {
-      "$ref": "v1.CinderVolumeSource",
+      "$ref": "v1.CinderPersistentVolumeSource",
       "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
      },
      "cephfs": {
@@ -19655,8 +19655,8 @@
      }
     }
    },
-   "v1.CinderVolumeSource": {
-    "id": "v1.CinderVolumeSource",
+   "v1.CinderPersistentVolumeSource": {
+    "id": "v1.CinderPersistentVolumeSource",
     "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
     "required": [
      "volumeID"
@@ -19673,6 +19673,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "secretRef": {
+      "$ref": "v1.SecretReference",
+      "description": "Optional: points to a secret object containing parameters used to connect to OpenStack."
      }
     }
    },
@@ -20360,6 +20364,13 @@
      "dnsConfig": {
       "$ref": "v1.PodDNSConfig",
       "description": "Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy."
+     },
+     "readinessGates": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PodReadinessGate"
+      },
+      "description": "If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md"
      }
     }
    },
@@ -20725,6 +20736,31 @@
      "options": {
       "type": "object",
       "description": "Optional: Extra command options if any."
+     }
+    }
+   },
+   "v1.CinderVolumeSource": {
+    "id": "v1.CinderVolumeSource",
+    "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string",
+      "description": "volume id used to identify the volume in cinder More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Optional: points to a secret object containing parameters used to connect to OpenStack."
      }
     }
    },
@@ -21917,13 +21953,26 @@
      }
     }
    },
+   "v1.PodReadinessGate": {
+    "id": "v1.PodReadinessGate",
+    "description": "PodReadinessGate contains the reference to a pod condition",
+    "required": [
+     "conditionType"
+    ],
+    "properties": {
+     "conditionType": {
+      "type": "string",
+      "description": "ConditionType refers to a condition in the pod's condition list with matching type."
+     }
+    }
+   },
    "v1.PodStatus": {
     "id": "v1.PodStatus",
-    "description": "PodStatus represents information about the status of a pod. Status may trail the actual state of a system.",
+    "description": "PodStatus represents information about the status of a pod. Status may trail the actual state of a system, especially if the node that hosts the pod cannot contact the control plane.",
     "properties": {
      "phase": {
       "type": "string",
-      "description": "Current condition of the pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase"
+      "description": "The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle. The conditions array, the reason and message fields, and the individual container status arrays contain more detail about the pod's status. There are five possible phase values:\n\nPending: The pod has been accepted by the Kubernetes system, but one or more of the container images has not been created. This includes time before being scheduled as well as time spent downloading images over the network, which could take a while. Running: The pod has been bound to a node, and all of the containers have been created. At least one container is still running, or is in the process of starting or restarting. Succeeded: All containers in the pod have terminated in success, and will not be restarted. Failed: All containers in the pod have terminated, and at least one container has terminated in failure. The container either exited with non-zero status or was terminated by the system. Unknown: For some reason the state of the pod could not be obtained, typically due to an error in communicating with the host of the pod.\n\nMore info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase"
      },
      "conditions": {
       "type": "array",
@@ -21986,7 +22035,7 @@
     "properties": {
      "type": {
       "type": "string",
-      "description": "Type is the type of the condition. Currently only Ready. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions"
+      "description": "Type is the type of the condition. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions"
      },
      "status": {
       "type": "string",

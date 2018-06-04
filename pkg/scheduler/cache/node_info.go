@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package schedulercache
+package cache
 
 import (
 	"errors"
@@ -410,6 +410,17 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		clone.taints = append([]v1.Taint(nil), n.taints...)
 	}
 	return clone
+}
+
+// VolumeLimits returns volume limits associated with the node
+func (n *NodeInfo) VolumeLimits() map[v1.ResourceName]int64 {
+	volumeLimits := map[v1.ResourceName]int64{}
+	for k, v := range n.AllocatableResource().ScalarResources {
+		if v1helper.IsAttachableVolumeResourceName(k) {
+			volumeLimits[k] = v
+		}
+	}
+	return volumeLimits
 }
 
 // String returns representation of human readable format of this NodeInfo.

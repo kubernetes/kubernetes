@@ -359,6 +359,10 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", provisioner.options.PVC.Spec.AccessModes, provisioner.plugin.GetAccessModes())
 	}
 
+	if util.CheckPersistentVolumeClaimModeBlock(provisioner.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisioner.plugin.GetPluginName())
+	}
+
 	if provisioner.options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}

@@ -270,11 +270,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	if c.csiClient == nil {
-		if csiSource.Driver == "" {
-			return fmt.Errorf("attacher.MountDevice failed, driver name is empty")
-		}
-		addr := fmt.Sprintf(csiAddrTemplate, csiSource.Driver)
-		c.csiClient = newCsiDriverClient("unix", addr)
+		c.csiClient = newCsiDriverClient(csiSource.Driver)
 	}
 	csi := c.csiClient
 
@@ -472,8 +468,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	if c.csiClient == nil {
-		addr := fmt.Sprintf(csiAddrTemplate, driverName)
-		c.csiClient = newCsiDriverClient("unix", addr)
+		c.csiClient = newCsiDriverClient(driverName)
 	}
 	csi := c.csiClient
 

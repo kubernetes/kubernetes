@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
@@ -55,9 +54,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("apiServerCertSANs"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
-	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
-	allErrs = append(allErrs, ValidateTokenUsages(c.TokenUsages, field.NewPath("tokenUsages"))...)
-	allErrs = append(allErrs, ValidateTokenGroups(c.TokenUsages, c.TokenGroups, field.NewPath("tokenGroups"))...)
+	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.API, field.NewPath("api"))...)
 	allErrs = append(allErrs, ValidateProxy(c.KubeProxy.Config, field.NewPath("kubeProxy").Child("config"))...)
@@ -181,18 +178,30 @@ func ValidateDiscoveryFile(discoveryFile string, fldPath *field.Path) field.Erro
 	return allErrs
 }
 
-// ValidateToken validates token
-func ValidateToken(t string, fldPath *field.Path) field.ErrorList {
+// ValidateBootstrapTokens validates a slice of BootstrapToken objects
+func ValidateBootstrapTokens(bts []kubeadm.BootstrapToken, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, bt := range bts {
+		btPath := fldPath.Child(fmt.Sprintf("%d", i))
+		allErrs = append(allErrs, ValidateToken(bt.Token.String(), btPath.Child("token"))...)
+		allErrs = append(allErrs, ValidateTokenUsages(bt.Usages, btPath.Child("usages"))...)
+		allErrs = append(allErrs, ValidateTokenGroups(bt.Usages, bt.Groups, btPath.Child("groups"))...)
+
+		if bt.Expires != nil && bt.TTL != nil {
+			allErrs = append(allErrs, field.Invalid(btPath, "", "the BootstrapToken .TTL and .Expires fields are mutually exclusive"))
+		}
+	}
+	return allErrs
+}
+
+// ValidateToken validates a Bootstrap Token
+func ValidateToken(token string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	id, secret, err := tokenutil.ParseToken(t)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, t, err.Error()))
+	if !bootstraputil.IsValidBootstrapToken(token) {
+		allErrs = append(allErrs, field.Invalid(fldPath, token, "the bootstrap token is invalid"))
 	}
 
-	if len(id) == 0 || len(secret) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, t, "token must be of form '[a-z0-9]{6}.[a-z0-9]{16}'"))
-	}
 	return allErrs
 }
 

@@ -393,7 +393,7 @@ func createPVSpec(name string, readOnly bool) *volume.Spec {
 		PersistentVolume: &v1.PersistentVolume{
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
-					Cinder: &v1.CinderVolumeSource{
+					Cinder: &v1.CinderPersistentVolumeSource{
 						VolumeID: name,
 						ReadOnly: readOnly,
 					},

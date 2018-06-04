@@ -193,7 +193,7 @@ type PersistentVolumeSource struct {
 	FlexVolume *FlexPersistentVolumeSource
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// +optional
-	Cinder *CinderVolumeSource
+	Cinder *CinderPersistentVolumeSource
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	// +optional
 	CephFS *CephFSPersistentVolumeSource
@@ -999,6 +999,32 @@ type CinderVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: points to a secret object containing parameters used to connect
+	// to OpenStack.
+	// +optional
+	SecretRef *LocalObjectReference
+}
+
+// Represents a cinder volume resource in Openstack. A Cinder volume
+// must exist before mounting to a container. The volume must also be
+// in the same region as the kubelet. Cinder volumes support ownership
+// management and SELinux relabeling.
+type CinderPersistentVolumeSource struct {
+	// Unique id of the volume used to identify the cinder volume
+	VolumeID string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+	// Optional: points to a secret object containing parameters used to connect
+	// to OpenStack.
+	// +optional
+	SecretRef *SecretReference
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
@@ -2409,6 +2435,12 @@ const (
 	TolerationOpEqual  TolerationOperator = "Equal"
 )
 
+// PodReadinessGate contains the reference to a pod condition
+type PodReadinessGate struct {
+	// ConditionType refers to a condition in the pod's condition list with matching type.
+	ConditionType PodConditionType
+}
+
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes []Volume
@@ -2505,6 +2537,12 @@ type PodSpec struct {
 	// configuration based on DNSPolicy.
 	// +optional
 	DNSConfig *PodDNSConfig
+	// If specified, all readiness gates will be evaluated for pod readiness.
+	// A pod is ready when all its containers are ready AND
+	// all conditions specified in the readiness gates have status equal to "True"
+	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
+	// +optional
+	ReadinessGates []PodReadinessGate
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -3590,6 +3628,8 @@ const (
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
 	// Name prefix for huge page resources (alpha).
 	ResourceHugePagesPrefix = "hugepages-"
+	// Name prefix for storage resource limits
+	ResourceAttachableVolumesPrefix = "attachable-volumes-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

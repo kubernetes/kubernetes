@@ -264,6 +264,18 @@ runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
 EOF
 }
 
+function install-exec-auth-plugin {
+  if [[ ! "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
+      return
+  fi
+  local -r plugin_url="${EXEC_AUTH_PLUGIN_URL}"
+  local -r plugin_sha1="${EXEC_AUTH_PLUGIN_SHA1}"
+
+  echo "Downloading gke-exec-auth-plugin binary"
+  download-or-bust "${plugin_sha1}" "${plugin_url}"
+  mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}"
+}
+
 function install-kube-manifests {
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   local dst_dir="${KUBE_HOME}/kube-manifests"
@@ -402,6 +414,10 @@ function install-kube-binary-config {
 
   # Install crictl on each node.
   install-crictl
+
+  if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
+    install-exec-auth-plugin
+  fi
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"

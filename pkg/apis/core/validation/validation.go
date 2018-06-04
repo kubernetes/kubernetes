@@ -1196,6 +1196,27 @@ func validateCinderVolumeSource(cd *core.CinderVolumeSource, fldPath *field.Path
 	if len(cd.VolumeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
 	}
+	if cd.SecretRef != nil {
+		if len(cd.SecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
+		}
+	}
+	return allErrs
+}
+
+func validateCinderPersistentVolumeSource(cd *core.CinderPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cd.VolumeID) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
+	}
+	if cd.SecretRef != nil {
+		if len(cd.SecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "name"), ""))
+		}
+		if len(cd.SecretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("secretRef", "namespace"), ""))
+		}
+	}
 	return allErrs
 }
 
@@ -1622,7 +1643,7 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("cinder"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateCinderVolumeSource(pv.Spec.Cinder, specPath.Child("cinder"))...)
+			allErrs = append(allErrs, validateCinderPersistentVolumeSource(pv.Spec.Cinder, specPath.Child("cinder"))...)
 		}
 	}
 	if pv.Spec.FC != nil {
@@ -2647,6 +2668,19 @@ const (
 	MaxDNSSearchListChars = 256
 )
 
+func validateReadinessGates(readinessGates []core.PodReadinessGate, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodReadinessGates) && len(readinessGates) > 0 {
+		return append(allErrs, field.Forbidden(fldPath, "PodReadinessGates is disabled by feature gate"))
+	}
+	for i, value := range readinessGates {
+		for _, msg := range validation.IsQualifiedName(string(value.ConditionType)) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("conditionType"), string(value.ConditionType), msg))
+		}
+	}
+	return allErrs
+}
+
 func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -2935,6 +2969,7 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, fldPath.Child("affinity"))...)
 	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"))...)
+	allErrs = append(allErrs, validateReadinessGates(spec.ReadinessGates, fldPath.Child("readinessGates"))...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
@@ -3485,6 +3520,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, validatePodConditions(newPod.Status.Conditions, fldPath.Child("conditions"))...)
 
 	fldPath = field.NewPath("status")
 	if newPod.Spec.NodeName != oldPod.Spec.NodeName {
@@ -3505,6 +3541,21 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	// For status update we ignore changes to pod spec.
 	newPod.Spec = oldPod.Spec
 
+	return allErrs
+}
+
+// validatePodConditions tests if the custom pod conditions are valid.
+func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	systemConditions := sets.NewString(string(core.PodScheduled), string(core.PodReady), string(core.PodInitialized))
+	for i, condition := range conditions {
+		if systemConditions.Has(string(condition.Type)) {
+			continue
+		}
+		for _, msg := range validation.IsQualifiedName(string(condition.Type)) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("Type"), string(condition.Type), msg))
+		}
+	}
 	return allErrs
 }
 

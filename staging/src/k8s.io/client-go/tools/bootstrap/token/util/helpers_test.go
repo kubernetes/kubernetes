@@ -21,6 +21,143 @@ import (
 	"testing"
 )
 
+func TestGenerateBootstrapToken(t *testing.T) {
+	token, err := GenerateBootstrapToken()
+	if err != nil {
+		t.Fatalf("GenerateBootstrapToken returned an unexpected error: %+v", err)
+	}
+	if !IsValidBootstrapToken(token) {
+		t.Errorf("GenerateBootstrapToken didn't generate a valid token: %q", token)
+	}
+}
+
+func TestRandBytes(t *testing.T) {
+	var randTest = []int{
+		0,
+		1,
+		2,
+		3,
+		100,
+	}
+
+	for _, rt := range randTest {
+		actual, err := randBytes(rt)
+		if err != nil {
+			t.Errorf("failed randBytes: %v", err)
+		}
+		if len(actual) != rt {
+			t.Errorf("failed randBytes:\n\texpected: %d\n\t  actual: %d\n", rt, len(actual))
+		}
+	}
+}
+
+func TestTokenFromIDAndSecret(t *testing.T) {
+	var tests = []struct {
+		id       string
+		secret   string
+		expected string
+	}{
+		{"foo", "bar", "foo.bar"}, // should use default
+		{"abcdef", "abcdef0123456789", "abcdef.abcdef0123456789"},
+		{"h", "b", "h.b"},
+	}
+	for _, rt := range tests {
+		actual := TokenFromIDAndSecret(rt.id, rt.secret)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed TokenFromIDAndSecret:\n\texpected: %s\n\t  actual: %s",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestIsValidBootstrapToken(t *testing.T) {
+	var tests = []struct {
+		token    string
+		expected bool
+	}{
+		{token: "", expected: false},
+		{token: ".", expected: false},
+		{token: "1234567890123456789012", expected: false},   // invalid parcel size
+		{token: "12345.1234567890123456", expected: false},   // invalid parcel size
+		{token: ".1234567890123456", expected: false},        // invalid parcel size
+		{token: "123456.", expected: false},                  // invalid parcel size
+		{token: "123456:1234567890.123456", expected: false}, // invalid separation
+		{token: "abcdef:1234567890123456", expected: false},  // invalid separation
+		{token: "Abcdef.1234567890123456", expected: false},  // invalid token id
+		{token: "123456.AABBCCDDEEFFGGHH", expected: false},  // invalid token secret
+		{token: "123456.AABBCCD-EEFFGGHH", expected: false},  // invalid character
+		{token: "abc*ef.1234567890123456", expected: false},  // invalid character
+		{token: "abcdef.1234567890123456", expected: true},
+		{token: "123456.aabbccddeeffgghh", expected: true},
+		{token: "ABCDEF.abcdef0123456789", expected: false},
+		{token: "abcdef.abcdef0123456789", expected: true},
+		{token: "123456.1234560123456789", expected: true},
+	}
+	for _, rt := range tests {
+		actual := IsValidBootstrapToken(rt.token)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed IsValidBootstrapToken for the token %q\n\texpected: %t\n\t  actual: %t",
+				rt.token,
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestIsValidBootstrapTokenID(t *testing.T) {
+	var tests = []struct {
+		tokenID  string
+		expected bool
+	}{
+		{tokenID: "", expected: false},
+		{tokenID: "1234567890123456789012", expected: false},
+		{tokenID: "12345", expected: false},
+		{tokenID: "Abcdef", expected: false},
+		{tokenID: "ABCDEF", expected: false},
+		{tokenID: "abcdef.", expected: false},
+		{tokenID: "abcdef", expected: true},
+		{tokenID: "123456", expected: true},
+	}
+	for _, rt := range tests {
+		actual := IsValidBootstrapTokenID(rt.tokenID)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed IsValidBootstrapTokenID for the token %q\n\texpected: %t\n\t  actual: %t",
+				rt.tokenID,
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestBootstrapTokenSecretName(t *testing.T) {
+	var tests = []struct {
+		tokenID  string
+		expected string
+	}{
+		{"foo", "bootstrap-token-foo"},
+		{"bar", "bootstrap-token-bar"},
+		{"", "bootstrap-token-"},
+		{"abcdef", "bootstrap-token-abcdef"},
+	}
+	for _, rt := range tests {
+		actual := BootstrapTokenSecretName(rt.tokenID)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed BootstrapTokenSecretName:\n\texpected: %s\n\t  actual: %s",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
 func TestValidateBootstrapGroupName(t *testing.T) {
 	tests := []struct {
 		name  string

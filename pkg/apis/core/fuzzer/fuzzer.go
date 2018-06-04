@@ -93,6 +93,19 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.Fuzz(&j.ObjectMeta)
 			j.Target.Name = c.RandString()
 		},
+		func(j *core.ReplicationController, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+
+			// match defaulting
+			if j.Spec.Template != nil {
+				if len(j.Labels) == 0 {
+					j.Labels = j.Spec.Template.Labels
+				}
+				if len(j.Spec.Selector) == 0 {
+					j.Spec.Selector = j.Spec.Template.Labels
+				}
+			}
+		},
 		func(j *core.ReplicationControllerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			//j.TemplateRef = nil // this is required for round trip

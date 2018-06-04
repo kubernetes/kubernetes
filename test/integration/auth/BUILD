@@ -51,6 +51,7 @@ go_test(
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
         "//vendor/k8s.io/api/authentication/v1:go_default_library",
         "//vendor/k8s.io/api/authentication/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

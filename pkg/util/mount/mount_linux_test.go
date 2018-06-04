@@ -1193,10 +1193,6 @@ func TestBindSubPath(t *testing.T) {
 					return nil, "", "", err
 				}
 
-				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
-					return nil, "", "", err
-				}
-
 				socketFile, socketCreateError := createSocketFile(volpath)
 
 				return mounts, volpath, socketFile, socketCreateError
@@ -1209,10 +1205,6 @@ func TestBindSubPath(t *testing.T) {
 				volpath, subpathMount := getTestPaths(base)
 				mounts := []string{subpathMount}
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
-				}
-
-				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
 					return nil, "", "", err
 				}
 
@@ -1299,7 +1291,7 @@ func TestBindSubPath(t *testing.T) {
 		}
 
 		_, subpathMount := getTestPaths(base)
-		bindPathTarget, err := doBindSubPath(fm, subpath, 1)
+		bindPathTarget, err := doBindSubPath(fm, subpath)
 		if test.expectError {
 			if err == nil {
 				t.Errorf("test %q failed: expected error, got success", test.name)

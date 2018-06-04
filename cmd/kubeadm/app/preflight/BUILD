@@ -57,7 +57,6 @@ go_library(
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/ipvs:go_default_library",
-        "//pkg/util/procfs:go_default_library",
         "//pkg/util/version:go_default_library",
         "//pkg/version:go_default_library",
         "//test/e2e_node/system:go_default_library",

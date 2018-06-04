@@ -966,7 +966,17 @@ func printCinderVolumeSource(cinder *api.CinderVolumeSource, w PrefixWriter) {
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		cinder.VolumeID, cinder.FSType, cinder.ReadOnly)
+		"    SecretRef:\t%v\n"+
+			cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
+}
+
+func printCinderPersistentVolumeSource(cinder *api.CinderPersistentVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
+		"    VolumeID:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		"    SecretRef:\t%v\n"+
+			cinder.VolumeID, cinder.SecretRef, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
 }
 
 func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w PrefixWriter) {
@@ -1228,7 +1238,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.VsphereVolume != nil:
 			printVsphereVolumeSource(pv.Spec.VsphereVolume, w)
 		case pv.Spec.Cinder != nil:
-			printCinderVolumeSource(pv.Spec.Cinder, w)
+			printCinderPersistentVolumeSource(pv.Spec.Cinder, w)
 		case pv.Spec.AzureDisk != nil:
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, w)
 		case pv.Spec.PhotonPersistentDisk != nil:

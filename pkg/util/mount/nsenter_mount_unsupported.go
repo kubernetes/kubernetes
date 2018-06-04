@@ -21,12 +21,14 @@ package mount
 import (
 	"errors"
 	"os"
+
+	"k8s.io/kubernetes/pkg/util/nsenter"
 )
 
 type NsenterMounter struct{}
 
-func NewNsenterMounter() (*NsenterMounter, error) {
-	return &NsenterMounter{}, nil
+func NewNsenterMounter(rootDir string, ne *nsenter.Nsenter) *NsenterMounter {
+	return &NsenterMounter{}
 }
 
 var _ = Interface(&NsenterMounter{})
@@ -83,8 +85,8 @@ func (*NsenterMounter) MakeFile(pathname string) error {
 	return nil
 }
 
-func (*NsenterMounter) ExistsPath(pathname string) bool {
-	return true
+func (*NsenterMounter) ExistsPath(pathname string) (bool, error) {
+	return true, errors.New("not implemented")
 }
 
 func (*NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
@@ -109,4 +111,8 @@ func (*NsenterMounter) GetFSGroup(pathname string) (int64, error) {
 
 func (*NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("not implemented")
+}
+
+func (*NsenterMounter) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
 }
