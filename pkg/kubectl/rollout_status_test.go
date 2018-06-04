@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"testing"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	api "k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -31,14 +30,14 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 	tests := []struct {
 		generation   int64
 		specReplicas int32
-		status       extensions.DeploymentStatus
+		status       apps.DeploymentStatus
 		msg          string
 		done         bool
 	}{
 		{
 			generation:   0,
 			specReplicas: 1,
-			status: extensions.DeploymentStatus{
+			status: apps.DeploymentStatus{
 				ObservedGeneration:  1,
 				Replicas:            1,
 				UpdatedReplicas:     0,
@@ -46,13 +45,13 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				UnavailableReplicas: 0,
 			},
 
-			msg:  "Waiting for rollout to finish: 0 out of 1 new replicas have been updated...\n",
+			msg:  "Waiting for deployment \"foo\" rollout to finish: 0 out of 1 new replicas have been updated...\n",
 			done: false,
 		},
 		{
 			generation:   1,
 			specReplicas: 1,
-			status: extensions.DeploymentStatus{
+			status: apps.DeploymentStatus{
 				ObservedGeneration:  1,
 				Replicas:            2,
 				UpdatedReplicas:     1,
@@ -60,13 +59,13 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				UnavailableReplicas: 0,
 			},
 
-			msg:  "Waiting for rollout to finish: 1 old replicas are pending termination...\n",
+			msg:  "Waiting for deployment \"foo\" rollout to finish: 1 old replicas are pending termination...\n",
 			done: false,
 		},
 		{
 			generation:   1,
 			specReplicas: 2,
-			status: extensions.DeploymentStatus{
+			status: apps.DeploymentStatus{
 				ObservedGeneration:  1,
 				Replicas:            2,
 				UpdatedReplicas:     2,
@@ -74,13 +73,13 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				UnavailableReplicas: 1,
 			},
 
-			msg:  "Waiting for rollout to finish: 1 of 2 updated replicas are available...\n",
+			msg:  "Waiting for deployment \"foo\" rollout to finish: 1 of 2 updated replicas are available...\n",
 			done: false,
 		},
 		{
 			generation:   1,
 			specReplicas: 2,
-			status: extensions.DeploymentStatus{
+			status: apps.DeploymentStatus{
 				ObservedGeneration:  1,
 				Replicas:            2,
 				UpdatedReplicas:     2,
@@ -94,7 +93,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 		{
 			generation:   2,
 			specReplicas: 2,
-			status: extensions.DeploymentStatus{
+			status: apps.DeploymentStatus{
 				ObservedGeneration:  1,
 				Replicas:            2,
 				UpdatedReplicas:     2,
@@ -108,19 +107,19 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		d := &extensions.Deployment{
+		d := &apps.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:  "bar",
 				Name:       "foo",
 				UID:        "8764ae47-9092-11e4-8393-42010af018ff",
 				Generation: test.generation,
 			},
-			Spec: extensions.DeploymentSpec{
+			Spec: apps.DeploymentSpec{
 				Replicas: &test.specReplicas,
 			},
 			Status: test.status,
 		}
-		client := fake.NewSimpleClientset(d).Extensions()
+		client := fake.NewSimpleClientset(d).Apps()
 		dsv := &DeploymentStatusViewer{c: client}
 		msg, done, err := dsv.Status("bar", "foo", 0)
 		if err != nil {
@@ -143,37 +142,37 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 func TestDaemonSetStatusViewerStatus(t *testing.T) {
 	tests := []struct {
 		generation int64
-		status     extensions.DaemonSetStatus
+		status     apps.DaemonSetStatus
 		msg        string
 		done       bool
 	}{
 		{
 			generation: 0,
-			status: extensions.DaemonSetStatus{
+			status: apps.DaemonSetStatus{
 				ObservedGeneration:     1,
 				UpdatedNumberScheduled: 0,
 				DesiredNumberScheduled: 1,
 				NumberAvailable:        0,
 			},
 
-			msg:  "Waiting for rollout to finish: 0 out of 1 new pods have been updated...\n",
+			msg:  "Waiting for daemon set \"foo\" rollout to finish: 0 out of 1 new pods have been updated...\n",
 			done: false,
 		},
 		{
 			generation: 1,
-			status: extensions.DaemonSetStatus{
+			status: apps.DaemonSetStatus{
 				ObservedGeneration:     1,
 				UpdatedNumberScheduled: 2,
 				DesiredNumberScheduled: 2,
 				NumberAvailable:        1,
 			},
 
-			msg:  "Waiting for rollout to finish: 1 of 2 updated pods are available...\n",
+			msg:  "Waiting for daemon set \"foo\" rollout to finish: 1 of 2 updated pods are available...\n",
 			done: false,
 		},
 		{
 			generation: 1,
-			status: extensions.DaemonSetStatus{
+			status: apps.DaemonSetStatus{
 				ObservedGeneration:     1,
 				UpdatedNumberScheduled: 2,
 				DesiredNumberScheduled: 2,
@@ -185,7 +184,7 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 		},
 		{
 			generation: 2,
-			status: extensions.DaemonSetStatus{
+			status: apps.DaemonSetStatus{
 				ObservedGeneration:     1,
 				UpdatedNumberScheduled: 2,
 				DesiredNumberScheduled: 2,
@@ -200,21 +199,21 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		t.Logf("testing scenario %d", i)
-		d := &extensions.DaemonSet{
+		d := &apps.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:  "bar",
 				Name:       "foo",
 				UID:        "8764ae47-9092-11e4-8393-42010af018ff",
 				Generation: test.generation,
 			},
-			Spec: extensions.DaemonSetSpec{
-				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-					Type: extensions.RollingUpdateDaemonSetStrategyType,
+			Spec: apps.DaemonSetSpec{
+				UpdateStrategy: apps.DaemonSetUpdateStrategy{
+					Type: apps.RollingUpdateDaemonSetStrategyType,
 				},
 			},
 			Status: test.status,
 		}
-		client := fake.NewSimpleClientset(d).Extensions()
+		client := fake.NewSimpleClientset(d).Apps()
 		dsv := &DaemonSetStatusViewer{c: client}
 		msg, done, err := dsv.Status("bar", "foo", 0)
 		if err != nil {
@@ -249,14 +248,11 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 			generation: 1,
 			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType},
 			status: apps.StatefulSetStatus{
-				ObservedGeneration: func() *int64 {
-					generation := int64(1)
-					return &generation
-				}(),
-				Replicas:        0,
-				ReadyReplicas:   1,
-				CurrentReplicas: 0,
-				UpdatedReplicas: 0,
+				ObservedGeneration: 1,
+				Replicas:           0,
+				ReadyReplicas:      1,
+				CurrentReplicas:    0,
+				UpdatedReplicas:    0,
 			},
 
 			msg:  "",
@@ -268,14 +264,11 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 			generation: 2,
 			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			status: apps.StatefulSetStatus{
-				ObservedGeneration: func() *int64 {
-					generation := int64(1)
-					return &generation
-				}(),
-				Replicas:        3,
-				ReadyReplicas:   3,
-				CurrentReplicas: 3,
-				UpdatedReplicas: 0,
+				ObservedGeneration: 1,
+				Replicas:           3,
+				ReadyReplicas:      3,
+				CurrentReplicas:    3,
+				UpdatedReplicas:    0,
 			},
 
 			msg:  "Waiting for statefulset spec update to be observed...\n",
@@ -287,14 +280,11 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 			generation: 1,
 			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			status: apps.StatefulSetStatus{
-				ObservedGeneration: func() *int64 {
-					generation := int64(2)
-					return &generation
-				}(),
-				Replicas:        3,
-				ReadyReplicas:   2,
-				CurrentReplicas: 3,
-				UpdatedReplicas: 0,
+				ObservedGeneration: 2,
+				Replicas:           3,
+				ReadyReplicas:      2,
+				CurrentReplicas:    3,
+				UpdatedReplicas:    0,
 			},
 
 			msg:  fmt.Sprintf("Waiting for %d pods to be ready...\n", 1),
@@ -310,14 +300,11 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 					return &apps.RollingUpdateStatefulSetStrategy{Partition: &partition}
 				}()},
 			status: apps.StatefulSetStatus{
-				ObservedGeneration: func() *int64 {
-					generation := int64(2)
-					return &generation
-				}(),
-				Replicas:        3,
-				ReadyReplicas:   3,
-				CurrentReplicas: 2,
-				UpdatedReplicas: 1,
+				ObservedGeneration: 2,
+				Replicas:           3,
+				ReadyReplicas:      3,
+				CurrentReplicas:    2,
+				UpdatedReplicas:    1,
 			},
 
 			msg:  fmt.Sprintf("partitioned roll out complete: %d new pods have been updated...\n", 1),
@@ -333,14 +320,11 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 					return &apps.RollingUpdateStatefulSetStrategy{Partition: &partition}
 				}()},
 			status: apps.StatefulSetStatus{
-				ObservedGeneration: func() *int64 {
-					generation := int64(2)
-					return &generation
-				}(),
-				Replicas:        3,
-				ReadyReplicas:   3,
-				CurrentReplicas: 3,
-				UpdatedReplicas: 0,
+				ObservedGeneration: 2,
+				Replicas:           3,
+				ReadyReplicas:      3,
+				CurrentReplicas:    3,
+				UpdatedReplicas:    0,
 			},
 
 			msg:  fmt.Sprintf("Waiting for partitioned roll out to finish: %d out of %d new pods have been updated...\n", 0, 1),
@@ -352,16 +336,13 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 			generation: 1,
 			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			status: apps.StatefulSetStatus{
-				ObservedGeneration: func() *int64 {
-					generation := int64(2)
-					return &generation
-				}(),
-				Replicas:        3,
-				ReadyReplicas:   3,
-				CurrentReplicas: 3,
-				UpdatedReplicas: 3,
-				CurrentRevision: "foo",
-				UpdateRevision:  "foo",
+				ObservedGeneration: 2,
+				Replicas:           3,
+				ReadyReplicas:      3,
+				CurrentReplicas:    3,
+				UpdatedReplicas:    3,
+				CurrentRevision:    "foo",
+				UpdateRevision:     "foo",
 			},
 
 			msg:  fmt.Sprintf("statefulset rolling update complete %d pods at revision %s...\n", 3, "foo"),
@@ -375,7 +356,7 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 		s.Status = test.status
 		s.Spec.UpdateStrategy = test.strategy
 		s.Generation = test.generation
-		client := fake.NewSimpleClientset(s).AppsV1beta1()
+		client := fake.NewSimpleClientset(s).AppsV1()
 		dsv := &StatefulSetStatusViewer{c: client}
 		msg, done, err := dsv.Status(s.Namespace, s.Name, 0)
 		if test.err && err == nil {
@@ -394,19 +375,19 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 }
 
 func TestDaemonSetStatusViewerStatusWithWrongUpdateStrategyType(t *testing.T) {
-	d := &extensions.DaemonSet{
+	d := &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "bar",
 			Name:      "foo",
 			UID:       "8764ae47-9092-11e4-8393-42010af018ff",
 		},
-		Spec: extensions.DaemonSetSpec{
-			UpdateStrategy: extensions.DaemonSetUpdateStrategy{
-				Type: extensions.OnDeleteDaemonSetStrategyType,
+		Spec: apps.DaemonSetSpec{
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
+				Type: apps.OnDeleteDaemonSetStrategyType,
 			},
 		},
 	}
-	client := fake.NewSimpleClientset(d).Extensions()
+	client := fake.NewSimpleClientset(d).Apps()
 	dsv := &DaemonSetStatusViewer{c: client}
 	msg, done, err := dsv.Status("bar", "foo", 0)
 	errMsg := "Status is available only for RollingUpdate strategy type"

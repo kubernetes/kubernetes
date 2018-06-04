@@ -36,7 +36,7 @@ type mockVolumes struct {
 
 var _ aws.Volumes = &mockVolumes{}
 
-func (v *mockVolumes) AttachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error) {
+func (v *mockVolumes) AttachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 

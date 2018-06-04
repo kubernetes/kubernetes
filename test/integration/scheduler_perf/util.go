@@ -40,7 +40,7 @@ func mustSetupScheduler() (scheduler.Configurator, util.ShutdownFunc) {
 		QPS:           5000.0,
 		Burst:         5000,
 	})
-	schedulerConfig, schedulerShutdown := util.StartScheduler(clientSet, true)
+	schedulerConfig, schedulerShutdown := util.StartScheduler(clientSet)
 
 	shutdownFunc := func() {
 		schedulerShutdown()

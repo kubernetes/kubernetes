@@ -26,7 +26,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -115,10 +115,10 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	if d.Spec.Paused {
 		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume deployment/%s' and try again", d.Name)
 	}
-	deploymentRollback := &extv1beta1.DeploymentRollback{
+	deploymentRollback := &extensionsv1beta1.DeploymentRollback{
 		Name:               d.Name,
 		UpdatedAnnotations: updatedAnnotations,
-		RollbackTo: extv1beta1.RollbackConfig{
+		RollbackTo: extensionsv1beta1.RollbackConfig{
 			Revision: toRevision,
 		},
 	}
@@ -184,12 +184,12 @@ func isRollbackEvent(e *api.Event) (bool, string) {
 }
 
 func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
-	externalDeployment := &extv1beta1.Deployment{}
+	externalDeployment := &appsv1.Deployment{}
 	if err := legacyscheme.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
 		return "", fmt.Errorf("failed to convert deployment, %v", err)
 	}
 
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(externalDeployment, c.ExtensionsV1beta1())
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(externalDeployment, c.AppsV1())
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)
 	}

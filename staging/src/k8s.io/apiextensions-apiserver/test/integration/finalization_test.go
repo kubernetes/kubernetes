@@ -36,12 +36,12 @@ func TestFinalization(t *testing.T) {
 	defer close(stopCh)
 
 	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
 	ns := "not-the-default"
 	name := "foo123"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	instance := testserver.NewNoxuInstance(ns, name)
 	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
@@ -100,13 +100,13 @@ func TestFinalizationAndDeletion(t *testing.T) {
 
 	// Create a CRD.
 	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	require.NoError(t, err)
 
 	// Create a CR with a finalizer.
 	ns := "not-the-default"
 	name := "foo123"
-	noxuResourceClient := NewNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	instance := testserver.NewNoxuInstance(ns, name)
 	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
@@ -156,7 +156,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	}
 
 	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err = testserver.GetCustomResourceDefinition(noxuDefinition, apiExtensionClient)
+		_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{})
 		return errors.IsNotFound(err), err
 	})
 	if !errors.IsNotFound(err) {

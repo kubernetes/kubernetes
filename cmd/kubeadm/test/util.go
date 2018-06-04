@@ -57,9 +57,10 @@ func SetupMasterConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.M
 		kind: MasterConfiguration
 		certificatesDir: {{.CertificatesDir}}
 		api:
-		   advertiseAddress: {{.API.AdvertiseAddress}}
-		   bindPort: {{.API.BindPort}}
-		nodeName: {{.NodeName}}
+		  advertiseAddress: {{.API.AdvertiseAddress}}
+		  bindPort: {{.API.BindPort}}
+		nodeRegistration:
+		  name: {{.NodeRegistration.Name}}
 		`)))
 
 	f, err := os.Create(cfgPath)

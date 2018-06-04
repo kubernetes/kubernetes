@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -133,7 +134,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
-	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
@@ -158,7 +159,6 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	//Replace will create a resource if it doesn't exist already, so ignore not found error
 	deleteOpts.IgnoreNotFound = true
-	deleteOpts.Reaper = f.Reaper
 	if o.PrintFlags.OutputFormat != nil {
 		deleteOpts.Output = *o.PrintFlags.OutputFormat
 	}
@@ -179,7 +179,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.Builder = f.NewBuilder
 	o.BuilderArgs = args
 
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -273,25 +273,20 @@ func (o *ReplaceOptions) forceReplace() error {
 		return err
 	}
 
-	var err error
-
-	// By default use a reaper to delete all related resources.
-	if o.DeleteOptions.Cascade {
-		glog.Warningf("\"cascade\" is set, kubectl will delete and re-create all resources managed by this resource (e.g. Pods created by a ReplicationController). Consider using \"kubectl rolling-update\" if you want to update a ReplicationController together with its Pods.")
-		err = o.DeleteOptions.ReapResult(r, o.DeleteOptions.Cascade, false)
-	} else {
-		err = o.DeleteOptions.DeleteResult(r)
+	if err := o.DeleteOptions.DeleteResult(r); err != nil {
+		return err
 	}
 
+	timeout := o.DeleteOptions.Timeout
 	if timeout == 0 {
-		timeout = kubectl.Timeout
+		timeout = 5 * time.Minute
 	}
-	err = r.Visit(func(info *resource.Info, err error) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
 
-		return wait.PollImmediate(kubectl.Interval, timeout, func() (bool, error) {
+		return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 			if err := info.Get(); !errors.IsNotFound(err) {
 				return false, err
 			}

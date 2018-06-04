@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -266,12 +267,19 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 		return DryRunStaticPodUpgrade(internalcfg)
 	}
 
+	// Don't save etcd backup directory if etcd is HA, as this could cause corruption
 	return PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade)
+}
+
+// GetPathManagerForUpgrade returns a path manager properly configured for the given MasterConfiguration.
+func GetPathManagerForUpgrade(internalcfg *kubeadmapi.MasterConfiguration, etcdUpgrade bool) (upgrade.StaticPodPathManager, error) {
+	isHAEtcd := etcdutil.CheckConfigurationIsHA(&internalcfg.Etcd)
+	return upgrade.NewKubeStaticPodPathManagerUsingTempDirs(constants.GetStaticPodDirectory(), true, etcdUpgrade && !isHAEtcd)
 }
 
 // PerformStaticPodUpgrade performs the upgrade of the control plane components for a static pod hosted cluster
 func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.MasterConfiguration, etcdUpgrade bool) error {
-	pathManager, err := upgrade.NewKubeStaticPodPathManagerUsingTempDirs(constants.GetStaticPodDirectory())
+	pathManager, err := GetPathManagerForUpgrade(internalcfg, etcdUpgrade)
 	if err != nil {
 		return err
 	}

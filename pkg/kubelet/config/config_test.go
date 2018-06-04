@@ -451,4 +451,10 @@ func TestPodRestore(t *testing.T) {
 		t.Fatalf("Restore returned error: %v", err)
 	}
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.RESTORE, kubetypes.ApiserverSource, pod))
+
+	// Verify Restore only happen once
+	if err := config.Restore(tmpDir, channel); err != nil {
+		t.Fatalf("The second restore returned error: %v", err)
+	}
+	expectNoPodUpdate(t, ch)
 }

@@ -39,8 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-const defaultAdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
-
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
 func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
 	glog.V(1).Infoln("[controlplane] creating static pod files")
@@ -141,9 +139,14 @@ func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguratio
 // getAPIServerCommand builds the right API server command from the given config object and version
 func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	defaultArguments := map[string]string{
-		"advertise-address":               cfg.API.AdvertiseAddress,
-		"insecure-port":                   "0",
-		"admission-control":               defaultAdmissionControl,
+		"advertise-address":        cfg.API.AdvertiseAddress,
+		"insecure-port":            "0",
+		"enable-admission-plugins": "NodeRestriction",
+		// TODO: remove `PersistentVolumeLabel` in kubeadm v1.11, as it's automatically disabled in v1.11.
+		// ref: https://github.com/kubernetes/kubernetes/pull/64326
+		// we can't skip it now as we support v1.10 clusters still.
+		// remove it from the unit tests too.
+		"disable-admission-plugins":       "PersistentVolumeLabel",
 		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
 		"service-account-key-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
 		"client-ca-file":                  filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
@@ -169,16 +172,16 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	command := []string{"kube-apiserver"}
 
 	// If the user set endpoints for an external etcd cluster
-	if len(cfg.Etcd.Endpoints) > 0 {
-		defaultArguments["etcd-servers"] = strings.Join(cfg.Etcd.Endpoints, ",")
+	if cfg.Etcd.External != nil {
+		defaultArguments["etcd-servers"] = strings.Join(cfg.Etcd.External.Endpoints, ",")
 
 		// Use any user supplied etcd certificates
-		if cfg.Etcd.CAFile != "" {
-			defaultArguments["etcd-cafile"] = cfg.Etcd.CAFile
+		if cfg.Etcd.External.CAFile != "" {
+			defaultArguments["etcd-cafile"] = cfg.Etcd.External.CAFile
 		}
-		if cfg.Etcd.CertFile != "" && cfg.Etcd.KeyFile != "" {
-			defaultArguments["etcd-certfile"] = cfg.Etcd.CertFile
-			defaultArguments["etcd-keyfile"] = cfg.Etcd.KeyFile
+		if cfg.Etcd.External.CertFile != "" && cfg.Etcd.External.KeyFile != "" {
+			defaultArguments["etcd-certfile"] = cfg.Etcd.External.CertFile
+			defaultArguments["etcd-keyfile"] = cfg.Etcd.External.KeyFile
 		}
 	} else {
 		// Default to etcd static pod on localhost
@@ -186,17 +189,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		defaultArguments["etcd-cafile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName)
 		defaultArguments["etcd-certfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName)
 		defaultArguments["etcd-keyfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
-
-		// Warn for unused user supplied variables
-		if cfg.Etcd.CAFile != "" {
-			glog.Warningf("[controlplane] configuration for %s CAFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CAFile, kubeadmconstants.Etcd)
-		}
-		if cfg.Etcd.CertFile != "" {
-			glog.Warningf("[controlplane] configuration for %s CertFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CertFile, kubeadmconstants.Etcd)
-		}
-		if cfg.Etcd.KeyFile != "" {
-			glog.Warningf("[controlplane] configuration for %s KeyFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.KeyFile, kubeadmconstants.Etcd)
-		}
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {

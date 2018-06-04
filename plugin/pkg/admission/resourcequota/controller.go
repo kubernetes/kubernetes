@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -531,7 +532,7 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 	evaluator := e.registry.Get(gr)
 	if evaluator == nil {
 		// create an object count evaluator if no evaluator previously registered
-		// note, we do not need aggregate usage here, so we pass a nil infomer func
+		// note, we do not need aggregate usage here, so we pass a nil informer func
 		evaluator = generic.NewObjectCountEvaluator(false, gr, nil, "")
 		e.registry.Add(evaluator)
 		glog.Infof("quota admission added evaluator for: %s", gr)
@@ -549,7 +550,7 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 	select {
 	case <-waiter.finished:
 	case <-time.After(10 * time.Second):
-		return fmt.Errorf("timeout")
+		return apierrors.NewInternalError(fmt.Errorf("resource quota evaluates timeout"))
 	}
 
 	return waiter.result

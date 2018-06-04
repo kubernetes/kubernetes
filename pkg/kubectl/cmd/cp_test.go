@@ -74,6 +74,10 @@ func TestExtractFileSpec(t *testing.T) {
 			spec:      "some:bad:spec",
 			expectErr: true,
 		},
+		{
+			spec:      "namespace/pod/invalid:/some/file",
+			expectErr: true,
+		},
 	}
 	for _, test := range tests {
 		spec, err := extractFileSpec(test.spec)
@@ -510,8 +514,7 @@ func TestClean(t *testing.T) {
 }
 
 func TestCopyToPod(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
-	tf.Namespace = "test"
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	ns := legacyscheme.Codecs
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
@@ -575,6 +578,38 @@ func TestCopyToPod(t *testing.T) {
 			}
 			if !test.expectedErr && !errors.IsNotFound(err) {
 				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		expectedErr bool
+	}{
+		{
+			name:        "Validate Succeed",
+			args:        []string{"1", "2"},
+			expectedErr: false,
+		},
+		{
+			name:        "Validate Fail",
+			args:        []string{"1", "2", "3"},
+			expectedErr: true,
+		},
+	}
+	tf := cmdtesting.NewTestFactory()
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	opts := NewCopyOptions(ioStreams)
+	cmd := NewCmdCp(tf, ioStreams)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := opts.Validate(cmd, test.args)
+			if (err != nil) != test.expectedErr {
+				t.Errorf("expected error: %v, saw: %v, error: %v", test.expectedErr, err != nil, err)
 			}
 		})
 	}

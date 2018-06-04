@@ -40,7 +40,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor]", func() {
+var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
 	if isAppArmorEnabled() {
 		BeforeEach(func() {
 			By("Loading AppArmor profiles for testing")

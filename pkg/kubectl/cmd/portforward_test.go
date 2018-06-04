@@ -73,7 +73,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var err error
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -94,7 +94,6 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 					}
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 			ff := &fakePortForwarder{}
 			if test.pfErr {

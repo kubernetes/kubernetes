@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -38,7 +39,8 @@ const (
 	// ManifestsSubDirName defines directory name to store manifests
 	ManifestsSubDirName = "manifests"
 	// TempDirForKubeadm defines temporary directory for kubeadm
-	TempDirForKubeadm = "/etc/kubernetes/tmp"
+	// should be joined with KubernetesDir.
+	TempDirForKubeadm = "tmp"
 
 	// CACertAndKeyBaseName defines certificate authority base name
 	CACertAndKeyBaseName = "ca"
@@ -165,8 +167,8 @@ const (
 	APICallRetryInterval = 500 * time.Millisecond
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
-	// MarkMasterTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
-	MarkMasterTimeout = 2 * time.Minute
+	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
+	PatchNodeTimeout = 2 * time.Minute
 	// UpdateNodeTimeout specifies how long kubeadm should wait for updating node with the initial remote configuration of kubelet before timing out
 	UpdateNodeTimeout = 2 * time.Minute
 
@@ -295,9 +297,6 @@ var (
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
 	MinimumKubeletVersion = version.MustParseSemantic("v1.10.0")
 
-	// MinimumKubeletConfigVersion specifies the minimum version of Kubernetes where kubeadm supports specifying --config to the kubelet
-	MinimumKubeletConfigVersion = version.MustParseSemantic("v1.11.0-alpha.1")
-
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
 		10: "3.1.12",
@@ -346,16 +345,34 @@ func AddSelfHostedPrefix(componentName string) string {
 
 // CreateTempDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp (not using /tmp as that would potentially be dangerous)
 func CreateTempDirForKubeadm(dirName string) (string, error) {
+	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
 	// creates target folder if not already exists
-	if err := os.MkdirAll(TempDirForKubeadm, 0700); err != nil {
-		return "", fmt.Errorf("failed to create directory %q: %v", TempDirForKubeadm, err)
+	if err := os.MkdirAll(tempDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
 	}
 
-	tempDir, err := ioutil.TempDir(TempDirForKubeadm, dirName)
+	tempDir, err := ioutil.TempDir(tempDir, dirName)
 	if err != nil {
 		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
 	}
 	return tempDir, nil
+}
+
+// CreateTimestampDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp formatted with the current date
+func CreateTimestampDirForKubeadm(dirName string) (string, error) {
+	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
+	// creates target folder if not already exists
+	if err := os.MkdirAll(tempDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
+	}
+
+	timestampDirName := fmt.Sprintf("%s-%s", dirName, time.Now().Format("2006-01-02-15-04-05"))
+	timestampDir := path.Join(tempDir, timestampDirName)
+	if err := os.Mkdir(timestampDir, 0700); err != nil {
+		return "", fmt.Errorf("could not create timestamp directory: %v", err)
+	}
+
+	return timestampDir, nil
 }
 
 // GetDNSIP returns a dnsIP, which is 10th IP in svcSubnet CIDR range

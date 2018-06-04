@@ -224,12 +224,8 @@ func TestEdit(t *testing.T) {
 					Client:               fake.CreateHTTPClient(reqResp),
 				}, nil
 			}
-
-			if len(testcase.Namespace) > 0 {
-				tf.Namespace = testcase.Namespace
-			}
+			tf.WithNamespace(testcase.Namespace)
 			tf.ClientConfigVal = defaultClientConfig()
-			tf.CommandVal = "edit test cmd invocation"
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 
 			var cmd *cobra.Command

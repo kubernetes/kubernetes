@@ -312,8 +312,8 @@ func TestDelayBinding(t *testing.T) {
 		}
 	}
 
-	// When feature gate is disabled, should always be delayed
-	name := "feature-disabled"
+	// When volumeScheduling feature gate is disabled, should always be delayed
+	name := "volumeScheduling-feature-disabled"
 	shouldDelay, err := ctrl.shouldDelayBinding(makePVCClass(&classWaitMode))
 	if err != nil {
 		t.Errorf("Test %q returned error: %v", name, err)
@@ -322,7 +322,7 @@ func TestDelayBinding(t *testing.T) {
 		t.Errorf("Test %q returned true, expected false", name)
 	}
 
-	// Enable feature gate
+	// Enable volumeScheduling feature gate
 	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
 	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
 
@@ -337,5 +337,44 @@ func TestDelayBinding(t *testing.T) {
 		if shouldDelay != test.shouldDelay {
 			t.Errorf("Test %q returned unexpected %v", name, test.shouldDelay)
 		}
+	}
+
+	// When dynamicProvisioningScheduling feature gate is disabled, should be delayed,
+	// even if the pvc has selectedNode annotation.
+	provisionedClaim := makePVCClass(&classWaitMode)
+	provisionedClaim.Annotations = map[string]string{annSelectedNode: "node-name"}
+	name = "dynamicProvisioningScheduling-feature-disabled"
+	shouldDelay, err = ctrl.shouldDelayBinding(provisionedClaim)
+	if err != nil {
+		t.Errorf("Test %q returned error: %v", name, err)
+	}
+	if !shouldDelay {
+		t.Errorf("Test %q returned false, expected true", name)
+	}
+
+	// Enable DynamicProvisioningScheduling feature gate
+	utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=true")
+	defer utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=false")
+
+	// When the pvc does not have selectedNode annotation, should be delayed,
+	// even if dynamicProvisioningScheduling feature gate is enabled.
+	name = "dynamicProvisioningScheduling-feature-enabled, selectedNode-annotation-not-set"
+	shouldDelay, err = ctrl.shouldDelayBinding(makePVCClass(&classWaitMode))
+	if err != nil {
+		t.Errorf("Test %q returned error: %v", name, err)
+	}
+	if !shouldDelay {
+		t.Errorf("Test %q returned false, expected true", name)
+	}
+
+	// Should not be delayed when dynamicProvisioningScheduling feature gate is enabled,
+	// and the pvc has selectedNode annotation.
+	name = "dynamicProvisioningScheduling-feature-enabled, selectedNode-annotation-set"
+	shouldDelay, err = ctrl.shouldDelayBinding(provisionedClaim)
+	if err != nil {
+		t.Errorf("Test %q returned error: %v", name, err)
+	}
+	if shouldDelay {
+		t.Errorf("Test %q returned true, expected false", name)
 	}
 }

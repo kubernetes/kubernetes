@@ -40,10 +40,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
-	scaleclient "k8s.io/client-go/scale"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -80,9 +78,7 @@ type ApplyOptions struct {
 	Validator     validation.Schema
 	Builder       *resource.Builder
 	Mapper        meta.RESTMapper
-	Scaler        scaleclient.ScalesGetter
 	DynamicClient dynamic.Interface
-	ClientSetFunc func() (internalclientset.Interface, error)
 	OpenAPISchema openapi.Resources
 
 	Namespace        string
@@ -201,7 +197,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	var err error
-	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
@@ -215,15 +211,9 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ShouldIncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, o.Prune)
 
 	o.OpenAPISchema, _ = f.OpenAPISchema()
-	o.ClientSetFunc = f.ClientSet
 	o.Validator, err = f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	o.Builder = f.NewBuilder()
 	o.Mapper, err = f.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-
-	o.Scaler, err = f.ScaleClient()
 	if err != nil {
 		return err
 	}
@@ -233,7 +223,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -406,7 +396,6 @@ func (o *ApplyOptions) Run() error {
 				mapping:       info.Mapping,
 				helper:        helper,
 				dynamicClient: o.DynamicClient,
-				clientsetFunc: o.ClientSetFunc,
 				overwrite:     o.Overwrite,
 				backOff:       clockwork.NewRealClock(),
 				force:         o.DeleteOptions.ForceDeletion,
@@ -414,7 +403,6 @@ func (o *ApplyOptions) Run() error {
 				timeout:       o.DeleteOptions.Timeout,
 				gracePeriod:   o.DeleteOptions.GracePeriod,
 				openapiSchema: openapiSchema,
-				scaleClient:   o.Scaler,
 			}
 
 			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
@@ -491,7 +479,6 @@ func (o *ApplyOptions) Run() error {
 	p := pruner{
 		mapper:        o.Mapper,
 		dynamicClient: o.DynamicClient,
-		clientsetFunc: o.ClientSetFunc,
 
 		labelSelector: o.Selector,
 		visitedUids:   visitedUids,
@@ -499,7 +486,6 @@ func (o *ApplyOptions) Run() error {
 		cascade:     o.DeleteOptions.Cascade,
 		dryRun:      o.DryRun,
 		gracePeriod: o.DeleteOptions.GracePeriod,
-		scaler:      o.Scaler,
 
 		toPrinter: o.ToPrinter,
 
@@ -553,6 +539,7 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"", "v1", "Secret", true},
 			{"", "v1", "Service", true},
 			{"batch", "v1", "Job", true},
+			{"batch", "v1beta1", "CronJob", true},
 			{"extensions", "v1beta1", "DaemonSet", true},
 			{"extensions", "v1beta1", "Deployment", true},
 			{"extensions", "v1beta1", "Ingress", true},
@@ -580,7 +567,6 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 type pruner struct {
 	mapper        meta.RESTMapper
 	dynamicClient dynamic.Interface
-	clientsetFunc func() (internalclientset.Interface, error)
 
 	visitedUids   sets.String
 	labelSelector string
@@ -589,8 +575,6 @@ type pruner struct {
 	cascade     bool
 	dryRun      bool
 	gracePeriod int
-
-	scaler scaleclient.ScalesGetter
 
 	toPrinter func(string) (printers.ResourcePrinter, error)
 
@@ -630,7 +614,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUnini
 		}
 		name := metadata.GetName()
 		if !p.dryRun {
-			if err := p.delete(namespace, name, mapping, p.scaler); err != nil {
+			if err := p.delete(namespace, name, mapping); err != nil {
 				return err
 			}
 		}
@@ -644,44 +628,31 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUnini
 	return nil
 }
 
-func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, scaleClient scaleclient.ScalesGetter) error {
-	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.clientsetFunc, scaleClient)
+func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
+	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, clientsetFunc func() (internalclientset.Interface, error), scaleClient scaleclient.ScalesGetter) error {
-	if !cascade {
-		return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, nil)
-	}
-	cs, err := clientsetFunc()
-	if err != nil {
-		return err
-	}
-	r, err := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), cs, scaleClient)
-	if err != nil {
-		if _, ok := err.(*kubectl.NoSuchReaperError); !ok {
-			return err
-		}
-		return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, nil)
-	}
-	var options *metav1.DeleteOptions
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int) error {
+	options := &metav1.DeleteOptions{}
 	if gracePeriod >= 0 {
 		options = metav1.NewDeleteOptions(int64(gracePeriod))
 	}
-	if err := r.Stop(namespace, name, 2*time.Minute, options); err != nil {
-		return err
+	policy := metav1.DeletePropagationForeground
+	if !cascade {
+		policy = metav1.DeletePropagationOrphan
 	}
-	return nil
+	options.PropagationPolicy = &policy
+	return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, options)
 }
 
 func (p *patcher) delete(namespace, name string) error {
-	return runDelete(namespace, name, p.mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.clientsetFunc, p.scaleClient)
+	return runDelete(namespace, name, p.mapping, p.dynamicClient, p.cascade, p.gracePeriod)
 }
 
 type patcher struct {
 	mapping       *meta.RESTMapping
 	helper        *resource.Helper
 	dynamicClient dynamic.Interface
-	clientsetFunc func() (internalclientset.Interface, error)
 
 	overwrite bool
 	backOff   clockwork.Clock
@@ -692,7 +663,6 @@ type patcher struct {
 	gracePeriod int
 
 	openapiSchema openapi.Resources
-	scaleClient   scaleclient.ScalesGetter
 }
 
 func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
@@ -790,17 +760,16 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 }
 
 func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, namespace, name string) ([]byte, runtime.Object, error) {
-	err := p.delete(namespace, name)
-	if err != nil {
+	if err := p.delete(namespace, name); err != nil {
 		return modified, nil, err
 	}
-	err = wait.PollImmediate(kubectl.Interval, p.timeout, func() (bool, error) {
+	// TODO: use wait
+	if err := wait.PollImmediate(1*time.Second, p.timeout, func() (bool, error) {
 		if _, err := p.helper.Get(namespace, name, false); !errors.IsNotFound(err) {
 			return false, err
 		}
 		return true, nil
-	})
-	if err != nil {
+	}); err != nil {
 		return modified, nil, err
 	}
 	versionedObject, _, err := unstructured.UnstructuredJSONScheme.Decode(modified, nil, nil)

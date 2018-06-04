@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -41,7 +42,7 @@ type ResumeConfig struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	Resumer func(object *resource.Info) ([]byte, error)
+	Resumer polymorphichelpers.ObjectResumerFunc
 	Infos   []*resource.Info
 
 	genericclioptions.IOStreams
@@ -99,9 +100,9 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, arg
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
-	o.Resumer = f.Resumer
+	o.Resumer = polymorphichelpers.ObjectResumerFn
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -140,7 +141,7 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, arg
 
 func (o ResumeConfig) RunResume() error {
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), o.Resumer) {
+	for _, patch := range set.CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), set.PatchFn(o.Resumer)) {
 		info := patch.Info
 
 		if patch.Err != nil {
@@ -158,7 +159,9 @@ func (o ResumeConfig) RunResume() error {
 				allErrs = append(allErrs, err)
 				continue
 			}
-			printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+			if err = printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+				allErrs = append(allErrs, err)
+			}
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -173,7 +176,9 @@ func (o ResumeConfig) RunResume() error {
 			allErrs = append(allErrs, err)
 			continue
 		}
-		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+		if err = printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 
 	return utilerrors.NewAggregate(allErrs)
