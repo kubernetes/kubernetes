@@ -114,6 +114,10 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	if iSpec := config.GetImage(); iSpec != nil {
 		image = iSpec.Image
 	}
+	binds, err := ds.generateMountBindings(config.GetMounts())
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate mount bindings: %v", err)
+	}
 	createConfig := dockertypes.ContainerCreateConfig{
 		Name: makeContainerName(sandboxConfig, config),
 		Config: &dockercontainer.Config{
@@ -135,7 +139,7 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 			},
 		},
 		HostConfig: &dockercontainer.HostConfig{
-			Binds: generateMountBindings(config.GetMounts()),
+			Binds: binds,
 		},
 	}
 

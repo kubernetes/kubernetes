@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
@@ -340,7 +341,21 @@ func TestGenerateMountBindings(t *testing.T) {
 		"/mnt/7:/var/lib/mysql/7",
 		"/mnt/8:/var/lib/mysql/8:ro,Z,rshared",
 	}
-	result := generateMountBindings(mounts)
-
+	ds, _, _ := newTestDockerService()
+	fakeOS := ds.os.(*containertest.FakeOS)
+	fakeOS.StatFn = func(path string) (os.FileInfo, error) {
+		return nil, nil
+	}
+	result, err := ds.generateMountBindings(mounts)
+	assert.NoError(t, err)
 	assert.Equal(t, expectedResult, result)
+
+	fakeOS.StatFn = func(path string) (os.FileInfo, error) {
+		if path == "/mnt/8" {
+			return nil, fmt.Errorf("random error")
+		}
+		return nil, nil
+	}
+	result, err = ds.generateMountBindings(mounts)
+	assert.Error(t, err)
 }

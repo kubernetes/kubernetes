@@ -119,9 +119,13 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 // 'ro', if the path is read only
 // 'Z', if the volume requires SELinux relabeling
 // propagation mode such as 'rslave'
-func generateMountBindings(mounts []*runtimeapi.Mount) []string {
+// generateMountBindings returns error if host path of a mount does not exist.
+func (ds *dockerService) generateMountBindings(mounts []*runtimeapi.Mount) ([]string, error) {
 	result := make([]string, 0, len(mounts))
 	for _, m := range mounts {
+		if _, err := ds.os.Stat(m.HostPath); err != nil {
+			return nil, err
+		}
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		var attrs []string
 		if m.Readonly {
@@ -151,7 +155,7 @@ func generateMountBindings(mounts []*runtimeapi.Mount) []string {
 		}
 		result = append(result, bind)
 	}
-	return result
+	return result, nil
 }
 
 func makePortsAndBindings(pm []*runtimeapi.PortMapping) (dockernat.PortSet, map[dockernat.Port][]dockernat.PortBinding) {
