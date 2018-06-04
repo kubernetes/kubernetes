@@ -2241,7 +2241,7 @@ function setup-netd-manifest {
   mkdir -p "${dst_dir}/netd"
   touch "${netd_file}"
   if [ -n "${CUSTOM_NETD_YAML:-}" ]; then
-    # Replace with custom GKE netd deployment.
+    # Replace with custom GCP netd deployment.
     cat > "${netd_file}" <<EOF
 $(echo "$CUSTOM_NETD_YAML")
 EOF
