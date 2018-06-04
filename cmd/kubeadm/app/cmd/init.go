@@ -482,8 +482,8 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 7: Make the control plane self-hosted if feature gate is enabled
-	glog.V(1).Infof("[init] feature gate is enabled. Making control plane self-hosted")
 	if features.Enabled(i.cfg.FeatureGates, features.SelfHosting) {
+		glog.V(1).Infof("[init] feature gate is enabled. Making control plane self-hosted")
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		glog.Infoln("[self-hosted] creating self-hosted control plane")
