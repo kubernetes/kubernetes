@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
-	cfg "k8s.io/kubernetes/pkg/apis/componentconfig/v1"
+	kubecfgv1 "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig/v1"
 )
 
 const (
@@ -128,7 +128,7 @@ func runBenchmark(b *testing.B, transformerConfig string) {
 }
 
 func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
-	transformerConfig cfg.ProviderConfiguration) ([]byte, error) {
+	transformerConfig kubecfgv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESGCM.Keys[0].Secret)
 	if err != nil {
@@ -146,7 +146,7 @@ func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
 }
 
 func unSealWithCBCTransformer(cipherText []byte, ctx value.Context,
-	transformerConfig cfg.ProviderConfiguration) ([]byte, error) {
+	transformerConfig kubecfgv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESCBC.Keys[0].Secret)
 	if err != nil {
