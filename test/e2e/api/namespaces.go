@@ -57,7 +57,7 @@ var _ = SIGDescribe("api-namespaces", func() {
 		     6) check that the newly created namespace is NOT brought when get by name is invoked.
 		     7) check that the newly created namespace does NOT appear on the list.
 		*/
-		framework.ConformanceIt("scenario: get: not-found > post > list : found > get by name: found-and-matches >  delete >  list: not-found > get: not-found", func() {
+		It("scenario: get: not-found > post > list : found > get by name: found-and-matches >  delete >  list: not-found > get: not-found", func() {
 			namespaceName :=
 				strings.Join([]string{"testbasename", string(uuid.NewUUID())}, "")
 
@@ -155,7 +155,7 @@ var _ = SIGDescribe("api-namespaces", func() {
 		     5) check that the newly created namespace is brought when get by name is invoked.
 		     6) delete the namespace.
 		*/
-		framework.ConformanceIt("scenario: get:not found > post >  get by name: found-and-matches >  patch  > get: found > delete", func() {
+		It("scenario: get:not found > post >  get by name: found-and-matches >  patch  > get: found > delete", func() {
 			namespaceName :=
 				strings.Join([]string{"testbasename", string(uuid.NewUUID())}, "")
 
@@ -280,6 +280,7 @@ func newDefaultVerifier() NamespaceVerifier {
 		verifyKind: func(namespace *v1.Namespace) {
 			Expect(namespace.TypeMeta.Kind).To(Equal(""))
 		},
+		
 		verifyAPIVersion: func(namespace *v1.Namespace) {
 			Expect(namespace.TypeMeta.APIVersion).To(Equal(""))
 		},
@@ -287,32 +288,30 @@ func newDefaultVerifier() NamespaceVerifier {
 		verifyName: func(namespace *v1.Namespace) {
 			Expect(namespace.ObjectMeta.Name).To(Equal(""))
 		},
+		
 		verifyGenerateName: func(namespace *v1.Namespace) {
 			Expect(namespace.ObjectMeta.GenerateName).To(Equal(""))
 		},
-
+		
 		verifySelfLink: func(namespace *v1.Namespace) {
-
 		},
+		
 		verifyUID: func(namespace *v1.Namespace) {
-			// TODO / Question
-			// How to work against UID? wanted to check is not empty
-			//Expect(len(strings.TrimSpace(namespace.ObjectMeta.UID)) != 0).To(BeTrue())
+			Expect(namespace.ObjectMeta.UID).NotTo(BeNil())
 		},
+		
 		verifyGeneration: func(namespace *v1.Namespace) {
-			By(fmt.Sprintf(">>>namespace.ObjectMeta.Generation:[%v]\n", namespace.ObjectMeta.Generation))
-			Expect(namespace.ObjectMeta.Generation).To(Equal(originalGeneration)) // this is brand new
+			Expect(namespace.ObjectMeta.Generation).To(Equal(originalGeneration))
 		},
 
 		verifyCreationTimestamp: func(namespace *v1.Namespace) {
 			Expect(namespace.ObjectMeta.CreationTimestamp).NotTo(BeNil())
 		},
+		
 		verifyDeletionTimestamp: func(namespace *v1.Namespace) {
-			// TODO / Question
-			// resolve Time package import
-			//var defaultDeletionTimestamp *Time = nil
-			//Expect(namespace.ObjectMeta.DeletionTimestamp).To(Equal(defaultDeletionTimestamp))
+			Expect(namespace.ObjectMeta.DeletionTimestamp).To(BeNil())
 		},
+		
 		verifyDeletionGracePeriodSeconds: func(namespace *v1.Namespace) {
 			var defaultDeletionGracePeriodSeconds *int64
 			Expect(namespace.ObjectMeta.DeletionGracePeriodSeconds).To(Equal(defaultDeletionGracePeriodSeconds))
@@ -321,16 +320,15 @@ func newDefaultVerifier() NamespaceVerifier {
 		verifyLabels: func(namespace *v1.Namespace) {
 			Expect(len(namespace.ObjectMeta.Labels)).To(Equal(0))
 		},
+		
 		verifyAnnotations: func(namespace *v1.Namespace) {
 			Expect(len(namespace.ObjectMeta.Annotations)).To(Equal(0))
 		},
-
+		
 		verifyInitializers: func(namespace *v1.Namespace) {
-			// TODO / Question
-			// resolve Initializers package import
-			//var defaultInitializers *Initializers = nil
-			//Expect(namespace.ObjectMeta.Initializers).To(Equal(defaultInitializers))
+			Expect(namespace.ObjectMeta.Initializers).To(BeNil())
 		},
+		
 		verifyFinalizers: func(namespace *v1.Namespace) {
 			Expect(len(namespace.ObjectMeta.Finalizers)).To(Equal(0))
 		},
