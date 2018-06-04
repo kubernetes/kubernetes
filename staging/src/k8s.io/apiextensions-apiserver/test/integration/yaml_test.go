@@ -35,6 +35,7 @@ import (
 )
 
 func TestYAML(t *testing.T) {
+	group := "yaml-test.example.com"
 	stopCh, config, err := testserver.StartDefaultServer()
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +51,7 @@ func TestYAML(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped, group)
 	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)

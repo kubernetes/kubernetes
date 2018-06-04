@@ -42,13 +42,13 @@ const (
 )
 
 //NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
-func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope, group string) *apiextensionsv1beta1.CustomResourceDefinition {
 	// ensure the singular doesn't end in an s for now
 	gName := names.SimpleNameGenerator.GenerateName("foo") + "a"
 	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: gName + "s.mygroup.example.com"},
+		ObjectMeta: metav1.ObjectMeta{Name: gName + "s." + group},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
+			Group:   group,
 			Version: "v1beta1",
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:   gName + "s",
@@ -61,11 +61,11 @@ func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceSc
 	}
 }
 
-func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope, group string) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
+		ObjectMeta: metav1.ObjectMeta{Name: "noxus." + group},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
+			Group:   group,
 			Version: "v1beta1",
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:     "noxus",
@@ -80,10 +80,10 @@ func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *
 	}
 }
 
-func NewVersionedNoxuInstance(namespace, name, version string) *unstructured.Unstructured {
+func NewVersionedNoxuInstance(namespace, name, group, version string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "mygroup.example.com/" + version,
+			"apiVersion": group + "/" + version,
 			"kind":       "WishIHadChosenNoxu",
 			"metadata": map[string]interface{}{
 				"namespace": namespace,
@@ -100,15 +100,15 @@ func NewVersionedNoxuInstance(namespace, name, version string) *unstructured.Uns
 	}
 }
 
-func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
-	return NewVersionedNoxuInstance(namespace, name, "v1beta1")
+func NewNoxuInstance(namespace, name, group string) *unstructured.Unstructured {
+	return NewVersionedNoxuInstance(namespace, name, group, "v1beta1")
 }
 
-func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope, groupName string) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
+		ObjectMeta: metav1.ObjectMeta{Name: "noxus." + groupName},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
+			Group:   groupName,
 			Version: "v1beta1",
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:     "noxus",
@@ -140,11 +140,11 @@ func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiext
 	}
 }
 
-func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope, group string) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: "noxus2.mygroup.example.com"},
+		ObjectMeta: metav1.ObjectMeta{Name: "noxus2." + group},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
+			Group:   group,
 			Version: "v1alpha1",
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:     "noxus2",
@@ -158,11 +158,11 @@ func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) 
 	}
 }
 
-func NewCurletCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+func NewCurletCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope, group string) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: "curlets.mygroup.example.com"},
+		ObjectMeta: metav1.ObjectMeta{Name: "curlets." + group},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
+			Group:   group,
 			Version: "v1beta1",
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:   "curlets",
@@ -175,10 +175,10 @@ func NewCurletCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope)
 	}
 }
 
-func NewCurletInstance(namespace, name string) *unstructured.Unstructured {
+func NewCurletInstance(namespace, name, group string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "mygroup.example.com/v1beta1",
+			"apiVersion": group + "/v1beta1",
 			"kind":       "Curlet",
 			"metadata": map[string]interface{}{
 				"namespace": namespace,

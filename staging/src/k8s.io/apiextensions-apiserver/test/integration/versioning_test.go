@@ -32,7 +32,7 @@ func TestVersionedNamspacedScopedCRD(t *testing.T) {
 	}
 	defer close(stopCh)
 
-	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped, "namespaced-version-test.example.com")
 	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func TestVersionedClusterScopedCRD(t *testing.T) {
 	}
 	defer close(stopCh)
 
-	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped, "cluster-version-test.example.com")
 	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
@@ -60,13 +60,13 @@ func TestVersionedClusterScopedCRD(t *testing.T) {
 }
 
 func TestStoragedVersionInNamespacedCRDStatus(t *testing.T) {
-	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped, "namespaced-version-status-test.example.com")
 	ns := "not-the-default"
 	testStoragedVersionInCRDStatus(t, ns, noxuDefinition)
 }
 
 func TestStoragedVersionInClusterScopedCRDStatus(t *testing.T) {
-	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped, "cluster-version-status-test.example.com")
 	ns := ""
 	testStoragedVersionInCRDStatus(t, ns, noxuDefinition)
 }
