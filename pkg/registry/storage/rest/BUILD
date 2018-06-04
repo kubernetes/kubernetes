@@ -14,6 +14,8 @@ go_library(
         "//pkg/apis/storage:go_default_library",
         "//pkg/registry/storage/storageclass/storage:go_default_library",
         "//pkg/registry/storage/volumeattachment/storage:go_default_library",
+        "//pkg/registry/storage/volumesnapshot/storage:go_default_library",
+        "//pkg/registry/storage/volumesnapshotdata/storage:go_default_library",
         "//vendor/k8s.io/api/storage/v1:go_default_library",
         "//vendor/k8s.io/api/storage/v1alpha1:go_default_library",
         "//vendor/k8s.io/api/storage/v1beta1:go_default_library",

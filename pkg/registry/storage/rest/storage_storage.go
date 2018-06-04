@@ -28,6 +28,8 @@ import (
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	storageclassstore "k8s.io/kubernetes/pkg/registry/storage/storageclass/storage"
 	volumeattachmentstore "k8s.io/kubernetes/pkg/registry/storage/volumeattachment/storage"
+	vsstore "k8s.io/kubernetes/pkg/registry/storage/volumesnapshot/storage"
+	vsdstore "k8s.io/kubernetes/pkg/registry/storage/volumesnapshotdata/storage"
 )
 
 type RESTStorageProvider struct {
@@ -56,6 +58,14 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	// volumeattachments
 	volumeAttachmentStorage := volumeattachmentstore.NewREST(restOptionsGetter)
 	storage["volumeattachments"] = volumeAttachmentStorage
+
+	volumeSnapshotStorage, volumeSnapshotStatusStorage := vsstore.NewREST(restOptionsGetter)
+	storage["volumesnapshots"] = volumeSnapshotStorage
+	storage["volumesnapshots/status"] = volumeSnapshotStatusStorage
+
+	volumeSnapshotDataStorage, volumeSnapshotDataStatusStorage := vsdstore.NewREST(restOptionsGetter)
+	storage["volumesnapshotdatas"] = volumeSnapshotDataStorage
+	storage["volumesnapshotdatas/status"] = volumeSnapshotDataStatusStorage
 
 	return storage
 }

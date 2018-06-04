@@ -147,6 +147,8 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]printers.Desc
 		api.Kind("ResourceQuota"):         &ResourceQuotaDescriber{c},
 		api.Kind("PersistentVolume"):      &PersistentVolumeDescriber{c},
 		api.Kind("PersistentVolumeClaim"): &PersistentVolumeClaimDescriber{c},
+		api.Kind("VolumeSnapshot"):        &VolumeSnapshotDescriber{c},
+		api.Kind("VolumeSnapshotData"):    &VolumeSnapshotDataDescriber{c},
 		api.Kind("Namespace"):             &NamespaceDescriber{c},
 		api.Kind("Endpoints"):             &EndpointsDescriber{c},
 		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
@@ -1340,6 +1342,127 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 
 		return nil
 	})
+}
+
+type VolumeSnapshotDescriber struct {
+	clientset.Interface
+}
+
+func (d *VolumeSnapshotDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
+	c := d.Storage().VolumeSnapshots(namespace)
+
+	vs, err := c.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	events, _ := d.Core().Events(namespace).Search(legacyscheme.Scheme, vs)
+
+	return describeVolumeSnapshot(vs, events)
+}
+
+func describeVolumeSnapshot(vs *storage.VolumeSnapshot, events *api.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", vs.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", vs.Namespace)
+		if vs.ObjectMeta.DeletionTimestamp != nil {
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestamp(*vs.ObjectMeta.DeletionTimestamp))
+		}
+
+		w.Write(LEVEL_0, "Claim:\t%s\n", vs.Spec.PersistentVolumeClaimName)
+		w.Write(LEVEL_0, "SnapshotDataName:\t%s\n", vs.Spec.SnapshotDataName)
+		printLabelsMultiline(w, "Labels", vs.Labels)
+		printAnnotationsMultiline(w, "Annotations", vs.Annotations)
+		w.Write(LEVEL_0, "Finalizers:\t%v\n", vs.ObjectMeta.Finalizers)
+		if len(vs.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
+			for _, c := range vs.Status.Conditions {
+				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
+					c.Type,
+					c.Status,
+					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.Reason,
+					c.Message)
+			}
+		}
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+
+		return nil
+	})
+}
+
+type VolumeSnapshotDataDescriber struct {
+	clientset.Interface
+}
+
+func (d *VolumeSnapshotDataDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
+	c := d.Storage().VolumeSnapshotDatas()
+
+	vsd, err := c.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, vsd)
+	}
+
+	return describeVolumeSnapshotData(vsd, events)
+}
+
+func describeVolumeSnapshotData(vsd *storage.VolumeSnapshotData, events *api.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", vsd.Name)
+		printLabelsMultiline(w, "Labels", vsd.Labels)
+		printAnnotationsMultiline(w, "Annotations", vsd.Annotations)
+		w.Write(LEVEL_0, "Finalizers:\t%v\n", vsd.ObjectMeta.Finalizers)
+		if vsd.ObjectMeta.DeletionTimestamp != nil {
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestamp(*vsd.ObjectMeta.DeletionTimestamp))
+		}
+		if vsd.Spec.VolumeSnapshotRef != nil {
+			w.Write(LEVEL_0, "Snapshot:\t%s\n", vsd.Spec.VolumeSnapshotRef.Namespace+"/"+vsd.Spec.VolumeSnapshotRef.Name)
+		} else {
+			w.Write(LEVEL_0, "Snapshot:\t%s\n", "")
+		}
+		if vsd.Spec.PersistentVolumeRef != nil {
+			w.Write(LEVEL_0, "Volume:\t%s\n", vsd.Spec.PersistentVolumeRef.Name)
+		} else {
+			w.Write(LEVEL_0, "Volume:\t%s\n", "")
+		}
+		w.Write(LEVEL_0, "RealCreateTime:\t%s\n", vsd.Status.CreationTimestamp)
+
+		switch {
+		case vsd.Spec.HostPath != nil:
+			printSnapshotID(vsd.Spec.HostPath.Path, w)
+		case vsd.Spec.GlusterSnapshotVolume != nil:
+			printSnapshotID(vsd.Spec.GlusterSnapshotVolume.SnapshotID, w)
+		case vsd.Spec.AWSElasticBlockStore != nil:
+			printSnapshotID(vsd.Spec.AWSElasticBlockStore.SnapshotID, w)
+		case vsd.Spec.GCEPersistentDiskSnapshot != nil:
+			printSnapshotID(vsd.Spec.GCEPersistentDiskSnapshot.SnapshotName, w)
+		case vsd.Spec.CinderSnapshot != nil:
+			printSnapshotID(vsd.Spec.CinderSnapshot.SnapshotID, w)
+		default:
+			w.Write(LEVEL_1, "<unknown>\n")
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+
+		return nil
+	})
+}
+
+func printSnapshotID(snapshotId string, w PrefixWriter) {
+	w.Write(LEVEL_1, "SnapshotID:\t%s\n", snapshotId)
 }
 
 func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus,

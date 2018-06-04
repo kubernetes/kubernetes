@@ -28,6 +28,8 @@ import (
 type StorageV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	VolumeAttachmentsGetter
+	VolumeSnapshotsGetter
+	VolumeSnapshotDatasGetter
 }
 
 // StorageV1alpha1Client is used to interact with features provided by the storage.k8s.io group.
@@ -37,6 +39,14 @@ type StorageV1alpha1Client struct {
 
 func (c *StorageV1alpha1Client) VolumeAttachments() VolumeAttachmentInterface {
 	return newVolumeAttachments(c)
+}
+
+func (c *StorageV1alpha1Client) VolumeSnapshots(namespace string) VolumeSnapshotInterface {
+	return newVolumeSnapshots(c, namespace)
+}
+
+func (c *StorageV1alpha1Client) VolumeSnapshotDatas() VolumeSnapshotDataInterface {
+	return newVolumeSnapshotDatas(c)
 }
 
 // NewForConfig creates a new StorageV1alpha1Client for the given config.
