@@ -1107,7 +1107,6 @@ items:
   - apiGroups:
     - ""
     resources:
-    - services
     - services/status
     verbs:
     - patch

@@ -683,7 +683,7 @@ func (s *ServiceController) addFinalizer(svc *v1.Service) (*v1.Service, error) {
 	updated := svc.DeepCopy()
 	updated.ObjectMeta.Finalizers = append(svc.ObjectMeta.Finalizers, serviceLoadBalancerFinalizer)
 
-	svc, err := serviceutil.Patch(s.kubeClient.CoreV1(), svc, updated)
+	svc, err := serviceutil.PatchStatus(s.kubeClient.CoreV1(), svc, updated)
 	if err != nil {
 		return nil, err
 	}
@@ -699,7 +699,7 @@ func (s *ServiceController) removeFinalizer(svc *v1.Service) (*v1.Service, error
 	updated := svc.DeepCopy()
 	updated.ObjectMeta.Finalizers = slice.RemoveString(svc.ObjectMeta.Finalizers, serviceLoadBalancerFinalizer, nil)
 
-	svc, err := serviceutil.Patch(s.kubeClient.CoreV1(), svc, updated)
+	svc, err := serviceutil.PatchStatus(s.kubeClient.CoreV1(), svc, updated)
 	if err != nil {
 		return nil, err
 	}
