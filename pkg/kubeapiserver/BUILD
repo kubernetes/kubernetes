@@ -33,6 +33,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubeapiserver/admission:all-srcs",
+        "//pkg/kubeapiserver/apis/kubeapiserverconfig:all-srcs",
         "//pkg/kubeapiserver/authenticator:all-srcs",
         "//pkg/kubeapiserver/authorizer:all-srcs",
         "//pkg/kubeapiserver/options:all-srcs",
