@@ -865,6 +865,9 @@ data:
   config: |-
     policy: enabled
     template: |-
+      metadata:
+        annotations:
+          container.seccomp.security.alpha.kubernetes.io/istio-proxy: 'docker/default'
       initContainers:
       - name: istio-init
         image: gcr.io/istio-release/proxy_init:0.8.0
