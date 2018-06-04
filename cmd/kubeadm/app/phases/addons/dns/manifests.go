@@ -173,16 +173,8 @@ spec:
         operator: Exists
       - key: {{ .MasterTaintKey }}
         effect: NoSchedule
-      # TODO: Remove this affinity field as soon as we are using manifest lists
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: beta.kubernetes.io/arch
-                operator: In
-                values:
-                - {{ .Arch }}
+      nodeSelector:
+        beta.kubernetes.io/arch: {{ .Arch }}
 `
 
 	// KubeDNSService is the kube-dns Service manifest
