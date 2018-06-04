@@ -123,11 +123,10 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 			t.Errorf("expected %v, got %v", e, a)
 		}
 		for watchVersion, noxuWatch := range noxuWatchs {
-			select {
-			case watchEvent := <-noxuWatch.ResultChan():
+			testserver.ExpectWatchEvent(noxuWatch, func(watchEvent watch.Event) {
 				if e, a := watch.Added, watchEvent.Type; e != a {
 					t.Errorf("expected %v, got %v", e, a)
-					break
+					return
 				}
 				createdObjectMeta, err := meta.Accessor(watchEvent.Object)
 				if err != nil {
@@ -150,9 +149,9 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 				if e, a := noxuDefinition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
 					t.Errorf("expected %v, got %v", e, a)
 				}
-			case <-time.After(5 * time.Second):
+			}, func() {
 				t.Errorf("missing watch event")
-			}
+			})
 		}
 
 		// Check get for all versions
@@ -210,11 +209,10 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 		}
 
 		for _, noxuWatch := range noxuWatchs {
-			select {
-			case watchEvent := <-noxuWatch.ResultChan():
+			testserver.ExpectWatchEvent(noxuWatch, func(watchEvent watch.Event) {
 				if e, a := watch.Deleted, watchEvent.Type; e != a {
 					t.Errorf("expected %v, got %v", e, a)
-					break
+					return
 				}
 				deletedObjectMeta, err := meta.Accessor(watchEvent.Object)
 				if err != nil {
@@ -226,12 +224,11 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 					t.Fatal(err)
 				}
 				if e, a := createdObjectMeta.GetUID(), deletedObjectMeta.GetUID(); e != a {
-					t.Errorf("expected %v, got %v", e, a)
+					t.Errorf("expected equal UID for (expected) %v, and (actual) %v", createdNoxuInstance, watchEvent.Object)
 				}
-
-			case <-time.After(5 * time.Second):
+			}, func() {
 				t.Errorf("missing watch event")
-			}
+			})
 		}
 
 		// Delete test
@@ -285,11 +282,10 @@ func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1b
 		t.Fatalf("unable to create noxu Instance:%v", err)
 	}
 
-	select {
-	case watchEvent := <-noxuWatch.ResultChan():
+	testserver.ExpectWatchEvent(noxuWatch, func(watchEvent watch.Event) {
 		if e, a := watch.Added, watchEvent.Type; e != a {
 			t.Errorf("expected %v, got %v", e, a)
-			break
+			return
 		}
 		createdObjectMeta, err := meta.Accessor(watchEvent.Object)
 		if err != nil {
@@ -315,10 +311,9 @@ func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1b
 		if e, a := noxuDefinition.Spec.Names.Kind, createdTypeMeta.GetKind(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
-
-	case <-time.After(5 * time.Second):
+	}, func() {
 		t.Errorf("missing watch event")
-	}
+	})
 
 	gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
 	if err != nil {
@@ -354,11 +349,10 @@ func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1b
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	select {
-	case watchEvent := <-noxuWatch.ResultChan():
+	testserver.ExpectWatchEvent(noxuWatch, func(watchEvent watch.Event) {
 		if e, a := watch.Deleted, watchEvent.Type; e != a {
 			t.Errorf("expected %v, got %v", e, a)
-			break
+			return
 		}
 		deletedObjectMeta, err := meta.Accessor(watchEvent.Object)
 		if err != nil {
@@ -378,10 +372,9 @@ func testFieldSelector(t *testing.T, ns string, noxuDefinition *apiextensionsv1b
 		if e, a := "foo", createdObjectMeta.GetName(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
-
-	case <-time.After(5 * time.Second):
+	}, func() {
 		t.Errorf("missing watch event")
-	}
+	})
 }
 
 func TestDiscovery(t *testing.T) {
@@ -707,8 +700,7 @@ func TestCrossNamespaceListWatch(t *testing.T) {
 
 	addEvents := 0
 	for addEvents < 2 {
-		select {
-		case watchEvent := <-noxuWatch.ResultChan():
+		testserver.ExpectWatchEvent(noxuWatch, func(watchEvent watch.Event) {
 			if e, a := watch.Added, watchEvent.Type; e != a {
 				t.Fatalf("expected %v, got %v", e, a)
 			}
@@ -731,9 +723,9 @@ func TestCrossNamespaceListWatch(t *testing.T) {
 			}
 			delete(instances, createdObjectMeta.GetNamespace())
 			addEvents++
-		case <-time.After(5 * time.Second):
-			t.Fatalf("missing watch event")
-		}
+		}, func() {
+			t.Errorf("missing watch event")
+		})
 	}
 	if e, a := 0, len(instances); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -754,8 +746,7 @@ func createInstanceWithNamespaceHelper(t *testing.T, ns string, name string, nox
 func checkNamespacesWatchHelper(t *testing.T, ns string, namespacedwatch watch.Interface) {
 	namespacedAddEvent := 0
 	for namespacedAddEvent < 2 {
-		select {
-		case watchEvent := <-namespacedwatch.ResultChan():
+		testserver.ExpectWatchEvent(namespacedwatch, func(watchEvent watch.Event) {
 			// Check that the namespaced watch only has one result
 			if namespacedAddEvent > 0 {
 				t.Fatalf("extra watch event")
@@ -770,11 +761,11 @@ func checkNamespacesWatchHelper(t *testing.T, ns string, namespacedwatch watch.I
 			if e, a := ns, createdObjectMeta.GetNamespace(); e != a {
 				t.Errorf("expected %v, got %v", e, a)
 			}
-		case <-time.After(5 * time.Second):
+		}, func() {
 			if namespacedAddEvent != 1 {
 				t.Fatalf("missing watch event")
 			}
-		}
+		})
 		namespacedAddEvent++
 	}
 }
