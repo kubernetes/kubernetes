@@ -7,16 +7,20 @@ auditPolicy:
   logDir: /var/log/kubernetes/audit
   logMaxAge: 2
   path: ""
+bootstrapTokens:
+- groups:
+  - system:bootstrappers:kubeadm:default-node-token
+  token: s73ybu.6tw6wnqgp5z0wb77
+  ttl: 24h0m0s
+  usages:
+  - signing
+  - authentication
 certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
-criSocket: /var/run/criruntime.sock
 etcd:
-  caFile: ""
-  certFile: ""
-  dataDir: /var/lib/etcd
-  endpoints: null
-  image: ""
-  keyFile: ""
+  local:
+    dataDir: /var/lib/etcd
+    image: ""
 imageRepository: my-company.com
 kind: MasterConfiguration
 kubeProxy:
@@ -118,6 +122,7 @@ kubeletConfiguration:
     registryBurst: 10
     registryPullQPS: 5
     resolvConf: /etc/resolv.conf
+    rotateCertificates: true
     runtimeRequestTimeout: 2m0s
     serializeImagePulls: true
     staticPodPath: /etc/kubernetes/manifests
@@ -129,12 +134,10 @@ networking:
   dnsDomain: cluster.global
   podSubnet: ""
   serviceSubnet: 10.196.0.0/12
-nodeName: master-1
-token: s73ybu.6tw6wnqgp5z0wb77
-tokenGroups:
-- system:bootstrappers:kubeadm:default-node-token
-tokenTTL: 24h0m0s
-tokenUsages:
-- signing
-- authentication
+nodeRegistration:
+  criSocket: /var/run/criruntime.sock
+  name: master-1
+  taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
 unifiedControlPlaneImage: ""

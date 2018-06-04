@@ -134,7 +134,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.builder = f.NewBuilder()
 	o.canBeAutoscaled = polymorphichelpers.CanBeAutoscaledFn
 	o.args = args
-	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.RecordFlags.Complete(cmd)
 
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
@@ -165,7 +165,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		}
 	}
 
-	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

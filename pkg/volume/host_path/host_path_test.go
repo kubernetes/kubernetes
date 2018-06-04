@@ -369,8 +369,8 @@ func (fftc *fakeFileTypeChecker) MakeDir(pathname string) error {
 	return nil
 }
 
-func (fftc *fakeFileTypeChecker) ExistsPath(pathname string) bool {
-	return true
+func (fftc *fakeFileTypeChecker) ExistsPath(pathname string) (bool, error) {
+	return true, nil
 }
 
 func (fftc *fakeFileTypeChecker) GetFileType(_ string) (utilmount.FileType, error) {
@@ -399,6 +399,10 @@ func (fftc *fakeFileTypeChecker) GetFSGroup(pathname string) (int64, error) {
 
 func (fftc *fakeFileTypeChecker) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("not implemented")
+}
+
+func (fftc *fakeFileTypeChecker) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
 }
 
 func setUp() error {

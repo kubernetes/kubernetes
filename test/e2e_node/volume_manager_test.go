@@ -34,7 +34,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 	f := framework.NewDefaultFramework("kubelet-volume-manager")
 	Describe("Volume Manager", func() {
 		Context("On terminatation of pod with memory backed volume", func() {
-			It("should remove the volume from the node", func() {
+			It("should remove the volume from the node [NodeConformance]", func() {
 				var (
 					memoryBackedPod *v1.Pod
 					volumeName      string

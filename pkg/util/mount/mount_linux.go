@@ -33,6 +33,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 	utilio "k8s.io/kubernetes/pkg/util/io"
 	utilexec "k8s.io/utils/exec"
 )
@@ -42,6 +43,8 @@ const (
 	maxListTries = 3
 	// Number of fields per line in /proc/mounts as per the fstab man page.
 	expectedNumFieldsPerLine = 6
+	// At least number of fields per line in /proc/<pid>/mountinfo.
+	expectedAtLeastNumFieldsPerMountInfo = 10
 	// Location of the mount file to use
 	procMountsPath = "/proc/mounts"
 	// Location of the mountinfo file
@@ -447,12 +450,8 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 	return nil
 }
 
-func (mounter *Mounter) ExistsPath(pathname string) bool {
-	_, err := os.Stat(pathname)
-	if err != nil {
-		return false
-	}
-	return true
+func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
+	return utilfile.FileExists(pathname)
 }
 
 // formatAndMount uses unix utils to format and mount the given disk
@@ -602,7 +601,7 @@ func isShared(mount string, mountInfoPath string) (bool, error) {
 	}
 
 	// parse optional parameters
-	for _, opt := range info.optional {
+	for _, opt := range info.optionalFields {
 		if strings.HasPrefix(opt, "shared:") {
 			return true, nil
 		}
@@ -610,14 +609,27 @@ func isShared(mount string, mountInfoPath string) (bool, error) {
 	return false, nil
 }
 
+// This represents a single line in /proc/<pid>/mountinfo.
 type mountInfo struct {
-	// Path of the mount point
+	// Unique ID for the mount (maybe reused after umount).
+	id int
+	// The ID of the parent mount (or of self for the root of this mount namespace's mount tree).
+	parentID int
+	// The value of `st_dev` for files on this filesystem.
+	majorMinor string
+	// The pathname of the directory in the filesystem which forms the root of this mount.
+	root string
+	// Mount source, filesystem-specific information. e.g. device, tmpfs name.
+	source string
+	// Mount point, the pathname of the mount point.
 	mountPoint string
-	// list of "optional parameters", mount propagation is one of them
-	optional []string
-	// mount options
+	// Optional fieds, zero or more fields of the form "tag[:value]".
+	optionalFields []string
+	// The filesystem type in the form "type[.subtype]".
+	fsType string
+	// Per-mount options.
 	mountOptions []string
-	// super options: per-superblock options.
+	// Per-superblock options.
 	superOptions []string
 }
 
@@ -637,20 +649,38 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 		}
 		// See `man proc` for authoritative description of format of the file.
 		fields := strings.Fields(line)
-		if len(fields) < 10 {
-			return nil, fmt.Errorf("wrong number of fields in (expected %d, got %d): %s", 10, len(fields), line)
+		if len(fields) < expectedAtLeastNumFieldsPerMountInfo {
+			return nil, fmt.Errorf("wrong number of fields in (expected at least %d, got %d): %s", expectedAtLeastNumFieldsPerMountInfo, len(fields), line)
+		}
+		id, err := strconv.Atoi(fields[0])
+		if err != nil {
+			return nil, err
+		}
+		parentID, err := strconv.Atoi(fields[1])
+		if err != nil {
+			return nil, err
 		}
 		info := mountInfo{
+			id:           id,
+			parentID:     parentID,
+			majorMinor:   fields[2],
+			root:         fields[3],
 			mountPoint:   fields[4],
 			mountOptions: strings.Split(fields[5], ","),
-			optional:     []string{},
 		}
 		// All fields until "-" are "optional fields".
-		for i := 6; i < len(fields) && fields[i] != "-"; i++ {
-			info.optional = append(info.optional, fields[i])
+		i := 6
+		for ; i < len(fields) && fields[i] != "-"; i++ {
+			info.optionalFields = append(info.optionalFields, fields[i])
 		}
-		superOpts := fields[len(fields)-1]
-		info.superOptions = strings.Split(superOpts, ",")
+		// Parse the rest 3 fields.
+		i += 1
+		if len(fields)-i < 3 {
+			return nil, fmt.Errorf("expect 3 fields in %s, got %d", line, len(fields)-i)
+		}
+		info.fsType = fields[i]
+		info.source = fields[i+1]
+		info.superOptions = strings.Split(fields[i+2], ",")
 		infos = append(infos, info)
 	}
 	return infos, nil
@@ -727,7 +757,8 @@ func getSELinuxSupport(path string, mountInfoFilename string) (bool, error) {
 }
 
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	newHostPath, err = doBindSubPath(mounter, subPath, os.Getpid())
+	newHostPath, err = doBindSubPath(mounter, subPath)
+
 	// There is no action when the container starts. Bind-mount will be cleaned
 	// when container stops by CleanSubPaths.
 	cleanupAction = nil
@@ -735,30 +766,107 @@ func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string,
 }
 
 // This implementation is shared between Linux and NsEnterMounter
-// kubeletPid is PID of kubelet in the PID namespace where bind-mount is done,
-// i.e. pid on the *host* if kubelet runs in a container.
-func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath string, err error) {
-	// Check early for symlink. This is just a pre-check to avoid bind-mount
-	// before the final check.
-	evalSubPath, err := filepath.EvalSymlinks(subpath.Path)
+func safeOpenSubPath(mounter Interface, subpath Subpath) (int, error) {
+	if !pathWithinBase(subpath.Path, subpath.VolumePath) {
+		return -1, fmt.Errorf("subpath %q not within volume path %q", subpath.Path, subpath.VolumePath)
+	}
+	fd, err := doSafeOpen(subpath.Path, subpath.VolumePath)
 	if err != nil {
-		return "", fmt.Errorf("evalSymlinks %q failed: %v", subpath.Path, err)
+		return -1, fmt.Errorf("error opening subpath %v: %v", subpath.Path, err)
 	}
-	glog.V(5).Infof("doBindSubPath %q, full subpath %q for volumepath %q", subpath.Path, evalSubPath, subpath.VolumePath)
+	return fd, nil
+}
 
-	evalSubPath = filepath.Clean(evalSubPath)
-	if !pathWithinBase(evalSubPath, subpath.VolumePath) {
-		return "", fmt.Errorf("subpath %q not within volume path %q", evalSubPath, subpath.VolumePath)
+// prepareSubpathTarget creates target for bind-mount of subpath. It returns
+// "true" when the target already exists and something is mounted there.
+// Given Subpath must have all paths with already resolved symlinks and with
+// paths relevant to kubelet (when it runs in a container).
+// This function is called also by NsEnterMounter. It works because
+// /var/lib/kubelet is mounted from the host into the container with Kubelet as
+// /var/lib/kubelet too.
+func prepareSubpathTarget(mounter Interface, subpath Subpath) (bool, string, error) {
+	// Early check for already bind-mounted subpath.
+	bindPathTarget := getSubpathBindTarget(subpath)
+	notMount, err := IsNotMountPoint(mounter, bindPathTarget)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
+		}
+		// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
+		notMount = true
+	}
+	if !notMount {
+		// It's already mounted
+		glog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
+		return true, bindPathTarget, nil
 	}
 
-	// Prepare directory for bind mounts
-	// containerName is DNS label, i.e. safe as a directory name.
-	bindDir := filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName)
-	err = os.MkdirAll(bindDir, 0750)
+	// bindPathTarget is in /var/lib/kubelet and thus reachable without any
+	// translation even to containerized kubelet.
+	bindParent := filepath.Dir(bindPathTarget)
+	err = os.MkdirAll(bindParent, 0750)
 	if err != nil && !os.IsExist(err) {
-		return "", fmt.Errorf("error creating directory %s: %s", bindDir, err)
+		return false, "", fmt.Errorf("error creating directory %s: %s", bindParent, err)
 	}
-	bindPathTarget := filepath.Join(bindDir, strconv.Itoa(subpath.VolumeMountIndex))
+
+	t, err := os.Lstat(subpath.Path)
+	if err != nil {
+		return false, "", fmt.Errorf("lstat %s failed: %s", subpath.Path, err)
+	}
+
+	if t.Mode()&os.ModeDir > 0 {
+		if err = os.Mkdir(bindPathTarget, 0750); err != nil && !os.IsExist(err) {
+			return false, "", fmt.Errorf("error creating directory %s: %s", bindPathTarget, err)
+		}
+	} else {
+		// "/bin/touch <bindPathTarget>".
+		// A file is enough for all possible targets (symlink, device, pipe,
+		// socket, ...), bind-mounting them into a file correctly changes type
+		// of the target file.
+		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
+			return false, "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
+		}
+	}
+	return false, bindPathTarget, nil
+}
+
+func getSubpathBindTarget(subpath Subpath) string {
+	// containerName is DNS label, i.e. safe as a directory name.
+	return filepath.Join(subpath.PodDir, containerSubPathDirectoryName, subpath.VolumeName, subpath.ContainerName, strconv.Itoa(subpath.VolumeMountIndex))
+}
+
+func doBindSubPath(mounter Interface, subpath Subpath) (hostPath string, err error) {
+	// Linux, kubelet runs on the host:
+	// - safely open the subpath
+	// - bind-mount /proc/<pid of kubelet>/fd/<fd> to subpath target
+	// User can't change /proc/<pid of kubelet>/fd/<fd> to point to a bad place.
+
+	// Evaluate all symlinks here once for all subsequent functions.
+	newVolumePath, err := filepath.EvalSymlinks(subpath.VolumePath)
+	if err != nil {
+		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.VolumePath, err)
+	}
+	newPath, err := filepath.EvalSymlinks(subpath.Path)
+	if err != nil {
+		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.Path, err)
+	}
+	glog.V(5).Infof("doBindSubPath %q (%q) for volumepath %q", subpath.Path, newPath, subpath.VolumePath)
+	subpath.VolumePath = newVolumePath
+	subpath.Path = newPath
+
+	fd, err := safeOpenSubPath(mounter, subpath)
+	if err != nil {
+		return "", err
+	}
+	defer syscall.Close(fd)
+
+	alreadyMounted, bindPathTarget, err := prepareSubpathTarget(mounter, subpath)
+	if err != nil {
+		return "", err
+	}
+	if alreadyMounted {
+		return bindPathTarget, nil
+	}
 
 	success := false
 	defer func() {
@@ -771,49 +879,7 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 		}
 	}()
 
-	// Check it's not already bind-mounted
-	notMount, err := IsNotMountPoint(mounter, bindPathTarget)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
-		}
-		// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
-		notMount = true
-	}
-	if !notMount {
-		// It's already mounted
-		glog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
-		success = true
-		return bindPathTarget, nil
-	}
-
-	// Create target of the bind mount. A directory for directories, empty file
-	// for everything else.
-	t, err := os.Lstat(subpath.Path)
-	if err != nil {
-		return "", fmt.Errorf("lstat %s failed: %s", subpath.Path, err)
-	}
-	if t.Mode()&os.ModeDir > 0 {
-		if err = os.Mkdir(bindPathTarget, 0750); err != nil && !os.IsExist(err) {
-			return "", fmt.Errorf("error creating directory %s: %s", bindPathTarget, err)
-		}
-	} else {
-		// "/bin/touch <bindDir>".
-		// A file is enough for all possible targets (symlink, device, pipe,
-		// socket, ...), bind-mounting them into a file correctly changes type
-		// of the target file.
-		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
-			return "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
-		}
-	}
-
-	// Safe open subpath and get the fd
-	fd, err := doSafeOpen(evalSubPath, subpath.VolumePath)
-	if err != nil {
-		return "", fmt.Errorf("error opening subpath %v: %v", evalSubPath, err)
-	}
-	defer syscall.Close(fd)
-
+	kubeletPid := os.Getpid()
 	mountSource := fmt.Sprintf("/proc/%d/fd/%v", kubeletPid, fd)
 
 	// Do the bind mount
@@ -826,8 +892,8 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
-
 	success = true
+
 	glog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
 	return bindPathTarget, nil
 }
@@ -962,8 +1028,15 @@ func removeEmptyDirs(baseDir, endDir string) error {
 	return nil
 }
 
-func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return doSafeMakeDir(pathname, base, perm)
+func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
+	realBase, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
+	}
+
+	realFullPath := filepath.Join(realBase, subdir)
+
+	return doSafeMakeDir(realFullPath, realBase, perm)
 }
 
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
@@ -971,7 +1044,7 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return getMountRefsByDev(mounter, realpath)
+	return searchMountPoints(realpath, procMountInfoPath)
 }
 
 func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
@@ -986,6 +1059,10 @@ func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	return getFSGroup(realpath)
 }
 
+func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
+	return getMode(pathname)
+}
+
 // This implementation is shared between Linux and NsEnterMounter
 func getFSGroup(pathname string) (int64, error) {
 	info, err := os.Stat(pathname)
@@ -996,6 +1073,17 @@ func getFSGroup(pathname string) (int64, error) {
 }
 
 // This implementation is shared between Linux and NsEnterMounter
+func getMode(pathname string) (os.FileMode, error) {
+	info, err := os.Stat(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return info.Mode(), nil
+}
+
+// This implementation is shared between Linux and NsEnterMounter. Both pathname
+// and base must be either already resolved symlinks or thet will be resolved in
+// kubelet's mount namespace (in case it runs containerized).
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	glog.V(4).Infof("Creating directory %q within base %q", pathname, base)
 
@@ -1149,6 +1237,9 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 // Symlinks are disallowed (pathname must already resolve symlinks),
 // and the path must be within the base directory.
 func doSafeOpen(pathname string, base string) (int, error) {
+	pathname = filepath.Clean(pathname)
+	base = filepath.Clean(base)
+
 	// Calculate segments to follow
 	subpath, err := filepath.Rel(base, pathname)
 	if err != nil {
@@ -1219,4 +1310,52 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	parentFD = -1
 
 	return finalFD, nil
+}
+
+// searchMountPoints finds all mount references to the source, returns a list of
+// mountpoints.
+// This function assumes source cannot be device.
+// Some filesystems may share a source name, e.g. tmpfs. And for bind mounting,
+// it's possible to mount a non-root path of a filesystem, so we need to use
+// root path and major:minor to represent mount source uniquely.
+// This implementation is shared between Linux and NsEnterMounter
+func searchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
+	mis, err := parseMountInfo(mountInfoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	mountID := 0
+	rootPath := ""
+	majorMinor := ""
+
+	// Finding the underlying root path and major:minor if possible.
+	// We need search in backward order because it's possible for later mounts
+	// to overlap earlier mounts.
+	for i := len(mis) - 1; i >= 0; i-- {
+		if hostSource == mis[i].mountPoint || pathWithinBase(hostSource, mis[i].mountPoint) {
+			// If it's a mount point or path under a mount point.
+			mountID = mis[i].id
+			rootPath = filepath.Join(mis[i].root, strings.TrimPrefix(hostSource, mis[i].mountPoint))
+			majorMinor = mis[i].majorMinor
+			break
+		}
+	}
+
+	if rootPath == "" || majorMinor == "" {
+		return nil, fmt.Errorf("failed to get root path and major:minor for %s", hostSource)
+	}
+
+	var refs []string
+	for i := range mis {
+		if mis[i].id == mountID {
+			// Ignore mount entry for mount source itself.
+			continue
+		}
+		if mis[i].root == rootPath && mis[i].majorMinor == majorMinor {
+			refs = append(refs, mis[i].mountPoint)
+		}
+	}
+
+	return refs, nil
 }

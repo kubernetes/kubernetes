@@ -70,6 +70,9 @@ type VolumeSource struct {
 	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore,omitempty" protobuf:"bytes,4,opt,name=awsElasticBlockStore"`
 	// GitRepo represents a git repository at a particular revision.
+	// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+	// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+	// into the Pod's container.
 	// +optional
 	GitRepo *GitRepoVolumeSource `json:"gitRepo,omitempty" protobuf:"bytes,5,opt,name=gitRepo"`
 	// Secret represents a secret that should populate this volume.
@@ -202,7 +205,7 @@ type PersistentVolumeSource struct {
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	// +optional
-	Cinder *CinderVolumeSource `json:"cinder,omitempty" protobuf:"bytes,8,opt,name=cinder"`
+	Cinder *CinderPersistentVolumeSource `json:"cinder,omitempty" protobuf:"bytes,8,opt,name=cinder"`
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	// +optional
 	CephFS *CephFSPersistentVolumeSource `json:"cephfs,omitempty" protobuf:"bytes,9,opt,name=cephfs"`
@@ -728,6 +731,35 @@ type CinderVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	// Optional: points to a secret object containing parameters used to connect
+	// to OpenStack.
+	// +optional
+	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,4,opt,name=secretRef"`
+}
+
+// Represents a cinder volume resource in Openstack.
+// A Cinder volume must exist before mounting to a container.
+// The volume must also be in the same region as the kubelet.
+// Cinder volumes support ownership management and SELinux relabeling.
+type CinderPersistentVolumeSource struct {
+	// volume id used to identify the volume in cinder
+	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	// Optional: points to a secret object containing parameters used to connect
+	// to OpenStack.
+	// +optional
+	SecretRef *SecretReference `json:"secretRef,omitempty" protobuf:"bytes,4,opt,name=secretRef"`
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
@@ -972,6 +1004,10 @@ type AWSElasticBlockStoreVolumeSource struct {
 // Represents a volume that is populated with the contents of a git repository.
 // Git repo volumes do not support ownership management.
 // Git repo volumes support SELinux relabeling.
+//
+// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+// into the Pod's container.
 type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string `json:"repository" protobuf:"bytes,1,opt,name=repository"`
@@ -1466,6 +1502,30 @@ type ConfigMapProjection struct {
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
 }
 
+// ServiceAccountTokenProjection represents a projected service account token
+// volume. This projection can be used to insert a service account token into
+// the pods runtime filesystem for use against APIs (Kubernetes API Server or
+// otherwise).
+type ServiceAccountTokenProjection struct {
+	// Audience is the intended audience of the token. A recipient of a token
+	// must identify itself with an identifier specified in the audience of the
+	// token, and otherwise should reject the token. The audience defaults to the
+	// identifier of the apiserver.
+	//+optional
+	Audience string `json:"audience,omitempty" protobuf:"bytes,1,rep,name=audience"`
+	// ExpirationSeconds is the requested duration of validity of the service
+	// account token. As the token approaches expiration, the kubelet volume
+	// plugin will proactively rotate the service account token. The kubelet will
+	// start trying to rotate the token if the token is older than 80 percent of
+	// its time to live or if the token is older than 24 hours.Defaults to 1 hour
+	// and must be at least 10 minutes.
+	//+optional
+	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty" protobuf:"varint,2,opt,name=expirationSeconds"`
+	// Path is the path relative to the mount point of the file to project the
+	// token into.
+	Path string `json:"path" protobuf:"bytes,3,opt,name=path"`
+}
+
 // Represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
@@ -1484,11 +1544,17 @@ type VolumeProjection struct {
 	// all types below are the supported types for projection into the same volume
 
 	// information about the secret data to project
+	// +optional
 	Secret *SecretProjection `json:"secret,omitempty" protobuf:"bytes,1,opt,name=secret"`
 	// information about the downwardAPI data to project
+	// +optional
 	DownwardAPI *DownwardAPIProjection `json:"downwardAPI,omitempty" protobuf:"bytes,2,opt,name=downwardAPI"`
 	// information about the configMap data to project
+	// +optional
 	ConfigMap *ConfigMapProjection `json:"configMap,omitempty" protobuf:"bytes,3,opt,name=configMap"`
+	// information about the serviceAccountToken data to project
+	// +optional
+	ServiceAccountToken *ServiceAccountTokenProjection `json:"serviceAccountToken,omitempty" protobuf:"bytes,4,opt,name=serviceAccountToken"`
 }
 
 const (
@@ -2251,7 +2317,6 @@ const (
 // PodCondition contains details for the current condition of this pod.
 type PodCondition struct {
 	// Type is the type of the condition.
-	// Currently only Ready.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
 	Type PodConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PodConditionType"`
 	// Status is the status of the condition.
@@ -2595,6 +2660,12 @@ const (
 	TolerationOpEqual  TolerationOperator = "Equal"
 )
 
+// PodReadinessGate contains the reference to a pod condition
+type PodReadinessGate struct {
+	// ConditionType refers to a condition in the pod's condition list with matching type.
+	ConditionType PodConditionType `json:"conditionType" protobuf:"bytes,1,opt,name=conditionType,casttype=PodConditionType"`
+}
+
 // PodSpec is a description of a pod.
 type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
@@ -2759,6 +2830,13 @@ type PodSpec struct {
 	// configuration based on DNSPolicy.
 	// +optional
 	DNSConfig *PodDNSConfig `json:"dnsConfig,omitempty" protobuf:"bytes,26,opt,name=dnsConfig"`
+
+	// If specified, all readiness gates will be evaluated for pod readiness.
+	// A pod is ready when all its containers are ready AND
+	// all conditions specified in the readiness gates have status equal to "True"
+	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
+	// +optional
+	ReadinessGates []PodReadinessGate `json:"readinessGates,omitempty" protobuf:"bytes,28,opt,name=readinessGates"`
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2863,9 +2941,26 @@ type PodDNSConfigOption struct {
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
-// state of a system.
+// state of a system, especially if the node that hosts the pod cannot contact the control
+// plane.
 type PodStatus struct {
-	// Current condition of the pod.
+	// The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.
+	// The conditions array, the reason and message fields, and the individual container status
+	// arrays contain more detail about the pod's status.
+	// There are five possible phase values:
+	//
+	// Pending: The pod has been accepted by the Kubernetes system, but one or more of the
+	// container images has not been created. This includes time before being scheduled as
+	// well as time spent downloading images over the network, which could take a while.
+	// Running: The pod has been bound to a node, and all of the containers have been created.
+	// At least one container is still running, or is in the process of starting or restarting.
+	// Succeeded: All containers in the pod have terminated in success, and will not be restarted.
+	// Failed: All containers in the pod have terminated, and at least one container has
+	// terminated in failure. The container either exited with non-zero status or was terminated
+	// by the system.
+	// Unknown: For some reason the state of the pod could not be obtained, typically due to an
+	// error in communicating with the host of the pod.
+	//
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase
 	// +optional
 	Phase PodPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=PodPhase"`
@@ -3974,6 +4069,8 @@ const (
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
 	// Name prefix for huge page resources (alpha).
 	ResourceHugePagesPrefix = "hugepages-"
+	// Name prefix for storage resource limits
+	ResourceAttachableVolumesPrefix = "attachable-volumes-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

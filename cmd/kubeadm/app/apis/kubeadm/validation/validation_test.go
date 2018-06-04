@@ -33,7 +33,7 @@ import (
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
-func TestValidateTokenDiscovery(t *testing.T) {
+func TestValidateToken(t *testing.T) {
 	var tests = []struct {
 		c        *kubeadm.NodeConfiguration
 		f        *field.Path
@@ -51,7 +51,7 @@ func TestValidateTokenDiscovery(t *testing.T) {
 		err := ValidateToken(rt.c.Token, rt.f).ToAggregate()
 		if (err == nil) != rt.expected {
 			t.Errorf(
-				"failed ValidateTokenDiscovery:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateToken:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(err == nil),
 			)
@@ -119,7 +119,7 @@ func TestValidateNodeName(t *testing.T) {
 		actual := ValidateNodeName(rt.s, rt.f)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed ValidateNodeName:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateNodeRegistration: kubeadm.NodeRegistrationOptions{Name:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
 			)
@@ -407,8 +407,8 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					ServiceSubnet: "10.96.0.1/12",
 					DNSDomain:     "cluster.local",
 				},
-				CertificatesDir: "/some/cert/dir",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/cert/dir",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.MasterConfiguration{
@@ -420,8 +420,8 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					ServiceSubnet: "2001:db8::1/98",
 					DNSDomain:     "cluster.local",
 				},
-				CertificatesDir: "/some/cert/dir",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/cert/dir",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.MasterConfiguration{
@@ -434,7 +434,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					DNSDomain:     "cluster.local",
 				},
 				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
 			}, false},
 		{"valid master configuration with incorrect IPv4 pod subnet",
 			&kubeadm.MasterConfiguration{
@@ -447,15 +446,19 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					DNSDomain:     "cluster.local",
 					PodSubnet:     "10.0.1.15",
 				},
-				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/other/cert/dir",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"valid master configuration with IPv4 service subnet",
 			&kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
+				},
+				Etcd: kubeadm.Etcd{
+					Local: &kubeadm.LocalEtcd{
+						DataDir: "/some/path",
+					},
 				},
 				KubeProxy: kubeadm.KubeProxy{
 					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
@@ -488,15 +491,19 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					DNSDomain:     "cluster.local",
 					PodSubnet:     "10.0.1.15/16",
 				},
-				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/other/cert/dir",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 		{"valid master configuration using IPv6 service subnet",
 			&kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
+				},
+				Etcd: kubeadm.Etcd{
+					Local: &kubeadm.LocalEtcd{
+						DataDir: "/some/path",
+					},
 				},
 				KubeProxy: kubeadm.KubeProxy{
 					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
@@ -528,9 +535,8 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					ServiceSubnet: "2001:db8::1/98",
 					DNSDomain:     "cluster.local",
 				},
-				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
-				NodeName:        nodename,
+				CertificatesDir:  "/some/other/cert/dir",
+				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 	}
 	for _, rt := range tests {

@@ -50,6 +50,12 @@ function container_runtime_monitoring {
   while true; do
     if ! timeout 60 ${healthcheck_command} > /dev/null; then
       echo "Container runtime ${container_runtime_name} failed!"
+      if [[ "$container_runtime_name" == "docker" ]]; then
+          # Dump stack of docker daemon for investigation.
+          # Log fle name looks like goroutine-stacks-TIMESTAMP and will be saved to
+          # the exec root directory, which is /var/run/docker/ on Ubuntu and COS.
+          pkill -SIGUSR1 dockerd
+      fi
       systemctl kill --kill-who=main "${container_runtime_name}"
       # Wait for a while, as we don't want to kill it again before it is really up.
       sleep 120

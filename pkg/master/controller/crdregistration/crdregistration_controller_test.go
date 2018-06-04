@@ -92,25 +92,27 @@ func TestHandleVersionUpdate(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		registration := &fakeAPIServiceRegistration{}
-		crdCache := cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		crdLister := crdlisters.NewCustomResourceDefinitionLister(crdCache)
-		c := crdRegistrationController{
-			crdLister:              crdLister,
-			apiServiceRegistration: registration,
-		}
-		for i := range test.startingCRDs {
-			crdCache.Add(test.startingCRDs[i])
-		}
+		t.Run(test.name, func(t *testing.T) {
+			registration := &fakeAPIServiceRegistration{}
+			crdCache := cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			crdLister := crdlisters.NewCustomResourceDefinitionLister(crdCache)
+			c := crdRegistrationController{
+				crdLister:              crdLister,
+				apiServiceRegistration: registration,
+			}
+			for i := range test.startingCRDs {
+				crdCache.Add(test.startingCRDs[i])
+			}
 
-		c.handleVersionUpdate(test.version)
+			c.handleVersionUpdate(test.version)
 
-		if !reflect.DeepEqual(test.expectedAdded, registration.added) {
-			t.Errorf("%s expected %v, got %v", test.name, test.expectedAdded, registration.added)
-		}
-		if !reflect.DeepEqual(test.expectedRemoved, registration.removed) {
-			t.Errorf("%s expected %v, got %v", test.name, test.expectedRemoved, registration.removed)
-		}
+			if !reflect.DeepEqual(test.expectedAdded, registration.added) {
+				t.Errorf("%s expected %v, got %v", test.name, test.expectedAdded, registration.added)
+			}
+			if !reflect.DeepEqual(test.expectedRemoved, registration.removed) {
+				t.Errorf("%s expected %v, got %v", test.name, test.expectedRemoved, registration.removed)
+			}
+		})
 	}
 }
 

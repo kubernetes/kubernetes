@@ -19,6 +19,8 @@ package csi
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path"
 	"time"
 
 	"github.com/golang/glog"
@@ -103,16 +105,13 @@ func (p *csiPlugin) NewMounter(
 		return nil, err
 	}
 
-	// before it is used in any paths such as socket etc
-	addr := fmt.Sprintf(csiAddrTemplate, pvSource.Driver)
-	glog.V(4).Infof(log("setting up mounter for [volume=%v,driver=%v]", pvSource.VolumeHandle, pvSource.Driver))
-	client := newCsiDriverClient("unix", addr)
-
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
 		glog.Error(log("failed to get a kubernetes client"))
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
+
+	csi := newCsiDriverClient(pvSource.Driver)
 
 	mounter := &csiMountMgr{
 		plugin:       p,
@@ -123,19 +122,66 @@ func (p *csiPlugin) NewMounter(
 		driverName:   pvSource.Driver,
 		volumeID:     pvSource.VolumeHandle,
 		specVolumeID: spec.Name(),
-		csiClient:    client,
+		csiClient:    csi,
 		readOnly:     readOnly,
 	}
+
+	// Save volume info in pod dir
+	dir := mounter.GetPath()
+	dataDir := path.Dir(dir) // dropoff /mount at end
+
+	if err := os.MkdirAll(dataDir, 0750); err != nil {
+		glog.Error(log("failed to create dir %#v:  %v", dataDir, err))
+		return nil, err
+	}
+	glog.V(4).Info(log("created path successfully [%s]", dataDir))
+
+	// persist volume info data for teardown
+	node := string(p.host.GetNodeName())
+	attachID := getAttachmentName(pvSource.VolumeHandle, pvSource.Driver, node)
+	volData := map[string]string{
+		volDataKey.specVolID:    spec.Name(),
+		volDataKey.volHandle:    pvSource.VolumeHandle,
+		volDataKey.driverName:   pvSource.Driver,
+		volDataKey.nodeName:     node,
+		volDataKey.attachmentID: attachID,
+	}
+
+	if err := saveVolumeData(dataDir, volDataFileName, volData); err != nil {
+		glog.Error(log("failed to save volume info data: %v", err))
+		if err := os.RemoveAll(dataDir); err != nil {
+			glog.Error(log("failed to remove dir after error [%s]: %v", dataDir, err))
+			return nil, err
+		}
+		return nil, err
+	}
+
+	glog.V(4).Info(log("mounter created successfully"))
+
 	return mounter, nil
 }
 
 func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
 	glog.V(4).Infof(log("setting up unmounter for [name=%v, podUID=%v]", specName, podUID))
+
 	unmounter := &csiMountMgr{
 		plugin:       p,
 		podUID:       podUID,
 		specVolumeID: specName,
 	}
+
+	// load volume info from file
+	dir := unmounter.GetPath()
+	dataDir := path.Dir(dir) // dropoff /mount at end
+	data, err := loadVolumeData(dataDir, volDataFileName)
+	if err != nil {
+		glog.Error(log("unmounter failed to load volume data file [%s]: %v", dir, err))
+		return nil, err
+	}
+	unmounter.driverName = data[volDataKey.driverName]
+	unmounter.volumeID = data[volDataKey.volHandle]
+	unmounter.csiClient = newCsiDriverClient(unmounter.driverName)
+
 	return unmounter, nil
 }
 

@@ -59,6 +59,12 @@ func TestPVSecrets(t *testing.T) {
 					SecretRef: &api.SecretReference{
 						Name: "Spec.PersistentVolumeSource.CephFS.SecretRef"}}}}},
 		{Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				Cinder: &api.CinderPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.Cinder.SecretRef",
+						Namespace: "cinder"}}}}},
+		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				FlexVolume: &api.FlexPersistentVolumeSource{
@@ -159,6 +165,7 @@ func TestPVSecrets(t *testing.T) {
 	expectedSecretPaths := sets.NewString(
 		"Spec.PersistentVolumeSource.AzureFile.SecretName",
 		"Spec.PersistentVolumeSource.CephFS.SecretRef",
+		"Spec.PersistentVolumeSource.Cinder.SecretRef",
 		"Spec.PersistentVolumeSource.FlexVolume.SecretRef",
 		"Spec.PersistentVolumeSource.RBD.SecretRef",
 		"Spec.PersistentVolumeSource.ScaleIO.SecretRef",
@@ -194,6 +201,8 @@ func TestPVSecrets(t *testing.T) {
 
 		"claimrefns/Spec.PersistentVolumeSource.CephFS.SecretRef",
 		"cephfs/Spec.PersistentVolumeSource.CephFS.SecretRef",
+
+		"cinder/Spec.PersistentVolumeSource.Cinder.SecretRef",
 
 		"claimrefns/Spec.PersistentVolumeSource.FlexVolume.SecretRef",
 		"flexns/Spec.PersistentVolumeSource.FlexVolume.SecretRef",

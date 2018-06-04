@@ -18,6 +18,7 @@ package transport
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"net/http"
 	"testing"
@@ -54,6 +55,7 @@ func TestTLSConfigKey(t *testing.T) {
 
 	// Make sure config fields that affect the tls config affect the cache key
 	dialer := net.Dialer{}
+	getCert := func() (*tls.Certificate, error) { return nil, nil }
 	uniqueConfigurations := map[string]*Config{
 		"no tls":   {},
 		"dialer":   {Dial: dialer.DialContext},
@@ -104,6 +106,24 @@ func TestTLSConfigKey(t *testing.T) {
 				CAData:   []byte{1},
 				CertData: []byte{1},
 				KeyData:  []byte{1},
+			},
+		},
+		"getCert1": {
+			TLS: TLSConfig{
+				KeyData: []byte{1},
+				GetCert: getCert,
+			},
+		},
+		"getCert2": {
+			TLS: TLSConfig{
+				KeyData: []byte{1},
+				GetCert: func() (*tls.Certificate, error) { return nil, nil },
+			},
+		},
+		"getCert1, key 2": {
+			TLS: TLSConfig{
+				KeyData: []byte{2},
+				GetCert: getCert,
 			},
 		},
 	}

@@ -18,12 +18,11 @@ package set
 
 import (
 	"fmt"
-	"strings"
-
-	"github.com/spf13/cobra"
-	"k8s.io/api/core/v1"
 
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
+
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -108,16 +107,11 @@ func NewResourcesOptions(streams genericclioptions.IOStreams) *SetResourcesOptio
 func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewResourcesOptions(streams)
 
-	resourceTypesWithPodTemplate := []string{}
-	for _, resource := range f.SuggestedPodTemplateResources() {
-		resourceTypesWithPodTemplate = append(resourceTypesWithPodTemplate, resource.Resource)
-	}
-
 	cmd := &cobra.Command{
 		Use: "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Update resource requests/limits on objects with pod templates"),
-		Long:    fmt.Sprintf(resources_long, strings.Join(resourceTypesWithPodTemplate, ", ")),
+		Long:    fmt.Sprintf(resources_long, cmdutil.SuggestApiResources("kubectl")),
 		Example: resources_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
@@ -147,7 +141,7 @@ func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
-	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
@@ -166,7 +160,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	}
 	o.PrintObj = printer.PrintObj
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -222,9 +216,9 @@ func (o *SetResourcesOptions) Validate() error {
 
 func (o *SetResourcesOptions) Run() error {
 	allErrs := []error{}
-	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
 		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
+		_, err := o.UpdatePodSpecForObject(obj, func(spec *v1.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) != 0 {
 				for i := range containers {
@@ -255,11 +249,11 @@ func (o *SetResourcesOptions) Run() error {
 			return nil, nil
 		}
 		// record this change (for rollout history)
-		if err := o.Recorder.Record(info.Object); err != nil {
+		if err := o.Recorder.Record(obj); err != nil {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
+		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 	})
 
 	for _, patch := range patches {
@@ -277,7 +271,7 @@ func (o *SetResourcesOptions) Run() error {
 
 		if o.Local || o.DryRun {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
-				return err
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
@@ -289,7 +283,7 @@ func (o *SetResourcesOptions) Run() error {
 		}
 
 		if err := o.PrintObj(actual, o.Out); err != nil {
-			return err
+			allErrs = append(allErrs, err)
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)

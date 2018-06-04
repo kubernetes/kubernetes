@@ -371,3 +371,34 @@ func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume 
 	}
 	return pvs
 }
+
+// PVCAssumeCache is a AssumeCache for PersistentVolumeClaim objects
+type PVCAssumeCache interface {
+	AssumeCache
+
+	// GetPVC returns the PVC from the cache with the same
+	// namespace and the same name of the specified pod.
+	// pvcKey is the result of MetaNamespaceKeyFunc on PVC obj
+	GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
+}
+
+type pvcAssumeCache struct {
+	*assumeCache
+}
+
+func NewPVCAssumeCache(informer cache.SharedIndexInformer) PVCAssumeCache {
+	return &pvcAssumeCache{assumeCache: NewAssumeCache(informer, "v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc)}
+}
+
+func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
+	obj, err := c.Get(pvcKey)
+	if err != nil {
+		return nil, err
+	}
+
+	pvc, ok := obj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		return nil, &errWrongType{"v1.PersistentVolumeClaim", obj}
+	}
+	return pvc, nil
+}

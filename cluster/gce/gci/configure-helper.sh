@@ -1207,7 +1207,15 @@ function prepare-kube-proxy-manifest-variables {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ "${KUBE_PROXY_MODE:-}" == "ipvs" ]];then
-    params+=" --proxy-mode=ipvs --feature-gates=SupportIPVSProxyMode=true"
+    sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
+    if [[ $? -eq 0 ]];
+    then
+      params+=" --proxy-mode=ipvs"
+    else
+      # If IPVS modules are not present, make sure the node does not come up as
+      # healthy.
+      exit 1
+    fi
   fi
   params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
@@ -1683,7 +1691,7 @@ function start-kube-apiserver {
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
-    authorization_mode="Webhook,${authorization_mode}"
+    authorization_mode="${authorization_mode},Webhook"
     params+=" --authorization-webhook-config-file=/etc/gcp_authz.config"
     webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\", \"type\": \"FileOrCreate\"}},"
@@ -2446,16 +2454,6 @@ function start-lb-controller {
   fi
 }
 
-# Starts rescheduler.
-function start-rescheduler {
-  if [[ "${ENABLE_RESCHEDULER:-}" == "true" ]]; then
-    echo "Start Rescheduler"
-    prepare-log-file /var/log/rescheduler.log
-    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/rescheduler.manifest" \
-       /etc/kubernetes/manifests/
-  fi
-}
-
 # Setup working directory for kubelet.
 function setup-kubelet-dir {
     echo "Making /var/lib/kubelet executable for kubelet"
@@ -2616,7 +2614,6 @@ function main() {
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
-    start-rescheduler
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy

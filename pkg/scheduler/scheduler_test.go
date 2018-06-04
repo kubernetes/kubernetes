@@ -37,8 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -660,8 +660,6 @@ func makePredicateError(failReason string) error {
 }
 
 func TestSchedulerWithVolumeBinding(t *testing.T) {
-	order := []string{predicates.CheckVolumeBindingPred, predicates.GeneralPred}
-	predicates.SetPredicatesOrdering(order)
 	findErr := fmt.Errorf("find err")
 	assumeErr := fmt.Errorf("assume err")
 	bindErr := fmt.Errorf("bind err")

@@ -56,8 +56,8 @@ func GetAllImages(cfg *kubeadmapi.MasterConfiguration) []string {
 	imgs = append(imgs, fmt.Sprintf("%v/pause-%v:%v", cfg.ImageRepository, runtime.GOARCH, "3.1"))
 
 	// if etcd is not external then add the image as it will be required
-	if len(cfg.Etcd.Endpoints) == 0 {
-		imgs = append(imgs, GetCoreImage(constants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.Image))
+	if cfg.Etcd.Local != nil {
+		imgs = append(imgs, GetCoreImage(constants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.Local.Image))
 	}
 
 	dnsImage := fmt.Sprintf("%v/k8s-dns-kube-dns-%v:%v", cfg.ImageRepository, runtime.GOARCH, dns.GetDNSVersion(nil, constants.KubeDNS))

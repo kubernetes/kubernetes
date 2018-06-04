@@ -133,7 +133,7 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	ds, err := framework.DsFromManifest(dsYamlUrl)
 	Expect(err).NotTo(HaveOccurred())
 	ds.Namespace = f.Namespace.Name
-	_, err = f.ClientSet.ExtensionsV1beta1().DaemonSets(f.Namespace.Name).Create(ds)
+	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ds)
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
 	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 

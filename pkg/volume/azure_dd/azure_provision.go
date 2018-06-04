@@ -23,6 +23,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -187,5 +189,10 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 			MountOptions: p.options.MountOptions,
 		},
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		pv.Spec.VolumeMode = p.options.PVC.Spec.VolumeMode
+	}
+
 	return pv, nil
 }

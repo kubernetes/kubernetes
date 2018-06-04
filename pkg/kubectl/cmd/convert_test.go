@@ -95,7 +95,7 @@ func TestConvertObject(t *testing.T) {
 	for _, tc := range testcases {
 		for _, field := range tc.fields {
 			t.Run(fmt.Sprintf("%s %s", tc.name, field), func(t *testing.T) {
-				tf := cmdtesting.NewTestFactory()
+				tf := cmdtesting.NewTestFactory().WithNamespace("test")
 				defer tf.Cleanup()
 
 				tf.UnstructuredClient = &fake.RESTClient{
@@ -104,7 +104,6 @@ func TestConvertObject(t *testing.T) {
 						return nil, nil
 					}),
 				}
-				tf.Namespace = "test"
 
 				buf := bytes.NewBuffer([]byte{})
 				cmd := NewCmdConvert(tf, genericclioptions.IOStreams{Out: buf, ErrOut: buf})

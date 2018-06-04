@@ -58,7 +58,6 @@ type OpenAPIService struct {
 	// rwMutex protects All members of this service.
 	rwMutex sync.RWMutex
 
-	orgSpec      *spec.Swagger
 	lastModified time.Time
 
 	specBytes []byte
@@ -161,7 +160,6 @@ func (o *OpenAPIService) getSwaggerPbGzBytes() ([]byte, string, time.Time) {
 }
 
 func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
-	orgSpec := openapiSpec
 	specBytes, err := json.MarshalIndent(openapiSpec, " ", " ")
 	if err != nil {
 		return err
@@ -181,7 +179,6 @@ func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
 	o.rwMutex.Lock()
 	defer o.rwMutex.Unlock()
 
-	o.orgSpec = orgSpec
 	o.specBytes = specBytes
 	o.specPb = specPb
 	o.specPbGz = specPbGz

@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/controller/job"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -207,11 +206,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Deleting the job")
 		job := cronJob.Status.Active[0]
-		reaper, err := kubectl.ReaperFor(batchinternal.Kind("Job"), f.InternalClientset, f.ScalesGetter)
-		Expect(err).NotTo(HaveOccurred())
-		timeout := 1 * time.Minute
-		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, metav1.NewDeleteOptions(0))
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name))
 
 		By("Ensuring job was deleted")
 		_, err = framework.GetJob(f.ClientSet, f.Namespace.Name, job.Name)

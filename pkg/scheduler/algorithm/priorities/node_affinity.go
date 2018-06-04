@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 // CalculateNodeAffinityPriorityMap prioritizes nodes according to node affinity scheduling preferences
@@ -37,12 +37,11 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
-	var affinity *v1.Affinity
+	// default is the podspec.
+	affinity := pod.Spec.Affinity
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		// We were able to parse metadata, use affinity from there.
 		affinity = priorityMeta.affinity
-	} else {
-		// We couldn't parse metadata - fallback to the podspec.
-		affinity = pod.Spec.Affinity
 	}
 
 	var count int32

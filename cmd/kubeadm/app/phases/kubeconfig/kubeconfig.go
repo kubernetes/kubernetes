@@ -160,7 +160,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.MasterConfiguration) (map[string]*kubeCo
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			CACert:     caCert,
 			APIServer:  masterEndpoint,
-			ClientName: fmt.Sprintf("system:node:%s", cfg.NodeName),
+			ClientName: fmt.Sprintf("system:node:%s", cfg.NodeRegistration.Name),
 			ClientCertAuth: &clientCertAuth{
 				CAKey:         caKey,
 				Organizations: []string{kubeadmconstants.NodesGroup},

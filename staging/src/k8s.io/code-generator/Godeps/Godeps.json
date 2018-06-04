@@ -260,11 +260,11 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "61db125d227fc9d4e373819a059516f32f7f23c7"
+			"Rev": "8a9b82f00b3a86eac24681da3f9fe6c34c01cea2"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators",
-			"Rev": "61db125d227fc9d4e373819a059516f32f7f23c7"
+			"Rev": "8a9b82f00b3a86eac24681da3f9fe6c34c01cea2"
 		}
 	]
 }

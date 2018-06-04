@@ -65,6 +65,7 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	// install apis
+	"github.com/golang/glog"
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
@@ -278,8 +279,7 @@ func NewRecommendedConfig(codecs serializer.CodecFactory) *RecommendedConfig {
 	}
 }
 
-func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, scheme *runtime.Scheme) *openapicommon.Config {
-	defNamer := apiopenapi.NewDefinitionNamer(scheme)
+func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, defNamer *apiopenapi.DefinitionNamer) *openapicommon.Config {
 	return &openapicommon.Config{
 		ProtocolList:   []string{"https"},
 		IgnorePrefixes: []string{"/swaggerapi"},
@@ -575,6 +575,16 @@ func installAPI(s *GenericAPIServer, c *Config) {
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
+		// so far, only logging related endpoints are considered valid to add for these debug flags.
+		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(
+			routes.StringFlagSetterFunc(func(val string) (string, error) {
+				var level glog.Level
+				if err := level.Set(val); err != nil {
+					return "", fmt.Errorf("failed set glog.logging.verbosity %s: %v", val, err)
+				}
+				return "successfully set glog.logging.verbosity to " + val, nil
+			}),
+		))
 	}
 	if c.EnableMetrics {
 		if c.EnableProfiling {
@@ -583,6 +593,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 			routes.DefaultMetrics{}.Install(s.Handler.NonGoRestfulMux)
 		}
 	}
+
 	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {

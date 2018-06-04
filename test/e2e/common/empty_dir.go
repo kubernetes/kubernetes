@@ -40,7 +40,7 @@ var (
 var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
-	Context("when FSGroup is specified", func() {
+	Context("when FSGroup is specified [NodeFeature:FSGroup]", func() {
 		It("new files should be created with FSGroup ownership when container is root", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
@@ -72,7 +72,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			of 'Memory', ensure the volume has 0777 unix file permissions and tmpfs
 			mount type.
 	*/
-	framework.ConformanceIt("volume on tmpfs should have the correct mode", func() {
+	framework.ConformanceIt("volume on tmpfs should have the correct mode [NodeConformance]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
@@ -82,7 +82,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			of 'Memory', ensure a root owned file with 0644 unix file permissions
 			is created correctly, has tmpfs mount type, and enforces the permissions.
 	*/
-	framework.ConformanceIt("should support (root,0644,tmpfs)", func() {
+	framework.ConformanceIt("should support (root,0644,tmpfs) [NodeConformance]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
@@ -92,7 +92,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			of 'Memory', ensure a root owned file with 0666 unix file permissions
 			is created correctly, has tmpfs mount type, and enforces the permissions.
 	*/
-	framework.ConformanceIt("should support (root,0666,tmpfs)", func() {
+	framework.ConformanceIt("should support (root,0666,tmpfs) [NodeConformance]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
@@ -102,7 +102,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			of 'Memory', ensure a root owned file with 0777 unix file permissions
 			is created correctly, has tmpfs mount type, and enforces the permissions.
 	*/
-	framework.ConformanceIt("should support (root,0777,tmpfs)", func() {
+	framework.ConformanceIt("should support (root,0777,tmpfs) [NodeConformance]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
@@ -112,7 +112,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			of 'Memory', ensure a user owned file with 0644 unix file permissions
 			is created correctly, has tmpfs mount type, and enforces the permissions.
 	*/
-	framework.ConformanceIt("should support (non-root,0644,tmpfs)", func() {
+	framework.ConformanceIt("should support (non-root,0644,tmpfs) [NodeConformance]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
@@ -122,7 +122,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			of 'Memory', ensure a user owned file with 0666 unix file permissions
 			is created correctly, has tmpfs mount type, and enforces the permissions.
 	*/
-	framework.ConformanceIt("should support (non-root,0666,tmpfs)", func() {
+	framework.ConformanceIt("should support (non-root,0666,tmpfs) [NodeConformance]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
@@ -132,7 +132,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			of 'Memory', ensure a user owned file with 0777 unix file permissions
 			is created correctly, has tmpfs mount type, and enforces the permissions.
 	*/
-	framework.ConformanceIt("should support (non-root,0777,tmpfs)", func() {
+	framework.ConformanceIt("should support (non-root,0777,tmpfs) [NodeConformance]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
@@ -141,7 +141,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		    Description: For a Pod created with an 'emptyDir' Volume, ensure the
 			volume has 0777 unix file permissions.
 	*/
-	framework.ConformanceIt("volume on default medium should have the correct mode", func() {
+	framework.ConformanceIt("volume on default medium should have the correct mode [NodeConformance]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
@@ -151,7 +151,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			root owned file with 0644 unix file permissions is created and enforced
 			correctly.
 	*/
-	framework.ConformanceIt("should support (root,0644,default)", func() {
+	framework.ConformanceIt("should support (root,0644,default) [NodeConformance]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
@@ -161,7 +161,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			root owned file with 0666 unix file permissions is created and enforced
 			correctly.
 	*/
-	framework.ConformanceIt("should support (root,0666,default)", func() {
+	framework.ConformanceIt("should support (root,0666,default) [NodeConformance]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
@@ -171,7 +171,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			root owned file with 0777 unix file permissions is created and enforced
 			correctly.
 	*/
-	framework.ConformanceIt("should support (root,0777,default)", func() {
+	framework.ConformanceIt("should support (root,0777,default) [NodeConformance]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
@@ -181,7 +181,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			user owned file with 0644 unix file permissions is created and enforced
 			correctly.
 	*/
-	framework.ConformanceIt("should support (non-root,0644,default)", func() {
+	framework.ConformanceIt("should support (non-root,0644,default) [NodeConformance]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
@@ -191,7 +191,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			user owned file with 0666 unix file permissions is created and enforced
 			correctly.
 	*/
-	framework.ConformanceIt("should support (non-root,0666,default)", func() {
+	framework.ConformanceIt("should support (non-root,0666,default) [NodeConformance]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
@@ -201,7 +201,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			user owned file with 0777 unix file permissions is created and enforced
 			correctly.
 	*/
-	framework.ConformanceIt("should support (non-root,0777,default)", func() {
+	framework.ConformanceIt("should support (non-root,0777,default) [NodeConformance]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 })

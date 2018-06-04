@@ -45,6 +45,32 @@ type openAPI struct {
 
 // BuildOpenAPISpec builds OpenAPI spec given a list of webservices (containing routes) and common.Config to customize it.
 func BuildOpenAPISpec(webServices []*restful.WebService, config *common.Config) (*spec.Swagger, error) {
+	o := newOpenAPI(config)
+	err := o.buildPaths(webServices)
+	if err != nil {
+		return nil, err
+	}
+	return o.finalizeSwagger()
+}
+
+// BuildOpenAPIDefinitionsForResource builds a partial OpenAPI spec given a sample object and common.Config to customize it.
+func BuildOpenAPIDefinitionsForResource(model interface{}, config *common.Config) (*spec.Definitions, error) {
+	o := newOpenAPI(config)
+	// We can discard the return value of toSchema because all we care about is the side effect of calling it.
+	// All the models created for this resource get added to o.swagger.Definitions
+	_, err := o.toSchema(model)
+	if err != nil {
+		return nil, err
+	}
+	swagger, err := o.finalizeSwagger()
+	if err != nil {
+		return nil, err
+	}
+	return &swagger.Definitions, nil
+}
+
+// newOpenAPI sets up the openAPI object so we can build the spec.
+func newOpenAPI(config *common.Config) openAPI {
 	o := openAPI{
 		config: config,
 		swagger: &spec.Swagger{
@@ -56,16 +82,6 @@ func BuildOpenAPISpec(webServices []*restful.WebService, config *common.Config) 
 			},
 		},
 	}
-
-	err := o.init(webServices)
-	if err != nil {
-		return nil, err
-	}
-
-	return o.swagger, nil
-}
-
-func (o *openAPI) init(webServices []*restful.WebService) error {
 	if o.config.GetOperationIDAndTags == nil {
 		o.config.GetOperationIDAndTags = func(r *restful.Route) (string, []string, error) {
 			return r.Operation, nil, nil
@@ -83,22 +99,25 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 	if o.config.CommonResponses == nil {
 		o.config.CommonResponses = map[int]spec.Response{}
 	}
-	err := o.buildPaths(webServices)
-	if err != nil {
-		return err
-	}
+	return o
+}
+
+// finalizeSwagger is called after the spec is built and returns the final spec.
+// NOTE: finalizeSwagger also make changes to the final spec, as specified in the config.
+func (o *openAPI) finalizeSwagger() (*spec.Swagger, error) {
 	if o.config.SecurityDefinitions != nil {
 		o.swagger.SecurityDefinitions = *o.config.SecurityDefinitions
 		o.swagger.Security = o.config.DefaultSecurity
 	}
 	if o.config.PostProcessSpec != nil {
+		var err error
 		o.swagger, err = o.config.PostProcessSpec(o.swagger)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return o.swagger, nil
 }
 
 func getCanonicalizeTypeName(t reflect.Type) string {

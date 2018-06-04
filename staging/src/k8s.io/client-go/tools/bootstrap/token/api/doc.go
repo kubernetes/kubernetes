@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package api (pkg/bootstrap/token/api) contains constants and types needed for
+// Package api (k8s.io/client-go/tools/bootstrap/token/api) contains constants and types needed for
 // bootstrap tokens as maintained by the BootstrapSigner and TokenCleaner
-// controllers (in pkg/controller/bootstrap)
+// controllers (in k8s.io/kubernetes/pkg/controller/bootstrap)
 package api // import "k8s.io/client-go/tools/bootstrap/token/api"

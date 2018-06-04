@@ -182,6 +182,7 @@ func Convert_v1_Deployment_To_extensions_Deployment(in *appsv1.Deployment, out *
 			out.Spec.RollbackTo = new(extensions.RollbackConfig)
 			out.Spec.RollbackTo.Revision = revision64
 		}
+		out.Annotations = deepCopyStringMap(out.Annotations)
 		delete(out.Annotations, appsv1.DeprecatedRollbackTo)
 	} else {
 		out.Spec.RollbackTo = nil
@@ -195,6 +196,8 @@ func Convert_v1_Deployment_To_extensions_Deployment(in *appsv1.Deployment, out *
 
 func Convert_extensions_Deployment_To_v1_Deployment(in *extensions.Deployment, out *appsv1.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
+	out.Annotations = deepCopyStringMap(out.Annotations) // deep copy because we modify it below
+
 	if err := Convert_extensions_DeploymentSpec_To_v1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -235,9 +238,8 @@ func Convert_v1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *
 
 func Convert_extensions_DaemonSet_To_v1_DaemonSet(in *extensions.DaemonSet, out *appsv1.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if out.Annotations == nil {
-		out.Annotations = make(map[string]string)
-	}
+	out.Annotations = deepCopyStringMap(out.Annotations) // deep copy annotations because we change them below
+
 	out.Annotations[appsv1.DeprecatedTemplateGeneration] = strconv.FormatInt(in.Spec.TemplateGeneration, 10)
 	if err := Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -287,6 +289,7 @@ func Convert_v1_DaemonSet_To_extensions_DaemonSet(in *appsv1.DaemonSet, out *ext
 			return err
 		} else {
 			out.Spec.TemplateGeneration = value64
+			out.Annotations = deepCopyStringMap(out.Annotations)
 			delete(out.Annotations, appsv1.DeprecatedTemplateGeneration)
 		}
 	}
@@ -495,4 +498,12 @@ func Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *apps.StatefulSet
 		}
 	}
 	return nil
+}
+
+func deepCopyStringMap(m map[string]string) map[string]string {
+	ret := make(map[string]string, len(m))
+	for k, v := range m {
+		ret[k] = v
+	}
+	return ret
 }

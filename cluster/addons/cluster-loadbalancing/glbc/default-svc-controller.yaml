@@ -17,6 +17,8 @@ spec:
       labels:
         k8s-app: glbc
         name: glbc
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       containers:
       - name: default-http-backend

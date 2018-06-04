@@ -40,28 +40,16 @@ type MasterConfiguration struct {
 	KubeletConfiguration KubeletConfiguration `json:"kubeletConfiguration"`
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking `json:"networking"`
+
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration"`
+
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string `json:"kubernetesVersion"`
-	// NodeName is the name of the node that will host the k8s control plane.
-	// Defaults to the hostname if not provided.
-	NodeName string `json:"nodeName"`
-	// NoTaintMaster will, if set, suppress the tainting of the
-	// master node allowing workloads to be run on it (e.g. in
-	// single node configurations).
-	NoTaintMaster bool `json:"noTaintMaster,omitempty"`
 
-	// Token is used for establishing bidirectional trust between nodes and masters.
-	// Used for joining nodes in the cluster.
-	Token string `json:"token"`
-	// TokenTTL defines the ttl for Token. Defaults to 24h.
-	TokenTTL *metav1.Duration `json:"tokenTTL,omitempty"`
-	// TokenUsages describes the ways in which this token can be used.
-	TokenUsages []string `json:"tokenUsages,omitempty"`
-	// Extra groups that this token will authenticate as when used for authentication
-	TokenGroups []string `json:"tokenGroups,omitempty"`
-
-	// CRISocket is used to retrieve container runtime info.
-	CRISocket string `json:"criSocket,omitempty"`
+	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
+	// This information IS NOT uploaded to the kubeadm cluster configmap, due to its sensitive nature
+	BootstrapTokens []BootstrapToken `json:"bootstrapTokens,omitempty"`
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -129,16 +117,26 @@ type API struct {
 	BindPort int32 `json:"bindPort"`
 }
 
-// TokenDiscovery contains elements needed for token discovery.
-type TokenDiscovery struct {
-	// ID is the first part of a bootstrap token. Considered public information.
-	// It is used when referring to a token without leaking the secret part.
-	ID string `json:"id"`
-	// Secret is the second part of a bootstrap token. Should only be shared
-	// with trusted parties.
-	Secret string `json:"secret"`
-	// TODO: Seems unused. Remove?
-	// Addresses []string `json:"addresses"`
+// NodeRegistrationOptions holds fields that relate to registering a new master or node to the cluster, either via "kubeadm init" or "kubeadm join"
+type NodeRegistrationOptions struct {
+
+	// Name is the `.Metadata.Name` field of the Node API object that will be created in this `kubeadm init` or `kubeadm joiń` operation.
+	// This field is also used in the CommonName field of the kubelet's client certificate to the API server.
+	// Defaults to the hostname of the node if not provided.
+	Name string `json:"name"`
+
+	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
+	CRISocket string `json:"criSocket"`
+
+	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
+	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your master node, set this field to an
+	// empty slice, i.e. `taints: {}` in the YAML file. This field is solely used for Node registration.
+	Taints []v1.Taint `json:"taints,omitempty"`
+
+	// ExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
+	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
+	// Flags have higher higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	ExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 }
 
 // Networking contains elements describing cluster's networking configuration
@@ -151,8 +149,65 @@ type Networking struct {
 	DNSDomain string `json:"dnsDomain"`
 }
 
+// BootstrapToken describes one bootstrap token, stored as a Secret in the cluster
+type BootstrapToken struct {
+	// Token is used for establishing bidirectional trust between nodes and masters.
+	// Used for joining nodes in the cluster.
+	Token *BootstrapTokenString `json:"token"`
+	// Description sets a human-friendly message why this token exists and what it's used
+	// for, so other administrators can know its purpose.
+	Description string `json:"description,omitempty"`
+	// TTL defines the time to live for this token. Defaults to 24h.
+	// Expires and TTL are mutually exclusive.
+	TTL *metav1.Duration `json:"ttl,omitempty"`
+	// Expires specifies the timestamp when this token expires. Defaults to being set
+	// dynamically at runtime based on the TTL. Expires and TTL are mutually exclusive.
+	Expires *metav1.Time `json:"expires,omitempty"`
+	// Usages describes the ways in which this token can be used. Can by default be used
+	// for establishing bidirectional trust, but that can be changed here.
+	Usages []string `json:"usages,omitempty"`
+	// Groups specifies the extra groups that this token will authenticate as when/if
+	// used for authentication
+	Groups []string `json:"groups,omitempty"`
+}
+
 // Etcd contains elements describing Etcd configuration.
 type Etcd struct {
+
+	// Local provides configuration knobs for configuring the local etcd instance
+	// Local and External are mutually exclusive
+	Local *LocalEtcd `json:"local,omitempty"`
+
+	// External describes how to connect to an external etcd cluster
+	// Local and External are mutually exclusive
+	External *ExternalEtcd `json:"external,omitempty"`
+}
+
+// LocalEtcd describes that kubeadm should run an etcd cluster locally
+type LocalEtcd struct {
+
+	// Image specifies which container image to use for running etcd.
+	// If empty, automatically populated by kubeadm using the image
+	// repository and default etcd version.
+	Image string `json:"image"`
+
+	// DataDir is the directory etcd will place its data.
+	// Defaults to "/var/lib/etcd".
+	DataDir string `json:"dataDir"`
+
+	// ExtraArgs are extra arguments provided to the etcd binary
+	// when run inside a static pod.
+	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
+
+	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
+	ServerCertSANs []string `json:"serverCertSANs,omitempty"`
+	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.
+	PeerCertSANs []string `json:"peerCertSANs,omitempty"`
+}
+
+// ExternalEtcd describes an external etcd cluster
+type ExternalEtcd struct {
+
 	// Endpoints of etcd members. Useful for using external etcd.
 	// If not provided, kubeadm will run etcd in a static pod.
 	Endpoints []string `json:"endpoints"`
@@ -162,20 +217,6 @@ type Etcd struct {
 	CertFile string `json:"certFile"`
 	// KeyFile is an SSL key file used to secure etcd communication.
 	KeyFile string `json:"keyFile"`
-	// DataDir is the directory etcd will place its data.
-	// Defaults to "/var/lib/etcd".
-	DataDir string `json:"dataDir"`
-	// ExtraArgs are extra arguments provided to the etcd binary
-	// when run inside a static pod.
-	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
-	// Image specifies which container image to use for running etcd.
-	// If empty, automatically populated by kubeadm using the image
-	// repository and default etcd version.
-	Image string `json:"image"`
-	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
-	ServerCertSANs []string `json:"serverCertSANs,omitempty"`
-	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.
-	PeerCertSANs []string `json:"peerCertSANs,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -184,6 +225,9 @@ type Etcd struct {
 // TODO: This struct should be replaced by dynamic kubelet configuration.
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration"`
 
 	// CACertPath is the path to the SSL certificate authority used to
 	// secure comunications between node and master.
@@ -201,16 +245,12 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers,omitempty"`
 	// DiscoveryTimeout modifies the discovery timeout
 	DiscoveryTimeout *metav1.Duration `json:"discoveryTimeout,omitempty"`
-	// NodeName is the name of the node to join the cluster. Defaults
-	// to the name of the host.
-	NodeName string `json:"nodeName"`
 	// TLSBootstrapToken is a token used for TLS bootstrapping.
 	// Defaults to Token.
 	TLSBootstrapToken string `json:"tlsBootstrapToken"`
 	// Token is used for both discovery and TLS bootstrapping.
 	Token string `json:"token"`
-	// CRISocket is used to retrieve container runtime info.
-	CRISocket string `json:"criSocket,omitempty"`
+
 	// ClusterName is the name for the cluster in kubeconfig.
 	ClusterName string `json:"clusterName,omitempty"`
 

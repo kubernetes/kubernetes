@@ -76,7 +76,7 @@ func CreateTestCRD(f *Framework) (*TestCrd, error) {
 	crd := newCRDForTest(testcrd)
 
 	//create CRD and waits for the resource to be recognized and available.
-	err = testserver.CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+	crd, err = testserver.CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 	if err != nil {
 		Failf("failed to create CustomResourceDefinition: %v", err)
 		return nil, err

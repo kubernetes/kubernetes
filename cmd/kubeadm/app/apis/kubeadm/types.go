@@ -17,6 +17,8 @@ limitations under the License.
 package kubeadm
 
 import (
+	fuzz "github.com/google/gofuzz"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
@@ -42,26 +44,13 @@ type MasterConfiguration struct {
 	Networking Networking
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string
-	// NodeName is the name of the node that will host the k8s control plane.
-	// Defaults to the hostname if not provided.
-	NodeName string
-	// NoTaintMaster will, if set, suppress the tainting of the
-	// master node allowing workloads to be run on it (e.g. in
-	// single node configurations).
-	NoTaintMaster bool
 
-	// Token is used for establishing bidirectional trust between nodes and masters.
-	// Used for joining nodes in the cluster.
-	Token string
-	// TokenTTL defines the ttl for Token. Defaults to 24h.
-	TokenTTL *metav1.Duration
-	// TokenUsages describes the ways in which this token can be used.
-	TokenUsages []string
-	// Extra groups that this token will authenticate as when used for authentication
-	TokenGroups []string
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions
 
-	// CRISocket is used to retrieve container runtime info.
-	CRISocket string
+	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
+	// This information IS NOT uploaded to the kubeadm cluster configmap, due to its sensitive nature
+	BootstrapTokens []BootstrapToken
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -136,16 +125,26 @@ type API struct {
 	BindPort int32
 }
 
-// TokenDiscovery contains elements needed for token discovery.
-type TokenDiscovery struct {
-	// ID is the first part of a bootstrap token. Considered public information.
-	// It is used when referring to a token without leaking the secret part.
-	ID string
-	// Secret is the second part of a bootstrap token. Should only be shared
-	// with trusted parties.
-	Secret string
-	// TODO: Seems unused. Remove?
-	// Addresses []string
+// NodeRegistrationOptions holds fields that relate to registering a new master or node to the cluster, either via "kubeadm init" or "kubeadm join"
+type NodeRegistrationOptions struct {
+
+	// Name is the `.Metadata.Name` field of the Node API object that will be created in this `kubeadm init` or `kubeadm joiń` operation.
+	// This field is also used in the CommonName field of the kubelet's client certificate to the API server.
+	// Defaults to the hostname of the node if not provided.
+	Name string
+
+	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
+	CRISocket string
+
+	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
+	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your master node, set this field to an
+	// empty slice, i.e. `taints: {}` in the YAML file. This field is solely used for Node registration.
+	Taints []v1.Taint
+
+	// ExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
+	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
+	// Flags have higher higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	ExtraArgs map[string]string
 }
 
 // Networking contains elements describing cluster's networking configuration.
@@ -158,8 +157,75 @@ type Networking struct {
 	DNSDomain string
 }
 
+// BootstrapToken describes one bootstrap token, stored as a Secret in the cluster
+// TODO: The BootstrapToken object should move out to either k8s.io/client-go or k8s.io/api in the future
+// (probably as part of Bootstrap Tokens going GA). It should not be staged under the kubeadm API as it is now.
+type BootstrapToken struct {
+	// Token is used for establishing bidirectional trust between nodes and masters.
+	// Used for joining nodes in the cluster.
+	Token *BootstrapTokenString
+	// Description sets a human-friendly message why this token exists and what it's used
+	// for, so other administrators can know its purpose.
+	Description string
+	// TTL defines the time to live for this token. Defaults to 24h.
+	// Expires and TTL are mutually exclusive.
+	TTL *metav1.Duration
+	// Expires specifies the timestamp when this token expires. Defaults to being set
+	// dynamically at runtime based on the TTL. Expires and TTL are mutually exclusive.
+	Expires *metav1.Time
+	// Usages describes the ways in which this token can be used. Can by default be used
+	// for establishing bidirectional trust, but that can be changed here.
+	Usages []string
+	// Groups specifies the extra groups that this token will authenticate as when/if
+	// used for authentication
+	Groups []string
+}
+
 // Etcd contains elements describing Etcd configuration.
 type Etcd struct {
+
+	// Local provides configuration knobs for configuring the local etcd instance
+	// Local and External are mutually exclusive
+	Local *LocalEtcd
+
+	// External describes how to connect to an external etcd cluster
+	// Local and External are mutually exclusive
+	External *ExternalEtcd
+}
+
+// Fuzz is a dummy function here to get the roundtrip tests working in cmd/kubeadm/app/apis/kubeadm/fuzzer working.
+// As we split the monolith-etcd struct into two smaller pieces with pointers and they are mutually exclusive, roundtrip
+// tests that randomize all values in this struct isn't feasible. Instead, we override the fuzzing function for .Etcd with
+// this func by letting Etcd implement the fuzz.Interface interface. As this func does nothing, we rely on the values given
+// in fuzzer/fuzzer.go for the roundtrip tests, which is exactly what we want.
+// TODO: Remove this function when we remove the v1alpha1 API
+func (e Etcd) Fuzz(c fuzz.Continue) {}
+
+// LocalEtcd describes that kubeadm should run an etcd cluster locally
+type LocalEtcd struct {
+
+	// Image specifies which container image to use for running etcd.
+	// If empty, automatically populated by kubeadm using the image
+	// repository and default etcd version.
+	Image string
+
+	// DataDir is the directory etcd will place its data.
+	// Defaults to "/var/lib/etcd".
+	DataDir string
+
+	// ExtraArgs are extra arguments provided to the etcd binary
+	// when run inside a static pod.
+	ExtraArgs map[string]string
+
+	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
+	ServerCertSANs []string
+	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.
+	PeerCertSANs []string
+}
+
+// ExternalEtcd describes an external etcd cluster
+type ExternalEtcd struct {
+
 	// Endpoints of etcd members. Useful for using external etcd.
 	// If not provided, kubeadm will run etcd in a static pod.
 	Endpoints []string
@@ -169,22 +235,6 @@ type Etcd struct {
 	CertFile string
 	// KeyFile is an SSL key file used to secure etcd communication.
 	KeyFile string
-	// DataDir is the directory etcd will place its data.
-	// Defaults to "/var/lib/etcd".
-	DataDir string
-	// ExtraArgs are extra arguments provided to the etcd binary
-	// when run inside a static pod.
-	ExtraArgs map[string]string
-	// Image specifies which container image to use for running etcd.
-	// If empty, automatically populated by kubeadm using the image
-	// repository and default etcd version.
-	Image string
-	// ServerCertSANs sets extra Subject Alternative Names for the etcd server
-	// signing cert. This is currently used for the etcd static-pod.
-	ServerCertSANs []string
-	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer
-	// signing cert. This is currently used for the etcd static-pod.
-	PeerCertSANs []string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -193,6 +243,9 @@ type Etcd struct {
 // TODO: This struct should be replaced by dynamic kubelet configuration.
 type NodeConfiguration struct {
 	metav1.TypeMeta
+
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions
 
 	// CACertPath is the path to the SSL certificate authority used to
 	// secure comunications between node and master.
@@ -210,16 +263,11 @@ type NodeConfiguration struct {
 	DiscoveryTokenAPIServers []string
 	// DiscoveryTimeout modifies the discovery timeout
 	DiscoveryTimeout *metav1.Duration
-	// NodeName is the name of the node to join the cluster. Defaults
-	// to the name of the host.
-	NodeName string
 	// TLSBootstrapToken is a token used for TLS bootstrapping.
 	// Defaults to Token.
 	TLSBootstrapToken string
 	// Token is used for both discovery and TLS bootstrapping.
 	Token string
-	// CRISocket is used to retrieve container runtime info.
-	CRISocket string
 	// The cluster name
 	ClusterName string
 
@@ -303,13 +351,13 @@ type CommonConfiguration interface {
 // GetCRISocket will return the CRISocket that is defined for the MasterConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
 func (cfg *MasterConfiguration) GetCRISocket() string {
-	return cfg.CRISocket
+	return cfg.NodeRegistration.CRISocket
 }
 
 // GetNodeName will return the NodeName that is defined for the MasterConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
 func (cfg *MasterConfiguration) GetNodeName() string {
-	return cfg.NodeName
+	return cfg.NodeRegistration.Name
 }
 
 // GetKubernetesVersion will return the KubernetesVersion that is defined for the MasterConfiguration.
@@ -321,13 +369,13 @@ func (cfg *MasterConfiguration) GetKubernetesVersion() string {
 // GetCRISocket will return the CRISocket that is defined for the NodeConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
 func (cfg *NodeConfiguration) GetCRISocket() string {
-	return cfg.CRISocket
+	return cfg.NodeRegistration.CRISocket
 }
 
 // GetNodeName will return the NodeName that is defined for the NodeConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
 func (cfg *NodeConfiguration) GetNodeName() string {
-	return cfg.NodeName
+	return cfg.NodeRegistration.Name
 }
 
 // GetKubernetesVersion will return an empty string since KubernetesVersion is not a

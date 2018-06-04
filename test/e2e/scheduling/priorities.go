@@ -153,7 +153,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		// Cleanup the replication controller when we are done.
 		defer func() {
 			// Resize the replication controller to zero to get rid of pods.
-			if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, rc.Name); err != nil {
+			if err := framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rc.Name); err != nil {
 				framework.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
 			}
 		}()

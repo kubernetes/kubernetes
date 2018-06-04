@@ -92,10 +92,14 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 		!IsHugePageResourceName(name)
 }
 
+func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
+}
+
 // Extended and Hugepages resources
 func IsScalarResourceName(name v1.ResourceName) bool {
 	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
-		IsPrefixedNativeResource(name)
+		IsPrefixedNativeResource(name) || IsAttachableVolumeResourceName(name)
 }
 
 // this function aims to check if the service's ClusterIP is set or not

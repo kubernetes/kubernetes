@@ -50,7 +50,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -78,7 +78,6 @@ func TestTopNodeAllMetrics(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -103,7 +102,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", customBaseMetricsAddress, metricsApiVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -131,7 +130,6 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -167,7 +165,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 	expectedPath := fmt.Sprintf("%s/%s/nodes/%s", baseMetricsAddress, metricsApiVersion, expectedMetrics.Name)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -195,7 +193,6 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -234,7 +231,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 	expectedQuery := fmt.Sprintf("labelSelector=%s", url.QueryEscape(label))
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -262,7 +259,6 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -289,7 +285,7 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 	expectedMetrics, nodes := testNodeV1beta1MetricsData()
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -315,7 +311,6 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, expectedMetrics, nil
 	})
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -357,7 +352,7 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 	}
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -383,7 +378,6 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 	fakemetricsClientset.AddReactor("get", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, &expectedMetrics, nil
 	})
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
@@ -435,7 +429,7 @@ func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
 	label := "key=value"
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -462,7 +456,6 @@ func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
 	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, expectedMetrics, nil
 	})
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 

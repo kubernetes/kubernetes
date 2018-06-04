@@ -815,7 +815,7 @@ func MakeWritePod(ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
 func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
 	if len(command) == 0 {
-		command = "while true; do sleep 1; done"
+		command = "trap exit TERM; while true; do sleep 1; done"
 	}
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -902,7 +902,7 @@ func MakeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 // SELinux testing requires to pass HostIPC and HostPID as booleansi arguments.
 func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64) *v1.Pod {
 	if len(command) == 0 {
-		command = "while true; do sleep 1; done"
+		command = "trap exit TERM; while true; do sleep 1; done"
 	}
 	podName := "security-context-" + string(uuid.NewUUID())
 	if fsGroup == nil {

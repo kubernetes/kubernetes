@@ -98,7 +98,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubectl/util/crlf:all-srcs",
         "//pkg/kubectl/util/hash:all-srcs",
         "//pkg/kubectl/util/i18n:all-srcs",
         "//pkg/kubectl/util/logs:all-srcs",

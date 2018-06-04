@@ -21,6 +21,7 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -29,6 +30,17 @@ import (
 // Funcs returns the fuzzer functions for the extensions api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(j *extensions.Deployment, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+
+			// match defaulting
+			if j.Spec.Selector == nil {
+				j.Spec.Selector = &metav1.LabelSelector{MatchLabels: j.Spec.Template.Labels}
+			}
+			if len(j.Labels) == 0 {
+				j.Labels = j.Spec.Template.Labels
+			}
+		},
 		func(j *extensions.DeploymentSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			rhl := int32(c.Rand.Int31())
@@ -54,6 +66,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.RollingUpdate = &rollingUpdate
 			}
 		},
+		func(j *extensions.DaemonSet, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+
+			// match defaulter
+			j.Spec.Template.Generation = 0
+			if len(j.ObjectMeta.Labels) == 0 {
+				j.ObjectMeta.Labels = j.Spec.Template.ObjectMeta.Labels
+			}
+		},
 		func(j *extensions.DaemonSetSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			rhl := int32(c.Rand.Int31())
@@ -76,6 +97,17 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 					}
 				}
 				j.RollingUpdate = &rollingUpdate
+			}
+		},
+		func(j *extensions.ReplicaSet, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+
+			// match defaulter
+			if j.Spec.Selector == nil {
+				j.Spec.Selector = &metav1.LabelSelector{MatchLabels: j.Spec.Template.Labels}
+			}
+			if len(j.Labels) == 0 {
+				j.Labels = j.Spec.Template.Labels
 			}
 		},
 	}

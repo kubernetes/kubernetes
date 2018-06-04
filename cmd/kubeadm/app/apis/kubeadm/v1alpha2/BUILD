@@ -1,8 +1,9 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = [
+        "bootstraptokenstring.go",
         "defaults.go",
         "doc.go",
         "register.go",
@@ -61,6 +62,8 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
+        "//vendor/k8s.io/client-go/tools/bootstrap/token/util:go_default_library",
     ],
 )
 
@@ -76,4 +79,10 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["bootstraptokenstring_test.go"],
+    embed = [":go_default_library"],
 )

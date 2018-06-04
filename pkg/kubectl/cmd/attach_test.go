@@ -140,7 +140,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -156,7 +156,6 @@ func TestPodAndContainerAttach(t *testing.T) {
 					return nil, nil
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			cmd := &cobra.Command{}
@@ -224,7 +223,7 @@ func TestAttach(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -247,7 +246,6 @@ func TestAttach(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 			remoteAttach := &fakeRemoteAttach{}
 			if test.remoteAttachErr {
@@ -312,7 +310,7 @@ func TestAttachWarnings(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -335,7 +333,6 @@ func TestAttachWarnings(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
 			ex := &fakeRemoteAttach{}

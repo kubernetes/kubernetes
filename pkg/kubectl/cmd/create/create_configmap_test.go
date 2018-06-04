@@ -36,7 +36,7 @@ import (
 func TestCreateConfigMap(t *testing.T) {
 	configMap := &v1.ConfigMap{}
 	configMap.Name = "my-configmap"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -55,7 +55,6 @@ func TestCreateConfigMap(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateConfigMap(tf, ioStreams)
 	cmd.Flags().Set("output", "name")

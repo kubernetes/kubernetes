@@ -19,10 +19,12 @@ package util
 import (
 	"fmt"
 	"testing"
-
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
+type pferror struct{}
+
+func (p *pferror) Preflight() bool { return true }
+func (p *pferror) Error() string   { return "" }
 func TestCheckErr(t *testing.T) {
 	var codeReturned int
 	errHandle := func(err string, code int) {
@@ -35,12 +37,12 @@ func TestCheckErr(t *testing.T) {
 	}{
 		{nil, 0},
 		{fmt.Errorf(""), DefaultErrorExitCode},
-		{&preflight.Error{}, PreFlightExitCode},
+		{&pferror{}, PreFlightExitCode},
 	}
 
 	for _, rt := range tokenTest {
 		codeReturned = 0
-		checkErr("", rt.e, errHandle)
+		checkErr(rt.e, errHandle)
 		if codeReturned != rt.expected {
 			t.Errorf(
 				"failed checkErr:\n\texpected: %d\n\t  actual: %d",

@@ -49,9 +49,6 @@ import (
 )
 
 const (
-	// maxImagesInNodeStatus is the number of max images we store in image status.
-	maxImagesInNodeStatus = 50
-
 	// maxNamesPerImageInNodeStatus is max number of names per image stored in
 	// the node status.
 	maxNamesPerImageInNodeStatus = 5
@@ -327,6 +324,30 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	kl.setNodeStatus(node)
 
 	return node, nil
+}
+
+// setVolumeLimits updates volume limits on the node
+func (kl *Kubelet) setVolumeLimits(node *v1.Node) {
+	if node.Status.Capacity == nil {
+		node.Status.Capacity = v1.ResourceList{}
+	}
+
+	if node.Status.Allocatable == nil {
+		node.Status.Allocatable = v1.ResourceList{}
+	}
+
+	pluginWithLimits := kl.volumePluginMgr.ListVolumePluginWithLimits()
+	for _, volumePlugin := range pluginWithLimits {
+		attachLimits, err := volumePlugin.GetVolumeLimits()
+		if err != nil {
+			glog.V(4).Infof("Error getting volume limit for plugin %s", volumePlugin.GetPluginName())
+			continue
+		}
+		for limitKey, value := range attachLimits {
+			node.Status.Capacity[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
+			node.Status.Allocatable[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
+		}
+	}
 }
 
 // syncNodeStatus should be called periodically from a goroutine.
@@ -721,8 +742,9 @@ func (kl *Kubelet) setNodeStatusImages(node *v1.Node) {
 		return
 	}
 	// sort the images from max to min, and only set top N images into the node status.
-	if maxImagesInNodeStatus < len(containerImages) {
-		containerImages = containerImages[0:maxImagesInNodeStatus]
+	if int(kl.nodeStatusMaxImages) > -1 &&
+		int(kl.nodeStatusMaxImages) < len(containerImages) {
+		containerImages = containerImages[0:kl.nodeStatusMaxImages]
 	}
 
 	for _, image := range containerImages {
@@ -753,6 +775,9 @@ func (kl *Kubelet) setNodeStatusInfo(node *v1.Node) {
 	kl.setNodeStatusDaemonEndpoints(node)
 	kl.setNodeStatusImages(node)
 	kl.setNodeStatusGoRuntime(node)
+	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		kl.setVolumeLimits(node)
+	}
 }
 
 // Set Ready condition for the node.

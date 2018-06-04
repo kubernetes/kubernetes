@@ -18,6 +18,7 @@ package e2e_node
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -27,11 +28,16 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	controller "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+
+	"github.com/prometheus/common/model"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -45,8 +51,6 @@ type expectNodeConfigStatus struct {
 	// If true, expect Status.Config.Active == Status.Config.LastKnownGood,
 	// otherwise expect Status.Config.Active == Status.Config.Assigned.
 	lkgActive bool
-	// If true, skip checking Status.Config.LastKnownGood == this.lastKnownGood in the status.
-	skipLkg bool
 }
 
 type nodeConfigTestCase struct {
@@ -65,7 +69,7 @@ type nodeConfigTestCase struct {
 }
 
 // This test is marked [Disruptive] because the Kubelet restarts several times during this test.
-var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeAlphaFeature:DynamicKubeletConfig][Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 	var beforeNode *apiv1.Node
 	var beforeConfigMap *apiv1.ConfigMap
@@ -296,7 +300,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 			})
 		})
 
-		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap", func() {
+		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
@@ -360,7 +364,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 			})
 		})
 
-		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey", func() {
+		Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
 			It(itDescription, func() {
 				const badConfigKey = "bad"
 				var err error
@@ -415,7 +419,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		})
 
 		// exposes resource leaks across config changes
-		Context("update Node.Spec.ConfigSource: 100 update stress test", func() {
+		Context("update Node.Spec.ConfigSource: 100 update stress test:", func() {
 			It(itDescription, func() {
 				var err error
 
@@ -472,7 +476,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("update ConfigMap in-place: state transitions", func() {
+		Context("update ConfigMap in-place: state transitions:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
@@ -552,7 +556,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("update ConfigMap in-place: recover to last-known-good version", func() {
+		Context("update ConfigMap in-place: recover to last-known-good version:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
@@ -631,7 +635,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("delete and recreate ConfigMap: state transitions", func() {
+		Context("delete and recreate ConfigMap: state transitions:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
@@ -711,7 +715,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig] [Serial] [Disrupt
 		// roll out a new Node.Spec.ConfigSource that references the new ConfigMap. In-place ConfigMap updates, including deletion
 		// followed by re-creation, will cause all observing Kubelets to immediately restart for new config, because these operations
 		// change the ResourceVersion of the ConfigMap.
-		Context("delete and recreate ConfigMap: error while ConfigMap is absent", func() {
+		Context("delete and recreate ConfigMap: error while ConfigMap is absent:", func() {
 			It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
@@ -809,6 +813,8 @@ func (tc *nodeConfigTestCase) run(f *framework.Framework, fn func(f *framework.F
 	tc.checkNodeConfigSource(f)
 	// check status
 	tc.checkConfigStatus(f)
+	// check that the Kubelet's config-related metrics are correct
+	tc.checkConfigMetrics(f)
 	// check expectConfig
 	if tc.expectConfig != nil {
 		tc.checkConfig(f)
@@ -929,7 +935,7 @@ func expectConfigStatus(tc *nodeConfigTestCase, actual *apiv1.NodeConfigStatus) 
 		errs = append(errs, spew.Sprintf("expected Assigned %#v but got %#v", expectAssigned, actual.Assigned))
 	}
 	// check LastKnownGood matches tc.expectConfigStatus.lastKnownGood
-	if !tc.expectConfigStatus.skipLkg && !apiequality.Semantic.DeepEqual(tc.expectConfigStatus.lastKnownGood, actual.LastKnownGood) {
+	if !apiequality.Semantic.DeepEqual(tc.expectConfigStatus.lastKnownGood, actual.LastKnownGood) {
 		errs = append(errs, spew.Sprintf("expected LastKnownGood %#v but got %#v", tc.expectConfigStatus.lastKnownGood, actual.LastKnownGood))
 	}
 	// check Active matches Assigned or LastKnownGood, depending on tc.expectConfigStatus.lkgActive
@@ -1011,6 +1017,111 @@ func (tc *nodeConfigTestCase) checkEvent(f *framework.Framework) {
 		// compare messages
 		if expectMessage != recent.Message {
 			return fmt.Errorf("checkEvent: case %s: expected event message %q but got %q", tc.desc, expectMessage, recent.Message)
+		}
+		return nil
+	}, timeout, interval).Should(BeNil())
+}
+
+// checkConfigMetrics makes sure the Kubelet's config related metrics are as we expect, given the test case
+func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
+	const (
+		timeout                = time.Minute
+		interval               = time.Second
+		assignedConfigKey      = metrics.KubeletSubsystem + "_" + metrics.AssignedConfigKey
+		activeConfigKey        = metrics.KubeletSubsystem + "_" + metrics.ActiveConfigKey
+		lastKnownGoodConfigKey = metrics.KubeletSubsystem + "_" + metrics.LastKnownGoodConfigKey
+		configErrorKey         = metrics.KubeletSubsystem + "_" + metrics.ConfigErrorKey
+	)
+	// local config helper
+	mkLocalSample := func(name model.LabelValue) *model.Sample {
+		return &model.Sample{
+			Metric: model.Metric(map[model.LabelName]model.LabelValue{
+				model.MetricNameLabel:                 name,
+				metrics.ConfigSourceLabelKey:          metrics.ConfigSourceLabelValueLocal,
+				metrics.ConfigUIDLabelKey:             "",
+				metrics.ConfigResourceVersionLabelKey: "",
+				metrics.KubeletConfigKeyLabelKey:      "",
+			}),
+			Value: 1,
+		}
+	}
+	// remote config helper
+	mkRemoteSample := func(name model.LabelValue, source *apiv1.NodeConfigSource) *model.Sample {
+		return &model.Sample{
+			Metric: model.Metric(map[model.LabelName]model.LabelValue{
+				model.MetricNameLabel:                 name,
+				metrics.ConfigSourceLabelKey:          model.LabelValue(fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", source.ConfigMap.Namespace, source.ConfigMap.Name)),
+				metrics.ConfigUIDLabelKey:             model.LabelValue(source.ConfigMap.UID),
+				metrics.ConfigResourceVersionLabelKey: model.LabelValue(source.ConfigMap.ResourceVersion),
+				metrics.KubeletConfigKeyLabelKey:      model.LabelValue(source.ConfigMap.KubeletConfigKey),
+			}),
+			Value: 1,
+		}
+	}
+	// error helper
+	mkErrorSample := func(expectError bool) *model.Sample {
+		v := model.SampleValue(0)
+		if expectError {
+			v = model.SampleValue(1)
+		}
+		return &model.Sample{
+			Metric: model.Metric(map[model.LabelName]model.LabelValue{model.MetricNameLabel: configErrorKey}),
+			Value:  v,
+		}
+	}
+	// construct expected metrics
+	// assigned
+	assignedSamples := model.Samples{mkLocalSample(assignedConfigKey)}
+	assignedSource := tc.configSource.DeepCopy()
+	if assignedSource != nil && assignedSource.ConfigMap != nil {
+		assignedSource.ConfigMap.UID = tc.configMap.UID
+		assignedSource.ConfigMap.ResourceVersion = tc.configMap.ResourceVersion
+		assignedSamples = model.Samples{mkRemoteSample(assignedConfigKey, assignedSource)}
+	}
+	// last-known-good
+	lastKnownGoodSamples := model.Samples{mkLocalSample(lastKnownGoodConfigKey)}
+	lastKnownGoodSource := tc.expectConfigStatus.lastKnownGood
+	if lastKnownGoodSource != nil && lastKnownGoodSource.ConfigMap != nil {
+		lastKnownGoodSamples = model.Samples{mkRemoteSample(lastKnownGoodConfigKey, lastKnownGoodSource)}
+	}
+	// active
+	activeSamples := model.Samples{mkLocalSample(activeConfigKey)}
+	activeSource := assignedSource
+	if tc.expectConfigStatus.lkgActive {
+		activeSource = lastKnownGoodSource
+	}
+	if activeSource != nil && activeSource.ConfigMap != nil {
+		activeSamples = model.Samples{mkRemoteSample(activeConfigKey, activeSource)}
+	}
+	// error
+	errorSamples := model.Samples{mkErrorSample(len(tc.expectConfigStatus.err) > 0)}
+	// expected metrics
+	expect := frameworkmetrics.KubeletMetrics(map[string]model.Samples{
+		assignedConfigKey:      assignedSamples,
+		activeConfigKey:        activeSamples,
+		lastKnownGoodConfigKey: lastKnownGoodSamples,
+		configErrorKey:         errorSamples,
+	})
+	// wait for expected metrics to appear
+	Eventually(func() error {
+		actual, err := getKubeletMetrics(sets.NewString(
+			assignedConfigKey,
+			activeConfigKey,
+			lastKnownGoodConfigKey,
+			configErrorKey,
+		))
+		if err != nil {
+			return err
+		}
+		// clear timestamps from actual, so DeepEqual is time-invariant
+		for _, samples := range actual {
+			for _, sample := range samples {
+				sample.Timestamp = 0
+			}
+		}
+		// compare to expected
+		if !reflect.DeepEqual(expect, actual) {
+			return fmt.Errorf("checkConfigMetrics: case: %s: expect metrics %s but got %s", tc.desc, spew.Sprintf("%#v", expect), spew.Sprintf("%#v", actual))
 		}
 		return nil
 	}, timeout, interval).Should(BeNil())

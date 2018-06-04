@@ -92,8 +92,8 @@ func (mi *fakeMountInterface) MakeFile(pathname string) error {
 	return nil
 }
 
-func (mi *fakeMountInterface) ExistsPath(pathname string) bool {
-	return true
+func (mi *fakeMountInterface) ExistsPath(pathname string) (bool, error) {
+	return true, errors.New("not implemented")
 }
 
 func (mi *fakeMountInterface) PrepareSafeSubpath(subPath mount.Subpath) (newHostPath string, cleanupAction func(), err error) {
@@ -118,6 +118,10 @@ func (mi *fakeMountInterface) GetFSGroup(pathname string) (int64, error) {
 
 func (mi *fakeMountInterface) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("not implemented")
+}
+
+func (mi *fakeMountInterface) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
 }
 
 func fakeContainerMgrMountInt() mount.Interface {

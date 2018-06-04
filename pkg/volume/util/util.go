@@ -278,18 +278,11 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]stri
 	if pv.Spec.NodeAffinity.Required != nil {
 		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
 		glog.V(10).Infof("Match for Required node selector terms %+v", terms)
-		for _, term := range terms {
-			selector, err := v1helper.NodeSelectorRequirementsAsSelector(term.MatchExpressions)
-			if err != nil {
-				return fmt.Errorf("Failed to parse MatchExpressions: %v", err)
-			}
-			if selector.Matches(labels.Set(nodeLabels)) {
-				// Terms are ORed, so only one needs to match
-				return nil
-			}
+		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
+			return fmt.Errorf("No matching NodeSelectorTerms")
 		}
-		return fmt.Errorf("No matching NodeSelectorTerms")
 	}
+
 	return nil
 }
 
@@ -723,6 +716,12 @@ func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// CheckPersistentVolumeClaimModeBlock checks VolumeMode.
+// If the mode is Block, return true otherwise return false.
+func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock
 }
 
 // MakeAbsolutePath convert path to absolute path according to GOOS
