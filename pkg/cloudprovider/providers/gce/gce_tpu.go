@@ -25,7 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"google.golang.org/api/googleapi"
-	tpuapi "google.golang.org/api/tpu/v1alpha1"
+	tpuapi "google.golang.org/api/tpu/v1"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -165,7 +165,7 @@ func (gce *GCECloud) waitForTPUOp(interval, timeout time.Duration, op *tpuapi.Op
 // newTPUMetricContext returns a new metricContext used for recording metrics
 // of Cloud TPU API calls.
 func newTPUMetricContext(request, zone string) *metricContext {
-	return newGenericMetricContext("tpus", request, unusedMetricLabel, zone, "alpha")
+	return newGenericMetricContext("tpus", request, unusedMetricLabel, zone, "v1")
 }
 
 // getErrorFromTPUOp returns the error in the failed op, or nil if the op
