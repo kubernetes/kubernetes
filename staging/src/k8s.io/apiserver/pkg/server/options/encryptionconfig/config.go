@@ -33,8 +33,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
-	cfg "k8s.io/kubernetes/pkg/apis/componentconfig"
-	cfgv1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1"
+	kubecfg "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig"
+	kubecfgv1 "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig/v1"
 )
 
 const (
@@ -97,17 +97,17 @@ func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 }
 
 // loadConfig decodes data as a EncryptionConfiguration object.
-func loadConfig(data []byte) (*cfg.EncryptionConfiguration, error) {
+func loadConfig(data []byte) (*kubecfg.EncryptionConfiguration, error) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	cfg.AddToScheme(scheme)
-	cfgv1.AddToScheme(scheme)
+	kubecfg.AddToScheme(scheme)
+	kubecfgv1.AddToScheme(scheme)
 
 	configObj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	config, ok := configObj.(*cfg.EncryptionConfiguration)
+	config, ok := configObj.(*kubecfg.EncryptionConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
 	}
@@ -118,7 +118,7 @@ func loadConfig(data []byte) (*cfg.EncryptionConfiguration, error) {
 var envelopeServiceFactory = envelope.NewGRPCService
 
 // GetPrefixTransformers constructs and returns the appropriate prefix transformers for the passed resource using its configuration.
-func GetPrefixTransformers(config *cfg.ResourceConfiguration) ([]value.PrefixTransformer, error) {
+func GetPrefixTransformers(config *kubecfg.ResourceConfiguration) ([]value.PrefixTransformer, error) {
 	var result []value.PrefixTransformer
 	for _, provider := range config.Providers {
 		found := false
@@ -198,7 +198,7 @@ type BlockTransformerFunc func(cipher.Block) value.Transformer
 
 // GetAESPrefixTransformer returns a prefix transformer from the provided configuration.
 // Returns an AES transformer based on the provided prefix and block transformer.
-func GetAESPrefixTransformer(config *cfg.AESConfiguration, fn BlockTransformerFunc, prefix string) (value.PrefixTransformer, error) {
+func GetAESPrefixTransformer(config *kubecfg.AESConfiguration, fn BlockTransformerFunc, prefix string) (value.PrefixTransformer, error) {
 	var result value.PrefixTransformer
 
 	if len(config.Keys) == 0 {
@@ -246,7 +246,7 @@ func GetAESPrefixTransformer(config *cfg.AESConfiguration, fn BlockTransformerFu
 }
 
 // GetSecretboxPrefixTransformer returns a prefix transformer from the provided configuration
-func GetSecretboxPrefixTransformer(config *cfg.SecretboxConfiguration) (value.PrefixTransformer, error) {
+func GetSecretboxPrefixTransformer(config *kubecfg.SecretboxConfiguration) (value.PrefixTransformer, error) {
 	var result value.PrefixTransformer
 
 	if len(config.Keys) == 0 {
@@ -298,7 +298,7 @@ func GetSecretboxPrefixTransformer(config *cfg.SecretboxConfiguration) (value.Pr
 
 // getEnvelopePrefixTransformer returns a prefix transformer from the provided config.
 // envelopeService is used as the root of trust.
-func getEnvelopePrefixTransformer(config *cfg.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
+func getEnvelopePrefixTransformer(config *kubecfg.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
 	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(config.CacheSize), aestransformer.NewCBCTransformer)
 	if err != nil {
 		return value.PrefixTransformer{}, err
