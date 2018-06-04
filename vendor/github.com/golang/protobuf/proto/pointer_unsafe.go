@@ -29,7 +29,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// +build !appengine,!js
+// +build !purego,!appengine,!js
 
 // This file contains the implementation of the proto field accesses using package unsafe.
 
@@ -37,38 +37,13 @@ package proto
 
 import (
 	"reflect"
+	"sync/atomic"
 	"unsafe"
 )
 
-// NOTE: These type_Foo functions would more idiomatically be methods,
-// but Go does not allow methods on pointer types, and we must preserve
-// some pointer type for the garbage collector. We use these
-// funcs with clunky names as our poor approximation to methods.
-//
-// An alternative would be
-//	type structPointer struct { p unsafe.Pointer }
-// but that does not registerize as well.
+const unsafeAllowed = true
 
-// A structPointer is a pointer to a struct.
-type structPointer unsafe.Pointer
-
-// toStructPointer returns a structPointer equivalent to the given reflect value.
-func toStructPointer(v reflect.Value) structPointer {
-	return structPointer(unsafe.Pointer(v.Pointer()))
-}
-
-// IsNil reports whether p is nil.
-func structPointer_IsNil(p structPointer) bool {
-	return p == nil
-}
-
-// Interface returns the struct pointer, assumed to have element type t,
-// as an interface value.
-func structPointer_Interface(p structPointer, t reflect.Type) interface{} {
-	return reflect.NewAt(t, unsafe.Pointer(p)).Interface()
-}
-
-// A field identifies a field in a struct, accessible from a structPointer.
+// A field identifies a field in a struct, accessible from a pointer.
 // In this implementation, a field is identified by its byte offset from the start of the struct.
 type field uintptr
 
@@ -80,191 +55,254 @@ func toField(f *reflect.StructField) field {
 // invalidField is an invalid field identifier.
 const invalidField = ^field(0)
 
+// zeroField is a noop when calling pointer.offset.
+const zeroField = field(0)
+
 // IsValid reports whether the field identifier is valid.
 func (f field) IsValid() bool {
-	return f != ^field(0)
+	return f != invalidField
 }
 
-// Bytes returns the address of a []byte field in the struct.
-func structPointer_Bytes(p structPointer, f field) *[]byte {
-	return (*[]byte)(unsafe.Pointer(uintptr(p) + uintptr(f)))
+// The pointer type below is for the new table-driven encoder/decoder.
+// The implementation here uses unsafe.Pointer to create a generic pointer.
+// In pointer_reflect.go we use reflect instead of unsafe to implement
+// the same (but slower) interface.
+type pointer struct {
+	p unsafe.Pointer
 }
 
-// BytesSlice returns the address of a [][]byte field in the struct.
-func structPointer_BytesSlice(p structPointer, f field) *[][]byte {
-	return (*[][]byte)(unsafe.Pointer(uintptr(p) + uintptr(f)))
+// size of pointer
+var ptrSize = unsafe.Sizeof(uintptr(0))
+
+// toPointer converts an interface of pointer type to a pointer
+// that points to the same target.
+func toPointer(i *Message) pointer {
+	// Super-tricky - read pointer out of data word of interface value.
+	// Saves ~25ns over the equivalent:
+	// return valToPointer(reflect.ValueOf(*i))
+	return pointer{p: (*[2]unsafe.Pointer)(unsafe.Pointer(i))[1]}
 }
 
-// Bool returns the address of a *bool field in the struct.
-func structPointer_Bool(p structPointer, f field) **bool {
-	return (**bool)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// BoolVal returns the address of a bool field in the struct.
-func structPointer_BoolVal(p structPointer, f field) *bool {
-	return (*bool)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// BoolSlice returns the address of a []bool field in the struct.
-func structPointer_BoolSlice(p structPointer, f field) *[]bool {
-	return (*[]bool)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// String returns the address of a *string field in the struct.
-func structPointer_String(p structPointer, f field) **string {
-	return (**string)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// StringVal returns the address of a string field in the struct.
-func structPointer_StringVal(p structPointer, f field) *string {
-	return (*string)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// StringSlice returns the address of a []string field in the struct.
-func structPointer_StringSlice(p structPointer, f field) *[]string {
-	return (*[]string)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// ExtMap returns the address of an extension map field in the struct.
-func structPointer_Extensions(p structPointer, f field) *XXX_InternalExtensions {
-	return (*XXX_InternalExtensions)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-func structPointer_ExtMap(p structPointer, f field) *map[int32]Extension {
-	return (*map[int32]Extension)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// NewAt returns the reflect.Value for a pointer to a field in the struct.
-func structPointer_NewAt(p structPointer, f field, typ reflect.Type) reflect.Value {
-	return reflect.NewAt(typ, unsafe.Pointer(uintptr(p)+uintptr(f)))
-}
-
-// SetStructPointer writes a *struct field in the struct.
-func structPointer_SetStructPointer(p structPointer, f field, q structPointer) {
-	*(*structPointer)(unsafe.Pointer(uintptr(p) + uintptr(f))) = q
-}
-
-// GetStructPointer reads a *struct field in the struct.
-func structPointer_GetStructPointer(p structPointer, f field) structPointer {
-	return *(*structPointer)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// StructPointerSlice the address of a []*struct field in the struct.
-func structPointer_StructPointerSlice(p structPointer, f field) *structPointerSlice {
-	return (*structPointerSlice)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// A structPointerSlice represents a slice of pointers to structs (themselves submessages or groups).
-type structPointerSlice []structPointer
-
-func (v *structPointerSlice) Len() int                  { return len(*v) }
-func (v *structPointerSlice) Index(i int) structPointer { return (*v)[i] }
-func (v *structPointerSlice) Append(p structPointer)    { *v = append(*v, p) }
-
-// A word32 is the address of a "pointer to 32-bit value" field.
-type word32 **uint32
-
-// IsNil reports whether *v is nil.
-func word32_IsNil(p word32) bool {
-	return *p == nil
-}
-
-// Set sets *v to point at a newly allocated word set to x.
-func word32_Set(p word32, o *Buffer, x uint32) {
-	if len(o.uint32s) == 0 {
-		o.uint32s = make([]uint32, uint32PoolSize)
+// toAddrPointer converts an interface to a pointer that points to
+// the interface data.
+func toAddrPointer(i *interface{}, isptr bool) pointer {
+	// Super-tricky - read or get the address of data word of interface value.
+	if isptr {
+		// The interface is of pointer type, thus it is a direct interface.
+		// The data word is the pointer data itself. We take its address.
+		return pointer{p: unsafe.Pointer(uintptr(unsafe.Pointer(i)) + ptrSize)}
 	}
-	o.uint32s[0] = x
-	*p = &o.uint32s[0]
-	o.uint32s = o.uint32s[1:]
+	// The interface is not of pointer type. The data word is the pointer
+	// to the data.
+	return pointer{p: (*[2]unsafe.Pointer)(unsafe.Pointer(i))[1]}
 }
 
-// Get gets the value pointed at by *v.
-func word32_Get(p word32) uint32 {
-	return **p
+// valToPointer converts v to a pointer. v must be of pointer type.
+func valToPointer(v reflect.Value) pointer {
+	return pointer{p: unsafe.Pointer(v.Pointer())}
 }
 
-// Word32 returns the address of a *int32, *uint32, *float32, or *enum field in the struct.
-func structPointer_Word32(p structPointer, f field) word32 {
-	return word32((**uint32)(unsafe.Pointer(uintptr(p) + uintptr(f))))
+// offset converts from a pointer to a structure to a pointer to
+// one of its fields.
+func (p pointer) offset(f field) pointer {
+	// For safety, we should panic if !f.IsValid, however calling panic causes
+	// this to no longer be inlineable, which is a serious performance cost.
+	/*
+		if !f.IsValid() {
+			panic("invalid field")
+		}
+	*/
+	return pointer{p: unsafe.Pointer(uintptr(p.p) + uintptr(f))}
 }
 
-// A word32Val is the address of a 32-bit value field.
-type word32Val *uint32
-
-// Set sets *p to x.
-func word32Val_Set(p word32Val, x uint32) {
-	*p = x
+func (p pointer) isNil() bool {
+	return p.p == nil
 }
 
-// Get gets the value pointed at by p.
-func word32Val_Get(p word32Val) uint32 {
-	return *p
+func (p pointer) toInt64() *int64 {
+	return (*int64)(p.p)
+}
+func (p pointer) toInt64Ptr() **int64 {
+	return (**int64)(p.p)
+}
+func (p pointer) toInt64Slice() *[]int64 {
+	return (*[]int64)(p.p)
+}
+func (p pointer) toInt32() *int32 {
+	return (*int32)(p.p)
 }
 
-// Word32Val returns the address of a *int32, *uint32, *float32, or *enum field in the struct.
-func structPointer_Word32Val(p structPointer, f field) word32Val {
-	return word32Val((*uint32)(unsafe.Pointer(uintptr(p) + uintptr(f))))
-}
-
-// A word32Slice is a slice of 32-bit values.
-type word32Slice []uint32
-
-func (v *word32Slice) Append(x uint32)    { *v = append(*v, x) }
-func (v *word32Slice) Len() int           { return len(*v) }
-func (v *word32Slice) Index(i int) uint32 { return (*v)[i] }
-
-// Word32Slice returns the address of a []int32, []uint32, []float32, or []enum field in the struct.
-func structPointer_Word32Slice(p structPointer, f field) *word32Slice {
-	return (*word32Slice)(unsafe.Pointer(uintptr(p) + uintptr(f)))
-}
-
-// word64 is like word32 but for 64-bit values.
-type word64 **uint64
-
-func word64_Set(p word64, o *Buffer, x uint64) {
-	if len(o.uint64s) == 0 {
-		o.uint64s = make([]uint64, uint64PoolSize)
+// See pointer_reflect.go for why toInt32Ptr/Slice doesn't exist.
+/*
+	func (p pointer) toInt32Ptr() **int32 {
+		return (**int32)(p.p)
 	}
-	o.uint64s[0] = x
-	*p = &o.uint64s[0]
-	o.uint64s = o.uint64s[1:]
+	func (p pointer) toInt32Slice() *[]int32 {
+		return (*[]int32)(p.p)
+	}
+*/
+func (p pointer) getInt32Ptr() *int32 {
+	return *(**int32)(p.p)
+}
+func (p pointer) setInt32Ptr(v int32) {
+	*(**int32)(p.p) = &v
 }
 
-func word64_IsNil(p word64) bool {
-	return *p == nil
+// getInt32Slice loads a []int32 from p.
+// The value returned is aliased with the original slice.
+// This behavior differs from the implementation in pointer_reflect.go.
+func (p pointer) getInt32Slice() []int32 {
+	return *(*[]int32)(p.p)
 }
 
-func word64_Get(p word64) uint64 {
-	return **p
+// setInt32Slice stores a []int32 to p.
+// The value set is aliased with the input slice.
+// This behavior differs from the implementation in pointer_reflect.go.
+func (p pointer) setInt32Slice(v []int32) {
+	*(*[]int32)(p.p) = v
 }
 
-func structPointer_Word64(p structPointer, f field) word64 {
-	return word64((**uint64)(unsafe.Pointer(uintptr(p) + uintptr(f))))
+// TODO: Can we get rid of appendInt32Slice and use setInt32Slice instead?
+func (p pointer) appendInt32Slice(v int32) {
+	s := (*[]int32)(p.p)
+	*s = append(*s, v)
 }
 
-// word64Val is like word32Val but for 64-bit values.
-type word64Val *uint64
-
-func word64Val_Set(p word64Val, o *Buffer, x uint64) {
-	*p = x
+func (p pointer) toUint64() *uint64 {
+	return (*uint64)(p.p)
+}
+func (p pointer) toUint64Ptr() **uint64 {
+	return (**uint64)(p.p)
+}
+func (p pointer) toUint64Slice() *[]uint64 {
+	return (*[]uint64)(p.p)
+}
+func (p pointer) toUint32() *uint32 {
+	return (*uint32)(p.p)
+}
+func (p pointer) toUint32Ptr() **uint32 {
+	return (**uint32)(p.p)
+}
+func (p pointer) toUint32Slice() *[]uint32 {
+	return (*[]uint32)(p.p)
+}
+func (p pointer) toBool() *bool {
+	return (*bool)(p.p)
+}
+func (p pointer) toBoolPtr() **bool {
+	return (**bool)(p.p)
+}
+func (p pointer) toBoolSlice() *[]bool {
+	return (*[]bool)(p.p)
+}
+func (p pointer) toFloat64() *float64 {
+	return (*float64)(p.p)
+}
+func (p pointer) toFloat64Ptr() **float64 {
+	return (**float64)(p.p)
+}
+func (p pointer) toFloat64Slice() *[]float64 {
+	return (*[]float64)(p.p)
+}
+func (p pointer) toFloat32() *float32 {
+	return (*float32)(p.p)
+}
+func (p pointer) toFloat32Ptr() **float32 {
+	return (**float32)(p.p)
+}
+func (p pointer) toFloat32Slice() *[]float32 {
+	return (*[]float32)(p.p)
+}
+func (p pointer) toString() *string {
+	return (*string)(p.p)
+}
+func (p pointer) toStringPtr() **string {
+	return (**string)(p.p)
+}
+func (p pointer) toStringSlice() *[]string {
+	return (*[]string)(p.p)
+}
+func (p pointer) toBytes() *[]byte {
+	return (*[]byte)(p.p)
+}
+func (p pointer) toBytesSlice() *[][]byte {
+	return (*[][]byte)(p.p)
+}
+func (p pointer) toExtensions() *XXX_InternalExtensions {
+	return (*XXX_InternalExtensions)(p.p)
+}
+func (p pointer) toOldExtensions() *map[int32]Extension {
+	return (*map[int32]Extension)(p.p)
 }
 
-func word64Val_Get(p word64Val) uint64 {
-	return *p
+// getPointerSlice loads []*T from p as a []pointer.
+// The value returned is aliased with the original slice.
+// This behavior differs from the implementation in pointer_reflect.go.
+func (p pointer) getPointerSlice() []pointer {
+	// Super-tricky - p should point to a []*T where T is a
+	// message type. We load it as []pointer.
+	return *(*[]pointer)(p.p)
 }
 
-func structPointer_Word64Val(p structPointer, f field) word64Val {
-	return word64Val((*uint64)(unsafe.Pointer(uintptr(p) + uintptr(f))))
+// setPointerSlice stores []pointer into p as a []*T.
+// The value set is aliased with the input slice.
+// This behavior differs from the implementation in pointer_reflect.go.
+func (p pointer) setPointerSlice(v []pointer) {
+	// Super-tricky - p should point to a []*T where T is a
+	// message type. We store it as []pointer.
+	*(*[]pointer)(p.p) = v
 }
 
-// word64Slice is like word32Slice but for 64-bit values.
-type word64Slice []uint64
+// getPointer loads the pointer at p and returns it.
+func (p pointer) getPointer() pointer {
+	return pointer{p: *(*unsafe.Pointer)(p.p)}
+}
 
-func (v *word64Slice) Append(x uint64)    { *v = append(*v, x) }
-func (v *word64Slice) Len() int           { return len(*v) }
-func (v *word64Slice) Index(i int) uint64 { return (*v)[i] }
+// setPointer stores the pointer q at p.
+func (p pointer) setPointer(q pointer) {
+	*(*unsafe.Pointer)(p.p) = q.p
+}
 
-func structPointer_Word64Slice(p structPointer, f field) *word64Slice {
-	return (*word64Slice)(unsafe.Pointer(uintptr(p) + uintptr(f)))
+// append q to the slice pointed to by p.
+func (p pointer) appendPointer(q pointer) {
+	s := (*[]unsafe.Pointer)(p.p)
+	*s = append(*s, q.p)
+}
+
+// getInterfacePointer returns a pointer that points to the
+// interface data of the interface pointed by p.
+func (p pointer) getInterfacePointer() pointer {
+	// Super-tricky - read pointer out of data word of interface value.
+	return pointer{p: (*(*[2]unsafe.Pointer)(p.p))[1]}
+}
+
+// asPointerTo returns a reflect.Value that is a pointer to an
+// object of type t stored at p.
+func (p pointer) asPointerTo(t reflect.Type) reflect.Value {
+	return reflect.NewAt(t, p.p)
+}
+
+func atomicLoadUnmarshalInfo(p **unmarshalInfo) *unmarshalInfo {
+	return (*unmarshalInfo)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(p))))
+}
+func atomicStoreUnmarshalInfo(p **unmarshalInfo, v *unmarshalInfo) {
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(p)), unsafe.Pointer(v))
+}
+func atomicLoadMarshalInfo(p **marshalInfo) *marshalInfo {
+	return (*marshalInfo)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(p))))
+}
+func atomicStoreMarshalInfo(p **marshalInfo, v *marshalInfo) {
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(p)), unsafe.Pointer(v))
+}
+func atomicLoadMergeInfo(p **mergeInfo) *mergeInfo {
+	return (*mergeInfo)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(p))))
+}
+func atomicStoreMergeInfo(p **mergeInfo, v *mergeInfo) {
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(p)), unsafe.Pointer(v))
+}
+func atomicLoadDiscardInfo(p **discardInfo) *discardInfo {
+	return (*discardInfo)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(p))))
+}
+func atomicStoreDiscardInfo(p **discardInfo, v *discardInfo) {
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(p)), unsafe.Pointer(v))
 }
