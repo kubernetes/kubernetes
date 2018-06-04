@@ -106,6 +106,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -1290,6 +1291,9 @@ func (kl *Kubelet) initializeModules() error {
 		}
 	}
 	if kl.enablePluginsWatcher {
+		// Adding Registration Callback function for CSI Driver
+		kl.pluginWatcher.AddHandler("CSIPlugin", csi.RegistrationCallback)
+
 		// Start the plugin watcher
 		if err := kl.pluginWatcher.Start(); err != nil {
 			return fmt.Errorf("failed to start Plugin Watcher. err: %v", err)

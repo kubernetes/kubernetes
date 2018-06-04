@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi/labelmanager"
 )
 
 const (
@@ -59,9 +62,54 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 // volume.VolumePlugin methods
 var _ volume.VolumePlugin = &csiPlugin{}
 
+type csiDriver struct {
+	driverName     string
+	driverEndpoint string
+}
+
+type csiDriversStore struct {
+	driversMap map[string]csiDriver
+	sync.RWMutex
+}
+
+// csiDrivers map keep track of all registered CSI drivers on the node and their
+// corresponding sockets
+var csiDrivers csiDriversStore
+
+var lm labelmanager.Interface
+
+// RegistrationCallback is called by kubelet's plugin watcher upon detection
+// of a new registration socket opened by CSI Driver registrar side car.
+func RegistrationCallback(pluginName string, endpoint string, versions []string, socketPath string) (error, chan bool) {
+
+	glog.Infof(log("Callback from kubelet with plugin name: %s endpoint: %s versions: %s socket path: %s",
+		pluginName, endpoint, strings.Join(versions, ","), socketPath))
+
+	if endpoint == "" {
+		endpoint = socketPath
+	}
+	// Calling nodeLabelManager to update label for newly registered CSI driver
+	err := lm.AddLabels(pluginName)
+	if err != nil {
+		return err, nil
+	}
+	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
+	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
+	csiDrivers.Lock()
+	defer csiDrivers.Unlock()
+	csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint}
+
+	return nil, nil
+}
+
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	glog.Info(log("plugin initializing..."))
 	p.host = host
+
+	// Initializing csiDrivers map and label management channels
+	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
+	lm = labelmanager.NewLabelManager(host.GetNodeName(), host.GetKubeClient())
+
 	return nil
 }
 
