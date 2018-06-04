@@ -19,7 +19,6 @@ package common
 import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -255,13 +254,13 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		}
 
 		// Pod should fail
-		testPodFailSubpath(f, pod, "SubPath `..`: must not contain '..'")
+		testPodFailSubpath(f, pod)
 	})
 
 	/*
 		    Testname: var-expansion-subpath-with-absolute-path
 		    Description: Make sure a container's subpath can not be set using an
-			expansion of environment variables when absoluete path is supplied.
+			expansion of environment variables when absolute path is supplied.
 	*/
 	It("should fail substituting values in a volume subpath with absolute path [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion][Slow]", func() {
 
@@ -304,11 +303,11 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		}
 
 		// Pod should fail
-		testPodFailSubpath(f, pod, "SubPath `/tmp` must not be an absolute path")
+		testPodFailSubpath(f, pod)
 	})
 })
 
-func testPodFailSubpath(f *framework.Framework, pod *v1.Pod, errorText string) {
+func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
@@ -319,17 +318,4 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod, errorText string) {
 
 	err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
-
-	selector := fields.Set{
-		"involvedObject.kind":      "Pod",
-		"involvedObject.name":      pod.Name,
-		"involvedObject.namespace": f.Namespace.Name,
-		"reason":                   "Failed",
-	}.AsSelector().String()
-
-	options := metav1.ListOptions{FieldSelector: selector}
-	events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
-	Expect(err).NotTo(HaveOccurred(), "while getting pod events")
-	Expect(len(events.Items)).NotTo(Equal(0), "no events found")
-	Expect(events.Items[0].Message).To(ContainSubstring(errorText), "subpath error not found")
 }
