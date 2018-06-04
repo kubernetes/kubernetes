@@ -743,7 +743,7 @@ def launch_default_ingress_controller():
         images = {'amd64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.15.0', # noqa
                   'arm64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-arm64:0.15.0', # noqa
                   's390x': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-s390x:0.15.0', # noqa
-                  'ppcle': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-ppc64le:0.15.0', # noqa
+                  'ppc64el': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-ppc64le:0.15.0', # noqa
                   }
         context['ingress_image'] = images.get(context['arch'], images['amd64'])
     if get_version('kubelet') < (1, 9):
