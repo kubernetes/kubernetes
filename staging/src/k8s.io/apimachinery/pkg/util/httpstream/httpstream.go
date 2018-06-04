@@ -45,17 +45,21 @@ type Dialer interface {
 
 	// Dial opens a streaming connection to a server using one of the protocols
 	// specified (in order of most preferred to least preferred).
-	Dial(protocols ...string) (Connection, string, error)
+	// newStreamHandler will be called asynchronously whenever the
+	// other end of the upgraded connection creates a new stream.
+	Dial(newStreamHandler NewStreamHandler, protocols ...string) (Connection, string, error)
 }
 
 // UpgradeRoundTripper is a type of http.RoundTripper that is able to upgrade
 // HTTP requests to support multiplexed bidirectional streams. After RoundTrip()
 // is invoked, if the upgrade is successful, clients may retrieve the upgraded
 // connection by calling UpgradeRoundTripper.Connection().
+// newStreamHandler will be called asynchronously whenever the
+// other end of the upgraded connection creates a new stream.
 type UpgradeRoundTripper interface {
 	http.RoundTripper
 	// NewConnection validates the response and creates a new Connection.
-	NewConnection(resp *http.Response) (Connection, error)
+	NewConnection(resp *http.Response, newStreamHandler NewStreamHandler) (Connection, error)
 }
 
 // ResponseUpgrader knows how to upgrade HTTP requests and responses to

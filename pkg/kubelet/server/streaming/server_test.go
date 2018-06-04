@@ -284,7 +284,7 @@ func TestServePortForward(t *testing.T) {
 	transport, upgrader, err := spdy.RoundTripperFor(&restclient.Config{})
 	require.NoError(t, err)
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", reqURL)
-	streamConn, _, err := dialer.Dial(kubeletportforward.ProtocolV1Name)
+	streamConn, _, err := dialer.Dial(nil, kubeletportforward.ProtocolV1Name)
 	require.NoError(t, err)
 	defer streamConn.Close()
 
@@ -426,7 +426,7 @@ func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr
 	return nil
 }
 
-func (f *fakeRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (f *fakeRuntime) PortForward(podSandboxID string, port int32, remote bool, stream io.ReadWriteCloser, newStreamFunc kubeletportforward.NewStreamFunc) error {
 	assert.Equal(f.t, testPodSandboxID, podSandboxID)
 	assert.EqualValues(f.t, testPort, port)
 	doServerStreams(f.t, "portforward", stream, stream, nil)

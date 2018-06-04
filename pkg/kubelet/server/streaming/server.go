@@ -29,7 +29,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	restful "github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful"
 
 	"k8s.io/apimachinery/pkg/types"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
@@ -63,7 +63,7 @@ type Server interface {
 type Runtime interface {
 	Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 	Attach(containerID string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
-	PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error
+	PortForward(podSandboxID string, port int32, remote bool, stream io.ReadWriteCloser, streamFunc portforward.NewStreamFunc) error
 }
 
 // Config defines the options used for running the stream server.
@@ -341,7 +341,7 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		return
 	}
 
-	portForwardOptions, err := portforward.BuildV4Options(pf.Port)
+	portForwardOptions, err := portforward.BuildV4Options(pf.Port, pf.Remote)
 	if err != nil {
 		resp.WriteError(http.StatusBadRequest, err)
 		return
@@ -377,6 +377,6 @@ func (a *criAdapter) AttachContainer(podName string, podUID types.UID, container
 	return a.Runtime.Attach(container, in, out, err, tty, resize)
 }
 
-func (a *criAdapter) PortForward(podName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
-	return a.Runtime.PortForward(podName, port, stream)
+func (a *criAdapter) PortForward(podName string, podUID types.UID, port int32, remote bool, stream io.ReadWriteCloser, newStreamFunc portforward.NewStreamFunc) error {
+	return a.Runtime.PortForward(podName, port, remote, stream, newStreamFunc)
 }

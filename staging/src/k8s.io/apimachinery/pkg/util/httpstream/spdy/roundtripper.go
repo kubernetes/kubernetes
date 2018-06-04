@@ -289,7 +289,9 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 // NewConnection validates the upgrade response, creating and returning a new
 // httpstream.Connection if there were no errors.
-func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connection, error) {
+// newStreamHandler will be called asynchronously whenever the
+// other end of the upgraded connection creates a new stream.
+func (s *SpdyRoundTripper) NewConnection(resp *http.Response, newStreamHandler httpstream.NewStreamHandler) (httpstream.Connection, error) {
 	connectionHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderConnection))
 	upgradeHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderUpgrade))
 	if (resp.StatusCode != http.StatusSwitchingProtocols) || !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
@@ -312,7 +314,7 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 		return nil, fmt.Errorf("unable to upgrade connection: %s", responseError)
 	}
 
-	return NewClientConnection(s.conn)
+	return NewClientConnection(s.conn, newStreamHandler)
 }
 
 // statusScheme is private scheme for the decoding here until someone fixes the TODO in NewConnection

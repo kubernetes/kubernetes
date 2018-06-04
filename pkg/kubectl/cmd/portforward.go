@@ -50,6 +50,7 @@ type PortForwardOptions struct {
 	RESTClient    *restclient.RESTClient
 	Config        *restclient.Config
 	PodClient     coreclient.PodsGetter
+	Remote        bool
 	Ports         []string
 	PortForwarder portForwarder
 	StopChannel   chan struct{}
@@ -58,13 +59,18 @@ type PortForwardOptions struct {
 
 var (
 	portforwardLong = templates.LongDesc(i18n.T(`
-                Forward one or more local ports to a pod.
+		Forward one or more ports between client host and a pod.
 
-                Use resource type/name such as deployment/mydeployment to select a pod. Resource type defaults to 'pod' if omitted.
+		There are 2 types of port forwarding:
+		Local port forwarding is used to forward a port from the client host to a pod.
+		Remote port forwarding allows connections made to a remote pod to be tunneled back to the client host.
+		
+		Do remote port forwarding by providing the --remote/-r flag, otherwise local port forwarding will be performed.
+		Use resource type/name such as deployment/mydeployment to select a pod. Resource type defaults to 'pod' if omitted.
 
-                If there are multiple pods matching the criteria, a pod will be selected automatically. The
-                forwarding session ends when the selected pod terminates, and rerun of the command is needed
-                to resume forwarding.`))
+		If there are multiple pods matching the criteria, a pod will be selected automatically. The
+		forwarding session ends when the selected pod terminates, and rerun of the command is needed
+		to resume forwarding.`))
 
 	portforwardExample = templates.Examples(i18n.T(`
 		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
@@ -80,7 +86,16 @@ var (
 		kubectl port-forward pod/mypod 8888:5000
 
 		# Listen on a random port locally, forwarding to 5000 in the pod
-		kubectl port-forward pod/mypod :5000`))
+		kubectl port-forward pod/mypod :5000
+
+		# Listen on ports 5000 and 6000 remotely, forwarding data to/from local ports 5000 and 6000
+		kubectl port-forward --remote pod/mypod 5000 6000
+
+		# Listen on port 8888 remotely, forwarding data to/from local port 5000
+		kubectl port-forward --remote pod/mypod 8888:5000
+
+		# Listen on a random port remotely, forwarding to local port 5000
+		kubectl port-forward --remote pod/mypod :5000`))
 )
 
 const (
@@ -95,9 +110,9 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 	cmd := &cobra.Command{
-		Use: "port-forward TYPE/NAME [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
+		Use: "port-forward [--remote] TYPE/NAME [SOURCE_PORT:]DEST_PORT [...[SOURCE_PORT_N:]DEST_PORT_N]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Forward one or more local ports to a pod"),
+		Short:   i18n.T("Forward one or more ports between client host and a pod"),
 		Long:    portforwardLong,
 		Example: portforwardExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -113,6 +128,7 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodPortForwardWaitTimeout)
+	cmd.Flags().BoolVarP(&opts.Remote, "remote", "r", false, "Whether to do remote port forwarding")
 	// TODO support UID
 	return cmd
 }
@@ -125,13 +141,23 @@ type defaultPortForwarder struct {
 	genericclioptions.IOStreams
 }
 
+type ClientGoPortForwarder interface {
+	ForwardPorts() error
+}
+
 func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
 	transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
 	if err != nil {
 		return err
 	}
+
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
+	var fw ClientGoPortForwarder
+	if !opts.Remote {
+		fw, err = portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
+	} else {
+		fw, err = portforward.NewRemotePortForwarder(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
+	}
 	if err != nil {
 		return err
 	}

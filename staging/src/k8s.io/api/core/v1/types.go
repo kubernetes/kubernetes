@@ -5257,4 +5257,6 @@ const (
 	// Name of header that specifies a request ID used to associate the error
 	// and data streams for a single forwarded connection
 	PortForwardRequestIDHeader = "requestID"
+	// Name of header that specifies if doing remote port forwarding rather than local port forwarding
+	PortForwardRemoteHeader = "remote"
 )

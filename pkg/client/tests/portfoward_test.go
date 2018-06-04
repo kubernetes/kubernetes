@@ -51,7 +51,7 @@ type fakePortForwarder struct {
 
 var _ portforward.PortForwarder = &fakePortForwarder{}
 
-func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
+func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port int32, remote bool, stream io.ReadWriteCloser, streamFunc portforward.NewStreamFunc) error {
 	defer stream.Close()
 
 	// read from the client

@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
-	spdy "k8s.io/client-go/transport/spdy"
+	"k8s.io/client-go/transport/spdy"
 )
 
 // StreamOptions holds information pertaining to the current streaming session: supported stream
@@ -115,6 +115,7 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 		e.upgrader,
 		&http.Client{Transport: e.transport},
 		req,
+		nil,
 		e.protocols...,
 	)
 	if err != nil {

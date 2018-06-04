@@ -130,7 +130,7 @@ func TestConnectionCloseIsImmediateThroughAProxy(t *testing.T) {
 		t.Fatalf("client: error connecting to proxy: %v", err)
 	}
 
-	spdyConn, err := NewClientConnection(conn)
+	spdyConn, err := NewClientConnection(conn, nil)
 	if err != nil {
 		t.Fatalf("client: error creating spdy connection: %v", err)
 	}

@@ -154,7 +154,7 @@ func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr
 	return f.attachFunc(containerID, stdin, stdout, stderr, tty, resize)
 }
 
-func (f *fakeRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (f *fakeRuntime) PortForward(podSandboxID string, port int32, remote bool, stream io.ReadWriteCloser, streamFunc portforward.NewStreamFunc) error {
 	return f.portForwardFunc(podSandboxID, port, stream)
 }
 
@@ -1178,7 +1178,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 		Deadline: time.Now().Add(60 * time.Second),
 		Timeout:  60 * time.Second,
 	}
-	conn, err := upgradeRoundTripper.NewConnection(resp)
+	conn, err := upgradeRoundTripper.NewConnection(resp, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error creating streaming connection: %s", err)
 	}
@@ -1347,7 +1347,7 @@ func testExecAttach(t *testing.T, verb string) {
 				return
 			}
 
-			conn, err := upgradeRoundTripper.NewConnection(resp)
+			conn, err := upgradeRoundTripper.NewConnection(resp, nil)
 			require.NoError(t, err, "creating streaming connection")
 			defer conn.Close()
 
@@ -1437,7 +1437,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	conn, err := upgradeRoundTripper.NewConnection(resp)
+	conn, err := upgradeRoundTripper.NewConnection(resp, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error creating streaming connection: %s", err)
 	}
@@ -1550,7 +1550,7 @@ func TestServePortForward(t *testing.T) {
 				assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
 			}
 
-			conn, err := upgradeRoundTripper.NewConnection(resp)
+			conn, err := upgradeRoundTripper.NewConnection(resp, nil)
 			require.NoError(t, err, "creating streaming connection")
 			defer conn.Close()
 

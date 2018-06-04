@@ -319,7 +319,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				resp, err := client.Do(req)
 				var conn httpstream.Connection
 				if err == nil {
-					conn, err = spdyTransport.NewConnection(resp)
+					conn, err = spdyTransport.NewConnection(resp, nil)
 				}
 				haveErr := err != nil
 				if e, a := testCase.shouldError, haveErr; e != a {
@@ -442,7 +442,7 @@ func TestRoundTripRedirects(t *testing.T) {
 				return
 			}
 
-			conn, err := spdyTransport.NewConnection(resp)
+			conn, err := spdyTransport.NewConnection(resp, nil)
 			if err != nil {
 				t.Fatalf("error calling NewConnection: %v", err)
 			}

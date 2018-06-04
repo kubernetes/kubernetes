@@ -31,9 +31,11 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"github.com/golang/glog"
+	"io"
 )
 
-func handleHttpStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
+func handleHttpStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID,
+	portForwardOptions *V4Options, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
 	_, err := httpstream.Handshake(req, w, supportedPortForwardProtocols)
 	// negotiated protocol isn't currently used server side, but could be in the future
 	if err != nil {
@@ -127,7 +129,7 @@ func (h *httpStreamHandler) getStreamPair(requestID string) (*httpStreamPair, bo
 
 	glog.V(5).Infof("(conn=%p, request=%s) creating new stream pair", h.conn, requestID)
 
-	p := newPortForwardPair(requestID)
+	p := newPortForwardPair(requestID, false)
 	h.streamPairs[requestID] = p
 
 	return p, true
@@ -216,12 +218,19 @@ Loop:
 		case stream := <-h.streamChan:
 			requestID := h.requestID(stream)
 			streamType := stream.Headers().Get(api.StreamType)
-			glog.V(5).Infof("(conn=%p, request=%s) received new stream of type %s", h.conn, requestID, streamType)
+			isRemote := stream.Headers().Get(api.PortForwardRemoteHeader) == "1"
+			glog.V(5).Infof("(conn=%p, request=%s, remote=%v) received new stream of type %s", h.conn, requestID, streamType, isRemote)
 
 			p, created := h.getStreamPair(requestID)
 			if created {
+				//p.remote = isRemote
 				go h.monitorStreamPair(p, time.After(h.streamCreationTimeout))
-			}
+			} /*else if p.remote != isRemote {
+				msg := fmt.Sprintf("error processing stream for request %s: Header `%s` doesn't match with each other", requestID, api.PortForwardRemoteHeader)
+				utilruntime.HandleError(errors.New(msg))
+				p.printError(msg)
+				continue
+			}*/
 			if complete, err := p.add(stream); err != nil {
 				msg := fmt.Sprintf("error processing stream for request %s: %v", requestID, err)
 				utilruntime.HandleError(errors.New(msg))
@@ -242,8 +251,16 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	portString := p.dataStream.Headers().Get(api.PortHeader)
 	port, _ := strconv.ParseInt(portString, 10, 32)
 
+	isRemote := p.dataStream.Headers().Get(api.PortForwardRemoteHeader) == "1"
+
 	glog.V(5).Infof("(conn=%p, request=%s) invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
-	err := h.forwarder.PortForward(h.pod, h.uid, int32(port), p.dataStream)
+
+	// newStreamFunc is function that can be called by a PortForwarder to create additional streams over the same connection
+	newStreamFunc := NewStreamFunc(func(option map[string][]string) (io.ReadWriteCloser, error) {
+		return h.conn.CreateStream(http.Header(option))
+	})
+
+	err := h.forwarder.PortForward(h.pod, h.uid, int32(port), isRemote, p.dataStream, newStreamFunc)
 	glog.V(5).Infof("(conn=%p, request=%s) done invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
 
 	if err != nil {
@@ -258,15 +275,17 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 type httpStreamPair struct {
 	lock        sync.RWMutex
 	requestID   string
+	remote      bool
 	dataStream  httpstream.Stream
 	errorStream httpstream.Stream
 	complete    chan struct{}
 }
 
 // newPortForwardPair creates a new httpStreamPair.
-func newPortForwardPair(requestID string) *httpStreamPair {
+func newPortForwardPair(requestID string, remote bool) *httpStreamPair {
 	return &httpStreamPair{
 		requestID: requestID,
+		remote:    remote,
 		complete:  make(chan struct{}),
 	}
 }

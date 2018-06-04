@@ -48,13 +48,24 @@ const (
 // All fields included in V4Options need to be expressed explicitly in the
 // CRI (pkg/kubelet/apis/cri/{version}/api.proto) PortForwardRequest.
 type V4Options struct {
-	Ports []int32
+	Ports  []int32
+	Remote bool
 }
 
 // newOptions creates a new options from the Request.
 func NewV4Options(req *http.Request) (*V4Options, error) {
 	if !wsstream.IsWebSocketRequest(req) {
 		return &V4Options{}, nil
+	}
+
+	remoteForwardingStrings := req.URL.Query()[api.PortForwardRemoteHeader]
+	remoteForwarding := false
+	if len(remoteForwardingStrings) > 0 {
+		if remoteForwardingStrings[0] == "1" {
+			remoteForwarding = true
+		} else {
+			return nil, fmt.Errorf("query parameter %q is invalid", api.PortForwardRemoteHeader)
+		}
 	}
 
 	portStrings := req.URL.Query()[api.PortHeader]
@@ -80,13 +91,14 @@ func NewV4Options(req *http.Request) (*V4Options, error) {
 	}
 
 	return &V4Options{
-		Ports: ports,
+		Ports:  ports,
+		Remote: remoteForwarding,
 	}, nil
 }
 
 // BuildV4Options returns a V4Options based on the given information.
-func BuildV4Options(ports []int32) (*V4Options, error) {
-	return &V4Options{Ports: ports}, nil
+func BuildV4Options(ports []int32, remote bool) (*V4Options, error) {
+	return &V4Options{Ports: ports, Remote: remote}, nil
 }
 
 // handleWebSocketStreams handles requests to forward ports to a pod via
@@ -186,7 +198,7 @@ func (h *websocketStreamHandler) portForward(p *websocketStreamPair) {
 	defer p.errorStream.Close()
 
 	glog.V(5).Infof("(conn=%p) invoking forwarder.PortForward for port %d", h.conn, p.port)
-	err := h.forwarder.PortForward(h.pod, h.uid, p.port, p.dataStream)
+	err := h.forwarder.PortForward(h.pod, h.uid, p.port, false, p.dataStream, nil)
 	glog.V(5).Infof("(conn=%p) done invoking forwarder.PortForward for port %d", h.conn, p.port)
 
 	if err != nil {

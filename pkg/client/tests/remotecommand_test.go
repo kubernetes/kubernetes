@@ -327,7 +327,7 @@ func (u *fakeUpgrader) RoundTrip(req *http.Request) (*http.Response, error) {
 	return u.resp, u.err
 }
 
-func (u *fakeUpgrader) NewConnection(resp *http.Response) (httpstream.Connection, error) {
+func (u *fakeUpgrader) NewConnection(resp *http.Response, streamHandler httpstream.NewStreamHandler) (httpstream.Connection, error) {
 	if u.checkResponse && u.resp != resp {
 		u.t.Errorf("response objects passed did not match: %#v", resp)
 	}
@@ -352,7 +352,7 @@ func TestDial(t *testing.T) {
 		},
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: upgrader}, "POST", &url.URL{Host: "something.com", Scheme: "https"})
-	conn, protocol, err := dialer.Dial("protocol1")
+	conn, protocol, err := dialer.Dial(nil, "protocol1")
 	if err != nil {
 		t.Fatal(err)
 	}

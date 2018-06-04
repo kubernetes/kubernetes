@@ -963,6 +963,9 @@ message PortForwardRequest {
     string pod_sandbox_id = 1;
     // Port to forward.
     repeated int32 port = 2;
+    // If `remote` is true, this is a remote forwarding request.
+    // Otherwise, this is a local forwarding request.
+    bool remote = 3;
 }
 
 message PortForwardResponse {

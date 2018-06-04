@@ -26,11 +26,14 @@ import (
 	"k8s.io/apiserver/pkg/util/wsstream"
 )
 
+// NewStreamFunc is a function that can be called by a PortForwarder to create a new stream for a port forwarding request.
+type NewStreamFunc func(map[string][]string) (io.ReadWriteCloser, error)
+
 // PortForwarder knows how to forward content from a data stream to/from a port
 // in a pod.
 type PortForwarder interface {
 	// PortForwarder copies data between a data stream and a port in a pod.
-	PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
+	PortForward(name string, uid types.UID, port int32, remote bool, stream io.ReadWriteCloser, newStreamFunc NewStreamFunc) error
 }
 
 // ServePortForward handles a port forwarding request.  A single request is
@@ -43,7 +46,7 @@ func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder Po
 	if wsstream.IsWebSocketRequest(req) {
 		err = handleWebSocketStreams(req, w, portForwarder, podName, uid, portForwardOptions, supportedProtocols, idleTimeout, streamCreationTimeout)
 	} else {
-		err = handleHttpStreams(req, w, portForwarder, podName, uid, supportedProtocols, idleTimeout, streamCreationTimeout)
+		err = handleHttpStreams(req, w, portForwarder, podName, uid, portForwardOptions, supportedProtocols, idleTimeout, streamCreationTimeout)
 	}
 
 	if err != nil {

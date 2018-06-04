@@ -29,7 +29,7 @@ import (
 // Upgrader validates a response from the server after a SPDY upgrade.
 type Upgrader interface {
 	// NewConnection validates the response and creates a new Connection.
-	NewConnection(resp *http.Response) (httpstream.Connection, error)
+	NewConnection(resp *http.Response, newStreamHandler httpstream.NewStreamHandler) (httpstream.Connection, error)
 }
 
 // RoundTripperFor returns a round tripper and upgrader to use with SPDY.
@@ -66,18 +66,18 @@ func NewDialer(upgrader Upgrader, client *http.Client, method string, url *url.U
 	}
 }
 
-func (d *dialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
+func (d *dialer) Dial(newStreamHandler httpstream.NewStreamHandler, protocols ...string) (httpstream.Connection, string, error) {
 	req, err := http.NewRequest(d.method, d.url.String(), nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("error creating request: %v", err)
 	}
-	return Negotiate(d.upgrader, d.client, req, protocols...)
+	return Negotiate(d.upgrader, d.client, req, newStreamHandler, protocols...)
 }
 
 // Negotiate opens a connection to a remote server and attempts to negotiate
 // a SPDY connection. Upon success, it returns the connection and the protocol selected by
 // the server. The client transport must use the upgradeRoundTripper - see RoundTripperFor.
-func Negotiate(upgrader Upgrader, client *http.Client, req *http.Request, protocols ...string) (httpstream.Connection, string, error) {
+func Negotiate(upgrader Upgrader, client *http.Client, req *http.Request, newStreamHandler httpstream.NewStreamHandler, protocols ...string) (httpstream.Connection, string, error) {
 	for i := range protocols {
 		req.Header.Add(httpstream.HeaderProtocolVersion, protocols[i])
 	}
@@ -86,7 +86,7 @@ func Negotiate(upgrader Upgrader, client *http.Client, req *http.Request, protoc
 		return nil, "", fmt.Errorf("error sending request: %v", err)
 	}
 	defer resp.Body.Close()
-	conn, err := upgrader.NewConnection(resp)
+	conn, err := upgrader.NewConnection(resp, newStreamHandler)
 	if err != nil {
 		return nil, "", err
 	}
