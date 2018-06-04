@@ -19,5 +19,5 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 
 // Package v1 is the v1 version of the API.
-// +groupName=apiserver.config.k8s.io
+// +groupName=kubeapiserver.config.k8s.io
 package v1
