@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/install",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/componentconfig/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission:go_default_library",
