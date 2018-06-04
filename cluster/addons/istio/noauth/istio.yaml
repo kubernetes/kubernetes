@@ -296,6 +296,7 @@ spec:
         istio: mixer
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-mixer-service-account
       containers:
@@ -1615,6 +1616,7 @@ spec:
         istio: pilot
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-pilot-service-account
       containers:
@@ -1718,6 +1720,7 @@ spec:
         istio: ingress
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-ingress-service-account
       containers:
@@ -1810,6 +1813,7 @@ spec:
         istio: istio-ca
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: istio-ca-service-account
       containers:
@@ -1858,6 +1862,7 @@ spec:
         app: grafana
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: grafana
       containers:
@@ -2115,6 +2120,7 @@ spec:
         app: prometheus
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: prometheus
       containers:
@@ -2199,6 +2205,7 @@ spec:
         app: servicegraph
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       containers:
       - name: servicegraph
@@ -2241,6 +2248,7 @@ spec:
         app: zipkin
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       containers:
       - name: zipkin
