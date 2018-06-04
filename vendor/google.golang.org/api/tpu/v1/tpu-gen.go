@@ -4,7 +4,7 @@
 //
 // Usage example:
 //
-//   import "google.golang.org/api/tpu/v1alpha1"
+//   import "google.golang.org/api/tpu/v1"
 //   ...
 //   tpuService, err := tpu.New(oauthHttpClient)
 package tpu
@@ -40,9 +40,9 @@ var _ = strings.Replace
 var _ = context.Canceled
 var _ = ctxhttp.Do
 
-const apiId = "tpu:v1alpha1"
+const apiId = "tpu:v1"
 const apiName = "tpu"
-const apiVersion = "v1alpha1"
+const apiVersion = "v1"
 const basePath = "https://tpu.googleapis.com/"
 
 // OAuth2 scopes used by this API.
@@ -89,6 +89,7 @@ type ProjectsService struct {
 
 func NewProjectsLocationsService(s *Service) *ProjectsLocationsService {
 	rs := &ProjectsLocationsService{s: s}
+	rs.AcceleratorTypes = NewProjectsLocationsAcceleratorTypesService(s)
 	rs.Nodes = NewProjectsLocationsNodesService(s)
 	rs.Operations = NewProjectsLocationsOperationsService(s)
 	rs.TensorflowVersions = NewProjectsLocationsTensorflowVersionsService(s)
@@ -98,11 +99,22 @@ func NewProjectsLocationsService(s *Service) *ProjectsLocationsService {
 type ProjectsLocationsService struct {
 	s *Service
 
+	AcceleratorTypes *ProjectsLocationsAcceleratorTypesService
+
 	Nodes *ProjectsLocationsNodesService
 
 	Operations *ProjectsLocationsOperationsService
 
 	TensorflowVersions *ProjectsLocationsTensorflowVersionsService
+}
+
+func NewProjectsLocationsAcceleratorTypesService(s *Service) *ProjectsLocationsAcceleratorTypesService {
+	rs := &ProjectsLocationsAcceleratorTypesService{s: s}
+	return rs
+}
+
+type ProjectsLocationsAcceleratorTypesService struct {
+	s *Service
 }
 
 func NewProjectsLocationsNodesService(s *Service) *ProjectsLocationsNodesService {
@@ -132,6 +144,42 @@ type ProjectsLocationsTensorflowVersionsService struct {
 	s *Service
 }
 
+// AcceleratorType: A accelerator type that a Node can be configured
+// with.
+type AcceleratorType struct {
+	// Name: The resource name.
+	Name string `json:"name,omitempty"`
+
+	// Type: the accelerator type.
+	Type string `json:"type,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Name") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Name") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AcceleratorType) MarshalJSON() ([]byte, error) {
+	type NoMethod AcceleratorType
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // Empty: A generic empty message that you can re-use to avoid defining
 // duplicated
 // empty messages in your APIs. A typical example is to use it as the
@@ -148,6 +196,42 @@ type Empty struct {
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
 	googleapi.ServerResponse `json:"-"`
+}
+
+// ListAcceleratorTypesResponse: Response for ListAcceleratorTypes.
+type ListAcceleratorTypesResponse struct {
+	// AcceleratorTypes: The listed nodes.
+	AcceleratorTypes []*AcceleratorType `json:"acceleratorTypes,omitempty"`
+
+	// NextPageToken: The next page token or empty if none.
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "AcceleratorTypes") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AcceleratorTypes") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ListAcceleratorTypesResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod ListAcceleratorTypesResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // ListLocationsResponse: The response message for
@@ -296,6 +380,11 @@ func (s *ListTensorFlowVersionsResponse) MarshalJSON() ([]byte, error) {
 
 // Location: A resource that represents Google Cloud Platform location.
 type Location struct {
+	// DisplayName: The friendly name for this location, typically a nearby
+	// city name.
+	// For example, "Tokyo".
+	DisplayName string `json:"displayName,omitempty"`
+
 	// Labels: Cross-service attributes for the location. For example
 	//
 	//     {"cloud.googleapis.com/region": "us-east1"}
@@ -319,7 +408,7 @@ type Location struct {
 	// server.
 	googleapi.ServerResponse `json:"-"`
 
-	// ForceSendFields is a list of field names (e.g. "Labels") to
+	// ForceSendFields is a list of field names (e.g. "DisplayName") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -327,10 +416,10 @@ type Location struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "Labels") to include in API
-	// requests with the JSON null value. By default, fields with empty
-	// values are omitted from API requests. However, any field with an
-	// empty value appearing in NullFields will be sent to the server as
+	// NullFields is a list of field names (e.g. "DisplayName") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
 	// null. It is an error if a field in this list has a non-empty value.
 	// This may be used to include null fields in Patch requests.
 	NullFields []string `json:"-"`
@@ -457,6 +546,8 @@ type Node struct {
 	// instances.
 	Port string `json:"port,omitempty"`
 
+	SchedulingConfig *SchedulingConfig `json:"schedulingConfig,omitempty"`
+
 	// ServiceAccount: Output only.
 	// The service account used to run the tensor flow services within the
 	// node.
@@ -482,6 +573,8 @@ type Node struct {
 	// found in the `help_description` field.
 	//   "STOPPED" - 7 - Reserved. Was SUSPENDED.
 	// TPU node is stopped.
+	//   "STOPPING" - TPU node is currently stopping.
+	//   "STARTING" - TPU node is currently starting.
 	State string `json:"state,omitempty"`
 
 	// TensorflowVersion: The version of Tensorflow running in the
@@ -680,6 +773,32 @@ func (s *ReimageNodeRequest) MarshalJSON() ([]byte, error) {
 type ResetNodeRequest struct {
 }
 
+type SchedulingConfig struct {
+	Preemptible bool `json:"preemptible,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Preemptible") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Preemptible") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SchedulingConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod SchedulingConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // StartNodeRequest: Request for StartNode.
 type StartNodeRequest struct {
 }
@@ -854,7 +973,7 @@ type ProjectsLocationsGetCall struct {
 	header_      http.Header
 }
 
-// Get: Get information about a location.
+// Get: Gets information about a location.
 func (r *ProjectsLocationsService) Get(name string) *ProjectsLocationsGetCall {
 	c := &ProjectsLocationsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.name = name
@@ -907,7 +1026,7 @@ func (c *ProjectsLocationsGetCall) doRequest(alt string) (*http.Response, error)
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	req.Header = reqHeaders
@@ -955,8 +1074,8 @@ func (c *ProjectsLocationsGetCall) Do(opts ...googleapi.CallOption) (*Location, 
 	}
 	return ret, nil
 	// {
-	//   "description": "Get information about a location.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}",
+	//   "description": "Gets information about a location.",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}",
 	//   "httpMethod": "GET",
 	//   "id": "tpu.projects.locations.get",
 	//   "parameterOrder": [
@@ -971,7 +1090,7 @@ func (c *ProjectsLocationsGetCall) Do(opts ...googleapi.CallOption) (*Location, 
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}",
+	//   "path": "v1/{+name}",
 	//   "response": {
 	//     "$ref": "Location"
 	//   },
@@ -1068,7 +1187,7 @@ func (c *ProjectsLocationsListCall) doRequest(alt string) (*http.Response, error
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}/locations")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}/locations")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	req.Header = reqHeaders
@@ -1117,7 +1236,7 @@ func (c *ProjectsLocationsListCall) Do(opts ...googleapi.CallOption) (*ListLocat
 	return ret, nil
 	// {
 	//   "description": "Lists information about the supported locations for this service.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations",
+	//   "flatPath": "v1/projects/{projectsId}/locations",
 	//   "httpMethod": "GET",
 	//   "id": "tpu.projects.locations.list",
 	//   "parameterOrder": [
@@ -1148,7 +1267,7 @@ func (c *ProjectsLocationsListCall) Do(opts ...googleapi.CallOption) (*ListLocat
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}/locations",
+	//   "path": "v1/{+name}/locations",
 	//   "response": {
 	//     "$ref": "ListLocationsResponse"
 	//   },
@@ -1163,6 +1282,352 @@ func (c *ProjectsLocationsListCall) Do(opts ...googleapi.CallOption) (*ListLocat
 // A non-nil error returned from f will halt the iteration.
 // The provided context supersedes any context provided to the Context method.
 func (c *ProjectsLocationsListCall) Pages(ctx context.Context, f func(*ListLocationsResponse) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "tpu.projects.locations.acceleratorTypes.get":
+
+type ProjectsLocationsAcceleratorTypesGetCall struct {
+	s            *Service
+	name         string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Get: Gets AcceleratorType.
+func (r *ProjectsLocationsAcceleratorTypesService) Get(name string) *ProjectsLocationsAcceleratorTypesGetCall {
+	c := &ProjectsLocationsAcceleratorTypesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsLocationsAcceleratorTypesGetCall) Fields(s ...googleapi.Field) *ProjectsLocationsAcceleratorTypesGetCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsLocationsAcceleratorTypesGetCall) IfNoneMatch(entityTag string) *ProjectsLocationsAcceleratorTypesGetCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsLocationsAcceleratorTypesGetCall) Context(ctx context.Context) *ProjectsLocationsAcceleratorTypesGetCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsLocationsAcceleratorTypesGetCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsLocationsAcceleratorTypesGetCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "tpu.projects.locations.acceleratorTypes.get" call.
+// Exactly one of *AcceleratorType or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *AcceleratorType.ServerResponse.Header or (if a response was returned
+// at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsLocationsAcceleratorTypesGetCall) Do(opts ...googleapi.CallOption) (*AcceleratorType, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &AcceleratorType{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Gets AcceleratorType.",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/acceleratorTypes/{acceleratorTypesId}",
+	//   "httpMethod": "GET",
+	//   "id": "tpu.projects.locations.acceleratorTypes.get",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The resource name.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/locations/[^/]+/acceleratorTypes/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v1/{+name}",
+	//   "response": {
+	//     "$ref": "AcceleratorType"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
+}
+
+// method id "tpu.projects.locations.acceleratorTypes.list":
+
+type ProjectsLocationsAcceleratorTypesListCall struct {
+	s            *Service
+	parent       string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// List: Lists accelerator types supported by this API.
+func (r *ProjectsLocationsAcceleratorTypesService) List(parent string) *ProjectsLocationsAcceleratorTypesListCall {
+	c := &ProjectsLocationsAcceleratorTypesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.parent = parent
+	return c
+}
+
+// Filter sets the optional parameter "filter": List filter.
+func (c *ProjectsLocationsAcceleratorTypesListCall) Filter(filter string) *ProjectsLocationsAcceleratorTypesListCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
+// OrderBy sets the optional parameter "orderBy": Sort results.
+func (c *ProjectsLocationsAcceleratorTypesListCall) OrderBy(orderBy string) *ProjectsLocationsAcceleratorTypesListCall {
+	c.urlParams_.Set("orderBy", orderBy)
+	return c
+}
+
+// PageSize sets the optional parameter "pageSize": The maximum number
+// of items to return.
+func (c *ProjectsLocationsAcceleratorTypesListCall) PageSize(pageSize int64) *ProjectsLocationsAcceleratorTypesListCall {
+	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": The
+// next_page_token value returned from a previous List request, if any.
+func (c *ProjectsLocationsAcceleratorTypesListCall) PageToken(pageToken string) *ProjectsLocationsAcceleratorTypesListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsLocationsAcceleratorTypesListCall) Fields(s ...googleapi.Field) *ProjectsLocationsAcceleratorTypesListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsLocationsAcceleratorTypesListCall) IfNoneMatch(entityTag string) *ProjectsLocationsAcceleratorTypesListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsLocationsAcceleratorTypesListCall) Context(ctx context.Context) *ProjectsLocationsAcceleratorTypesListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsLocationsAcceleratorTypesListCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsLocationsAcceleratorTypesListCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}/acceleratorTypes")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"parent": c.parent,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "tpu.projects.locations.acceleratorTypes.list" call.
+// Exactly one of *ListAcceleratorTypesResponse or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *ListAcceleratorTypesResponse.ServerResponse.Header or (if a
+// response was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsLocationsAcceleratorTypesListCall) Do(opts ...googleapi.CallOption) (*ListAcceleratorTypesResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &ListAcceleratorTypesResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Lists accelerator types supported by this API.",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/acceleratorTypes",
+	//   "httpMethod": "GET",
+	//   "id": "tpu.projects.locations.acceleratorTypes.list",
+	//   "parameterOrder": [
+	//     "parent"
+	//   ],
+	//   "parameters": {
+	//     "filter": {
+	//       "description": "List filter.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "orderBy": {
+	//       "description": "Sort results.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "pageSize": {
+	//       "description": "The maximum number of items to return.",
+	//       "format": "int32",
+	//       "location": "query",
+	//       "type": "integer"
+	//     },
+	//     "pageToken": {
+	//       "description": "The next_page_token value returned from a previous List request, if any.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "parent": {
+	//       "description": "The parent resource name.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/locations/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v1/{+parent}/acceleratorTypes",
+	//   "response": {
+	//     "$ref": "ListAcceleratorTypesResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ProjectsLocationsAcceleratorTypesListCall) Pages(ctx context.Context, f func(*ListAcceleratorTypesResponse) error) error {
 	c.ctx_ = ctx
 	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
 	for {
@@ -1244,7 +1709,7 @@ func (c *ProjectsLocationsNodesCreateCall) doRequest(alt string) (*http.Response
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+parent}/nodes")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}/nodes")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	req.Header = reqHeaders
@@ -1293,7 +1758,7 @@ func (c *ProjectsLocationsNodesCreateCall) Do(opts ...googleapi.CallOption) (*Op
 	return ret, nil
 	// {
 	//   "description": "Creates a node.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/nodes",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes",
 	//   "httpMethod": "POST",
 	//   "id": "tpu.projects.locations.nodes.create",
 	//   "parameterOrder": [
@@ -1313,7 +1778,7 @@ func (c *ProjectsLocationsNodesCreateCall) Do(opts ...googleapi.CallOption) (*Op
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+parent}/nodes",
+	//   "path": "v1/{+parent}/nodes",
 	//   "request": {
 	//     "$ref": "Node"
 	//   },
@@ -1377,7 +1842,7 @@ func (c *ProjectsLocationsNodesDeleteCall) doRequest(alt string) (*http.Response
 	reqHeaders.Set("User-Agent", c.s.userAgent())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("DELETE", urls, body)
 	req.Header = reqHeaders
@@ -1426,7 +1891,7 @@ func (c *ProjectsLocationsNodesDeleteCall) Do(opts ...googleapi.CallOption) (*Op
 	return ret, nil
 	// {
 	//   "description": "Deletes a node.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}",
 	//   "httpMethod": "DELETE",
 	//   "id": "tpu.projects.locations.nodes.delete",
 	//   "parameterOrder": [
@@ -1441,7 +1906,7 @@ func (c *ProjectsLocationsNodesDeleteCall) Do(opts ...googleapi.CallOption) (*Op
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}",
+	//   "path": "v1/{+name}",
 	//   "response": {
 	//     "$ref": "Operation"
 	//   },
@@ -1516,7 +1981,7 @@ func (c *ProjectsLocationsNodesGetCall) doRequest(alt string) (*http.Response, e
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	req.Header = reqHeaders
@@ -1565,7 +2030,7 @@ func (c *ProjectsLocationsNodesGetCall) Do(opts ...googleapi.CallOption) (*Node,
 	return ret, nil
 	// {
 	//   "description": "Gets the details of a node.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}",
 	//   "httpMethod": "GET",
 	//   "id": "tpu.projects.locations.nodes.get",
 	//   "parameterOrder": [
@@ -1580,7 +2045,7 @@ func (c *ProjectsLocationsNodesGetCall) Do(opts ...googleapi.CallOption) (*Node,
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}",
+	//   "path": "v1/{+name}",
 	//   "response": {
 	//     "$ref": "Node"
 	//   },
@@ -1669,7 +2134,7 @@ func (c *ProjectsLocationsNodesListCall) doRequest(alt string) (*http.Response, 
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+parent}/nodes")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}/nodes")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	req.Header = reqHeaders
@@ -1718,7 +2183,7 @@ func (c *ProjectsLocationsNodesListCall) Do(opts ...googleapi.CallOption) (*List
 	return ret, nil
 	// {
 	//   "description": "Lists nodes.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/nodes",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes",
 	//   "httpMethod": "GET",
 	//   "id": "tpu.projects.locations.nodes.list",
 	//   "parameterOrder": [
@@ -1744,7 +2209,7 @@ func (c *ProjectsLocationsNodesListCall) Do(opts ...googleapi.CallOption) (*List
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+parent}/nodes",
+	//   "path": "v1/{+parent}/nodes",
 	//   "response": {
 	//     "$ref": "ListNodesResponse"
 	//   },
@@ -1833,7 +2298,7 @@ func (c *ProjectsLocationsNodesReimageCall) doRequest(alt string) (*http.Respons
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}:reimage")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}:reimage")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	req.Header = reqHeaders
@@ -1882,7 +2347,7 @@ func (c *ProjectsLocationsNodesReimageCall) Do(opts ...googleapi.CallOption) (*O
 	return ret, nil
 	// {
 	//   "description": "Reimages a node's OS.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:reimage",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:reimage",
 	//   "httpMethod": "POST",
 	//   "id": "tpu.projects.locations.nodes.reimage",
 	//   "parameterOrder": [
@@ -1897,7 +2362,7 @@ func (c *ProjectsLocationsNodesReimageCall) Do(opts ...googleapi.CallOption) (*O
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}:reimage",
+	//   "path": "v1/{+name}:reimage",
 	//   "request": {
 	//     "$ref": "ReimageNodeRequest"
 	//   },
@@ -1968,7 +2433,7 @@ func (c *ProjectsLocationsNodesResetCall) doRequest(alt string) (*http.Response,
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}:reset")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}:reset")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	req.Header = reqHeaders
@@ -2017,7 +2482,7 @@ func (c *ProjectsLocationsNodesResetCall) Do(opts ...googleapi.CallOption) (*Ope
 	return ret, nil
 	// {
 	//   "description": "Resets a node, which stops and starts the VM.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:reset",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:reset",
 	//   "httpMethod": "POST",
 	//   "id": "tpu.projects.locations.nodes.reset",
 	//   "parameterOrder": [
@@ -2032,7 +2497,7 @@ func (c *ProjectsLocationsNodesResetCall) Do(opts ...googleapi.CallOption) (*Ope
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}:reset",
+	//   "path": "v1/{+name}:reset",
 	//   "request": {
 	//     "$ref": "ResetNodeRequest"
 	//   },
@@ -2103,7 +2568,7 @@ func (c *ProjectsLocationsNodesStartCall) doRequest(alt string) (*http.Response,
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}:start")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}:start")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	req.Header = reqHeaders
@@ -2152,7 +2617,7 @@ func (c *ProjectsLocationsNodesStartCall) Do(opts ...googleapi.CallOption) (*Ope
 	return ret, nil
 	// {
 	//   "description": "Starts a node.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:start",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:start",
 	//   "httpMethod": "POST",
 	//   "id": "tpu.projects.locations.nodes.start",
 	//   "parameterOrder": [
@@ -2167,7 +2632,7 @@ func (c *ProjectsLocationsNodesStartCall) Do(opts ...googleapi.CallOption) (*Ope
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}:start",
+	//   "path": "v1/{+name}:start",
 	//   "request": {
 	//     "$ref": "StartNodeRequest"
 	//   },
@@ -2238,7 +2703,7 @@ func (c *ProjectsLocationsNodesStopCall) doRequest(alt string) (*http.Response, 
 	}
 	reqHeaders.Set("Content-Type", "application/json")
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}:stop")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}:stop")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	req.Header = reqHeaders
@@ -2287,7 +2752,7 @@ func (c *ProjectsLocationsNodesStopCall) Do(opts ...googleapi.CallOption) (*Oper
 	return ret, nil
 	// {
 	//   "description": "Stops a node.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:stop",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:stop",
 	//   "httpMethod": "POST",
 	//   "id": "tpu.projects.locations.nodes.stop",
 	//   "parameterOrder": [
@@ -2302,7 +2767,7 @@ func (c *ProjectsLocationsNodesStopCall) Do(opts ...googleapi.CallOption) (*Oper
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}:stop",
+	//   "path": "v1/{+name}:stop",
 	//   "request": {
 	//     "$ref": "StopNodeRequest"
 	//   },
@@ -2383,7 +2848,7 @@ func (c *ProjectsLocationsOperationsCancelCall) doRequest(alt string) (*http.Res
 	reqHeaders.Set("User-Agent", c.s.userAgent())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}:cancel")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}:cancel")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("POST", urls, body)
 	req.Header = reqHeaders
@@ -2432,7 +2897,7 @@ func (c *ProjectsLocationsOperationsCancelCall) Do(opts ...googleapi.CallOption)
 	return ret, nil
 	// {
 	//   "description": "Starts asynchronous cancellation on a long-running operation.  The server\nmakes a best effort to cancel the operation, but success is not\nguaranteed.  If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.  Clients can use\nOperations.GetOperation or\nother methods to check whether the cancellation succeeded or whether the\noperation completed despite cancellation. On successful cancellation,\nthe operation is not deleted; instead, it becomes an operation with\nan Operation.error value with a google.rpc.Status.code of 1,\ncorresponding to `Code.CANCELLED`.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/operations/{operationsId}:cancel",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/operations/{operationsId}:cancel",
 	//   "httpMethod": "POST",
 	//   "id": "tpu.projects.locations.operations.cancel",
 	//   "parameterOrder": [
@@ -2447,7 +2912,7 @@ func (c *ProjectsLocationsOperationsCancelCall) Do(opts ...googleapi.CallOption)
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}:cancel",
+	//   "path": "v1/{+name}:cancel",
 	//   "response": {
 	//     "$ref": "Empty"
 	//   },
@@ -2514,7 +2979,7 @@ func (c *ProjectsLocationsOperationsDeleteCall) doRequest(alt string) (*http.Res
 	reqHeaders.Set("User-Agent", c.s.userAgent())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("DELETE", urls, body)
 	req.Header = reqHeaders
@@ -2563,7 +3028,7 @@ func (c *ProjectsLocationsOperationsDeleteCall) Do(opts ...googleapi.CallOption)
 	return ret, nil
 	// {
 	//   "description": "Deletes a long-running operation. This method indicates that the client is\nno longer interested in the operation result. It does not cancel the\noperation. If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/operations/{operationsId}",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/operations/{operationsId}",
 	//   "httpMethod": "DELETE",
 	//   "id": "tpu.projects.locations.operations.delete",
 	//   "parameterOrder": [
@@ -2578,7 +3043,7 @@ func (c *ProjectsLocationsOperationsDeleteCall) Do(opts ...googleapi.CallOption)
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}",
+	//   "path": "v1/{+name}",
 	//   "response": {
 	//     "$ref": "Empty"
 	//   },
@@ -2657,7 +3122,7 @@ func (c *ProjectsLocationsOperationsGetCall) doRequest(alt string) (*http.Respon
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	req.Header = reqHeaders
@@ -2706,7 +3171,7 @@ func (c *ProjectsLocationsOperationsGetCall) Do(opts ...googleapi.CallOption) (*
 	return ret, nil
 	// {
 	//   "description": "Gets the latest state of a long-running operation.  Clients can use this\nmethod to poll the operation result at intervals as recommended by the API\nservice.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/operations/{operationsId}",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/operations/{operationsId}",
 	//   "httpMethod": "GET",
 	//   "id": "tpu.projects.locations.operations.get",
 	//   "parameterOrder": [
@@ -2721,7 +3186,7 @@ func (c *ProjectsLocationsOperationsGetCall) Do(opts ...googleapi.CallOption) (*
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}",
+	//   "path": "v1/{+name}",
 	//   "response": {
 	//     "$ref": "Operation"
 	//   },
@@ -2833,7 +3298,7 @@ func (c *ProjectsLocationsOperationsListCall) doRequest(alt string) (*http.Respo
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}/operations")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}/operations")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	req.Header = reqHeaders
@@ -2882,7 +3347,7 @@ func (c *ProjectsLocationsOperationsListCall) Do(opts ...googleapi.CallOption) (
 	return ret, nil
 	// {
 	//   "description": "Lists operations that match the specified filter in the request. If the\nserver doesn't support this method, it returns `UNIMPLEMENTED`.\n\nNOTE: the `name` binding allows API services to override the binding\nto use different resource name schemes, such as `users/*/operations`. To\noverride the binding, API services can add a binding such as\n`\"/v1/{name=users/*}/operations\"` to their service configuration.\nFor backwards compatibility, the default name includes the operations\ncollection id, however overriding users must ensure the name binding\nis the parent resource, without the operations collection id.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/operations",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/operations",
 	//   "httpMethod": "GET",
 	//   "id": "tpu.projects.locations.operations.list",
 	//   "parameterOrder": [
@@ -2913,7 +3378,7 @@ func (c *ProjectsLocationsOperationsListCall) Do(opts ...googleapi.CallOption) (
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}/operations",
+	//   "path": "v1/{+name}/operations",
 	//   "response": {
 	//     "$ref": "ListOperationsResponse"
 	//   },
@@ -3009,7 +3474,7 @@ func (c *ProjectsLocationsTensorflowVersionsGetCall) doRequest(alt string) (*htt
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+name}")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+name}")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	req.Header = reqHeaders
@@ -3058,7 +3523,7 @@ func (c *ProjectsLocationsTensorflowVersionsGetCall) Do(opts ...googleapi.CallOp
 	return ret, nil
 	// {
 	//   "description": "Gets TensorFlow Version.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/tensorflowVersions/{tensorflowVersionsId}",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/tensorflowVersions/{tensorflowVersionsId}",
 	//   "httpMethod": "GET",
 	//   "id": "tpu.projects.locations.tensorflowVersions.get",
 	//   "parameterOrder": [
@@ -3073,7 +3538,7 @@ func (c *ProjectsLocationsTensorflowVersionsGetCall) Do(opts ...googleapi.CallOp
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+name}",
+	//   "path": "v1/{+name}",
 	//   "response": {
 	//     "$ref": "TensorFlowVersion"
 	//   },
@@ -3095,7 +3560,7 @@ type ProjectsLocationsTensorflowVersionsListCall struct {
 	header_      http.Header
 }
 
-// List: Lists TensorFlow versions supported by this API.
+// List: List TensorFlow versions supported by this API.
 func (r *ProjectsLocationsTensorflowVersionsService) List(parent string) *ProjectsLocationsTensorflowVersionsListCall {
 	c := &ProjectsLocationsTensorflowVersionsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.parent = parent
@@ -3174,7 +3639,7 @@ func (c *ProjectsLocationsTensorflowVersionsListCall) doRequest(alt string) (*ht
 	}
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
-	urls := googleapi.ResolveRelative(c.s.BasePath, "v1alpha1/{+parent}/tensorflowVersions")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}/tensorflowVersions")
 	urls += "?" + c.urlParams_.Encode()
 	req, _ := http.NewRequest("GET", urls, body)
 	req.Header = reqHeaders
@@ -3222,8 +3687,8 @@ func (c *ProjectsLocationsTensorflowVersionsListCall) Do(opts ...googleapi.CallO
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists TensorFlow versions supported by this API.",
-	//   "flatPath": "v1alpha1/projects/{projectsId}/locations/{locationsId}/tensorflowVersions",
+	//   "description": "List TensorFlow versions supported by this API.",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/tensorflowVersions",
 	//   "httpMethod": "GET",
 	//   "id": "tpu.projects.locations.tensorflowVersions.list",
 	//   "parameterOrder": [
@@ -3259,7 +3724,7 @@ func (c *ProjectsLocationsTensorflowVersionsListCall) Do(opts ...googleapi.CallO
 	//       "type": "string"
 	//     }
 	//   },
-	//   "path": "v1alpha1/{+parent}/tensorflowVersions",
+	//   "path": "v1/{+parent}/tensorflowVersions",
 	//   "response": {
 	//     "$ref": "ListTensorFlowVersionsResponse"
 	//   },
