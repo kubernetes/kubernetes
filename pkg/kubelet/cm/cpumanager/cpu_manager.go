@@ -137,9 +137,12 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		policy = NewNonePolicy()
 	}
 
-	stateImpl := state.NewFileState(
+	stateImpl, err := state.NewFileState(
 		path.Join(stateFileDirecory, CPUManagerStateFileName),
 		policy.Name())
+	if err != nil {
+		glog.Exit(err)
+	}
 
 	manager := &manager{
 		policy:                     policy,
