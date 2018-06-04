@@ -91,10 +91,13 @@ func (s *Service) userAgent() string {
 
 func NewProjectsService(s *Service) *ProjectsService {
 	rs := &ProjectsService{s: s}
+	rs.AlertPolicies = NewProjectsAlertPoliciesService(s)
 	rs.CollectdTimeSeries = NewProjectsCollectdTimeSeriesService(s)
 	rs.Groups = NewProjectsGroupsService(s)
 	rs.MetricDescriptors = NewProjectsMetricDescriptorsService(s)
 	rs.MonitoredResourceDescriptors = NewProjectsMonitoredResourceDescriptorsService(s)
+	rs.NotificationChannelDescriptors = NewProjectsNotificationChannelDescriptorsService(s)
+	rs.NotificationChannels = NewProjectsNotificationChannelsService(s)
 	rs.TimeSeries = NewProjectsTimeSeriesService(s)
 	rs.UptimeCheckConfigs = NewProjectsUptimeCheckConfigsService(s)
 	return rs
@@ -102,6 +105,8 @@ func NewProjectsService(s *Service) *ProjectsService {
 
 type ProjectsService struct {
 	s *Service
+
+	AlertPolicies *ProjectsAlertPoliciesService
 
 	CollectdTimeSeries *ProjectsCollectdTimeSeriesService
 
@@ -111,9 +116,22 @@ type ProjectsService struct {
 
 	MonitoredResourceDescriptors *ProjectsMonitoredResourceDescriptorsService
 
+	NotificationChannelDescriptors *ProjectsNotificationChannelDescriptorsService
+
+	NotificationChannels *ProjectsNotificationChannelsService
+
 	TimeSeries *ProjectsTimeSeriesService
 
 	UptimeCheckConfigs *ProjectsUptimeCheckConfigsService
+}
+
+func NewProjectsAlertPoliciesService(s *Service) *ProjectsAlertPoliciesService {
+	rs := &ProjectsAlertPoliciesService{s: s}
+	return rs
+}
+
+type ProjectsAlertPoliciesService struct {
+	s *Service
 }
 
 func NewProjectsCollectdTimeSeriesService(s *Service) *ProjectsCollectdTimeSeriesService {
@@ -164,6 +182,24 @@ type ProjectsMonitoredResourceDescriptorsService struct {
 	s *Service
 }
 
+func NewProjectsNotificationChannelDescriptorsService(s *Service) *ProjectsNotificationChannelDescriptorsService {
+	rs := &ProjectsNotificationChannelDescriptorsService{s: s}
+	return rs
+}
+
+type ProjectsNotificationChannelDescriptorsService struct {
+	s *Service
+}
+
+func NewProjectsNotificationChannelsService(s *Service) *ProjectsNotificationChannelsService {
+	rs := &ProjectsNotificationChannelsService{s: s}
+	return rs
+}
+
+type ProjectsNotificationChannelsService struct {
+	s *Service
+}
+
 func NewProjectsTimeSeriesService(s *Service) *ProjectsTimeSeriesService {
 	rs := &ProjectsTimeSeriesService{s: s}
 	return rs
@@ -189,6 +225,361 @@ func NewUptimeCheckIpsService(s *Service) *UptimeCheckIpsService {
 
 type UptimeCheckIpsService struct {
 	s *Service
+}
+
+// Aggregation: Describes how to combine multiple time series to provide
+// different views of the data. Aggregation consists of an alignment
+// step on individual time series (alignment_period and
+// per_series_aligner) followed by an optional reduction step of the
+// data across the aligned time series (cross_series_reducer and
+// group_by_fields). For more details, see Aggregation.
+type Aggregation struct {
+	// AlignmentPeriod: The alignment period for per-time series alignment.
+	// If present, alignmentPeriod must be at least 60 seconds. After
+	// per-time series alignment, each time series will contain data points
+	// only on the period boundaries. If perSeriesAligner is not specified
+	// or equals ALIGN_NONE, then this field is ignored. If perSeriesAligner
+	// is specified and does not equal ALIGN_NONE, then this field must be
+	// defined; otherwise an error is returned.
+	AlignmentPeriod string `json:"alignmentPeriod,omitempty"`
+
+	// CrossSeriesReducer: The approach to be used to combine time series.
+	// Not all reducer functions may be applied to all time series,
+	// depending on the metric type and the value type of the original time
+	// series. Reduction may change the metric type of value type of the
+	// time series.Time series data must be aligned in order to perform
+	// cross-time series reduction. If crossSeriesReducer is specified, then
+	// perSeriesAligner must be specified and not equal ALIGN_NONE and
+	// alignmentPeriod must be specified; otherwise, an error is returned.
+	//
+	// Possible values:
+	//   "REDUCE_NONE" - No cross-time series reduction. The output of the
+	// aligner is returned.
+	//   "REDUCE_MEAN" - Reduce by computing the mean across time series for
+	// each alignment period. This reducer is valid for delta and gauge
+	// metrics with numeric or distribution values. The value type of the
+	// output is DOUBLE.
+	//   "REDUCE_MIN" - Reduce by computing the minimum across time series
+	// for each alignment period. This reducer is valid for delta and gauge
+	// metrics with numeric values. The value type of the output is the same
+	// as the value type of the input.
+	//   "REDUCE_MAX" - Reduce by computing the maximum across time series
+	// for each alignment period. This reducer is valid for delta and gauge
+	// metrics with numeric values. The value type of the output is the same
+	// as the value type of the input.
+	//   "REDUCE_SUM" - Reduce by computing the sum across time series for
+	// each alignment period. This reducer is valid for delta and gauge
+	// metrics with numeric and distribution values. The value type of the
+	// output is the same as the value type of the input.
+	//   "REDUCE_STDDEV" - Reduce by computing the standard deviation across
+	// time series for each alignment period. This reducer is valid for
+	// delta and gauge metrics with numeric or distribution values. The
+	// value type of the output is DOUBLE.
+	//   "REDUCE_COUNT" - Reduce by computing the count of data points
+	// across time series for each alignment period. This reducer is valid
+	// for delta and gauge metrics of numeric, Boolean, distribution, and
+	// string value type. The value type of the output is INT64.
+	//   "REDUCE_COUNT_TRUE" - Reduce by computing the count of True-valued
+	// data points across time series for each alignment period. This
+	// reducer is valid for delta and gauge metrics of Boolean value type.
+	// The value type of the output is INT64.
+	//   "REDUCE_COUNT_FALSE" - Reduce by computing the count of
+	// False-valued data points across time series for each alignment
+	// period. This reducer is valid for delta and gauge metrics of Boolean
+	// value type. The value type of the output is INT64.
+	//   "REDUCE_FRACTION_TRUE" - Reduce by computing the fraction of
+	// True-valued data points across time series for each alignment period.
+	// This reducer is valid for delta and gauge metrics of Boolean value
+	// type. The output value is in the range 0, 1 and has value type
+	// DOUBLE.
+	//   "REDUCE_PERCENTILE_99" - Reduce by computing 99th percentile of
+	// data points across time series for each alignment period. This
+	// reducer is valid for gauge and delta metrics of numeric and
+	// distribution type. The value of the output is DOUBLE
+	//   "REDUCE_PERCENTILE_95" - Reduce by computing 95th percentile of
+	// data points across time series for each alignment period. This
+	// reducer is valid for gauge and delta metrics of numeric and
+	// distribution type. The value of the output is DOUBLE
+	//   "REDUCE_PERCENTILE_50" - Reduce by computing 50th percentile of
+	// data points across time series for each alignment period. This
+	// reducer is valid for gauge and delta metrics of numeric and
+	// distribution type. The value of the output is DOUBLE
+	//   "REDUCE_PERCENTILE_05" - Reduce by computing 5th percentile of data
+	// points across time series for each alignment period. This reducer is
+	// valid for gauge and delta metrics of numeric and distribution type.
+	// The value of the output is DOUBLE
+	CrossSeriesReducer string `json:"crossSeriesReducer,omitempty"`
+
+	// GroupByFields: The set of fields to preserve when crossSeriesReducer
+	// is specified. The groupByFields determine how the time series are
+	// partitioned into subsets prior to applying the aggregation function.
+	// Each subset contains time series that have the same value for each of
+	// the grouping fields. Each individual time series is a member of
+	// exactly one subset. The crossSeriesReducer is applied to each subset
+	// of time series. It is not possible to reduce across different
+	// resource types, so this field implicitly contains resource.type.
+	// Fields not specified in groupByFields are aggregated away. If
+	// groupByFields is not specified and all the time series have the same
+	// resource type, then the time series are aggregated into a single
+	// output time series. If crossSeriesReducer is not defined, this field
+	// is ignored.
+	GroupByFields []string `json:"groupByFields,omitempty"`
+
+	// PerSeriesAligner: The approach to be used to align individual time
+	// series. Not all alignment functions may be applied to all time
+	// series, depending on the metric type and value type of the original
+	// time series. Alignment may change the metric type or the value type
+	// of the time series.Time series data must be aligned in order to
+	// perform cross-time series reduction. If crossSeriesReducer is
+	// specified, then perSeriesAligner must be specified and not equal
+	// ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error
+	// is returned.
+	//
+	// Possible values:
+	//   "ALIGN_NONE" - No alignment. Raw data is returned. Not valid if
+	// cross-time series reduction is requested. The value type of the
+	// result is the same as the value type of the input.
+	//   "ALIGN_DELTA" - Align and convert to delta metric type. This
+	// alignment is valid for cumulative metrics and delta metrics. Aligning
+	// an existing delta metric to a delta metric requires that the
+	// alignment period be increased. The value type of the result is the
+	// same as the value type of the input.One can think of this aligner as
+	// a rate but without time units; that is, the output is conceptually
+	// (second_point - first_point).
+	//   "ALIGN_RATE" - Align and convert to a rate. This alignment is valid
+	// for cumulative metrics and delta metrics with numeric values. The
+	// output is a gauge metric with value type DOUBLE.One can think of this
+	// aligner as conceptually providing the slope of the line that passes
+	// through the value at the start and end of the window. In other words,
+	// this is conceptually ((y1 - y0)/(t1 - t0)), and the output unit is
+	// one that has a "/time" dimension.If, by rate, you are looking for
+	// percentage change, see the ALIGN_PERCENT_CHANGE aligner option.
+	//   "ALIGN_INTERPOLATE" - Align by interpolating between adjacent
+	// points around the period boundary. This alignment is valid for gauge
+	// metrics with numeric values. The value type of the result is the same
+	// as the value type of the input.
+	//   "ALIGN_NEXT_OLDER" - Align by shifting the oldest data point before
+	// the period boundary to the boundary. This alignment is valid for
+	// gauge metrics. The value type of the result is the same as the value
+	// type of the input.
+	//   "ALIGN_MIN" - Align time series via aggregation. The resulting data
+	// point in the alignment period is the minimum of all data points in
+	// the period. This alignment is valid for gauge and delta metrics with
+	// numeric values. The value type of the result is the same as the value
+	// type of the input.
+	//   "ALIGN_MAX" - Align time series via aggregation. The resulting data
+	// point in the alignment period is the maximum of all data points in
+	// the period. This alignment is valid for gauge and delta metrics with
+	// numeric values. The value type of the result is the same as the value
+	// type of the input.
+	//   "ALIGN_MEAN" - Align time series via aggregation. The resulting
+	// data point in the alignment period is the average or arithmetic mean
+	// of all data points in the period. This alignment is valid for gauge
+	// and delta metrics with numeric values. The value type of the output
+	// is DOUBLE.
+	//   "ALIGN_COUNT" - Align time series via aggregation. The resulting
+	// data point in the alignment period is the count of all data points in
+	// the period. This alignment is valid for gauge and delta metrics with
+	// numeric or Boolean values. The value type of the output is INT64.
+	//   "ALIGN_SUM" - Align time series via aggregation. The resulting data
+	// point in the alignment period is the sum of all data points in the
+	// period. This alignment is valid for gauge and delta metrics with
+	// numeric and distribution values. The value type of the output is the
+	// same as the value type of the input.
+	//   "ALIGN_STDDEV" - Align time series via aggregation. The resulting
+	// data point in the alignment period is the standard deviation of all
+	// data points in the period. This alignment is valid for gauge and
+	// delta metrics with numeric values. The value type of the output is
+	// DOUBLE.
+	//   "ALIGN_COUNT_TRUE" - Align time series via aggregation. The
+	// resulting data point in the alignment period is the count of
+	// True-valued data points in the period. This alignment is valid for
+	// gauge metrics with Boolean values. The value type of the output is
+	// INT64.
+	//   "ALIGN_COUNT_FALSE" - Align time series via aggregation. The
+	// resulting data point in the alignment period is the count of
+	// False-valued data points in the period. This alignment is valid for
+	// gauge metrics with Boolean values. The value type of the output is
+	// INT64.
+	//   "ALIGN_FRACTION_TRUE" - Align time series via aggregation. The
+	// resulting data point in the alignment period is the fraction of
+	// True-valued data points in the period. This alignment is valid for
+	// gauge metrics with Boolean values. The output value is in the range
+	// 0, 1 and has value type DOUBLE.
+	//   "ALIGN_PERCENTILE_99" - Align time series via aggregation. The
+	// resulting data point in the alignment period is the 99th percentile
+	// of all data points in the period. This alignment is valid for gauge
+	// and delta metrics with distribution values. The output is a gauge
+	// metric with value type DOUBLE.
+	//   "ALIGN_PERCENTILE_95" - Align time series via aggregation. The
+	// resulting data point in the alignment period is the 95th percentile
+	// of all data points in the period. This alignment is valid for gauge
+	// and delta metrics with distribution values. The output is a gauge
+	// metric with value type DOUBLE.
+	//   "ALIGN_PERCENTILE_50" - Align time series via aggregation. The
+	// resulting data point in the alignment period is the 50th percentile
+	// of all data points in the period. This alignment is valid for gauge
+	// and delta metrics with distribution values. The output is a gauge
+	// metric with value type DOUBLE.
+	//   "ALIGN_PERCENTILE_05" - Align time series via aggregation. The
+	// resulting data point in the alignment period is the 5th percentile of
+	// all data points in the period. This alignment is valid for gauge and
+	// delta metrics with distribution values. The output is a gauge metric
+	// with value type DOUBLE.
+	//   "ALIGN_PERCENT_CHANGE" - Align and convert to a percentage change.
+	// This alignment is valid for gauge and delta metrics with numeric
+	// values. This alignment conceptually computes the equivalent of
+	// "((current - previous)/previous)*100" where previous value is
+	// determined based on the alignmentPeriod. In the event that previous
+	// is 0 the calculated value is infinity with the exception that if both
+	// (current - previous) and previous are 0 the calculated value is 0. A
+	// 10 minute moving mean is computed at each point of the time window
+	// prior to the above calculation to smooth the metric and prevent false
+	// positives from very short lived spikes. Only applicable for data that
+	// is >= 0. Any values < 0 are treated as no data. While delta metrics
+	// are accepted by this alignment special care should be taken that the
+	// values for the metric will always be positive. The output is a gauge
+	// metric with value type DOUBLE.
+	PerSeriesAligner string `json:"perSeriesAligner,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AlignmentPeriod") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AlignmentPeriod") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Aggregation) MarshalJSON() ([]byte, error) {
+	type NoMethod Aggregation
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// AlertPolicy: A description of the conditions under which some aspect
+// of your system is considered to be "unhealthy" and the ways to notify
+// people or services about this state. For an overview of alert
+// policies, see Introduction to Alerting.
+type AlertPolicy struct {
+	// Combiner: How to combine the results of multiple conditions to
+	// determine if an incident should be opened.
+	//
+	// Possible values:
+	//   "COMBINE_UNSPECIFIED" - An unspecified combiner.
+	//   "AND" - Combine conditions using the logical AND operator. An
+	// incident is created only if all conditions are met simultaneously.
+	// This combiner is satisfied if all conditions are met, even if they
+	// are met on completely different resources.
+	//   "OR" - Combine conditions using the logical OR operator. An
+	// incident is created if any of the listed conditions is met.
+	//   "AND_WITH_MATCHING_RESOURCE" - Combine conditions using logical AND
+	// operator, but unlike the regular AND option, an incident is created
+	// only if all conditions are met simultaneously on at least one
+	// resource.
+	Combiner string `json:"combiner,omitempty"`
+
+	// Conditions: A list of conditions for the policy. The conditions are
+	// combined by AND or OR according to the combiner field. If the
+	// combined conditions evaluate to true, then an incident is created. A
+	// policy can have from one to six conditions.
+	Conditions []*Condition `json:"conditions,omitempty"`
+
+	// CreationRecord: A read-only record of the creation of the alerting
+	// policy. If provided in a call to create or update, this field will be
+	// ignored.
+	CreationRecord *MutationRecord `json:"creationRecord,omitempty"`
+
+	// DisplayName: A short name or phrase used to identify the policy in
+	// dashboards, notifications, and incidents. To avoid confusion, don't
+	// use the same display name for multiple policies in the same project.
+	// The name is limited to 512 Unicode characters.
+	DisplayName string `json:"displayName,omitempty"`
+
+	// Documentation: Documentation that is included with notifications and
+	// incidents related to this policy. Best practice is for the
+	// documentation to include information to help responders understand,
+	// mitigate, escalate, and correct the underlying problems detected by
+	// the alerting policy. Notification channels that have limited capacity
+	// might not show this documentation.
+	Documentation *Documentation `json:"documentation,omitempty"`
+
+	// Enabled: Whether or not the policy is enabled. On write, the default
+	// interpretation if unset is that the policy is enabled. On read,
+	// clients should not make any assumption about the state if it has not
+	// been populated. The field should always be populated on List and Get
+	// operations, unless a field projection has been specified that strips
+	// it out.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// MutationRecord: A read-only record of the most recent change to the
+	// alerting policy. If provided in a call to create or update, this
+	// field will be ignored.
+	MutationRecord *MutationRecord `json:"mutationRecord,omitempty"`
+
+	// Name: Required if the policy exists. The resource name for this
+	// policy. The syntax
+	// is:
+	// projects/[PROJECT_ID]/alertPolicies/[ALERT_POLICY_ID]
+	// [ALERT_POLIC
+	// Y_ID] is assigned by Stackdriver Monitoring when the policy is
+	// created. When calling the alertPolicies.create method, do not include
+	// the name field in the alerting policy passed as part of the request.
+	Name string `json:"name,omitempty"`
+
+	// NotificationChannels: Identifies the notification channels to which
+	// notifications should be sent when incidents are opened or closed or
+	// when new violations occur on an already opened incident. Each element
+	// of this array corresponds to the name field in each of the
+	// NotificationChannel objects that are returned from the
+	// ListNotificationChannels method. The syntax of the entries in this
+	// field is:
+	// projects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID]
+	//
+	NotificationChannels []string `json:"notificationChannels,omitempty"`
+
+	// UserLabels: User-supplied key/value data to be used for organizing
+	// and identifying the AlertPolicy objects.The field can contain up to
+	// 64 entries. Each key and value is limited to 63 Unicode characters or
+	// 128 bytes, whichever is smaller. Labels and values can contain only
+	// lowercase letters, numerals, underscores, and dashes. Keys must begin
+	// with a letter.
+	UserLabels map[string]string `json:"userLabels,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Combiner") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Combiner") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AlertPolicy) MarshalJSON() ([]byte, error) {
+	type NoMethod AlertPolicy
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // BasicAuthentication: A type of authentication to perform against the
@@ -446,6 +837,67 @@ func (s *CollectdValueError) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// Condition: A condition is a true/false test that determines when an
+// alerting policy should open an incident. If a condition evaluates to
+// true, it signifies that something is wrong.
+type Condition struct {
+	// ConditionAbsent: A condition that checks that a time series continues
+	// to receive new data points.
+	ConditionAbsent *MetricAbsence `json:"conditionAbsent,omitempty"`
+
+	// ConditionThreshold: A condition that compares a time series against a
+	// threshold.
+	ConditionThreshold *MetricThreshold `json:"conditionThreshold,omitempty"`
+
+	// DisplayName: A short name or phrase used to identify the condition in
+	// dashboards, notifications, and incidents. To avoid confusion, don't
+	// use the same display name for multiple conditions in the same policy.
+	DisplayName string `json:"displayName,omitempty"`
+
+	// Name: Required if the condition exists. The unique resource name for
+	// this condition. Its syntax
+	// is:
+	// projects/[PROJECT_ID]/alertPolicies/[POLICY_ID]/conditions/[CONDIT
+	// ION_ID]
+	// [CONDITION_ID] is assigned by Stackdriver Monitoring when the
+	// condition is created as part of a new or updated alerting policy.When
+	// calling the alertPolicies.create method, do not include the name
+	// field in the conditions of the requested alerting policy. Stackdriver
+	// Monitoring creates the condition identifiers and includes them in the
+	// new policy.When calling the alertPolicies.update method to update a
+	// policy, including a condition name causes the existing condition to
+	// be updated. Conditions without names are added to the updated policy.
+	// Existing conditions are deleted if they are not updated.Best practice
+	// is to preserve [CONDITION_ID] if you make only small changes, such as
+	// those to condition thresholds, durations, or trigger values.
+	// Otherwise, treat the change as a new condition and let the existing
+	// condition be deleted.
+	Name string `json:"name,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ConditionAbsent") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ConditionAbsent") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Condition) MarshalJSON() ([]byte, error) {
+	type NoMethod Condition
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // ContentMatcher: Used to perform string matching. Currently, this
 // matches on the exact content. In the future, it can be expanded to
 // allow for regular expressions and more complex matching.
@@ -616,6 +1068,11 @@ type Distribution struct {
 	// histogram is provided.
 	Count int64 `json:"count,omitempty,string"`
 
+	// Exemplars: Must be in increasing order of |value| field. The current
+	// requirement enforced by the backend is that at most one Exemplar will
+	// fall into any bucket.
+	Exemplars []*Exemplar `json:"exemplars,omitempty"`
+
 	// Mean: The arithmetic mean of the values in the population. If count
 	// is zero then this field must be zero.
 	Mean float64 `json:"mean,omitempty"`
@@ -673,6 +1130,43 @@ func (s *Distribution) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Documentation: A content string and a MIME type that describes the
+// content string's format.
+type Documentation struct {
+	// Content: The text of the documentation, interpreted according to
+	// mime_type. The content may not exceed 8,192 Unicode characters and
+	// may not exceed more than 10,240 bytes when encoded in UTF-8 format,
+	// whichever is smaller.
+	Content string `json:"content,omitempty"`
+
+	// MimeType: The format of the content field. Presently, only the value
+	// "text/markdown" is supported. See Markdown
+	// (https://en.wikipedia.org/wiki/Markdown) for more information.
+	MimeType string `json:"mimeType,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Content") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Content") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Documentation) MarshalJSON() ([]byte, error) {
+	type NoMethod Documentation
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // Empty: A generic empty message that you can re-use to avoid defining
 // duplicated empty messages in your APIs. A typical example is to use
 // it as the request or the response type of an API method. For
@@ -686,6 +1180,67 @@ type Empty struct {
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
 	googleapi.ServerResponse `json:"-"`
+}
+
+// Exemplar: Exemplars are example points that may be used to annotate
+// aggregated distribution values. They are metadata that gives
+// information about a particular value added to a Distribution bucket,
+// such as a trace ID that was active when a value was added. They may
+// contain further information, such as a example values and timestamps,
+// origin, etc.
+type Exemplar struct {
+	// Attachments: Contextual information about the example value. Examples
+	// are:Trace ID:
+	// type.googleapis.com/google.devtools.cloudtrace.v1.TraceLiteral
+	// string: type.googleapis.com/google.protobuf.StringValueLabels dropped
+	// during aggregation:
+	// type.googleapis.com/google.monitoring.v3.DroppedLabelsThere may be
+	// only a single attachment of any given message type in a single
+	// exemplar, and this is enforced by the system.
+	Attachments []googleapi.RawMessage `json:"attachments,omitempty"`
+
+	// Timestamp: The observation (sampling) time of the above value.
+	Timestamp string `json:"timestamp,omitempty"`
+
+	// Value: Value of the exemplar point. This value determines to which
+	// bucket the exemplar belongs.
+	Value float64 `json:"value,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Attachments") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Attachments") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Exemplar) MarshalJSON() ([]byte, error) {
+	type NoMethod Exemplar
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *Exemplar) UnmarshalJSON(data []byte) error {
+	type NoMethod Exemplar
+	var s1 struct {
+		Value gensupport.JSONFloat64 `json:"value"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.Value = float64(s1.Value)
+	return nil
 }
 
 // Explicit: Specifies a set of buckets with arbitrary widths.There are
@@ -862,6 +1417,86 @@ type Field struct {
 
 func (s *Field) MarshalJSON() ([]byte, error) {
 	type NoMethod Field
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// GetNotificationChannelVerificationCodeRequest: The
+// GetNotificationChannelVerificationCode request.
+type GetNotificationChannelVerificationCodeRequest struct {
+	// ExpireTime: The desired expiration time. If specified, the API will
+	// guarantee that the returned code will not be valid after the
+	// specified timestamp; however, the API cannot guarantee that the
+	// returned code will be valid for at least as long as the requested
+	// time (the API puts an upper bound on the amount of time for which a
+	// code may be valid). If omitted, a default expiration will be used,
+	// which may be less than the max permissible expiration (so specifying
+	// an expiration may extend the code's lifetime over omitting an
+	// expiration, even though the API does impose an upper limit on the
+	// maximum expiration that is permitted).
+	ExpireTime string `json:"expireTime,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ExpireTime") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ExpireTime") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GetNotificationChannelVerificationCodeRequest) MarshalJSON() ([]byte, error) {
+	type NoMethod GetNotificationChannelVerificationCodeRequest
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// GetNotificationChannelVerificationCodeResponse: The
+// GetNotificationChannelVerificationCode request.
+type GetNotificationChannelVerificationCodeResponse struct {
+	// Code: The verification code, which may be used to verify other
+	// channels that have an equivalent identity (i.e. other channels of the
+	// same type with the same fingerprint such as other email channels with
+	// the same email address or other sms channels with the same number).
+	Code string `json:"code,omitempty"`
+
+	// ExpireTime: The expiration time associated with the code that was
+	// returned. If an expiration was provided in the request, this is the
+	// minimum of the requested expiration in the request and the max
+	// permitted expiration.
+	ExpireTime string `json:"expireTime,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Code") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Code") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GetNotificationChannelVerificationCodeResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod GetNotificationChannelVerificationCodeResponse
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1142,6 +1777,44 @@ func (s *Linear) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ListAlertPoliciesResponse: The protocol for the ListAlertPolicies
+// response.
+type ListAlertPoliciesResponse struct {
+	// AlertPolicies: The returned alert policies.
+	AlertPolicies []*AlertPolicy `json:"alertPolicies,omitempty"`
+
+	// NextPageToken: If there might be more results than were returned,
+	// then this field is set to a non-empty value. To see the additional
+	// results, use that value as pageToken in the next call to this method.
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "AlertPolicies") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AlertPolicies") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ListAlertPoliciesResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod ListAlertPoliciesResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // ListGroupMembersResponse: The ListGroupMembers response.
 type ListGroupMembersResponse struct {
 	// Members: A set of monitored resources in the group.
@@ -1297,16 +1970,59 @@ func (s *ListMonitoredResourceDescriptorsResponse) MarshalJSON() ([]byte, error)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// ListTimeSeriesResponse: The ListTimeSeries response.
-type ListTimeSeriesResponse struct {
-	// NextPageToken: If there are more results than have been returned,
-	// then this field is set to a non-empty value. To see the additional
-	// results, use that value as pageToken in the next call to this method.
+// ListNotificationChannelDescriptorsResponse: The
+// ListNotificationChannelDescriptors response.
+type ListNotificationChannelDescriptorsResponse struct {
+	// ChannelDescriptors: The monitored resource descriptors supported for
+	// the specified project, optionally filtered.
+	ChannelDescriptors []*NotificationChannelDescriptor `json:"channelDescriptors,omitempty"`
+
+	// NextPageToken: If not empty, indicates that there may be more results
+	// that match the request. Use the value in the page_token field in a
+	// subsequent request to fetch the next set of results. If empty, all
+	// results have been returned.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
-	// TimeSeries: One or more time series that match the filter included in
-	// the request.
-	TimeSeries []*TimeSeries `json:"timeSeries,omitempty"`
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "ChannelDescriptors")
+	// to unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ChannelDescriptors") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ListNotificationChannelDescriptorsResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod ListNotificationChannelDescriptorsResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ListNotificationChannelsResponse: The ListNotificationChannels
+// response.
+type ListNotificationChannelsResponse struct {
+	// NextPageToken: If not empty, indicates that there may be more results
+	// that match the request. Use the value in the page_token field in a
+	// subsequent request to fetch the next set of results. If empty, all
+	// results have been returned.
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// NotificationChannels: The notification channels defined for the
+	// specified project.
+	NotificationChannels []*NotificationChannel `json:"notificationChannels,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
@@ -1326,6 +2042,49 @@ type ListTimeSeriesResponse struct {
 	// an empty value appearing in NullFields will be sent to the server as
 	// null. It is an error if a field in this list has a non-empty value.
 	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ListNotificationChannelsResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod ListNotificationChannelsResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// ListTimeSeriesResponse: The ListTimeSeries response.
+type ListTimeSeriesResponse struct {
+	// ExecutionErrors: Query execution errors that may have caused the time
+	// series data returned to be incomplete.
+	ExecutionErrors []*Status `json:"executionErrors,omitempty"`
+
+	// NextPageToken: If there are more results than have been returned,
+	// then this field is set to a non-empty value. To see the additional
+	// results, use that value as pageToken in the next call to this method.
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// TimeSeries: One or more time series that match the filter included in
+	// the request.
+	TimeSeries []*TimeSeries `json:"timeSeries,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "ExecutionErrors") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ExecutionErrors") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
 	NullFields []string `json:"-"`
 }
 
@@ -1455,6 +2214,67 @@ func (s *Metric) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// MetricAbsence: A condition type that checks that monitored resources
+// are reporting data. The configuration defines a metric and a set of
+// monitored resources. The predicate is considered in violation when a
+// time series for the specified metric of a monitored resource does not
+// include any data in the specified duration.
+type MetricAbsence struct {
+	// Aggregations: Specifies the alignment of data points in individual
+	// time series as well as how to combine the retrieved time series
+	// together (such as when aggregating multiple streams on each resource
+	// to a single stream for each resource or when aggregating streams
+	// across all members of a group of resrouces). Multiple aggregations
+	// are applied in the order specified.This field is similar to the one
+	// in the MetricService.ListTimeSeries request. It is advisable to use
+	// the ListTimeSeries method when debugging this field.
+	Aggregations []*Aggregation `json:"aggregations,omitempty"`
+
+	// Duration: The amount of time that a time series must fail to report
+	// new data to be considered failing. Currently, only values that are a
+	// multiple of a minute--e.g. 60, 120, or 300 seconds--are supported. If
+	// an invalid value is given, an error will be returned. The
+	// Duration.nanos field is ignored.
+	Duration string `json:"duration,omitempty"`
+
+	// Filter: A filter that identifies which time series should be compared
+	// with the threshold.The filter is similar to the one that is specified
+	// in the MetricService.ListTimeSeries request (that call is useful to
+	// verify the time series that will be retrieved / processed) and must
+	// specify the metric type and optionally may contain restrictions on
+	// resource type, resource labels, and metric labels. This field may not
+	// exceed 2048 Unicode characters in length.
+	Filter string `json:"filter,omitempty"`
+
+	// Trigger: The number/percent of time series for which the comparison
+	// must hold in order for the condition to trigger. If unspecified, then
+	// the condition will trigger if the comparison is true for any of the
+	// time series that have been identified by filter and aggregations.
+	Trigger *Trigger `json:"trigger,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Aggregations") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Aggregations") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *MetricAbsence) MarshalJSON() ([]byte, error) {
+	type NoMethod MetricAbsence
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // MetricDescriptor: Defines a metric type and its schema. Once a metric
 // descriptor is created, deleting or altering it stops data collection
 // and makes the metric type's existing data unusable.
@@ -1555,6 +2375,135 @@ func (s *MetricDescriptor) MarshalJSON() ([]byte, error) {
 	type NoMethod MetricDescriptor
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// MetricThreshold: A condition type that compares a collection of time
+// series against a threshold.
+type MetricThreshold struct {
+	// Aggregations: Specifies the alignment of data points in individual
+	// time series as well as how to combine the retrieved time series
+	// together (such as when aggregating multiple streams on each resource
+	// to a single stream for each resource or when aggregating streams
+	// across all members of a group of resrouces). Multiple aggregations
+	// are applied in the order specified.This field is similar to the one
+	// in the MetricService.ListTimeSeries request. It is advisable to use
+	// the ListTimeSeries method when debugging this field.
+	Aggregations []*Aggregation `json:"aggregations,omitempty"`
+
+	// Comparison: The comparison to apply between the time series
+	// (indicated by filter and aggregation) and the threshold (indicated by
+	// threshold_value). The comparison is applied on each time series, with
+	// the time series on the left-hand side and the threshold on the
+	// right-hand side.Only COMPARISON_LT and COMPARISON_GT are supported
+	// currently.
+	//
+	// Possible values:
+	//   "COMPARISON_UNSPECIFIED" - No ordering relationship is specified.
+	//   "COMPARISON_GT" - The left argument is greater than the right
+	// argument.
+	//   "COMPARISON_GE" - The left argument is greater than or equal to the
+	// right argument.
+	//   "COMPARISON_LT" - The left argument is less than the right
+	// argument.
+	//   "COMPARISON_LE" - The left argument is less than or equal to the
+	// right argument.
+	//   "COMPARISON_EQ" - The left argument is equal to the right argument.
+	//   "COMPARISON_NE" - The left argument is not equal to the right
+	// argument.
+	Comparison string `json:"comparison,omitempty"`
+
+	// DenominatorAggregations: Specifies the alignment of data points in
+	// individual time series selected by denominatorFilter as well as how
+	// to combine the retrieved time series together (such as when
+	// aggregating multiple streams on each resource to a single stream for
+	// each resource or when aggregating streams across all members of a
+	// group of resources).When computing ratios, the aggregations and
+	// denominator_aggregations fields must use the same alignment period
+	// and produce time series that have the same periodicity and
+	// labels.This field is similar to the one in the
+	// MetricService.ListTimeSeries request. It is advisable to use the
+	// ListTimeSeries method when debugging this field.
+	DenominatorAggregations []*Aggregation `json:"denominatorAggregations,omitempty"`
+
+	// DenominatorFilter: A filter that identifies a time series that should
+	// be used as the denominator of a ratio that will be compared with the
+	// threshold. If a denominator_filter is specified, the time series
+	// specified by the filter field will be used as the numerator.The
+	// filter is similar to the one that is specified in the
+	// MetricService.ListTimeSeries request (that call is useful to verify
+	// the time series that will be retrieved / processed) and must specify
+	// the metric type and optionally may contain restrictions on resource
+	// type, resource labels, and metric labels. This field may not exceed
+	// 2048 Unicode characters in length.
+	DenominatorFilter string `json:"denominatorFilter,omitempty"`
+
+	// Duration: The amount of time that a time series must violate the
+	// threshold to be considered failing. Currently, only values that are a
+	// multiple of a minute--e.g., 0, 60, 120, or 300 seconds--are
+	// supported. If an invalid value is given, an error will be returned.
+	// When choosing a duration, it is useful to keep in mind the frequency
+	// of the underlying time series data (which may also be affected by any
+	// alignments specified in the aggregations field); a good duration is
+	// long enough so that a single outlier does not generate spurious
+	// alerts, but short enough that unhealthy states are detected and
+	// alerted on quickly.
+	Duration string `json:"duration,omitempty"`
+
+	// Filter: A filter that identifies which time series should be compared
+	// with the threshold.The filter is similar to the one that is specified
+	// in the MetricService.ListTimeSeries request (that call is useful to
+	// verify the time series that will be retrieved / processed) and must
+	// specify the metric type and optionally may contain restrictions on
+	// resource type, resource labels, and metric labels. This field may not
+	// exceed 2048 Unicode characters in length.
+	Filter string `json:"filter,omitempty"`
+
+	// ThresholdValue: A value against which to compare the time series.
+	ThresholdValue float64 `json:"thresholdValue,omitempty"`
+
+	// Trigger: The number/percent of time series for which the comparison
+	// must hold in order for the condition to trigger. If unspecified, then
+	// the condition will trigger if the comparison is true for any of the
+	// time series that have been identified by filter and aggregations, or
+	// by the ratio, if denominator_filter and denominator_aggregations are
+	// specified.
+	Trigger *Trigger `json:"trigger,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Aggregations") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Aggregations") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *MetricThreshold) MarshalJSON() ([]byte, error) {
+	type NoMethod MetricThreshold
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *MetricThreshold) UnmarshalJSON(data []byte) error {
+	type NoMethod MetricThreshold
+	var s1 struct {
+		ThresholdValue gensupport.JSONFloat64 `json:"thresholdValue"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.ThresholdValue = float64(s1.ThresholdValue)
+	return nil
 }
 
 // MonitoredResource: An object representing a resource that can be used
@@ -1713,6 +2662,222 @@ type MonitoredResourceMetadata struct {
 
 func (s *MonitoredResourceMetadata) MarshalJSON() ([]byte, error) {
 	type NoMethod MonitoredResourceMetadata
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// MutationRecord: Describes a change made to a configuration.
+type MutationRecord struct {
+	// MutateTime: When the change occurred.
+	MutateTime string `json:"mutateTime,omitempty"`
+
+	// MutatedBy: The email address of the user making the change.
+	MutatedBy string `json:"mutatedBy,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "MutateTime") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "MutateTime") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *MutationRecord) MarshalJSON() ([]byte, error) {
+	type NoMethod MutationRecord
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// NotificationChannel: A NotificationChannel is a medium through which
+// an alert is delivered when a policy violation is detected. Examples
+// of channels include email, SMS, and third-party messaging
+// applications. Fields containing sensitive information like
+// authentication tokens or contact info are only partially populated on
+// retrieval.
+type NotificationChannel struct {
+	// Description: An optional human-readable description of this
+	// notification channel. This description may provide additional
+	// details, beyond the display name, for the channel. This may not
+	// exceeed 1024 Unicode characters.
+	Description string `json:"description,omitempty"`
+
+	// DisplayName: An optional human-readable name for this notification
+	// channel. It is recommended that you specify a non-empty and unique
+	// name in order to make it easier to identify the channels in your
+	// project, though this is not enforced. The display name is limited to
+	// 512 Unicode characters.
+	DisplayName string `json:"displayName,omitempty"`
+
+	// Enabled: Whether notifications are forwarded to the described
+	// channel. This makes it possible to disable delivery of notifications
+	// to a particular channel without removing the channel from all
+	// alerting policies that reference the channel. This is a more
+	// convenient approach when the change is temporary and you want to
+	// receive notifications from the same set of alerting policies on the
+	// channel at some point in the future.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Labels: Configuration fields that define the channel and its
+	// behavior. The permissible and required labels are specified in the
+	// NotificationChannelDescriptor.labels of the
+	// NotificationChannelDescriptor corresponding to the type field.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Name: The full REST resource name for this channel. The syntax
+	// is:
+	// projects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID]
+	// The [CHANNEL_ID] is automatically assigned by the server on creation.
+	Name string `json:"name,omitempty"`
+
+	// Type: The type of the notification channel. This field matches the
+	// value of the NotificationChannelDescriptor.type field.
+	Type string `json:"type,omitempty"`
+
+	// UserLabels: User-supplied key/value data that does not need to
+	// conform to the corresponding NotificationChannelDescriptor's schema,
+	// unlike the labels field. This field is intended to be used for
+	// organizing and identifying the NotificationChannel objects.The field
+	// can contain up to 64 entries. Each key and value is limited to 63
+	// Unicode characters or 128 bytes, whichever is smaller. Labels and
+	// values can contain only lowercase letters, numerals, underscores, and
+	// dashes. Keys must begin with a letter.
+	UserLabels map[string]string `json:"userLabels,omitempty"`
+
+	// VerificationStatus: Indicates whether this channel has been verified
+	// or not. On a ListNotificationChannels or GetNotificationChannel
+	// operation, this field is expected to be populated.If the value is
+	// UNVERIFIED, then it indicates that the channel is non-functioning (it
+	// both requires verification and lacks verification); otherwise, it is
+	// assumed that the channel works.If the channel is neither VERIFIED nor
+	// UNVERIFIED, it implies that the channel is of a type that does not
+	// require verification or that this specific channel has been exempted
+	// from verification because it was created prior to verification being
+	// required for channels of this type.This field cannot be modified
+	// using a standard UpdateNotificationChannel operation. To change the
+	// value of this field, you must call VerifyNotificationChannel.
+	//
+	// Possible values:
+	//   "VERIFICATION_STATUS_UNSPECIFIED" - Sentinel value used to indicate
+	// that the state is unknown, omitted, or is not applicable (as in the
+	// case of channels that neither support nor require verification in
+	// order to function).
+	//   "UNVERIFIED" - The channel has yet to be verified and requires
+	// verification to function. Note that this state also applies to the
+	// case where the verification process has been initiated by sending a
+	// verification code but where the verification code has not been
+	// submitted to complete the process.
+	//   "VERIFIED" - It has been proven that notifications can be received
+	// on this notification channel and that someone on the project has
+	// access to messages that are delivered to that channel.
+	VerificationStatus string `json:"verificationStatus,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Description") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Description") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *NotificationChannel) MarshalJSON() ([]byte, error) {
+	type NoMethod NotificationChannel
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// NotificationChannelDescriptor: A description of a notification
+// channel. The descriptor includes the properties of the channel and
+// the set of labels or fields that must be specified to configure
+// channels of a given type.
+type NotificationChannelDescriptor struct {
+	// Description: A human-readable description of the notification channel
+	// type. The description may include a description of the properties of
+	// the channel and pointers to external documentation.
+	Description string `json:"description,omitempty"`
+
+	// DisplayName: A human-readable name for the notification channel type.
+	// This form of the name is suitable for a user interface.
+	DisplayName string `json:"displayName,omitempty"`
+
+	// Labels: The set of labels that must be defined to identify a
+	// particular channel of the corresponding type. Each label includes a
+	// description for how that field should be populated.
+	Labels []*LabelDescriptor `json:"labels,omitempty"`
+
+	// Name: The full REST resource name for this descriptor. The syntax
+	// is:
+	// projects/[PROJECT_ID]/notificationChannelDescriptors/[TYPE]
+	// In the above, [TYPE] is the value of the type field.
+	Name string `json:"name,omitempty"`
+
+	// SupportedTiers: The tiers that support this notification channel; the
+	// project service tier must be one of the supported_tiers.
+	//
+	// Possible values:
+	//   "SERVICE_TIER_UNSPECIFIED" - An invalid sentinel value, used to
+	// indicate that a tier has not been provided explicitly.
+	//   "SERVICE_TIER_BASIC" - The Stackdriver Basic tier, a free tier of
+	// service that provides basic features, a moderate allotment of logs,
+	// and access to built-in metrics. A number of features are not
+	// available in this tier. For more details, see the service tiers
+	// documentation (https://cloud.google.com/monitoring/accounts/tiers).
+	//   "SERVICE_TIER_PREMIUM" - The Stackdriver Premium tier, a higher,
+	// more expensive tier of service that provides access to all
+	// Stackdriver features, lets you use Stackdriver with AWS accounts, and
+	// has a larger allotments for logs and metrics. For more details, see
+	// the service tiers documentation
+	// (https://cloud.google.com/monitoring/accounts/tiers).
+	SupportedTiers []string `json:"supportedTiers,omitempty"`
+
+	// Type: The type of notification channel, such as "email", "sms", etc.
+	// Notification channel types are globally unique.
+	Type string `json:"type,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Description") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Description") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *NotificationChannelDescriptor) MarshalJSON() ([]byte, error) {
+	type NoMethod NotificationChannelDescriptor
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1880,6 +3045,11 @@ func (s *ResourceGroup) MarshalJSON() ([]byte, error) {
 	type NoMethod ResourceGroup
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// SendNotificationChannelVerificationCodeRequest: The
+// SendNotificationChannelVerificationCode request.
+type SendNotificationChannelVerificationCodeRequest struct {
 }
 
 // SourceContext: SourceContext represents information about the source
@@ -2144,6 +3314,55 @@ func (s *TimeSeries) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// Trigger: Specifies how many time series must fail a predicate to
+// trigger a condition. If not specified, then a {count: 1} trigger is
+// used.
+type Trigger struct {
+	// Count: The absolute number of time series that must fail the
+	// predicate for the condition to be triggered.
+	Count int64 `json:"count,omitempty"`
+
+	// Percent: The percentage of time series that must fail the predicate
+	// for the condition to be triggered.
+	Percent float64 `json:"percent,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Count") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Count") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Trigger) MarshalJSON() ([]byte, error) {
+	type NoMethod Trigger
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *Trigger) UnmarshalJSON(data []byte) error {
+	type NoMethod Trigger
+	var s1 struct {
+		Percent gensupport.JSONFloat64 `json:"percent"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.Percent = float64(s1.Percent)
+	return nil
+}
+
 // Type: A protocol buffer message type.
 type Type struct {
 	// Fields: The list of fields.
@@ -2297,7 +3516,8 @@ type UptimeCheckConfig struct {
 
 	// Period: How often, in seconds, the uptime check is performed.
 	// Currently, the only supported values are 60s (1 minute), 300s (5
-	// minutes), 600s (10 minutes), and 900s (15 minutes). Required.
+	// minutes), 600s (10 minutes), and 900s (15 minutes). Optional,
+	// defaults to 300s.
 	Period string `json:"period,omitempty"`
 
 	// ResourceGroup: The group resource associated with the configuration.
@@ -2410,6 +3630,830 @@ func (s *UptimeCheckIp) MarshalJSON() ([]byte, error) {
 	type NoMethod UptimeCheckIp
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// VerifyNotificationChannelRequest: The VerifyNotificationChannel
+// request.
+type VerifyNotificationChannelRequest struct {
+	// Code: The verification code that was delivered to the channel as a
+	// result of invoking the SendNotificationChannelVerificationCode API
+	// method or that was retrieved from a verified channel via
+	// GetNotificationChannelVerificationCode. For example, one might have
+	// "G-123456" or "TKNZGhhd2EyN3I1MnRnMjRv" (in general, one is only
+	// guaranteed that the code is valid UTF-8; one should not make any
+	// assumptions regarding the structure or format of the code).
+	Code string `json:"code,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Code") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Code") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *VerifyNotificationChannelRequest) MarshalJSON() ([]byte, error) {
+	type NoMethod VerifyNotificationChannelRequest
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// method id "monitoring.projects.alertPolicies.create":
+
+type ProjectsAlertPoliciesCreateCall struct {
+	s           *Service
+	name        string
+	alertpolicy *AlertPolicy
+	urlParams_  gensupport.URLParams
+	ctx_        context.Context
+	header_     http.Header
+}
+
+// Create: Creates a new alerting policy.
+func (r *ProjectsAlertPoliciesService) Create(name string, alertpolicy *AlertPolicy) *ProjectsAlertPoliciesCreateCall {
+	c := &ProjectsAlertPoliciesCreateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.alertpolicy = alertpolicy
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsAlertPoliciesCreateCall) Fields(s ...googleapi.Field) *ProjectsAlertPoliciesCreateCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsAlertPoliciesCreateCall) Context(ctx context.Context) *ProjectsAlertPoliciesCreateCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsAlertPoliciesCreateCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsAlertPoliciesCreateCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.alertpolicy)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}/alertPolicies")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.alertPolicies.create" call.
+// Exactly one of *AlertPolicy or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *AlertPolicy.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *ProjectsAlertPoliciesCreateCall) Do(opts ...googleapi.CallOption) (*AlertPolicy, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &AlertPolicy{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Creates a new alerting policy.",
+	//   "flatPath": "v3/projects/{projectsId}/alertPolicies",
+	//   "httpMethod": "POST",
+	//   "id": "monitoring.projects.alertPolicies.create",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The project in which to create the alerting policy. The format is projects/[PROJECT_ID].Note that this field names the parent container in which the alerting policy will be written, not the name of the created policy. The alerting policy that is returned will have a name that contains a normalized representation of this name as a prefix but adds a suffix of the form /alertPolicies/[POLICY_ID], identifying the policy in the container.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}/alertPolicies",
+	//   "request": {
+	//     "$ref": "AlertPolicy"
+	//   },
+	//   "response": {
+	//     "$ref": "AlertPolicy"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.alertPolicies.delete":
+
+type ProjectsAlertPoliciesDeleteCall struct {
+	s          *Service
+	name       string
+	urlParams_ gensupport.URLParams
+	ctx_       context.Context
+	header_    http.Header
+}
+
+// Delete: Deletes an alerting policy.
+func (r *ProjectsAlertPoliciesService) Delete(name string) *ProjectsAlertPoliciesDeleteCall {
+	c := &ProjectsAlertPoliciesDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsAlertPoliciesDeleteCall) Fields(s ...googleapi.Field) *ProjectsAlertPoliciesDeleteCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsAlertPoliciesDeleteCall) Context(ctx context.Context) *ProjectsAlertPoliciesDeleteCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsAlertPoliciesDeleteCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsAlertPoliciesDeleteCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("DELETE", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.alertPolicies.delete" call.
+// Exactly one of *Empty or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Empty.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *ProjectsAlertPoliciesDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Empty{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Deletes an alerting policy.",
+	//   "flatPath": "v3/projects/{projectsId}/alertPolicies/{alertPoliciesId}",
+	//   "httpMethod": "DELETE",
+	//   "id": "monitoring.projects.alertPolicies.delete",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The alerting policy to delete. The format is:\nprojects/[PROJECT_ID]/alertPolicies/[ALERT_POLICY_ID]\nFor more information, see AlertPolicy.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/alertPolicies/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "response": {
+	//     "$ref": "Empty"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.alertPolicies.get":
+
+type ProjectsAlertPoliciesGetCall struct {
+	s            *Service
+	name         string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Get: Gets a single alerting policy.
+func (r *ProjectsAlertPoliciesService) Get(name string) *ProjectsAlertPoliciesGetCall {
+	c := &ProjectsAlertPoliciesGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsAlertPoliciesGetCall) Fields(s ...googleapi.Field) *ProjectsAlertPoliciesGetCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsAlertPoliciesGetCall) IfNoneMatch(entityTag string) *ProjectsAlertPoliciesGetCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsAlertPoliciesGetCall) Context(ctx context.Context) *ProjectsAlertPoliciesGetCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsAlertPoliciesGetCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsAlertPoliciesGetCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.alertPolicies.get" call.
+// Exactly one of *AlertPolicy or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *AlertPolicy.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *ProjectsAlertPoliciesGetCall) Do(opts ...googleapi.CallOption) (*AlertPolicy, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &AlertPolicy{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Gets a single alerting policy.",
+	//   "flatPath": "v3/projects/{projectsId}/alertPolicies/{alertPoliciesId}",
+	//   "httpMethod": "GET",
+	//   "id": "monitoring.projects.alertPolicies.get",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The alerting policy to retrieve. The format is\nprojects/[PROJECT_ID]/alertPolicies/[ALERT_POLICY_ID]\n",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/alertPolicies/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "response": {
+	//     "$ref": "AlertPolicy"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring",
+	//     "https://www.googleapis.com/auth/monitoring.read"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.alertPolicies.list":
+
+type ProjectsAlertPoliciesListCall struct {
+	s            *Service
+	name         string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// List: Lists the existing alerting policies for the project.
+func (r *ProjectsAlertPoliciesService) List(name string) *ProjectsAlertPoliciesListCall {
+	c := &ProjectsAlertPoliciesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Filter sets the optional parameter "filter": If provided, this field
+// specifies the criteria that must be met by alert policies to be
+// included in the response.For more details, see sorting and filtering.
+func (c *ProjectsAlertPoliciesListCall) Filter(filter string) *ProjectsAlertPoliciesListCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
+// OrderBy sets the optional parameter "orderBy": A comma-separated list
+// of fields by which to sort the result. Supports the same set of field
+// references as the filter field. Entries can be prefixed with a minus
+// sign to sort by the field in descending order.For more details, see
+// sorting and filtering.
+func (c *ProjectsAlertPoliciesListCall) OrderBy(orderBy string) *ProjectsAlertPoliciesListCall {
+	c.urlParams_.Set("orderBy", orderBy)
+	return c
+}
+
+// PageSize sets the optional parameter "pageSize": The maximum number
+// of results to return in a single response.
+func (c *ProjectsAlertPoliciesListCall) PageSize(pageSize int64) *ProjectsAlertPoliciesListCall {
+	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": If this field is
+// not empty then it must contain the nextPageToken value returned by a
+// previous call to this method. Using this field causes the method to
+// return more results from the previous method call.
+func (c *ProjectsAlertPoliciesListCall) PageToken(pageToken string) *ProjectsAlertPoliciesListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsAlertPoliciesListCall) Fields(s ...googleapi.Field) *ProjectsAlertPoliciesListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsAlertPoliciesListCall) IfNoneMatch(entityTag string) *ProjectsAlertPoliciesListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsAlertPoliciesListCall) Context(ctx context.Context) *ProjectsAlertPoliciesListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsAlertPoliciesListCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsAlertPoliciesListCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}/alertPolicies")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.alertPolicies.list" call.
+// Exactly one of *ListAlertPoliciesResponse or error will be non-nil.
+// Any non-2xx status code is an error. Response headers are in either
+// *ListAlertPoliciesResponse.ServerResponse.Header or (if a response
+// was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsAlertPoliciesListCall) Do(opts ...googleapi.CallOption) (*ListAlertPoliciesResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &ListAlertPoliciesResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Lists the existing alerting policies for the project.",
+	//   "flatPath": "v3/projects/{projectsId}/alertPolicies",
+	//   "httpMethod": "GET",
+	//   "id": "monitoring.projects.alertPolicies.list",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "filter": {
+	//       "description": "If provided, this field specifies the criteria that must be met by alert policies to be included in the response.For more details, see sorting and filtering.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "name": {
+	//       "description": "The project whose alert policies are to be listed. The format is\nprojects/[PROJECT_ID]\nNote that this field names the parent container in which the alerting policies to be listed are stored. To retrieve a single alerting policy by name, use the GetAlertPolicy operation, instead.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "orderBy": {
+	//       "description": "A comma-separated list of fields by which to sort the result. Supports the same set of field references as the filter field. Entries can be prefixed with a minus sign to sort by the field in descending order.For more details, see sorting and filtering.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "pageSize": {
+	//       "description": "The maximum number of results to return in a single response.",
+	//       "format": "int32",
+	//       "location": "query",
+	//       "type": "integer"
+	//     },
+	//     "pageToken": {
+	//       "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return more results from the previous method call.",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}/alertPolicies",
+	//   "response": {
+	//     "$ref": "ListAlertPoliciesResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring",
+	//     "https://www.googleapis.com/auth/monitoring.read"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ProjectsAlertPoliciesListCall) Pages(ctx context.Context, f func(*ListAlertPoliciesResponse) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "monitoring.projects.alertPolicies.patch":
+
+type ProjectsAlertPoliciesPatchCall struct {
+	s           *Service
+	name        string
+	alertpolicy *AlertPolicy
+	urlParams_  gensupport.URLParams
+	ctx_        context.Context
+	header_     http.Header
+}
+
+// Patch: Updates an alerting policy. You can either replace the entire
+// policy with a new one or replace only certain fields in the current
+// alerting policy by specifying the fields to be updated via
+// updateMask. Returns the updated alerting policy.
+func (r *ProjectsAlertPoliciesService) Patch(name string, alertpolicy *AlertPolicy) *ProjectsAlertPoliciesPatchCall {
+	c := &ProjectsAlertPoliciesPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.alertpolicy = alertpolicy
+	return c
+}
+
+// UpdateMask sets the optional parameter "updateMask": A list of
+// alerting policy field names. If this field is not empty, each listed
+// field in the existing alerting policy is set to the value of the
+// corresponding field in the supplied policy (alert_policy), or to the
+// field's default value if the field is not in the supplied alerting
+// policy. Fields not listed retain their previous value.Examples of
+// valid field masks include display_name, documentation,
+// documentation.content, documentation.mime_type, user_labels,
+// user_label.nameofkey, enabled, conditions, combiner, etc.If this
+// field is empty, then the supplied alerting policy replaces the
+// existing policy. It is the same as deleting the existing policy and
+// adding the supplied policy, except for the following:
+// The new policy will have the same [ALERT_POLICY_ID] as the former
+// policy. This gives you continuity with the former policy in your
+// notifications and incidents.
+// Conditions in the new policy will keep their former [CONDITION_ID] if
+// the supplied condition includes the name field with that
+// [CONDITION_ID]. If the supplied condition omits the name field, then
+// a new [CONDITION_ID] is created.
+func (c *ProjectsAlertPoliciesPatchCall) UpdateMask(updateMask string) *ProjectsAlertPoliciesPatchCall {
+	c.urlParams_.Set("updateMask", updateMask)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsAlertPoliciesPatchCall) Fields(s ...googleapi.Field) *ProjectsAlertPoliciesPatchCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsAlertPoliciesPatchCall) Context(ctx context.Context) *ProjectsAlertPoliciesPatchCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsAlertPoliciesPatchCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsAlertPoliciesPatchCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.alertpolicy)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PATCH", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.alertPolicies.patch" call.
+// Exactly one of *AlertPolicy or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *AlertPolicy.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *ProjectsAlertPoliciesPatchCall) Do(opts ...googleapi.CallOption) (*AlertPolicy, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &AlertPolicy{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Updates an alerting policy. You can either replace the entire policy with a new one or replace only certain fields in the current alerting policy by specifying the fields to be updated via updateMask. Returns the updated alerting policy.",
+	//   "flatPath": "v3/projects/{projectsId}/alertPolicies/{alertPoliciesId}",
+	//   "httpMethod": "PATCH",
+	//   "id": "monitoring.projects.alertPolicies.patch",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "Required if the policy exists. The resource name for this policy. The syntax is:\nprojects/[PROJECT_ID]/alertPolicies/[ALERT_POLICY_ID]\n[ALERT_POLICY_ID] is assigned by Stackdriver Monitoring when the policy is created. When calling the alertPolicies.create method, do not include the name field in the alerting policy passed as part of the request.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/alertPolicies/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "updateMask": {
+	//       "description": "Optional. A list of alerting policy field names. If this field is not empty, each listed field in the existing alerting policy is set to the value of the corresponding field in the supplied policy (alert_policy), or to the field's default value if the field is not in the supplied alerting policy. Fields not listed retain their previous value.Examples of valid field masks include display_name, documentation, documentation.content, documentation.mime_type, user_labels, user_label.nameofkey, enabled, conditions, combiner, etc.If this field is empty, then the supplied alerting policy replaces the existing policy. It is the same as deleting the existing policy and adding the supplied policy, except for the following:\nThe new policy will have the same [ALERT_POLICY_ID] as the former policy. This gives you continuity with the former policy in your notifications and incidents.\nConditions in the new policy will keep their former [CONDITION_ID] if the supplied condition includes the name field with that [CONDITION_ID]. If the supplied condition omits the name field, then a new [CONDITION_ID] is created.",
+	//       "format": "google-fieldmask",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "request": {
+	//     "$ref": "AlertPolicy"
+	//   },
+	//   "response": {
+	//     "$ref": "AlertPolicy"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
 }
 
 // method id "monitoring.projects.collectdTimeSeries.create":
@@ -4550,6 +6594,1570 @@ func (c *ProjectsMonitoredResourceDescriptorsListCall) Pages(ctx context.Context
 	}
 }
 
+// method id "monitoring.projects.notificationChannelDescriptors.get":
+
+type ProjectsNotificationChannelDescriptorsGetCall struct {
+	s            *Service
+	name         string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Get: Gets a single channel descriptor. The descriptor indicates which
+// fields are expected / permitted for a notification channel of the
+// given type.
+func (r *ProjectsNotificationChannelDescriptorsService) Get(name string) *ProjectsNotificationChannelDescriptorsGetCall {
+	c := &ProjectsNotificationChannelDescriptorsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelDescriptorsGetCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelDescriptorsGetCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsNotificationChannelDescriptorsGetCall) IfNoneMatch(entityTag string) *ProjectsNotificationChannelDescriptorsGetCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelDescriptorsGetCall) Context(ctx context.Context) *ProjectsNotificationChannelDescriptorsGetCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelDescriptorsGetCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelDescriptorsGetCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannelDescriptors.get" call.
+// Exactly one of *NotificationChannelDescriptor or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *NotificationChannelDescriptor.ServerResponse.Header or (if a
+// response was returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsNotificationChannelDescriptorsGetCall) Do(opts ...googleapi.CallOption) (*NotificationChannelDescriptor, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &NotificationChannelDescriptor{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Gets a single channel descriptor. The descriptor indicates which fields are expected / permitted for a notification channel of the given type.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannelDescriptors/{notificationChannelDescriptorsId}",
+	//   "httpMethod": "GET",
+	//   "id": "monitoring.projects.notificationChannelDescriptors.get",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The channel type for which to execute the request. The format is projects/[PROJECT_ID]/notificationChannelDescriptors/{channel_type}.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/notificationChannelDescriptors/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "response": {
+	//     "$ref": "NotificationChannelDescriptor"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring",
+	//     "https://www.googleapis.com/auth/monitoring.read"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.notificationChannelDescriptors.list":
+
+type ProjectsNotificationChannelDescriptorsListCall struct {
+	s            *Service
+	name         string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// List: Lists the descriptors for supported channel types. The use of
+// descriptors makes it possible for new channel types to be dynamically
+// added.
+func (r *ProjectsNotificationChannelDescriptorsService) List(name string) *ProjectsNotificationChannelDescriptorsListCall {
+	c := &ProjectsNotificationChannelDescriptorsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// PageSize sets the optional parameter "pageSize": The maximum number
+// of results to return in a single response. If not set to a positive
+// number, a reasonable value will be chosen by the service.
+func (c *ProjectsNotificationChannelDescriptorsListCall) PageSize(pageSize int64) *ProjectsNotificationChannelDescriptorsListCall {
+	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": If non-empty,
+// page_token must contain a value returned as the next_page_token in a
+// previous response to request the next set of results.
+func (c *ProjectsNotificationChannelDescriptorsListCall) PageToken(pageToken string) *ProjectsNotificationChannelDescriptorsListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelDescriptorsListCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelDescriptorsListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsNotificationChannelDescriptorsListCall) IfNoneMatch(entityTag string) *ProjectsNotificationChannelDescriptorsListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelDescriptorsListCall) Context(ctx context.Context) *ProjectsNotificationChannelDescriptorsListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelDescriptorsListCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelDescriptorsListCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}/notificationChannelDescriptors")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannelDescriptors.list" call.
+// Exactly one of *ListNotificationChannelDescriptorsResponse or error
+// will be non-nil. Any non-2xx status code is an error. Response
+// headers are in either
+// *ListNotificationChannelDescriptorsResponse.ServerResponse.Header or
+// (if a response was returned at all) in
+// error.(*googleapi.Error).Header. Use googleapi.IsNotModified to check
+// whether the returned error was because http.StatusNotModified was
+// returned.
+func (c *ProjectsNotificationChannelDescriptorsListCall) Do(opts ...googleapi.CallOption) (*ListNotificationChannelDescriptorsResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &ListNotificationChannelDescriptorsResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Lists the descriptors for supported channel types. The use of descriptors makes it possible for new channel types to be dynamically added.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannelDescriptors",
+	//   "httpMethod": "GET",
+	//   "id": "monitoring.projects.notificationChannelDescriptors.list",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The REST resource name of the parent from which to retrieve the notification channel descriptors. The expected syntax is:\nprojects/[PROJECT_ID]\nNote that this names the parent container in which to look for the descriptors; to retrieve a single descriptor by name, use the GetNotificationChannelDescriptor operation, instead.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "pageSize": {
+	//       "description": "The maximum number of results to return in a single response. If not set to a positive number, a reasonable value will be chosen by the service.",
+	//       "format": "int32",
+	//       "location": "query",
+	//       "type": "integer"
+	//     },
+	//     "pageToken": {
+	//       "description": "If non-empty, page_token must contain a value returned as the next_page_token in a previous response to request the next set of results.",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}/notificationChannelDescriptors",
+	//   "response": {
+	//     "$ref": "ListNotificationChannelDescriptorsResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring",
+	//     "https://www.googleapis.com/auth/monitoring.read"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ProjectsNotificationChannelDescriptorsListCall) Pages(ctx context.Context, f func(*ListNotificationChannelDescriptorsResponse) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "monitoring.projects.notificationChannels.create":
+
+type ProjectsNotificationChannelsCreateCall struct {
+	s                   *Service
+	name                string
+	notificationchannel *NotificationChannel
+	urlParams_          gensupport.URLParams
+	ctx_                context.Context
+	header_             http.Header
+}
+
+// Create: Creates a new notification channel, representing a single
+// notification endpoint such as an email address, SMS number, or
+// pagerduty service.
+func (r *ProjectsNotificationChannelsService) Create(name string, notificationchannel *NotificationChannel) *ProjectsNotificationChannelsCreateCall {
+	c := &ProjectsNotificationChannelsCreateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.notificationchannel = notificationchannel
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelsCreateCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelsCreateCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelsCreateCall) Context(ctx context.Context) *ProjectsNotificationChannelsCreateCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelsCreateCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelsCreateCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.notificationchannel)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}/notificationChannels")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannels.create" call.
+// Exactly one of *NotificationChannel or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *NotificationChannel.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsNotificationChannelsCreateCall) Do(opts ...googleapi.CallOption) (*NotificationChannel, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &NotificationChannel{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Creates a new notification channel, representing a single notification endpoint such as an email address, SMS number, or pagerduty service.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannels",
+	//   "httpMethod": "POST",
+	//   "id": "monitoring.projects.notificationChannels.create",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The project on which to execute the request. The format is:\nprojects/[PROJECT_ID]\nNote that this names the container into which the channel will be written. This does not name the newly created channel. The resulting channel's name will have a normalized version of this field as a prefix, but will add /notificationChannels/[CHANNEL_ID] to identify the channel.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}/notificationChannels",
+	//   "request": {
+	//     "$ref": "NotificationChannel"
+	//   },
+	//   "response": {
+	//     "$ref": "NotificationChannel"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.notificationChannels.delete":
+
+type ProjectsNotificationChannelsDeleteCall struct {
+	s          *Service
+	name       string
+	urlParams_ gensupport.URLParams
+	ctx_       context.Context
+	header_    http.Header
+}
+
+// Delete: Deletes a notification channel.
+func (r *ProjectsNotificationChannelsService) Delete(name string) *ProjectsNotificationChannelsDeleteCall {
+	c := &ProjectsNotificationChannelsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Force sets the optional parameter "force": If true, the notification
+// channel will be deleted regardless of its use in alert policies (the
+// policies will be updated to remove the channel). If false, channels
+// that are still referenced by an existing alerting policy will fail to
+// be deleted in a delete operation.
+func (c *ProjectsNotificationChannelsDeleteCall) Force(force bool) *ProjectsNotificationChannelsDeleteCall {
+	c.urlParams_.Set("force", fmt.Sprint(force))
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelsDeleteCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelsDeleteCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelsDeleteCall) Context(ctx context.Context) *ProjectsNotificationChannelsDeleteCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelsDeleteCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelsDeleteCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("DELETE", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannels.delete" call.
+// Exactly one of *Empty or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Empty.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *ProjectsNotificationChannelsDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Empty{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Deletes a notification channel.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannels/{notificationChannelsId}",
+	//   "httpMethod": "DELETE",
+	//   "id": "monitoring.projects.notificationChannels.delete",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "force": {
+	//       "description": "If true, the notification channel will be deleted regardless of its use in alert policies (the policies will be updated to remove the channel). If false, channels that are still referenced by an existing alerting policy will fail to be deleted in a delete operation.",
+	//       "location": "query",
+	//       "type": "boolean"
+	//     },
+	//     "name": {
+	//       "description": "The channel for which to execute the request. The format is projects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID].",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "response": {
+	//     "$ref": "Empty"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.notificationChannels.get":
+
+type ProjectsNotificationChannelsGetCall struct {
+	s            *Service
+	name         string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Get: Gets a single notification channel. The channel includes the
+// relevant configuration details with which the channel was created.
+// However, the response may truncate or omit passwords, API keys, or
+// other private key matter and thus the response may not be 100%
+// identical to the information that was supplied in the call to the
+// create method.
+func (r *ProjectsNotificationChannelsService) Get(name string) *ProjectsNotificationChannelsGetCall {
+	c := &ProjectsNotificationChannelsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelsGetCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelsGetCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsNotificationChannelsGetCall) IfNoneMatch(entityTag string) *ProjectsNotificationChannelsGetCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelsGetCall) Context(ctx context.Context) *ProjectsNotificationChannelsGetCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelsGetCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelsGetCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannels.get" call.
+// Exactly one of *NotificationChannel or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *NotificationChannel.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsNotificationChannelsGetCall) Do(opts ...googleapi.CallOption) (*NotificationChannel, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &NotificationChannel{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Gets a single notification channel. The channel includes the relevant configuration details with which the channel was created. However, the response may truncate or omit passwords, API keys, or other private key matter and thus the response may not be 100% identical to the information that was supplied in the call to the create method.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannels/{notificationChannelsId}",
+	//   "httpMethod": "GET",
+	//   "id": "monitoring.projects.notificationChannels.get",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The channel for which to execute the request. The format is projects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID].",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "response": {
+	//     "$ref": "NotificationChannel"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring",
+	//     "https://www.googleapis.com/auth/monitoring.read"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.notificationChannels.getVerificationCode":
+
+type ProjectsNotificationChannelsGetVerificationCodeCall struct {
+	s                                             *Service
+	name                                          string
+	getnotificationchannelverificationcoderequest *GetNotificationChannelVerificationCodeRequest
+	urlParams_                                    gensupport.URLParams
+	ctx_                                          context.Context
+	header_                                       http.Header
+}
+
+// GetVerificationCode: Requests a verification code for an already
+// verified channel that can then be used in a call to
+// VerifyNotificationChannel() on a different channel with an equivalent
+// identity in the same or in a different project. This makes it
+// possible to copy a channel between projects without requiring manual
+// reverification of the channel. If the channel is not in the verified
+// state, this method will fail (in other words, this may only be used
+// if the SendNotificationChannelVerificationCode and
+// VerifyNotificationChannel paths have already been used to put the
+// given channel into the verified state).There is no guarantee that the
+// verification codes returned by this method will be of a similar
+// structure or form as the ones that are delivered to the channel via
+// SendNotificationChannelVerificationCode; while
+// VerifyNotificationChannel() will recognize both the codes delivered
+// via SendNotificationChannelVerificationCode() and returned from
+// GetNotificationChannelVerificationCode(), it is typically the case
+// that the verification codes delivered via
+// SendNotificationChannelVerificationCode() will be shorter and also
+// have a shorter expiration (e.g. codes such as "G-123456") whereas
+// GetVerificationCode() will typically return a much longer, websafe
+// base 64 encoded string that has a longer expiration time.
+func (r *ProjectsNotificationChannelsService) GetVerificationCode(name string, getnotificationchannelverificationcoderequest *GetNotificationChannelVerificationCodeRequest) *ProjectsNotificationChannelsGetVerificationCodeCall {
+	c := &ProjectsNotificationChannelsGetVerificationCodeCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.getnotificationchannelverificationcoderequest = getnotificationchannelverificationcoderequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelsGetVerificationCodeCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelsGetVerificationCodeCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelsGetVerificationCodeCall) Context(ctx context.Context) *ProjectsNotificationChannelsGetVerificationCodeCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelsGetVerificationCodeCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelsGetVerificationCodeCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.getnotificationchannelverificationcoderequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}:getVerificationCode")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannels.getVerificationCode" call.
+// Exactly one of *GetNotificationChannelVerificationCodeResponse or
+// error will be non-nil. Any non-2xx status code is an error. Response
+// headers are in either
+// *GetNotificationChannelVerificationCodeResponse.ServerResponse.Header
+// or (if a response was returned at all) in
+// error.(*googleapi.Error).Header. Use googleapi.IsNotModified to check
+// whether the returned error was because http.StatusNotModified was
+// returned.
+func (c *ProjectsNotificationChannelsGetVerificationCodeCall) Do(opts ...googleapi.CallOption) (*GetNotificationChannelVerificationCodeResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &GetNotificationChannelVerificationCodeResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Requests a verification code for an already verified channel that can then be used in a call to VerifyNotificationChannel() on a different channel with an equivalent identity in the same or in a different project. This makes it possible to copy a channel between projects without requiring manual reverification of the channel. If the channel is not in the verified state, this method will fail (in other words, this may only be used if the SendNotificationChannelVerificationCode and VerifyNotificationChannel paths have already been used to put the given channel into the verified state).There is no guarantee that the verification codes returned by this method will be of a similar structure or form as the ones that are delivered to the channel via SendNotificationChannelVerificationCode; while VerifyNotificationChannel() will recognize both the codes delivered via SendNotificationChannelVerificationCode() and returned from GetNotificationChannelVerificationCode(), it is typically the case that the verification codes delivered via SendNotificationChannelVerificationCode() will be shorter and also have a shorter expiration (e.g. codes such as \"G-123456\") whereas GetVerificationCode() will typically return a much longer, websafe base 64 encoded string that has a longer expiration time.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannels/{notificationChannelsId}:getVerificationCode",
+	//   "httpMethod": "POST",
+	//   "id": "monitoring.projects.notificationChannels.getVerificationCode",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The notification channel for which a verification code is to be generated and retrieved. This must name a channel that is already verified; if the specified channel is not verified, the request will fail.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}:getVerificationCode",
+	//   "request": {
+	//     "$ref": "GetNotificationChannelVerificationCodeRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "GetNotificationChannelVerificationCodeResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.notificationChannels.list":
+
+type ProjectsNotificationChannelsListCall struct {
+	s            *Service
+	name         string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// List: Lists the notification channels that have been created for the
+// project.
+func (r *ProjectsNotificationChannelsService) List(name string) *ProjectsNotificationChannelsListCall {
+	c := &ProjectsNotificationChannelsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	return c
+}
+
+// Filter sets the optional parameter "filter": If provided, this field
+// specifies the criteria that must be met by notification channels to
+// be included in the response.For more details, see sorting and
+// filtering.
+func (c *ProjectsNotificationChannelsListCall) Filter(filter string) *ProjectsNotificationChannelsListCall {
+	c.urlParams_.Set("filter", filter)
+	return c
+}
+
+// OrderBy sets the optional parameter "orderBy": A comma-separated list
+// of fields by which to sort the result. Supports the same set of
+// fields as in filter. Entries can be prefixed with a minus sign to
+// sort in descending rather than ascending order.For more details, see
+// sorting and filtering.
+func (c *ProjectsNotificationChannelsListCall) OrderBy(orderBy string) *ProjectsNotificationChannelsListCall {
+	c.urlParams_.Set("orderBy", orderBy)
+	return c
+}
+
+// PageSize sets the optional parameter "pageSize": The maximum number
+// of results to return in a single response. If not set to a positive
+// number, a reasonable value will be chosen by the service.
+func (c *ProjectsNotificationChannelsListCall) PageSize(pageSize int64) *ProjectsNotificationChannelsListCall {
+	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": If non-empty,
+// page_token must contain a value returned as the next_page_token in a
+// previous response to request the next set of results.
+func (c *ProjectsNotificationChannelsListCall) PageToken(pageToken string) *ProjectsNotificationChannelsListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelsListCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelsListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsNotificationChannelsListCall) IfNoneMatch(entityTag string) *ProjectsNotificationChannelsListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelsListCall) Context(ctx context.Context) *ProjectsNotificationChannelsListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelsListCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelsListCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}/notificationChannels")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannels.list" call.
+// Exactly one of *ListNotificationChannelsResponse or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *ListNotificationChannelsResponse.ServerResponse.Header or (if
+// a response was returned at all) in error.(*googleapi.Error).Header.
+// Use googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsNotificationChannelsListCall) Do(opts ...googleapi.CallOption) (*ListNotificationChannelsResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &ListNotificationChannelsResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Lists the notification channels that have been created for the project.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannels",
+	//   "httpMethod": "GET",
+	//   "id": "monitoring.projects.notificationChannels.list",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "filter": {
+	//       "description": "If provided, this field specifies the criteria that must be met by notification channels to be included in the response.For more details, see sorting and filtering.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "name": {
+	//       "description": "The project on which to execute the request. The format is projects/[PROJECT_ID]. That is, this names the container in which to look for the notification channels; it does not name a specific channel. To query a specific channel by REST resource name, use the GetNotificationChannel operation.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "orderBy": {
+	//       "description": "A comma-separated list of fields by which to sort the result. Supports the same set of fields as in filter. Entries can be prefixed with a minus sign to sort in descending rather than ascending order.For more details, see sorting and filtering.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "pageSize": {
+	//       "description": "The maximum number of results to return in a single response. If not set to a positive number, a reasonable value will be chosen by the service.",
+	//       "format": "int32",
+	//       "location": "query",
+	//       "type": "integer"
+	//     },
+	//     "pageToken": {
+	//       "description": "If non-empty, page_token must contain a value returned as the next_page_token in a previous response to request the next set of results.",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}/notificationChannels",
+	//   "response": {
+	//     "$ref": "ListNotificationChannelsResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring",
+	//     "https://www.googleapis.com/auth/monitoring.read"
+	//   ]
+	// }
+
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ProjectsNotificationChannelsListCall) Pages(ctx context.Context, f func(*ListNotificationChannelsResponse) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken")) // reset paging to original point
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
+}
+
+// method id "monitoring.projects.notificationChannels.patch":
+
+type ProjectsNotificationChannelsPatchCall struct {
+	s                   *Service
+	name                string
+	notificationchannel *NotificationChannel
+	urlParams_          gensupport.URLParams
+	ctx_                context.Context
+	header_             http.Header
+}
+
+// Patch: Updates a notification channel. Fields not specified in the
+// field mask remain unchanged.
+func (r *ProjectsNotificationChannelsService) Patch(name string, notificationchannel *NotificationChannel) *ProjectsNotificationChannelsPatchCall {
+	c := &ProjectsNotificationChannelsPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.notificationchannel = notificationchannel
+	return c
+}
+
+// UpdateMask sets the optional parameter "updateMask": The fields to
+// update.
+func (c *ProjectsNotificationChannelsPatchCall) UpdateMask(updateMask string) *ProjectsNotificationChannelsPatchCall {
+	c.urlParams_.Set("updateMask", updateMask)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelsPatchCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelsPatchCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelsPatchCall) Context(ctx context.Context) *ProjectsNotificationChannelsPatchCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelsPatchCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelsPatchCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.notificationchannel)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("PATCH", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannels.patch" call.
+// Exactly one of *NotificationChannel or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *NotificationChannel.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsNotificationChannelsPatchCall) Do(opts ...googleapi.CallOption) (*NotificationChannel, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &NotificationChannel{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Updates a notification channel. Fields not specified in the field mask remain unchanged.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannels/{notificationChannelsId}",
+	//   "httpMethod": "PATCH",
+	//   "id": "monitoring.projects.notificationChannels.patch",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The full REST resource name for this channel. The syntax is:\nprojects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID]\nThe [CHANNEL_ID] is automatically assigned by the server on creation.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "updateMask": {
+	//       "description": "The fields to update.",
+	//       "format": "google-fieldmask",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}",
+	//   "request": {
+	//     "$ref": "NotificationChannel"
+	//   },
+	//   "response": {
+	//     "$ref": "NotificationChannel"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.notificationChannels.sendVerificationCode":
+
+type ProjectsNotificationChannelsSendVerificationCodeCall struct {
+	s                                              *Service
+	name                                           string
+	sendnotificationchannelverificationcoderequest *SendNotificationChannelVerificationCodeRequest
+	urlParams_                                     gensupport.URLParams
+	ctx_                                           context.Context
+	header_                                        http.Header
+}
+
+// SendVerificationCode: Causes a verification code to be delivered to
+// the channel. The code can then be supplied in
+// VerifyNotificationChannel to verify the channel.
+func (r *ProjectsNotificationChannelsService) SendVerificationCode(name string, sendnotificationchannelverificationcoderequest *SendNotificationChannelVerificationCodeRequest) *ProjectsNotificationChannelsSendVerificationCodeCall {
+	c := &ProjectsNotificationChannelsSendVerificationCodeCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.sendnotificationchannelverificationcoderequest = sendnotificationchannelverificationcoderequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelsSendVerificationCodeCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelsSendVerificationCodeCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelsSendVerificationCodeCall) Context(ctx context.Context) *ProjectsNotificationChannelsSendVerificationCodeCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelsSendVerificationCodeCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelsSendVerificationCodeCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.sendnotificationchannelverificationcoderequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}:sendVerificationCode")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannels.sendVerificationCode" call.
+// Exactly one of *Empty or error will be non-nil. Any non-2xx status
+// code is an error. Response headers are in either
+// *Empty.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
+// check whether the returned error was because http.StatusNotModified
+// was returned.
+func (c *ProjectsNotificationChannelsSendVerificationCodeCall) Do(opts ...googleapi.CallOption) (*Empty, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Empty{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Causes a verification code to be delivered to the channel. The code can then be supplied in VerifyNotificationChannel to verify the channel.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannels/{notificationChannelsId}:sendVerificationCode",
+	//   "httpMethod": "POST",
+	//   "id": "monitoring.projects.notificationChannels.sendVerificationCode",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The notification channel to which to send a verification code.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}:sendVerificationCode",
+	//   "request": {
+	//     "$ref": "SendNotificationChannelVerificationCodeRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "Empty"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
+// method id "monitoring.projects.notificationChannels.verify":
+
+type ProjectsNotificationChannelsVerifyCall struct {
+	s                                *Service
+	name                             string
+	verifynotificationchannelrequest *VerifyNotificationChannelRequest
+	urlParams_                       gensupport.URLParams
+	ctx_                             context.Context
+	header_                          http.Header
+}
+
+// Verify: Verifies a NotificationChannel by proving receipt of the code
+// delivered to the channel as a result of calling
+// SendNotificationChannelVerificationCode.
+func (r *ProjectsNotificationChannelsService) Verify(name string, verifynotificationchannelrequest *VerifyNotificationChannelRequest) *ProjectsNotificationChannelsVerifyCall {
+	c := &ProjectsNotificationChannelsVerifyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.name = name
+	c.verifynotificationchannelrequest = verifynotificationchannelrequest
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsNotificationChannelsVerifyCall) Fields(s ...googleapi.Field) *ProjectsNotificationChannelsVerifyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsNotificationChannelsVerifyCall) Context(ctx context.Context) *ProjectsNotificationChannelsVerifyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsNotificationChannelsVerifyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsNotificationChannelsVerifyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.verifynotificationchannelrequest)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}:verify")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"name": c.name,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "monitoring.projects.notificationChannels.verify" call.
+// Exactly one of *NotificationChannel or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *NotificationChannel.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsNotificationChannelsVerifyCall) Do(opts ...googleapi.CallOption) (*NotificationChannel, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &NotificationChannel{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Verifies a NotificationChannel by proving receipt of the code delivered to the channel as a result of calling SendNotificationChannelVerificationCode.",
+	//   "flatPath": "v3/projects/{projectsId}/notificationChannels/{notificationChannelsId}:verify",
+	//   "httpMethod": "POST",
+	//   "id": "monitoring.projects.notificationChannels.verify",
+	//   "parameterOrder": [
+	//     "name"
+	//   ],
+	//   "parameters": {
+	//     "name": {
+	//       "description": "The notification channel to verify.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v3/{+name}:verify",
+	//   "request": {
+	//     "$ref": "VerifyNotificationChannelRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "NotificationChannel"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/monitoring"
+	//   ]
+	// }
+
+}
+
 // method id "monitoring.projects.timeSeries.create":
 
 type ProjectsTimeSeriesCreateCall struct {
@@ -4845,10 +8453,11 @@ func (c *ProjectsTimeSeriesListCall) OrderBy(orderBy string) *ProjectsTimeSeries
 }
 
 // PageSize sets the optional parameter "pageSize": A positive number
-// that is the maximum number of results to return. When view field sets
-// to FULL, it limits the number of Points server will return; if view
-// field is HEADERS, it limits the number of TimeSeries server will
-// return.
+// that is the maximum number of results to return. If page_size is
+// empty or more than 100,000 results, the effective page_size is
+// 100,000 results. If view is set to FULL, this is the maximum number
+// of Points returned. If view is set to HEADERS, this is the maximum
+// number of TimeSeries returned.
 func (c *ProjectsTimeSeriesListCall) PageSize(pageSize int64) *ProjectsTimeSeriesListCall {
 	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
 	return c
@@ -5065,7 +8674,7 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 	//       "type": "string"
 	//     },
 	//     "pageSize": {
-	//       "description": "A positive number that is the maximum number of results to return. When view field sets to FULL, it limits the number of Points server will return; if view field is HEADERS, it limits the number of TimeSeries server will return.",
+	//       "description": "A positive number that is the maximum number of results to return. If page_size is empty or more than 100,000 results, the effective page_size is 100,000 results. If view is set to FULL, this is the maximum number of Points returned. If view is set to HEADERS, this is the maximum number of TimeSeries returned.",
 	//       "format": "int32",
 	//       "location": "query",
 	//       "type": "integer"
