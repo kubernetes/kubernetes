@@ -78,7 +78,7 @@ func validateAndLoadInsecureConfig(insecureClusterInfo *v1.ConfigMap, token *kub
 	}
 	detachedJWSToken, ok := insecureClusterInfo.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]
 	if !ok || len(detachedJWSToken) == 0 {
-		return nil, fmt.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the master node to creating a new valid token", tokenID)
+		return nil, fmt.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the master node to creating a new valid token", token.ID)
 	}
 	if !bootstrap.DetachedTokenIsValid(detachedJWSToken, insecureKubeconfigString, token.ID, token.Secret) {
 		return nil, fmt.Errorf("failed to verify JWS signature of received cluster info object, can't trust this API Server")
