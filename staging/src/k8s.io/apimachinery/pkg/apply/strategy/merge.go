@@ -14,15 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package parse
+package strategy
 
-import "k8s.io/kubernetes/pkg/kubectl/apply"
+import "k8s.io/apimachinery/pkg/apply"
 
-// primitiveElement builds a new primitiveElement from a PrimitiveItem
-func (v ElementBuildingVisitor) primitiveElement(item *primitiveItem) (*apply.PrimitiveElement, error) {
-	meta := apply.FieldMetaImpl{Name: item.Name}
-	return &apply.PrimitiveElement{
-		FieldMetaImpl:  meta,
-		RawElementData: item.RawElementData,
-	}, nil
+// Options controls how a merge will be executed
+type Options struct {
+	// FailOnConflict when true will fail patch creation if the recorded and remote
+	// have 2 fields set for the same value that cannot be merged.
+	// e.g. primitive values, list values with replace strategy, and map values with do
+	// strategy
+	FailOnConflict bool
+}
+
+// Create returns a new apply.Visitor for merging multiple objects together
+func Create(options Options) apply.Strategy {
+	return createDelegatingStrategy(options)
 }

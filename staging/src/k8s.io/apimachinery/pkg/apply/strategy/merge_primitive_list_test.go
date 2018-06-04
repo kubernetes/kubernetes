@@ -19,7 +19,7 @@ package strategy_test
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
+	"k8s.io/apimachinery/pkg/apply/strategy"
 )
 
 var _ = Describe("Merging fields of type list-of-primitive with openapi", func() {
@@ -59,7 +59,7 @@ metadata:
   - "a"
   - "c"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -99,7 +99,7 @@ metadata:
   - "b"
   - "c"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -138,7 +138,7 @@ metadata:
   - "a"
   - "b"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -183,7 +183,7 @@ metadata:
   - "d"
   - "e"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })

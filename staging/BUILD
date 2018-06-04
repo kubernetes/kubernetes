@@ -24,6 +24,7 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/apply:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/fields:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/labels:all-srcs",

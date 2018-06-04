@@ -19,7 +19,7 @@ package strategy_test
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
+	"k8s.io/apimachinery/pkg/apply/strategy"
 )
 
 var _ = Describe("Replacing fields of type list without openapi", func() {
@@ -67,7 +67,7 @@ spec:
   - name: bar2
     value: 2
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, nil)
 		})
 	})
 })

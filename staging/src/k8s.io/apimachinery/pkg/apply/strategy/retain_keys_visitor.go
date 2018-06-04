@@ -18,7 +18,8 @@ package strategy
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/kubectl/apply"
+
+	"k8s.io/apimachinery/pkg/apply"
 )
 
 func createRetainKeysStrategy(options Options, strategic *delegatingStrategy) retainKeysStrategy {

@@ -19,7 +19,7 @@ package strategy_test
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
+	"k8s.io/apimachinery/pkg/apply/strategy"
 )
 
 var _ = Describe("Merging fields with the retainkeys strategy", func() {
@@ -55,7 +55,7 @@ spec:
   strategy:
     type: Recreate
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentModel)
 		})
 	})
 
@@ -95,7 +95,7 @@ spec:
       maxUnavailable: 2
       maxSurge: 1
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentModel)
 		})
 	})
 
@@ -139,7 +139,7 @@ spec:
       - name: cache-volume
         emptyDir:
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -189,7 +189,7 @@ spec:
           type: Directory
         emptyDir:
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })
