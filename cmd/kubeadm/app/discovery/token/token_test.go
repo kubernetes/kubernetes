@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 )
@@ -129,30 +130,39 @@ func TestFetchInsecureClusterInfo(t *testing.T) {
 }
 
 func TestValidateAndLoadInsecureConfig(t *testing.T) {
+	user := &kubeadmapi.BootstrapTokenString{
+		ID:     "johndoe",
+		Secret: "John's secret",
+	}
+	noSecretUser := &kubeadmapi.BootstrapTokenString{
+		ID:     "johndoe",
+		Secret: "",
+	}
+	emptyUser := &kubeadmapi.BootstrapTokenString{
+		ID:     "",
+		Secret: "",
+	}
 	tests := []struct {
 		description string
 		clusterInfo *v1.ConfigMap
-		tokenID     string
-		tokenSecret string
+		token       *kubeadmapi.BootstrapTokenString
 		expectError bool
 	}{
 		{
 			description: "Valid config is loaded",
 			expectError: false,
-			tokenID:     userID,
-			tokenSecret: userSecret,
+			token:       user,
 			clusterInfo: &v1.ConfigMap{
 				Data: map[string]string{
-					bootstrapapi.KubeConfigKey:                  validConfig,
-					bootstrapapi.JWSSignatureKeyPrefix + userID: validToken,
+					bootstrapapi.KubeConfigKey:                   validConfig,
+					bootstrapapi.JWSSignatureKeyPrefix + user.ID: validToken,
 				},
 			},
 		},
 		{
 			description: "Empty KubeConfig returns error",
 			expectError: true,
-			tokenID:     "",
-			tokenSecret: "",
+			token:       emptyUser,
 			clusterInfo: &v1.ConfigMap{
 				Data: map[string]string{
 					bootstrapapi.KubeConfigKey: "",
@@ -162,8 +172,7 @@ func TestValidateAndLoadInsecureConfig(t *testing.T) {
 		{
 			description: "Missing KubeConfig returns error",
 			expectError: true,
-			tokenID:     "",
-			tokenSecret: "",
+			token:       emptyUser,
 			clusterInfo: &v1.ConfigMap{
 				Data: map[string]string{},
 			},
@@ -171,8 +180,7 @@ func TestValidateAndLoadInsecureConfig(t *testing.T) {
 		{
 			description: "Missing JWSSignatureKeyPrefix returns error",
 			expectError: true,
-			tokenID:     userID,
-			tokenSecret: "",
+			token:       noSecretUser,
 			clusterInfo: &v1.ConfigMap{
 				Data: map[string]string{
 					bootstrapapi.KubeConfigKey: "XYZ",
@@ -182,43 +190,40 @@ func TestValidateAndLoadInsecureConfig(t *testing.T) {
 		{
 			description: "Empty JWSSignatureKeyPrefix returns error",
 			expectError: true,
-			tokenID:     userID,
-			tokenSecret: "",
+			token:       noSecretUser,
 			clusterInfo: &v1.ConfigMap{
 				Data: map[string]string{
-					bootstrapapi.KubeConfigKey:                  "#$%",
-					bootstrapapi.JWSSignatureKeyPrefix + userID: "",
+					bootstrapapi.KubeConfigKey:                           "#$%",
+					bootstrapapi.JWSSignatureKeyPrefix + noSecretUser.ID: "",
 				},
 			},
 		},
 		{
 			description: "Mismatching signature returns error",
 			expectError: true,
-			tokenID:     userID,
-			tokenSecret: userSecret,
+			token:       user,
 			clusterInfo: &v1.ConfigMap{
 				Data: map[string]string{
-					bootstrapapi.KubeConfigKey:                  "#$%",
-					bootstrapapi.JWSSignatureKeyPrefix + userID: "#$%",
+					bootstrapapi.KubeConfigKey:                   "#$%",
+					bootstrapapi.JWSSignatureKeyPrefix + user.ID: "#$%",
 				},
 			},
 		},
 		{
 			description: "Invalid but signed KubeConfig returns error",
 			expectError: true,
-			tokenID:     userID,
-			tokenSecret: userSecret,
+			token:       user,
 			clusterInfo: &v1.ConfigMap{
 				Data: map[string]string{
-					bootstrapapi.KubeConfigKey:                  "%$^*",
-					bootstrapapi.JWSSignatureKeyPrefix + userID: "eyJhbGciOiJIUzI1NiIsImtpZCI6ImpvaG5kb2UifQ..zGIAkO6lW_-9a2FVLjYwfAS52VcJrK-8F52PoPPHy_M",
+					bootstrapapi.KubeConfigKey:                   "%$^*",
+					bootstrapapi.JWSSignatureKeyPrefix + user.ID: "eyJhbGciOiJIUzI1NiIsImtpZCI6ImpvaG5kb2UifQ..zGIAkO6lW_-9a2FVLjYwfAS52VcJrK-8F52PoPPHy_M",
 				},
 			},
 		},
 	}
 
 	for _, test := range tests {
-		config, err := validateAndLoadInsecureConfig(test.clusterInfo, test.tokenID, test.tokenSecret)
+		config, err := validateAndLoadInsecureConfig(test.clusterInfo, test.token)
 		if err == nil && test.expectError {
 			t.Errorf("%s: unexpected success", test.description)
 		} else if err != nil && test.expectError == false {
