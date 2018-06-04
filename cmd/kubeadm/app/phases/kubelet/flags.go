@@ -28,6 +28,7 @@ import (
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -78,7 +79,12 @@ func buildKubeletArgMap(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, registe
 		kubeletFlags["resolv-conf"] = "/run/systemd/resolve/resolv.conf"
 	}
 
-	// TODO: Pass through --hostname-override if a custom name is used?
+	// Make sure the node name we're passed will work with Kubelet
+	if nodeRegOpts.Name != "" && nodeRegOpts.Name != nodeutil.GetHostname("") {
+		glog.V(1).Info("setting kubelet hostname-override to %q", nodeRegOpts.Name)
+		kubeletFlags["hostname-override"] = nodeRegOpts.Name
+	}
+
 	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs` for CRI other than Docker
 
 	return kubeletFlags
