@@ -410,7 +410,7 @@ func (ip *ImagesPull) PullAll() error {
 		if err := ip.puller.Pull(image); err != nil {
 			return fmt.Errorf("failed to pull image %q: %v", image, err)
 		}
-		glog.Infof("[config/images] Pulled %s\n", image)
+		fmt.Printf("[config/images] Pulled %s\n", image)
 	}
 	return nil
 }

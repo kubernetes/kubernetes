@@ -62,7 +62,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		}
 	}
 
-	glog.Infof("[certificates] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
+	fmt.Printf("[certificates] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	return nil
 }

@@ -251,9 +251,9 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha2.MasterConfiguration
 		return nil, err
 	}
 
-	glog.Infof("[init] using Kubernetes version: %s\n", cfg.KubernetesVersion)
+	fmt.Printf("[init] using Kubernetes version: %s\n", cfg.KubernetesVersion)
 
-	glog.Infoln("[preflight] running pre-flight checks")
+	fmt.Println("[preflight] running pre-flight checks")
 
 	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
 		return nil, err
@@ -314,7 +314,7 @@ func (i *Init) Run(out io.Writer) error {
 		}
 
 	} else {
-		glog.Infoln("[externalca] the file 'ca.key' was not found, yet all other certificates are present. Using external CA mode - certificates or kubeconfig will not be generated")
+		fmt.Println("[externalca] the file 'ca.key' was not found, yet all other certificates are present. Using external CA mode - certificates or kubeconfig will not be generated")
 	}
 
 	if features.Enabled(i.cfg.FeatureGates, features.Auditing) {
@@ -433,9 +433,9 @@ func (i *Init) Run(out io.Writer) error {
 	}
 	if !i.skipTokenPrint {
 		if len(tokens) == 1 {
-			glog.Infof("[bootstraptoken] using token: %s\n", tokens[0])
+			fmt.Printf("[bootstraptoken] using token: %s\n", tokens[0])
 		} else if len(tokens) > 1 {
-			glog.Infof("[bootstraptoken] using tokens: %v\n", tokens)
+			fmt.Printf("[bootstraptoken] using tokens: %v\n", tokens)
 		}
 	}
 
@@ -486,7 +486,7 @@ func (i *Init) Run(out io.Writer) error {
 	if features.Enabled(i.cfg.FeatureGates, features.SelfHosting) {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
-		glog.Infoln("[self-hosted] creating self-hosted control plane")
+		fmt.Println("[self-hosted] creating self-hosted control plane")
 		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter, i.dryRun); err != nil {
 			return fmt.Errorf("error creating self hosted control plane: %v", err)
 		}
@@ -554,9 +554,9 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 		return nil
 	}
 
-	glog.Infof("[dryrun] wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
-	glog.Infoln("[dryrun] the certificates or kubeconfig files would not be printed due to their sensitive nature")
-	glog.Infof("[dryrun] please examine the %q directory for details about what would be written\n", manifestDir)
+	fmt.Printf("[dryrun] wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
+	fmt.Println("[dryrun] the certificates or kubeconfig files would not be printed due to their sensitive nature")
+	fmt.Printf("[dryrun] please examine the %q directory for details about what would be written\n", manifestDir)
 
 	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
 	files := []dryrunutil.FileToPrint{}
@@ -587,8 +587,8 @@ func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
 func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
 	errorChan := make(chan error)
 
-	glog.Infof("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", kubeadmconstants.GetStaticPodDirectory())
-	glog.Infoln("[init] this might take a minute or longer if the control plane images have to be pulled")
+	fmt.Printf("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", kubeadmconstants.GetStaticPodDirectory())
+	fmt.Println("[init] this might take a minute or longer if the control plane images have to be pulled")
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special

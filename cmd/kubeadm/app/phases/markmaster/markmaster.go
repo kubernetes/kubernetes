@@ -17,7 +17,7 @@ limitations under the License.
 package markmaster
 
 import (
-	"github.com/golang/glog"
+	"fmt"
 
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -28,10 +28,10 @@ import (
 // MarkMaster taints the master and sets the master label
 func MarkMaster(client clientset.Interface, masterName string, taints []v1.Taint) error {
 
-	glog.Infof("[markmaster] Marking the node %s as master by adding the label \"%s=''\"\n", masterName, constants.LabelNodeRoleMaster)
+	fmt.Printf("[markmaster] Marking the node %s as master by adding the label \"%s=''\"\n", masterName, constants.LabelNodeRoleMaster)
 
 	if taints != nil && len(taints) > 0 {
-		glog.Infof("[markmaster] Marking the node %s as master by adding the taints %v\n", masterName, taints)
+		fmt.Printf("[markmaster] Marking the node %s as master by adding the taints %v\n", masterName, taints)
 	}
 
 	return apiclient.PatchNode(client, masterName, func(n *v1.Node) {
