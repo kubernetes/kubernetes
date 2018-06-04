@@ -117,14 +117,24 @@ func (plugin *azureDataDiskPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
+	volumeLimits := map[string]int64{
+		util.AzureVolumeLimitKey: 16,
+	}
+
 	cloud := plugin.host.GetCloudProvider()
+
+	// if we can't fetch cloudprovider we return an error
+	// hoping external CCM or admin can set it. Returning
+	// default values from here will mean, no one can
+	// override them.
+	if cloud == nil {
+		return nil, fmt.Errorf("No cloudprovider present")
+	}
+
 	if cloud.ProviderName() != azure.CloudProviderName {
 		return nil, fmt.Errorf("Expected Azure cloudprovider, got %s", cloud.ProviderName())
 	}
 
-	volumeLimits := map[string]int64{
-		util.AzureVolumeLimitKey: 16,
-	}
 	return volumeLimits, nil
 }
 
