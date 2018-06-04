@@ -152,10 +152,10 @@ func (e *quotaEvaluator) doWork() {
 		if quit {
 			return true
 		}
-		defer e.completeWork(ns)
 		if len(admissionAttributes) == 0 {
 			return false
 		}
+		defer e.completeWork(ns)
 		e.checkAttributes(ns, admissionAttributes)
 		return false
 	}
@@ -583,6 +583,11 @@ func (e *quotaEvaluator) completeWork(ns string) {
 	e.inProgress.Delete(ns)
 }
 
+// getWork() returns a naemspace, a list of items in that namespace to
+// check, and a boolean indicating whether to shutdown.  If shutdown
+// then the list is empty.  If the list is non-empty then completeWork
+// must eventually be called for the namespace; otherwise completeWork
+// must NOT be called for the namespae.
 func (e *quotaEvaluator) getWork() (string, []*admissionWaiter, bool) {
 	uncastNS, shutdown := e.queue.Get()
 	if shutdown {
