@@ -17,14 +17,17 @@ limitations under the License.
 package priorities
 
 import (
+	"crypto/sha256"
 	"reflect"
 	"sort"
 	"testing"
 
+	"encoding/hex"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 func TestImageLocalityPriority(t *testing.T) {
@@ -65,7 +68,7 @@ func TestImageLocalityPriority(t *testing.T) {
 		Images: []v1.ContainerImage{
 			{
 				Names: []string{
-					"gcr.io/40",
+					"gcr.io/40:" + parsers.DefaultImageTag,
 					"gcr.io/40:v1",
 					"gcr.io/40:v1",
 				},
@@ -73,14 +76,14 @@ func TestImageLocalityPriority(t *testing.T) {
 			},
 			{
 				Names: []string{
-					"gcr.io/140",
+					"gcr.io/140:" + parsers.DefaultImageTag,
 					"gcr.io/140:v1",
 				},
 				SizeBytes: int64(140 * mb),
 			},
 			{
 				Names: []string{
-					"gcr.io/2000",
+					"gcr.io/2000:" + parsers.DefaultImageTag,
 				},
 				SizeBytes: int64(2000 * mb),
 			},
@@ -91,13 +94,13 @@ func TestImageLocalityPriority(t *testing.T) {
 		Images: []v1.ContainerImage{
 			{
 				Names: []string{
-					"gcr.io/250",
+					"gcr.io/250:" + parsers.DefaultImageTag,
 				},
 				SizeBytes: int64(250 * mb),
 			},
 			{
 				Names: []string{
-					"gcr.io/10",
+					"gcr.io/10:" + parsers.DefaultImageTag,
 					"gcr.io/10:v1",
 				},
 				SizeBytes: int64(10 * mb),
@@ -116,11 +119,11 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Pod: gcr.io/40 gcr.io/250
 
 			// Node1
-			// Image: gcr.io/40 40MB
+			// Image: gcr.io/40:latest 40MB
 			// Score: (40M-23M)/97.7M + 1 = 1
 
 			// Node2
-			// Image: gcr.io/250 250MB
+			// Image: gcr.io/250:latest 250MB
 			// Score: (250M-23M)/97.7M + 1 = 3
 			pod:          &v1.Pod{Spec: test40250},
 			nodes:        []*v1.Node{makeImageNode("machine1", node401402000), makeImageNode("machine2", node25010)},
@@ -131,7 +134,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Pod: gcr.io/40 gcr.io/140
 
 			// Node1
-			// Image: gcr.io/40 40MB, gcr.io/140 140MB
+			// Image: gcr.io/40:latest 40MB, gcr.io/140:latest 140MB
 			// Score: (40M+140M-23M)/97.7M + 1 = 2
 
 			// Node2
@@ -146,11 +149,11 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Pod: gcr.io/2000 gcr.io/10
 
 			// Node1
-			// Image: gcr.io/2000 2000MB
+			// Image: gcr.io/2000:latest 2000MB
 			// Score: 2000 > max score = 10
 
 			// Node2
-			// Image: gcr.io/10 10MB
+			// Image: gcr.io/10:latest 10MB
 			// Score: 10 < min score = 0
 			pod:          &v1.Pod{Spec: testMinMax},
 			nodes:        []*v1.Node{makeImageNode("machine1", node401402000), makeImageNode("machine2", node25010)},
@@ -177,9 +180,31 @@ func TestImageLocalityPriority(t *testing.T) {
 	}
 }
 
+func TestNormalizedImageName(t *testing.T) {
+	for _, testCase := range []struct {
+		Input  string
+		Output string
+	}{
+		{Input: "root", Output: "root:latest"},
+		{Input: "root:tag", Output: "root:tag"},
+		{Input: "gcr.io:5000/root", Output: "gcr.io:5000/root:latest"},
+		{Input: "root@" + getImageFakeDigest("root"), Output: "root@" + getImageFakeDigest("root")},
+	} {
+		image := normalizedImageName(testCase.Input)
+		if image != testCase.Output {
+			t.Errorf("expected image reference: %q, got %q", testCase.Output, image)
+		}
+	}
+}
+
 func makeImageNode(node string, status v1.NodeStatus) *v1.Node {
 	return &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: node},
 		Status:     status,
 	}
+}
+
+func getImageFakeDigest(fakeContent string) string {
+	hash := sha256.Sum256([]byte(fakeContent))
+	return "sha256:" + hex.EncodeToString(hash[:])
 }
