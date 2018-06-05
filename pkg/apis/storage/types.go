@@ -151,7 +151,9 @@ type VolumeAttachmentSource struct {
 	// +optional
 	PersistentVolumeName *string
 
-	// Placeholder for *VolumeSource to accommodate inline volumes in pods.
+	// Copy of VolumeSource to accommodate inline volumes in pods.
+	// +optional
+	InlineVolumeSource *api.CSIPersistentVolumeSource
 }
 
 // The status of a VolumeAttachment request.

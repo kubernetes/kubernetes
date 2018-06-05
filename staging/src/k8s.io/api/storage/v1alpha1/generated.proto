@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.api.storage.v1alpha1;
 
+import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
@@ -70,6 +71,10 @@ message VolumeAttachmentSource {
   // Name of the persistent volume to attach.
   // +optional
   optional string persistentVolumeName = 1;
+
+  // Copy of VolumeSource to accommodate inline volumes in pods.
+  // +optional
+  optional k8s.io.api.core.v1.CSIPersistentVolumeSource inlineVolumeSource = 2;
 }
 
 // VolumeAttachmentSpec is the specification of a VolumeAttachment request.
