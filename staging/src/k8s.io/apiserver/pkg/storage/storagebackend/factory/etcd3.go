@@ -24,6 +24,8 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
@@ -94,8 +96,12 @@ func newETCD3Client(c storagebackend.Config) (*clientv3.Client, error) {
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
 		DialKeepAliveTimeout: keepaliveTimeout,
-		Endpoints:            c.ServerList,
-		TLS:                  tlsConfig,
+		DialOptions: []grpc.DialOption{
+			grpc.WithUnaryInterceptor(grpcprom.UnaryClientInterceptor),
+			grpc.WithStreamInterceptor(grpcprom.StreamClientInterceptor),
+		},
+		Endpoints: c.ServerList,
+		TLS:       tlsConfig,
 	}
 	client, err := clientv3.New(cfg)
 	return client, err
