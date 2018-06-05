@@ -195,8 +195,6 @@ type KubeletFlags struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
-	// enable gathering custom metrics.
-	EnableCustomMetrics bool
 	// allowPrivileged enables containers to request privileged mode.
 	// Defaults to true.
 	AllowPrivileged bool
@@ -234,15 +232,13 @@ func NewKubeletFlags() *KubeletFlags {
 		RegisterSchedulable:                 true,
 		ExperimentalKernelMemcgNotification: false,
 		RemoteRuntimeEndpoint:               remoteRuntimeEndpoint,
-		// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
-		EnableCustomMetrics: false,
-		NodeLabels:          make(map[string]string),
-		VolumePluginDir:     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
-		RegisterNode:        true,
-		SeccompProfileRoot:  filepath.Join(defaultRootDir, "seccomp"),
-		HostNetworkSources:  []string{kubetypes.AllSource},
-		HostPIDSources:      []string{kubetypes.AllSource},
-		HostIPCSources:      []string{kubetypes.AllSource},
+		NodeLabels:                          make(map[string]string),
+		VolumePluginDir:                     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
+		RegisterNode:                        true,
+		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
+		HostNetworkSources:                  []string{kubetypes.AllSource},
+		HostPIDSources:                      []string{kubetypes.AllSource},
+		HostIPCSources:                      []string{kubetypes.AllSource},
 		// TODO(#56523:v1.12.0): Remove --cadvisor-port, it has been deprecated since v1.10
 		CAdvisorPort: 0,
 		// TODO(#58010:v1.13.0): Remove --allow-privileged, it is deprecated
@@ -421,9 +417,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("non-masquerade-cidr", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
-	// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
-	fs.BoolVar(&f.EnableCustomMetrics, "enable-custom-metrics", f.EnableCustomMetrics, "Support for gathering custom metrics.")
-	fs.MarkDeprecated("enable-custom-metrics", "will be removed in a future version")
 	// TODO(#58010:v1.13.0): Remove --allow-privileged, it is deprecated
 	fs.BoolVar(&f.AllowPrivileged, "allow-privileged", f.AllowPrivileged, "If true, allow containers to request privileged mode. Default: true")
 	fs.MarkDeprecated("allow-privileged", "will be removed in a future version")
