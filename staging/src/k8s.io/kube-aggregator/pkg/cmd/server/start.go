@@ -107,8 +107,11 @@ func (o *AggregatorOptions) Complete() error {
 }
 
 func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
-	// TODO have a "real" external address
-	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil); err != nil {
+	advertiseAddr, err := o.RecommendedOptions.SecureServing.DefaultExternalAddress()
+	if err != nil {
+		return err
+	}
+	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts(advertiseAddr.String(), []string{"localhost"}, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
@@ -134,7 +137,6 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		},
 	}
 
-	var err error
 	config.ExtraConfig.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
 	if err != nil {
 		return err

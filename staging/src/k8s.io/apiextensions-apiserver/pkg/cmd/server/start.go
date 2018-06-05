@@ -95,8 +95,11 @@ func (o *CustomResourceDefinitionsServerOptions) Complete() error {
 }
 
 func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, error) {
-	// TODO have a "real" external address
-	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+	advertiseAddr, err := o.RecommendedOptions.SecureServing.DefaultExternalAddress()
+	if err != nil {
+		return nil, err
+	}
+	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts(advertiseAddr.String(), []string{"localhost"}, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
