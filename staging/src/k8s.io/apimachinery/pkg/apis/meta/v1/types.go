@@ -333,9 +333,12 @@ type ListOptions struct {
 	// add, update, and remove notifications. Specify resourceVersion.
 	// +optional
 	Watch bool `json:"watch,omitempty" protobuf:"varint,3,opt,name=watch"`
-	// When specified with a watch call, shows changes that occur after that particular version of a resource.
+	// When specified with a watch call:
+	// shows changes that occur after that particular version of a resource.
+	// If it's 0, then the result will be current objects directory defined by key in "ADDED" events
+	// followed by any new changes.
 	// Defaults to changes from the beginning of history.
-	// When specified for list:
+	// When specified with a list call:
 	// - if unset, then the result is returned from remote storage based on quorum-read flag;
 	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
 	// - if set to non zero, then the result is at least as fresh as given rv.
