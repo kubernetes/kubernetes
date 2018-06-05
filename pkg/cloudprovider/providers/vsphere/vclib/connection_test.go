@@ -98,7 +98,7 @@ func TestWithInvalidCaCertPath(t *testing.T) {
 	_, err := connection.NewClient(context.Background())
 
 	if err != vclib.ErrCaCertNotReadable {
-		t.Fatalf("should have occoured")
+		t.Fatalf("should have occurred")
 	}
 }
 
@@ -112,7 +112,7 @@ func TestInvalidCaCert(t *testing.T) {
 	_, err := connection.NewClient(context.Background())
 
 	if err != vclib.ErrCaCertInvalid {
-		t.Fatalf("should have occoured")
+		t.Fatalf("should have occurred")
 	}
 }
 
@@ -127,7 +127,7 @@ func TestUnsupportedTransport(t *testing.T) {
 
 	err := connection.ConfigureTransportWithCA(notHttpTransport)
 	if err != vclib.ErrUnsupportedTransport {
-		t.Fatalf("should have occured")
+		t.Fatalf("should have occurred")
 	}
 }
 
