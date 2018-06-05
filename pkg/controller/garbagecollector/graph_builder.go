@@ -158,7 +158,40 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				oldObj:    oldObj,
 				gvk:       kind,
 			}
-			gb.graphChanges.Add(event)
+
+			oldAccessor, err := meta.Accessor(oldObj)
+			if err != nil {
+				gb.graphChanges.Add(event)
+				return
+			}
+			newAccessor, err := meta.Accessor(newObj)
+			if err != nil {
+				gb.graphChanges.Add(event)
+				return
+			}
+			glog.V(4).Infof("garbage collector update event for obj %q, %q", oldAccessor.GetName(), oldAccessor.GetNamespace())
+			added, removed, changed := referencesDiffs(oldAccessor.GetOwnerReferences(), newAccessor.GetOwnerReferences())
+			if deletionStarts(oldObj, newAccessor) {
+				glog.V(4).Infof(">>> change start deletion")
+				gb.graphChanges.Add(event)
+				return
+			}
+			if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
+				glog.V(4).Infof(">>> change ownerRef")
+				gb.graphChanges.Add(event)
+				return
+			}
+			if !hasDeleteDependentsFinalizer(oldAccessor) && hasDeleteDependentsFinalizer(newAccessor) {
+				glog.V(4).Infof(">>> change deleteDependentsFinalizer")
+				gb.graphChanges.Add(event)
+				return
+			}
+			if !hasOrphanFinalizer(oldAccessor) && hasOrphanFinalizer(newAccessor) {
+				glog.V(4).Infof(">>> change orphanFinalizer")
+				gb.graphChanges.Add(event)
+				return
+			}
+
 		},
 		DeleteFunc: func(obj interface{}) {
 			// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
