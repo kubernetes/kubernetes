@@ -12,9 +12,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/csi",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/csi/labelmanager:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -25,6 +27,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
@@ -70,6 +73,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/volume/csi/fake:all-srcs",
+        "//pkg/volume/csi/labelmanager:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
