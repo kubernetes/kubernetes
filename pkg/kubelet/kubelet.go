@@ -92,7 +92,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -551,12 +550,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.cloudproviderRequestTimeout = 10 * time.Second
 	}
 
-	secretManager := secret.NewCachingSecretManager(
-		kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
+	secretManager := secret.NewWatchingSecretManager(kubeDeps.KubeClient)
 	klet.secretManager = secretManager
 
-	configMapManager := configmap.NewCachingConfigMapManager(
-		kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
+	configMapManager := configmap.NewWatchingConfigMapManager(kubeDeps.KubeClient)
 	klet.configMapManager = configMapManager
 
 	if klet.experimentalHostUserNamespaceDefaulting {
