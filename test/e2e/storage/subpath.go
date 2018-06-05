@@ -110,6 +110,13 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			testBasicSubpath(f, "configmap-value", pod)
 		})
 
+		It("should support subpaths with configmap pod with mountPath of existing file", func() {
+			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}})
+			file := "/etc/resolv.conf"
+			pod.Spec.Containers[0].VolumeMounts[0].MountPath = file
+			testBasicSubpathFile(f, "configmap-value", pod, file)
+		})
+
 		It("should support subpaths with downward pod", func() {
 			pod := testPodSubpath(f, "downward/podname", "downwardAPI", &v1.VolumeSource{
 				DownwardAPI: &v1.DownwardAPIVolumeSource{
@@ -199,7 +206,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				setInitCommand(pod, fmt.Sprintf("ln -s /bin %s", subPathDir))
 
 				// Pod should fail
-				testPodFailSupath(f, pod)
+				testPodFailSubpath(f, pod)
 			})
 
 			It("should fail if subpath file is outside the volume [Slow]", func() {
@@ -207,7 +214,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				setInitCommand(pod, fmt.Sprintf("ln -s /bin/sh %s", subPathDir))
 
 				// Pod should fail
-				testPodFailSupath(f, pod)
+				testPodFailSubpath(f, pod)
 			})
 
 			It("should fail if non-existent subpath is outside the volume [Slow]", func() {
@@ -215,7 +222,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				setInitCommand(pod, fmt.Sprintf("ln -s /bin/notanexistingpath %s", subPathDir))
 
 				// Pod should fail
-				testPodFailSupath(f, pod)
+				testPodFailSubpath(f, pod)
 			})
 
 			It("should fail if subpath with backstepping is outside the volume [Slow]", func() {
@@ -223,7 +230,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				setInitCommand(pod, fmt.Sprintf("ln -s ../ %s", subPathDir))
 
 				// Pod should fail
-				testPodFailSupath(f, pod)
+				testPodFailSubpath(f, pod)
 			})
 
 			It("should support creating multiple subpath from same volumes [Slow]", func() {
@@ -297,7 +304,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testReadFile(f, volumePath, pod, 0)
 			})
 
-			It("should support readOnly directory specified in the volumeSource", func() {
+			It("should support existing directories when readOnly specified in the volumeSource", func() {
 				roVol := vol.getReadOnlyVolumeSpec()
 				if roVol == nil {
 					framework.Skipf("Volume type %v doesn't support readOnly source", curVolType)
@@ -312,6 +319,19 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				// Read it from inside the subPath from container 0
 				testReadFile(f, filePathInSubpath, pod, 0)
 			})
+
+			It("should fail for new directories when readOnly specified in the volumeSource", func() {
+				roVol := vol.getReadOnlyVolumeSpec()
+				if roVol == nil {
+					framework.Skipf("Volume type %v doesn't support readOnly source", curVolType)
+				}
+
+				// Set volume source to read only
+				pod.Spec.Volumes[0].VolumeSource = *roVol
+
+				// Pod should fail
+				testPodFailSubpathError(f, pod, "")
+			})
 		})
 	}
 
@@ -319,7 +339,11 @@ var _ = utils.SIGDescribe("Subpath", func() {
 })
 
 func testBasicSubpath(f *framework.Framework, contents string, pod *v1.Pod) {
-	setReadCommand(volumePath, &pod.Spec.Containers[0])
+	testBasicSubpathFile(f, contents, pod, volumePath)
+}
+
+func testBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, filepath string) {
+	setReadCommand(filepath, &pod.Spec.Containers[0])
 
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
 	f.TestContainerOutput("atomic-volume-subpath", pod, 0, []string{contents})
@@ -412,6 +436,11 @@ func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 					},
 				},
 			},
+			SecurityContext: &v1.PodSecurityContext{
+				SELinuxOptions: &v1.SELinuxOptions{
+					Level: "s0:c0,c1",
+				},
+			},
 		},
 	}
 }
@@ -473,7 +502,11 @@ func testReadFile(f *framework.Framework, file string, pod *v1.Pod, containerInd
 	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
 }
 
-func testPodFailSupath(f *framework.Framework, pod *v1.Pod) {
+func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
+	testPodFailSubpathError(f, pod, "subPath")
+}
+
+func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg string) {
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
@@ -494,7 +527,7 @@ func testPodFailSupath(f *framework.Framework, pod *v1.Pod) {
 	events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
 	Expect(err).NotTo(HaveOccurred(), "while getting pod events")
 	Expect(len(events.Items)).NotTo(Equal(0), "no events found")
-	Expect(events.Items[0].Message).To(ContainSubstring("subPath"), "subpath error not found")
+	Expect(events.Items[0].Message).To(ContainSubstring(errorMsg), fmt.Sprintf("%q error not found", errorMsg))
 }
 
 // Tests that the existing subpath mount is detected when a container restarts
@@ -784,6 +817,47 @@ func (s *gcepdPVCSource) createVolume(f *framework.Framework) volInfo {
 	pvc := newClaim(testCase, f.Namespace.Name, "subpath")
 	s.pvc, err = framework.CreatePVC(f.ClientSet, f.Namespace.Name, pvc)
 	framework.ExpectNoError(err, "Error creating PVC")
+
+	// Launch pod to format the PD first
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("gcepd-prep-%s", f.Namespace.Name),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
+					Image:   "busybox",
+					Command: []string{"/bin/sh", "-ec", "echo nothing"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: "/vol",
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: volumeName,
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: s.pvc.Name,
+						},
+					},
+				},
+			},
+		},
+	}
+	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	Expect(err).ToNot(HaveOccurred(), "while creating gce pd init pod")
+
+	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	Expect(err).ToNot(HaveOccurred(), "while waiting for gce pd init pod to succeed")
+
+	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
+	Expect(err).ToNot(HaveOccurred(), "while deleting gce pd init pod")
 
 	return volInfo{
 		source: &v1.VolumeSource{
