@@ -203,8 +203,11 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
 	swapData, err := ioutil.ReadFile("/proc/swaps")
 	if err != nil {
-		return nil, err
+		if failSwapOn {
+			return nil, err
+		}
 	}
+
 	swapData = bytes.TrimSpace(swapData) // extra trailing \n
 	swapLines := strings.Split(string(swapData), "\n")
 
