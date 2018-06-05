@@ -291,7 +291,7 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 	}
 
 	if schema := customResourceValidation.OpenAPIV3Schema; schema != nil {
-		// if subresources are enabled, only "properties" and "required" is allowed inside the root schema
+		// if subresources are enabled, only "properties", "required" and "description" are allowed inside the root schema
 		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && statusSubresourceEnabled {
 			v := reflect.ValueOf(schema).Elem()
 			for i := 0; i < v.NumField(); i++ {
@@ -300,8 +300,8 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 					continue
 				}
 
-				if name := v.Type().Field(i).Name; name != "Properties" && name != "Required" {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), *schema, fmt.Sprintf(`must only have "properties" or "required" at the root if the status subresource is enabled`)))
+				if name := v.Type().Field(i).Name; name != "Properties" && name != "Required" && name != "Description" {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), *schema, fmt.Sprintf(`must only have "properties", "required" or "description" at the root if the status subresource is enabled`)))
 					break
 				}
 			}
