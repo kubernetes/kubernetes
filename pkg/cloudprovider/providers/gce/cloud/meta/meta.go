@@ -115,6 +115,7 @@ var AllServices = []*ServiceInfo{
 		keyType:     Global,
 		serviceType: reflect.TypeOf(&beta.BackendServicesService{}),
 		additionalMethods: []string{
+			"Update",
 			"SetSecurityPolicy",
 		},
 	},
