@@ -72,3 +72,9 @@ go_test(
         "//vendor/github.com/vmware/govmomi/simulator:go_default_library",
     ],
 )
+
+go_test(
+    name = "go_default_xtest",
+    srcs = ["connection_test.go"],
+    deps = [":go_default_library"],
+)
