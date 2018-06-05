@@ -849,14 +849,15 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			wantError:     true,
 		},
 		{
-			name: "properties and required with status",
+			name: "properties, required and description with status",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"spec":   {},
 						"status": {},
 					},
-					Required: []string{"spec", "status"},
+					Required:    []string{"spec", "status"},
+					Description: "This is a description",
 				},
 			},
 			statusEnabled: true,
