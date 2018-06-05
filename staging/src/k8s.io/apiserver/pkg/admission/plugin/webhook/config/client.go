@@ -122,6 +122,9 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
+		if h.ClientConfig.Timeout != nil {
+			cfg.Timeout = h.ClientConfig.Timeout.Duration
+		}
 		client, err := rest.UnversionedRESTClientFor(cfg)
 		if err == nil {
 			cm.cache.Add(string(cacheKey), client)

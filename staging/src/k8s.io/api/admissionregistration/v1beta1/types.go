@@ -263,6 +263,11 @@ type WebhookClientConfig struct {
 	// the webhook's server certificate.
 	// Required.
 	CABundle []byte `json:"caBundle" protobuf:"bytes,2,opt,name=caBundle"`
+
+	// `timeout` is the duration after which the webhook request times out.
+	// Must be greater than 0 if set. If not set, will use server default 30s.
+	// +optional
+	Timeout *metav1.Duration `json:"timeout,omitempty" protobuf:"varint,4,opt,name=timeout"`
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

@@ -259,5 +259,10 @@ message WebhookClientConfig {
   // the webhook's server certificate.
   // Required.
   optional bytes caBundle = 2;
+
+  // `timeout` is the duration after which the webhook request times out.
+  // Must be greater than 0 if set. If not set, will use server default 30s.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Duration timeout = 4;
 }
 

@@ -307,6 +307,11 @@ type WebhookClientConfig struct {
 	// the webhook's server certificate.
 	// Required.
 	CABundle []byte
+
+	// `timeout` is the duration after which the webhook request times out.
+	// Must be greater than 0 if set. If not set, will use server default 30s.
+	// +optional
+	Timeout *metav1.Duration
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

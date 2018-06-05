@@ -1782,6 +1782,10 @@
      "caBundle": {
       "type": "string",
       "description": "`caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. Required."
+     },
+     "timeout": {
+      "type": "string",
+      "description": "`timeout` is the duration after which the webhook request times out. Must be greater than 0 if set. If not set, will use server default 30s."
      }
     }
    },

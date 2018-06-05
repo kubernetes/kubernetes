@@ -234,6 +234,11 @@ func validateWebhookClientConfig(fldPath *field.Path, cc *admissionregistration.
 	if cc.Service != nil {
 		allErrors = append(allErrors, validateWebhookService(fldPath.Child("service"), cc.Service)...)
 	}
+	if cc.Timeout != nil {
+		if cc.Timeout.Duration <= 0 {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("timeout"), cc.Timeout, "timeout must be greater than 0 if set"))
+		}
+	}
 	return allErrors
 }
 
