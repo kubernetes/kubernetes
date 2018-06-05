@@ -18,6 +18,7 @@ package azure
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -172,6 +173,10 @@ func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, er
 
 func (az *Cloud) getSecurityGroup() (sg network.SecurityGroup, exists bool, err error) {
 	var realErr error
+
+	if az.SecurityGroupName == "" {
+		return sg, false, fmt.Errorf("securityGroupName is not configured")
+	}
 
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("SecurityGroupsClient.Get(%s): start", az.SecurityGroupName)
