@@ -209,6 +209,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 	supportedGpuTypes := []string{"nvidia-tesla-k80", "nvidia-tesla-v100", "nvidia-tesla-p100"}
 	for _, gpuType := range supportedGpuTypes {
+		gpuType := gpuType // create new variable for each iteration step
 
 		It(fmt.Sprintf("Should scale up GPU pool from 0 [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
 			framework.SkipUnlessProviderIs("gke")
