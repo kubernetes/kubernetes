@@ -1142,6 +1142,18 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		return fmt.Errorf("couldn't get key for object %#v: %v", ds, err)
 	}
 
+	// If the DaemonSet is being deleted (either by foreground deletion or
+	// orphan deletion), we cannot be sure if the DaemonSet history objects
+	// it owned still exist -- those history objects can either be deleted
+	// or orphaned. Garbage collector doesn't guarantee that it will delete
+	// DaemonSet pods before deleting DaemonSet history objects, because
+	// DaemonSet history doesn't own DaemonSet pods. We cannot reliably
+	// calculate the status of a DaemonSet being deleted. Therefore, return
+	// here without updating status for the DaemonSet being deleted.
+	if ds.DeletionTimestamp != nil {
+		return nil
+	}
+
 	// Construct histories of the DaemonSet, and get the hash of current history
 	cur, old, err := dsc.constructHistory(ds)
 	if err != nil {
@@ -1149,7 +1161,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	}
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
-	if ds.DeletionTimestamp != nil || !dsc.expectations.SatisfiedExpectations(dsKey) {
+	if !dsc.expectations.SatisfiedExpectations(dsKey) {
 		// Only update status.
 		return dsc.updateDaemonSetStatus(ds, hash)
 	}
