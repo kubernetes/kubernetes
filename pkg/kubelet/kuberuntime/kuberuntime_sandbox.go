@@ -52,10 +52,30 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 	if err != nil {
 		message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
 		glog.Error(message)
+		m.clearFailedPodSandbox(pod, podSandboxConfig, podSandBoxID)
 		return "", message, err
 	}
 
 	return podSandBoxID, "", nil
+}
+
+// clearFailedPodSandbox clear the faild sandbox
+func (m *kubeGenericRuntimeManager) clearFailedPodSandbox(pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, podSandBoxID string) {
+	// Remove pod logs directory
+	err := m.osInterface.RemoveAll(podSandboxConfig.LogDirectory)
+	if err != nil {
+		message := fmt.Sprintf("Remove pod log directory for pod %q failed: %v", format.Pod(pod), err)
+		glog.Errorf(message)
+	}
+
+	// RemovePodSandbox
+	if podSandBoxID != "" {
+		err = m.runtimeService.RemovePodSandbox(podSandBoxID)
+		if err != nil {
+			message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
+			glog.Error(message)
+		}
+	}
 }
 
 // generatePodSandboxConfig generates pod sandbox config from v1.Pod.
