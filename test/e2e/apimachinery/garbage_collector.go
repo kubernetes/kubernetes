@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
@@ -175,7 +176,7 @@ func verifyRemainingDeploymentsReplicaSetsPods(
 	}
 	if len(deployments.Items) != deploymentNum {
 		ret = false
-		By(fmt.Sprintf("expected %d Deploymentss, got %d Deployments", deploymentNum, len(deployments.Items)))
+		By(fmt.Sprintf("expected %d Deployments, got %d Deployments", deploymentNum, len(deployments.Items)))
 	}
 	pods, err := clientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
@@ -451,17 +452,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("%v", err)
 		}
 		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			pods, err := podClient.List(metav1.ListOptions{})
-			if err != nil {
-				return false, fmt.Errorf("Failed to list pods: %v", err)
-			}
-			if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
-				return false, fmt.Errorf("expect %d pods, got %d pods", e, a)
-			}
-			return false, nil
-		}); err != nil && err != wait.ErrWaitTimeout {
-			framework.Failf("%v", err)
+		time.Sleep(30 * time.Second)
+		pods, err := podClient.List(metav1.ListOptions{})
+		if err != nil {
+			framework.Failf("Failed to list pods: %v", err)
+		}
+		if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
+			framework.Failf("expect %d pods, got %d pods", e, a)
 		}
 		gatherMetrics(f)
 	})
@@ -499,17 +496,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
 		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			pods, err := podClient.List(metav1.ListOptions{})
-			if err != nil {
-				return false, fmt.Errorf("Failed to list pods: %v", err)
-			}
-			if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
-				return false, fmt.Errorf("expect %d pods, got %d pods", e, a)
-			}
-			return false, nil
-		}); err != nil && err != wait.ErrWaitTimeout {
-			framework.Failf("%v", err)
+		time.Sleep(30 * time.Second)
+		pods, err := podClient.List(metav1.ListOptions{})
+		if err != nil {
+			framework.Failf("Failed to list pods: %v", err)
+		}
+		if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
+			framework.Failf("expect %d pods, got %d pods", e, a)
 		}
 		gatherMetrics(f)
 	})
@@ -556,14 +549,17 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
 			return verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 0, 0)
 		})
-		if err == wait.ErrWaitTimeout {
-			err = fmt.Errorf("Failed to wait for all rs to be garbage collected: %v", err)
+		if err != nil {
+			errList := make([]error, 0)
+			errList = append(errList, err)
 			remainingRSs, err := rsClient.List(metav1.ListOptions{})
 			if err != nil {
-				framework.Failf("failed to list RSs post mortem: %v", err)
+				errList = append(errList, fmt.Errorf("failed to list RSs post mortem: %v", err))
 			} else {
-				framework.Failf("remaining rs are: %#v", remainingRSs)
+				errList = append(errList, fmt.Errorf("remaining rs are: %#v", remainingRSs))
 			}
+			aggregatedError := utilerrors.NewAggregate(errList)
+			framework.Failf("Failed to wait for all rs to be garbage collected: %v", aggregatedError)
 
 		}
 
@@ -608,24 +604,28 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := deployClient.Delete(deployment.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
-		By("wait for 2 Minute to see if the garbage collector mistakenly deletes the rs")
-		err = wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-			return verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 1, 2)
-		})
+		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the rs")
+		time.Sleep(30 * time.Second)
+		ok, err := verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 1, 2)
 		if err != nil {
-			err = fmt.Errorf("Failed to wait to see if the garbage collecter mistakenly deletes the rs: %v", err)
+			framework.Failf("Unexpected error while verifying remaining deployments, rs, and pods: %v", err)
+		}
+		if !ok {
+			errList := make([]error, 0)
 			remainingRSs, err := rsClient.List(metav1.ListOptions{})
 			if err != nil {
-				framework.Failf("failed to list RSs post mortem: %v", err)
+				errList = append(errList, fmt.Errorf("failed to list RSs post mortem: %v", err))
 			} else {
-				framework.Failf("remaining rs post mortem: %#v", remainingRSs)
+				errList = append(errList, fmt.Errorf("remaining rs post mortem: %#v", remainingRSs))
 			}
 			remainingDSs, err := deployClient.List(metav1.ListOptions{})
 			if err != nil {
-				framework.Failf("failed to list Deployments post mortem: %v", err)
+				errList = append(errList, fmt.Errorf("failed to list Deployments post mortem: %v", err))
 			} else {
-				framework.Failf("remaining deployment's post mortem: %#v", remainingDSs)
+				errList = append(errList, fmt.Errorf("remaining deployment's post mortem: %#v", remainingDSs))
 			}
+			aggregatedError := utilerrors.NewAggregate(errList)
+			framework.Failf("Failed to verify remaining deployments, rs, and pods: %v", aggregatedError)
 		}
 		rs, err := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
