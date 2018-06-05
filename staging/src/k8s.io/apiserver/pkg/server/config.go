@@ -59,13 +59,13 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	// install apis
-	"github.com/golang/glog"
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
@@ -576,15 +576,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 			goruntime.SetBlockProfileRate(1)
 		}
 		// so far, only logging related endpoints are considered valid to add for these debug flags.
-		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(
-			routes.StringFlagSetterFunc(func(val string) (string, error) {
-				var level glog.Level
-				if err := level.Set(val); err != nil {
-					return "", fmt.Errorf("failed set glog.logging.verbosity %s: %v", val, err)
-				}
-				return "successfully set glog.logging.verbosity to " + val, nil
-			}),
-		))
+		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
 	}
 	if c.EnableMetrics {
 		if c.EnableProfiling {
