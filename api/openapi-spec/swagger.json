@@ -78477,7 +78477,7 @@
     }
    },
    "io.k8s.api.core.v1.NodeSelectorTerm": {
-    "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed.",
+    "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
     "properties": {
      "matchExpressions": {
       "description": "A list of node selector requirements by node's labels.",
@@ -80945,6 +80945,38 @@
      "value": {
       "description": "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
       "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.TopologySelectorLabelRequirement": {
+    "description": "A topology selector requirement is a selector that matches given label. This is an alpha feature and may change in the future.",
+    "required": [
+     "key",
+     "values"
+    ],
+    "properties": {
+     "key": {
+      "description": "The label key that the selector applies to.",
+      "type": "string"
+     },
+     "values": {
+      "description": "An array of string values. One value must match the label to be selected. Each entry in Values is ORed.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.TopologySelectorTerm": {
+    "description": "A topology selector term represents the result of label queries. A null or empty topology selector term matches no objects. The requirements of them are ANDed. It provides a subset of functionality as NodeSelectorTerm. This is an alpha feature and may change in the future.",
+    "properties": {
+     "matchLabelExpressions": {
+      "description": "A list of topology selector requirements by labels.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.TopologySelectorLabelRequirement"
+      }
      }
     }
    },
@@ -84727,6 +84759,13 @@
       "description": "AllowVolumeExpansion shows whether the storage class allow volume expand",
       "type": "boolean"
      },
+     "allowedTopologies": {
+      "description": "Restrict the node topologies where volumes can be dynamically provisioned. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is alpha-level and is only honored by servers that enable the DynamicProvisioningScheduling feature.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.TopologySelectorTerm"
+      }
+     },
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
       "type": "string"
@@ -84957,6 +84996,13 @@
      "allowVolumeExpansion": {
       "description": "AllowVolumeExpansion shows whether the storage class allow volume expand",
       "type": "boolean"
+     },
+     "allowedTopologies": {
+      "description": "Restrict the node topologies where volumes can be dynamically provisioned. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is alpha-level and is only honored by servers that enable the DynamicProvisioningScheduling feature.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.TopologySelectorTerm"
+      }
      },
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",

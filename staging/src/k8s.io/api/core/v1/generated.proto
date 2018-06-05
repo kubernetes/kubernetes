@@ -1992,6 +1992,7 @@ message NodeSelectorRequirement {
 
 // A null or empty node selector term matches no objects. The requirements of
 // them are ANDed.
+// The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
 message NodeSelectorTerm {
   // A list of node selector requirements by node's labels.
   // +optional
@@ -4436,6 +4437,28 @@ message Toleration {
   // negative values will be treated as 0 (evict immediately) by the system.
   // +optional
   optional int64 tolerationSeconds = 5;
+}
+
+// A topology selector requirement is a selector that matches given label.
+// This is an alpha feature and may change in the future.
+message TopologySelectorLabelRequirement {
+  // The label key that the selector applies to.
+  optional string key = 1;
+
+  // An array of string values. One value must match the label to be selected.
+  // Each entry in Values is ORed.
+  repeated string values = 2;
+}
+
+// A topology selector term represents the result of label queries.
+// A null or empty topology selector term matches no objects.
+// The requirements of them are ANDed.
+// It provides a subset of functionality as NodeSelectorTerm.
+// This is an alpha feature and may change in the future.
+message TopologySelectorTerm {
+  // A list of topology selector requirements by labels.
+  // +optional
+  repeated TopologySelectorLabelRequirement matchLabelExpressions = 1;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

@@ -3104,6 +3104,32 @@ func ValidateNodeSelector(nodeSelector *core.NodeSelector, fldPath *field.Path) 
 	return allErrs
 }
 
+// validateTopologySelectorLabelRequirement tests that the specified TopologySelectorLabelRequirement fields has valid data
+func validateTopologySelectorLabelRequirement(rq core.TopologySelectorLabelRequirement, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(rq.Values) == 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "must specify as least one value"))
+	}
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(rq.Key, fldPath.Child("key"))...)
+
+	return allErrs
+}
+
+// ValidateTopologySelectorTerm tests that the specified topology selector term has valid data
+func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
+		for i, req := range term.MatchLabelExpressions {
+			allErrs = append(allErrs, validateTopologySelectorLabelRequirement(req, fldPath.Child("matchLabelExpressions").Index(i))...)
+		}
+	} else if len(term.MatchLabelExpressions) != 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate DynamicProvisioningScheduling"))
+	}
+
+	return allErrs
+}
+
 // ValidateAvoidPodsInNodeAnnotations tests that the serialized AvoidPods in Node.Annotations has valid data
 func ValidateAvoidPodsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
