@@ -35,6 +35,44 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
+func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
+	gce := simpleFakeGCECloud(vals)
+
+	// Used in disk unit tests
+	gce.manager = newFakeManager(vals.ProjectID, vals.Region)
+	gce.nodeZones = createNodeZones([]string{vals.ZoneName})
+
+	gce.alphaFeatureGate = NewAlphaFeatureGate([]string{})
+	gce.nodeInformerSynced = func() bool { return true },
+
+	gce.c.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
+	gce.c.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
+	gce.c.MockForwardingRules.InsertHook = mock.InsertFwdRuleHook
+	gce.c.MockAddresses.InsertHook = mock.InsertAddressHook
+	gce.c.MockAlphaAddresses.InsertHook = mock.InsertAlphaAddressHook
+	gce.c.MockAlphaAddresses.X = mock.AddressAttributes{}
+	gce.c.MockAddresses.X = mock.AddressAttributes{}
+
+	gce.c.MockInstanceGroups.X = mock.InstanceGroupAttributes{
+		InstanceMap: make(map[meta.Key]map[string]*compute.InstanceWithNamedPorts),
+		Lock:        &sync.Mutex{},
+	}
+	gce.c.MockInstanceGroups.AddInstancesHook = mock.AddInstancesHook
+	gce.c.MockInstanceGroups.RemoveInstancesHook = mock.RemoveInstancesHook
+	gce.c.MockInstanceGroups.ListInstancesHook = mock.ListInstancesHook
+
+	gce..MockRegionBackendServices.UpdateHook = mock.UpdateRegionBackendServiceHook
+	gce.c.MockHealthChecks.UpdateHook = mock.UpdateHealthCheckHook
+	gce.c.MockFirewalls.UpdateHook = mock.UpdateFirewallHook
+
+	keyGA := meta.GlobalKey("key-ga")
+	gce.c.MockZones.Objects[*keyGA] = &cloud.MockZonesObj{
+		Obj: &compute.Zone{Name: vals.ZoneName, Region: gce.getRegionLink(vals.Region)},
+	}
+
+	return gce, nil
+}
+
 type gceInstance struct {
 	Zone  string
 	Name  string
