@@ -239,7 +239,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: coredns
-        image: coredns/coredns:{{ .Version }}
+        image: {{ .ImageRepository }}/coredns:{{ .Version }}
         imagePullPolicy: IfNotPresent
         resources:
           limits:
