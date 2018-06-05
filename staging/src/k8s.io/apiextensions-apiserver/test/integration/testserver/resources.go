@@ -38,7 +38,8 @@ import (
 )
 
 const (
-	noxuInstanceNum int64 = 9223372036854775807
+	noxuInstanceNum   int64 = 9223372036854775807
+	setupInstanceName       = "setup-instance"
 )
 
 //NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
@@ -272,14 +273,13 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 		return err
 	}
 
-	instanceName := "setup-instance"
 	instance := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{
 				"namespace": ns,
-				"name":      instanceName,
+				"name":      setupInstanceName,
 			},
 			"alpha":   "foo_123",
 			"beta":    10,
@@ -294,7 +294,7 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 	}
 	// we created something, clean it up
 	defer func() {
-		resourceClient.Delete(instanceName, nil)
+		resourceClient.Delete(setupInstanceName, nil)
 	}()
 
 	noxuWatch, err := resourceClient.Watch(metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
@@ -312,6 +312,23 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("gave up waiting for watch event")
+	}
+}
+
+func ExpectWatchEvent(w watch.Interface, onWatchEvent func(watch.Event), onTimeout func()) {
+	stop := false
+	for !stop {
+		select {
+		case watchEvent := <-w.ResultChan():
+			if name, err := meta.NewAccessor().Name(watchEvent.Object); err == nil && name == setupInstanceName {
+				continue
+			}
+			onWatchEvent(watchEvent)
+			stop = true
+		case <-time.After(5 * time.Second):
+			onTimeout()
+			stop = true
+		}
 	}
 }
 

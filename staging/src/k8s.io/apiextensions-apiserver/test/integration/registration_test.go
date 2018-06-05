@@ -20,13 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/coreos/etcd/clientv3"
 	"os"
 	"path"
 	"reflect"
 	"testing"
-	"time"
-
-	"github.com/coreos/etcd/clientv3"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
@@ -88,8 +86,7 @@ func TestMultipleResourceInstances(t *testing.T) {
 
 	addEvents := 0
 	for addEvents < len(instances) {
-		select {
-		case watchEvent := <-noxuNamespacedWatch.ResultChan():
+		testserver.ExpectWatchEvent(noxuNamespacedWatch, func(watchEvent watch.Event) {
 			if e, a := watch.Added, watchEvent.Type; e != a {
 				t.Fatalf("expected %v, got %v", e, a)
 			}
@@ -102,9 +99,9 @@ func TestMultipleResourceInstances(t *testing.T) {
 			}
 			instances[name].Added = true
 			addEvents++
-		case <-time.After(5 * time.Second):
-			t.Fatalf("missing watch event")
-		}
+		}, func() {
+			t.Errorf("missing watch event")
+		})
 	}
 
 	for key, val := range instances {
@@ -143,11 +140,10 @@ func TestMultipleResourceInstances(t *testing.T) {
 
 	deleteEvents := 0
 	for deleteEvents < len(instances) {
-		select {
-		case watchEvent := <-noxuNamespacedWatch.ResultChan():
+		testserver.ExpectWatchEvent(noxuNamespacedWatch, func(watchEvent watch.Event) {
 			if e, a := watch.Deleted, watchEvent.Type; e != a {
 				t.Errorf("expected %v, got %v", e, a)
-				break
+				return
 			}
 			name, err := meta.NewAccessor().Name(watchEvent.Object)
 			if err != nil {
@@ -158,9 +154,9 @@ func TestMultipleResourceInstances(t *testing.T) {
 			}
 			instances[name].Deleted = true
 			deleteEvents++
-		case <-time.After(5 * time.Second):
+		}, func() {
 			t.Errorf("missing watch event")
-		}
+		})
 	}
 }
 
