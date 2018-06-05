@@ -145,13 +145,11 @@ func UpgradeNodeRegistrationOptionsForMaster(in *MasterConfiguration, out *kubea
 	}
 }
 
+// UpgradeBootstrapTokens should create at least one empty bootstrap token in the out config.
 func UpgradeBootstrapTokens(in *MasterConfiguration, out *kubeadm.MasterConfiguration) error {
-	if len(in.Token) == 0 {
-		return nil
-	}
-
 	bts, err := kubeadm.NewBootstrapTokenString(in.Token)
-	if err != nil {
+	// Ignore the error if the incoming token was empty.
+	if err != nil && in.Token != "" {
 		return fmt.Errorf("can't parse .Token, and hence can't convert v1alpha1 API to a newer version: %v", err)
 	}
 
