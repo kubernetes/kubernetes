@@ -354,7 +354,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodShareProcessNamespace:                    {Default: false, PreRelease: utilfeature.Alpha},
-	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},

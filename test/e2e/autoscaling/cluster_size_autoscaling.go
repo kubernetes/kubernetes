@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
-	"k8s.io/api/scheduling/v1alpha1"
+	schedulerapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -2150,13 +2150,13 @@ func createPriorityClasses(f *framework.Framework) func() {
 		highPriorityClassName:       1000,
 	}
 	for className, priority := range priorityClasses {
-		_, err := f.ClientSet.SchedulingV1alpha1().PriorityClasses().Create(&v1alpha1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
+		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 	}
 
 	return func() {
 		for className := range priorityClasses {
-			f.ClientSet.SchedulingV1alpha1().PriorityClasses().Delete(className, nil)
+			f.ClientSet.SchedulingV1beta1().PriorityClasses().Delete(className, nil)
 		}
 	}
 }
