@@ -34,6 +34,7 @@ filegroup(
         "//vendor/github.com/golang/protobuf/ptypes/empty:all-srcs",
         "//vendor/github.com/golang/protobuf/ptypes/struct:all-srcs",
         "//vendor/github.com/golang/protobuf/ptypes/timestamp:all-srcs",
+        "//vendor/github.com/golang/protobuf/ptypes/wrappers:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
