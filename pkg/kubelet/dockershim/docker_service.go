@@ -85,7 +85,7 @@ const (
 type CRIService interface {
 	runtimeapi.RuntimeServiceServer
 	runtimeapi.ImageServiceServer
-	Start(<-chan struct{}) error
+	Start() error
 }
 
 // DockerService is an interface that embeds the new RuntimeService and
@@ -400,17 +400,11 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 }
 
 // Start initializes and starts components in dockerService.
-func (ds *dockerService) Start(stopCh <-chan struct{}) error {
+func (ds *dockerService) Start() error {
 	// Initialize the legacy cleanup flag.
 	if ds.startLocalStreamingServer {
 		go func() {
-			<-stopCh
-			if err := ds.streamingServer.Stop(); err != nil {
-				glog.Errorf("Failed to stop streaming server: %v", err)
-			}
-		}()
-		go func() {
-			if err := ds.streamingServer.Start(true); err != nil && err != http.ErrServerClosed {
+			if err := ds.streamingServer.Start(true); err != nil {
 				glog.Fatalf("Streaming server stopped unexpectedly: %v", err)
 			}
 		}()

@@ -49,9 +49,9 @@ func NewDockerServer(endpoint string, s dockershim.CRIService) *DockerServer {
 }
 
 // Start starts the dockershim grpc server.
-func (s *DockerServer) Start(stopCh <-chan struct{}) error {
+func (s *DockerServer) Start() error {
 	// Start the internal service.
-	if err := s.service.Start(stopCh); err != nil {
+	if err := s.service.Start(); err != nil {
 		glog.Errorf("Unable to start docker service")
 		return err
 	}
@@ -70,18 +70,8 @@ func (s *DockerServer) Start(stopCh <-chan struct{}) error {
 	runtimeapi.RegisterImageServiceServer(s.server, s.service)
 	go func() {
 		if err := s.server.Serve(l); err != nil {
-			glog.Errorf("Failed to serve connections: %v", err)
+			glog.Fatalf("Failed to serve connections: %v", err)
 		}
 	}()
-	go func() {
-		<-stopCh
-		s.Stop()
-	}()
 	return nil
-}
-
-// Stop stops the dockershim grpc server.
-func (s *DockerServer) Stop() {
-	glog.V(2).Infof("Stop docker server")
-	s.server.Stop()
 }
