@@ -121,6 +121,9 @@ type VSphereConfig struct {
 		VCenterPort string `gcfg:"port"`
 		// True if vCenter uses self-signed cert.
 		InsecureFlag bool `gcfg:"insecure-flag"`
+		// Specifies the path to a CA certificate in PEM format. Optional; if not
+		// configured, the system's CA certificates will be used.
+		CAFile string `gcfg:"ca-file"`
 		// Datacenter in which VMs are located.
 		// Deprecated. Use "datacenters" instead.
 		Datacenter string `gcfg:"datacenter"`
@@ -345,7 +348,9 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			Insecure:          cfg.Global.InsecureFlag,
 			RoundTripperCount: vcConfig.RoundTripperCount,
 			Port:              vcConfig.VCenterPort,
+			CACert:            cfg.Global.CAFile,
 		}
+
 		vsphereIns := VSphereInstance{
 			conn: &vSphereConn,
 			cfg:  &vcConfig,
