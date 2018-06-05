@@ -878,6 +878,10 @@ func (rbd *rbdDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
 }
 
+func (rbd *rbdDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return volutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+}
+
 func (rbd *rbd) rbdGlobalMapPath(spec *volume.Spec) (string, error) {
 	mon, err := getVolumeSourceMonitors(spec)
 	if err != nil {
