@@ -23,7 +23,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
@@ -60,9 +59,9 @@ func GetAllImages(cfg *kubeadmapi.MasterConfiguration) []string {
 		imgs = append(imgs, GetCoreImage(constants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.Local.Image))
 	}
 
-	dnsImage := fmt.Sprintf("%v/k8s-dns-kube-dns-%v:%v", cfg.ImageRepository, runtime.GOARCH, dns.GetDNSVersion(nil, constants.KubeDNS))
+	dnsImage := fmt.Sprintf("%v/k8s-dns-kube-dns-%v:%v", cfg.ImageRepository, runtime.GOARCH, constants.KubeDNSVersion)
 	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
-		dnsImage = fmt.Sprintf("coredns/coredns:%v", dns.GetDNSVersion(nil, constants.CoreDNS))
+		dnsImage = fmt.Sprintf("coredns/coredns:%v", constants.CoreDNSVersion)
 	}
 	imgs = append(imgs, dnsImage)
 	return imgs

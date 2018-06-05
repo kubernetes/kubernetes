@@ -273,6 +273,12 @@ const (
 
 	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
 	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"
+
+	// KubeDNSVersion is the version of kube-dns to be deployed if it is used
+	KubeDNSVersion = "1.14.10"
+
+	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
+	CoreDNSVersion = "1.1.3"
 )
 
 var (
@@ -401,4 +407,14 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 // GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod
 func GetStaticPodAuditPolicyFile() string {
 	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditPolicyFile)
+}
+
+// GetDNSVersion is a handy function that returns the DNS version by DNS type
+func GetDNSVersion(dnsType string) string {
+	switch dnsType {
+	case CoreDNS:
+		return CoreDNSVersion
+	default:
+		return KubeDNSVersion
+	}
 }
