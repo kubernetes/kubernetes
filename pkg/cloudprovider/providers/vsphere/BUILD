@@ -45,6 +45,7 @@ go_test(
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
+        "//pkg/cloudprovider/providers/vsphere/vclib/fixtures:go_default_library",
         "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

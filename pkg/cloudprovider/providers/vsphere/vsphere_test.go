@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/fixtures"
 )
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
@@ -267,16 +268,12 @@ func TestVSphereLoginByToken(t *testing.T) {
 }
 
 func TestVSphereLoginWithCaCert(t *testing.T) {
-	caCertPath := "./vclib/fixtures/ca.pem"
-	serverCertPath := "./vclib/fixtures/server.pem"
-	serverKeyPath := "./vclib/fixtures/server.key"
-
-	caCertPEM, err := ioutil.ReadFile(caCertPath)
+	caCertPEM, err := ioutil.ReadFile(fixtures.CaCertPath)
 	if err != nil {
 		t.Fatalf("Could not read ca cert from file")
 	}
 
-	serverCert, err := tls.LoadX509KeyPair(serverCertPath, serverKeyPath)
+	serverCert, err := tls.LoadX509KeyPair(fixtures.ServerCertPath, fixtures.ServerKeyPath)
 	if err != nil {
 		t.Fatalf("Could not load server cert and server key from files: %#v", err)
 	}
@@ -294,7 +291,7 @@ func TestVSphereLoginWithCaCert(t *testing.T) {
 	cfg, cleanup := configFromSimWithTLS(&tlsConfig, false)
 	defer cleanup()
 
-	cfg.Global.CAFile = caCertPath
+	cfg.Global.CAFile = fixtures.CaCertPath
 
 	// Create vSphere configuration object
 	vs, err := newControllerNode(cfg)

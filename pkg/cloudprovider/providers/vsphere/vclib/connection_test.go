@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/fixtures"
 )
 
 func createTestServer(t *testing.T, caCertPath, serverCertPath, serverKeyPath string, handler http.HandlerFunc) *httptest.Server {
@@ -57,16 +58,12 @@ func createTestServer(t *testing.T, caCertPath, serverCertPath, serverKeyPath st
 }
 
 func TestWithValidCaCert(t *testing.T) {
-	caCertPath := "fixtures/ca.pem"
-	serverCertPath := "fixtures/server.pem"
-	serverKeyPath := "fixtures/server.key"
-
 	gotRequest := false
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		gotRequest = true
 	}
 
-	server := createTestServer(t, caCertPath, serverCertPath, serverKeyPath, handler)
+	server := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
 	server.StartTLS()
 
 	u, err := url.Parse(server.URL)
@@ -77,7 +74,7 @@ func TestWithValidCaCert(t *testing.T) {
 	connection := &vclib.VSphereConnection{
 		Hostname: u.Hostname(),
 		Port:     u.Port(),
-		CACert:   "fixtures/ca.pem",
+		CACert:   fixtures.CaCertPath,
 	}
 
 	// Ignoring error here, because we only care about the TLS connection
@@ -106,7 +103,7 @@ func TestInvalidCaCert(t *testing.T) {
 	connection := &vclib.VSphereConnection{
 		Hostname: "should-not-matter",
 		Port:     "should-not-matter",
-		CACert:   "fixtures/invalid.pem",
+		CACert:   fixtures.InvalidCaCertPath,
 	}
 
 	_, err := connection.NewClient(context.Background())
@@ -122,7 +119,7 @@ func TestUnsupportedTransport(t *testing.T) {
 	connection := &vclib.VSphereConnection{
 		Hostname: "should-not-matter",
 		Port:     "should-not-matter",
-		CACert:   "fixtures/ca.pem",
+		CACert:   fixtures.CaCertPath,
 	}
 
 	err := connection.ConfigureTransportWithCA(notHttpTransport)

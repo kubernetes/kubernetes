@@ -52,6 +52,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/cloudprovider/providers/vsphere/vclib/diskmanagers:all-srcs",
+        "//pkg/cloudprovider/providers/vsphere/vclib/fixtures:all-srcs",
     ],
     tags = ["automanaged"],
 )
@@ -76,5 +77,8 @@ go_test(
 go_test(
     name = "go_default_xtest",
     srcs = ["connection_test.go"],
-    deps = [":go_default_library"],
+    deps = [
+        ":go_default_library",
+        "//pkg/cloudprovider/providers/vsphere/vclib/fixtures:go_default_library",
+    ],
 )
