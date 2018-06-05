@@ -3831,6 +3831,11 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 			**out = **in
 		}
 	}
+	if in.Sysctls != nil {
+		in, out := &in.Sysctls, &out.Sysctls
+		*out = make([]Sysctl, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

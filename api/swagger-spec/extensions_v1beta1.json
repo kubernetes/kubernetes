@@ -9063,6 +9063,31 @@
       "type": "integer",
       "format": "int64",
       "description": "A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:\n\n1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw "
+     },
+     "sysctls": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Sysctl"
+      },
+      "description": "Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch."
+     }
+    }
+   },
+   "v1.Sysctl": {
+    "id": "v1.Sysctl",
+    "description": "Sysctl defines a kernel parameter to be set",
+    "required": [
+     "name",
+     "value"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of a property to set"
+     },
+     "value": {
+      "type": "string",
+      "description": "Value of a property to set"
      }
     }
    },
@@ -10392,6 +10417,20 @@
        "$ref": "v1beta1.AllowedFlexVolume"
       },
       "description": "allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"volumes\" field."
+     },
+     "allowedUnsafeSysctls": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed. Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.\n\nExamples: e.g. \"foo/*\" allows \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" allows \"foo.bar\", \"foo.baz\", etc."
+     },
+     "forbiddenSysctls": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.\n\nExamples: e.g. \"foo/*\" forbids \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" forbids \"foo.bar\", \"foo.baz\", etc."
      }
     }
    },

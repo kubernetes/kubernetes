@@ -92,6 +92,7 @@ go_library(
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//pkg/security/podsecuritypolicy/sysctl:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/file:go_default_library",
