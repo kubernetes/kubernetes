@@ -78,8 +78,6 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 # enable swagger ui
 ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
-# enable Pod priority and preemption
-ENABLE_POD_PRIORITY_PREEMPTION=${ENABLE_POD_PRIORITY_PREEMPTION:-""}
 
 # enable kubernetes dashboard
 ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
@@ -134,11 +132,6 @@ if [ "${KUBE_PROXY_MODE}" == "ipvs" ]; then
       echo "Required kernel modules for ipvs not found. Falling back to iptables mode."
       KUBE_PROXY_MODE=iptables
     fi
-fi
-
-# set feature gates if enable Pod priority and preemption
-if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
-    FEATURE_GATES="$FEATURE_GATES,PodPriority=true"
 fi
 
 # warn if users are running with swap allowed
@@ -465,19 +458,13 @@ function start_apiserver {
     if [[ -n "${NODE_ADMISSION}" ]]; then
       security_admission=",NodeRestriction"
     fi
-    if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
-      security_admission=",Priority"
-      if [[ -n "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG+=","
-      fi
-      RUNTIME_CONFIG+="scheduling.k8s.io/v1alpha1=true"
-    fi
-
 
     # Admission Controllers to invoke prior to persisting objects in cluster
     #
     # The order defined here dose not matter.
-    ENABLE_ADMISSION_PLUGINS=Initializers,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,StorageObjectInUseProtection
+
+
+    ENABLE_ADMISSION_PLUGINS=Initializers,LimitRanger,ServiceAccount${security_admission},Priority,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,StorageObjectInUseProtection
 
     audit_arg=""
     APISERVER_BASIC_AUDIT_LOG=""
