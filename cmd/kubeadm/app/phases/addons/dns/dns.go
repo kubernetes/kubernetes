@@ -191,12 +191,14 @@ func coreDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interfac
 	}
 
 	// Get the config file for CoreDNS
-	coreDNSConfigMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap, struct{ DNSDomain, UpstreamNameserver, Federation, StubDomain string }{
-		DNSDomain:          coreDNSDomain,
-		UpstreamNameserver: upstreamNameserver,
-		Federation:         federations,
-		StubDomain:         stubDomain,
-	})
+	coreDNSConfigMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap,
+		struct{ ImageRepository, DNSDomain, UpstreamNameserver, Federation, StubDomain string }{
+			ImageRepository:    cfg.ImageRepository,
+			DNSDomain:          coreDNSDomain,
+			UpstreamNameserver: upstreamNameserver,
+			Federation:         federations,
+			StubDomain:         stubDomain,
+		})
 	if err != nil {
 		return fmt.Errorf("error when parsing CoreDNS configMap template: %v", err)
 	}
