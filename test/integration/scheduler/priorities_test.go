@@ -22,6 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // This file tests the scheduler priority functions.
@@ -171,4 +172,63 @@ func TestPodAffinity(t *testing.T) {
 		}
 	}
 	t.Errorf("Pod %v got scheduled on an unexpected node: %v.", podName, pod.Spec.NodeName)
+}
+
+// TestImageLocality verifies that the scheduler's image locality priority function
+// works correctly, i.e., the pod gets scheduled to the node where its container images are ready.
+func TestImageLocality(t *testing.T) {
+	context := initTest(t, "image-locality")
+	defer cleanupTest(t, context)
+	// Add a few nodes.
+	nodes, err := createNodes(context.clientSet, "testnode", nil, 5)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
+	}
+	// We use the mnist-tpu as the test image used by the pod, which has relatively large image size.
+	// TODO: replace this image with a LargeImage dedicated to testing image locality once the LargeImage is added
+	usedImages := []imageutils.ImageConfig{
+		imageutils.MnistTpu,
+	}
+	// Add images to one of the nodes.
+	nodeWithUsedImages := nodes[1]
+	if err = testutils.AddImagesToNode(context.clientSet, nodeWithUsedImages.Name, usedImages); err != nil {
+		t.Fatalf("Cannot add images to node: %v", err)
+	}
+	if err = waitForNodeImages(context.clientSet, nodeWithUsedImages.Name, usedImages); err != nil {
+		t.Fatalf("Adding images to node didn't succeed: %v", err)
+	}
+	// Create a pod with containers each having the specified image.
+	podName := "pod-with-images"
+	pod, err := runPodWithContainers(context.clientSet, initPodWithContainers(context.clientSet, &podWithContainersConfig{
+		Name:       podName,
+		Namespace:  context.ns.Name,
+		Containers: makeContainersWithImages(usedImages),
+	}))
+	if err != nil {
+		t.Fatalf("Error running pod with images: %v", err)
+	}
+	if pod.Spec.NodeName != nodeWithUsedImages.Name {
+		t.Errorf("Pod %v got scheduled on an unexpected node: %v. Expected node: %v.", podName, pod.Spec.NodeName, nodeWithUsedImages.Name)
+	} else {
+		t.Logf("Pod %v got successfully scheduled on node %v.", podName, pod.Spec.NodeName)
+	}
+}
+
+// makeContainerWithImage returns a list of v1.Container objects for each given image. Duplicates of an image are ignored,
+// i.e., each image is used only once.
+func makeContainersWithImages(images []imageutils.ImageConfig) []v1.Container {
+	var containers []v1.Container
+	usedImages := make(map[string]struct{})
+
+	for _, image := range images {
+		imageName := image.Name()
+		if _, ok := usedImages[imageName]; !ok {
+			containers = append(containers, v1.Container{
+				Name:  imageName + "-container",
+				Image: imageutils.GetE2EImage(image),
+			})
+			usedImages[imageName] = struct{}{}
+		}
+	}
+	return containers
 }

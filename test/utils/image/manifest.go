@@ -43,6 +43,10 @@ func (i *ImageConfig) SetName(name string) {
 	i.name = name
 }
 
+func (i *ImageConfig) Name() string {
+	return i.name
+}
+
 func (i *ImageConfig) SetVersion(version string) {
 	i.version = version
 }
@@ -71,18 +75,21 @@ var (
 	Kitten                   = ImageConfig{e2eRegistry, "kitten", "1.0", true}
 	Liveness                 = ImageConfig{e2eRegistry, "liveness", "1.0", true}
 	LogsGenerator            = ImageConfig{e2eRegistry, "logs-generator", "1.0", true}
-	Mounttest                = ImageConfig{e2eRegistry, "mounttest", "1.0", true}
-	MounttestUser            = ImageConfig{e2eRegistry, "mounttest-user", "1.0", true}
-	Nautilus                 = ImageConfig{e2eRegistry, "nautilus", "1.0", true}
-	Net                      = ImageConfig{e2eRegistry, "net", "1.0", true}
-	Netexec                  = ImageConfig{e2eRegistry, "netexec", "1.0", true}
-	Nettest                  = ImageConfig{e2eRegistry, "nettest", "1.0", true}
-	NginxSlim                = ImageConfig{gcRegistry, "nginx-slim", "0.20", true}
-	NginxSlimNew             = ImageConfig{gcRegistry, "nginx-slim", "0.21", true}
-	Nonewprivs               = ImageConfig{e2eRegistry, "nonewprivs", "1.0", true}
-	NoSnatTest               = ImageConfig{e2eRegistry, "no-snat-test", "1.0", true}
-	NoSnatTestProxy          = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0", true}
-	NWayHTTP                 = ImageConfig{e2eRegistry, "n-way-http", "1.0", true}
+	// This image is primarily used for verifying image locality priority scheduling function given its relatively large size
+	// TODO: replace this image with a LargeImage dedicated to image locality test, and add its source code to test/images
+	MnistTpu        = ImageConfig{e2eRegistry, "mnist-tpu", "1.0", true}
+	Mounttest       = ImageConfig{e2eRegistry, "mounttest", "1.0", true}
+	MounttestUser   = ImageConfig{e2eRegistry, "mounttest-user", "1.0", true}
+	Nautilus        = ImageConfig{e2eRegistry, "nautilus", "1.0", true}
+	Net             = ImageConfig{e2eRegistry, "net", "1.0", true}
+	Netexec         = ImageConfig{e2eRegistry, "netexec", "1.0", true}
+	Nettest         = ImageConfig{e2eRegistry, "nettest", "1.0", true}
+	NginxSlim       = ImageConfig{gcRegistry, "nginx-slim", "0.20", true}
+	NginxSlimNew    = ImageConfig{gcRegistry, "nginx-slim", "0.21", true}
+	Nonewprivs      = ImageConfig{e2eRegistry, "nonewprivs", "1.0", true}
+	NoSnatTest      = ImageConfig{e2eRegistry, "no-snat-test", "1.0", true}
+	NoSnatTestProxy = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0", true}
+	NWayHTTP        = ImageConfig{e2eRegistry, "n-way-http", "1.0", true}
 	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	Pause               = ImageConfig{gcRegistry, "pause", "3.1", false}
 	Porter              = ImageConfig{e2eRegistry, "porter", "1.0", true}

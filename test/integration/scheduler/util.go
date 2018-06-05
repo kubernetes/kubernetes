@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -322,6 +323,37 @@ func waitForNodeLabels(cs clientset.Interface, nodeName string, labels map[strin
 	return wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, nodeHasLabels(cs, nodeName, labels))
 }
 
+// nodeHasImages returns a function that checks if a node has all the given images.
+func nodeHasImages(cs clientset.Interface, nodeName string, images []imageutils.ImageConfig) wait.ConditionFunc {
+	return func() (bool, error) {
+		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+
+		nodeImages := sets.NewString()
+		for _, nodeImage := range node.Status.Images {
+			nodeImages.Insert(nodeImage.Names...)
+		}
+
+		for _, image := range images {
+			if _, ok := nodeImages[imageutils.GetE2EImage(image)]; !ok {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+}
+
+// waitForNodeImages waits for the given node to have all the given images.
+func waitForNodeImages(cs clientset.Interface, nodeName string, images []imageutils.ImageConfig) error {
+	return wait.Poll(time.Second, wait.ForeverTestTimeout, nodeHasImages(cs, nodeName, images))
+}
+
 // createNode creates a node with the given resource list and
 // returns a pointer and error status. If 'res' is nil, a predefined amount of
 // resource will be used.
@@ -441,6 +473,43 @@ func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating pause pod: %v", err)
+	}
+	if err = waitForPodToSchedule(cs, pod); err != nil {
+		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
+	}
+	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
+		return pod, fmt.Errorf("Error getting pod %v info: %v", pod.Name, err)
+	}
+	return pod, nil
+}
+
+type podWithContainersConfig struct {
+	Name       string
+	Namespace  string
+	Containers []v1.Container
+}
+
+// initPodWithContainers initializes a pod API object from the given config. This is used primarily for generating
+// pods with containers each having a specific image.
+func initPodWithContainers(cs clientset.Interface, conf *podWithContainersConfig) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      conf.Name,
+			Namespace: conf.Namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: conf.Containers,
+		},
+	}
+	return pod
+}
+
+// runPodWithContainers creates a pod with given config and containers and waits
+// until it is scheduled. It returns its pointer and error status.
+func runPodWithContainers(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
+	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating pod-with-containers: %v", err)
 	}
 	if err = waitForPodToSchedule(cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
