@@ -19,8 +19,12 @@ package vclib
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/pem"
+	"errors"
+	"io/ioutil"
 	"net"
+	"net/http"
 	neturl "net/url"
 	"sync"
 
@@ -38,6 +42,7 @@ type VSphereConnection struct {
 	Password          string
 	Hostname          string
 	Port              string
+	CACert            string
 	Insecure          bool
 	RoundTripperCount uint
 	credentialsLock   sync.Mutex
@@ -130,9 +135,48 @@ func (connection *VSphereConnection) login(ctx context.Context, client *vim25.Cl
 // Logout calls SessionManager.Logout for the given connection.
 func (connection *VSphereConnection) Logout(ctx context.Context) {
 	m := session.NewManager(connection.Client)
+
+	hasActiveSession, err := m.SessionIsActive(ctx)
+	if err != nil {
+		glog.Errorf("Logout failed: %s", err)
+		return
+	}
+	if !hasActiveSession {
+		glog.Errorf("No active session, cannot logout")
+		return
+	}
 	if err := m.Logout(ctx); err != nil {
 		glog.Errorf("Logout failed: %s", err)
 	}
+}
+
+var (
+	ErrCaCertNotReadable    = errors.New("Could not read CA cert file")
+	ErrCaCertInvalid        = errors.New("Could not parse CA cert file")
+	ErrUnsupportedTransport = errors.New("Only support HTTP transport if configuring TLS")
+)
+
+func (connection *VSphereConnection) ConfigureTransportWithCA(transport http.RoundTripper) error {
+	caCertBytes, err := ioutil.ReadFile(connection.CACert)
+	if err != nil {
+		glog.Errorf("Could not read CA cert file, %s", connection.CACert)
+		return ErrCaCertNotReadable
+	}
+	certPool := x509.NewCertPool()
+
+	if ok := certPool.AppendCertsFromPEM(caCertBytes); !ok {
+		glog.Errorf("Cannot add CA to cert pool")
+		return ErrCaCertInvalid
+	}
+	httpTransport, ok := transport.(*http.Transport)
+	if !ok {
+		glog.Errorf("Failed to http transport")
+		return ErrUnsupportedTransport
+	}
+
+	httpTransport.TLSClientConfig.RootCAs = certPool
+
+	return nil
 }
 
 // NewClient creates a new govmomi client for the VSphereConnection obj
@@ -144,11 +188,19 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 	}
 
 	sc := soap.NewClient(url, connection.Insecure)
+
+	if connection.CACert != "" {
+		if err := connection.ConfigureTransportWithCA(sc.Client.Transport); err != nil {
+			return nil, err
+		}
+	}
+
 	client, err := vim25.NewClient(ctx, sc)
 	if err != nil {
 		glog.Errorf("Failed to create new client. err: %+v", err)
 		return nil, err
 	}
+
 	err = connection.login(ctx, client)
 	if err != nil {
 		return nil, err

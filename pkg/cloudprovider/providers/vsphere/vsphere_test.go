@@ -19,6 +19,8 @@ package vsphere
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -89,8 +91,12 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	return
 }
 
-// configFromSim starts a vcsim instance and returns config for use against the vcsim instance.
 func configFromSim() (VSphereConfig, func()) {
+	return configFromSimWithTLS(new(tls.Config), true)
+}
+
+// configFromSim starts a vcsim instance and returns config for use against the vcsim instance.
+func configFromSimWithTLS(tlsConfig *tls.Config, insecureAllowed bool) (VSphereConfig, func()) {
 	var cfg VSphereConfig
 	model := simulator.VPX()
 
@@ -99,7 +105,7 @@ func configFromSim() (VSphereConfig, func()) {
 		log.Fatal(err)
 	}
 
-	model.Service.TLS = new(tls.Config)
+	model.Service.TLS = tlsConfig
 	s := model.Service.NewServer()
 
 	// STS simulator
@@ -109,7 +115,8 @@ func configFromSim() (VSphereConfig, func()) {
 	// Lookup Service simulator
 	model.Service.RegisterSDK(lookup.New())
 
-	cfg.Global.InsecureFlag = true
+	cfg.Global.InsecureFlag = insecureAllowed
+
 	cfg.Global.VCenterIP = s.URL.Hostname()
 	cfg.Global.VCenterPort = s.URL.Port()
 	cfg.Global.User = s.URL.User.Username()
@@ -160,6 +167,7 @@ insecure-flag = true
 datacenter = us-west
 vm-uuid = 1234
 vm-name = vmname
+ca-file = /some/path/to/a/ca.pem
 `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -179,6 +187,10 @@ vm-name = vmname
 
 	if cfg.Global.VMName != "vmname" {
 		t.Errorf("incorrect vm-name: %s", cfg.Global.VMName)
+	}
+
+	if cfg.Global.CAFile != "/some/path/to/a/ca.pem" {
+		t.Errorf("incorrect ca-file: %s", cfg.Global.CAFile)
 	}
 }
 
@@ -228,6 +240,57 @@ func TestVSphereLoginByToken(t *testing.T) {
 	// Configure for SAML token auth
 	cfg.Global.User = localhostCert
 	cfg.Global.Password = localhostKey
+
+	// Create vSphere configuration object
+	vs, err := newControllerNode(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	}
+
+	ctx := context.Background()
+
+	// Create vSphere client
+	vcInstance, ok := vs.vsphereInstanceMap[cfg.Global.VCenterIP]
+	if !ok {
+		t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
+	}
+
+	err = vcInstance.conn.Connect(ctx)
+	if err != nil {
+		t.Errorf("Failed to connect to vSphere: %s", err)
+	}
+	vcInstance.conn.Logout(ctx)
+}
+
+func TestVSphereLoginWithCaCert(t *testing.T) {
+	caCertPath := "./vclib/fixtures/ca.pem"
+	serverCertPath := "./vclib/fixtures/server.pem"
+	serverKeyPath := "./vclib/fixtures/server.key"
+
+	caCertPEM, err := ioutil.ReadFile(caCertPath)
+	if err != nil {
+		t.Fatalf("Could not read ca cert from file")
+	}
+
+	serverCert, err := tls.LoadX509KeyPair(serverCertPath, serverKeyPath)
+	if err != nil {
+		t.Fatalf("Could not load server cert and server key from files: %#v", err)
+	}
+
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM(caCertPEM); !ok {
+		t.Fatalf("Cannot add CA to CAPool")
+	}
+
+	tlsConfig := tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		RootCAs:      certPool,
+	}
+
+	cfg, cleanup := configFromSimWithTLS(&tlsConfig, false)
+	defer cleanup()
+
+	cfg.Global.CAFile = caCertPath
 
 	// Create vSphere configuration object
 	vs, err := newControllerNode(cfg)
