@@ -108,13 +108,9 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			jm.enqueueController(obj, true)
-		},
+		AddFunc:    jm.enqueueController,
 		UpdateFunc: jm.updateJob,
-		DeleteFunc: func(obj interface{}) {
-			jm.enqueueController(obj, true)
-		},
+		DeleteFunc: jm.enqueueController,
 	})
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
@@ -212,7 +208,7 @@ func (jm *JobController) addPod(obj interface{}) {
 			return
 		}
 		jm.expectations.CreationObserved(jobKey)
-		jm.enqueueController(job, true)
+		jm.enqueueController(job)
 		return
 	}
 
@@ -221,7 +217,7 @@ func (jm *JobController) addPod(obj interface{}) {
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
 	for _, job := range jm.getPodJobs(pod) {
-		jm.enqueueController(job, true)
+		jm.enqueueController(job)
 	}
 }
 
@@ -245,8 +241,7 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 		return
 	}
 
-	// the only time we want the backoff to kick-in, is when the pod failed
-	immediate := curPod.Status.Phase != v1.PodFailed
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
 	curControllerRef := metav1.GetControllerOf(curPod)
 	oldControllerRef := metav1.GetControllerOf(oldPod)
@@ -254,7 +249,7 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
 		if job := jm.resolveControllerRef(oldPod.Namespace, oldControllerRef); job != nil {
-			jm.enqueueController(job, immediate)
+			jm.enqueueController(job)
 		}
 	}
 
@@ -264,16 +259,15 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 		if job == nil {
 			return
 		}
-		jm.enqueueController(job, immediate)
+		jm.enqueueController(job)
 		return
 	}
 
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
-	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if labelChanged || controllerRefChanged {
 		for _, job := range jm.getPodJobs(curPod) {
-			jm.enqueueController(job, immediate)
+			jm.enqueueController(job)
 		}
 	}
 }
@@ -314,7 +308,7 @@ func (jm *JobController) deletePod(obj interface{}) {
 		return
 	}
 	jm.expectations.DeletionObserved(jobKey)
-	jm.enqueueController(job, true)
+	jm.enqueueController(job)
 }
 
 func (jm *JobController) updateJob(old, cur interface{}) {
@@ -326,7 +320,7 @@ func (jm *JobController) updateJob(old, cur interface{}) {
 	if err != nil {
 		return
 	}
-	jm.enqueueController(curJob, true)
+	jm.enqueueController(curJob)
 	// check if need to add a new rsync for ActiveDeadlineSeconds
 	if curJob.Status.StartTime != nil {
 		curADS := curJob.Spec.ActiveDeadlineSeconds
@@ -346,19 +340,15 @@ func (jm *JobController) updateJob(old, cur interface{}) {
 	}
 }
 
-// obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item,
-// immediate tells the controller to update the status right away, and should
-// happen ONLY when there was a successful pod run.
-func (jm *JobController) enqueueController(obj interface{}, immediate bool) {
-	key, err := controller.KeyFunc(obj)
+// obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
+func (jm *JobController) enqueueController(job interface{}) {
+	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", job, err))
 		return
 	}
 
-	if immediate {
-		jm.queue.Forget(key)
-	}
+	// Retrieves the backoff duration for this Job
 	backoff := getBackoff(jm.queue, key)
 
 	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
@@ -503,6 +493,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		jobFailed = true
 		failureReason = "BackoffLimitExceeded"
 		failureMessage = "Job has reached the specified backoff limit"
+		glog.V(2).Infof("Job %q/%q deadline exceeded. jobHaveNewFailure = %v; previousRetry = %v", job.Namespace, job.Name, jobHaveNewFailure, previousRetry)
 	} else if pastActiveDeadline(&job) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
