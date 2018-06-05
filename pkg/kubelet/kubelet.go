@@ -780,7 +780,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		containerRefManager,
 		kubeDeps.Recorder)
 
-	tokenManager := token.NewManager(kubeDeps.KubeClient.CoreV1())
+	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
 	klet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
