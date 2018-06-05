@@ -356,10 +356,10 @@ func (jm *JobController) enqueueController(obj interface{}, immediate bool) {
 		return
 	}
 
-	if immediate {
-		jm.queue.Forget(key)
+	backoff := time.Duration(0)
+	if !immediate {
+		backoff = getBackoff(jm.queue, key)
 	}
-	backoff := getBackoff(jm.queue, key)
 
 	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
 	// deterministically avoid syncing controllers that fight over pods. Currently, we only
@@ -503,6 +503,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		jobFailed = true
 		failureReason = "BackoffLimitExceeded"
 		failureMessage = "Job has reached the specified backoff limit"
+		glog.V(2).Infof("Job %q/%q deadline exceeded. jobHaveNewFailure = %v; previousRetry = %v", job.Namespace, job.Name, jobHaveNewFailure, previousRetry)
 	} else if pastActiveDeadline(&job) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
