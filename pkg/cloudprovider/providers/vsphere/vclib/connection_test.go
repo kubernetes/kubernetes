@@ -56,7 +56,7 @@ func createTestServer(t *testing.T, caCertPath, serverCertPath, serverKeyPath st
 	return server
 }
 
-func TestSomething(t *testing.T) {
+func TestWithValidCaCert(t *testing.T) {
 	caCertPath := "fixtures/ca.pem"
 	serverCertPath := "fixtures/server.pem"
 	serverKeyPath := "fixtures/server.key"

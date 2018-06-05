@@ -91,11 +91,15 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	return
 }
 
+// configFromSim starts a vcsim instance and returns config for use against the vcsim instance.
+// The vcsim instance is configured with an empty tls.Config.
 func configFromSim() (VSphereConfig, func()) {
 	return configFromSimWithTLS(new(tls.Config), true)
 }
 
-// configFromSim starts a vcsim instance and returns config for use against the vcsim instance.
+// configFromSimWithTLS starts a vcsim instance and returns config for use against the vcsim instance.
+// The vcsim instance is configured with a tls.Config. The returned client
+// config can be configured to allow/decline insecure connections.
 func configFromSimWithTLS(tlsConfig *tls.Config, insecureAllowed bool) (VSphereConfig, func()) {
 	var cfg VSphereConfig
 	model := simulator.VPX()
