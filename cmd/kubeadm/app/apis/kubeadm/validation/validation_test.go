@@ -33,7 +33,7 @@ import (
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
-func TestValidateTokenDiscovery(t *testing.T) {
+func TestValidateToken(t *testing.T) {
 	var tests = []struct {
 		c        *kubeadm.NodeConfiguration
 		f        *field.Path
@@ -51,7 +51,7 @@ func TestValidateTokenDiscovery(t *testing.T) {
 		err := ValidateToken(rt.c.Token, rt.f).ToAggregate()
 		if (err == nil) != rt.expected {
 			t.Errorf(
-				"failed ValidateTokenDiscovery:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateToken:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(err == nil),
 			)
@@ -434,7 +434,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					DNSDomain:     "cluster.local",
 				},
 				CertificatesDir: "/some/other/cert/dir",
-				Token:           "abcdef.0123456789abcdef",
 			}, false},
 		{"valid master configuration with incorrect IPv4 pod subnet",
 			&kubeadm.MasterConfiguration{
@@ -448,7 +447,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					PodSubnet:     "10.0.1.15",
 				},
 				CertificatesDir:  "/some/other/cert/dir",
-				Token:            "abcdef.0123456789abcdef",
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"valid master configuration with IPv4 service subnet",
@@ -494,7 +492,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					PodSubnet:     "10.0.1.15/16",
 				},
 				CertificatesDir:  "/some/other/cert/dir",
-				Token:            "abcdef.0123456789abcdef",
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 		{"valid master configuration using IPv6 service subnet",
@@ -539,7 +536,6 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					DNSDomain:     "cluster.local",
 				},
 				CertificatesDir:  "/some/other/cert/dir",
-				Token:            "abcdef.0123456789abcdef",
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 	}

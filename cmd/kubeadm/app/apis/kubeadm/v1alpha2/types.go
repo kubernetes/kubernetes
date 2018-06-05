@@ -47,15 +47,9 @@ type MasterConfiguration struct {
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string `json:"kubernetesVersion"`
 
-	// Token is used for establishing bidirectional trust between nodes and masters.
-	// Used for joining nodes in the cluster.
-	Token string `json:"token"`
-	// TokenTTL defines the ttl for Token. Defaults to 24h.
-	TokenTTL *metav1.Duration `json:"tokenTTL,omitempty"`
-	// TokenUsages describes the ways in which this token can be used.
-	TokenUsages []string `json:"tokenUsages,omitempty"`
-	// Extra groups that this token will authenticate as when used for authentication
-	TokenGroups []string `json:"tokenGroups,omitempty"`
+	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
+	// This information IS NOT uploaded to the kubeadm cluster configmap, due to its sensitive nature
+	BootstrapTokens []BootstrapToken `json:"bootstrapTokens,omitempty"`
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -145,18 +139,6 @@ type NodeRegistrationOptions struct {
 	ExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 }
 
-// TokenDiscovery contains elements needed for token discovery.
-type TokenDiscovery struct {
-	// ID is the first part of a bootstrap token. Considered public information.
-	// It is used when referring to a token without leaking the secret part.
-	ID string `json:"id"`
-	// Secret is the second part of a bootstrap token. Should only be shared
-	// with trusted parties.
-	Secret string `json:"secret"`
-	// TODO: Seems unused. Remove?
-	// Addresses []string `json:"addresses"`
-}
-
 // Networking contains elements describing cluster's networking configuration
 type Networking struct {
 	// ServiceSubnet is the subnet used by k8s services. Defaults to "10.96.0.0/12".
@@ -165,6 +147,28 @@ type Networking struct {
 	PodSubnet string `json:"podSubnet"`
 	// DNSDomain is the dns domain used by k8s services. Defaults to "cluster.local".
 	DNSDomain string `json:"dnsDomain"`
+}
+
+// BootstrapToken describes one bootstrap token, stored as a Secret in the cluster
+type BootstrapToken struct {
+	// Token is used for establishing bidirectional trust between nodes and masters.
+	// Used for joining nodes in the cluster.
+	Token *BootstrapTokenString `json:"token"`
+	// Description sets a human-friendly message why this token exists and what it's used
+	// for, so other administrators can know its purpose.
+	Description string `json:"description,omitempty"`
+	// TTL defines the time to live for this token. Defaults to 24h.
+	// Expires and TTL are mutually exclusive.
+	TTL *metav1.Duration `json:"ttl,omitempty"`
+	// Expires specifies the timestamp when this token expires. Defaults to being set
+	// dynamically at runtime based on the TTL. Expires and TTL are mutually exclusive.
+	Expires *metav1.Time `json:"expires,omitempty"`
+	// Usages describes the ways in which this token can be used. Can by default be used
+	// for establishing bidirectional trust, but that can be changed here.
+	Usages []string `json:"usages,omitempty"`
+	// Groups specifies the extra groups that this token will authenticate as when/if
+	// used for authentication
+	Groups []string `json:"groups,omitempty"`
 }
 
 // Etcd contains elements describing Etcd configuration.

@@ -1012,7 +1012,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
-						Cinder: &api.CinderVolumeSource{},
+						Cinder: &api.CinderPersistentVolumeSource{},
 					},
 				},
 			},

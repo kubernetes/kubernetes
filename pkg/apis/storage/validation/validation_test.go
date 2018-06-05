@@ -450,21 +450,22 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 	}
 }
 
-func makeClassWithBinding(mode *storage.VolumeBindingMode) *storage.StorageClass {
+func makeClass(mode *storage.VolumeBindingMode, topologies []api.TopologySelectorTerm) *storage.StorageClass {
 	return &storage.StorageClass{
 		ObjectMeta:        metav1.ObjectMeta{Name: "foo", ResourceVersion: "foo"},
 		Provisioner:       "kubernetes.io/foo-provisioner",
 		ReclaimPolicy:     &deleteReclaimPolicy,
 		VolumeBindingMode: mode,
+		AllowedTopologies: topologies,
 	}
 }
 
 // TODO: Remove these tests once feature gate is not required
 func TestValidateVolumeBindingModeAlphaDisabled(t *testing.T) {
 	errorCases := map[string]*storage.StorageClass{
-		"immediate mode": makeClassWithBinding(&immediateMode1),
-		"waiting mode":   makeClassWithBinding(&waitingMode),
-		"invalid mode":   makeClassWithBinding(&invalidMode),
+		"immediate mode": makeClass(&immediateMode1, nil),
+		"waiting mode":   makeClass(&waitingMode, nil),
+		"invalid mode":   makeClass(&invalidMode, nil),
 	}
 
 	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
@@ -486,19 +487,19 @@ type bindingTest struct {
 func TestValidateVolumeBindingMode(t *testing.T) {
 	cases := map[string]bindingTest{
 		"no mode": {
-			class:         makeClassWithBinding(nil),
+			class:         makeClass(nil, nil),
 			shouldSucceed: false,
 		},
 		"immediate mode": {
-			class:         makeClassWithBinding(&immediateMode1),
+			class:         makeClass(&immediateMode1, nil),
 			shouldSucceed: true,
 		},
 		"waiting mode": {
-			class:         makeClassWithBinding(&waitingMode),
+			class:         makeClass(&waitingMode, nil),
 			shouldSucceed: true,
 		},
 		"invalid mode": {
-			class:         makeClassWithBinding(&invalidMode),
+			class:         makeClass(&invalidMode, nil),
 			shouldSucceed: false,
 		},
 	}
@@ -532,10 +533,10 @@ type updateTest struct {
 }
 
 func TestValidateUpdateVolumeBindingMode(t *testing.T) {
-	noBinding := makeClassWithBinding(nil)
-	immediateBinding1 := makeClassWithBinding(&immediateMode1)
-	immediateBinding2 := makeClassWithBinding(&immediateMode2)
-	waitBinding := makeClassWithBinding(&waitingMode)
+	noBinding := makeClass(nil, nil)
+	immediateBinding1 := makeClass(&immediateMode1, nil)
+	immediateBinding2 := makeClass(&immediateMode2, nil)
+	waitBinding := makeClass(&waitingMode, nil)
 
 	cases := map[string]updateTest{
 		"old and new no mode": {
@@ -589,5 +590,104 @@ func TestValidateUpdateVolumeBindingMode(t *testing.T) {
 	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
 	if err != nil {
 		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
+	}
+}
+
+func TestValidateAllowedTopologies(t *testing.T) {
+
+	validTopology := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone2"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node2"},
+				},
+			},
+		},
+	}
+
+	topologyInvalidKey := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "/invalidkey",
+					Values: []string{"zone1"},
+				},
+			},
+		},
+	}
+
+	topologyLackOfValues := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{},
+				},
+			},
+		},
+	}
+
+	cases := map[string]bindingTest{
+		"no topology": {
+			class:         makeClass(nil, nil),
+			shouldSucceed: true,
+		},
+		"valid topology": {
+			class:         makeClass(nil, validTopology),
+			shouldSucceed: true,
+		},
+		"topology invalid key": {
+			class:         makeClass(nil, topologyInvalidKey),
+			shouldSucceed: false,
+		},
+		"topology lack of values": {
+			class:         makeClass(nil, topologyLackOfValues),
+			shouldSucceed: false,
+		},
+	}
+
+	// TODO: remove when feature gate not required
+	err := utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for DynamicProvisioningScheduling: %v", err)
+	}
+
+	for testName, testCase := range cases {
+		errs := ValidateStorageClass(testCase.class)
+		if testCase.shouldSucceed && len(errs) != 0 {
+			t.Errorf("Expected success for test %q, got %v", testName, errs)
+		}
+		if !testCase.shouldSucceed && len(errs) == 0 {
+			t.Errorf("Expected failure for test %q, got success", testName)
+		}
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for DynamicProvisioningScheduling: %v", err)
+	}
+
+	for testName, testCase := range cases {
+		errs := ValidateStorageClass(testCase.class)
+		if len(errs) == 0 && testCase.class.AllowedTopologies != nil {
+			t.Errorf("Expected failure for test %q, got success", testName)
+		}
 	}
 }

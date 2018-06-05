@@ -21,8 +21,6 @@ package mount
 import (
 	"errors"
 	"os"
-
-	"github.com/golang/glog"
 )
 
 type Mounter struct {
@@ -110,9 +108,8 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 	return unsupportedErr
 }
 
-func (mounter *Mounter) ExistsPath(pathname string) bool {
-	glog.Errorf("%s", unsupportedErr)
-	return true
+func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
+	return true, errors.New("not implemented")
 }
 
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
@@ -137,4 +134,8 @@ func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 
 func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("not implemented")
+}
+
+func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
 }

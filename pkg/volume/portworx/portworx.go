@@ -383,6 +383,10 @@ func (c *portworxVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
+	if util.CheckPersistentVolumeClaimModeBlock(c.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", c.plugin.GetPluginName())
+	}
+
 	volumeID, sizeGiB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
 		return nil, err

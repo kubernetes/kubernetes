@@ -32,6 +32,14 @@ func newBool(val bool) *bool {
 // Funcs returns the fuzzer functions for the batch api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(j *batch.Job, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+
+			// match defaulting
+			if len(j.Labels) == 0 {
+				j.Labels = j.Spec.Template.Labels
+			}
+		},
 		func(j *batch.JobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			completions := int32(c.Rand.Int31())

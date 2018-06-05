@@ -17,13 +17,17 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 //ManagedDiskController : managed disk controller struct
@@ -130,4 +134,42 @@ func (c *ManagedDiskController) getDisk(diskName string) (string, string, error)
 	}
 
 	return "", "", err
+}
+
+// ResizeDisk Expand the disk to new size
+func (c *ManagedDiskController) ResizeDisk(diskName string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+
+	result, err := c.common.cloud.DisksClient.Get(ctx, c.common.resourceGroup, diskName)
+	if err != nil {
+		return oldSize, err
+	}
+
+	if result.DiskProperties == nil || result.DiskProperties.DiskSizeGB == nil {
+		return oldSize, fmt.Errorf("DiskProperties of disk(%s) is nil", diskName)
+	}
+
+	requestBytes := newSize.Value()
+	// Azure resizes in chunks of GiB (not GB)
+	requestGiB := int32(util.RoundUpSize(requestBytes, 1024*1024*1024))
+	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
+
+	glog.V(2).Infof("azureDisk - begin to resize disk(%s) with new size(%d), old size(%v)", diskName, requestGiB, oldSize)
+	// If disk already of greater or equal size than requested we return
+	if *result.DiskProperties.DiskSizeGB >= requestGiB {
+		return newSizeQuant, nil
+	}
+
+	result.DiskProperties.DiskSizeGB = &requestGiB
+
+	ctx, cancel = getContextWithCancel()
+	defer cancel()
+	if _, err := c.common.cloud.DisksClient.CreateOrUpdate(ctx, c.common.resourceGroup, diskName, result); err != nil {
+		return oldSize, err
+	}
+
+	glog.V(2).Infof("azureDisk - resize disk(%s) with new size(%d) completed", diskName, requestGiB)
+
+	return newSizeQuant, nil
 }

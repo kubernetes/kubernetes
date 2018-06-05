@@ -302,6 +302,34 @@ message CephFSVolumeSource {
 // A Cinder volume must exist before mounting to a container.
 // The volume must also be in the same region as the kubelet.
 // Cinder volumes support ownership management and SELinux relabeling.
+message CinderPersistentVolumeSource {
+  // volume id used to identify the volume in cinder
+  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  optional string volumeID = 1;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // +optional
+  optional string fsType = 2;
+
+  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // +optional
+  optional bool readOnly = 3;
+
+  // Optional: points to a secret object containing parameters used to connect
+  // to OpenStack.
+  // +optional
+  optional SecretReference secretRef = 4;
+}
+
+// Represents a cinder volume resource in Openstack.
+// A Cinder volume must exist before mounting to a container.
+// The volume must also be in the same region as the kubelet.
+// Cinder volumes support ownership management and SELinux relabeling.
 message CinderVolumeSource {
   // volume id used to identify the volume in cinder
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
@@ -319,6 +347,11 @@ message CinderVolumeSource {
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
   optional bool readOnly = 3;
+
+  // Optional: points to a secret object containing parameters used to connect
+  // to OpenStack.
+  // +optional
+  optional LocalObjectReference secretRef = 4;
 }
 
 // ClientIPConfig represents the configurations of Client IP based session affinity.
@@ -1959,6 +1992,7 @@ message NodeSelectorRequirement {
 
 // A null or empty node selector term matches no objects. The requirements of
 // them are ANDed.
+// The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
 message NodeSelectorTerm {
   // A list of node selector requirements by node's labels.
   // +optional
@@ -2358,7 +2392,7 @@ message PersistentVolumeSource {
   // Cinder represents a cinder volume attached and mounted on kubelets host machine
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
-  optional CinderVolumeSource cinder = 8;
+  optional CinderPersistentVolumeSource cinder = 8;
 
   // CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
   // +optional
@@ -2631,7 +2665,6 @@ message PodAttachOptions {
 // PodCondition contains details for the current condition of this pod.
 message PodCondition {
   // Type is the type of the condition.
-  // Currently only Ready.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
   optional string type = 1;
 
@@ -2798,6 +2831,12 @@ message PodProxyOptions {
   // Path is the URL path to use for the current proxy request to pod.
   // +optional
   optional string path = 1;
+}
+
+// PodReadinessGate contains the reference to a pod condition
+message PodReadinessGate {
+  // ConditionType refers to a condition in the pod's condition list with matching type.
+  optional string conditionType = 1;
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -3052,12 +3091,36 @@ message PodSpec {
   // configuration based on DNSPolicy.
   // +optional
   optional PodDNSConfig dnsConfig = 26;
+
+  // If specified, all readiness gates will be evaluated for pod readiness.
+  // A pod is ready when all its containers are ready AND
+  // all conditions specified in the readiness gates have status equal to "True"
+  // More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
+  // +optional
+  repeated PodReadinessGate readinessGates = 28;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
-// state of a system.
+// state of a system, especially if the node that hosts the pod cannot contact the control
+// plane.
 message PodStatus {
-  // Current condition of the pod.
+  // The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.
+  // The conditions array, the reason and message fields, and the individual container status
+  // arrays contain more detail about the pod's status.
+  // There are five possible phase values:
+  // 
+  // Pending: The pod has been accepted by the Kubernetes system, but one or more of the
+  // container images has not been created. This includes time before being scheduled as
+  // well as time spent downloading images over the network, which could take a while.
+  // Running: The pod has been bound to a node, and all of the containers have been created.
+  // At least one container is still running, or is in the process of starting or restarting.
+  // Succeeded: All containers in the pod have terminated in success, and will not be restarted.
+  // Failed: All containers in the pod have terminated, and at least one container has
+  // terminated in failure. The container either exited with non-zero status or was terminated
+  // by the system.
+  // Unknown: For some reason the state of the pod could not be obtained, typically due to an
+  // error in communicating with the host of the pod.
+  // 
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase
   // +optional
   optional string phase = 1;
@@ -3577,7 +3640,7 @@ message ResourceQuotaList {
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 message ResourceQuotaSpec {
-  // Hard is the set of desired hard limits for each named resource.
+  // hard is the set of desired hard limits for each named resource.
   // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
@@ -3586,6 +3649,12 @@ message ResourceQuotaSpec {
   // If not specified, the quota matches all objects.
   // +optional
   repeated string scopes = 2;
+
+  // scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+  // but expressed using ScopeSelectorOperator in combination with possible values.
+  // For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
+  // +optional
+  optional ScopeSelector scopeSelector = 3;
 }
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use.
@@ -3720,6 +3789,32 @@ message ScaleIOVolumeSource {
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 10;
+}
+
+// A scope selector represents the AND of the selectors represented
+// by the scoped-resource selector requirements.
+message ScopeSelector {
+  // A list of scope selector requirements by scope of the resources.
+  // +optional
+  repeated ScopedResourceSelectorRequirement matchExpressions = 1;
+}
+
+// A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+// that relates the scope name and values.
+message ScopedResourceSelectorRequirement {
+  // The name of the scope that the selector applies to.
+  optional string scopeName = 1;
+
+  // Represents a scope's relationship to a set of values.
+  // Valid operators are In, NotIn, Exists, DoesNotExist.
+  optional string operator = 2;
+
+  // An array of string values. If the operator is In or NotIn,
+  // the values array must be non-empty. If the operator is Exists or DoesNotExist,
+  // the values array must be empty.
+  // This array is replaced during a strategic merge patch.
+  // +optional
+  repeated string values = 3;
 }
 
 // Secret holds secret data of a certain type. The total bytes of the values in
@@ -4342,6 +4437,28 @@ message Toleration {
   // negative values will be treated as 0 (evict immediately) by the system.
   // +optional
   optional int64 tolerationSeconds = 5;
+}
+
+// A topology selector requirement is a selector that matches given label.
+// This is an alpha feature and may change in the future.
+message TopologySelectorLabelRequirement {
+  // The label key that the selector applies to.
+  optional string key = 1;
+
+  // An array of string values. One value must match the label to be selected.
+  // Each entry in Values is ORed.
+  repeated string values = 2;
+}
+
+// A topology selector term represents the result of label queries.
+// A null or empty topology selector term matches no objects.
+// The requirements of them are ANDed.
+// It provides a subset of functionality as NodeSelectorTerm.
+// This is an alpha feature and may change in the future.
+message TopologySelectorTerm {
+  // A list of topology selector requirements by labels.
+  // +optional
+  repeated TopologySelectorLabelRequirement matchLabelExpressions = 1;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

@@ -35,10 +35,6 @@ import (
 	_ "github.com/stretchr/testify/assert"
 )
 
-const (
-	defaultTimeout = 3 * time.Minute
-)
-
 var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList

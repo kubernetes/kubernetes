@@ -92,10 +92,14 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 		!IsHugePageResourceName(name)
 }
 
+func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
+}
+
 // Extended and Hugepages resources
 func IsScalarResourceName(name v1.ResourceName) bool {
 	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
-		IsPrefixedNativeResource(name)
+		IsPrefixedNativeResource(name) || IsAttachableVolumeResourceName(name)
 }
 
 // this function aims to check if the service's ClusterIP is set or not
@@ -304,6 +308,50 @@ func MatchNodeSelectorTerms(
 			if err != nil || !fieldSelector.Matches(nodeFields) {
 				continue
 			}
+		}
+
+		return true
+	}
+
+	return false
+}
+
+// TopologySelectorRequirementsAsSelector converts the []TopologySelectorLabelRequirement api type into a struct
+// that implements labels.Selector.
+func TopologySelectorRequirementsAsSelector(tsm []v1.TopologySelectorLabelRequirement) (labels.Selector, error) {
+	if len(tsm) == 0 {
+		return labels.Nothing(), nil
+	}
+
+	selector := labels.NewSelector()
+	for _, expr := range tsm {
+		r, err := labels.NewRequirement(expr.Key, selection.In, expr.Values)
+		if err != nil {
+			return nil, err
+		}
+		selector = selector.Add(*r)
+	}
+
+	return selector, nil
+}
+
+// MatchTopologySelectorTerms checks whether given labels match topology selector terms in ORed;
+// nil or empty term matches no objects; while empty term list matches all objects.
+func MatchTopologySelectorTerms(topologySelectorTerms []v1.TopologySelectorTerm, lbls labels.Set) bool {
+	if len(topologySelectorTerms) == 0 {
+		// empty term list matches all objects
+		return true
+	}
+
+	for _, req := range topologySelectorTerms {
+		// nil or empty term selects no objects
+		if len(req.MatchLabelExpressions) == 0 {
+			continue
+		}
+
+		labelSelector, err := TopologySelectorRequirementsAsSelector(req.MatchLabelExpressions)
+		if err != nil || !labelSelector.Matches(lbls) {
+			continue
 		}
 
 		return true

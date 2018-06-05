@@ -30,6 +30,7 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/client-go/pkg/apis/clientauthentication/install:all-srcs",
         "//staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

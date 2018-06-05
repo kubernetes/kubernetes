@@ -51,6 +51,10 @@ message AllowedHostPath {
   // `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
   // `/foo` would not allow `/food` or `/etc/foo`
   optional string pathPrefix = 1;
+
+  // when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.
+  // +optional
+  optional bool readOnly = 2;
 }
 
 message CustomMetricCurrentStatus {

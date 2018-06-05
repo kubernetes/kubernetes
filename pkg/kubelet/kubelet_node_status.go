@@ -326,6 +326,30 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	return node, nil
 }
 
+// setVolumeLimits updates volume limits on the node
+func (kl *Kubelet) setVolumeLimits(node *v1.Node) {
+	if node.Status.Capacity == nil {
+		node.Status.Capacity = v1.ResourceList{}
+	}
+
+	if node.Status.Allocatable == nil {
+		node.Status.Allocatable = v1.ResourceList{}
+	}
+
+	pluginWithLimits := kl.volumePluginMgr.ListVolumePluginWithLimits()
+	for _, volumePlugin := range pluginWithLimits {
+		attachLimits, err := volumePlugin.GetVolumeLimits()
+		if err != nil {
+			glog.V(4).Infof("Error getting volume limit for plugin %s", volumePlugin.GetPluginName())
+			continue
+		}
+		for limitKey, value := range attachLimits {
+			node.Status.Capacity[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
+			node.Status.Allocatable[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
+		}
+	}
+}
+
 // syncNodeStatus should be called periodically from a goroutine.
 // It synchronizes node status to master, registering the kubelet first if
 // necessary.
@@ -751,6 +775,9 @@ func (kl *Kubelet) setNodeStatusInfo(node *v1.Node) {
 	kl.setNodeStatusDaemonEndpoints(node)
 	kl.setNodeStatusImages(node)
 	kl.setNodeStatusGoRuntime(node)
+	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		kl.setVolumeLimits(node)
+	}
 }
 
 // Set Ready condition for the node.

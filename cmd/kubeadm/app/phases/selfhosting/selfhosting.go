@@ -128,7 +128,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 			return err
 		}
 
-		glog.Infof("[self-hosted] self-hosted %s ready after %f seconds\n", componentName, time.Since(start).Seconds())
+		fmt.Printf("[self-hosted] self-hosted %s ready after %f seconds\n", componentName, time.Since(start).Seconds())
 	}
 	return nil
 }

@@ -865,12 +865,12 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdConfig(cmdutil.NewFactory(genericclioptions.NewTestConfigFlags()), clientcmd.NewDefaultPathOptions(), streams)
+	// "context" is a global flag, inherited from base kubectl command in the real world
+	cmd.PersistentFlags().String("context", "", "The name of the kubeconfig context to use")
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
 
-	// outBytes, _ := ioutil.ReadFile(fakeKubeFile.Name())
 	config := clientcmd.GetConfigFromFileOrDie(fakeKubeFile.Name())
-
 	return buf.String(), *config
 }
 

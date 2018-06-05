@@ -352,6 +352,9 @@ func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
 	}
+	if util.CheckPersistentVolumeClaimModeBlock(v.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", v.plugin.GetPluginName())
+	}
 
 	volSpec, err := v.manager.CreateVolume(v)
 	if err != nil {

@@ -50,7 +50,7 @@ func NewCmdMarkMaster() *cobra.Command {
 	cfg := &kubeadmapiv1alpha2.MasterConfiguration{
 		// KubernetesVersion is not used by mark master, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.9.0",
+		KubernetesVersion: "v1.10.0",
 	}
 
 	// Default values for the cobra help text

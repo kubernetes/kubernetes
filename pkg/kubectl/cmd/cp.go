@@ -113,30 +113,25 @@ var (
 )
 
 func extractFileSpec(arg string) (fileSpec, error) {
-	pieces := strings.Split(arg, ":")
-	if len(pieces) == 1 {
+	if i := strings.Index(arg, ":"); i == -1 {
 		return fileSpec{File: arg}, nil
-	}
-	if len(pieces) != 2 {
-		// FIXME Kubernetes can't copy files that contain a ':'
-		// character.
-		return fileSpec{}, errFileSpecDoesntMatchFormat
-	}
-	file := pieces[1]
-
-	pieces = strings.Split(pieces[0], "/")
-	if len(pieces) == 1 {
-		return fileSpec{
-			PodName: pieces[0],
-			File:    file,
-		}, nil
-	}
-	if len(pieces) == 2 {
-		return fileSpec{
-			PodNamespace: pieces[0],
-			PodName:      pieces[1],
-			File:         file,
-		}, nil
+	} else if i > 0 {
+		file := arg[i+1:]
+		pod := arg[:i]
+		pieces := strings.Split(pod, "/")
+		if len(pieces) == 1 {
+			return fileSpec{
+				PodName: pieces[0],
+				File:    file,
+			}, nil
+		}
+		if len(pieces) == 2 {
+			return fileSpec{
+				PodNamespace: pieces[0],
+				PodName:      pieces[1],
+				File:         file,
+			}, nil
+		}
 	}
 
 	return fileSpec{}, errFileSpecDoesntMatchFormat
@@ -177,13 +172,21 @@ func (o *CopyOptions) Run(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	if len(srcSpec.PodName) != 0 && len(destSpec.PodName) != 0 {
+		if _, err := os.Stat(args[0]); err == nil {
+			return o.copyToPod(fileSpec{File: args[0]}, destSpec)
+		}
+		return fmt.Errorf("src doesn't exist in local filesystem")
+	}
+
 	if len(srcSpec.PodName) != 0 {
 		return o.copyFromPod(srcSpec, destSpec)
 	}
 	if len(destSpec.PodName) != 0 {
 		return o.copyToPod(srcSpec, destSpec)
 	}
-	return fmt.Errorf("One of src or dest must be a remote file specification")
+	return fmt.Errorf("one of src or dest must be a remote file specification")
 }
 
 // checkDestinationIsDir receives a destination fileSpec and
@@ -287,7 +290,20 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	}()
 	prefix := getPrefix(src.File)
 	prefix = path.Clean(prefix)
+	// remove extraneous path shortcuts - these could occur if a path contained extra "../"
+	// and attempted to navigate beyond "/" in a remote filesystem
+	prefix = stripPathShortcuts(prefix)
 	return untarAll(reader, dest.File, prefix)
+}
+
+// stripPathShortcuts removes any leading or trailing "../" from a given path
+func stripPathShortcuts(p string) string {
+	newPath := path.Clean(p)
+	if len(newPath) > 0 && string(newPath[0]) == "/" {
+		return newPath[1:]
+	}
+
+	return newPath
 }
 
 func makeTar(srcPath, destPath string, writer io.Writer) error {

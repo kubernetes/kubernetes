@@ -44,6 +44,10 @@ func SetObjectDefaults_MasterConfiguration(in *MasterConfiguration) {
 		v1beta1.SetDefaults_KubeletConfiguration(in.KubeletConfiguration.BaseConfig)
 	}
 	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
+	for i := range in.BootstrapTokens {
+		a := &in.BootstrapTokens[i]
+		SetDefaults_BootstrapToken(a)
+	}
 }
 
 func SetObjectDefaults_NodeConfiguration(in *NodeConfiguration) {

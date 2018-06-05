@@ -22,6 +22,12 @@ import (
 	"k8s.io/utils/exec"
 )
 
+const (
+	// DefaultHostRootFsPath is path to host's filesystem mounted into container
+	// with kubelet.
+	DefaultHostRootFsPath = "/rootfs"
+)
+
 // Nsenter is part of experimental support for running the kubelet
 // in a container.
 type Nsenter struct {
@@ -30,7 +36,7 @@ type Nsenter struct {
 }
 
 // NewNsenter constructs a new instance of Nsenter
-func NewNsenter() (*Nsenter, error) {
+func NewNsenter(hostRootFsPath string, executor exec.Interface) (*Nsenter, error) {
 	return &Nsenter{}, nil
 }
 

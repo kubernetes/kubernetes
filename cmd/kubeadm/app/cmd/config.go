@@ -48,10 +48,18 @@ const (
 	// TODO: Figure out how to get these constants from the API machinery
 	masterConfig = "MasterConfiguration"
 	nodeConfig   = "NodeConfiguration"
-	sillyToken   = "abcdef.0123456789abcdef"
 )
 
-var availableAPIObjects = []string{masterConfig, nodeConfig}
+var (
+	availableAPIObjects = []string{masterConfig, nodeConfig}
+	// sillyToken is only set statically to make kubeadm not randomize the token on every run
+	sillyToken = kubeadmapiv1alpha2.BootstrapToken{
+		Token: &kubeadmapiv1alpha2.BootstrapTokenString{
+			ID:     "abcdef",
+			Secret: "0123456789abcdef",
+		},
+	}
+)
 
 // NewCmdConfig returns cobra.Command for "kubeadm config" command
 func NewCmdConfig(out io.Writer) *cobra.Command {
@@ -123,7 +131,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	if apiObject == masterConfig {
 
 		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha2.MasterConfiguration{
-			Token: sillyToken,
+			BootstrapTokens: []kubeadmapiv1alpha2.BootstrapToken{sillyToken},
 		})
 		kubeadmutil.CheckErr(err)
 
@@ -131,7 +139,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	}
 	if apiObject == nodeConfig {
 		internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha2.NodeConfiguration{
-			Token: sillyToken,
+			Token: sillyToken.Token.String(),
 			DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
 			DiscoveryTokenUnsafeSkipCAVerification: true,
 		})
@@ -402,7 +410,7 @@ func (ip *ImagesPull) PullAll() error {
 		if err := ip.puller.Pull(image); err != nil {
 			return fmt.Errorf("failed to pull image %q: %v", image, err)
 		}
-		glog.Infof("[config/images] Pulled %s\n", image)
+		fmt.Printf("[config/images] Pulled %s\n", image)
 	}
 	return nil
 }

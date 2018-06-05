@@ -241,6 +241,32 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		{PathPrefix: "/foo/bar"},
 	}
 
+	failHostPathReadOnlyPod := defaultPod()
+	failHostPathReadOnlyPod.Spec.Containers[0].VolumeMounts = []api.VolumeMount{
+		{
+			Name:     "bad volume",
+			ReadOnly: false,
+		},
+	}
+	failHostPathReadOnlyPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "bad volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo",
+				},
+			},
+		},
+	}
+	failHostPathReadOnlyPSP := defaultPSP()
+	failHostPathReadOnlyPSP.Spec.Volumes = []policy.FSType{policy.HostPath}
+	failHostPathReadOnlyPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
+		{
+			PathPrefix: "/foo",
+			ReadOnly:   true,
+		},
+	}
+
 	failOtherSysctlsAllowedPSP := defaultPSP()
 	failOtherSysctlsAllowedPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
 
@@ -327,6 +353,11 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			pod:           failHostPathDirPod,
 			psp:           failHostPathDirPSP,
 			expectedError: "is not allowed to be used",
+		},
+		"failHostPathReadOnlyPSP": {
+			pod:           failHostPathReadOnlyPod,
+			psp:           failHostPathReadOnlyPSP,
+			expectedError: "must be read-only",
 		},
 		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
 			pod:           failSafeSysctlFooPod,
@@ -598,13 +629,64 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		Level: "level",
 	}
 
+	hostPathDirPodVolumeMounts := []api.VolumeMount{
+		{
+			Name:     "writeable /foo/bar",
+			ReadOnly: false,
+		},
+		{
+			Name:     "read only /foo/bar/baz",
+			ReadOnly: true,
+		},
+		{
+			Name:     "parent read only volume",
+			ReadOnly: true,
+		},
+		{
+			Name:     "read only child volume",
+			ReadOnly: true,
+		},
+	}
+
 	hostPathDirPod := defaultPod()
+	hostPathDirPod.Spec.InitContainers = []api.Container{
+		{
+			Name:         defaultContainerName,
+			VolumeMounts: hostPathDirPodVolumeMounts,
+		},
+	}
+
+	hostPathDirPod.Spec.Containers[0].VolumeMounts = hostPathDirPodVolumeMounts
 	hostPathDirPod.Spec.Volumes = []api.Volume{
 		{
-			Name: "good volume",
+			Name: "writeable /foo/bar",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/bar",
+				},
+			},
+		},
+		{
+			Name: "read only /foo/bar/baz",
 			VolumeSource: api.VolumeSource{
 				HostPath: &api.HostPathVolumeSource{
 					Path: "/foo/bar/baz",
+				},
+			},
+		},
+		{
+			Name: "parent read only volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/",
+				},
+			},
+		},
+		{
+			Name: "read only child volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/readonly/child",
 				},
 			},
 		},
@@ -613,13 +695,16 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	hostPathDirPSP := defaultPSP()
 	hostPathDirPSP.Spec.Volumes = []policy.FSType{policy.HostPath}
 	hostPathDirPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
-		{PathPrefix: "/foo/bar"},
+		// overlapping test case where child is different than parent directory.
+		{PathPrefix: "/foo/bar/baz", ReadOnly: true},
+		{PathPrefix: "/foo", ReadOnly: true},
+		{PathPrefix: "/foo/bar", ReadOnly: false},
 	}
 
 	hostPathDirAsterisksPSP := defaultPSP()
 	hostPathDirAsterisksPSP.Spec.Volumes = []policy.FSType{policy.All}
 	hostPathDirAsterisksPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
-		{PathPrefix: "/foo/bar"},
+		{PathPrefix: "/foo"},
 	}
 
 	sysctlAllowFooPSP := defaultPSP()

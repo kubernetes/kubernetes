@@ -68,7 +68,6 @@ func TestPrintConfiguration(t *testing.T) {
 	nodeRegistration:
 	  criSocket: ""
 	  name: ""
-	token: ""
 	unifiedControlPlaneImage: ""
 `),
 		},
@@ -113,7 +112,6 @@ func TestPrintConfiguration(t *testing.T) {
 	nodeRegistration:
 	  criSocket: ""
 	  name: ""
-	token: ""
 	unifiedControlPlaneImage: ""
 `),
 		},

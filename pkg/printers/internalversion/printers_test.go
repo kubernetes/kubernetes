@@ -1098,6 +1098,7 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	verifyTable(t, table)
 	if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -1227,6 +1228,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			verifyTable(t, table)
 			if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
 				t.Fatal(err)
 			}
@@ -1505,6 +1507,7 @@ func TestPrintPodTable(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		buf := &bytes.Buffer{}
 		p := printers.NewHumanReadablePrinter(nil, test.opts).With(AddHandlers).AddTabWriter(false)
 		if err := p.PrintObj(table, buf); err != nil {
@@ -1545,7 +1548,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test container error overwrites pod phase
@@ -1560,7 +1563,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test the same as the above but with Terminated state and the first container overwrites the rest
@@ -1575,7 +1578,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1590,7 +1593,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1606,7 +1609,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod has 2 containers, one is running and the other is completed.
@@ -1622,7 +1625,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", int64(6), "<unknown>"}}},
 		},
 	}
 
@@ -1663,7 +1666,7 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "1.1.1.1", "test1", "node1"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are none
@@ -1682,7 +1685,7 @@ func TestPrintPodwide(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", 6, "<unknown>", "<none>", "<none>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>"}}},
 		},
 	}
 
@@ -1732,7 +1735,7 @@ func TestPrintPodList(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", 6, "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", 1, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", int64(6), "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", int64(1), "<unknown>"}}},
 		},
 	}
 
@@ -1769,7 +1772,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Pending should be printed
@@ -1784,7 +1787,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Unknown should be printed
@@ -1799,7 +1802,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Succeeded shouldn't be printed
@@ -1814,7 +1817,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "Succeeded", 6, "<unknown>"}, Conditions: podSuccessConditions}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "Succeeded", int64(6), "<unknown>"}, Conditions: podSuccessConditions}},
 		},
 		{
 			// Test pod phase Failed shouldn't be printed
@@ -1829,7 +1832,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "Failed", 6, "<unknown>"}, Conditions: podFailedConditions}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "Failed", int64(6), "<unknown>"}, Conditions: podFailedConditions}},
 		},
 	}
 
@@ -1838,6 +1841,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		rows := table.Rows
 		for i := range rows {
 			rows[i].Object.Object = nil
@@ -1871,7 +1875,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{"col1", "COL2"},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "asd", "zxc"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "asd", "zxc"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1890,7 +1894,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 	}
 
@@ -1899,6 +1903,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		rows := table.Rows
 		for i := range rows {
 			rows[i].Object.Object = nil
@@ -1982,6 +1987,7 @@ func TestPrintDeployment(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -1990,6 +1996,7 @@ func TestPrintDeployment(t *testing.T) {
 		}
 		buf.Reset()
 		table, err = printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.deployment, printers.PrintOptions{Wide: true})
+		verifyTable(t, table)
 		// print deployment with '-o wide' option
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{Wide: true, NoHeaders: true}); err != nil {
 			t.Fatal(err)
@@ -2035,6 +2042,7 @@ func TestPrintDaemonSet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2089,6 +2097,7 @@ func TestPrintJob(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2620,6 +2629,7 @@ func TestPrintHPA(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2654,7 +2664,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			true,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "COL2=zxc,col1=asd"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "COL2=zxc,col1=asd"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -2673,7 +2683,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			false,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 	}
 
@@ -2682,6 +2692,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		rows := table.Rows
 		for i := range rows {
 			rows[i].Object.Object = nil
@@ -2848,6 +2859,7 @@ func TestPrintService(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2905,6 +2917,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -2985,6 +2998,7 @@ func TestPrintControllerRevision(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3045,6 +3059,7 @@ func TestPrintReplicaSet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3057,6 +3072,7 @@ func TestPrintReplicaSet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true, Wide: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3155,6 +3171,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3227,6 +3244,7 @@ func TestPrintCronJob(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3270,6 +3288,7 @@ func TestPrintStorageClass(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
@@ -3277,5 +3296,19 @@ func TestPrintStorageClass(t *testing.T) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
+	}
+}
+
+func verifyTable(t *testing.T, table *metav1beta1.Table) {
+	var panicErr interface{}
+	func() {
+		defer func() {
+			panicErr = recover()
+		}()
+		table.DeepCopyObject() // cells are untyped, better check that types are JSON types and can be deep copied
+	}()
+
+	if panicErr != nil {
+		t.Errorf("unexpected panic during deepcopy of table %#v: %v", table, panicErr)
 	}
 }

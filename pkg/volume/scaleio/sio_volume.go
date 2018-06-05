@@ -259,6 +259,10 @@ func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
 	}
 
+	if util.CheckPersistentVolumeClaimModeBlock(v.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", v.plugin.GetPluginName())
+	}
+
 	// setup volume attrributes
 	genName := v.generateName("k8svol", 11)
 	var oneGig int64 = 1024 * 1024 * 1024
