@@ -78,10 +78,11 @@ type SSHTunneler struct {
 	lastSync       int64 // Seconds since Epoch
 	lastSSHKeySync int64 // Seconds since Epoch
 
-	SSHUser        string
-	SSHKeyfile     string
-	InstallSSHKey  InstallSSHKey
-	HealthCheckURL *url.URL
+	SSHUser            string
+	SSHKeyfile         string
+	InstallSSHKey      InstallSSHKey
+	HealthCheckURL     *url.URL
+	HealthCheckTimeout time.Duration
 
 	tunnels        *ssh.SSHTunnelList
 	lastSyncMetric prometheus.GaugeFunc
@@ -91,13 +92,14 @@ type SSHTunneler struct {
 	stopChan     chan struct{}
 }
 
-func New(sshUser, sshKeyfile string, healthCheckURL *url.URL, installSSHKey InstallSSHKey) Tunneler {
+func New(sshUser, sshKeyfile string, healthCheckURL *url.URL, healthCheckTimeout time.Duration, installSSHKey InstallSSHKey) Tunneler {
 	return &SSHTunneler{
-		SSHUser:        sshUser,
-		SSHKeyfile:     sshKeyfile,
-		InstallSSHKey:  installSSHKey,
-		HealthCheckURL: healthCheckURL,
-		clock:          clock.RealClock{},
+		SSHUser:            sshUser,
+		SSHKeyfile:         sshKeyfile,
+		InstallSSHKey:      installSSHKey,
+		HealthCheckURL:     healthCheckURL,
+		HealthCheckTimeout: healthCheckTimeout,
+		clock:              clock.RealClock{},
 	}
 }
 
@@ -132,7 +134,7 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 		}
 	}
 
-	c.tunnels = ssh.NewSSHTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.stopChan)
+	c.tunnels = ssh.NewSSHTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.HealthCheckTimeout, c.stopChan)
 	// Sync loop to ensure that the SSH key has been installed.
 	c.lastSSHKeySync = c.clock.Now().Unix()
 	c.installSSHKeySyncLoop(c.SSHUser, publicKeyFile)

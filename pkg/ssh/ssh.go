@@ -320,18 +320,20 @@ type SSHTunnelList struct {
 	tunnelCreator sshTunnelCreator
 	tunnelsLock   sync.Mutex
 
-	user           string
-	keyfile        string
-	healthCheckURL *url.URL
+	user               string
+	keyfile            string
+	healthCheckURL     *url.URL
+	healthCheckTimeout time.Duration
 }
 
-func NewSSHTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan chan struct{}) *SSHTunnelList {
+func NewSSHTunnelList(user, keyfile string, healthCheckURL *url.URL, healthCheckTimeout time.Duration, stopChan chan struct{}) *SSHTunnelList {
 	l := &SSHTunnelList{
-		adding:         make(map[string]bool),
-		tunnelCreator:  &realTunnelCreator{},
-		user:           user,
-		keyfile:        keyfile,
-		healthCheckURL: healthCheckURL,
+		adding:             make(map[string]bool),
+		tunnelCreator:      &realTunnelCreator{},
+		user:               user,
+		keyfile:            keyfile,
+		healthCheckURL:     healthCheckURL,
+		healthCheckTimeout: healthCheckTimeout,
 	}
 	healthCheckPoll := 1 * time.Minute
 	go wait.Until(func() {
@@ -370,7 +372,7 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 		// close the connection.
 		DisableKeepAlives: true,
 	})
-	client := &http.Client{Transport: transport}
+	client := &http.Client{Transport: transport, Timeout: l.healthCheckTimeout}
 	resp, err := client.Get(l.healthCheckURL.String())
 	if err != nil {
 		return err
