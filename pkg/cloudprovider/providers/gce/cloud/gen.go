@@ -3018,6 +3018,7 @@ type BetaBackendServices interface {
 	Insert(ctx context.Context, key *meta.Key, obj *beta.BackendService) error
 	Delete(ctx context.Context, key *meta.Key) error
 	SetSecurityPolicy(context.Context, *meta.Key, *beta.SecurityPolicyReference) error
+	Update(context.Context, *meta.Key, *beta.BackendService) error
 }
 
 // NewMockBetaBackendServices returns a new mock for BackendServices.
@@ -3058,6 +3059,7 @@ type MockBetaBackendServices struct {
 	InsertHook            func(ctx context.Context, key *meta.Key, obj *beta.BackendService, m *MockBetaBackendServices) (bool, error)
 	DeleteHook            func(ctx context.Context, key *meta.Key, m *MockBetaBackendServices) (bool, error)
 	SetSecurityPolicyHook func(context.Context, *meta.Key, *beta.SecurityPolicyReference, *MockBetaBackendServices) error
+	UpdateHook            func(context.Context, *meta.Key, *beta.BackendService, *MockBetaBackendServices) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -3207,6 +3209,14 @@ func (m *MockBetaBackendServices) Obj(o *beta.BackendService) *MockBackendServic
 func (m *MockBetaBackendServices) SetSecurityPolicy(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicyReference) error {
 	if m.SetSecurityPolicyHook != nil {
 		return m.SetSecurityPolicyHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// Update is a mock for the corresponding method.
+func (m *MockBetaBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *beta.BackendService) error {
+	if m.UpdateHook != nil {
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -3383,6 +3393,39 @@ func (g *GCEBetaBackendServices) SetSecurityPolicy(ctx context.Context, key *met
 	}
 	err = g.s.WaitForCompletion(ctx, op)
 	glog.V(4).Infof("GCEBetaBackendServices.SetSecurityPolicy(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// Update is a method on GCEBetaBackendServices.
+func (g *GCEBetaBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *beta.BackendService) error {
+	glog.V(5).Infof("GCEBetaBackendServices.Update(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaBackendServices.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "BackendServices")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Update",
+		Version:   meta.Version("beta"),
+		Service:   "BackendServices",
+	}
+	glog.V(5).Infof("GCEBetaBackendServices.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.BackendServices.Update(projectID, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
 	return err
 }
 
