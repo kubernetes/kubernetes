@@ -52,6 +52,7 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -379,7 +380,10 @@ func (i *Init) Run(out io.Writer) error {
 	glog.V(1).Infof("[init] waiting for the API server to be healthy")
 	waiter := getWaiter(i, client)
 
-	if err := waitForAPIAndKubelet(waiter); err != nil {
+	fmt.Printf("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", kubeadmconstants.GetStaticPodDirectory())
+	fmt.Println("[init] this might take a minute or longer if the control plane images have to be pulled")
+
+	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
 			"Error":                  fmt.Sprintf("%v", err),
 			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
@@ -415,6 +419,11 @@ func (i *Init) Run(out io.Writer) error {
 	glog.V(1).Infof("[init] marking the master with right label")
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.Taints); err != nil {
 		return fmt.Errorf("error marking master: %v", err)
+	}
+
+	glog.V(1).Infof("[init] preserving the crisocket information for the master")
+	if err := patchnodephase.AnnotateCRISocket(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.CRISocket); err != nil {
+		return fmt.Errorf("error uploading crisocket: %v", err)
 	}
 
 	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
@@ -581,14 +590,10 @@ func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
 	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 
-// waitForAPIAndKubelet waits primarily for the API server to come up. If that takes a long time, and the kubelet
-// /healthz and /healthz/syncloop endpoints continuously are unhealthy, kubeadm will error out after a period of
-// backoffing exponentially
-func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
+// waitForKubeletAndFunc waits primarily for the function f to execute, even though it might take some time. If that takes a long time, and the kubelet
+// /healthz continuously are unhealthy, kubeadm will error out after a period of exponential backoff
+func waitForKubeletAndFunc(waiter apiclient.Waiter, f func() error) error {
 	errorChan := make(chan error)
-
-	fmt.Printf("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", kubeadmconstants.GetStaticPodDirectory())
-	fmt.Println("[init] this might take a minute or longer if the control plane images have to be pulled")
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
@@ -598,9 +603,9 @@ func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
 	}(errorChan, waiter)
 
 	go func(errC chan error, waiter apiclient.Waiter) {
-		// This main goroutine sends whatever WaitForAPI returns (error or not) to the channel
-		// This in order to continue on success (nil error), or just fail if
-		errC <- waiter.WaitForAPI()
+		// This main goroutine sends whatever the f function returns (error or not) to the channel
+		// This in order to continue on success (nil error), or just fail if the function returns an error
+		errC <- f()
 	}(errorChan, waiter)
 
 	// This call is blocking until one of the goroutines sends to errorChan
