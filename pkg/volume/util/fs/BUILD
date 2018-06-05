@@ -34,7 +34,7 @@ go_library(
             "fs_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
-            "fs_unsupported.go",
+            "fs_windows.go",
         ],
         "//conditions:default": [],
     }),
@@ -74,6 +74,7 @@ go_library(
             "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/golang.org/x/sys/windows:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "//conditions:default": [],

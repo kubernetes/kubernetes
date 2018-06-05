@@ -303,3 +303,11 @@ func buildRootfsStats(cstat *cadvisorapiv2.ContainerStats, imageFs *cadvisorapiv
 		Inodes:         imageFs.Inodes,
 	}
 }
+
+func getUint64Value(value *uint64) uint64 {
+	if value == nil {
+		return 0
+	}
+
+	return *value
+}
