@@ -25,11 +25,17 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
@@ -70,6 +76,7 @@ type QuotaMonitor struct {
 	// each monitor list/watches a resource and determines if we should replenish quota
 	monitors    monitors
 	monitorLock sync.Mutex
+
 	// informersStarted is closed after after all of the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
@@ -85,10 +92,8 @@ type QuotaMonitor struct {
 	// monitors are the producer of the resourceChanges queue
 	resourceChanges workqueue.RateLimitingInterface
 
-	// interfaces with informers
-	informerFactory InformerFactory
-
 	// list of resources to ignore
+	// TODO: we either find a way to discover this or find a way to provide it via config
 	ignoredResources map[schema.GroupResource]struct{}
 
 	// The period that should be used to re-sync the monitored resource
@@ -99,17 +104,28 @@ type QuotaMonitor struct {
 
 	// maintains list of evaluators
 	registry quota.Registry
+
+	// restMapper can reset itself from discovery
+	restMapper meta.RESTMapper
+	// dynamicClient is used to work with unknown resources,
+	// like those created via CRDs or aggregated apiservers
+	dynamicClient dynamic.Interface
+
+	// sharedInformerFactory interfaces with shared informers
+	SharedInformerFactory informers.SharedInformerFactory
 }
 
-func NewQuotaMonitor(informersStarted <-chan struct{}, informerFactory InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
+func NewQuotaMonitor(restMapper meta.RESTMapper, dynamicClient dynamic.Interface, informersStarted <-chan struct{}, sharedInformerFactory informers.SharedInformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
 	return &QuotaMonitor{
-		informersStarted:  informersStarted,
-		informerFactory:   informerFactory,
-		ignoredResources:  ignoredResources,
-		resourceChanges:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
-		resyncPeriod:      resyncPeriod,
-		replenishmentFunc: replenishmentFunc,
-		registry:          registry,
+		informersStarted:      informersStarted,
+		ignoredResources:      ignoredResources,
+		resourceChanges:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
+		resyncPeriod:          resyncPeriod,
+		replenishmentFunc:     replenishmentFunc,
+		registry:              registry,
+		restMapper:            restMapper,
+		dynamicClient:         dynamicClient,
+		SharedInformerFactory: sharedInformerFactory,
 	}
 }
 
@@ -130,7 +146,20 @@ func (m *monitor) Run() {
 
 type monitors map[schema.GroupVersionResource]*monitor
 
-func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cache.Controller, error) {
+func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource) *cache.ListWatch {
+	return &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
+			return client.Resource(resource).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
+			return client.Resource(resource).Watch(options)
+		},
+	}
+}
+
+func (qm *QuotaMonitor) controllerAndListerFor(resource schema.GroupVersionResource) (cache.Controller, cache.GenericLister, error) {
 	// TODO: pass this down
 	clock := clock.RealClock{}
 	handlers := cache.ResourceEventHandlerFuncs{
@@ -171,17 +200,29 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 			qm.resourceChanges.Add(event)
 		},
 	}
-	shared, err := qm.informerFactory.ForResource(resource)
-	if err == nil {
-		glog.V(4).Infof("QuotaMonitor using a shared informer for resource %q", resource.String())
-		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
-		return shared.Informer().GetController(), nil
-	}
-	glog.V(4).Infof("QuotaMonitor unable to use a shared informer for resource %q: %v", resource.String(), err)
 
-	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
-	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
-	return nil, fmt.Errorf("unable to monitor quota for resource %q", resource.String())
+	shared, err := qm.SharedInformerFactory.ForResource(resource)
+	if err == nil {
+		glog.Infof("QuotaMonitor using a shared informer for resource %q", resource.String())
+		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
+		return shared.Informer().GetController(), shared.Lister(), nil
+	} else {
+		glog.Infof("QuotaMonitor unable to use a shared informer for resource %q: %v", resource.String(), err)
+	}
+
+	// TODO: consider store in one storage with GC.
+	glog.Infof("QuotaMonitor creating generic storage for resource %s", resource.String())
+	indexer, monitor := cache.NewIndexerInformer(
+		listWatcher(qm.dynamicClient, resource),
+		nil,
+		qm.resyncPeriod(),
+		// don't need to clone because it's not from shared cache
+		handlers,
+		cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc},
+	)
+	lister := cache.NewGenericLister(indexer, resource.GroupResource())
+
+	return monitor, lister, nil
 }
 
 // SyncMonitors rebuilds the monitor set according to the supplied resources,
@@ -212,7 +253,8 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 			kept++
 			continue
 		}
-		c, err := qm.controllerFor(resource)
+
+		c, l, err := qm.controllerAndListerFor(resource)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
@@ -221,9 +263,10 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 		// check if we need to create an evaluator for this resource (if none previously registered)
 		evaluator := qm.registry.Get(resource.GroupResource())
 		if evaluator == nil {
-			listerFunc := generic.ListerFuncForResourceFunc(qm.informerFactory.ForResource)
-			listResourceFunc := generic.ListResourceUsingListerFunc(listerFunc, resource)
-			evaluator = generic.NewObjectCountEvaluator(false, resource.GroupResource(), listResourceFunc, "")
+			listerFuncByNameSpace := func(namespace string) ([]runtime.Object, error) {
+				return l.ByNamespace(namespace).List(labels.Everything())
+			}
+			evaluator = generic.NewObjectCountEvaluator(false, resource.GroupResource(), listerFuncByNameSpace, "")
 			qm.registry.Add(evaluator)
 			glog.Infof("QuotaMonitor created object count evaluator for %s", resource.GroupResource())
 		}
@@ -267,7 +310,7 @@ func (qm *QuotaMonitor) StartMonitors() {
 	for _, monitor := range monitors {
 		if monitor.stopCh == nil {
 			monitor.stopCh = make(chan struct{})
-			qm.informerFactory.Start(qm.stopCh)
+			qm.SharedInformerFactory.Start(qm.stopCh)
 			go monitor.Run()
 			started++
 		}
@@ -323,6 +366,9 @@ func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
 			close(monitor.stopCh)
 		}
 	}
+
+	// reset monitors so that the quota monitor can be safely re-run/synced.
+	qm.monitors = nil
 	glog.Infof("QuotaMonitor stopped %d of %d monitors", stopped, len(monitors))
 }
 

@@ -31,9 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -107,12 +109,13 @@ func TestQuota(t *testing.T) {
 		QuotaClient:               clientset.Core(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
-		InformerFactory:           informers,
+		SharedInformerFactory:     informers,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      qc.IgnoredResources,
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
+		RESTMapper:                restmapper.NewDeferredDiscoveryRESTMapper(cached.NewMemCacheClient(clientset.Discovery())),
 	}
 	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
 	if err != nil {
@@ -120,8 +123,8 @@ func TestQuota(t *testing.T) {
 	}
 	go resourceQuotaController.Run(2, controllerCh)
 
-	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, controllerCh)
+	// Periodically sync the quota controller to detect new resource types
+	go resourceQuotaController.Sync(clientset.Discovery(), 30*time.Second, controllerCh)
 
 	internalInformers.Start(controllerCh)
 	informers.Start(controllerCh)
@@ -302,12 +305,13 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		QuotaClient:               clientset.Core(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
-		InformerFactory:           informers,
+		SharedInformerFactory:     informers,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      qc.IgnoredResources,
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
+		RESTMapper:                restmapper.NewDeferredDiscoveryRESTMapper(cached.NewMemCacheClient(clientset.Discovery())),
 	}
 	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
 	if err != nil {
@@ -316,7 +320,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	go resourceQuotaController.Run(2, controllerCh)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, controllerCh)
+	go resourceQuotaController.Sync(clientset.Discovery(), 30*time.Second, controllerCh)
 
 	internalInformers.Start(controllerCh)
 	informers.Start(controllerCh)

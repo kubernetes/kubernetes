@@ -258,7 +258,19 @@ func startPodGCController(ctx ControllerContext) (bool, error) {
 }
 
 func startResourceQuotaController(ctx ControllerContext) (bool, error) {
+	// Use a discovery client capable of being refreshed
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
+	discoveryClient := cacheddiscovery.NewMemCacheClient(resourceQuotaControllerClient.Discovery())
+
+	config := ctx.ClientBuilder.ConfigOrDie("resourcequota-controller")
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return true, err
+	}
+
+	// get an initial set of quotable resources to prime the quota controller
+	quotableResources := resourcequotacontroller.GetQuotableResources(discoveryClient)
+
 	discoveryFunc := resourceQuotaControllerClient.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
@@ -267,12 +279,15 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration),
-		InformerFactory:           ctx.InformerFactory,
+		SharedInformerFactory:     ctx.InformerFactory,
 		ReplenishmentResyncPeriod: ctx.ResyncPeriod,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
 		InformersStarted:          ctx.InformersStarted,
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
+		DynamicClient:             dynamicClient,
+		RESTMapper:                ctx.RESTMapper,
+		QuotableResources:         quotableResources,
 	}
 	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -282,12 +297,14 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 
 	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
 	if err != nil {
-		return false, err
+		return true, fmt.Errorf("Failed to start the resource quota controller: %v", err)
 	}
+
+	// Start the resourceQuota controller
 	go resourceQuotaController.Run(int(ctx.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs), ctx.Stop)
 
-	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Stop)
+	// Periodically sync the quota controller to detect new resource types
+	go resourceQuotaController.Sync(resourceQuotaControllerClient.Discovery(), 30*time.Second, ctx.Stop)
 
 	return true, nil
 }

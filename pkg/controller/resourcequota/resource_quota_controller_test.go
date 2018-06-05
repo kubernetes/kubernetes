@@ -21,17 +21,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -78,33 +86,71 @@ func newGenericLister(groupResource schema.GroupResource, items []runtime.Object
 	return cache.NewGenericLister(store, groupResource)
 }
 
+type testRESTMapper struct {
+	meta.RESTMapper
+}
+
+func (_ *testRESTMapper) Reset() {}
+
 type quotaController struct {
 	*ResourceQuotaController
 	stop chan struct{}
 }
 
 func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister quota.ListerForResourceFunc) quotaController {
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	config := &restclient.Config{}
+	tweakableRM := meta.NewDefaultRESTMapper(nil)
+	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	twoResources := map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}:                          {},
+		{Group: "example.com", Version: "v1", Resource: "foobars"}: {},
+	}
+
+	sharedInformerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaConfiguration := install.NewQuotaConfigurationForControllers(lister)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
+
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
 		QuotaClient:               kubeClient.CoreV1(),
-		ResourceQuotaInformer:     informerFactory.Core().V1().ResourceQuotas(),
+		ResourceQuotaInformer:     sharedInformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
 		DiscoveryFunc:             mockDiscoveryFunc,
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 		InformersStarted:          alwaysStarted,
+		RESTMapper:                rm,
+		DynamicClient:             dynamicClient,
+		QuotableResources:         twoResources,
+		SharedInformerFactory:     sharedInformerFactory,
 	}
 	qc, err := NewResourceQuotaController(resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
 	stop := make(chan struct{})
-	go informerFactory.Start(stop)
+	go sharedInformerFactory.Start(stop)
 	return quotaController{qc, stop}
+}
+
+func newTestUnstructured() []runtime.Object {
+	return []runtime.Object{
+		&unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "example.com/v1",
+				"kind":       "foobar",
+				"content": map[string]interface{}{
+					"key": "value",
+				},
+			},
+		},
+	}
 }
 
 func newTestPods() []runtime.Object {
@@ -289,9 +335,9 @@ func TestSyncResourceQuota(t *testing.T) {
 
 func TestAddQuota(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
-	gvr := v1.SchemeGroupVersion.WithResource("pods")
+	gvr := schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "foobars"}
 	listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
-		gvr: newGenericLister(gvr.GroupResource(), newTestPods()),
+		gvr: newGenericLister(gvr.GroupResource(), newTestUnstructured()),
 	}
 
 	qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig))
@@ -381,8 +427,8 @@ func TestAddQuota(t *testing.T) {
 			},
 		},
 		{
-			name:             "status, missing usage, but don't care (no informer)",
-			expectedPriority: false,
+			name:             "status, missing usage",
+			expectedPriority: true,
 			quota: &v1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
@@ -390,12 +436,12 @@ func TestAddQuota(t *testing.T) {
 				},
 				Spec: v1.ResourceQuotaSpec{
 					Hard: v1.ResourceList{
-						"foobars.example.com": resource.MustParse("4"),
+						"count/foobars.example.com": resource.MustParse("4"),
 					},
 				},
 				Status: v1.ResourceQuotaStatus{
 					Hard: v1.ResourceList{
-						"foobars.example.com": resource.MustParse("4"),
+						"count/foobars.example.com": resource.MustParse("4"),
 					},
 				},
 			},
@@ -451,4 +497,76 @@ func TestAddQuota(t *testing.T) {
 			qc.queue.Done(key)
 		}
 	}
+}
+
+func TestQuotaControllerConstruction(t *testing.T) {
+	gvr := schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "foobar"}
+	listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
+		gvr: newGenericLister(gvr.GroupResource(), newTestUnstructured()),
+	}
+
+	config := &restclient.Config{}
+	tweakableRM := meta.NewDefaultRESTMapper(nil)
+	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	podResource := map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}: {},
+	}
+	twoResources := map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}:                         {},
+		{Group: "example.com", Version: "v1", Resource: "foobar"}: {},
+	}
+
+	client := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+	quotaConfiguration := install.NewQuotaConfigurationForControllers(mockListerForResourceFunc(listersForResourceConfig))
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+		QuotaClient:               client.CoreV1(),
+		ResourceQuotaInformer:     sharedInformers.Core().V1().ResourceQuotas(),
+		ResyncPeriod:              controller.NoResyncPeriodFunc,
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
+		DiscoveryFunc:             mockDiscoveryFunc,
+		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
+		InformersStarted:          alwaysStarted,
+		DynamicClient:             dynamicClient,
+		RESTMapper:                rm,
+		QuotableResources:         twoResources,
+		SharedInformerFactory:     sharedInformers,
+	}
+	qc, err := NewResourceQuotaController(resourceQuotaControllerOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 2, len(qc.quotaMonitor.monitors))
+
+	// Make sure resource monitor syncing creates and stops resource monitors.
+	err = qc.resyncMonitors(podResource)
+	if err != nil {
+		t.Errorf("Failed removing a monitor: %v", err)
+	}
+	assert.Equal(t, 1, len(qc.quotaMonitor.monitors))
+
+	// Make sure the syncing mechanism also works after Run() has been called
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go qc.Run(1, stopCh)
+
+	err = qc.resyncMonitors(twoResources)
+	if err != nil {
+		t.Errorf("Failed adding a monitor: %v", err)
+	}
+	assert.Equal(t, 2, len(qc.quotaMonitor.monitors))
+
+	err = qc.resyncMonitors(podResource)
+	if err != nil {
+		t.Errorf("Failed removing a monitor: %v", err)
+	}
+	assert.Equal(t, 1, len(qc.quotaMonitor.monitors))
 }

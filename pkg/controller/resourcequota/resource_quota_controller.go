@@ -27,12 +27,14 @@ import (
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -52,10 +54,11 @@ type NamespacedResourcesFunc func() ([]*metav1.APIResourceList, error)
 // that may require quota to be recalculated.
 type ReplenishmentFunc func(groupResource schema.GroupResource, namespace string)
 
-// InformerFactory is all the quota system needs to interface with informers.
-type InformerFactory interface {
-	ForResource(resource schema.GroupVersionResource) (informers.GenericInformer, error)
-	Start(stopCh <-chan struct{})
+// resettableRESTMapper is a RESTMapper which is capable of resetting itself
+// from discovery.
+type resettableRESTMapper interface {
+	meta.RESTMapper
+	Reset()
 }
 
 // ResourceQuotaControllerOptions holds options for creating a quota controller
@@ -74,10 +77,19 @@ type ResourceQuotaControllerOptions struct {
 	IgnoredResourcesFunc func() map[schema.GroupResource]struct{}
 	// InformersStarted knows if informers were started.
 	InformersStarted <-chan struct{}
-	// InformerFactory interfaces with informers.
-	InformerFactory InformerFactory
+	// SharedInformerFactory interfaces with shared informers.
+	SharedInformerFactory informers.SharedInformerFactory
 	// Controls full resync of objects monitored for replenishment.
 	ReplenishmentResyncPeriod controller.ResyncPeriodFunc
+	// dynamicClient is used to work with unknown resources,
+	// like those created via CRDs or aggregated apiservers.
+	DynamicClient dynamic.Interface
+	// RESTMapper can reset itself from discovery.
+	RESTMapper resettableRESTMapper
+	// QuotableResources are resources that the quota controller can work with.
+	// More specifically, all preferred resources which support the
+	// 'create','list' and 'delete' verbs.
+	QuotableResources map[schema.GroupVersionResource]struct{}
 }
 
 // ResourceQuotaController is responsible for tracking quota usage status in the system
@@ -104,19 +116,29 @@ type ResourceQuotaController struct {
 	// this lock is acquired to control write access to the monitors and ensures that all
 	// monitors are synced before the controller can process quotas.
 	workerLock sync.RWMutex
+	// dynamicClient is used to work with unknown resources,
+	// like those created via CRD or aggregated apiservers.
+	dynamicClient dynamic.Interface
+	// restMapper can reset itself from discovery.
+	restMapper resettableRESTMapper
+	// sharedInformerFactory interfaces with shared informers.
+	sharedInformerFactory informers.SharedInformerFactory
 }
 
 // NewResourceQuotaController creates a quota controller with specified options
 func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*ResourceQuotaController, error) {
 	// build the resource quota controller
 	rq := &ResourceQuotaController{
-		rqClient:            options.QuotaClient,
-		rqLister:            options.ResourceQuotaInformer.Lister(),
-		informerSyncedFuncs: []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced},
-		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_primary"),
-		missingUsageQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_priority"),
-		resyncPeriod:        options.ResyncPeriod,
-		registry:            options.Registry,
+		rqClient:              options.QuotaClient,
+		rqLister:              options.ResourceQuotaInformer.Lister(),
+		informerSyncedFuncs:   []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced},
+		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_primary"),
+		missingUsageQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_priority"),
+		resyncPeriod:          options.ResyncPeriod,
+		registry:              options.Registry,
+		dynamicClient:         options.DynamicClient,
+		restMapper:            options.RESTMapper,
+		sharedInformerFactory: options.SharedInformerFactory,
 	}
 	// set the synchronization handler
 	rq.syncHandler = rq.syncResourceQuotaFromKey
@@ -150,23 +172,22 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*Resou
 
 	if options.DiscoveryFunc != nil {
 		qm := &QuotaMonitor{
-			informersStarted:  options.InformersStarted,
-			informerFactory:   options.InformerFactory,
-			ignoredResources:  options.IgnoredResourcesFunc(),
-			resourceChanges:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
-			resyncPeriod:      options.ReplenishmentResyncPeriod,
-			replenishmentFunc: rq.replenishQuota,
-			registry:          rq.registry,
+			informersStarted: options.InformersStarted,
+			// TODO: we either find a way to discover this or find a way to provide it via config
+			ignoredResources:      options.IgnoredResourcesFunc(),
+			resourceChanges:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
+			resyncPeriod:          options.ReplenishmentResyncPeriod,
+			replenishmentFunc:     rq.replenishQuota,
+			registry:              rq.registry,
+			dynamicClient:         options.DynamicClient,
+			restMapper:            options.RESTMapper,
+			SharedInformerFactory: options.SharedInformerFactory,
 		}
 
 		rq.quotaMonitor = qm
 
 		// do initial quota monitor setup
-		resources, err := GetQuotableResources(options.DiscoveryFunc)
-		if err != nil {
-			return nil, err
-		}
-		if err = qm.SyncMonitors(resources); err != nil {
+		if err := qm.SyncMonitors(options.QuotableResources); err != nil {
 			utilruntime.HandleError(fmt.Errorf("initial monitor sync has error: %v", err))
 		}
 
@@ -282,6 +303,8 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 	if !controller.WaitForCacheSync("resource quota", stopCh, rq.informerSyncedFuncs...) {
 		return
 	}
+
+	glog.Infof("Resource Quota controller: all resource monitors have synced. Proceeding to monitor quota")
 
 	// the workers that chug through the quota calculation backlog
 	for i := 0; i < workers; i++ {
@@ -416,15 +439,25 @@ func (rq *ResourceQuotaController) replenishQuota(groupResource schema.GroupReso
 	}
 }
 
-// Sync periodically resyncs the controller when new resources are observed from discovery.
-func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, period time.Duration, stopCh <-chan struct{}) {
+// Sync periodically resyncs the controller when new resources are
+// observed from discovery. When new resources are detected, Sync will stop all
+// RQ workers, reset rq.restMapper, and resync the monitors.
+//
+// Note that discoveryClient should NOT be shared with rq.restMapper, otherwise
+// the mapper's underlying discovery client will be unnecessarily reset during
+// the course of detecting new resources.
+func (rq *ResourceQuotaController) Sync(discoveryClient discovery.ServerResourcesInterface, period time.Duration, stopCh <-chan struct{}) {
 	// Something has changed, so track the new state and perform a sync.
 	oldResources := make(map[schema.GroupVersionResource]struct{})
 	wait.Until(func() {
 		// Get the current resource list from discovery.
-		newResources, err := GetQuotableResources(discoveryFunc)
-		if err != nil {
-			utilruntime.HandleError(err)
+		newResources := GetQuotableResources(discoveryClient)
+
+		// This can occur if there is an internal error in GetQuotableResources.
+		// If the rq attempts to sync with 0 resources it will block forever.
+		// TODO: Implement a more complete solution for the resource quota controller hanging.
+		if len(newResources) == 0 {
+			glog.V(4).Infof("no resources reported by discovery, skipping resource quota controller sync")
 			return
 		}
 
@@ -436,49 +469,99 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 
 		// Something has changed, so track the new state and perform a sync.
 		glog.V(2).Infof("syncing resource quota controller with updated resources from discovery: %v", newResources)
-		oldResources = newResources
 
 		// Ensure workers are paused to avoid processing events before informers
 		// have resynced.
 		rq.workerLock.Lock()
 		defer rq.workerLock.Unlock()
 
+		// Resetting the REST mapper will also invalidate the underlying discovery
+		// client. This is a leaky abstraction and assumes behavior about the REST
+		// mapper, but we'll deal with it for now.
+		rq.restMapper.Reset()
+
 		// Perform the monitor resync and wait for controllers to report cache sync.
+		//
+		// NOTE: It's possible that newResources will diverge from the resources
+		// discovered by restMapper during the call to Reset, since they are
+		// distinct discovery clients invalidated at different times. For example,
+		// newResources may contain resources not returned in the restMapper's
+		// discovery call if the resources appeared in-between the calls. In that
+		// case, the restMapper will fail to map some of newResources until the next
+		// sync period.
 		if err := rq.resyncMonitors(newResources); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
 			return
 		}
+
+		// TODO: WaitForCacheSync can block forever during normal operation. Could
+		// pass a timeout channel, but we have to consider the implications of
+		// un-pausing the resource quota controller with a partially synced quota monitor.
 		if rq.quotaMonitor != nil && !controller.WaitForCacheSync("resource quota", stopCh, rq.quotaMonitor.IsSynced) {
 			utilruntime.HandleError(fmt.Errorf("timed out waiting for quota monitor sync"))
 		}
+
+		// Finally, keep track of our new state. Do this after all preceding steps
+		// have succeeded to ensure we'll retry on subsequent syncs if an error
+		// occurred.
+		oldResources = newResources
+		glog.Infof("synced resource quota controller")
+
 	}, period, stopCh)
+}
+
+func (rq *ResourceQuotaController) IsSynced() bool {
+	return rq.quotaMonitor.IsSynced()
 }
 
 // resyncMonitors starts or stops quota monitors as needed to ensure that all
 // (and only) those resources present in the map are monitored.
-func (rq *ResourceQuotaController) resyncMonitors(resources map[schema.GroupVersionResource]struct{}) error {
+func (rq *ResourceQuotaController) resyncMonitors(quotableResources map[schema.GroupVersionResource]struct{}) error {
 	if rq.quotaMonitor == nil {
 		return nil
 	}
 
-	if err := rq.quotaMonitor.SyncMonitors(resources); err != nil {
+	if err := rq.quotaMonitor.SyncMonitors(quotableResources); err != nil {
 		return err
 	}
 	rq.quotaMonitor.StartMonitors()
 	return nil
 }
 
-// GetQuotableResources returns all resources that the quota system should recognize.
-// It requires a resource supports the following verbs: 'create','list','delete'
-func GetQuotableResources(discoveryFunc NamespacedResourcesFunc) (map[schema.GroupVersionResource]struct{}, error) {
-	possibleResources, err := discoveryFunc()
+// GetQuotableResources returns all resources from discoveryClient that the
+// quota system should recognize and work with. More specifically, all
+// preferred resources which support the 'create','list' and 'delete' verbs.
+//
+// All discovery errors are considered temporary. Upon encountering any error,
+// GetQuotableResources will log and return any discovered resources it was
+// able to process (which may be none).
+func GetQuotableResources(discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct{} {
+	preferredResources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover resources: %v", err)
+		if discovery.IsGroupDiscoveryFailedError(err) {
+			glog.V(4).Infof("failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
+		} else {
+			glog.V(4).Infof("failed to discover preferred resources: %v", err)
+		}
 	}
-	quotableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"create", "list", "watch", "delete"}}, possibleResources)
-	quotableGroupVersionResources, err := discovery.GroupVersionResources(quotableResources)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse resources: %v", err)
+	if preferredResources == nil {
+		return map[schema.GroupVersionResource]struct{}{}
 	}
-	return quotableGroupVersionResources, nil
+
+	// This is extracted from discovery.GroupVersionResources to allow tolerating
+	// failures on a per-resource basis.
+	quotableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"create", "list", "delete"}}, preferredResources)
+	quotableGroupVersionResources := map[schema.GroupVersionResource]struct{}{}
+	for _, rl := range quotableResources {
+		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
+		if err != nil {
+			glog.Warningf("ignoring invalid discovered resource %q: %v", rl.GroupVersion, err)
+			continue
+		}
+		for i := range rl.APIResources {
+			quotableGroupVersionResources[schema.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: rl.APIResources[i].Name}] = struct{}{}
+		}
+	}
+
+	return quotableGroupVersionResources
 }

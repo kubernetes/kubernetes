@@ -778,7 +778,7 @@ func TestGetDeletableResources(t *testing.T) {
 
 	for name, test := range tests {
 		t.Logf("testing %q", name)
-		client := &fakeServerResources{
+		client := &fakeDiscoveryClient{
 			PreferredResources: test.serverResources,
 			Error:              test.err,
 		}
@@ -800,7 +800,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 			},
 		},
 	}
-	fakeDiscoveryClient := &fakeServerResources{
+	fakeDiscoveryClient := &fakeDiscoveryClient{
 		PreferredResources: serverResources,
 		Error:              nil,
 		Lock:               sync.Mutex{},
@@ -871,7 +871,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	}
 }
 
-func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources) error {
+func expectSyncNotBlocked(fakeDiscoveryClient *fakeDiscoveryClient) error {
 	before := fakeDiscoveryClient.getInterfaceUsedCount()
 	t := 1 * time.Second
 	time.Sleep(t)
@@ -882,46 +882,46 @@ func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources) error {
 	return nil
 }
 
-type fakeServerResources struct {
+type fakeDiscoveryClient struct {
 	PreferredResources []*metav1.APIResourceList
 	Error              error
 	Lock               sync.Mutex
 	InterfaceUsedCount int
 }
 
-func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+func (_ *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
+func (_ *fakeDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (f *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+func (f *fakeDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.InterfaceUsedCount++
 	return f.PreferredResources, f.Error
 }
 
-func (f *fakeServerResources) setPreferredResources(resources []*metav1.APIResourceList) {
+func (f *fakeDiscoveryClient) setPreferredResources(resources []*metav1.APIResourceList) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.PreferredResources = resources
 }
 
-func (f *fakeServerResources) setError(err error) {
+func (f *fakeDiscoveryClient) setError(err error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.Error = err
 }
 
-func (f *fakeServerResources) getInterfaceUsedCount() int {
+func (f *fakeDiscoveryClient) getInterfaceUsedCount() int {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	return f.InterfaceUsedCount
 }
 
-func (_ *fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+func (_ *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
