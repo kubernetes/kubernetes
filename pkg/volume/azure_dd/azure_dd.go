@@ -23,6 +23,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -55,6 +56,9 @@ type DiskController interface {
 	CreateVolume(name, storageAccount, storageAccountType, location string, requestGB int) (string, string, int, error)
 	// Delete a VHD blob
 	DeleteVolume(diskURI string) error
+
+	// Expand the disk to new size
+	ResizeDisk(diskName string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 }
 
 type azureDataDiskPlugin struct {
@@ -67,6 +71,7 @@ var _ volume.DeletableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.ProvisionableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.AttachableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.VolumePluginWithAttachLimits = &azureDataDiskPlugin{}
+var _ volume.ExpandableVolumePlugin = &azureDataDiskPlugin{}
 
 const (
 	azureDataDiskPluginName = "kubernetes.io/azure-disk"
@@ -208,6 +213,26 @@ func (plugin *azureDataDiskPlugin) NewUnmounter(volName string, podUID types.UID
 		plugin:   plugin,
 		dataDisk: disk,
 	}, nil
+}
+
+func (plugin *azureDataDiskPlugin) RequiresFSResize() bool {
+	return true
+}
+
+func (plugin *azureDataDiskPlugin) ExpandVolumeDevice(
+	spec *volume.Spec,
+	newSize resource.Quantity,
+	oldSize resource.Quantity) (resource.Quantity, error) {
+	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.AzureDisk == nil {
+		return oldSize, fmt.Errorf("invalid PV spec")
+	}
+
+	diskController, err := getDiskController(plugin.host)
+	if err != nil {
+		return oldSize, err
+	}
+
+	return diskController.ResizeDisk(spec.PersistentVolume.Spec.AzureDisk.DiskName, oldSize, newSize)
 }
 
 func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
