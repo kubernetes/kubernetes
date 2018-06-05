@@ -50,7 +50,7 @@ var csiTestDrivers = map[string]func(f *framework.Framework, config framework.Vo
 	"[Feature: GCE PD CSI Plugin] gcePD": initCSIgcePD,
 }
 
-var _ = utils.SIGDescribe("CSI Volumes", func() {
+var _ = utils.SIGDescribe("CSI Volumes [Containerized]", func() {
 	f := framework.NewDefaultFramework("csi-mock-plugin")
 
 	var (

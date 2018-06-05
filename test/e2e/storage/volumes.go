@@ -81,7 +81,7 @@ func DeleteCinderVolume(name string) error {
 }
 
 // These tests need privileged containers, which are disabled by default.
-var _ = utils.SIGDescribe("Volumes", func() {
+var _ = utils.SIGDescribe("Volumes [Containerized]", func() {
 	f := framework.NewDefaultFramework("volume")
 
 	// note that namespace deletion is handled by delete-namespace flag

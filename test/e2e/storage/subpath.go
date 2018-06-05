@@ -100,24 +100,24 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			}
 		})
 
-		It("should support subpaths with secret pod", func() {
+		It("should support subpaths with secret pod [Containerized]", func() {
 			pod := testPodSubpath(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}})
 			testBasicSubpath(f, "secret-value", pod)
 		})
 
-		It("should support subpaths with configmap pod", func() {
+		It("should support subpaths with configmap pod [Containerized]", func() {
 			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}})
 			testBasicSubpath(f, "configmap-value", pod)
 		})
 
-		It("should support subpaths with configmap pod with mountPath of existing file", func() {
+		It("should support subpaths with configmap pod with mountPath of existing file [Containerized]", func() {
 			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}})
 			file := "/etc/resolv.conf"
 			pod.Spec.Containers[0].VolumeMounts[0].MountPath = file
 			testBasicSubpathFile(f, "configmap-value", pod, file)
 		})
 
-		It("should support subpaths with downward pod", func() {
+		It("should support subpaths with downward pod [Containerized]", func() {
 			pod := testPodSubpath(f, "downward/podname", "downwardAPI", &v1.VolumeSource{
 				DownwardAPI: &v1.DownwardAPIVolumeSource{
 					Items: []v1.DownwardAPIVolumeFile{{Path: "downward/podname", FieldRef: &v1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
@@ -126,7 +126,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			testBasicSubpath(f, pod.Name, pod)
 		})
 
-		It("should support subpaths with projected pod", func() {
+		It("should support subpaths with projected pod [Containerized]", func() {
 			pod := testPodSubpath(f, "projected/configmap-key", "projected", &v1.VolumeSource{
 				Projected: &v1.ProjectedVolumeSource{
 					Sources: []v1.VolumeProjection{
@@ -167,7 +167,19 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				vol.cleanupVolume(f)
 			})
 
-			It("should support non-existent path", func() {
+			// Containerized kubelet does not support creation of
+			// directories/files outside of /var/lib/kubelet, some tests must
+			// not get [Containerized] flag.
+			skipContainerizedHostPath := func(volType string, msg string) string {
+				if strings.Contains(volType, "hostPath") {
+					// Don't run this test with containerized kubelet
+					return msg
+				}
+				// Run this test with containerized kubelet
+				return fmt.Sprintf("%s [Containerized]", msg)
+
+			}
+			It(skipContainerizedHostPath(volType, "should support non-existent path"), func() {
 				// Write the file in the subPath from container 0
 				setWriteCommand(filePathInSubpath, &pod.Spec.Containers[0])
 
@@ -175,7 +187,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testReadFile(f, filePathInVolume, pod, 1)
 			})
 
-			It("should support existing directory", func() {
+			It("should support existing directory [Containerized]", func() {
 				// Create the directory
 				setInitCommand(pod, fmt.Sprintf("mkdir -p %s", subPathDir))
 
@@ -186,7 +198,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testReadFile(f, filePathInVolume, pod, 1)
 			})
 
-			It("should support existing single file", func() {
+			It("should support existing single file [Containerized]", func() {
 				// Create the file in the init container
 				setInitCommand(pod, fmt.Sprintf("mkdir -p %s; echo \"mount-tester new file\" > %s", subPathDir, filePathInVolume))
 
@@ -194,14 +206,14 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testReadFile(f, filePathInSubpath, pod, 0)
 			})
 
-			It("should support file as subpath", func() {
+			It("should support file as subpath [Containerized]", func() {
 				// Create the file in the init container
 				setInitCommand(pod, fmt.Sprintf("echo %s > %s", f.Namespace.Name, subPathDir))
 
 				testBasicSubpath(f, f.Namespace.Name, pod)
 			})
 
-			It("should fail if subpath directory is outside the volume [Slow]", func() {
+			It("should fail if subpath directory is outside the volume [Slow][Containerized]", func() {
 				// Create the subpath outside the volume
 				setInitCommand(pod, fmt.Sprintf("ln -s /bin %s", subPathDir))
 
@@ -209,7 +221,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testPodFailSubpath(f, pod)
 			})
 
-			It("should fail if subpath file is outside the volume [Slow]", func() {
+			It("should fail if subpath file is outside the volume [Slow][Containerized]", func() {
 				// Create the subpath outside the volume
 				setInitCommand(pod, fmt.Sprintf("ln -s /bin/sh %s", subPathDir))
 
@@ -217,7 +229,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testPodFailSubpath(f, pod)
 			})
 
-			It("should fail if non-existent subpath is outside the volume [Slow]", func() {
+			It("should fail if non-existent subpath is outside the volume [Slow][Containerized]", func() {
 				// Create the subpath outside the volume
 				setInitCommand(pod, fmt.Sprintf("ln -s /bin/notanexistingpath %s", subPathDir))
 
@@ -225,7 +237,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testPodFailSubpath(f, pod)
 			})
 
-			It("should fail if subpath with backstepping is outside the volume [Slow]", func() {
+			It("should fail if subpath with backstepping is outside the volume [Slow][Containerized]", func() {
 				// Create the subpath outside the volume
 				setInitCommand(pod, fmt.Sprintf("ln -s ../ %s", subPathDir))
 
@@ -233,7 +245,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testPodFailSubpath(f, pod)
 			})
 
-			It("should support creating multiple subpath from same volumes [Slow]", func() {
+			It(skipContainerizedHostPath(volType, "should support creating multiple subpath from same volumes [Slow]"), func() {
 				subpathDir1 := filepath.Join(volumePath, "subpath1")
 				subpathDir2 := filepath.Join(volumePath, "subpath2")
 				filepath1 := filepath.Join("/test-subpath1", fileName)
@@ -255,14 +267,14 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testMultipleReads(f, pod, 0, filepath1, filepath2)
 			})
 
-			It("should support restarting containers using directory as subpath [Slow]", func() {
+			It("should support restarting containers using directory as subpath [Slow][Containerized]", func() {
 				// Create the directory
 				setInitCommand(pod, fmt.Sprintf("mkdir -p %v; touch %v", subPathDir, probeFilePath))
 
 				testPodContainerRestart(f, pod)
 			})
 
-			It("should support restarting containers using file as subpath [Slow]", func() {
+			It("should support restarting containers using file as subpath [Slow][Containerized]", func() {
 				// Create the file
 				setInitCommand(pod, fmt.Sprintf("touch %v; touch %v", subPathDir, probeFilePath))
 
@@ -280,7 +292,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testSubpathReconstruction(f, pod, true)
 			})
 
-			It("should support readOnly directory specified in the volumeMount", func() {
+			It("should support readOnly directory specified in the volumeMount [Containerized]", func() {
 				// Create the directory
 				setInitCommand(pod, fmt.Sprintf("mkdir -p %s", subPathDir))
 
@@ -292,7 +304,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testReadFile(f, filePathInSubpath, pod, 0)
 			})
 
-			It("should support readOnly file specified in the volumeMount", func() {
+			It("should support readOnly file specified in the volumeMount [Containerized]", func() {
 				// Create the file
 				setInitCommand(pod, fmt.Sprintf("touch %s", subPathDir))
 
@@ -304,7 +316,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testReadFile(f, volumePath, pod, 0)
 			})
 
-			It("should support existing directories when readOnly specified in the volumeSource", func() {
+			It("should support existing directories when readOnly specified in the volumeSource [Containerized]", func() {
 				roVol := vol.getReadOnlyVolumeSpec()
 				if roVol == nil {
 					framework.Skipf("Volume type %v doesn't support readOnly source", curVolType)
@@ -320,7 +332,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				testReadFile(f, filePathInSubpath, pod, 0)
 			})
 
-			It("should fail for new directories when readOnly specified in the volumeSource", func() {
+			It("should fail for new directories when readOnly specified in the volumeSource  [Containerized]", func() {
 				roVol := vol.getReadOnlyVolumeSpec()
 				if roVol == nil {
 					framework.Skipf("Volume type %v doesn't support readOnly source", curVolType)
