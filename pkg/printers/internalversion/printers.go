@@ -154,7 +154,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
-		{Name: "Selector", Type: "string", Priority: 1, Description: batchv1.JobSpec{}.SwaggerDoc()["selector"]},
+		{Name: "Start Time", Type: "string", Priority: 1, Description: batchv1.JobStatus{}.SwaggerDoc()["startTime"]},
 	}
 	h.TableHandler(jobColumnDefinitions, printJob)
 	h.TableHandler(jobColumnDefinitions, printJobList)
@@ -758,7 +758,7 @@ func printJob(obj *batch.Job, options printers.PrintOptions) ([]metav1beta1.Tabl
 	row.Cells = append(row.Cells, obj.Name, completions, int64(obj.Status.Succeeded), translateTimestamp(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
-		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))
+		row.Cells = append(row.Cells, names, images, obj.Status.StartTime)
 	}
 	return []metav1beta1.TableRow{row}, nil
 }
