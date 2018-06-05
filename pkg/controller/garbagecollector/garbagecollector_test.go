@@ -804,7 +804,6 @@ func TestGarbageCollectorSync(t *testing.T) {
 		PreferredResources: serverResources,
 		Error:              nil,
 		Lock:               sync.Mutex{},
-		InterfaceUsedCount: 0,
 	}
 
 	testHandler := &fakeActionHandler{
@@ -849,7 +848,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	fmt.Printf("Test output")
 	time.Sleep(1 * time.Second)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient)
+	err = expectSyncNotBlocked(gc)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to be running but it is blocked: %v", err)
 	}
@@ -865,28 +864,33 @@ func TestGarbageCollectorSync(t *testing.T) {
 	fakeDiscoveryClient.setPreferredResources(serverResources)
 	fakeDiscoveryClient.setError(nil)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient)
+	err = expectSyncNotBlocked(gc)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
 }
 
-func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources) error {
-	before := fakeDiscoveryClient.getInterfaceUsedCount()
+func expectSyncNotBlocked(gc *GarbageCollector) error {
 	t := 1 * time.Second
-	time.Sleep(t)
-	after := fakeDiscoveryClient.getInterfaceUsedCount()
-	if before == after {
-		return fmt.Errorf("discoveryClient.ServerPreferredResources() called %d times over %v", after-before, t)
+	timeout := time.After(t)
+	done := make(chan struct{})
+	go func() {
+		gc.workerLock.Lock()
+		defer gc.workerLock.Unlock()
+		close(done)
+	}()
+	select {
+	case <-timeout:
+		return fmt.Errorf("Time limit of %v reached while waiting for gc worker lock", t)
+	case <-done:
+		return nil
 	}
-	return nil
 }
 
 type fakeServerResources struct {
 	PreferredResources []*metav1.APIResourceList
 	Error              error
 	Lock               sync.Mutex
-	InterfaceUsedCount int
 }
 
 func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
@@ -900,7 +904,6 @@ func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, erro
 func (f *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
-	f.InterfaceUsedCount++
 	return f.PreferredResources, f.Error
 }
 
@@ -914,12 +917,6 @@ func (f *fakeServerResources) setError(err error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.Error = err
-}
-
-func (f *fakeServerResources) getInterfaceUsedCount() int {
-	f.Lock.Lock()
-	defer f.Lock.Unlock()
-	return f.InterfaceUsedCount
 }
 
 func (_ *fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
