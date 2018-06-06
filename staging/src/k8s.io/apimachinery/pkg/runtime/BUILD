@@ -65,8 +65,6 @@ go_test(
         "scheme_test.go",
     ],
     deps = [
-        "//vendor/github.com/google/gofuzz:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
