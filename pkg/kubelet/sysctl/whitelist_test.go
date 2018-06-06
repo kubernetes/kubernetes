@@ -54,6 +54,7 @@ func TestWhitelist(t *testing.T) {
 		{sysctl: "net.ipv4.ip_local_port_range"},
 		{sysctl: "kernel.msgmax"},
 		{sysctl: "kernel.sem"},
+		{sysctl: "net.ipv6.conf.all.disable_ipv6"},
 	}
 	invalid := []Test{
 		{sysctl: "kernel.shm_rmid_forced", hostIPC: true},
