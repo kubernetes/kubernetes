@@ -21,18 +21,12 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
-
-	lru "github.com/hashicorp/golang-lru"
 )
-
-// defaultCacheSize is the number of decrypted DEKs which would be cached by the transformer.
-const defaultCacheSize = 1000
 
 func init() {
 	value.RegisterMetrics()
@@ -49,28 +43,16 @@ type Service interface {
 type envelopeTransformer struct {
 	envelopeService Service
 
-	// transformers is a thread-safe LRU cache which caches decrypted DEKs indexed by their encrypted form.
-	transformers *lru.Cache
-
 	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
 	baseTransformerFunc func(cipher.Block) value.Transformer
 }
 
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
-// the data items they encrypt. A cache (of size cacheSize) is maintained to store the most recently
-// used decrypted DEKs in memory.
-func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
-	if cacheSize == 0 {
-		cacheSize = defaultCacheSize
-	}
-	cache, err := lru.New(cacheSize)
-	if err != nil {
-		return nil, err
-	}
+// the data items they encrypt.
+func NewEnvelopeTransformer(envelopeService Service, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
 	return &envelopeTransformer{
 		envelopeService:     envelopeService,
-		transformers:        cache,
 		baseTransformerFunc: baseTransformerFunc,
 	}, nil
 }
@@ -87,19 +69,15 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 	encKey := data[2 : keyLen+2]
 	encData := data[2+keyLen:]
 
-	// Look up the decrypted DEK from cache or Envelope.
-	transformer := t.getTransformer(encKey)
-	if transformer == nil {
-		value.RecordCacheMiss()
-		key, err := t.envelopeService.Decrypt(encKey)
-		if err != nil {
-			return nil, false, fmt.Errorf("error while decrypting key: %q", err)
-		}
-		transformer, err = t.addTransformer(encKey, key)
-		if err != nil {
-			return nil, false, err
-		}
+	key, err := t.envelopeService.Decrypt(encKey)
+	if err != nil {
+		return nil, false, fmt.Errorf("error while decrypting key: %q", err)
 	}
+	transformer, err := t.newTransformer(encKey, key)
+	if err != nil {
+		return nil, false, err
+	}
+
 	return transformer.TransformFromStorage(encData, context)
 }
 
@@ -115,7 +93,7 @@ func (t *envelopeTransformer) TransformToStorage(data []byte, context value.Cont
 		return nil, err
 	}
 
-	transformer, err := t.addTransformer(encKey, newKey)
+	transformer, err := t.newTransformer(encKey, newKey)
 	if err != nil {
 		return nil, err
 	}
@@ -139,26 +117,14 @@ func (t *envelopeTransformer) TransformToStorage(data []byte, context value.Cont
 
 var _ value.Transformer = &envelopeTransformer{}
 
-// addTransformer inserts a new transformer to the Envelope cache of DEKs for future reads.
-func (t *envelopeTransformer) addTransformer(encKey []byte, key []byte) (value.Transformer, error) {
+// newTransformer constructs a transformer responsible for encryption/decryption of DEK portion of the envelope.
+func (t *envelopeTransformer) newTransformer(encKey []byte, key []byte) (value.Transformer, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
 	transformer := t.baseTransformerFunc(block)
-	// Use base64 of encKey as the key into the cache because hashicorp/golang-lru
-	// cannot hash []uint8.
-	t.transformers.Add(base64.StdEncoding.EncodeToString(encKey), transformer)
 	return transformer, nil
-}
-
-// getTransformer fetches the transformer corresponding to encKey from cache, if it exists.
-func (t *envelopeTransformer) getTransformer(encKey []byte) value.Transformer {
-	_transformer, found := t.transformers.Get(base64.StdEncoding.EncodeToString(encKey))
-	if found {
-		return _transformer.(value.Transformer)
-	}
-	return nil
 }
 
 // generateKey generates a random key using system randomness.

@@ -78,9 +78,6 @@ type IdentityConfig struct{}
 type KMSConfig struct {
 	// name is the name of the KMS plugin to be used.
 	Name string `json:"name"`
-	// cacheSize is the maximum number of secrets which are cached in memory. The default value is 1000.
-	// +optional
-	CacheSize int `json:"cachesize,omitempty"`
 	// the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
 	Endpoint string `json:"endpoint"`
 }

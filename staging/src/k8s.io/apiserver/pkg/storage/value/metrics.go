@@ -51,15 +51,6 @@ var (
 		[]string{"transformation_type"},
 	)
 
-	envelopeTransformationCacheMissTotal = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "envelope_transformation_cache_misses_total",
-			Help:      "Total number of cache misses while accessing key decryption key(KEK).",
-		},
-	)
-
 	dataKeyGenerationLatencies = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
@@ -85,7 +76,6 @@ func RegisterMetrics() {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(transformerLatencies)
 		prometheus.MustRegister(transformerFailuresTotal)
-		prometheus.MustRegister(envelopeTransformationCacheMissTotal)
 		prometheus.MustRegister(dataKeyGenerationLatencies)
 		prometheus.MustRegister(dataKeyGenerationFailuresTotal)
 	})
@@ -100,11 +90,6 @@ func RecordTransformation(transformationType string, start time.Time, err error)
 
 	since := sinceInMicroseconds(start)
 	transformerLatencies.WithLabelValues(transformationType).Observe(float64(since))
-}
-
-// RecordCacheMiss records a miss on Key Encryption Key(KEK) - call to KMS was required to decrypt KEK.
-func RecordCacheMiss() {
-	envelopeTransformationCacheMissTotal.Inc()
 }
 
 // RecordDataKeyGeneration records latencies and count of Data Encryption Key generation operations.
