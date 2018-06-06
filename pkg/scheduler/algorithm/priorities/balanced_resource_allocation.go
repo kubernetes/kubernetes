@@ -32,7 +32,7 @@ var (
 	// BalancedResourceAllocationMap should **NOT** be used alone, and **MUST** be used together
 	// with LeastRequestedPriority. It calculates the difference between the cpu and memory fraction
 	// of capacity, and prioritizes the host based on how close the two metrics are to each other.
-	// Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
+	// Detail: score = 10 - variance(cpuFraction,memoryFraction,volumeFraction)*10. The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced
 	// Resource Utilization"
 	BalancedResourceAllocationMap = balancedResourcePriority.PriorityMap
@@ -44,8 +44,8 @@ func balancedResourceScorer(requested, allocable *schedulercache.Resource, inclu
 	// This to find a node which has most balanced CPU, memory and volume usage.
 	if includeVolumes && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && allocatableVolumes > 0 {
 		volumeFraction := float64(requestedVolumes) / float64(allocatableVolumes)
-		if cpuFraction >= 1 || memoryFraction >= 1 || volumeFraction >= 1 {
-			// if requested >= capacity, the corresponding host should never be preferred.
+		if cpuFraction > 1 || memoryFraction > 1 || volumeFraction > 1 {
+			// if requested > capacity, the corresponding host should never be preferred.
 			return 0
 		}
 		// Compute variance for all the three fractions.
@@ -57,8 +57,8 @@ func balancedResourceScorer(requested, allocable *schedulercache.Resource, inclu
 		return int64((1 - variance) * float64(schedulerapi.MaxPriority))
 	}
 
-	if cpuFraction >= 1 || memoryFraction >= 1 {
-		// if requested >= capacity, the corresponding host should never be preferred.
+	if cpuFraction > 1 || memoryFraction > 1 {
+		// if requested > capacity, the corresponding host should never be preferred.
 		return 0
 	}
 	// Upper and lower boundary of difference between cpuFraction and memoryFraction are -1 and 1
@@ -71,7 +71,7 @@ func balancedResourceScorer(requested, allocable *schedulercache.Resource, inclu
 
 func fractionOfCapacity(requested, capacity int64) float64 {
 	if capacity == 0 {
-		return 1
+		return math.MaxFloat64
 	}
 	return float64(requested) / float64(capacity)
 }

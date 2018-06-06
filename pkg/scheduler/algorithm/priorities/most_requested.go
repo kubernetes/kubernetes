@@ -39,10 +39,10 @@ func mostResourceScorer(requested, allocable *schedulercache.Resource, includeVo
 // The used capacity is calculated on a scale of 0-10
 // 0 being the lowest priority and 10 being the highest.
 // The more resources are used the higher the score is. This function
-// is almost a reversed version of least_requested_priority.calculatUnusedScore
+// is almost a reversed version of least_requested_priority.calculateUnusedScore
 // (10 - calculateUnusedScore). The main difference is in rounding. It was added to
 // keep the final formula clean and not to modify the widely used (by users
-// in their default scheduling policies) calculateUSedScore.
+// in their default scheduling policies) calculateUsedScore.
 func mostRequestedScore(requested, capacity int64) int64 {
 	if capacity == 0 {
 		return 0

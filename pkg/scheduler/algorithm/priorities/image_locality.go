@@ -59,7 +59,7 @@ func calculateScoreFromSize(sumSize int64) int {
 	switch {
 	case sumSize == 0 || sumSize < minImgSize:
 		// 0 means none of the images required by this pod are present on this
-		// node or the total size of the images present is too small to be taken into further consideration.
+		// node or the total size of the images present are too small to be taken into further consideration.
 		return 0
 
 	case sumSize >= maxImgSize:
