@@ -66,6 +66,11 @@ message Event {
   // +optional
   repeated string sourceIPs = 10;
 
+  // UserAgent records the user agent string reported by the client.
+  // Note that the UserAgent is provided by the client, and must not be trusted.
+  // +optional
+  optional string userAgent = 18;
+
   // Object reference this request is targeted at.
   // Does not apply for List-type requests, or non-resource requests.
   // +optional

@@ -70,6 +70,7 @@ func autoConvert_v1alpha1_Event_To_audit_Event(in *Event, out *audit.Event, s co
 	}
 	out.ImpersonatedUser = (*audit.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
+	out.UserAgent = in.UserAgent
 	if in.ObjectRef != nil {
 		in, out := &in.ObjectRef, &out.ObjectRef
 		*out = new(audit.ObjectReference)
@@ -100,6 +101,7 @@ func autoConvert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s co
 	}
 	out.ImpersonatedUser = (*authentication_v1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
+	out.UserAgent = in.UserAgent
 	if in.ObjectRef != nil {
 		in, out := &in.ObjectRef, &out.ObjectRef
 		*out = new(ObjectReference)

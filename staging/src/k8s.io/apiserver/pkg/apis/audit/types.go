@@ -99,7 +99,7 @@ type Event struct {
 	// Source IPs, from where the request originated and intermediate proxies.
 	// +optional
 	SourceIPs []string
-	// UserAgent is an optional field that specifies the caller of this request.
+	// UserAgent records the user agent string reported by the client.
 	// Note that the UserAgent is provided by the client, and must not be trusted.
 	// +optional
 	UserAgent string
