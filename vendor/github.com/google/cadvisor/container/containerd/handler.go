@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"golang.org/x/net/context"
@@ -37,31 +36,21 @@ import (
 )
 
 type containerdContainerHandler struct {
-	client             containerdClient
-	name               string
-	id                 string
-	aliases            []string
 	machineInfoFactory info.MachineInfoFactory
 	// Absolute path to the cgroup hierarchies of this container.
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
 	cgroupPaths map[string]string
-	// Manager of this container's cgroups.
-	cgroupManager cgroups.Manager
-	fsInfo        fs.FsInfo
-	poolName      string
-	// Time at which this container was created.
-	creationTime time.Time
+	fsInfo      fs.FsInfo
 	// Metadata associated with the container.
-	labels map[string]string
-	envs   map[string]string
-	// The container PID used to switch namespaces as required
-	pid int
+	reference info.ContainerReference
+	envs      map[string]string
+	labels    map[string]string
 	// Image name used for this container.
 	image string
-	// The host root FS to read
-	rootFs string
 	// Filesystem handler.
 	ignoreMetrics container.MetricSet
+
+	libcontainerHandler *containerlibcontainer.Handler
 }
 
 var _ container.ContainerHandler = &containerdContainerHandler{}
@@ -131,25 +120,27 @@ func newContainerdContainerHandler(
 		rootfs = "/rootfs"
 	}
 
+	containerReference := info.ContainerReference{
+		Id:        id,
+		Name:      name,
+		Namespace: k8sContainerdNamespace,
+		Aliases:   []string{id, name},
+	}
+
+	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootfs, int(taskPid), ignoreMetrics)
+
 	handler := &containerdContainerHandler{
-		id:                 id,
-		client:             client,
-		name:               name,
-		machineInfoFactory: machineInfoFactory,
-		cgroupPaths:        cgroupPaths,
-		cgroupManager:      cgroupManager,
-		rootFs:             rootfs,
-		fsInfo:             fsInfo,
-		envs:               make(map[string]string),
-		labels:             make(map[string]string),
-		ignoreMetrics:      ignoreMetrics,
-		pid:                int(taskPid),
-		creationTime:       cntr.CreatedAt,
+		machineInfoFactory:  machineInfoFactory,
+		cgroupPaths:         cgroupPaths,
+		fsInfo:              fsInfo,
+		envs:                make(map[string]string),
+		labels:              cntr.Labels,
+		ignoreMetrics:       ignoreMetrics,
+		reference:           containerReference,
+		libcontainerHandler: libcontainerHandler,
 	}
 	// Add the name and bare ID as aliases of the container.
-	handler.labels = cntr.Labels
 	handler.image = cntr.Image
-	handler.aliases = []string{id, name}
 	for _, envVar := range spec.Process.Env {
 		if envVar != "" {
 			splits := strings.SplitN(envVar, "=", 2)
@@ -163,13 +154,7 @@ func newContainerdContainerHandler(
 }
 
 func (self *containerdContainerHandler) ContainerReference() (info.ContainerReference, error) {
-	return info.ContainerReference{
-		Id:        self.id,
-		Name:      self.name,
-		Namespace: k8sContainerdNamespace,
-		Labels:    self.labels,
-		Aliases:   self.aliases,
-	}, nil
+	return self.reference, nil
 }
 
 func (self *containerdContainerHandler) needNet() bool {
@@ -208,7 +193,7 @@ func (self *containerdContainerHandler) getFsStats(stats *info.ContainerStats) e
 }
 
 func (self *containerdContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := containerlibcontainer.GetStats(self.cgroupManager, self.rootFs, self.pid, self.ignoreMetrics)
+	stats, err := self.libcontainerHandler.GetStats()
 	if err != nil {
 		return stats, err
 	}
@@ -232,7 +217,7 @@ func (self *containerdContainerHandler) ListContainers(listType container.ListTy
 func (self *containerdContainerHandler) GetCgroupPath(resource string) (string, error) {
 	path, ok := self.cgroupPaths[resource]
 	if !ok {
-		return "", fmt.Errorf("could not find path for resource %q for container %q\n", resource, self.name)
+		return "", fmt.Errorf("could not find path for resource %q for container %q\n", resource, self.reference.Name)
 	}
 	return path, nil
 }
@@ -242,7 +227,7 @@ func (self *containerdContainerHandler) GetContainerLabels() map[string]string {
 }
 
 func (self *containerdContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	return containerlibcontainer.GetProcesses(self.cgroupManager)
+	return self.libcontainerHandler.GetProcesses()
 }
 
 func (self *containerdContainerHandler) Exists() bool {
