@@ -1153,7 +1153,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		return err
 	}
 	ds, err := dsc.dsLister.DaemonSets(namespace).Get(name)
-	if errors.IsNotFound(err) {
+	if errors.IsNotFound(err) || ds.DeletionTimestamp != nil {
 		glog.V(3).Infof("daemon set has been deleted %v", key)
 		dsc.expectations.DeleteExpectations(key)
 		return nil
