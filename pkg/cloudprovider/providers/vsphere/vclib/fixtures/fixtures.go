@@ -24,10 +24,17 @@ import (
 )
 
 var (
-	CaCertPath        string
-	ServerCertPath    string
-	ServerKeyPath     string
-	InvalidCaCertPath string
+	// CaCertPath is the filepath to a certificate that can be used as a CA
+	// certificate.
+	CaCertPath string
+	// ServerCertPath is the filepath to a leaf certifiacte signed by the CA at
+	// `CaCertPath`.
+	ServerCertPath string
+	// ServerKeyPath is the filepath to the private key for the ceritifiacte at
+	// `ServerCertPath`.
+	ServerKeyPath string
+	// InvalidCertPath is the filepath to an invalid certificate.
+	InvalidCertPath string
 )
 
 func init() {
@@ -54,5 +61,5 @@ func init() {
 	CaCertPath = filepath.Join(fixturesDir, "ca.pem")
 	ServerCertPath = filepath.Join(fixturesDir, "server.pem")
 	ServerKeyPath = filepath.Join(fixturesDir, "server.key")
-	InvalidCaCertPath = filepath.Join(fixturesDir, "invalid.pem")
+	InvalidCertPath = filepath.Join(fixturesDir, "invalid.pem")
 }
