@@ -317,6 +317,7 @@ func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
 		if err := cache.updatePod(oldPod, newPod); err != nil {
 			return err
 		}
+		currState.pod = newPod
 	default:
 		return fmt.Errorf("pod %v is not added to scheduler cache, so cannot be updated", key)
 	}
