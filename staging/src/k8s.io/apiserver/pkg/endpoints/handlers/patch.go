@@ -24,8 +24,13 @@ import (
 	"time"
 
 	"github.com/evanphx/json-patch"
+	"github.com/ghodss/yaml"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apply"
+	"k8s.io/apimachinery/pkg/apply/parse"
+	"k8s.io/apimachinery/pkg/apply/strategy"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // PatchResource returns a function that will handle a resource patch.
@@ -140,7 +146,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			trace: trace,
 		}
 
-		result, err := p.patchResource(ctx)
+		result, err := p.patchResource(ctx, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -315,23 +321,99 @@ func strategicPatchObject(
 
 type applyPatcher struct {
 	*patcher
+
+	model proto.Schema
+}
+
+// TODO(apelisse): workflowId needs to be passed as a query
+// param/header, and a better defaulting needs to be defined too.
+const workflowId = "default"
+
+func (p *applyPatcher) convertCurrentVersion(obj runtime.Object) (map[string]interface{}, error) {
+	vo, err := p.unsafeConvertor.ConvertToVersion(obj, p.kind.GroupVersion())
+	if err != nil {
+		return nil, err
+	}
+	return runtime.DefaultUnstructuredConverter.ToUnstructured(vo)
+}
+
+func (p *applyPatcher) extractLastIntent(obj runtime.Object, workflow string) (map[string]interface{}, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get accessor: %v", err)
+	}
+	last := make(map[string]interface{})
+	if accessor.GetLastApplied()[workflow] != "" {
+		if err := json.Unmarshal([]byte(accessor.GetLastApplied()[workflow]), &last); err != nil {
+			return nil, fmt.Errorf("couldn't unmarshal last applied field: %v", err)
+		}
+	}
+	return last, nil
+}
+
+func (p *applyPatcher) getNewIntent() (map[string]interface{}, error) {
+	patch := make(map[string]interface{})
+	if err := yaml.Unmarshal(p.patchBytes, &patch); err != nil {
+		return nil, fmt.Errorf("couldn't unmarshal patch object: %v (patch: %v)", err, string(p.patchBytes))
+	}
+	return patch, nil
+}
+
+func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.Object, error) {
+	voutput, err := p.creater.New(p.kind)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create empty output object: %v", err)
+	}
+
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(result.MergedResult.(map[string]interface{}), voutput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert merge result back: %v", err)
+	}
+	p.defaulter.Default(voutput)
+
+	uoutput, err := p.toUnversioned(voutput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert to unversioned: %v", err)
+	}
+
+	return uoutput, nil
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
-	versionedObjToUpdate, err := p.creater.New(p.kind)
+	current, err := p.convertCurrentVersion(currentObject)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert current object: %v", err)
 	}
-	if err := runtime.DecodeInto(p.codec, p.patchBytes, versionedObjToUpdate); err != nil {
-		return nil, err
-	}
-	// For now, instead of performing a structured merge we will just attempt a PUT
-	// So we just convert the object back to unversioned (aka internal version).
-	unversionedObjToUpdate, err := p.toUnversioned(versionedObjToUpdate)
+
+	lastIntent, err := p.extractLastIntent(currentObject, workflowId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to extract last intent: %v", err)
 	}
-	return unversionedObjToUpdate, nil
+	newIntent, err := p.getNewIntent()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new intent: %v", err)
+	}
+
+	element, err := parse.CreateElement(lastIntent, newIntent, current, p.model)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse elements: %v", err)
+	}
+	result, err := element.Merge(strategy.Create(strategy.Options{}))
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge elements: %v", err)
+	}
+
+	output, err := p.convertResultToUnversioned(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert merge result: %v", err)
+	}
+
+	// TODO(apelisse): Update last applied
+	// TODO(apelisse): Also update last-applied on the create path
+	// TODO(apelisse): Check for conflicts with other lastApplied
+	// and report actionable errors to users.
+
+	return output, nil
 }
 
 // applyPatch is called every time GuaranteedUpdate asks for the updated object,
@@ -363,7 +445,7 @@ func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Obje
 }
 
 // patchResource divides PatchResource for easier unit testing
-func (p *patcher) patchResource(ctx context.Context) (runtime.Object, error) {
+func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtime.Object, error) {
 	p.namespace = request.NamespaceValue(ctx)
 	switch p.patchType {
 	case types.JSONPatchType, types.MergePatchType:
@@ -376,7 +458,7 @@ func (p *patcher) patchResource(ctx context.Context) (runtime.Object, error) {
 		p.mechanism = &smpPatcher{patcher: p, schemaReferenceObj: schemaReferenceObj}
 	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
 	case types.ApplyPatchType:
-		p.mechanism = &applyPatcher{patcher: p}
+		p.mechanism = &applyPatcher{patcher: p, model: scope.OpenAPISchema}
 	default:
 		return nil, fmt.Errorf("%v: unimplemented patch type", p.patchType)
 	}
