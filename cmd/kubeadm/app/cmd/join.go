@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -28,6 +29,7 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -37,8 +39,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	utilsexec "k8s.io/utils/exec"
@@ -95,6 +99,19 @@ var (
 
 		Often times the same token is used for both parts. In this case, the
 		--token flag can be used instead of specifying each token individually.
+		`)
+
+	kubeadmJoinFailMsgf = dedent.Dedent(`
+		Unfortunately, an error has occurred:
+			%v
+
+		This error is likely caused by:
+			- The kubelet is not running
+			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
+
+		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
+			- 'systemctl status kubelet'
+			- 'journalctl -xeu kubelet'
 		`)
 )
 
@@ -269,16 +286,30 @@ func (j *Join) Run(out io.Writer) error {
 	}
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming bootstrap-kubeconfig.conf to kubeconfig.conf in /etc/kubernetes
+	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf KubeConfig file. If this process
+	// times out, display a somewhat user-friendly message.
+	waiter := apiclient.NewKubeWaiter(nil, kubeadmconstants.TLSBootstrapTimeout, os.Stdout)
+	if err := waitForKubeletAndFunc(waiter, waitForTLSBootstrappedClient); err != nil {
+		fmt.Printf(kubeadmJoinFailMsgf, err)
+		return err
+	}
+
+	// When we know the /etc/kubernetes/kubelet.conf file is available, get the client
+	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+	client, err := kubeconfigutil.ClientSetFromFile(kubeletKubeConfig)
+	if err != nil {
+		return err
+	}
+
+	glog.V(1).Infof("[join] preserving the crisocket information for the node")
+	if err := patchnodephase.AnnotateCRISocket(client, j.cfg.NodeRegistration.Name, j.cfg.NodeRegistration.CRISocket); err != nil {
+		return fmt.Errorf("error uploading crisocket: %v", err)
+	}
 
 	// NOTE: the "--dynamic-config-dir" flag should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf for this to work
 	// This feature is disabled by default, as it is alpha still
 	glog.V(1).Infoln("[join] enabling dynamic kubelet configuration")
 	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		client, err := kubeletphase.GetLocalNodeTLSBootstrappedClient()
-		if err != nil {
-			return err
-		}
-
 		if err := kubeletphase.EnableDynamicConfigForNode(client, j.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
 			return fmt.Errorf("error consuming base kubelet configuration: %v", err)
 		}
@@ -286,4 +317,16 @@ func (j *Join) Run(out io.Writer) error {
 
 	fmt.Fprintf(out, joinDoneMsgf)
 	return nil
+}
+
+// waitForTLSBootstrappedClient waits for the /etc/kubernetes/kubelet.conf file to be available
+func waitForTLSBootstrappedClient() error {
+	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
+
+	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
+	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.TLSBootstrapTimeout, func() (bool, error) {
+		_, err := os.Stat(kubeletKubeConfig)
+		return (err == nil), nil
+	})
 }
