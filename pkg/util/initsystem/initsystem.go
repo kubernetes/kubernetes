@@ -44,15 +44,26 @@ type InitSystem interface {
 
 type SystemdInitSystem struct{}
 
+func (sysd SystemdInitSystem) reloadSystemd() error {
+	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+		return fmt.Errorf("failed to reload systemd: %v", err)
+	}
+	return nil
+}
+
 func (sysd SystemdInitSystem) ServiceStart(service string) error {
+	// Before we try to start any service, make sure that systemd is ready
+	if err := sysd.reloadSystemd(); err != nil {
+		return err
+	}
 	args := []string{"start", service}
-	err := exec.Command("systemctl", args...).Run()
-	return err
+	return exec.Command("systemctl", args...).Run()
 }
 
 func (sysd SystemdInitSystem) ServiceRestart(service string) error {
-	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
-		return fmt.Errorf("failed to reload systemd: %v", err)
+	// Before we try to restart any service, make sure that systemd is ready
+	if err := sysd.reloadSystemd(); err != nil {
+		return err
 	}
 	args := []string{"restart", service}
 	return exec.Command("systemctl", args...).Run()
@@ -60,8 +71,7 @@ func (sysd SystemdInitSystem) ServiceRestart(service string) error {
 
 func (sysd SystemdInitSystem) ServiceStop(service string) error {
 	args := []string{"stop", service}
-	err := exec.Command("systemctl", args...).Run()
-	return err
+	return exec.Command("systemctl", args...).Run()
 }
 
 func (sysd SystemdInitSystem) ServiceExists(service string) bool {

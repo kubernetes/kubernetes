@@ -1063,15 +1063,41 @@ func TryStartKubelet(ignorePreflightErrors sets.String) {
 	// If we notice that the kubelet service is inactive, try to start it
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		fmt.Println("[preflight] no supported init system detected, won't ensure kubelet is running.")
-	} else if initSystem.ServiceExists("kubelet") {
+		fmt.Println("[preflight] no supported init system detected, won't make sure the kubelet is running properly.")
+		return
+	}
 
-		fmt.Println("[preflight] Activating the kubelet service")
-		// This runs "systemctl daemon-reload && systemctl restart kubelet"
-		if err := initSystem.ServiceRestart("kubelet"); err != nil {
-			glog.Warningf("[preflight] unable to start the kubelet service: [%v]\n", err)
-			glog.Warningf("[preflight] please ensure kubelet is running manually.")
-		}
+	if !initSystem.ServiceExists("kubelet") {
+		fmt.Println("[preflight] couldn't detect a kubelet service, can't make sure the kubelet is running properly.")
+	}
+
+	fmt.Println("[preflight] Activating the kubelet service")
+	// This runs "systemctl daemon-reload && systemctl restart kubelet"
+	if err := initSystem.ServiceRestart("kubelet"); err != nil {
+		fmt.Printf("[preflight] WARNING: unable to start the kubelet service: [%v]\n", err)
+		fmt.Printf("[preflight] please ensure kubelet is reloaded and running manually.\n")
+	}
+}
+
+// TryStopKubelet attempts to bring down the kubelet service momentarily
+func TryStopKubelet(ignorePreflightErrors sets.String) {
+	if setHasItemOrAll(ignorePreflightErrors, "StopKubelet") {
+		return
+	}
+	// If we notice that the kubelet service is inactive, try to start it
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		fmt.Println("[preflight] no supported init system detected, won't make sure the kubelet not running for a short period of time while setting up configuration for it.")
+		return
+	}
+
+	if !initSystem.ServiceExists("kubelet") {
+		fmt.Println("[preflight] couldn't detect a kubelet service, can't make sure the kubelet not running for a short period of time while setting up configuration for it.")
+	}
+
+	// This runs "systemctl daemon-reload && systemctl stop kubelet"
+	if err := initSystem.ServiceStop("kubelet"); err != nil {
+		fmt.Printf("[preflight] WARNING: unable to stop the kubelet service momentarily: [%v]\n", err)
 	}
 }
 

@@ -30,6 +30,21 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
+	// After that, the information in the fields ARE NOT uploaded to the `kubeadm-config` ConfigMap
+	// that is used by `kubeadm upgrade` for instance. These fields must be omitempty.
+
+	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
+	// This information IS NOT uploaded to the kubeadm cluster configmap, partly because of its sensitive nature
+	BootstrapTokens []BootstrapToken `json:"bootstrapTokens,omitempty"`
+
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
+
+	// Cluster-wide configuration
+	// TODO: Move these fields under some kind of ClusterConfiguration or similar struct that describes
+	// one cluster. Eventually we want this kind of spec to align well with the Cluster API spec.
+
 	// API holds configuration for the k8s apiserver.
 	API API `json:"api"`
 	// KubeProxy holds configuration for the k8s service proxy.
@@ -41,15 +56,8 @@ type MasterConfiguration struct {
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking `json:"networking"`
 
-	// NodeRegistration holds fields that relate to registering the new master node to the cluster
-	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration"`
-
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string `json:"kubernetesVersion"`
-
-	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
-	// This information IS NOT uploaded to the kubeadm cluster configmap, due to its sensitive nature
-	BootstrapTokens []BootstrapToken `json:"bootstrapTokens,omitempty"`
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -133,10 +141,10 @@ type NodeRegistrationOptions struct {
 	// empty slice, i.e. `taints: {}` in the YAML file. This field is solely used for Node registration.
 	Taints []v1.Taint `json:"taints,omitempty"`
 
-	// ExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
+	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
 	// Flags have higher higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
-	ExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
+	KubeletExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 }
 
 // Networking contains elements describing cluster's networking configuration

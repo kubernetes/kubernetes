@@ -42,6 +42,8 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 
 	// Removes sensitive info from the data that will be stored in the config map
 	externalcfg.BootstrapTokens = nil
+	// Clear the NodeRegistration object.
+	externalcfg.NodeRegistration = kubeadmapiv1alpha2.NodeRegistrationOptions{}
 
 	cfgYaml, err := util.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, scheme.Codecs)
 	if err != nil {

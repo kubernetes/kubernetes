@@ -32,6 +32,21 @@ import (
 type MasterConfiguration struct {
 	metav1.TypeMeta
 
+	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
+	// After that, the information in the fields ARE NOT uploaded to the `kubeadm-config` ConfigMap
+	// that is used by `kubeadm upgrade` for instance.
+
+	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
+	// This information IS NOT uploaded to the kubeadm cluster configmap, partly because of its sensitive nature
+	BootstrapTokens []BootstrapToken
+
+	// NodeRegistration holds fields that relate to registering the new master node to the cluster
+	NodeRegistration NodeRegistrationOptions
+
+	// Cluster-wide configuration
+	// TODO: Move these fields under some kind of ClusterConfiguration or similar struct that describes
+	// one cluster. Eventually we want this kind of spec to align well with the Cluster API spec.
+
 	// API holds configuration for the k8s apiserver.
 	API API
 	// KubeProxy holds configuration for the k8s service proxy.
@@ -44,13 +59,6 @@ type MasterConfiguration struct {
 	Networking Networking
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string
-
-	// NodeRegistration holds fields that relate to registering the new master node to the cluster
-	NodeRegistration NodeRegistrationOptions
-
-	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
-	// This information IS NOT uploaded to the kubeadm cluster configmap, due to its sensitive nature
-	BootstrapTokens []BootstrapToken
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -141,10 +149,10 @@ type NodeRegistrationOptions struct {
 	// empty slice, i.e. `taints: {}` in the YAML file. This field is solely used for Node registration.
 	Taints []v1.Taint
 
-	// ExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
+	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
 	// Flags have higher higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
-	ExtraArgs map[string]string
+	KubeletExtraArgs map[string]string
 }
 
 // Networking contains elements describing cluster's networking configuration.

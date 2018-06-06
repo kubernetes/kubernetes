@@ -31,7 +31,11 @@ func MarkMaster(client clientset.Interface, masterName string, taints []v1.Taint
 	fmt.Printf("[markmaster] Marking the node %s as master by adding the label \"%s=''\"\n", masterName, constants.LabelNodeRoleMaster)
 
 	if taints != nil && len(taints) > 0 {
-		fmt.Printf("[markmaster] Marking the node %s as master by adding the taints %v\n", masterName, taints)
+		taintStrs := []string{}
+		for _, taint := range taints {
+			taintStrs = append(taintStrs, taint.ToString())
+		}
+		fmt.Printf("[markmaster] Marking the node %s as master by adding the taints %v\n", masterName, taintStrs)
 	}
 
 	return apiclient.PatchNode(client, masterName, func(n *v1.Node) {
