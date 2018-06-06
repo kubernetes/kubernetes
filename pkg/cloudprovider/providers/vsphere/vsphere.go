@@ -428,6 +428,7 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 				Insecure:          cfg.Global.InsecureFlag,
 				RoundTripperCount: vcConfig.RoundTripperCount,
 				Port:              vcConfig.VCenterPort,
+				CACert:            cfg.Global.CAFile,
 				Thumbprint:        vcConfig.Thumbprint,
 			}
 			vsphereIns := VSphereInstance{

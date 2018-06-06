@@ -641,6 +641,28 @@ func TestSecretVSphereConfig(t *testing.T) {
 				"1.1.1.1": "thumbprint:1",
 			},
 		},
+		{
+			testName: "Multiple virtual centers use the global CA cert",
+			conf: `[Global]
+			user = user
+			password = password
+			datacenter = us-west
+			ca-file = /some/path/to/my/trusted/ca.pem
+			[VirtualCenter "0.0.0.0"]
+			user = user
+			password = password
+			[VirtualCenter "1.1.1.1"]
+			user = user
+			password = password
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -672,6 +694,7 @@ func TestSecretVSphereConfig(t *testing.T) {
 				}
 			}
 		}
+		// Check, if all the expected thumbprints are configured
 		for instanceName, expectedThumbprint := range testcase.expectedThumbprints {
 			instanceConfig, ok := vs.vsphereInstanceMap[instanceName]
 			if !ok {
@@ -682,6 +705,17 @@ func TestSecretVSphereConfig(t *testing.T) {
 					"Expected thumbprint for instance '%s' to be '%s', got '%s'",
 					instanceName, expectedThumbprint, actualThumbprint,
 				)
+			}
+		}
+		// Check, if all all connections are configured with the global CA certificate
+		if expectedCaPath := cfg.Global.CAFile; expectedCaPath != "" {
+			for name, instance := range vs.vsphereInstanceMap {
+				if actualCaPath := instance.conn.CACert; actualCaPath != expectedCaPath {
+					t.Fatalf(
+						"Expected CA certificate path for instance '%s' to be the globally configured one ('%s'), got '%s'",
+						name, expectedCaPath, actualCaPath,
+					)
+				}
 			}
 		}
 	}
