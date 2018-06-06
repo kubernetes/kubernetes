@@ -108,7 +108,10 @@ func TestMarkMaster(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		hostname := node.GetHostname("")
+		hostname, err := node.GetHostname("")
+		if err != nil {
+			t.Fatalf("MarkMaster(%s): unexpected error: %v", tc.name, err)
+		}
 		masterNode := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: hostname,
