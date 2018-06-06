@@ -90,8 +90,8 @@ var _ = SIGDescribe("Services", func() {
 			framework.DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {
-			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+			framework.Logf("cleaning load balancer resource for %s", lb)
+			framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -1624,8 +1624,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 			framework.DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {
-			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+			framework.Logf("cleaning load balancer resource for %s", lb)
+			framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -2025,8 +2025,8 @@ func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface
 	defer func() {
 		framework.StopServeHostnameService(cs, ns, serviceName)
 		lb := cloudprovider.GetLoadBalancerName(svc)
-		framework.Logf("cleaning gce resource for %s", lb)
-		framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+		framework.Logf("cleaning load balancer resource for %s", lb)
+		framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 	}()
 	ingressIP := framework.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 	port := int(svc.Spec.Ports[0].Port)
