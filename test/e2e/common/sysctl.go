@@ -22,11 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+var sysctlFeatureFromAnnotationsToAPIFields = utilversion.MustParseSemantic("v1.11.0-alpha.0")
 
 var _ = framework.KubeDescribe("Sysctls", func() {
 	f := framework.NewDefaultFramework("sysctl")
@@ -53,7 +56,16 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		return &pod
 	}
 
+	sysctlFeatureFromAnnotationsToAPIFields := false
 	BeforeEach(func() {
+		var err error
+		sysctlFeatureFromAnnotationsToAPIFields, err = framework.ServerVersionGTE(sysctlFeatureFromAnnotationsToAPIFields, f.ClientSet.Discovery())
+		Expect(err).NotTo(HaveOccurred())
+
+		if sysctlFeatureFromAnnotationsToAPIFields {
+			framework.Skipf("Skipping all Sysctls tests. Running version > %q", sysctlFeatureFromAnnotationsToAPIFields)
+		}
+
 		podClient = f.PodClient()
 	})
 
