@@ -9,6 +9,7 @@ go_library(
     importpath = "github.com/google/cadvisor/machine",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/docker/docker/pkg/parsers/operatingsystem:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",

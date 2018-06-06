@@ -40,8 +40,8 @@ type rawFactory struct {
 	// Information about mounted filesystems.
 	fsInfo fs.FsInfo
 
-	// Watcher for inotify events.
-	watcher *common.InotifyWatcher
+	// Watcher for fsnotify events.
+	watcher *common.FsnotifyWatcher
 
 	// List of metrics to be ignored.
 	ignoreMetrics map[container.MetricKind]struct{}
@@ -78,7 +78,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, igno
 		return fmt.Errorf("failed to find supported cgroup mounts for the raw factory")
 	}
 
-	watcher, err := common.NewInotifyWatcher()
+	watcher, err := common.NewFsnotifyWatcher()
 	if err != nil {
 		return err
 	}
