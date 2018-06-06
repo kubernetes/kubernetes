@@ -151,7 +151,7 @@ Networking:
   ServiceSubnet: 10.96.0.0/12
 NodeRegistration:
   CRISocket: /var/run/dockershim.sock
-  ExtraArgs: null
+  KubeletExtraArgs: null
   Name: master-1
   Taints:
   - effect: NoSchedule
