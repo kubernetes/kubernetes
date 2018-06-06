@@ -172,3 +172,29 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestGetKubeDNSVersion(t *testing.T) {
+	var tests = []struct {
+		dns      string
+		expected string
+	}{
+		{
+			dns:      KubeDNS,
+			expected: KubeDNSVersion,
+		},
+		{
+			dns:      CoreDNS,
+			expected: CoreDNSVersion,
+		},
+	}
+	for _, rt := range tests {
+		actualDNSVersion := GetDNSVersion(rt.dns)
+		if actualDNSVersion != rt.expected {
+			t.Errorf(
+				"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
+				rt.expected,
+				actualDNSVersion,
+			)
+		}
+	}
+}

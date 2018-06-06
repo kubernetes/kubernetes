@@ -1,17 +1,16 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["empty.proto"],
-    visibility = ["//visibility:public"],
-)
-
 go_library(
     name = "go_default_library",
-    srcs = ["empty.pb.go"],
-    importpath = "github.com/golang/protobuf/ptypes/empty",
+    srcs = ["tpu-gen.go"],
+    importpath = "google.golang.org/api/tpu/v1",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
+    deps = [
+        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/golang.org/x/net/context/ctxhttp:go_default_library",
+        "//vendor/google.golang.org/api/gensupport:go_default_library",
+        "//vendor/google.golang.org/api/googleapi:go_default_library",
+    ],
 )
 
 filegroup(

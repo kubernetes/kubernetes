@@ -19,6 +19,7 @@ limitations under the License.
 package token
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -27,7 +28,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -36,10 +37,13 @@ const (
 )
 
 // NewManager returns a new token manager.
-func NewManager(c corev1.CoreV1Interface) *Manager {
+func NewManager(c clientset.Interface) *Manager {
 	m := &Manager{
 		getToken: func(name, namespace string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-			return c.ServiceAccounts(namespace).CreateToken(name, tr)
+			if c == nil {
+				return nil, errors.New("cannot use TokenManager when kubelet is in standalone mode")
+			}
+			return c.CoreV1().ServiceAccounts(namespace).CreateToken(name, tr)
 		},
 		cache: make(map[string]*authenticationv1.TokenRequest),
 		clock: clock.RealClock{},

@@ -64,6 +64,15 @@ func (f *PrintFlags) Copy() PrintFlags {
 	return printFlags
 }
 
+func (f *PrintFlags) AllowedFormats() []string {
+	formats := f.JSONYamlPrintFlags.AllowedFormats()
+	formats = append(formats, f.NamePrintFlags.AllowedFormats()...)
+	formats = append(formats, f.TemplateFlags.AllowedFormats()...)
+	formats = append(formats, f.CustomColumnsFlags.AllowedFormats()...)
+	formats = append(formats, f.HumanReadableFlags.AllowedFormats()...)
+	return formats
+}
+
 // UseOpenAPIColumns modifies the output format, as well as the
 // "allowMissingKeys" option for template printers, to values
 // defined in the OpenAPI schema of a resource.
@@ -132,7 +141,7 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 		return p, err
 	}
 
-	return nil, genericclioptions.NoCompatiblePrinterError{Options: f}
+	return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: f.AllowedFormats()}
 }
 
 // AddFlags receives a *cobra.Command reference and binds

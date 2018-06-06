@@ -6,7 +6,6 @@ go_library(
     importpath = "github.com/containerd/containerd/api/types/task",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/gogo/protobuf/types:go_default_library",
     ],

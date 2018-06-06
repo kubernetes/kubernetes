@@ -6778,12 +6778,28 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SysctlsPodAnnotationKey:       "kernel.shmmni=32768,kernel.shmmax=1000000000",
-					core.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
+			},
+			Spec: core.PodSpec{
+				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+				SecurityContext: &core.PodSecurityContext{
+					Sysctls: []core.Sysctl{
+						{
+							Name:  "kernel.shmmni",
+							Value: "32768",
+						},
+						{
+							Name:  "kernel.shmmax",
+							Value: "1000000000",
+						},
+						{
+							Name:  "knet.ipv4.route.min_pmtu",
+							Value: "1000",
+						},
+					},
 				},
 			},
-			Spec: validPodSpec(nil),
 		},
 		{ // valid extended resources for init container
 			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
@@ -7459,59 +7475,6 @@ func TestValidatePod(t *testing.T) {
 					Namespace: "ns",
 					Annotations: map[string]string{
 						apparmor.ContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"invalid sysctl annotation": {
-			expectedError: "metadata.annotations[security.alpha.kubernetes.io/sysctls]",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SysctlsPodAnnotationKey: "foo:",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"invalid comma-separated sysctl annotation": {
-			expectedError: "not of the format sysctl_name=value",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SysctlsPodAnnotationKey: "kernel.msgmax,",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"invalid unsafe sysctl annotation": {
-			expectedError: "metadata.annotations[security.alpha.kubernetes.io/sysctls]",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SysctlsPodAnnotationKey: "foo:",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"intersecting safe sysctls and unsafe sysctls annotations": {
-			expectedError: "can not be safe and unsafe",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SysctlsPodAnnotationKey:       "kernel.shmmax=10000000",
-						core.UnsafeSysctlsPodAnnotationKey: "kernel.shmmax=10000000",
 					},
 				},
 				Spec: validPodSpec(nil),
@@ -12805,6 +12768,11 @@ func TestValidateSysctls(t *testing.T) {
 		"_invalid",
 	}
 
+	duplicates := []string{
+		"kernel.shmmax",
+		"kernel.shmmax",
+	}
+
 	sysctls := make([]core.Sysctl, len(valid))
 	for i, sysctl := range valid {
 		sysctls[i].Name = sysctl
@@ -12828,6 +12796,17 @@ func TestValidateSysctls(t *testing.T) {
 		if got, expected := errs[1].Error(), "foo"; !strings.Contains(got, expected) {
 			t.Errorf("unexpected errors: expected=%q, got=%q", expected, got)
 		}
+	}
+
+	sysctls = make([]core.Sysctl, len(duplicates))
+	for i, sysctl := range duplicates {
+		sysctls[i].Name = sysctl
+	}
+	errs = validateSysctls(sysctls, field.NewPath("foo"))
+	if len(errs) != 1 {
+		t.Errorf("unexpected validation errors: %v", errs)
+	} else if errs[0].Type != field.ErrorTypeDuplicate {
+		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
 	}
 }
 

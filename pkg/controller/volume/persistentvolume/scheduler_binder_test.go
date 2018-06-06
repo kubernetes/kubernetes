@@ -50,6 +50,7 @@ var (
 	provisionedPVC2             = makeTestPVC("provisioned-pvc2", "1Gi", pvcUnbound, "", "1", &waitClass)
 	provisionedPVCHigherVersion = makeTestPVC("provisioned-pvc2", "1Gi", pvcUnbound, "", "2", &waitClass)
 	noProvisionerPVC            = makeTestPVC("no-provisioner-pvc", "1Gi", pvcUnbound, "", "1", &provisionNotSupportClass)
+	topoMismatchPVC             = makeTestPVC("topo-mismatch-pvc", "1Gi", pvcUnbound, "", "1", &topoMismatchClass)
 
 	pvNoNode                   = makeTestPV("pv-no-node", "", "1G", "1", nil, waitClass)
 	pvNode1a                   = makeTestPV("pv-node1a", "node1", "5G", "1", nil, waitClass)
@@ -74,6 +75,7 @@ var (
 	waitClass                = "waitClass"
 	immediateClass           = "immediateClass"
 	provisionNotSupportClass = "provisionNotSupportedClass"
+	topoMismatchClass        = "topoMismatchClass"
 
 	nodeLabelKey   = "nodeKey"
 	nodeLabelValue = "node1"
@@ -112,6 +114,16 @@ func newTestBinder(t *testing.T) *testEnv {
 			},
 			VolumeBindingMode: &waitMode,
 			Provisioner:       "test-provisioner",
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    nodeLabelKey,
+							Values: []string{nodeLabelValue, "reference-value"},
+						},
+					},
+				},
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -125,6 +137,23 @@ func newTestBinder(t *testing.T) *testEnv {
 			},
 			VolumeBindingMode: &waitMode,
 			Provisioner:       "kubernetes.io/no-provisioner",
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: topoMismatchClass,
+			},
+			VolumeBindingMode: &waitMode,
+			Provisioner:       "test-provisioner",
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    nodeLabelKey,
+							Values: []string{"reference-value"},
+						},
+					},
+				},
+			},
 		},
 	}
 	for _, class := range classes {
@@ -737,6 +766,11 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		},
 		"invalid-provisioner": {
 			podPVCs:         []*v1.PersistentVolumeClaim{noProvisionerPVC},
+			expectedUnbound: false,
+			expectedBound:   true,
+		},
+		"volume-topology-unsatisfied": {
+			podPVCs:         []*v1.PersistentVolumeClaim{topoMismatchPVC},
 			expectedUnbound: false,
 			expectedBound:   true,
 		},

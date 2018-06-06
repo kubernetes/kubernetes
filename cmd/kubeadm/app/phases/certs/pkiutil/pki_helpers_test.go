@@ -539,7 +539,7 @@ func TestGetEtcdAltNames(t *testing.T) {
 		}
 	}
 
-	expectedIPAddresses := []string{"127.0.0.1", proxyIP}
+	expectedIPAddresses := []string{"127.0.0.1", net.IPv6loopback.String(), proxyIP}
 	for _, IPAddress := range expectedIPAddresses {
 		found := false
 		for _, val := range altNames.IPs {

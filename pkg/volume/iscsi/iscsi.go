@@ -367,6 +367,10 @@ func (b *iscsiDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
 }
 
+func (b *iscsiDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return ioutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+}
+
 type iscsiDiskUnmapper struct {
 	*iscsiDisk
 	exec       mount.Exec

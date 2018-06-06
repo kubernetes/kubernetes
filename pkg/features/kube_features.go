@@ -160,6 +160,12 @@ const (
 	// Enable pods to consume pre-allocated huge pages of varying page sizes
 	HugePages utilfeature.Feature = "HugePages"
 
+	// owner: @sjenning
+	// beta: v1.11
+	//
+	// Enable pods to set sysctls on a pod
+	Sysctls utilfeature.Feature = "Sysctls"
+
 	// owner @brendandburns
 	// alpha: v1.9
 	//
@@ -352,6 +358,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.Beta},
 	LocalStorageCapacityIsolation:               {Default: true, PreRelease: utilfeature.Beta},
 	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
+	Sysctls:                                     {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodShareProcessNamespace:                    {Default: false, PreRelease: utilfeature.Alpha},
 	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},

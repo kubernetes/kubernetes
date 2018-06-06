@@ -12,11 +12,9 @@ go_library(
     importpath = "github.com/containerd/containerd/api/services/containers/v1",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
         "//vendor/github.com/gogo/protobuf/types:go_default_library",
-        "//vendor/github.com/golang/protobuf/ptypes/empty:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
     ],

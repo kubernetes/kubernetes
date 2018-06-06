@@ -412,8 +412,8 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		},
 		"activeDeadlineSeconds with backofflimit reach": {
 			1, 1, 1, 10, 0,
-			1, 0, 2,
-			true, 1, 0, 0, 3, "BackoffLimitExceeded",
+			0, 0, 1,
+			true, 0, 0, 0, 1, "BackoffLimitExceeded",
 		},
 	}
 

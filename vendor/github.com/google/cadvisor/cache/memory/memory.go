@@ -70,16 +70,16 @@ type InMemoryCache struct {
 	backend           storage.StorageDriver
 }
 
-func (self *InMemoryCache) AddStats(ref info.ContainerReference, stats *info.ContainerStats) error {
+func (self *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.ContainerStats) error {
 	var cstore *containerCache
 	var ok bool
 
 	func() {
 		self.lock.Lock()
 		defer self.lock.Unlock()
-		if cstore, ok = self.containerCacheMap[ref.Name]; !ok {
-			cstore = newContainerStore(ref, self.maxAge)
-			self.containerCacheMap[ref.Name] = cstore
+		if cstore, ok = self.containerCacheMap[cInfo.ContainerReference.Name]; !ok {
+			cstore = newContainerStore(cInfo.ContainerReference, self.maxAge)
+			self.containerCacheMap[cInfo.ContainerReference.Name] = cstore
 		}
 	}()
 
@@ -87,7 +87,7 @@ func (self *InMemoryCache) AddStats(ref info.ContainerReference, stats *info.Con
 		// TODO(monnand): To deal with long delay write operations, we
 		// may want to start a pool of goroutines to do write
 		// operations.
-		if err := self.backend.AddStats(ref, stats); err != nil {
+		if err := self.backend.AddStats(cInfo, stats); err != nil {
 			glog.Error(err)
 		}
 	}

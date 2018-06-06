@@ -32,14 +32,13 @@ const (
 	ReadinessGatesNotReady   = "ReadinessGatesNotReady"
 )
 
-// GeneratePodReadyCondition returns "Ready" condition of a pod.
-// The status of "Ready" condition is "True", if all containers in a pod are ready
-// AND all matching conditions specified in the ReadinessGates have status equal to "True".
-func GeneratePodReadyCondition(spec *v1.PodSpec, conditions []v1.PodCondition, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
+// GenerateContainersReadyCondition returns the status of "ContainersReady" condition.
+// The status of "ContainersReady" condition is true when all containers are ready.
+func GenerateContainersReadyCondition(spec *v1.PodSpec, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
 	// Find if all containers are ready or not.
 	if containerStatuses == nil {
 		return v1.PodCondition{
-			Type:   v1.PodReady,
+			Type:   v1.ContainersReady,
 			Status: v1.ConditionFalse,
 			Reason: UnknownContainerStatuses,
 		}
@@ -59,7 +58,7 @@ func GeneratePodReadyCondition(spec *v1.PodSpec, conditions []v1.PodCondition, c
 	// If all containers are known and succeeded, just return PodCompleted.
 	if podPhase == v1.PodSucceeded && len(unknownContainers) == 0 {
 		return v1.PodCondition{
-			Type:   v1.PodReady,
+			Type:   v1.ContainersReady,
 			Status: v1.ConditionFalse,
 			Reason: PodCompleted,
 		}
@@ -76,16 +75,37 @@ func GeneratePodReadyCondition(spec *v1.PodSpec, conditions []v1.PodCondition, c
 	unreadyMessage := strings.Join(unreadyMessages, ", ")
 	if unreadyMessage != "" {
 		return v1.PodCondition{
-			Type:    v1.PodReady,
+			Type:    v1.ContainersReady,
 			Status:  v1.ConditionFalse,
 			Reason:  ContainersNotReady,
 			Message: unreadyMessage,
 		}
 	}
 
+	return v1.PodCondition{
+		Type:   v1.ContainersReady,
+		Status: v1.ConditionTrue,
+	}
+}
+
+// GeneratePodReadyCondition returns "Ready" condition of a pod.
+// The status of "Ready" condition is "True", if all containers in a pod are ready
+// AND all matching conditions specified in the ReadinessGates have status equal to "True".
+func GeneratePodReadyCondition(spec *v1.PodSpec, conditions []v1.PodCondition, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
+	containersReady := GenerateContainersReadyCondition(spec, containerStatuses, podPhase)
+	// If the status of ContainersReady is not True, return the same status, reason and message as ContainersReady.
+	if containersReady.Status != v1.ConditionTrue {
+		return v1.PodCondition{
+			Type:    v1.PodReady,
+			Status:  containersReady.Status,
+			Reason:  containersReady.Reason,
+			Message: containersReady.Message,
+		}
+	}
+
 	// Evaluate corresponding conditions specified in readiness gate
 	// Generate message if any readiness gate is not satisfied.
-	unreadyMessages = []string{}
+	unreadyMessages := []string{}
 	for _, rg := range spec.ReadinessGates {
 		_, c := podutil.GetPodConditionFromList(conditions, rg.ConditionType)
 		if c == nil {

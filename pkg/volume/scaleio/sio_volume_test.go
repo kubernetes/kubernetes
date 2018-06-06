@@ -296,7 +296,7 @@ func TestVolumeProvisioner(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 
-	spec, err := provisioner.Provision()
+	spec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Fatalf("call to Provision() failed: %v", err)
 	}
@@ -467,7 +467,7 @@ func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 
-	_, err = provisioner.Provision()
+	_, err = provisioner.Provision(nil, nil)
 	if err == nil {
 		t.Fatalf("call to Provision() should fail with invalid capacity")
 	}
@@ -516,7 +516,7 @@ func TestVolumeProvisionerWithSecretNamespace(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 
-	spec, err := sioVol.Provision()
+	spec, err := sioVol.Provision(nil, nil)
 	if err != nil {
 		t.Fatalf("call to Provision() failed: %v", err)
 	}

@@ -70,7 +70,7 @@ go_library(
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/container/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
-        "//vendor/google.golang.org/api/tpu/v1alpha1:go_default_library",
+        "//vendor/google.golang.org/api/tpu/v1:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

@@ -2,14 +2,14 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["tpu-gen.go"],
-    importpath = "google.golang.org/api/tpu/v1alpha1",
+    srcs = ["patchnode.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/golang.org/x/net/context/ctxhttp:go_default_library",
-        "//vendor/google.golang.org/api/gensupport:go_default_library",
-        "//vendor/google.golang.org/api/googleapi:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/util/apiclient:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
 

@@ -171,6 +171,8 @@ const (
 	PatchNodeTimeout = 2 * time.Minute
 	// UpdateNodeTimeout specifies how long kubeadm should wait for updating node with the initial remote configuration of kubelet before timing out
 	UpdateNodeTimeout = 2 * time.Minute
+	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
+	TLSBootstrapTimeout = 2 * time.Minute
 
 	// MinimumAddressesInServiceSubnet defines minimum amount of nodes the Service subnet should allow.
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
@@ -183,6 +185,10 @@ const (
 	// LabelNodeRoleMaster specifies that a node is a master
 	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+
+	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
+	// init/join time for use later. kubeadm annotates the node object with this information
+	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
 
 	// MasterConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
 	MasterConfigurationConfigMap = "kubeadm-config"
@@ -267,6 +273,12 @@ const (
 
 	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
 	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"
+
+	// KubeDNSVersion is the version of kube-dns to be deployed if it is used
+	KubeDNSVersion = "1.14.10"
+
+	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
+	CoreDNSVersion = "1.1.3"
 )
 
 var (
@@ -395,4 +407,14 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 // GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod
 func GetStaticPodAuditPolicyFile() string {
 	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditPolicyFile)
+}
+
+// GetDNSVersion is a handy function that returns the DNS version by DNS type
+func GetDNSVersion(dnsType string) string {
+	switch dnsType {
+	case CoreDNS:
+		return CoreDNSVersion
+	default:
+		return KubeDNSVersion
+	}
 }

@@ -1,10 +1,17 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["wrappers.proto"],
+    visibility = ["//visibility:public"],
+)
+
 go_library(
     name = "go_default_library",
-    srcs = ["doc.go"],
-    importpath = "google.golang.org/grpc/grpclb/grpc_lb_v1",
+    srcs = ["wrappers.pb.go"],
+    importpath = "github.com/golang/protobuf/ptypes/wrappers",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
 )
 
 filegroup(
@@ -16,10 +23,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/google.golang.org/grpc/grpclb/grpc_lb_v1/messages:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
