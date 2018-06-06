@@ -287,6 +287,7 @@ filegroup(
         "//vendor/github.com/mailru/easyjson/jlexer:all-srcs",
         "//vendor/github.com/mailru/easyjson/jwriter:all-srcs",
         "//vendor/github.com/marstr/guid:all-srcs",
+        "//vendor/github.com/mattn/go-shellwords:all-srcs",
         "//vendor/github.com/matttproud/golang_protobuf_extensions/pbutil:all-srcs",
         "//vendor/github.com/mholt/caddy/caddyfile:all-srcs",
         "//vendor/github.com/miekg/dns:all-srcs",

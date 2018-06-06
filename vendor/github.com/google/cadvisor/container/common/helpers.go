@@ -40,7 +40,7 @@ func DebugInfo(watches map[string][]string) map[string][]string {
 			lines = append(lines, fmt.Sprintf("\t%s", cg))
 		}
 	}
-	out["Inotify watches"] = lines
+	out["Fsnotify watches"] = lines
 
 	return out
 }

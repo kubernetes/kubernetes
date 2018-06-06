@@ -242,7 +242,7 @@ func retryDockerStatus() info.DockerStatus {
 	for {
 		ctx, _ := context.WithTimeout(context.Background(), startupTimeout)
 		dockerStatus, err := docker.StatusWithContext(ctx)
-		if err != nil {
+		if err == nil {
 			return dockerStatus
 		}
 
