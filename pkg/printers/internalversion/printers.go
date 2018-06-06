@@ -758,7 +758,7 @@ func printJob(obj *batch.Job, options printers.PrintOptions) ([]metav1beta1.Tabl
 	row.Cells = append(row.Cells, obj.Name, completions, int64(obj.Status.Succeeded), translateTimestamp(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
-		row.Cells = append(row.Cells, names, images, obj.Status.StartTime)
+		row.Cells = append(row.Cells, names, images, fmt.Sprint(obj.Status.StartTime))
 	}
 	return []metav1beta1.TableRow{row}, nil
 }
