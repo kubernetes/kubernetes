@@ -1526,6 +1526,104 @@ func TestUpdateDefaultLabels(t *testing.T) {
 	}
 }
 
+func TestReconcileExtendedResource(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
+	extendedResourceName1 := v1.ResourceName("test.com/resource1")
+	extendedResourceName2 := v1.ResourceName("test.com/resource2")
+
+	cases := []struct {
+		name         string
+		existingNode *v1.Node
+		expectedNode *v1.Node
+		needsUpdate  bool
+	}{
+		{
+			name: "no update needed without extended resource",
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			needsUpdate: false,
+		},
+		{
+			name: "extended resource capacity is zeroed",
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
+						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						extendedResourceName1:       *resource.NewQuantity(int64(2), resource.DecimalSI),
+						extendedResourceName2:       *resource.NewQuantity(int64(10), resource.DecimalSI),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						extendedResourceName1:       *resource.NewQuantity(int64(0), resource.DecimalSI),
+						extendedResourceName2:       *resource.NewQuantity(int64(0), resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						extendedResourceName1:       *resource.NewQuantity(int64(0), resource.DecimalSI),
+						extendedResourceName2:       *resource.NewQuantity(int64(0), resource.DecimalSI),
+					},
+				},
+			},
+			needsUpdate: true,
+		},
+	}
+
+	for _, tc := range cases {
+		defer testKubelet.Cleanup()
+		kubelet := testKubelet.kubelet
+		initialNode := &v1.Node{}
+
+		needsUpdate := kubelet.reconcileExtendedResource(initialNode, tc.existingNode)
+		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
+		assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
+	}
+
+}
+
 func TestValidateNodeIPParam(t *testing.T) {
 	type test struct {
 		nodeIP   string
