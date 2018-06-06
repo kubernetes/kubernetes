@@ -19,7 +19,7 @@ package strategy_test
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
+	"k8s.io/apimachinery/pkg/apply/strategy"
 )
 
 var _ = Describe("Merging fields of type map with openapi for some fields", func() {
@@ -65,7 +65,7 @@ spec:
     bar: "baz3"
     image: "3"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -108,7 +108,7 @@ spec:
     bar: "baz2"
     image: "2"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 
@@ -158,7 +158,7 @@ spec:
     bar: "baz2-1"
     image: "2-1"
 `)
-			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected, deploymentAppsModel)
 		})
 	})
 })

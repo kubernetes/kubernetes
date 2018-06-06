@@ -17,8 +17,8 @@ limitations under the License.
 package parse
 
 import (
+	"k8s.io/apimachinery/pkg/apply"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/kubectl/apply"
 )
 
 // typeElement builds a new mapElement from a typeItem

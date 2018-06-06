@@ -19,7 +19,7 @@ package strategy
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply"
+	"k8s.io/apimachinery/pkg/apply"
 )
 
 func createMergeStrategy(options Options, strategic *delegatingStrategy) mergeStrategy {

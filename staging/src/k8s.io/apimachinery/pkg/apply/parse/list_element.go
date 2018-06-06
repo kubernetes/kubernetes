@@ -19,8 +19,8 @@ package parse
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/apply"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/kubectl/apply"
 )
 
 // Contains the heavy lifting for finding tuples of matching elements in lists based on the merge key
