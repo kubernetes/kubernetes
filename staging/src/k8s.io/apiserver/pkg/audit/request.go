@@ -42,6 +42,7 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 		RequestReceivedTimestamp: metav1.NewMicroTime(time.Now()),
 		Verb:       attribs.GetVerb(),
 		RequestURI: req.URL.RequestURI(),
+		UserAgent:  req.UserAgent(),
 	}
 
 	ev.Level = level
