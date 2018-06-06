@@ -430,6 +430,7 @@ func TestSecretVSphereConfig(t *testing.T) {
 		expectedUsername         string
 		expectedPassword         string
 		expectedError            error
+		expectedThumbprints      map[string]string
 	}{
 		{
 			testName: "Username and password with old configuration",
@@ -599,6 +600,47 @@ func TestSecretVSphereConfig(t *testing.T) {
 			expectedIsSecretProvided: true,
 			expectedError:            nil,
 		},
+		{
+			testName: "virtual centers with a thumbprint",
+			conf: `[Global]
+			server = global
+			user = user
+			password = password
+			datacenter = us-west
+			thumbprint = "thumbprint:global"
+			working-dir = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+			expectedThumbprints: map[string]string{
+				"global": "thumbprint:global",
+			},
+		},
+		{
+			testName: "Multiple virtual centers with different thumbprints",
+			conf: `[Global]
+			user = user
+			password = password
+			datacenter = us-west
+			[VirtualCenter "0.0.0.0"]
+			thumbprint = thumbprint:0
+			[VirtualCenter "no_thumbprint"]
+			[VirtualCenter "1.1.1.1"]
+			thumbprint = thumbprint:1
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+			expectedThumbprints: map[string]string{
+				"0.0.0.0": "thumbprint:0",
+				"1.1.1.1": "thumbprint:1",
+			},
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -628,9 +670,19 @@ func TestSecretVSphereConfig(t *testing.T) {
 					t.Fatalf("Expected password %s doesn't match actual password %s in config %s. error: %s",
 						testcase.expectedPassword, vsInstance.conn.Password, testcase.conf, err)
 				}
-
 			}
 		}
-
+		for instanceName, expectedThumbprint := range testcase.expectedThumbprints {
+			instanceConfig, ok := vs.vsphereInstanceMap[instanceName]
+			if !ok {
+				t.Fatalf("Could not find configuration for instance %s", instanceName)
+			}
+			if actualThumbprint := instanceConfig.conn.Thumbprint; actualThumbprint != expectedThumbprint {
+				t.Fatalf(
+					"Expected thumbprint for instance '%s' to be '%s', got '%s'",
+					instanceName, expectedThumbprint, actualThumbprint,
+				)
+			}
+		}
 	}
 }

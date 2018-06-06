@@ -43,6 +43,7 @@ type VSphereConnection struct {
 	Hostname          string
 	Port              string
 	CACert            string
+	Thumbprint        string
 	Insecure          bool
 	RoundTripperCount uint
 	credentialsLock   sync.Mutex
