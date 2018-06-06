@@ -40,6 +40,10 @@ func (f *NamePrintFlags) Complete(successTemplate string) error {
 	return nil
 }
 
+func (f *NamePrintFlags) AllowedFormats() []string {
+	return []string{"name"}
+}
+
 // ToPrinter receives an outputFormat and returns a printer capable of
 // handling --output=name printing.
 // Returns false if the specified outputFormat does not match a supported format.
@@ -57,7 +61,7 @@ func (f *NamePrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinte
 	case "":
 		return namePrinter, nil
 	default:
-		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &outputFormat}
+		return nil, NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: f.AllowedFormats()}
 	}
 }
 

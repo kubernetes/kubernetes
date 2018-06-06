@@ -18,6 +18,8 @@ package genericclioptions
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,8 +27,9 @@ import (
 )
 
 type NoCompatiblePrinterError struct {
-	OutputFormat *string
-	Options      interface{}
+	OutputFormat   *string
+	AllowedFormats []string
+	Options        interface{}
 }
 
 func (e NoCompatiblePrinterError) Error() string {
@@ -35,7 +38,8 @@ func (e NoCompatiblePrinterError) Error() string {
 		output = *e.OutputFormat
 	}
 
-	return fmt.Sprintf("unable to match a printer suitable for the output format %q and the options specified: %#v", output, e.Options)
+	sort.Strings(e.AllowedFormats)
+	return fmt.Sprintf("unable to match a printer suitable for the output format %q, allowed formats are: %s", output, strings.Join(e.AllowedFormats, ","))
 }
 
 func IsNoCompatiblePrinterError(err error) bool {
@@ -63,6 +67,10 @@ func (f *PrintFlags) Complete(successTemplate string) error {
 	return f.NamePrintFlags.Complete(successTemplate)
 }
 
+func (f *PrintFlags) AllowedFormats() []string {
+	return append(f.JSONYamlPrintFlags.AllowedFormats(), f.NamePrintFlags.AllowedFormats()...)
+}
+
 func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	outputFormat := ""
 	if f.OutputFormat != nil {
@@ -81,7 +89,7 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 		}
 	}
 
-	return nil, NoCompatiblePrinterError{Options: f, OutputFormat: f.OutputFormat}
+	return nil, NoCompatiblePrinterError{OutputFormat: f.OutputFormat, AllowedFormats: f.AllowedFormats()}
 }
 
 func (f *PrintFlags) AddFlags(cmd *cobra.Command) {

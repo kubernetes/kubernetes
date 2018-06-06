@@ -33,6 +33,10 @@ type KubeTemplatePrintFlags struct {
 	TemplateArgument *string
 }
 
+func (f *KubeTemplatePrintFlags) AllowedFormats() []string {
+	return append(f.GoTemplatePrintFlags.AllowedFormats(), f.JSONPathPrintFlags.AllowedFormats()...)
+}
+
 func (f *KubeTemplatePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, error) {
 	if p, err := f.JSONPathPrintFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return p, err
