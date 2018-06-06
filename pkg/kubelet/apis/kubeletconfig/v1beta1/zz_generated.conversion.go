@@ -249,6 +249,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_kubeletconfig_KubeletConfigurat
 	if err := v1.Convert_Pointer_bool_To_bool(&in.FailSwapOn, &out.FailSwapOn, s); err != nil {
 		return err
 	}
+	out.PlegRelistThreshold = in.PlegRelistThreshold
 	out.ContainerLogMaxSize = in.ContainerLogMaxSize
 	if err := v1.Convert_Pointer_int32_To_int32(&in.ContainerLogMaxFiles, &out.ContainerLogMaxFiles, s); err != nil {
 		return err
@@ -373,6 +374,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1beta1_KubeletConfigurat
 	if err := v1.Convert_bool_To_Pointer_bool(&in.FailSwapOn, &out.FailSwapOn, s); err != nil {
 		return err
 	}
+	out.PlegRelistThreshold = in.PlegRelistThreshold
 	out.ContainerLogMaxSize = in.ContainerLogMaxSize
 	if err := v1.Convert_int32_To_Pointer_int32(&in.ContainerLogMaxFiles, &out.ContainerLogMaxFiles, s); err != nil {
 		return err

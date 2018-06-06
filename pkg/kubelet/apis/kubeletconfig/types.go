@@ -255,6 +255,8 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
+	// Kubelet will reports PLEG error and be notReady if pleg relist take times greater than experimental-pleg-relist-threshold.
+	PlegRelistThreshold metav1.Duration
 	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
 	ContainerLogMaxSize string
 	// Maximum number of container log files that can be present for a container.

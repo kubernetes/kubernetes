@@ -296,7 +296,7 @@ func newTestKubeletWithImageList(
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
-	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, clock.RealClock{})
+	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, 3*time.Minute, nil, clock.RealClock{})
 	kubelet.clock = fakeClock
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 

@@ -411,6 +411,10 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	FailSwapOn *bool `json:"failSwapOn,omitempty"`
+	// Kubelet will report PLEG error and be notReady if PLEG relist takes time greater than experimental-pleg-relist-threshold.
+	// Default: 3m
+	// +optional
+	PlegRelistThreshold metav1.Duration `json:"plegRelistThreshold"`
 	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
 	// Default: "10Mi"
 	// +optional

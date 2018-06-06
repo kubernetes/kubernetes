@@ -156,6 +156,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	out.PlegRelistThreshold = in.PlegRelistThreshold
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved
 		*out = make(map[string]string, len(*in))

@@ -318,6 +318,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
+	out.PlegRelistThreshold = in.PlegRelistThreshold
 	if in.ContainerLogMaxFiles != nil {
 		in, out := &in.ContainerLogMaxFiles, &out.ContainerLogMaxFiles
 		if *in == nil {

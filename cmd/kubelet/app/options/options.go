@@ -456,6 +456,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 		mainfs.AddFlagSet(fs)
 	}()
 
+	fs.DurationVar(&c.PlegRelistThreshold.Duration, "experimental-pleg-relist-threshold", c.PlegRelistThreshold.Duration, "Kubelet will reports PLEG error and be notReady if pleg relist take times greater than experimental-pleg-relist-threshold. Needs to be greater than the pleg relisting period(1s) + the relisting time, which can vary significantly. Set a conservative threshold to avoid flipping between healthy and unhealthy. Default: '3m'")
 	fs.BoolVar(&c.FailSwapOn, "fail-swap-on", c.FailSwapOn, "Makes the Kubelet fail to start if swap is enabled on the node. ")
 	fs.BoolVar(&c.FailSwapOn, "experimental-fail-swap-on", c.FailSwapOn, "DEPRECATED: please use --fail-swap-on instead.")
 

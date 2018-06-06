@@ -201,4 +201,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
 	}
+	if obj.PlegRelistThreshold == zeroDuration {
+		obj.FileCheckFrequency = metav1.Duration{Duration: 3 * time.Minute}
+	}
 }
