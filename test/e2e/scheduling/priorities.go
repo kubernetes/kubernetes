@@ -43,6 +43,15 @@ type Resource struct {
 	Memory   int64
 }
 
+type imagePodConfig struct {
+	Name     string
+	Labels   map[string]string
+	Images   []imageutils.ImageConfig
+	NodeName string
+}
+
+var imagePodLabel map[string]string = map[string]string{"name": "priority-image-locality"}
+
 var balancePodLabel map[string]string = map[string]string{"name": "priority-balanced-memory"}
 
 var podRequestedResource *v1.ResourceRequirements = &v1.ResourceRequirements{
@@ -82,7 +91,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Pod should be schedule to node that don't match the PodAntiAffinity terms", func() {
+	It("Pod should be scheduled to nodes that don't match the PodAntiAffinity terms", func() {
 		By("Trying to launch a pod with a label to get a node which can launch it.")
 		pod := runPausePod(f, pausePodConfig{
 			Name:   "pod-with-label-security-s1",
@@ -206,7 +215,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 	})
 
-	It("Pod should perfer to scheduled to nodes pod can tolerate", func() {
+	It("Pod should prefer to be scheduled to nodes pod can tolerate", func() {
 		// make the nodes have balanced cpu,mem usage ratio
 		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		framework.ExpectNoError(err)
@@ -230,7 +239,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		})
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
-		By("Pod should prefer scheduled to the node don't have the taint.")
+		By("Pod should prefer to be scheduled to the node don't have the taint.")
 		tolePod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
@@ -250,10 +259,42 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		})
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
-		By("Pod should prefer scheduled to the node that pod can tolerate.")
+		By("Pod should prefer to be scheduled to the node that pod can tolerate.")
 		tolePod, err = cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
+	})
+
+	It("Pod should prefer to be scheduled to nodes having container images ready.", func() {
+		// make the nodes have balanced cpu,mem usage ratio
+		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
+		framework.ExpectNoError(err)
+		// decide the images used by the pod and the node that has the image
+		nodeWithUsedImage := nodeList.Items[0]
+		// we use the mnist-tpu as the test image used by the pod, which has relatively large image size; we create three
+		// containers using the image such that the total size should result in the maximum priority score
+		// TODO: replace this image with a LargeImage dedicated to testing image locality once the LargeImage is added
+		usedImages := []imageutils.ImageConfig{
+			imageutils.MnistTpu,
+			imageutils.MnistTpu,
+			imageutils.MnistTpu,
+		}
+		// make the node have the given images
+		framework.ExpectNoError(createImagePodForNode(f, cs, ns, nodeWithUsedImage, usedImages))
+
+		By("Create a pod with the used images.")
+		usedImagePodName := "with-used-images"
+		pod := createImagePod(f, imagePodConfig{
+			Name:   usedImagePodName,
+			Labels: imagePodLabel,
+			Images: usedImages,
+		})
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+
+		By("Pod should prefer scheduled to the node that has its used images.")
+		imagePod, err := cs.CoreV1().Pods(ns).Get(usedImagePodName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(imagePod.Spec.NodeName).To(Equal(nodeWithUsedImage.Name))
 	})
 })
 
@@ -313,6 +354,52 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 		computeCpuMemFraction(cs, node, requestedResource)
 	}
 
+	return nil
+}
+
+// initImagePod returns a pod api object that for each given container image there is a container inside the
+// pod that uses the image. This pod is primarily used in reserving image locality on nodes.
+func initImagePod(f *framework.Framework, conf imagePodConfig) *v1.Pod {
+	var containers []v1.Container
+
+	for _, image := range conf.Images {
+		containers = append(containers, v1.Container{
+			Name:  image.Name(),
+			Image: imageutils.GetE2EImage(image),
+		})
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   conf.Name,
+			Labels: conf.Labels,
+		},
+		Spec: v1.PodSpec{
+			Containers: containers,
+			NodeName:   conf.NodeName,
+		},
+	}
+	return pod
+}
+
+func createImagePod(f *framework.Framework, conf imagePodConfig) *v1.Pod {
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(initImagePod(f, conf))
+	framework.ExpectNoError(err)
+	return pod
+}
+
+// createImagePodForNode creates a pod on the given node with given images and waits until the pod's running.
+func createImagePodForNode(f *framework.Framework, cs clientset.Interface, ns string, node v1.Node, images []imageutils.ImageConfig) error {
+	err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
+		*initImagePod(f, imagePodConfig{
+			Name:     "image-pod",
+			Labels:   imagePodLabel,
+			Images:   images,
+			NodeName: node.Name,
+		}), true, framework.Logf)
+
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
