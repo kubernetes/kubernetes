@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"net/http"
 	"net/url"
 	"sync"
 
@@ -191,6 +192,7 @@ type Test struct {
 	ExpectAllow       bool
 	ErrorContains     string
 	ExpectAnnotations map[string]string
+	ExpectCode        int32
 }
 
 // NewNonMutatingTestCases returns test cases with a given base url.
@@ -244,8 +246,8 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 				Rules:             matchEverythingRules,
 				NamespaceSelector: &metav1.LabelSelector{},
 			}},
-
 			ErrorContains: "you shall not pass",
+			ExpectCode:    http.StatusForbidden,
 		},
 		{
 			Name: "match & disallow & but allowed because namespaceSelector exempt the ns",

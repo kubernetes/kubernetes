@@ -75,6 +75,7 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				Allowed: false,
 				Result: &metav1.Status{
 					Message: "you shall not pass",
+					Code:    http.StatusForbidden,
 				},
 			},
 		})
