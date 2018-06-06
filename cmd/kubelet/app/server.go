@@ -1184,5 +1184,10 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	}
 	glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 	server := dockerremote.NewDockerServer(f.RemoteRuntimeEndpoint, ds)
-	return server.Start(stopCh)
+	if err = server.Start(stopCh); err != nil {
+		return err
+	}
+
+	<-stopCh
+	return nil
 }
