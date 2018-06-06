@@ -209,89 +209,17 @@ func TestEtcdProbe(t *testing.T) {
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{
-							"listen-client-urls": "http://1.2.3.4:2379,http://4.3.2.1:2379"},
+							"listen-client-urls": "http://1.2.3.4:1,http://4.3.2.1:1"},
 					},
 				},
 			},
 			component: kubeadmconstants.Etcd,
 			port:      1,
-			certsDir:  "secretsA",
+			certsDir:  "secrets_A",
 			cacert:    "ca1",
 			cert:      "cert1",
 			key:       "key1",
-			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[1.2.3.4]:1 --cacert=secretsA/ca1 --cert=secretsA/cert1 --key=secretsA/key1 get foo",
-		},
-		{
-			name: "valid etcd probe using listen-client-urls unspecified IPv6 address",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{
-					Local: &kubeadmapi.LocalEtcd{
-						ExtraArgs: map[string]string{
-							"listen-client-urls": "http://[0:0:0:0:0:0:0:0]:2379"},
-					},
-				},
-			},
-			component: kubeadmconstants.Etcd,
-			port:      1,
-			certsDir:  "secretsB",
-			cacert:    "ca2",
-			cert:      "cert2",
-			key:       "key2",
-			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:1 --cacert=secretsB/ca2 --cert=secretsB/cert2 --key=secretsB/key2 get foo",
-		},
-		{
-			name: "valid etcd probe using listen-client-urls unspecified IPv6 address 2",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{
-					Local: &kubeadmapi.LocalEtcd{
-						ExtraArgs: map[string]string{
-							"listen-client-urls": "http://[::0:0]:2379"},
-					},
-				},
-			},
-			component: kubeadmconstants.Etcd,
-			port:      1,
-			certsDir:  "secretsB",
-			cacert:    "ca2",
-			cert:      "cert2",
-			key:       "key2",
-			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:1 --cacert=secretsB/ca2 --cert=secretsB/cert2 --key=secretsB/key2 get foo",
-		},
-		{
-			name: "valid etcd probe using listen-client-urls unspecified IPv6 address 3",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{
-					Local: &kubeadmapi.LocalEtcd{
-						ExtraArgs: map[string]string{
-							"listen-client-urls": "http://[::]:2379"},
-					},
-				},
-			},
-			component: kubeadmconstants.Etcd,
-			port:      1,
-			certsDir:  "secretsB",
-			cacert:    "ca2",
-			cert:      "cert2",
-			key:       "key2",
-			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:1 --cacert=secretsB/ca2 --cert=secretsB/cert2 --key=secretsB/key2 get foo",
-		},
-		{
-			name: "valid etcd probe using listen-client-urls unspecified IPv4 address",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{
-					Local: &kubeadmapi.LocalEtcd{
-						ExtraArgs: map[string]string{
-							"listen-client-urls": "http://1.2.3.4:2379,http://4.3.2.1:2379"},
-					},
-				},
-			},
-			component: kubeadmconstants.Etcd,
-			port:      1,
-			certsDir:  "secretsA",
-			cacert:    "ca1",
-			cert:      "cert1",
-			key:       "key1",
-			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[1.2.3.4]:1 --cacert=secretsA/ca1 --cert=secretsA/cert1 --key=secretsA/key1 get foo",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[1.2.3.4]:1 --cacert=secrets_A/ca1 --cert=secrets_A/cert1 --key=secrets_A/key1 get foo",
 		},
 		{
 			name: "valid etcd probe using listen-client-urls IPv6 addresses",
@@ -299,17 +227,17 @@ func TestEtcdProbe(t *testing.T) {
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{
-							"listen-client-urls": "http://[2001:db8::1]:2379,http://[2001:db8::2]:2379"},
+							"listen-client-urls": "http://[2001:db8::1]:2,http://[2001:db8::2]:2"},
 					},
 				},
 			},
 			component: kubeadmconstants.Etcd,
-			port:      1,
-			certsDir:  "secretsB",
+			port:      2,
+			certsDir:  "secrets_B",
 			cacert:    "ca2",
 			cert:      "cert2",
 			key:       "key2",
-			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[2001:db8::1]:1 --cacert=secretsB/ca2 --cert=secretsB/cert2 --key=secretsB/key2 get foo",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[2001:db8::1]:2 --cacert=secrets_B/ca2 --cert=secrets_B/cert2 --key=secrets_B/key2 get foo",
 		},
 		{
 			name: "valid IPv4 etcd probe using hostname for listen-client-urls",
@@ -317,17 +245,89 @@ func TestEtcdProbe(t *testing.T) {
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{
-							"listen-client-urls": "http://localhost:2379"},
+							"listen-client-urls": "http://localhost:3"},
 					},
 				},
 			},
 			component: kubeadmconstants.Etcd,
-			port:      1,
-			certsDir:  "secretsC",
+			port:      3,
+			certsDir:  "secrets_C",
 			cacert:    "ca3",
 			cert:      "cert3",
 			key:       "key3",
-			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[127.0.0.1]:1 --cacert=secretsC/ca3 --cert=secretsC/cert3 --key=secretsC/key3 get foo",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[127.0.0.1]:3 --cacert=secrets_C/ca3 --cert=secrets_C/cert3 --key=secrets_C/key3 get foo",
+		},
+		{
+			name: "valid etcd probe using listen-client-urls unspecified IPv6 address (8 zeros)",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						ExtraArgs: map[string]string{
+							"listen-client-urls": "http://[0:0:0:0:0:0:0:0]:4"},
+					},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      4,
+			certsDir:  "secrets_D",
+			cacert:    "ca4",
+			cert:      "cert4",
+			key:       "key4",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:4 --cacert=secrets_D/ca4 --cert=secrets_D/cert4 --key=secrets_D/key4 get foo",
+		},
+		{
+			name: "valid etcd probe using listen-client-urls unspecified IPv6 address (2 zeros)",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						ExtraArgs: map[string]string{
+							"listen-client-urls": "http://[::0:0]:5"},
+					},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      5,
+			certsDir:  "secrets_E",
+			cacert:    "ca5",
+			cert:      "cert5",
+			key:       "key5",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:5 --cacert=secrets_E/ca5 --cert=secrets_E/cert5 --key=secrets_E/key5 get foo",
+		},
+		{
+			name: "valid etcd probe using listen-client-urls unspecified IPv6 address (no zeros)",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						ExtraArgs: map[string]string{
+							"listen-client-urls": "http://[::]:6"},
+					},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      6,
+			certsDir:  "secrets_F",
+			cacert:    "ca6",
+			cert:      "cert6",
+			key:       "key6",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:6 --cacert=secrets_F/ca6 --cert=secrets_F/cert6 --key=secrets_F/key6 get foo",
+		},
+		{
+			name: "valid etcd probe using listen-client-urls unspecified IPv4 address",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						ExtraArgs: map[string]string{
+							"listen-client-urls": "http://0.0.0.0:7"},
+					},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      7,
+			certsDir:  "secrets_G",
+			cacert:    "ca7",
+			cert:      "cert7",
+			key:       "key7",
+			expected:  "ETCDCTL_API=3 etcdctl --endpoints=https://[127.0.0.1]:7 --cacert=secrets_G/ca7 --cert=secrets_G/cert7 --key=secrets_G/key7 get foo",
 		},
 	}
 	for _, rt := range tests {
