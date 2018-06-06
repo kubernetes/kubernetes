@@ -129,23 +129,6 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.Po
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
 	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
 
-	sysctls, err := helper.SysctlsFromPodAnnotation(annotations[core.SysctlsPodAnnotationKey])
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(core.SysctlsPodAnnotationKey), annotations[core.SysctlsPodAnnotationKey], err.Error()))
-	} else {
-		allErrs = append(allErrs, validateSysctls(sysctls, fldPath.Key(core.SysctlsPodAnnotationKey))...)
-	}
-	unsafeSysctls, err := helper.SysctlsFromPodAnnotation(annotations[core.UnsafeSysctlsPodAnnotationKey])
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(core.UnsafeSysctlsPodAnnotationKey), annotations[core.UnsafeSysctlsPodAnnotationKey], err.Error()))
-	} else {
-		allErrs = append(allErrs, validateSysctls(unsafeSysctls, fldPath.Key(core.UnsafeSysctlsPodAnnotationKey))...)
-	}
-	inBoth := sysctlIntersection(sysctls, unsafeSysctls)
-	if len(inBoth) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(core.UnsafeSysctlsPodAnnotationKey), strings.Join(inBoth, ", "), "can not be safe and unsafe"))
-	}
-
 	return allErrs
 }
 
@@ -3364,12 +3347,16 @@ func IsValidSysctlName(name string) bool {
 
 func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	names := make(map[string]struct{})
 	for i, s := range sysctls {
 		if len(s.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("name"), ""))
 		} else if !IsValidSysctlName(s.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, fmt.Sprintf("must have at most %d characters and match regex %s", SysctlMaxLength, SysctlFmt)))
+		} else if _, ok := names[s.Name]; ok {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("name"), s.Name))
 		}
+		names[s.Name] = struct{}{}
 	}
 	return allErrs
 }
@@ -3406,6 +3393,14 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "Process Namespace Sharing is disabled by PodShareProcessNamespace feature-gate"))
 			} else if securityContext.HostPID && *securityContext.ShareProcessNamespace {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("shareProcessNamespace"), *securityContext.ShareProcessNamespace, "ShareProcessNamespace and HostPID cannot both be enabled"))
+			}
+		}
+
+		if len(securityContext.Sysctls) != 0 {
+			if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
+				allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
+			} else {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("sysctls"), "Sysctls are disabled by Sysctls feature-gate"))
 			}
 		}
 	}
@@ -5277,20 +5272,6 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 		}
 	}
 	return allErrs
-}
-
-func sysctlIntersection(a []core.Sysctl, b []core.Sysctl) []string {
-	lookup := make(map[string]struct{}, len(a))
-	result := []string{}
-	for i := range a {
-		lookup[a[i].Name] = struct{}{}
-	}
-	for i := range b {
-		if _, found := lookup[b[i].Name]; found {
-			result = append(result, b[i].Name)
-		}
-	}
-	return result
 }
 
 // validateVolumeNodeAffinity tests that the PersistentVolume.NodeAffinity has valid data

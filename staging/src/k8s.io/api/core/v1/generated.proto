@@ -2893,6 +2893,11 @@ message PodSecurityContext {
   // If unset, the Kubelet will not modify the ownership and permissions of any volume.
   // +optional
   optional int64 fsGroup = 5;
+
+  // Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+  // sysctls (by the container runtime) might fail to launch.
+  // +optional
+  repeated Sysctl sysctls = 7;
 }
 
 // Describes the class of pods that should avoid this node.

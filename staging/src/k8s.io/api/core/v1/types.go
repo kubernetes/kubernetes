@@ -2919,6 +2919,10 @@ type PodSecurityContext struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// +optional
 	FSGroup *int64 `json:"fsGroup,omitempty" protobuf:"varint,5,opt,name=fsGroup"`
+	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+	// sysctls (by the container runtime) might fail to launch.
+	// +optional
+	Sysctls []Sysctl `json:"sysctls,omitempty" protobuf:"bytes,7,rep,name=sysctls"`
 }
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -5203,9 +5207,9 @@ const (
 // Sysctl defines a kernel parameter to be set
 type Sysctl struct {
 	// Name of a property to set
-	Name string `protobuf:"bytes,1,opt,name=name"`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Value of a property to set
-	Value string `protobuf:"bytes,2,opt,name=value"`
+	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`
 }
 
 // NodeResources is an object for conveying resource information about a node.
