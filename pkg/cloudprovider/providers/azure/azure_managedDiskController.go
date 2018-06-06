@@ -148,11 +148,17 @@ func (c *ManagedDiskController) getDisk(diskName string) (string, string, error)
 }
 
 // ResizeDisk Expand the disk to new size
-func (c *ManagedDiskController) ResizeDisk(diskName string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	result, err := c.common.cloud.DisksClient.Get(ctx, c.common.resourceGroup, diskName)
+	diskName := path.Base(diskURI)
+	resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
+	if err != nil {
+		return oldSize, err
+	}
+
+	result, err := c.common.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
 	if err != nil {
 		return oldSize, err
 	}
