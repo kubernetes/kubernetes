@@ -58,7 +58,7 @@ type DiskController interface {
 	DeleteVolume(diskURI string) error
 
 	// Expand the disk to new size
-	ResizeDisk(diskName string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
+	ResizeDisk(diskURI string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 }
 
 type azureDataDiskPlugin struct {
@@ -242,7 +242,7 @@ func (plugin *azureDataDiskPlugin) ExpandVolumeDevice(
 		return oldSize, err
 	}
 
-	return diskController.ResizeDisk(spec.PersistentVolume.Spec.AzureDisk.DiskName, oldSize, newSize)
+	return diskController.ResizeDisk(spec.PersistentVolume.Spec.AzureDisk.DataDiskURI, oldSize, newSize)
 }
 
 func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
