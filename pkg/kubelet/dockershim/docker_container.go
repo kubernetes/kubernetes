@@ -98,7 +98,7 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	}
 
 	labels := makeLabels(config.GetLabels(), config.GetAnnotations())
-	// Apply a the container type label.
+	// Apply the container type label.
 	labels[containerTypeLabelKey] = containerTypeLabelContainer
 	// Write the container log path in the labels.
 	labels[containerLogPathLabelKey] = filepath.Join(sandboxConfig.LogDirectory, config.LogPath)
