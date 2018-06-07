@@ -19,12 +19,9 @@ package vclib
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 	"net"
-	"net/http"
 	neturl "net/url"
 	"sync"
 
@@ -152,33 +149,9 @@ func (connection *VSphereConnection) Logout(ctx context.Context) {
 }
 
 var (
-	ErrCaCertNotReadable    = errors.New("Could not read CA cert file")
-	ErrCaCertInvalid        = errors.New("Could not parse CA cert file")
-	ErrUnsupportedTransport = errors.New("Only support HTTP transport if configuring TLS")
+	ErrCaCertNotReadable = errors.New("Could not read CA cert file")
+	ErrCaCertInvalid     = errors.New("Could not parse CA cert file")
 )
-
-func (connection *VSphereConnection) ConfigureTransportWithCA(transport http.RoundTripper) error {
-	caCertBytes, err := ioutil.ReadFile(connection.CACert)
-	if err != nil {
-		glog.Errorf("Could not read CA cert file, %s", connection.CACert)
-		return ErrCaCertNotReadable
-	}
-	certPool := x509.NewCertPool()
-
-	if ok := certPool.AppendCertsFromPEM(caCertBytes); !ok {
-		glog.Errorf("Cannot add CA to cert pool")
-		return ErrCaCertInvalid
-	}
-	httpTransport, ok := transport.(*http.Transport)
-	if !ok {
-		glog.Errorf("Failed to http transport")
-		return ErrUnsupportedTransport
-	}
-
-	httpTransport.TLSClientConfig.RootCAs = certPool
-
-	return nil
-}
 
 // NewClient creates a new govmomi client for the VSphereConnection obj
 func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Client, error) {
@@ -190,8 +163,8 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 
 	sc := soap.NewClient(url, connection.Insecure)
 
-	if connection.CACert != "" {
-		if err := connection.ConfigureTransportWithCA(sc.Client.Transport); err != nil {
+	if ca := connection.CACert; ca != "" {
+		if err := sc.SetRootCAs(ca); err != nil {
 			return nil, err
 		}
 	}

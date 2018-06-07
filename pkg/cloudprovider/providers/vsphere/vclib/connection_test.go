@@ -18,21 +18,20 @@ package vclib_test
 
 import (
 	"context"
-	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/fixtures"
 )
 
-func createTestServer(t *testing.T, caCertPath, serverCertPath, serverKeyPath string, handler http.HandlerFunc) (*httptest.Server, string) {
+func createTestServer(t *testing.T, caCertPath, serverCertPath, serverKeyPath string, handler http.HandlerFunc) *httptest.Server {
 	caCertPEM, err := ioutil.ReadFile(caCertPath)
 	if err != nil {
 		t.Fatalf("Could not read ca cert from file")
@@ -56,18 +55,18 @@ func createTestServer(t *testing.T, caCertPath, serverCertPath, serverKeyPath st
 		RootCAs: certPool,
 	}
 
-	// calculate the leaf certificate's fingerprint
-	x509LeafCert := server.TLS.Certificates[0].Certificate[0]
-	tpBytes := sha1.Sum(x509LeafCert)
-	tpString := fmt.Sprintf("%x", tpBytes)
+	// // calculate the leaf certificate's fingerprint
+	// x509LeafCert := server.TLS.Certificates[0].Certificate[0]
+	// tpBytes := sha1.Sum(x509LeafCert)
+	// tpString := fmt.Sprintf("%x", tpBytes)
 
-	return server, tpString
+	return server
 }
 
 func TestWithValidCaCert(t *testing.T) {
 	handler, verify := getRequestVerifier(t)
 
-	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+	server := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
 	server.StartTLS()
 	u := mustParseUrl(t, server.URL)
 
@@ -83,24 +82,24 @@ func TestWithValidCaCert(t *testing.T) {
 	verify()
 }
 
-func TestWithValidThumbprint(t *testing.T) {
-	handler, verify := getRequestVerifier(t)
-
-	server, serverThumbprint := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
-	server.StartTLS()
-	u := mustParseUrl(t, server.URL)
-
-	connection := &vclib.VSphereConnection{
-		Hostname:   u.Hostname(),
-		Port:       u.Port(),
-		Thumbprint: serverThumbprint,
-	}
-
-	// Ignoring error here, because we only care about the TLS connection
-	connection.NewClient(context.Background())
-
-	verify()
-}
+// func TestWithValidThumbprint(t *testing.T) {
+// 	handler, verify := getRequestVerifier(t)
+//
+// 	server, serverThumbprint := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+// 	server.StartTLS()
+// 	u := mustParseUrl(t, server.URL)
+//
+// 	connection := &vclib.VSphereConnection{
+// 		Hostname:   u.Hostname(),
+// 		Port:       u.Port(),
+// 		Thumbprint: serverThumbprint,
+// 	}
+//
+// 	// Ignoring error here, because we only care about the TLS connection
+// 	connection.NewClient(context.Background())
+//
+// 	verify()
+// }
 
 func TestWithInvalidCaCertPath(t *testing.T) {
 	connection := &vclib.VSphereConnection{
@@ -110,13 +109,14 @@ func TestWithInvalidCaCertPath(t *testing.T) {
 	}
 
 	_, err := connection.NewClient(context.Background())
-
-	if err != vclib.ErrCaCertNotReadable {
-		t.Fatalf("should have occurred")
+	if _, ok := err.(*os.PathError); !ok {
+		t.Fatalf("Expected an os.PathError, got: '%s' (%#v)", err.Error(), err)
 	}
 }
 
 func TestInvalidCaCert(t *testing.T) {
+	t.Skip("Waiting for https://github.com/vmware/govmomi/pull/1154")
+
 	connection := &vclib.VSphereConnection{
 		Hostname: "should-not-matter",
 		Port:     "should-not-matter",
@@ -126,29 +126,8 @@ func TestInvalidCaCert(t *testing.T) {
 	_, err := connection.NewClient(context.Background())
 
 	if err != vclib.ErrCaCertInvalid {
-		t.Fatalf("should have occurred")
+		t.Fatalf("ErrCaCertInvalid should have occurred, instead got: %v", err)
 	}
-}
-
-func TestUnsupportedTransport(t *testing.T) {
-	notHttpTransport := new(fakeTransport)
-
-	connection := &vclib.VSphereConnection{
-		Hostname: "should-not-matter",
-		Port:     "should-not-matter",
-		CACert:   fixtures.CaCertPath,
-	}
-
-	err := connection.ConfigureTransportWithCA(notHttpTransport)
-	if err != vclib.ErrUnsupportedTransport {
-		t.Fatalf("should have occurred")
-	}
-}
-
-type fakeTransport struct{}
-
-func (ft fakeTransport) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, nil
 }
 
 func getRequestVerifier(t *testing.T) (http.HandlerFunc, func()) {
