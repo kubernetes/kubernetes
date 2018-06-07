@@ -998,6 +998,109 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 	})
 
+	It("should support orphan deletion of custom resources", func() {
+		config, err := framework.LoadConfig()
+		if err != nil {
+			framework.Failf("failed to load config: %v", err)
+		}
+
+		apiExtensionClient, err := apiextensionsclientset.NewForConfig(config)
+		if err != nil {
+			framework.Failf("failed to initialize apiExtensionClient: %v", err)
+		}
+
+		// Create a random custom resource definition and ensure it's available for
+		// use.
+		definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+		defer func() {
+			err = apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient)
+			if err != nil && !errors.IsNotFound(err) {
+				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+			}
+		}()
+		definition, err = apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
+		if err != nil {
+			framework.Failf("failed to create CustomResourceDefinition: %v", err)
+		}
+
+		// Get a client for the custom resource.
+		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+		resourceClient := f.DynamicClient.Resource(gvr)
+
+		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
+
+		// Create a custom owner resource.
+		ownerName := names.SimpleNameGenerator.GenerateName("owner")
+		owner := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       definition.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": ownerName,
+				},
+			},
+		}
+		persistedOwner, err := resourceClient.Create(owner)
+		if err != nil {
+			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
+		}
+		framework.Logf("created owner resource %q", ownerName)
+
+		// Create a custom dependent resource.
+		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
+		dependent := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       definition.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": dependentName,
+					"ownerReferences": []map[string]string{
+						{
+							"uid":        string(persistedOwner.GetUID()),
+							"apiVersion": apiVersion,
+							"kind":       definition.Spec.Names.Kind,
+							"name":       ownerName,
+						},
+					},
+				},
+			},
+		}
+		_, err = resourceClient.Create(dependent)
+		if err != nil {
+			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
+		}
+		framework.Logf("created dependent resource %q", dependentName)
+
+		// Delete the owner and orphan the dependent.
+		err = resourceClient.Delete(ownerName, getOrphanOptions())
+		if err != nil {
+			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
+		}
+
+		By("wait for the owner to be deleted")
+		if err := wait.Poll(5*time.Second, 120*time.Second, func() (bool, error) {
+			_, err = resourceClient.Get(ownerName, metav1.GetOptions{})
+			if err == nil {
+				return false, nil
+			}
+			if err != nil && !errors.IsNotFound(err) {
+				return false, fmt.Errorf("Failed to get owner: %v", err)
+			}
+			return true, nil
+		}); err != nil {
+			framework.Failf("timeout in waiting for the owner to be deleted: %v", err)
+		}
+
+		// Wait 30s and ensure the dependent is not deleted.
+		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the dependent crd")
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			_, err := resourceClient.Get(dependentName, metav1.GetOptions{})
+			return false, err
+		}); err != nil && err != wait.ErrWaitTimeout {
+			framework.Failf("failed to ensure the dependent is not deleted: %v", err)
+		}
+	})
+
 	It("should delete jobs and pods created by cronjob", func() {
 		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 
