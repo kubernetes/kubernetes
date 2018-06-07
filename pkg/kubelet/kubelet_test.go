@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
+	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
@@ -481,6 +482,16 @@ func TestHandlePortConflicts(t *testing.T) {
 		},
 	}}
 
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	testClusterDNSDomain := "TEST"
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+
 	spec := v1.PodSpec{NodeName: string(kl.nodeName), Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}
 	pods := []*v1.Pod{
 		podWithUIDNameNsSpec("123456789", "newpod", "foo", spec),
@@ -518,6 +529,16 @@ func TestHandleHostNameConflicts(t *testing.T) {
 		},
 	}}
 
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	testClusterDNSDomain := "TEST"
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+
 	// default NodeName in test is 127.0.0.1
 	pods := []*v1.Pod{
 		podWithUIDNameNsSpec("123456789", "notfittingpod", "foo", v1.PodSpec{NodeName: "127.0.0.2"}),
@@ -551,6 +572,17 @@ func TestHandleNodeSelector(t *testing.T) {
 		},
 	}
 	kl.nodeInfo = testNodeInfo{nodes: nodes}
+
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	testClusterDNSDomain := "TEST"
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+
 	pods := []*v1.Pod{
 		podWithUIDNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "A"}}),
 		podWithUIDNameNsSpec("987654321", "podB", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "B"}}),
@@ -581,6 +613,16 @@ func TestHandleMemExceeded(t *testing.T) {
 			}}},
 	}
 	kl.nodeInfo = testNodeInfo{nodes: nodes}
+
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	testClusterDNSDomain := "TEST"
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
 
 	spec := v1.PodSpec{NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
@@ -667,6 +709,16 @@ func TestHandlePluginResources(t *testing.T) {
 	// add updatePluginResourcesFunc to admission handler, to test it's behavior.
 	kl.admitHandlers = lifecycle.PodAdmitHandlers{}
 	kl.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kl.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc))
+
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	testClusterDNSDomain := "TEST"
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
 
 	// pod requiring adjustedResource can be successfully allocated because updatePluginResourcesFunc
 	// adjusts node.allocatableResource for this resource to a sufficient value.
