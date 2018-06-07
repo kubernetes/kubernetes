@@ -38,6 +38,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "apply.go",
         "create.go",
         "delete.go",
         "doc.go",
