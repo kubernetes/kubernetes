@@ -6,6 +6,7 @@ go_library(
         "csi_objects.go",
         "csi_volumes.go",
         "empty_dir_wrapper.go",
+        "ephemeral_volume.go",
         "flexvolume.go",
         "generic_persistent_volume-disruptive.go",
         "mounted_volume_resize.go",
