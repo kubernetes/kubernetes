@@ -128,6 +128,26 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		})
 	})
 
+	It("should support container.SecurityContext.RunAsNonRootGroup [Feature:RunAsGroup]", func() {
+		pod := scTestPod(false, false)
+		userID := int64(1001)
+		groupID := int64(0)
+		overrideUserID := int64(1002)
+		overrideGroupID := int64(2002)
+		pod.Spec.SecurityContext.RunAsUser = &userID
+		pod.Spec.SecurityContext.RunAsGroup = &groupID
+		trueVal := true
+		pod.Spec.SecurityContext.RunAsNonRootGroup = &trueVal
+		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
+		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
+		pod.Spec.Containers[0].SecurityContext.RunAsGroup = &overrideGroupID
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
+
+		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
+		pod, err := client.Create(pod)
+		Expect(err).To(HaveOccurred())
+	})
+
 	It("should support volume SELinux relabeling", func() {
 		testPodSELinuxLabeling(f, false, false)
 	})
