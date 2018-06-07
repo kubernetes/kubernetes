@@ -29,10 +29,19 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
+const (
+	operationStatusDone = "DONE"
+)
+
 // operation is a GCE operation that can be watied on.
 type operation interface {
 	// isDone queries GCE for the done status. This call can block.
 	isDone(ctx context.Context) (bool, error)
+
+	// isError returns an error if the operation ended in an error.
+	isError() error
+
+	// isError
 	// rateLimitKey returns the rate limit key to use for the given operation.
 	// This rate limit will govern how fast the server will be polled for
 	// operation completion status.
@@ -43,6 +52,8 @@ type gaOperation struct {
 	s         *Service
 	projectID string
 	key       *meta.Key
+
+	resultError error
 }
 
 func (o *gaOperation) String() string {
@@ -71,7 +82,20 @@ func (o *gaOperation) isDone(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return op != nil && op.Status == "DONE", nil
+
+	if op == nil || op.Status != operationStatusDone {
+		return false, nil
+	}
+
+	if op.Error != nil && len(op.Error.Errors) > 0 && op.Error.Errors[0] != nil {
+		e := op.Error.Errors[0]
+		o.resultError = GCEOperationError{HttpStatusCode: op.HTTPStatusCode, Code: e.Code, Message: e.Message}
+	}
+	return true, nil
+}
+
+func (o *gaOperation) isError() error {
+	return o.resultError
 }
 
 func (o *gaOperation) rateLimitKey() *RateLimitKey {
@@ -87,6 +111,8 @@ type alphaOperation struct {
 	s         *Service
 	projectID string
 	key       *meta.Key
+
+	resultError error
 }
 
 func (o *alphaOperation) String() string {
@@ -115,7 +141,20 @@ func (o *alphaOperation) isDone(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return op != nil && op.Status == "DONE", nil
+
+	if op == nil || op.Status != operationStatusDone {
+		return false, nil
+	}
+
+	if op.Error != nil && len(op.Error.Errors) > 0 && op.Error.Errors[0] != nil {
+		e := op.Error.Errors[0]
+		o.resultError = GCEOperationError{HttpStatusCode: op.HTTPStatusCode, Code: e.Code, Message: e.Message}
+	}
+	return true, nil
+}
+
+func (o *alphaOperation) isError() error {
+	return o.resultError
 }
 
 func (o *alphaOperation) rateLimitKey() *RateLimitKey {
@@ -131,6 +170,8 @@ type betaOperation struct {
 	s         *Service
 	projectID string
 	key       *meta.Key
+
+	resultError error
 }
 
 func (o *betaOperation) String() string {
@@ -159,7 +200,20 @@ func (o *betaOperation) isDone(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return op != nil && op.Status == "DONE", nil
+
+	if op == nil || op.Status != operationStatusDone {
+		return false, nil
+	}
+
+	if op.Error != nil && len(op.Error.Errors) > 0 && op.Error.Errors[0] != nil {
+		e := op.Error.Errors[0]
+		o.resultError = GCEOperationError{HttpStatusCode: op.HTTPStatusCode, Code: e.Code, Message: e.Message}
+	}
+	return true, nil
+}
+
+func (o *betaOperation) isError() error {
+	return o.resultError
 }
 
 func (o *betaOperation) rateLimitKey() *RateLimitKey {

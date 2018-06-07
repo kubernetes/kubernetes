@@ -19,12 +19,19 @@ package cloud
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 
 	alpha "google.golang.org/api/compute/v0.alpha"
 	beta "google.golang.org/api/compute/v0.beta"
 	ga "google.golang.org/api/compute/v1"
+)
+
+const (
+	// maxOpErrorDuration is the duration an operation will continue to be polled despite errors
+	// *retrieving* the operation.
+	maxOpGetErrorDuration = 1 * time.Minute
 )
 
 // Service is the top-level adapter for all of the different compute API
@@ -45,19 +52,19 @@ func (s *Service) wrapOperation(anyOp interface{}) (operation, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &gaOperation{s, r.ProjectID, r.Key}, nil
+		return &gaOperation{s: s, projectID: r.ProjectID, key: r.Key}, nil
 	case *alpha.Operation:
 		r, err := ParseResourceURL(o.SelfLink)
 		if err != nil {
 			return nil, err
 		}
-		return &alphaOperation{s, r.ProjectID, r.Key}, nil
+		return &alphaOperation{s: s, projectID: r.ProjectID, key: r.Key}, nil
 	case *beta.Operation:
 		r, err := ParseResourceURL(o.SelfLink)
 		if err != nil {
 			return nil, err
 		}
-		return &betaOperation{s, r.ProjectID, r.Key}, nil
+		return &betaOperation{s: s, projectID: r.ProjectID, key: r.Key}, nil
 	default:
 		return nil, fmt.Errorf("invalid type %T", anyOp)
 	}
@@ -72,14 +79,22 @@ func (s *Service) WaitForCompletion(ctx context.Context, genericOp interface{}) 
 		glog.Errorf("wrapOperation(%+v) error: %v", genericOp, err)
 		return err
 	}
+	var lastOpCheck time.Time
 	for done, err := op.isDone(ctx); !done; done, err = op.isDone(ctx) {
 		if err != nil {
-			glog.V(4).Infof("op.isDone(%v) error; op = %v, err = %v", ctx, op, err)
-			return err
+			if time.Since(lastOpCheck) > maxOpGetErrorDuration {
+				glog.V(4).Infof("op.isDone(%v) error; op = %v, err = %v", ctx, op, err)
+				return OperationPollingError{LastPollError: err}
+			}
+
+			glog.V(4).Infof("op.isDone(%v) error; op = %v, err = %v, retrying", ctx, op, err)
+		} else {
+			lastOpCheck = time.Now()
 		}
+
 		glog.V(5).Infof("op.isDone(%v) waiting; op = %v", ctx, op)
 		s.RateLimiter.Accept(ctx, op.rateLimitKey())
 	}
 	glog.V(5).Infof("op.isDone(%v) complete; op = %v", ctx, op)
-	return nil
+	return op.isError()
 }
