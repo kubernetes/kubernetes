@@ -23,7 +23,6 @@ package v2beta1
 import (
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -36,10 +35,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v2beta1.HorizontalPodAutoscalerList{}, func(obj interface{}) {
 		SetObjectDefaults_HorizontalPodAutoscalerList(obj.(*v2beta1.HorizontalPodAutoscalerList))
 	})
-	scheme.AddTypeDefaultingFunc(&v2beta1.VerticalPodAutoscaler{}, func(obj interface{}) { SetObjectDefaults_VerticalPodAutoscaler(obj.(*v2beta1.VerticalPodAutoscaler)) })
-	scheme.AddTypeDefaultingFunc(&v2beta1.VerticalPodAutoscalerList{}, func(obj interface{}) {
-		SetObjectDefaults_VerticalPodAutoscalerList(obj.(*v2beta1.VerticalPodAutoscalerList))
-	})
 	return nil
 }
 
@@ -51,30 +46,5 @@ func SetObjectDefaults_HorizontalPodAutoscalerList(in *v2beta1.HorizontalPodAuto
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_HorizontalPodAutoscaler(a)
-	}
-}
-
-func SetObjectDefaults_VerticalPodAutoscaler(in *v2beta1.VerticalPodAutoscaler) {
-	if in.Spec.ResourcePolicy != nil {
-		for i := range in.Spec.ResourcePolicy.ContainerPolicies {
-			a := &in.Spec.ResourcePolicy.ContainerPolicies[i]
-			v1.SetDefaults_ResourceList(&a.MinAllowed)
-			v1.SetDefaults_ResourceList(&a.MaxAllowed)
-		}
-	}
-	if in.Status.Recommendation != nil {
-		for i := range in.Status.Recommendation.ContainerRecommendations {
-			a := &in.Status.Recommendation.ContainerRecommendations[i]
-			v1.SetDefaults_ResourceList(&a.Target)
-			v1.SetDefaults_ResourceList(&a.LowerBound)
-			v1.SetDefaults_ResourceList(&a.UpperBound)
-		}
-	}
-}
-
-func SetObjectDefaults_VerticalPodAutoscalerList(in *v2beta1.VerticalPodAutoscalerList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_VerticalPodAutoscaler(a)
 	}
 }
