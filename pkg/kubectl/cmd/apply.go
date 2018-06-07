@@ -64,6 +64,7 @@ type ApplyOptions struct {
 	DeleteFlags   *DeleteFlags
 	DeleteOptions *DeleteOptions
 
+	ServerSideApply            bool
 	Selector                   string
 	DryRun                     bool
 	Prune                      bool
@@ -174,6 +175,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.OpenApiPatch, "openapi-patch", o.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
+	cmdutil.AddServerSideApplyFlag(cmd)
 
 	// apply subcommands
 	cmd.AddCommand(NewCmdApplyViewLastApplied(f, ioStreams))
@@ -184,6 +186,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 }
 
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	// allow for a success message operation to be specified at print time
@@ -329,6 +332,47 @@ func (o *ApplyOptions) Run() error {
 
 		if err := o.Recorder.Record(info.Object); err != nil {
 			glog.V(4).Infof("error recording current command: %v", err)
+		}
+
+		if o.ServerSideApply {
+			// Send the full object to be applied on the server side.
+			data, err := runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+			if err != nil {
+				return cmdutil.AddSourceToErr("server-side-apply", info.Source, err)
+			}
+			// TODO: Pass in dry-run flag if it exists.
+			// TODO: If we get a 415 (unsupported media type), then the server doesn't understand
+			// serverside apply; continue flow after this block.
+			obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(
+				info.Namespace,
+				info.Name,
+				types.ApplyPatchType,
+				data,
+			)
+			if err != nil {
+				return cmdutil.AddSourceToErr("server-side-apply", info.Source, err)
+			}
+
+			info.Refresh(obj, true)
+			metadata, err := meta.Accessor(info.Object)
+			if err != nil {
+				return err
+			}
+
+			visitedUids.Insert(string(metadata.GetUID()))
+
+			count++
+
+			if len(output) > 0 && !shortOutput {
+				objs = append(objs, info.Object)
+				return nil
+			}
+
+			printer, err := o.ToPrinter("server-side-applied")
+			if err != nil {
+				return err
+			}
+			return printer.PrintObj(info.Object, o.Out)
 		}
 
 		// Get the modified configuration of the object. Embed the result
