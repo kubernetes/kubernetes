@@ -27,7 +27,10 @@ go_test(
     name = "go_default_test",
     srcs = ["images_test.go"],
     embed = [":go_default_library"],
-    deps = ["//cmd/kubeadm/app/constants:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
+    ],
 )
 
 filegroup(
