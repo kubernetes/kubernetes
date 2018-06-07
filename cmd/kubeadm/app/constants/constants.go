@@ -205,8 +205,26 @@ const (
 	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
 	KubeletBaseConfigMapRolePrefix = "kubeadm:kubelet-config-"
 
-	// KubeletConfigurationFile specifies the file name on the node which stores initial remote configuration of kubelet
-	KubeletConfigurationFile = "/var/lib/kubelet/config.yaml"
+	// KubeletRunDirectory specifies the directory where the kubelet runtime information is stored.
+	// TODO: Make hard-coded "/var/lib/kubelet" strings reference this constant.
+	KubeletRunDirectory = "/var/lib/kubelet"
+
+	// KubeletConfigurationFileName specifies the file name on the node which stores initial remote configuration of kubelet
+	// This file should exist under KubeletRunDirectory
+	KubeletConfigurationFileName = "config.yaml"
+
+	// DynamicKubeletConfigurationDirectoryName specifies the directory which stores the dynamic configuration checkpoints for the kubelet
+	// This directory should exist under KubeletRunDirectory
+	DynamicKubeletConfigurationDirectoryName = "dynamic-config"
+
+	// KubeletEnvFileName is a file "kubeadm init" writes at runtime. Using that interface, kubeadm can customize certain
+	// kubelet flags conditionally based on the environment at runtime. Also, parameters given to the configuration file
+	// might be passed through this file. "kubeadm init" writes one variable, with the name ${KubeletEnvFileVariableName}.
+	// This file should exist under KubeletRunDirectory
+	KubeletEnvFileName = "kubeadm-flags.env"
+
+	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
+	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.2.17"
@@ -265,14 +283,6 @@ const (
 	// Copied from pkg/master/reconcilers to avoid pulling extra dependencies
 	// TODO: Import this constant from a consts only package, that does not pull any further dependencies.
 	LeaseEndpointReconcilerType = "lease"
-
-	// KubeletEnvFile is a file "kubeadm init" writes at runtime. Using that interface, kubeadm can customize certain
-	// kubelet flags conditionally based on the environment at runtime. Also, parameters given to the configuration file
-	// might be passed through this file. "kubeadm init" writes one variable, with the name ${KubeletEnvFileVariableName}.
-	KubeletEnvFile = "/var/lib/kubelet/kubeadm-flags.env"
-
-	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
-	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"
 
 	// KubeDNSVersion is the version of kube-dns to be deployed if it is used
 	KubeDNSVersion = "1.14.10"
@@ -348,6 +358,16 @@ func GetStaticPodFilepath(componentName, manifestsDir string) string {
 // GetAdminKubeConfigPath returns the location on the disk where admin kubeconfig is located by default
 func GetAdminKubeConfigPath() string {
 	return filepath.Join(KubernetesDir, AdminKubeConfigFileName)
+}
+
+// GetBootstrapKubeletKubeConfigPath returns the location on the disk where bootstrap kubelet kubeconfig is located by default
+func GetBootstrapKubeletKubeConfigPath() string {
+	return filepath.Join(KubernetesDir, KubeletBootstrapKubeConfigFileName)
+}
+
+// GetKubeletKubeConfigPath returns the location on the disk where kubelet kubeconfig is located by default
+func GetKubeletKubeConfigPath() string {
+	return filepath.Join(KubernetesDir, KubeletKubeConfigFileName)
 }
 
 // AddSelfHostedPrefix adds the self-hosted- prefix to the component name

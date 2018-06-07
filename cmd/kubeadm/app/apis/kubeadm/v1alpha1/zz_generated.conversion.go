@@ -244,6 +244,8 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 }
 
 func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in *kubeadm.MasterConfiguration, out *MasterConfiguration, s conversion.Scope) error {
+	// WARNING: in.BootstrapTokens requires manual conversion: does not exist in peer-type
+	// WARNING: in.NodeRegistration requires manual conversion: does not exist in peer-type
 	if err := Convert_kubeadm_API_To_v1alpha1_API(&in.API, &out.API, s); err != nil {
 		return err
 	}
@@ -260,8 +262,6 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 		return err
 	}
 	out.KubernetesVersion = in.KubernetesVersion
-	// WARNING: in.NodeRegistration requires manual conversion: does not exist in peer-type
-	// WARNING: in.BootstrapTokens requires manual conversion: does not exist in peer-type
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))

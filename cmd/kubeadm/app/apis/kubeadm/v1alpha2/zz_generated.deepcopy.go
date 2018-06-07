@@ -295,12 +295,6 @@ func (in *LocalEtcd) DeepCopy() *LocalEtcd {
 func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.API = in.API
-	in.KubeProxy.DeepCopyInto(&out.KubeProxy)
-	in.Etcd.DeepCopyInto(&out.Etcd)
-	in.KubeletConfiguration.DeepCopyInto(&out.KubeletConfiguration)
-	out.Networking = in.Networking
-	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 	if in.BootstrapTokens != nil {
 		in, out := &in.BootstrapTokens, &out.BootstrapTokens
 		*out = make([]BootstrapToken, len(*in))
@@ -308,6 +302,12 @@ func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+	out.API = in.API
+	in.KubeProxy.DeepCopyInto(&out.KubeProxy)
+	in.Etcd.DeepCopyInto(&out.Etcd)
+	in.KubeletConfiguration.DeepCopyInto(&out.KubeletConfiguration)
+	out.Networking = in.Networking
 	if in.APIServerExtraArgs != nil {
 		in, out := &in.APIServerExtraArgs, &out.APIServerExtraArgs
 		*out = make(map[string]string, len(*in))
@@ -456,8 +456,8 @@ func (in *NodeRegistrationOptions) DeepCopyInto(out *NodeRegistrationOptions) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.ExtraArgs != nil {
-		in, out := &in.ExtraArgs, &out.ExtraArgs
+	if in.KubeletExtraArgs != nil {
+		in, out := &in.KubeletExtraArgs, &out.KubeletExtraArgs
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
