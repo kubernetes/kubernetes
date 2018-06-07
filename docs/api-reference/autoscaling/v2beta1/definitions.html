@@ -375,6 +375,12 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <li>
 <p><a href="#_v2beta1_horizontalpodautoscalerlist">v2beta1.HorizontalPodAutoscalerList</a></p>
 </li>
+<li>
+<p><a href="#_v2beta1_verticalpodautoscaler">v2beta1.VerticalPodAutoscaler</a></p>
+</li>
+<li>
+<p><a href="#_v2beta1_verticalpodautoscalerlist">v2beta1.VerticalPodAutoscalerList</a></p>
+</li>
 </ul>
 </div>
 </div>
@@ -603,6 +609,95 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="_v2beta1_podupdatepolicy">v2beta1.PodUpdatePolicy</h3>
+<div class="paragraph">
+<p>PodUpdatePolicy describes the rules on how changes are applied to the pods.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">updateMode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Controls when autoscaler applies changes to the pod resources. The default is <em>Auto</em>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_updatemode">v2beta1.UpdateMode</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2beta1_recommendedcontainerresources">v2beta1.RecommendedContainerResources</h3>
+<div class="paragraph">
+<p>RecommendedContainerResources is the recommendation of resources computed by autoscaler for a specific container. Respects the container resource policy if present in the spec. In particular the recommendation is not produced for containers with <code>ContainerScalingMode</code> set to <em>Off</em>.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">containerName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the container.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">target</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Recommended amount of resources.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lowerBound</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Minimum recommended amount of resources. This amount is not guaranteed to be sufficient for the application to operate in a stable way, however running with less resources is likely to have significant impact on performance/availability.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">upperBound</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Maximum recommended amount of resources. Any resources allocated beyond this value are likely wasted. This value may be larger than the maximum amount of application is actually capable of consuming.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_preconditions">v1.Preconditions</h3>
 <div class="paragraph">
 <p>Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.</p>
@@ -675,6 +770,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 </tbody>
 </table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2beta1_containerscalingmode">v2beta1.ContainerScalingMode</h3>
 
 </div>
 <div class="sect2">
@@ -802,6 +901,95 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">Suggested HTTP return code for this status, 0 if not set.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2beta1_recommendedpodresources">v2beta1.RecommendedPodResources</h3>
+<div class="paragraph">
+<p>RecommendedPodResources is the recommendation of resources computed by autoscaler. It contains a recommendation for each container in the pod (except for those with <code>ContainerScalingMode</code> set to <em>Off</em>).</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">containerRecommendations</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Resources recommended by the autoscaler for each container.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_recommendedcontainerresources">v2beta1.RecommendedContainerResources</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2beta1_verticalpodautoscalerlist">v2beta1.VerticalPodAutoscalerList</h3>
+<div class="paragraph">
+<p>VerticalPodAutoscalerList is a list of VerticalPodAutoscaler objects.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds">https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">apiVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="https://git.k8s.io/community/contributors/devel/api-conventions.md#resources">https://git.k8s.io/community/contributors/devel/api-conventions.md#resources</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metadata is the standard list metadata.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_listmeta">v1.ListMeta</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items is the list of vertical pod autoscaler objects.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_verticalpodautoscaler">v2beta1.VerticalPodAutoscaler</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -991,6 +1179,95 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2beta1_verticalpodautoscalerstatus">v2beta1.VerticalPodAutoscalerStatus</h3>
+<div class="paragraph">
+<p>VerticalPodAutoscalerStatus describes the runtime state of the autoscaler.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">recommendation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The most recently computed amount of resources recommended by the autoscaler for the controlled pods.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_recommendedpodresources">v2beta1.RecommendedPodResources</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">conditions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_verticalpodautoscalercondition">v2beta1.VerticalPodAutoscalerCondition</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2beta1_verticalpodautoscalerspec">v2beta1.VerticalPodAutoscalerSpec</h3>
+<div class="paragraph">
+<p>VerticalPodAutoscalerSpec is the specification of the behavior of the autoscaler.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">selector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A label query that determines the set of pods controlled by the Autoscaler. More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_labelselector">v1.LabelSelector</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">updatePolicy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Describes the rules on how changes are applied to the pods. If not specified, all fields in the <code>PodUpdatePolicy</code> are set to their default values.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_podupdatepolicy">v2beta1.PodUpdatePolicy</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourcePolicy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Controls how the autoscaler computes recommended resources. The resource policy may be used to set constraints on the recommendations for individual containers. If not specified, the autoscaler computes recommended resources for all containers in the pod, without additional constraints.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_podresourcepolicy">v2beta1.PodResourcePolicy</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -1311,6 +1588,61 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="_v2beta1_containerresourcepolicy">v2beta1.ContainerResourcePolicy</h3>
+<div class="paragraph">
+<p>ContainerResourcePolicy controls how autoscaler computes the recommended resources for a specific container.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">containerName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the container or DefaultContainerResourcePolicy, in which case the policy is used by the containers that don&#8217;t have their own policy specified.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether autoscaler is enabled for the container. The default is "Auto".</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_containerscalingmode">v2beta1.ContainerScalingMode</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">minAllowed</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the minimal amount of resources that will be recommended for the container. The default is no minimum.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">maxAllowed</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the maximum amount of resources that will be recommended for the container. The default is no maximum.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_patch">v1.Patch</h3>
 <div class="paragraph">
 <p>Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.</p>
@@ -1379,6 +1711,40 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: <em>Orphan</em> - orphan the dependents; <em>Background</em> - allow the garbage collector to delete the dependents in the background; <em>Foreground</em> - a cascading policy that deletes all dependents in the foreground.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_deletionpropagation">v1.DeletionPropagation</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2beta1_podresourcepolicy">v2beta1.PodResourcePolicy</h3>
+<div class="paragraph">
+<p>PodResourcePolicy controls how autoscaler computes the recommended resources for containers belonging to the pod. There can be at most one entry for every named container and optionally a single wildcard entry with <code>containerName</code> = <em>*</em>, which handles all containers that don&#8217;t have individual policies.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">containerPolicies</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Per-container resource policies.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_containerresourcepolicy">v2beta1.ContainerResourcePolicy</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -1486,6 +1852,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 </tbody>
 </table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2beta1_updatemode">v2beta1.UpdateMode</h3>
 
 </div>
 <div class="sect2">
@@ -2010,6 +2380,68 @@ Examples:<br>
 
 </div>
 <div class="sect2">
+<h3 id="_v2beta1_verticalpodautoscaler">v2beta1.VerticalPodAutoscaler</h3>
+<div class="paragraph">
+<p>VerticalPodAutoscaler is the configuration for a vertical pod autoscaler, which automatically manages pod resources based on historical and real time resource utilization.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds">https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">apiVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="https://git.k8s.io/community/contributors/devel/api-conventions.md#resources">https://git.k8s.io/community/contributors/devel/api-conventions.md#resources</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard object metadata. More info: <a href="https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata">https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectmeta">v1.ObjectMeta</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">spec</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specification of the behavior of the autoscaler. More info: <a href="https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status</a>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_verticalpodautoscalerspec">v2beta1.VerticalPodAutoscalerSpec</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">status</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Current information about the autoscaler.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v2beta1_verticalpodautoscalerstatus">v2beta1.VerticalPodAutoscalerStatus</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v2beta1_metricspec">v2beta1.MetricSpec</h3>
 <div class="paragraph">
 <p>MetricSpec specifies how to scale based on a single metric (only <code>type</code> and one other matching field should be set at once).</p>
@@ -2112,6 +2544,68 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">currentValue</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">currentValue is the current value of the metric (as a quantity).</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v2beta1_verticalpodautoscalercondition">v2beta1.VerticalPodAutoscalerCondition</h3>
+<div class="paragraph">
+<p>VerticalPodAutoscalerCondition describes the state of a VerticalPodAutoscaler at a certain point.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">type</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">type describes the current condition</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">status</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">status is the status of the condition (True, False, Unknown)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lastTransitionTime</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lastTransitionTime is the last time the condition transitioned from one status to another</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">reason</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">reason is the reason for the condition&#8217;s last transition.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">message</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">message is a human-readable explanation containing details about the transition</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
