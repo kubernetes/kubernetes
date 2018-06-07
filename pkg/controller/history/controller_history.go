@@ -18,11 +18,11 @@ package history
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"sort"
 	"strconv"
-	"encoding/json"
 
 	apps "k8s.io/api/apps/v1"
 	appsinformers "k8s.io/client-go/informers/apps/v1"

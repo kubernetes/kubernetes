@@ -31,6 +31,7 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/controller/daemon:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
+        "//pkg/controller/history:go_default_library",
         "//pkg/controller/job:go_default_library",
         "//pkg/controller/nodelifecycle:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
