@@ -129,7 +129,7 @@ func TestGenerateService(t *testing.T) {
 				"port":           "80",
 				"protocol":       "UDP",
 				"container-port": "foobar",
-				"external-ip":    "1.2.3.4",
+				"external-ips":   "1.2.3.4",
 			},
 			expected: v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -159,7 +159,7 @@ func TestGenerateService(t *testing.T) {
 				"port":           "80",
 				"protocol":       "UDP",
 				"container-port": "foobar",
-				"external-ip":    "1.2.3.4,5.6.7.8",
+				"external-ips":   "1.2.3.4,5.6.7.8",
 			},
 			expected: v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -189,7 +189,7 @@ func TestGenerateService(t *testing.T) {
 				"port":           "80",
 				"protocol":       "UDP",
 				"container-port": "foobar",
-				"external-ip":    "1.2.3.4",
+				"external-ips":   "1.2.3.4",
 				"type":           "LoadBalancer",
 			},
 			expected: v1.Service{

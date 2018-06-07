@@ -57,11 +57,11 @@ func paramNames() []GeneratorParam {
 		// port will be used if a user specifies --port OR the exposed object
 		// has one port
 		{"port", false},
-		// ports will be used iff a user doesn't specify --port AND the
+		// ports will be used if a user doesn't specify --port AND the
 		// exposed object has multiple ports
 		{"ports", false},
 		{"labels", false},
-		{"external-ip", false},
+		{"external-ips", false},
 		{"load-balancer-ip", false},
 		{"type", false},
 		{"protocol", false},
@@ -209,9 +209,8 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 			service.Spec.Ports[i].TargetPort = intstr.FromInt(int(port))
 		}
 	}
-	if len(params["external-ip"]) > 0 {
-		// Allow for list of comma separated IPs
-		service.Spec.ExternalIPs = strings.Split(params["external-ip"], ",")
+	if len(params["external-ips"]) > 0 {
+		service.Spec.ExternalIPs = strings.Split(params["external-ips"], ",")
 	}
 	if len(params["type"]) != 0 {
 		service.Spec.Type = v1.ServiceType(params["type"])
