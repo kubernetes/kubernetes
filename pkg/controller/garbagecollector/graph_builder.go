@@ -148,6 +148,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				gvk:       kind,
 			}
 			gb.graphChanges.Add(event)
+			glog.V(4).Infof(">>> Graph change length after adding add event: %v", gb.graphChanges.Len())
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			// TODO: check if there are differences in the ownerRefs,
@@ -158,7 +159,33 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				oldObj:    oldObj,
 				gvk:       kind,
 			}
+
+			oldAccessor, err := meta.Accessor(oldObj)
+			if err != nil {
+				gb.graphChanges.Add(event)
+				return
+			}
+			newAccessor, err := meta.Accessor(newObj)
+			if err != nil {
+				gb.graphChanges.Add(event)
+				return
+			}
+			glog.V(4).Infof("garbage collector update event for obj %q, %q", oldAccessor.GetName(), oldAccessor.GetNamespace())
+			added, removed, changed := referencesDiffs(oldAccessor.GetOwnerReferences(), newAccessor.GetOwnerReferences())
+			if deletionStarts(oldObj, newAccessor) {
+				glog.V(4).Infof(">>> change start deletion")
+			}
+			if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
+				glog.V(4).Infof(">>> change ownerRef")
+			}
+			if !hasDeleteDependentsFinalizer(oldAccessor) && hasDeleteDependentsFinalizer(newAccessor) {
+				glog.V(4).Infof(">>> change deleteDependentsFinalizer")
+			}
+			if !hasOrphanFinalizer(oldAccessor) && hasOrphanFinalizer(newAccessor) {
+				glog.V(4).Infof(">>> change orphanFinalizer")
+			}
 			gb.graphChanges.Add(event)
+			glog.V(4).Infof(">>> Graph change length after adding update event: %v", gb.graphChanges.Len())
 		},
 		DeleteFunc: func(obj interface{}) {
 			// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
@@ -170,7 +197,14 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				obj:       obj,
 				gvk:       kind,
 			}
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				glog.V(4).Infof("garbage collector informer for resource %q, kind %q: adding Delete event for object: unable to access metadata", resource.String(), kind.String())
+			} else {
+				glog.V(4).Infof("garbage collector informer for resource %q, kind %q: adding Delete event for object: Name %q, Namespace %q, UID %q", resource.String(), kind.String(), accessor.GetName(), accessor.GetNamespace(), accessor.GetUID())
+			}
 			gb.graphChanges.Add(event)
+			glog.V(4).Infof(">>> Graph change length after adding delete event: %v", gb.graphChanges.Len())
 		},
 	}
 	shared, err := gb.sharedInformers.ForResource(resource)
@@ -184,7 +218,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 	}
 
 	// TODO: consider store in one storage.
-	glog.V(5).Infof("create storage for resource %s", resource)
+	glog.V(4).Infof("create storage for resource %s", resource)
 	_, monitor := cache.NewInformer(
 		listWatcher(gb.dynamicClient, resource),
 		nil,
@@ -366,6 +400,7 @@ func (gb *GraphBuilder) enqueueVirtualDeleteEvent(ref objectReference) {
 			ObjectMeta: metav1.ObjectMeta{Namespace: ref.Namespace, UID: ref.UID, Name: ref.Name},
 		},
 	})
+	glog.V(4).Infof(">>> Graph change length after adding virtual delete event: %v", gb.graphChanges.Len())
 }
 
 // addDependentToOwners adds n to owners' dependents list. If the owner does not
@@ -386,7 +421,7 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 				dependents: make(map[*node]struct{}),
 				virtual:    true,
 			}
-			glog.V(5).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
+			glog.V(4).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
 			gb.uidToNode.Write(ownerNode)
 		}
 		ownerNode.addDependent(n)
@@ -524,7 +559,7 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerRe
 		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion {
 			node, found := gb.uidToNode.Read(ref.UID)
 			if !found {
-				glog.V(5).Infof("cannot find %s in uidToNode", ref.UID)
+				glog.V(4).Infof("cannot find %s in uidToNode", ref.UID)
 				continue
 			}
 			gb.attemptToDelete.Add(node)
@@ -536,7 +571,7 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerRe
 		if wasBlocked && isUnblocked {
 			node, found := gb.uidToNode.Read(c.newRef.UID)
 			if !found {
-				glog.V(5).Infof("cannot find %s in uidToNode", c.newRef.UID)
+				glog.V(4).Infof("cannot find %s in uidToNode", c.newRef.UID)
 				continue
 			}
 			gb.attemptToDelete.Add(node)
@@ -546,7 +581,7 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerRe
 
 func (gb *GraphBuilder) processTransitions(oldObj interface{}, newAccessor metav1.Object, n *node) {
 	if startsWaitingForDependentsOrphaned(oldObj, newAccessor) {
-		glog.V(5).Infof("add %s to the attemptToOrphan", n.identity)
+		glog.V(4).Infof("add %s to the attemptToOrphan", n.identity)
 		gb.attemptToOrphan.Add(n)
 		return
 	}
@@ -584,7 +619,8 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return true
 	}
-	glog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
+	glog.V(4).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
+	glog.V(4).Infof(">>> Graph change length when processing graphChanges queue: %v", gb.graphChanges.Len())
 	// Check if the node already exsits
 	existingNode, found := gb.uidToNode.Read(accessor.GetUID())
 	if found {
@@ -618,6 +654,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		// handle changes in ownerReferences
 		added, removed, changed := referencesDiffs(existingNode.owners, accessor.GetOwnerReferences())
 		if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
+			glog.V(4).Infof("garbage collector update event adding to queue: %v", accessor.GetUID())
 			// check if the changed dependency graph unblock owners that are
 			// waiting for the deletion of their dependents.
 			gb.addUnblockedOwnersToDeleteQueue(removed, changed)
@@ -631,12 +668,13 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		}
 
 		if beingDeleted(accessor) {
+			glog.V(4).Infof("garbage collector update event being deleted: %v", accessor.GetUID())
 			existingNode.markBeingDeleted()
 		}
 		gb.processTransitions(event.oldObj, accessor, existingNode)
 	case event.eventType == deleteEvent:
 		if !found {
-			glog.V(5).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
+			glog.V(4).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
 			return true
 		}
 		// removeNode updates the graph
