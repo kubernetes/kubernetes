@@ -24,9 +24,15 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -285,11 +291,70 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 }
 
 func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) error {
+	// TODO: Remove this in or after 1.12 release.
+	//       Server version >= 1.11 no longer needs this hack.
+	mapping := info.ResourceMapping()
+	if mapping.Resource.GroupResource() == (schema.GroupResource{Group: "extensions", Resource: "daemonsets"}) ||
+		mapping.Resource.GroupResource() == (schema.GroupResource{Group: "apps", Resource: "daemonsets"}) {
+		if err := updateDaemonSet(info.Namespace, info.Name, o.DynamicClient); err != nil {
+			return err
+		}
+	}
+
 	if err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions); err != nil {
 		return cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
 	o.PrintObj(info)
+	return nil
+}
+
+// TODO: Remove this in or after 1.12 release.
+//       Server version >= 1.11 no longer needs this hack.
+func updateDaemonSet(namespace, name string, dynamicClient dynamic.Interface) error {
+	dsClient := dynamicClient.Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}).Namespace(namespace)
+	obj, err := dsClient.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	ds := &appsv1.DaemonSet{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ds); err != nil {
+		return err
+	}
+
+	// We set the nodeSelector to a random label. This label is nearly guaranteed
+	// to not be set on any node so the DameonSetController will start deleting
+	// daemon pods. Once it's done deleting the daemon pods, it's safe to delete
+	// the DaemonSet.
+	ds.Spec.Template.Spec.NodeSelector = map[string]string{
+		string(uuid.NewUUID()): string(uuid.NewUUID()),
+	}
+	// force update to avoid version conflict
+	ds.ResourceVersion = ""
+
+	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ds)
+	if err != nil {
+		return err
+	}
+	if _, err = dsClient.Update(&unstructured.Unstructured{Object: out}); err != nil {
+		return err
+	}
+
+	// Wait for the daemon set controller to kill all the daemon pods.
+	if err := wait.Poll(1*time.Second, 5*time.Minute, func() (bool, error) {
+		updatedObj, err := dsClient.Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		updatedDS := &appsv1.DaemonSet{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(updatedObj.Object, ds); err != nil {
+			return false, nil
+		}
+
+		return updatedDS.Status.CurrentNumberScheduled+updatedDS.Status.NumberMisscheduled == 0, nil
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
