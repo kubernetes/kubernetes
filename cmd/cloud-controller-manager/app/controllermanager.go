@@ -157,11 +157,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 		}
 	}
 
-	runCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	if !c.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
-		run(runCtx)
+		run(context.TODO())
 		panic("unreachable")
 	}
 
@@ -187,7 +184,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	}
 
 	// Try and become the leader and start cloud controller manager loops
-	leaderelection.RunOrDie(runCtx, leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.GenericComponent.LeaderElection.RenewDeadline.Duration,

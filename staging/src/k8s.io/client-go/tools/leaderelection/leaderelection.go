@@ -208,10 +208,9 @@ func (le *LeaderElector) renew(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wait.Until(func() {
-		// PollUntil() sleeps for "interval" duration before calling the function so we need to increase the timeout by le.config.RetryPeriod
-		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RetryPeriod+le.config.RenewDeadline)
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)
 		defer timeoutCancel()
-		err := wait.PollUntil(le.config.RetryPeriod, func() (bool, error) {
+		err := wait.PollImmediateUntil(le.config.RetryPeriod, func() (bool, error) {
 			return le.tryAcquireOrRenew(), nil
 		}, timeoutCtx.Done())
 		le.maybeReportTransition()

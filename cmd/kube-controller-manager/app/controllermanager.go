@@ -181,11 +181,8 @@ func Run(c *config.CompletedConfig) error {
 		select {}
 	}
 
-	runCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	if !c.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
-		run(runCtx)
+		run(context.TODO())
 		panic("unreachable")
 	}
 
@@ -208,7 +205,7 @@ func Run(c *config.CompletedConfig) error {
 		glog.Fatalf("error creating lock: %v", err)
 	}
 
-	leaderelection.RunOrDie(runCtx, leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.GenericComponent.LeaderElection.RenewDeadline.Duration,

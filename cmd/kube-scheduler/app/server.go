@@ -187,14 +187,14 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 		<-ctx.Done()
 	}
 
-	runCtx, cancel := context.WithCancel(context.TODO()) // once Run() accepts a context, it should be used here
+	ctx, cancel := context.WithCancel(context.TODO()) // TODO once Run() accepts a context, it should be used here
 	defer cancel()
 
 	go func() {
 		select {
 		case <-stopCh:
 			cancel()
-		case <-runCtx.Done():
+		case <-ctx.Done():
 		}
 	}()
 
@@ -211,13 +211,13 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 			return fmt.Errorf("couldn't create leader elector: %v", err)
 		}
 
-		leaderElector.Run(runCtx)
+		leaderElector.Run(ctx)
 
 		return fmt.Errorf("lost lease")
 	}
 
 	// Leader election is disabled, so run inline until done.
-	run(runCtx)
+	run(ctx)
 	return fmt.Errorf("finished without leader elect")
 }
 
