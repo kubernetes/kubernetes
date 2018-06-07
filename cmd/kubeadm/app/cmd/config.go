@@ -202,7 +202,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 			}
 
 			if newCfgPath == "" {
-				fmt.Fprintf(out, string(outputBytes))
+				fmt.Fprint(out, string(outputBytes))
 			} else {
 				if err := ioutil.WriteFile(newCfgPath, outputBytes, 0644); err != nil {
 					kubeadmutil.CheckErr(fmt.Errorf("failed to write the new configuration to the file %q: %v", newCfgPath, err))

@@ -134,6 +134,7 @@ go_test(
         ":go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
+        "//cmd/kubeadm/app/util/config:go_default_library",
         "//vendor/github.com/renstrom/dedent:go_default_library",
     ],
 )
