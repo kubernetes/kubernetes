@@ -90,6 +90,25 @@ func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.
 	return uoutput, nil
 }
 
+func (p *applyPatcher) saveNewIntent(workflow string, dst runtime.Object) error {
+	// We want to consistently save the intent in JSon.
+	json, err := yaml.YAMLToJSON(p.patchBytes)
+	if err != nil {
+		return fmt.Errorf("failed to convert patch to JSon: %v", err)
+	}
+	accessor, err := meta.Accessor(dst)
+	if err != nil {
+		return fmt.Errorf("couldn't get accessor: %v", err)
+	}
+	m := accessor.GetLastApplied()
+	if m == nil {
+		m = make(map[string]string)
+	}
+	m[workflow] = string(json)
+	accessor.SetLastApplied(m)
+	return nil
+}
+
 func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
 	current, err := p.convertCurrentVersion(currentObject)
 	if err != nil {
@@ -119,7 +138,10 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 		return nil, fmt.Errorf("failed to convert merge result: %v", err)
 	}
 
-	// TODO(apelisse): Update last applied
+	if err := p.saveNewIntent(workflowId, output); err != nil {
+		return nil, fmt.Errorf("failed to save last intent: %v", err)
+	}
+
 	// TODO(apelisse): Also update last-applied on the create path
 	// TODO(apelisse): Check for conflicts with other lastApplied
 	// and report actionable errors to users.
