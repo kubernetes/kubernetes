@@ -1312,7 +1312,7 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	if len(columns) == 0 {
 		t.Errorf("unexpected number of columns: %v", len(columns))
 	}
-	if columns[0].Name != "Name" || columns[0].Type != "string" || columns[0].Format != "name" {
+	if !strings.EqualFold(columns[0].Name, "Name") || columns[0].Type != "string" || columns[0].Format != "name" {
 		t.Errorf("expect column 0 to be the name column: %#v", columns[0])
 	}
 	for j, column := range columns {
