@@ -68,8 +68,13 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 		spec = specHandler.DefaultSpec()
 	}
 
-	// Pass all parameters as volume labels for Portworx server-side processing.
-	spec.VolumeLabels = p.options.Parameters
+	// Pass all parameters as volume labels for Portworx server-side processing
+	if len(p.options.Parameters) > 0 {
+		spec.VolumeLabels = p.options.Parameters
+	} else {
+		spec.VolumeLabels = make(map[string]string, 0)
+	}
+
 	// Update the requested size in the spec
 	spec.Size = uint64(requestGB * 1024 * 1024 * 1024)
 	// Change the Portworx Volume name to PV name
