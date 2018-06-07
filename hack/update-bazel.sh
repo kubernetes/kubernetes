@@ -36,6 +36,12 @@ go install ./vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle
 go install ./vendor/github.com/kubernetes/repo-infra/kazel
 
 touch "${KUBE_ROOT}/vendor/BUILD"
+# Ensure that we use the correct importmap for all vendored dependencies.
+# Probably not necessary in gazelle 0.13+
+# (https://github.com/bazelbuild/bazel-gazelle/pull/207).
+if ! grep -q "# gazelle:importmap_prefix" "${KUBE_ROOT}/vendor/BUILD"; then
+  echo "# gazelle:importmap_prefix k8s.io/kubernetes/vendor" >> "${KUBE_ROOT}/vendor/BUILD"
+fi
 
 gazelle fix \
     -build_file_name=BUILD,BUILD.bazel \
