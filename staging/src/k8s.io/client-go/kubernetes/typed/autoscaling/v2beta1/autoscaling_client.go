@@ -28,7 +28,6 @@ import (
 type AutoscalingV2beta1Interface interface {
 	RESTClient() rest.Interface
 	HorizontalPodAutoscalersGetter
-	VerticalPodAutoscalersGetter
 }
 
 // AutoscalingV2beta1Client is used to interact with features provided by the autoscaling group.
@@ -38,10 +37,6 @@ type AutoscalingV2beta1Client struct {
 
 func (c *AutoscalingV2beta1Client) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
 	return newHorizontalPodAutoscalers(c, namespace)
-}
-
-func (c *AutoscalingV2beta1Client) VerticalPodAutoscalers(namespace string) VerticalPodAutoscalerInterface {
-	return newVerticalPodAutoscalers(c, namespace)
 }
 
 // NewForConfig creates a new AutoscalingV2beta1Client for the given config.
