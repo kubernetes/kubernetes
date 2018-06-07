@@ -55,6 +55,18 @@ type DryRunClientOptions struct {
 	PrintGETAndLIST bool
 }
 
+// GetDefaultDryRunClientOptions returns the default DryRunClientOptions values
+func GetDefaultDryRunClientOptions(drg DryRunGetter, w io.Writer) DryRunClientOptions {
+	return DryRunClientOptions{
+		Writer:          w,
+		Getter:          drg,
+		PrependReactors: []core.Reactor{},
+		AppendReactors:  []core.Reactor{},
+		MarshalFunc:     DefaultMarshalFunc,
+		PrintGETAndLIST: false,
+	}
+}
+
 // actionWithName is the generic interface for an action that has a name associated with it
 // This just makes it easier to catch all actions that has a name; instead of hard-coding all request that has it associated
 type actionWithName interface {
@@ -71,14 +83,7 @@ type actionWithObject interface {
 
 // NewDryRunClient is a wrapper for NewDryRunClientWithOpts using some default values
 func NewDryRunClient(drg DryRunGetter, w io.Writer) clientset.Interface {
-	return NewDryRunClientWithOpts(DryRunClientOptions{
-		Writer:          w,
-		Getter:          drg,
-		PrependReactors: []core.Reactor{},
-		AppendReactors:  []core.Reactor{},
-		MarshalFunc:     DefaultMarshalFunc,
-		PrintGETAndLIST: false,
-	})
+	return NewDryRunClientWithOpts(GetDefaultDryRunClientOptions(drg, w))
 }
 
 // NewDryRunClientWithOpts returns a clientset.Interface that can be used normally for talking to the Kubernetes API.

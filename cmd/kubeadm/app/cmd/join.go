@@ -215,7 +215,8 @@ func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bo
 
 // Join defines struct used by kubeadm join command
 type Join struct {
-	cfg *kubeadmapi.NodeConfiguration
+	cfg                   *kubeadmapi.NodeConfiguration
+	ignorePreflightErrors sets.String
 }
 
 // NewJoin instantiates Join struct with given arguments
@@ -239,39 +240,31 @@ func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1alpha2.NodeC
 		return nil, err
 	}
 
-	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infoln("[preflight] starting kubelet service if it's inactive")
-	preflight.TryStartKubelet(ignorePreflightErrors)
-
-	return &Join{cfg: internalcfg}, nil
+	return &Join{cfg: internalcfg, ignorePreflightErrors: ignorePreflightErrors}, nil
 }
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
 
-	// Write env file with flags for the kubelet to use. Also register taints
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&j.cfg.NodeRegistration, true); err != nil {
-		return err
-	}
-
+	// Perform the Discovery, which turns a Bootstrap Token and optionally (and preferably) a CA cert hash into a KubeConfig
+	// file that may be used for the TLS Bootstrapping process the kubelet performs using the Certificates API.
 	glog.V(1).Infoln("[join] retrieving KubeConfig objects")
 	cfg, err := discovery.For(j.cfg)
 	if err != nil {
 		return err
 	}
 
-	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)
+	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
 
 	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
-	glog.V(1).Infoln("[join] writing bootstrap kubelet config file at", kubeconfigFile)
-	if err := kubeconfigutil.WriteToDisk(kubeconfigFile, cfg); err != nil {
+	glog.V(1).Infoln("[join] writing bootstrap kubelet config file at", bootstrapKubeConfigFile)
+	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, cfg); err != nil {
 		return fmt.Errorf("couldn't save bootstrap-kubelet.conf to disk: %v", err)
 	}
 
 	// Write the ca certificate to disk so kubelet can use it for authentication
 	cluster := cfg.Contexts[cfg.CurrentContext].Cluster
-	err = certutil.WriteCert(j.cfg.CACertPath, cfg.Clusters[cluster].CertificateAuthorityData)
-	if err != nil {
+	if err := certutil.WriteCert(j.cfg.CACertPath, cfg.Clusters[cluster].CertificateAuthorityData); err != nil {
 		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
 
@@ -280,12 +273,31 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	// Write the configuration for the kubelet down to disk so the kubelet can start
-	if err := kubeletphase.DownloadConfig(kubeconfigFile, kubeletVersion); err != nil {
+	bootstrapClient, err := kubeconfigutil.ClientSetFromFile(bootstrapKubeConfigFile)
+	if err != nil {
+		return fmt.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
+	}
+
+	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
+	// Try to stop the kubelet service so no race conditions occur when configuring it
+	glog.V(1).Infof("Stopping the kubelet")
+	preflight.TryStopKubelet(j.ignorePreflightErrors)
+
+	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
+	if err := kubeletphase.DownloadConfig(bootstrapClient, kubeletVersion, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
 	}
 
-	// Now the kubelet will perform the TLS Bootstrap, transforming bootstrap-kubeconfig.conf to kubeconfig.conf in /etc/kubernetes
+	// Write env file with flags for the kubelet to use. Also register taints
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&j.cfg.NodeRegistration, j.cfg.FeatureGates, true, kubeadmconstants.KubeletRunDirectory); err != nil {
+		return err
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	glog.V(1).Infof("Starting the kubelet")
+	preflight.TryStartKubelet(j.ignorePreflightErrors)
+
+	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
 	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf KubeConfig file. If this process
 	// times out, display a somewhat user-friendly message.
 	waiter := apiclient.NewKubeWaiter(nil, kubeadmconstants.TLSBootstrapTimeout, os.Stdout)
@@ -295,8 +307,7 @@ func (j *Join) Run(out io.Writer) error {
 	}
 
 	// When we know the /etc/kubernetes/kubelet.conf file is available, get the client
-	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
-	client, err := kubeconfigutil.ClientSetFromFile(kubeletKubeConfig)
+	client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
 	if err != nil {
 		return err
 	}
@@ -306,9 +317,7 @@ func (j *Join) Run(out io.Writer) error {
 		return fmt.Errorf("error uploading crisocket: %v", err)
 	}
 
-	// NOTE: the "--dynamic-config-dir" flag should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf for this to work
-	// This feature is disabled by default, as it is alpha still
-	glog.V(1).Infoln("[join] enabling dynamic kubelet configuration")
+	// This feature is disabled by default in kubeadm
 	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
 		if err := kubeletphase.EnableDynamicConfigForNode(client, j.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
 			return fmt.Errorf("error consuming base kubelet configuration: %v", err)

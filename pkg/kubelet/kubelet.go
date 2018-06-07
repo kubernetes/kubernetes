@@ -223,8 +223,7 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
 	bootstrapCheckpointPath string,
-	nodeStatusMaxImages int32,
-	stopCh <-chan struct{}) (Bootstrap, error)
+	nodeStatusMaxImages int32) (Bootstrap, error)
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -350,8 +349,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
 	bootstrapCheckpointPath string,
-	nodeStatusMaxImages int32,
-	stopCh <-chan struct{}) (*Kubelet, error) {
+	nodeStatusMaxImages int32) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -632,7 +630,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			remoteImageEndpoint)
 		glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 		server := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
-		if err := server.Start(stopCh); err != nil {
+		if err := server.Start(); err != nil {
 			return nil, err
 		}
 

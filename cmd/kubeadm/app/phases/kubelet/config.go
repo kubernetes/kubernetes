@@ -19,6 +19,7 @@ package kubelet
 import (
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -28,7 +29,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
@@ -37,13 +37,13 @@ import (
 
 // WriteConfigToDisk writes the kubelet config object down to a file
 // Used at "kubeadm init" and "kubeadm upgrade" time
-func WriteConfigToDisk(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration) error {
+func WriteConfigToDisk(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, kubeletDir string) error {
 
 	kubeletBytes, err := getConfigBytes(kubeletConfig)
 	if err != nil {
 		return err
 	}
-	return writeConfigBytesToDisk(kubeletBytes)
+	return writeConfigBytesToDisk(kubeletBytes, kubeletDir)
 }
 
 // CreateConfigMap creates a ConfigMap with the generic kubelet configuration.
@@ -120,7 +120,7 @@ func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Ve
 
 // DownloadConfig downloads the kubelet configuration from a ConfigMap and writes it to disk.
 // Used at "kubeadm join" time
-func DownloadConfig(kubeletKubeConfig string, kubeletVersion *version.Version) error {
+func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version, kubeletDir string) error {
 
 	// Download the ConfigMap from the cluster based on what version the kubelet is
 	configMapName := configMapName(kubeletVersion)
@@ -128,17 +128,12 @@ func DownloadConfig(kubeletKubeConfig string, kubeletVersion *version.Version) e
 	fmt.Printf("[kubelet] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
 		configMapName, metav1.NamespaceSystem)
 
-	client, err := kubeconfigutil.ClientSetFromFile(kubeletKubeConfig)
-	if err != nil {
-		return fmt.Errorf("couldn't create client from kubeconfig file %q", kubeletKubeConfig)
-	}
-
 	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	return writeConfigBytesToDisk([]byte(kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey]))
+	return writeConfigBytesToDisk([]byte(kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey]), kubeletDir)
 }
 
 // configMapName returns the right ConfigMap name for the right branch of k8s
@@ -162,11 +157,12 @@ func getConfigBytes(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration) ([
 }
 
 // writeConfigBytesToDisk writes a byte slice down to disk at the specific location of the kubelet config file
-func writeConfigBytesToDisk(b []byte) error {
-	fmt.Printf("[kubelet] Writing kubelet configuration to file %q\n", kubeadmconstants.KubeletConfigurationFile)
+func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
+	configFile := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
+	fmt.Printf("[kubelet] Writing kubelet configuration to file %q\n", configFile)
 
-	if err := ioutil.WriteFile(kubeadmconstants.KubeletConfigurationFile, b, 0644); err != nil {
-		return fmt.Errorf("failed to write kubelet configuration to the file %q: %v", kubeadmconstants.KubeletConfigurationFile, err)
+	if err := ioutil.WriteFile(configFile, b, 0644); err != nil {
+		return fmt.Errorf("failed to write kubelet configuration to the file %q: %v", configFile, err)
 	}
 	return nil
 }

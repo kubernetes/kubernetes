@@ -277,24 +277,35 @@ type Init struct {
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
 
-	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
-	// as we handle that ourselves in the markmaster phase
-	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, false); err != nil {
-		return err
-	}
-
-	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infof("Starting kubelet")
-	preflight.TryStartKubelet(i.ignorePreflightErrors)
-
 	// Get directories to write files to; can be faked if we're dry-running
 	glog.V(1).Infof("[init] Getting certificates directory from configuration")
 	realCertsDir := i.cfg.CertificatesDir
-	certsDirToWriteTo, kubeConfigDir, manifestDir, err := getDirectoriesToUse(i.dryRun, i.cfg.CertificatesDir)
+	certsDirToWriteTo, kubeConfigDir, manifestDir, kubeletDir, err := getDirectoriesToUse(i.dryRun, i.cfg.CertificatesDir)
 	if err != nil {
 		return fmt.Errorf("error getting directories to use: %v", err)
 	}
+
+	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
+	// Try to stop the kubelet service so no race conditions occur when configuring it
+	glog.V(1).Infof("Stopping the kubelet")
+	preflight.TryStopKubelet(i.ignorePreflightErrors)
+
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
+	// as we handle that ourselves in the markmaster phase
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, i.cfg.FeatureGates, false, kubeletDir); err != nil {
+		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err)
+	}
+
+	// Write the kubelet configuration file to disk.
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig, kubeletDir); err != nil {
+		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	glog.V(1).Infof("Starting the kubelet")
+	preflight.TryStartKubelet(i.ignorePreflightErrors)
+
 	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
 	i.cfg.CertificatesDir = certsDirToWriteTo
 
@@ -359,16 +370,6 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
-	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
-	if err != nil {
-		return err
-	}
-
-	// Write the kubelet configuration to disk.
-	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig); err != nil {
-		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
-	}
-
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
 	glog.V(1).Infof("creating Kubernetes client")
 	client, err := createClient(i.cfg, i.dryRun)
@@ -426,9 +427,13 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error uploading crisocket: %v", err)
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	// This feature is disabled by default, as it is alpha still
+	// This feature is disabled by default
 	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
+		if err != nil {
+			return err
+		}
+
 		// Enable dynamic kubelet configuration for the node.
 		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
 			return fmt.Errorf("error enabling dynamic kubelet configuration: %v", err)
@@ -544,17 +549,17 @@ func createClient(cfg *kubeadmapi.MasterConfiguration, dryRun bool) (clientset.I
 
 // getDirectoriesToUse returns the (in order) certificates, kubeconfig and Static Pod manifest directories, followed by a possible error
 // This behaves differently when dry-running vs the normal flow
-func getDirectoriesToUse(dryRun bool, defaultPkiDir string) (string, string, string, error) {
+func getDirectoriesToUse(dryRun bool, defaultPkiDir string) (string, string, string, string, error) {
 	if dryRun {
 		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
 		if err != nil {
-			return "", "", "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+			return "", "", "", "", fmt.Errorf("couldn't create a temporary directory: %v", err)
 		}
 		// Use the same temp dir for all
-		return dryRunDir, dryRunDir, dryRunDir, nil
+		return dryRunDir, dryRunDir, dryRunDir, dryRunDir, nil
 	}
 
-	return defaultPkiDir, kubeadmconstants.KubernetesDir, kubeadmconstants.GetStaticPodDirectory(), nil
+	return defaultPkiDir, kubeadmconstants.KubernetesDir, kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubeletRunDirectory, nil
 }
 
 // printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
@@ -569,9 +574,17 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 
 	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
 	files := []dryrunutil.FileToPrint{}
+	// Print static pod manifests
 	for _, component := range kubeadmconstants.MasterComponents {
 		realPath := kubeadmconstants.GetStaticPodFilepath(component, manifestDir)
 		outputPath := kubeadmconstants.GetStaticPodFilepath(component, kubeadmconstants.GetStaticPodDirectory())
+		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
+	}
+	// Print kubelet config manifests
+	kubeletConfigFiles := []string{kubeadmconstants.KubeletConfigurationFileName, kubeadmconstants.KubeletEnvFileName}
+	for _, filename := range kubeletConfigFiles {
+		realPath := filepath.Join(manifestDir, filename)
+		outputPath := filepath.Join(kubeadmconstants.KubeletRunDirectory, filename)
 		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
 	}
 
