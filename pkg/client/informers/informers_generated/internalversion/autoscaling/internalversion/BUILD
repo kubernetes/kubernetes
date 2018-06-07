@@ -10,7 +10,6 @@ go_library(
     srcs = [
         "horizontalpodautoscaler.go",
         "interface.go",
-        "verticalpodautoscaler.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/autoscaling/internalversion",
     deps = [
