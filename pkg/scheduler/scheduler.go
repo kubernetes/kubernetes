@@ -430,6 +430,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	}
 
 	metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
+	metrics.SchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(bindingStart))
 	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, b.Target.Name)
 	return nil
 }
@@ -462,6 +463,7 @@ func (sched *Scheduler) scheduleOne() {
 		return
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
+	metrics.SchedulingLatency.WithLabelValues(metrics.SelectingNode).Observe(metrics.SinceInSeconds(start))
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
 	assumedPod := pod.DeepCopy()

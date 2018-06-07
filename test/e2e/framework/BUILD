@@ -72,6 +72,7 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/cache:go_default_library",
+        "//pkg/scheduler/metrics:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/ssh:go_default_library",
         "//pkg/util/file:go_default_library",

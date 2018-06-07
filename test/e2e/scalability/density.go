@@ -413,8 +413,6 @@ var _ = SIGDescribe("Density", func() {
 		}
 
 		// Verify scheduler metrics.
-		// TODO: Reset metrics at the beginning of the test.
-		// We should do something similar to how we do it for APIserver.
 		latency, err := framework.VerifySchedulerLatency(c)
 		framework.ExpectNoError(err)
 		if err == nil {
@@ -469,6 +467,7 @@ var _ = SIGDescribe("Density", func() {
 
 		uuid = string(utiluuid.NewUUID())
 
+		framework.ExpectNoError(framework.ResetSchedulerMetrics(c))
 		framework.ExpectNoError(framework.ResetMetrics(c))
 		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(framework.TestContext.OutputDir+"/%s", uuid), 0777))
 
