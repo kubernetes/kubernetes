@@ -47,11 +47,14 @@ func GetCoreImage(image, repoPrefix, k8sVersion, overrideImage string) string {
 
 // GetAllImages returns a list of container images kubeadm expects to use on a control plane node
 func GetAllImages(cfg *kubeadmapi.MasterConfiguration) []string {
+	repoPrefix := cfg.GetControlPlaneImageRepository()
 	imgs := []string{}
-	imgs = append(imgs, GetCoreImage(constants.KubeAPIServer, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage))
-	imgs = append(imgs, GetCoreImage(constants.KubeControllerManager, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage))
-	imgs = append(imgs, GetCoreImage(constants.KubeScheduler, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage))
-	imgs = append(imgs, fmt.Sprintf("%v/%v-%v:%v", cfg.ImageRepository, constants.KubeProxy, runtime.GOARCH, kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)))
+	imgs = append(imgs, GetCoreImage(constants.KubeAPIServer, repoPrefix, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage))
+	imgs = append(imgs, GetCoreImage(constants.KubeControllerManager, repoPrefix, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage))
+	imgs = append(imgs, GetCoreImage(constants.KubeScheduler, repoPrefix, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage))
+	imgs = append(imgs, fmt.Sprintf("%v/%v-%v:%v", repoPrefix, constants.KubeProxy, runtime.GOARCH, kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)))
+
+	// pause, etcd and kube-dns are not available on the ci image repository so use the default image repository.
 	imgs = append(imgs, fmt.Sprintf("%v/pause-%v:%v", cfg.ImageRepository, runtime.GOARCH, "3.1"))
 
 	// if etcd is not external then add the image as it will be required
