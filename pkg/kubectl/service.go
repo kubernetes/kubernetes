@@ -210,7 +210,8 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		}
 	}
 	if len(params["external-ip"]) > 0 {
-		service.Spec.ExternalIPs = []string{params["external-ip"]}
+		// Allow for list of comma separated IPs
+		service.Spec.ExternalIPs = strings.Split(params["external-ip"], ",")
 	}
 	if len(params["type"]) != 0 {
 		service.Spec.Type = v1.ServiceType(params["type"])

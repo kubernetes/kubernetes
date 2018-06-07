@@ -159,6 +159,36 @@ func TestGenerateService(t *testing.T) {
 				"port":           "80",
 				"protocol":       "UDP",
 				"container-port": "foobar",
+				"external-ip":    "1.2.3.4,5.6.7.8",
+			},
+			expected: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: v1.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []v1.ServicePort{
+						{
+							Port:       80,
+							Protocol:   "UDP",
+							TargetPort: intstr.FromString("foobar"),
+						},
+					},
+					ExternalIPs: []string{"1.2.3.4", "5.6.7.8"},
+				},
+			},
+		},
+		{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
+				"selector":       "foo=bar,baz=blah",
+				"name":           "test",
+				"port":           "80",
+				"protocol":       "UDP",
+				"container-port": "foobar",
 				"external-ip":    "1.2.3.4",
 				"type":           "LoadBalancer",
 			},
