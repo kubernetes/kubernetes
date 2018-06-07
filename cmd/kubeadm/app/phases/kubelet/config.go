@@ -19,6 +19,7 @@ package kubelet
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"k8s.io/api/core/v1"
@@ -160,6 +161,11 @@ func getConfigBytes(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration) ([
 func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
 	configFile := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
 	fmt.Printf("[kubelet] Writing kubelet configuration to file %q\n", configFile)
+
+	// creates target folder if not already exists
+	if err := os.MkdirAll(kubeletDir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %q: %v", kubeletDir, err)
+	}
 
 	if err := ioutil.WriteFile(configFile, b, 0644); err != nil {
 		return fmt.Errorf("failed to write kubelet configuration to the file %q: %v", configFile, err)
