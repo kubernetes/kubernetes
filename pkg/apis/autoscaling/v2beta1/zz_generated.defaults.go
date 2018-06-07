@@ -55,6 +55,7 @@ func SetObjectDefaults_HorizontalPodAutoscalerList(in *v2beta1.HorizontalPodAuto
 }
 
 func SetObjectDefaults_VerticalPodAutoscaler(in *v2beta1.VerticalPodAutoscaler) {
+	SetDefaults_VerticalPodAutoscaler(in)
 	if in.Spec.ResourcePolicy != nil {
 		for i := range in.Spec.ResourcePolicy.ContainerPolicies {
 			a := &in.Spec.ResourcePolicy.ContainerPolicies[i]

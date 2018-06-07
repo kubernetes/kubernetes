@@ -23,6 +23,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
+var (
+	defaultUpdateMode           = autoscalingv2beta1.UpdateModeAuto
+	defaultContainerScalingMode = autoscalingv2beta1.ContainerScalingModeAuto
+)
+
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
@@ -43,6 +48,22 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2beta1.HorizontalPodAu
 					TargetAverageUtilization: &utilizationDefaultVal,
 				},
 			},
+		}
+	}
+}
+
+func SetDefaults_VerticalPodAutoscaler(obj *autoscalingv2beta1.VerticalPodAutoscaler) {
+	if obj.Spec.UpdatePolicy == nil {
+		obj.Spec.UpdatePolicy = &autoscalingv2beta1.PodUpdatePolicy{}
+	}
+	if obj.Spec.UpdatePolicy.UpdateMode == nil || *obj.Spec.UpdatePolicy.UpdateMode == "" {
+		obj.Spec.UpdatePolicy.UpdateMode = &defaultUpdateMode
+	}
+	if obj.Spec.ResourcePolicy != nil {
+		for i, containerPolicy := range obj.Spec.ResourcePolicy.ContainerPolicies {
+			if containerPolicy.Mode == nil || *containerPolicy.Mode == "" {
+				obj.Spec.ResourcePolicy.ContainerPolicies[i].Mode = &defaultContainerScalingMode
+			}
 		}
 	}
 }

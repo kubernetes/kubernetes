@@ -2641,6 +2641,50 @@ func TestPrintHPA(t *testing.T) {
 	}
 }
 
+func TestPrintVPA(t *testing.T) {
+	validUpdateMode := autoscaling.UpdateModeInitial
+	tests := []struct {
+		vpa      autoscaling.VerticalPodAutoscaler
+		expected string
+	}{
+		{
+			autoscaling.VerticalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-vpa-1"},
+				Spec: autoscaling.VerticalPodAutoscalerSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+					UpdatePolicy: &autoscaling.PodUpdatePolicy{
+						UpdateMode: &validUpdateMode,
+					},
+				},
+			},
+			"some-vpa-1\tfoo=baz\tInitial\t<unknown>\n",
+		},
+		{
+			autoscaling.VerticalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-vpa-2"},
+				Spec:       autoscaling.VerticalPodAutoscalerSpec{},
+			},
+			"some-vpa-2\t<unset>\t<unset>\t<unknown>\n",
+		},
+	}
+
+	buff := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.vpa, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buff.String() != test.expected {
+			t.Errorf("expected %q, got %q", test.expected, buff.String())
+		}
+
+		buff.Reset()
+	}
+}
+
 func TestPrintPodShowLabels(t *testing.T) {
 	tests := []struct {
 		pod        api.Pod

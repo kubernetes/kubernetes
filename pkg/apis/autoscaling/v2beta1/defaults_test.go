@@ -105,6 +105,88 @@ func TestSetDefaultHPA(t *testing.T) {
 	}
 }
 
+var (
+	defaultUpdateMode           = autoscalingv2beta1.UpdateModeAuto
+	defaultContainerScalingMode = autoscalingv2beta1.ContainerScalingModeAuto
+)
+
+func TestSetDefaultVPA(t *testing.T) {
+	tests := []struct {
+		name     string
+		original *autoscalingv2beta1.VerticalPodAutoscaler
+		expected *autoscalingv2beta1.VerticalPodAutoscaler
+	}{
+		{
+			name: "UpdatePolicy default value",
+			original: &autoscalingv2beta1.VerticalPodAutoscaler{
+				Spec: autoscalingv2beta1.VerticalPodAutoscalerSpec{},
+			},
+			expected: &autoscalingv2beta1.VerticalPodAutoscaler{
+				Spec: autoscalingv2beta1.VerticalPodAutoscalerSpec{
+					UpdatePolicy: &autoscalingv2beta1.PodUpdatePolicy{
+						UpdateMode: &defaultUpdateMode,
+					},
+				},
+			},
+		},
+		{
+			name: "UpdatePolicy.UpdateMode default value",
+			original: &autoscalingv2beta1.VerticalPodAutoscaler{
+				Spec: autoscalingv2beta1.VerticalPodAutoscalerSpec{
+					UpdatePolicy: &autoscalingv2beta1.PodUpdatePolicy{},
+				},
+			},
+			expected: &autoscalingv2beta1.VerticalPodAutoscaler{
+				Spec: autoscalingv2beta1.VerticalPodAutoscalerSpec{
+					UpdatePolicy: &autoscalingv2beta1.PodUpdatePolicy{
+						UpdateMode: &defaultUpdateMode,
+					},
+				},
+			},
+		},
+		{
+			name: "ContainerPolicies[].Mode default value",
+			original: &autoscalingv2beta1.VerticalPodAutoscaler{
+				Spec: autoscalingv2beta1.VerticalPodAutoscalerSpec{
+					UpdatePolicy: &autoscalingv2beta1.PodUpdatePolicy{
+						UpdateMode: &defaultUpdateMode,
+					},
+					ResourcePolicy: &autoscalingv2beta1.PodResourcePolicy{
+						ContainerPolicies: []autoscalingv2beta1.ContainerResourcePolicy{
+							{},
+						},
+					},
+				},
+			},
+			expected: &autoscalingv2beta1.VerticalPodAutoscaler{
+				Spec: autoscalingv2beta1.VerticalPodAutoscalerSpec{
+					UpdatePolicy: &autoscalingv2beta1.PodUpdatePolicy{
+						UpdateMode: &defaultUpdateMode,
+					},
+					ResourcePolicy: &autoscalingv2beta1.PodResourcePolicy{
+						ContainerPolicies: []autoscalingv2beta1.ContainerResourcePolicy{
+							{Mode: &defaultContainerScalingMode},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		original := test.original
+		expected := test.expected
+		obj2 := roundTrip(t, runtime.Object(original))
+		got, ok := obj2.(*autoscalingv2beta1.VerticalPodAutoscaler)
+		if !ok {
+			t.Fatalf("(%s) unexpected object: %v", test.name, obj2)
+		}
+		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
+			t.Errorf("(%s) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", test.name, got.Spec, expected.Spec)
+		}
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {

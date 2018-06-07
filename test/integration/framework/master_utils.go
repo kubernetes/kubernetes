@@ -247,6 +247,9 @@ func NewMasterConfig() *master.Config {
 	// we also need to set both for the storage group and for volumeattachments, separately
 	resourceEncoding.SetVersionEncoding(storage.GroupName, *testapi.Storage.GroupVersion(), schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "volumeattachments"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
+	// we also need to set both for the autoscaing group and for verticalpodautoscalers, separately
+	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, *testapi.Autoscaling.GroupVersion(), schema.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: autoscaling.GroupName, Resource: "verticalpodautoscalers"}, schema.GroupVersion{Group: autoscaling.GroupName, Version: "v2beta1"}, schema.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
 
 	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, resourceEncoding, master.DefaultAPIResourceConfigSource(), nil)
 	storageFactory.SetSerializer(

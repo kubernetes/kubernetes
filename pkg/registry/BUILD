@@ -42,6 +42,7 @@ filegroup(
         "//pkg/registry/authorization/util:all-srcs",
         "//pkg/registry/autoscaling/horizontalpodautoscaler:all-srcs",
         "//pkg/registry/autoscaling/rest:all-srcs",
+        "//pkg/registry/autoscaling/verticalpodautoscaler:all-srcs",
         "//pkg/registry/batch/cronjob:all-srcs",
         "//pkg/registry/batch/job:all-srcs",
         "//pkg/registry/batch/rest:all-srcs",

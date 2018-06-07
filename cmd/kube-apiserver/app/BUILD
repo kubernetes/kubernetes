@@ -18,6 +18,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/events:go_default_library",

@@ -46,6 +46,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
+		&VerticalPodAutoscaler{},
+		&VerticalPodAutoscalerList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

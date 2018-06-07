@@ -26,6 +26,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1945,6 +1946,133 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 			}
 			t.Logf("Description for %q:\n%s", test.name, str)
 		})
+	}
+}
+
+func TestDescribeVerticalPodAutoscaler(t *testing.T) {
+	updateMode := autoscalingv2beta1.UpdateModeAuto
+	containerScalingModeAuto := autoscalingv2beta1.ContainerScalingModeAuto
+	containerScalingModeOff := autoscalingv2beta1.ContainerScalingModeOff
+	vpa := autoscalingv2beta1.VerticalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: autoscalingv2beta1.VerticalPodAutoscalerSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+			UpdatePolicy: &autoscalingv2beta1.PodUpdatePolicy{
+				UpdateMode: &updateMode,
+			},
+			ResourcePolicy: &autoscalingv2beta1.PodResourcePolicy{
+				ContainerPolicies: []autoscalingv2beta1.ContainerResourcePolicy{
+					{
+						ContainerName: "container-A",
+						MinAllowed: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+						MaxAllowed: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("200m"),
+						},
+					}, {
+						ContainerName: "container-B",
+						Mode:          &containerScalingModeAuto,
+						MinAllowed: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100M"),
+						},
+					}, {
+						ContainerName: "container-D",
+						Mode:          &containerScalingModeOff,
+					}},
+			},
+		},
+		Status: autoscalingv2beta1.VerticalPodAutoscalerStatus{
+			Recommendation: &autoscalingv2beta1.RecommendedPodResources{
+				ContainerRecommendations: []autoscalingv2beta1.RecommendedContainerResources{
+					{
+						ContainerName: "container-B",
+						Target: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("50m"),
+							v1.ResourceMemory: resource.MustParse("150M"),
+						},
+					}, {
+						ContainerName: "container-C",
+						Target: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("60m"),
+							v1.ResourceMemory: resource.MustParse("160M"),
+						},
+					},
+				},
+			},
+			Conditions: []autoscalingv2beta1.VerticalPodAutoscalerCondition{
+				{
+					Type:    autoscalingv2beta1.RecommendationProvided,
+					Status:  v1.ConditionTrue,
+					Reason:  "some reason",
+					Message: "some message",
+				},
+			},
+		},
+	}
+
+	fake := fake.NewSimpleClientset()
+	versionedFake := versionedfake.NewSimpleClientset(&vpa)
+
+	desc := VerticalPodAutoscalerDescriber{fake, versionedFake}
+	vpaDescription, err := desc.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	t.Logf("Description for VerticalPodAutoscaler:\n%s", vpaDescription)
+
+	expectations := []struct {
+		regexp  string
+		element string
+	}{
+		{
+			regexp:  "Name:\\s+bar",
+			element: "VPA name",
+		},
+		{
+			regexp:  "Namespace:\\s+foo",
+			element: "namespace",
+		},
+		{
+			regexp:  "Selector:\\s+foo=baz",
+			element: "selector",
+		},
+		{
+			regexp:  "UpdateMode:\\s+Auto",
+			element: "update mode",
+		},
+		{
+			regexp:  "Container:\\s+container-A\\s+cpu:\\s+<no recommendation> \\(allowed range: 100m...200m\\)\\s+memory:\\s+<no recommendation>",
+			element: "container-A details",
+		},
+		{
+			regexp:  "Container:\\s+container-B\\s+cpu:\\s+50m\\s+memory:\\s+150M \\(allowed range: 100M...INF\\)",
+			element: "container-B details",
+		},
+		{
+			regexp:  "Container:\\s+container-C\\s+cpu:\\s+60m\\s+memory:\\s+160M",
+			element: "container-C details",
+		},
+		{
+			regexp:  "Container:\\s+container-D \\(autoscaling: Off\\)",
+			element: "container-D details",
+		},
+		{
+			regexp:  "RecommendationProvided\\s+True\\s+some reason\\s+some message",
+			element: "RecommendationProvided condition description",
+		},
+	}
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	} else if vpaDescription == "" {
+		t.Errorf("Unexpected empty string.  Expected VPA Describer output.")
+	} else {
+		for _, test := range expectations {
+			if matched, err := regexp.MatchString(test.regexp, vpaDescription); err != nil || !matched {
+				t.Errorf("Missing or invalid %s. Failed to match the following regexp:\n\"%s\"", test.element, test.regexp)
+			}
+		}
 	}
 }
 

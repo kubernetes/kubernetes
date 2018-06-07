@@ -332,6 +332,15 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscaler)
 	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscalerList)
 
+	verticalPodAutoscalerColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Selector", Type: "string", Description: autoscalingv2beta1.VerticalPodAutoscalerSpec{}.SwaggerDoc()["selector"]},
+		{Name: "UpdateMode", Type: "string", Description: autoscalingv2beta1.PodUpdatePolicy{}.SwaggerDoc()["updateMode"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(verticalPodAutoscalerColumnDefinitions, printVerticalPodAutoscaler)
+	h.TableHandler(verticalPodAutoscalerColumnDefinitions, printVerticalPodAutoscalerList)
+
 	configMapColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Data", Type: "string", Description: apiv1.ConfigMap{}.SwaggerDoc()["data"]},
@@ -1599,6 +1608,34 @@ func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerL
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printHorizontalPodAutoscaler(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printVerticalPodAutoscaler(obj *autoscaling.VerticalPodAutoscaler, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	selector := "<unset>"
+	if obj.Spec.Selector != nil {
+		selector = metav1.FormatLabelSelector(obj.Spec.Selector)
+	}
+	updateMode := "<unset>"
+	if obj.Spec.UpdatePolicy != nil && obj.Spec.UpdatePolicy.UpdateMode != nil {
+		updateMode = string(*obj.Spec.UpdatePolicy.UpdateMode)
+	}
+	row.Cells = append(row.Cells, obj.Name, selector, updateMode, translateTimestamp(obj.CreationTimestamp))
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printVerticalPodAutoscalerList(list *autoscaling.VerticalPodAutoscalerList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printVerticalPodAutoscaler(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
