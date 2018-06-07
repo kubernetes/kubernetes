@@ -148,6 +148,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				gvk:       kind,
 			}
 			gb.graphChanges.Add(event)
+			glog.V(4).Infof(">>> Graph change length after adding add event: %v", gb.graphChanges.Len())
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			// TODO: check if there are differences in the ownerRefs,
@@ -173,25 +174,18 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 			added, removed, changed := referencesDiffs(oldAccessor.GetOwnerReferences(), newAccessor.GetOwnerReferences())
 			if deletionStarts(oldObj, newAccessor) {
 				glog.V(4).Infof(">>> change start deletion")
-				gb.graphChanges.Add(event)
-				return
 			}
 			if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
 				glog.V(4).Infof(">>> change ownerRef")
-				gb.graphChanges.Add(event)
-				return
 			}
 			if !hasDeleteDependentsFinalizer(oldAccessor) && hasDeleteDependentsFinalizer(newAccessor) {
 				glog.V(4).Infof(">>> change deleteDependentsFinalizer")
-				gb.graphChanges.Add(event)
-				return
 			}
 			if !hasOrphanFinalizer(oldAccessor) && hasOrphanFinalizer(newAccessor) {
 				glog.V(4).Infof(">>> change orphanFinalizer")
-				gb.graphChanges.Add(event)
-				return
 			}
-
+			gb.graphChanges.Add(event)
+			glog.V(4).Infof(">>> Graph change length after adding update event: %v", gb.graphChanges.Len())
 		},
 		DeleteFunc: func(obj interface{}) {
 			// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
@@ -210,6 +204,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 				glog.V(4).Infof("garbage collector informer for resource %q, kind %q: adding Delete event for object: Name %q, Namespace %q, UID %q", resource.String(), kind.String(), accessor.GetName(), accessor.GetNamespace(), accessor.GetUID())
 			}
 			gb.graphChanges.Add(event)
+			glog.V(4).Infof(">>> Graph change length after adding delete event: %v", gb.graphChanges.Len())
 		},
 	}
 	shared, err := gb.sharedInformers.ForResource(resource)
@@ -405,6 +400,7 @@ func (gb *GraphBuilder) enqueueVirtualDeleteEvent(ref objectReference) {
 			ObjectMeta: metav1.ObjectMeta{Namespace: ref.Namespace, UID: ref.UID, Name: ref.Name},
 		},
 	})
+	glog.V(4).Infof(">>> Graph change length after adding virtual delete event: %v", gb.graphChanges.Len())
 }
 
 // addDependentToOwners adds n to owners' dependents list. If the owner does not
@@ -624,6 +620,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		return true
 	}
 	glog.V(4).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
+	glog.V(4).Infof(">>> Graph change length when processing graphChanges queue: %v", gb.graphChanges.Len())
 	// Check if the node already exsits
 	existingNode, found := gb.uidToNode.Read(accessor.GetUID())
 	if found {
