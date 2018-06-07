@@ -179,7 +179,9 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 		case statInfo.Mode().IsRegular():
 			pod, err := s.extractFromFile(path)
 			if err != nil {
-				glog.Errorf("Can't process manifest file %q: %v", path, err)
+				if !os.IsNotExist(err) {
+					glog.Errorf("Can't process manifest file %q: %v", path, err)
+				}
 			} else {
 				pods = append(pods, pod)
 			}
