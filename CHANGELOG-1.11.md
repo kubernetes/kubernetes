@@ -1,30 +1,178 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [v1.11.0-beta.1](#v1110-beta1)
-  - [Downloads for v1.11.0-beta.1](#downloads-for-v1110-beta1)
+- [v1.11.0-beta.2](#v1110-beta2)
+  - [Downloads for v1.11.0-beta.2](#downloads-for-v1110-beta2)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
-  - [Changelog since v1.11.0-alpha.2](#changelog-since-v1110-alpha2)
+  - [Changelog since v1.11.0-beta.1](#changelog-since-v1110-beta1)
     - [Action Required](#action-required)
     - [Other notable changes](#other-notable-changes)
-- [v1.11.0-alpha.2](#v1110-alpha2)
-  - [Downloads for v1.11.0-alpha.2](#downloads-for-v1110-alpha2)
+- [v1.11.0-beta.1](#v1110-beta1)
+  - [Downloads for v1.11.0-beta.1](#downloads-for-v1110-beta1)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
     - [Node Binaries](#node-binaries-1)
-  - [Changelog since v1.11.0-alpha.1](#changelog-since-v1110-alpha1)
+  - [Changelog since v1.11.0-alpha.2](#changelog-since-v1110-alpha2)
+    - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-1)
-- [v1.11.0-alpha.1](#v1110-alpha1)
-  - [Downloads for v1.11.0-alpha.1](#downloads-for-v1110-alpha1)
+- [v1.11.0-alpha.2](#v1110-alpha2)
+  - [Downloads for v1.11.0-alpha.2](#downloads-for-v1110-alpha2)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
     - [Node Binaries](#node-binaries-2)
-  - [Changelog since v1.10.0](#changelog-since-v1100)
-    - [Action Required](#action-required-1)
+  - [Changelog since v1.11.0-alpha.1](#changelog-since-v1110-alpha1)
     - [Other notable changes](#other-notable-changes-2)
+- [v1.11.0-alpha.1](#v1110-alpha1)
+  - [Downloads for v1.11.0-alpha.1](#downloads-for-v1110-alpha1)
+    - [Client Binaries](#client-binaries-3)
+    - [Server Binaries](#server-binaries-3)
+    - [Node Binaries](#node-binaries-3)
+  - [Changelog since v1.10.0](#changelog-since-v1100)
+    - [Action Required](#action-required-2)
+    - [Other notable changes](#other-notable-changes-3)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.11.0-beta.2
+
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+
+## Downloads for v1.11.0-beta.2
+
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes.tar.gz) | `0addbff3fc61047460da0fca7413f4cc679fac7482c3f09aa4f4a60d8ec8dd5c`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-src.tar.gz) | `943629abc5b046cc5db280417e5cf3a8342c5f67c8deb3d7283b02de67b3a3c3`
+
+### Client Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-darwin-386.tar.gz) | `9b714bb99e9d8c51c718d9ec719412b2006c921e6a5566acf387797b57014386`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-darwin-amd64.tar.gz) | `11fc9f94c82b2adc860964be8e84ed1e17ae711329cac3c7aff58067caeeffe2`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-linux-386.tar.gz) | `016abd161dc394ab6e1e8f57066ff413b523c71ac2af458bfc8dfa2107530910`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-linux-amd64.tar.gz) | `f98c223c24680aae583ff63fa8e1ef49421ddd660bd748fea493841c24ad6417`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-linux-arm.tar.gz) | `78cf5dca303314023d6f82c7570e92b814304029fb7d3941d7c04855679e120d`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-linux-arm64.tar.gz) | `c35e03687d491d9ca955121912c56d00741c86381370ed5890b0ee8b629a3e01`
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-linux-ppc64le.tar.gz) | `4e848a58f822f971dbda607d26128d1b718fc07665d2f65b87936eec40b037b2`
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-linux-s390x.tar.gz) | `ead83a70e4782efdaea3645ca2a59e51209041ce41f9d805d5c1d10f029b1cb0`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-windows-386.tar.gz) | `c357b28c83e769517d7b19e357260d62485e861005d98f84c752d109fa48bd20`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-client-windows-amd64.tar.gz) | `2ae78921a35a8a582b226521f904f0840c17e3e097364d6a3fcd10d196bec0dc`
+
+### Server Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-server-linux-amd64.tar.gz) | `26bd6e05a4bf942534f0578b1cdbd11b8c868aa3331e2681734ecc93d75f6b85`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-server-linux-arm.tar.gz) | `df706ccad0a235613e644eda363c49bfb858860a2ae5219b17b996f36669a7fc`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-server-linux-arm64.tar.gz) | `73f3e7a82d7c78a9f03ce0c84ae4904942f0bf88b3bf045fc9b1707b686cb04e`
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-server-linux-ppc64le.tar.gz) | `ebeb67e45e630469d55b442d2c6092065f1c1403d1965c4340d0b6c1fa7f6676`
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-server-linux-s390x.tar.gz) | `c82e6a41b8e451600fb5bfdad3addf3c35b5edb518a7bf9ebd03af0574d57975`
+
+### Node Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-node-linux-amd64.tar.gz) | `e6dbd56c10fee83f400e76ae02325eda0a583347f6b965eeb610c90d664d7990`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-node-linux-arm.tar.gz) | `df9d18c3af4d6ee237a238b3029823f6e90b2ae3f0d25b741d4b3fedb7ea14f8`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-node-linux-arm64.tar.gz) | `d84e98702651615336256d3453516df9ad39f39400f6091d9e2b4c95b4111ede`
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-node-linux-ppc64le.tar.gz) | `a62037f00ab29302f72aa23116c304b676cc41a6f47f79a2faf4e4ea18059178`
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-node-linux-s390x.tar.gz) | `bef66f2080f7ebf442234d841ec9c994089fa02b400d98e1b01021f1f66c4cd0`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.11.0-beta.2/kubernetes-node-windows-amd64.tar.gz) | `2b029715b98c3355a172ed5a6e08e73ad4ef264c74a26ed5a3da67f90764b7dc`
+
+## Changelog since v1.11.0-beta.1
+
+### Action Required
+
+* [action required] TODO ([#64792](https://github.com/kubernetes/kubernetes/pull/64792), [@luxas](https://github.com/luxas))
+* [action required] The structure of the kubelet dropin in the kubeadm deb package has changed significantly. ([#64780](https://github.com/kubernetes/kubernetes/pull/64780), [@luxas](https://github.com/luxas))
+    * Instead of hard-coding the parameters for the kubelet in the dropin, a structured configuration file
+    * for the kubelet is used, and is expected to be present in `/var/lib/kubelet/config.yaml`.
+    * For runtime-detected, instance-specific configuration values, a environment file with
+    * dynamically-generated flags at `kubeadm init` or `kubeadm join` run time is used.
+    * Finally, if the user wants to override something specific for the kubelet that can't be done via
+    * the kubeadm Configuration file (which is preferred), they might add flags to the 
+    * `KUBELET_EXTRA_ARGS` environment variable in either `/etc/default/kubelet`
+    * or `/etc/sysconfig/kubelet`, depending on the system you're running on.
+* [action required] The `--node-name` flag for kubeadm now dictates the Node API object name the ([#64706](https://github.com/kubernetes/kubernetes/pull/64706), [@liztio](https://github.com/liztio))
+    * kubelet uses for registration, in all cases but where you might use an in-tree cloud provider.
+    * If you're not using an in-tree cloud provider, `--node-name` will set the Node API object name.
+    * If you're using an in-tree cloud provider, you MUST make `--node-name` match the name the
+    * in-tree cloud provider decides to use.
+* [action required] kubeadm: The Token-related fields in the `MasterConfiguration` object have now been refactored. Instead of the top-level `.Token`, `.TokenTTL`, `.TokenUsages`, `.TokenGroups` fields, there is now a `BootstrapTokens` slice of `BootstrapToken` objects that support the same features under the `.Token`, `.TTL`, `.Usages`, `.Groups` fields. ([#64408](https://github.com/kubernetes/kubernetes/pull/64408), [@luxas](https://github.com/luxas))
+
+### Other notable changes
+
+* Add Vertical Pod Autoscaler to autoscaling/v2beta1 ([#63797](https://github.com/kubernetes/kubernetes/pull/63797), [@kgrygiel](https://github.com/kgrygiel))
+* kubeadm: only run kube-proxy on architecture consistent nodes ([#64696](https://github.com/kubernetes/kubernetes/pull/64696), [@dixudx](https://github.com/dixudx))
+* kubeadm: Add a new `kubeadm upgrade node config` command ([#64624](https://github.com/kubernetes/kubernetes/pull/64624), [@luxas](https://github.com/luxas))
+* Orphan delete is now supported for custom resources ([#63386](https://github.com/kubernetes/kubernetes/pull/63386), [@roycaihw](https://github.com/roycaihw))
+* Update version of Istio addon from 0.6.0 to 0.8.0. ([#64537](https://github.com/kubernetes/kubernetes/pull/64537), [@ostromart](https://github.com/ostromart))
+    * See https://istio.io/about/notes/0.8.html for full Isto release notes.
+* Provides API support for external CSI storage drivers to support block volumes. ([#64723](https://github.com/kubernetes/kubernetes/pull/64723), [@vladimirvivien](https://github.com/vladimirvivien))
+* kubectl will list all allowed print formats when an invalid format is passed. ([#64371](https://github.com/kubernetes/kubernetes/pull/64371), [@CaoShuFeng](https://github.com/CaoShuFeng))
+* Use IONice to reduce IO priority of du and find ([#64800](https://github.com/kubernetes/kubernetes/pull/64800), [@dashpole](https://github.com/dashpole))
+    * cAdvisor ContainerReference no longer contains Labels. Use ContainerSpec instead.
+    * Fix a bug where cadvisor failed to discover a sub-cgroup that was created soon after the parent cgroup.
+* Kubelet will set extended resource capacity to zero after it restarts. If the extended resource is exported by a device plugin, its capacity will change to a valid value after the device plugin re-connects with the Kubelet. If the extended resource is exported by an external component through direct node status capacity patching, the component should repatch the field after kubelet becomes ready again. During the time gap, pods previously assigned with such resources may fail kubelet admission but their controller should create new pods in response to such failures. ([#64784](https://github.com/kubernetes/kubernetes/pull/64784), [@jiayingz](https://github.com/jiayingz))
+* Introduce ContainersReady condition in Pod Status ([#64646](https://github.com/kubernetes/kubernetes/pull/64646), [@freehan](https://github.com/freehan))
+* The Sysctls experimental feature has been promoted to beta (enabled by default via the `Sysctls` feature flag). PodSecurityPolicy and Pod objects now have fields for specifying and controlling sysctls. Alpha sysctl annotations will be ignored by 1.11+ kubelets. All alpha sysctl annotations in existing deployments must be converted to API fields to be effective. ([#63717](https://github.com/kubernetes/kubernetes/pull/63717), [@ingvagabund](https://github.com/ingvagabund))
+* kubeadm now configures the etcd liveness probe correctly when etcd is listening on all interfaces ([#64670](https://github.com/kubernetes/kubernetes/pull/64670), [@stealthybox](https://github.com/stealthybox))
+* Fix regression in `v1.JobSpec.backoffLimit` that caused failed Jobs to be restarted indefinitely. ([#63650](https://github.com/kubernetes/kubernetes/pull/63650), [@soltysh](https://github.com/soltysh))
+* GCE: Update cloud provider to use TPU v1 API ([#64727](https://github.com/kubernetes/kubernetes/pull/64727), [@yguo0905](https://github.com/yguo0905))
+* Kubelet: Add security context for Windows containers ([#64009](https://github.com/kubernetes/kubernetes/pull/64009), [@feiskyer](https://github.com/feiskyer))
+* Volume topology aware dynamic provisioning ([#63193](https://github.com/kubernetes/kubernetes/pull/63193), [@lichuqiang](https://github.com/lichuqiang))
+* CoreDNS deployment configuration now uses k8s.gcr.io imageRepository ([#64775](https://github.com/kubernetes/kubernetes/pull/64775), [@rajansandeep](https://github.com/rajansandeep))
+* Updated Container Storage Interface specification version to v0.3.0 ([#64719](https://github.com/kubernetes/kubernetes/pull/64719), [@davidz627](https://github.com/davidz627))
+* Kubeadm: Make CoreDNS run in read-only mode and drop all unneeded privileges  ([#64473](https://github.com/kubernetes/kubernetes/pull/64473), [@nberlee](https://github.com/nberlee))
+* Add a volume projection that is able to project service account tokens. ([#62005](https://github.com/kubernetes/kubernetes/pull/62005), [@mikedanese](https://github.com/mikedanese))
+* Fix kubectl auth can-i exit code. It will return 1 if the user is not allowed and 0 if it's allowed. ([#59579](https://github.com/kubernetes/kubernetes/pull/59579), [@fbac](https://github.com/fbac))
+* apply global flag "context" for kubectl config view --minify ([#64608](https://github.com/kubernetes/kubernetes/pull/64608), [@dixudx](https://github.com/dixudx))
+* Fix kube-controller-manager panic while provisioning Azure security group rules ([#64739](https://github.com/kubernetes/kubernetes/pull/64739), [@feiskyer](https://github.com/feiskyer))
+* API change for volume topology aware dynamic provisioning ([#63233](https://github.com/kubernetes/kubernetes/pull/63233), [@lichuqiang](https://github.com/lichuqiang))
+* Add azuredisk PV size grow feature ([#64386](https://github.com/kubernetes/kubernetes/pull/64386), [@andyzhangx](https://github.com/andyzhangx))
+* Modify e2e tests to use priorityClass beta version & switch priorityClass feature to beta ([#63724](https://github.com/kubernetes/kubernetes/pull/63724), [@ravisantoshgudimetla](https://github.com/ravisantoshgudimetla))
+* Adding CSI driver registration code. ([#64560](https://github.com/kubernetes/kubernetes/pull/64560), [@sbezverk](https://github.com/sbezverk))
+* fixes a potential deadlock in the garbage collection controller ([#64235](https://github.com/kubernetes/kubernetes/pull/64235), [@liggitt](https://github.com/liggitt))
+* Fixes issue for readOnly subpath mounts for SELinux systems and when the volume mountPath already existed in the container image. ([#64351](https://github.com/kubernetes/kubernetes/pull/64351), [@msau42](https://github.com/msau42))
+* Add log and fs stats for Windows containers ([#62266](https://github.com/kubernetes/kubernetes/pull/62266), [@feiskyer](https://github.com/feiskyer))
+* client-go: credential exec plugins have been promoted to beta ([#64482](https://github.com/kubernetes/kubernetes/pull/64482), [@ericchiang](https://github.com/ericchiang))
+* Revert [#64364](https://github.com/kubernetes/kubernetes/pull/64364) to resurrect rescheduler. More info https://github.com/kubernetes/kubernetes/issues/64725 :) ([#64592](https://github.com/kubernetes/kubernetes/pull/64592), [@ravisantoshgudimetla](https://github.com/ravisantoshgudimetla))
+* Add RequestedToCapacityRatioPriority priority function. Function is parametrized with set of points mapping node utilization (0-100) to score (0-10). ([#63929](https://github.com/kubernetes/kubernetes/pull/63929), [@losipiuk](https://github.com/losipiuk))
+    * Function is linear between points. Resource utilization is defined as one minus ratio of total amount of resource requested by pods on node and node's capacity (scaled to 100). 
+    * Final utilization used for computation is arithmetic mean of cpu utilization and memory utilization.
+    * Function is disabled by default and can be enabled via scheduler policy config file.
+    * If no parametrization is specified in config file it defaults to one which gives score 10 to utilization 0 and score 0 to utilization 100.
+* `kubeadm init` detects if systemd-resolved is running and configures the kubelet to use a working resolv.conf. ([#64665](https://github.com/kubernetes/kubernetes/pull/64665), [@stealthybox](https://github.com/stealthybox))
+* fix data loss issue if using existing azure disk with partitions in disk mount  ([#63270](https://github.com/kubernetes/kubernetes/pull/63270), [@andyzhangx](https://github.com/andyzhangx))
+* Meta data of CustomResources is now pruned and schema checked during deserialization of requests and when read from etcd. In the former case, invalid meta data is rejected, in the later it is dropped from the CustomResource objects. ([#64267](https://github.com/kubernetes/kubernetes/pull/64267), [@sttts](https://github.com/sttts))
+* Add Alpha support for dynamic volume limits based on node type ([#64154](https://github.com/kubernetes/kubernetes/pull/64154), [@gnufied](https://github.com/gnufied))
+* Fixed CSI gRPC connection leak during volume operations. ([#64519](https://github.com/kubernetes/kubernetes/pull/64519), [@vladimirvivien](https://github.com/vladimirvivien))
+* in-tree support for openstack credentials is now deprecated. please use the "client-keystone-auth" from the cloud-provider-openstack repository. details on how to use this new capability is documented here - https://github.com/kubernetes/cloud-provider-openstack/blob/master/docs/using-client-keystone-auth.md ([#64346](https://github.com/kubernetes/kubernetes/pull/64346), [@dims](https://github.com/dims))
+* `ScheduleDaemonSetPods` is an alpha feature (since v1.11) that causes DaemonSet Pods ([#63223](https://github.com/kubernetes/kubernetes/pull/63223), [@k82cn](https://github.com/k82cn))
+    * to be scheduler by default scheduler, instead of Daemonset controller. When it is enabled,
+    * the `NodeAffinity` term (instead of `.spec.nodeName`) is added to the DaemonSet Pods;
+    * this enables the default scheduler to bind the Pod to the target host. If node affinity
+    * of DaemonSet Pod already exists, it will be replaced.
+    * DaemonSet controller will only perform these operations when creating DaemonSet Pods;
+    * and those operations will only modify the Pods of DaemonSet, no changes are made to the
+    * `.spec.template` of DaemonSet.
+* fix formatAndMount func issue on Windows ([#63248](https://github.com/kubernetes/kubernetes/pull/63248), [@andyzhangx](https://github.com/andyzhangx))
+* AWS EBS, Azure Disk, GCE PD and Ceph RBD volume plugins support dynamic provisioning of raw block volumes. ([#64447](https://github.com/kubernetes/kubernetes/pull/64447), [@jsafrane](https://github.com/jsafrane))
+* kubeadm upgrade apply can now ignore version errors with --force ([#64570](https://github.com/kubernetes/kubernetes/pull/64570), [@liztio](https://github.com/liztio))
+* Adds feature gate for plugin watcher ([#64605](https://github.com/kubernetes/kubernetes/pull/64605), [@vikaschoudhary16](https://github.com/vikaschoudhary16))
+* Kubelet now proxies container streaming between apiserver and container runtime. The connection between kubelet and apiserver is authenticated. Container runtime should change streaming server to serve on localhost, to make the connection between kubelet and container runtime local. ([#64006](https://github.com/kubernetes/kubernetes/pull/64006), [@Random-Liu](https://github.com/Random-Liu))
+    * In this way, the whole container streaming connection is secure. To switch back to the old behavior, set `--redirect-container-streaming=true` flag.
+* TokenRequests now are required to have an expiration duration between 10 minutes and 2^32 seconds. ([#63999](https://github.com/kubernetes/kubernetes/pull/63999), [@mikedanese](https://github.com/mikedanese))
+* Expose `/debug/flags/v` to allow dynamically set glog logging level, if want to change glog level to 3, you only have to send a PUT request with like `curl -X PUT http://127.0.0.1:8080/debug/flags/v -d "3"`. ([#63777](https://github.com/kubernetes/kubernetes/pull/63777), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
+* New conformance test added for Watch. ([#61424](https://github.com/kubernetes/kubernetes/pull/61424), [@jennybuckley](https://github.com/jennybuckley))
+* The GitRepo volume type is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container. ([#63445](https://github.com/kubernetes/kubernetes/pull/63445), [@ericchiang](https://github.com/ericchiang))
+* kubeadm now preserves previous manifests after upgrades ([#64337](https://github.com/kubernetes/kubernetes/pull/64337), [@liztio](https://github.com/liztio))
+* Implement kubelet side online file system resizing ([#62460](https://github.com/kubernetes/kubernetes/pull/62460), [@mlmhl](https://github.com/mlmhl))
+
 
 
 # v1.11.0-beta.1
