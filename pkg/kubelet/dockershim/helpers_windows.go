@@ -148,7 +148,11 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 					return containerIP
 				}
 			} else {
-				// Do not return any IP, so that we would continue and get the IP of the Sandbox
+				// Do not return any IP, so that we would continue and get the IP of the Sandbox.
+				// Windows 1709 and 1803 doesn't have the Namespace support, so getIP() is called
+				// to replicate the DNS registry key to the Workload container (IP/Gateway/MAC is
+				// set separately than DNS).
+				// TODO(feiskyer): remove this workaround after Namespace is supported in Windows RS5.
 				ds.getIP(sandboxID, r)
 			}
 		} else {
