@@ -19,7 +19,6 @@ package app
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -52,7 +51,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
@@ -223,23 +221,11 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 	return handler
 }
 
-func installMetricHandler(pathRecorderMux *mux.PathRecorderMux) {
-	configz.InstallHandler(pathRecorderMux)
-	defaultMetricsHandler := prometheus.Handler().ServeHTTP
-	pathRecorderMux.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == "DELETE" {
-			metrics.Reset()
-			io.WriteString(w, "metrics reset\n")
-			return
-		}
-		defaultMetricsHandler(w, req)
-	})
-}
-
 // newMetricsHandler builds a metrics server from the config.
 func newMetricsHandler(config *componentconfig.KubeSchedulerConfiguration) http.Handler {
 	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
-	installMetricHandler(pathRecorderMux)
+	configz.InstallHandler(pathRecorderMux)
+	pathRecorderMux.Handle("/metrics", prometheus.Handler())
 	if config.EnableProfiling {
 		routes.Profiling{}.Install(pathRecorderMux)
 		if config.EnableContentionProfiling {
@@ -256,7 +242,8 @@ func newHealthzHandler(config *componentconfig.KubeSchedulerConfiguration, separ
 	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
 	healthz.InstallHandler(pathRecorderMux)
 	if !separateMetrics {
-		installMetricHandler(pathRecorderMux)
+		configz.InstallHandler(pathRecorderMux)
+		pathRecorderMux.Handle("/metrics", prometheus.Handler())
 	}
 	if config.EnableProfiling {
 		routes.Profiling{}.Install(pathRecorderMux)
