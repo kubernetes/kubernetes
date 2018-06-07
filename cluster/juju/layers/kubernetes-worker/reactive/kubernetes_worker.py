@@ -632,6 +632,10 @@ def configure_kubelet(dns, ingress_ip):
         cloud_config_path = _cloud_config_path('kubelet')
         kubelet_opts['cloud-provider'] = 'gce'
         kubelet_opts['cloud-config'] = str(cloud_config_path)
+    elif is_state('endpoint.openstack.ready'):
+        cloud_config_path = _cloud_config_path('kubelet')
+        kubelet_opts['cloud-provider'] = 'openstack'
+        kubelet_opts['cloud-config'] = str(cloud_config_path)
 
     configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
 
@@ -1040,7 +1044,9 @@ def get_node_name():
     if is_state('endpoint.aws.ready'):
         cloud_provider = 'aws'
     elif is_state('endpoint.gcp.ready'):
-        cloud_provider = 'gcp'
+        cloud_provider = 'gce'
+    elif is_state('endpoint.openstack.ready'):
+        cloud_provider = 'openstack'
     if cloud_provider == 'aws':
         return getfqdn()
     else:
@@ -1122,11 +1128,14 @@ def clear_requested_integration():
 
 
 @when_any('endpoint.aws.ready',
-          'endpoint.gcp.ready')
+          'endpoint.gcp.ready',
+          'endpoint.openstack.ready')
 @when_not('kubernetes-worker.restarted-for-cloud')
 def restart_for_cloud():
     if is_state('endpoint.gcp.ready'):
         _write_gcp_snap_config('kubelet')
+    elif is_state('endpoint.openstack.ready'):
+        _write_openstack_snap_config('kubelet')
     set_state('kubernetes-worker.restarted-for-cloud')
     set_state('kubernetes-worker.restart-needed')
 
@@ -1174,6 +1183,21 @@ def _write_gcp_snap_config(component):
         daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
         daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
         daemon_env_path.write_text(daemon_env)
+
+
+def _write_openstack_snap_config(component):
+    # openstack requires additional credentials setup
+    openstack = endpoint_from_flag('endpoint.openstack.ready')
+
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text('\n'.join([
+        '[Global]',
+        'auth-url = {}'.format(openstack.auth_url),
+        'username = {}'.format(openstack.username),
+        'password = {}'.format(openstack.password),
+        'tenant-name = {}'.format(openstack.project_name),
+        'domain-name = {}'.format(openstack.user_domain_name),
+    ]))
 
 
 def get_first_mount(mount_relation):

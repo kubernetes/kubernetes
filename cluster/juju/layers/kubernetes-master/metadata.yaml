@@ -41,9 +41,11 @@ requires:
   ceph-storage:
     interface: ceph-admin
   aws:
-    interface: aws
+    interface: aws-integration
   gcp:
-    interface: gcp
+    interface: gcp-integration
+  openstack:
+    interface: openstack-integration
 resources:
   kubectl:
     type: file
