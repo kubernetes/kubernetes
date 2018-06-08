@@ -227,6 +227,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 			By("Schedule a pod which requires GPU")
 			framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "gpu-pod-rc")
 
 			framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 				func(size int) bool { return size == nodeCount+1 }, scaleUpTimeout))
@@ -244,6 +245,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 			By("Schedule a single pod which requires GPU")
 			framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "gpu-pod-rc")
 
 			By("Enable autoscaler")
 			framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 2))
@@ -294,6 +296,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 			By("Schedule a single pod which requires GPU")
 			framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "gpu-pod-rc")
 
 			By("Enable autoscaler")
 			framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 1))
