@@ -37,12 +37,23 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-const (
-	csiHostPathPluginImage      string = "quay.io/k8scsi/hostpathplugin:v0.2.0"
-	csiExternalAttacherImage    string = "quay.io/k8scsi/csi-attacher:v0.2.0"
-	csiExternalProvisionerImage string = "quay.io/k8scsi/csi-provisioner:v0.2.1"
-	csiDriverRegistrarImage     string = "quay.io/k8scsi/driver-registrar:v0.2.0"
-)
+var csiImageVersions = map[string]string{
+	"hostpathplugin":   "v0.2.0",
+	"csi-attacher":     "v0.2.0",
+	"csi-provisioner":  "v0.2.1",
+	"driver-registrar": "v0.2.0",
+}
+
+func csiContainerImage(image string) string {
+	var fullName string
+	fullName += framework.TestContext.CSIImageRegistry + "/" + image + ":"
+	if framework.TestContext.CSIImageVersion != "" {
+		fullName += framework.TestContext.CSIImageVersion
+	} else {
+		fullName += csiImageVersions[image]
+	}
+	return fullName
+}
 
 // Create the driver registrar cluster role if it doesn't exist, no teardown so that tests
 // are parallelizable. This role will be shared with many of the CSI tests.
@@ -207,7 +218,7 @@ func csiHostPathPod(
 			Containers: []v1.Container{
 				{
 					Name:            "external-provisioner",
-					Image:           csiExternalProvisionerImage,
+					Image:           csiContainerImage("csi-provisioner"),
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -223,7 +234,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "driver-registrar",
-					Image:           csiDriverRegistrarImage,
+					Image:           csiContainerImage("driver-registrar"),
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -248,7 +259,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "external-attacher",
-					Image:           csiExternalAttacherImage,
+					Image:           csiContainerImage("csi-attacher"),
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -269,7 +280,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "hostpath-driver",
-					Image:           csiHostPathPluginImage,
+					Image:           csiContainerImage("hostpathplugin"),
 					ImagePullPolicy: v1.PullAlways,
 					SecurityContext: &v1.SecurityContext{
 						Privileged: &priv,
