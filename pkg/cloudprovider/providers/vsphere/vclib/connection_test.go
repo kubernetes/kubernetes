@@ -18,20 +18,29 @@ package vclib_test
 
 import (
 	"context"
+	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/fixtures"
 )
 
-func createTestServer(t *testing.T, caCertPath, serverCertPath, serverKeyPath string, handler http.HandlerFunc) *httptest.Server {
+func createTestServer(
+	t *testing.T,
+	caCertPath string,
+	serverCertPath string,
+	serverKeyPath string,
+	handler http.HandlerFunc,
+) (*httptest.Server, string) {
 	caCertPEM, err := ioutil.ReadFile(caCertPath)
 	if err != nil {
 		t.Fatalf("Could not read ca cert from file")
@@ -55,18 +64,18 @@ func createTestServer(t *testing.T, caCertPath, serverCertPath, serverKeyPath st
 		RootCAs: certPool,
 	}
 
-	// // calculate the leaf certificate's fingerprint
-	// x509LeafCert := server.TLS.Certificates[0].Certificate[0]
-	// tpBytes := sha1.Sum(x509LeafCert)
-	// tpString := fmt.Sprintf("%x", tpBytes)
+	// calculate the leaf certificate's fingerprint
+	x509LeafCert := server.TLS.Certificates[0].Certificate[0]
+	tpBytes := sha1.Sum(x509LeafCert)
+	tpString := fmt.Sprintf("%x", tpBytes)
 
-	return server
+	return server, tpString
 }
 
 func TestWithValidCaCert(t *testing.T) {
-	handler, verify := getRequestVerifier(t)
+	handler, verifyConnectionWasMade := getRequestVerifier(t)
 
-	server := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
 	server.StartTLS()
 	u := mustParseUrl(t, server.URL)
 
@@ -79,27 +88,88 @@ func TestWithValidCaCert(t *testing.T) {
 	// Ignoring error here, because we only care about the TLS connection
 	connection.NewClient(context.Background())
 
-	verify()
+	verifyConnectionWasMade()
 }
 
-// func TestWithValidThumbprint(t *testing.T) {
-// 	handler, verify := getRequestVerifier(t)
-//
-// 	server, serverThumbprint := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
-// 	server.StartTLS()
-// 	u := mustParseUrl(t, server.URL)
-//
-// 	connection := &vclib.VSphereConnection{
-// 		Hostname:   u.Hostname(),
-// 		Port:       u.Port(),
-// 		Thumbprint: serverThumbprint,
-// 	}
-//
-// 	// Ignoring error here, because we only care about the TLS connection
-// 	connection.NewClient(context.Background())
-//
-// 	verify()
-// }
+func TestWithVerificationWithWrongThumbprint(t *testing.T) {
+	handler, _ := getRequestVerifier(t)
+
+	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+	server.StartTLS()
+	u := mustParseUrl(t, server.URL)
+
+	connection := &vclib.VSphereConnection{
+		Hostname:   u.Hostname(),
+		Port:       u.Port(),
+		Thumbprint: "obviously wrong",
+	}
+
+	_, err := connection.NewClient(context.Background())
+
+	if msg := err.Error(); !strings.Contains(msg, "thumbprint does not match") {
+		t.Fatalf("Expected wrong thumbprint error, got '%s'", msg)
+	}
+}
+
+func TestWithVerificationWithoutCaCertOrThumbprint(t *testing.T) {
+	handler, _ := getRequestVerifier(t)
+
+	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+	server.StartTLS()
+	u := mustParseUrl(t, server.URL)
+
+	connection := &vclib.VSphereConnection{
+		Hostname: u.Hostname(),
+		Port:     u.Port(),
+	}
+
+	_, err := connection.NewClient(context.Background())
+
+	verifyWrappedX509UnkownAuthorityErr(t, err)
+}
+
+func TestWithValidThumbprint(t *testing.T) {
+	handler, verifyConnectionWasMade := getRequestVerifier(t)
+
+	server, thumbprint :=
+		createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+	server.StartTLS()
+	u := mustParseUrl(t, server.URL)
+
+	connection := &vclib.VSphereConnection{
+		Hostname:   u.Hostname(),
+		Port:       u.Port(),
+		Thumbprint: thumbprint,
+	}
+
+	// Ignoring error here, because we only care about the TLS connection
+	connection.NewClient(context.Background())
+
+	verifyConnectionWasMade()
+}
+
+func TestWithValidThumbprintAlternativeFormat(t *testing.T) {
+	handler, verifyConnectionWasMade := getRequestVerifier(t)
+
+	server, thumbprint :=
+		createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+	server.StartTLS()
+	u := mustParseUrl(t, server.URL)
+
+	// lowercase, remove the ':'
+	tpDifferentFormat := strings.Replace(strings.ToLower(thumbprint), ":", "", -1)
+
+	connection := &vclib.VSphereConnection{
+		Hostname:   u.Hostname(),
+		Port:       u.Port(),
+		Thumbprint: tpDifferentFormat,
+	}
+
+	// Ignoring error here, because we only care about the TLS connection
+	connection.NewClient(context.Background())
+
+	verifyConnectionWasMade()
+}
 
 func TestWithInvalidCaCertPath(t *testing.T) {
 	connection := &vclib.VSphereConnection{
@@ -127,6 +197,20 @@ func TestInvalidCaCert(t *testing.T) {
 
 	if err != vclib.ErrCaCertInvalid {
 		t.Fatalf("ErrCaCertInvalid should have occurred, instead got: %v", err)
+	}
+}
+
+func verifyWrappedX509UnkownAuthorityErr(t *testing.T, err error) {
+	urlErr, ok := err.(*url.Error)
+	if !ok {
+		t.Fatalf("Expected to receive an url.Error, got '%s' (%#v)", err.Error(), err)
+	}
+	x509Err, ok := urlErr.Err.(x509.UnknownAuthorityError)
+	if !ok {
+		t.Fatalf("Expected to receive a wrapped x509.UnknownAuthorityError, got: '%s' (%#v)", urlErr.Error(), urlErr)
+	}
+	if msg := x509Err.Error(); msg != "x509: certificate signed by unknown authority" {
+		t.Fatalf("Expected 'signed by unknown authority' error, got: '%s'", msg)
 	}
 }
 
