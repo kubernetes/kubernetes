@@ -33,7 +33,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: gcr.io/projectcalico-org/node:v2.6.7
+          image: gcr.io/projectcalico-org/node:v3.1.3
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -84,10 +84,16 @@ spec:
             - mountPath: /etc/calico
               name: etc-calico
               readOnly: true
+            - mountPath: /var/run/calico
+              name: var-run-calico
+              readOnly: false
+            - mountPath: /var/lib/calico
+              name: var-lib-calico
+              readOnly: false
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: gcr.io/projectcalico-org/cni:v1.11.2
+          image: gcr.io/projectcalico-org/cni:v3.1.3
           command: ["/install-cni.sh"]
           env:
             - name: CNI_CONF_NAME
@@ -149,6 +155,14 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
+        # Used to
+        - name: var-run-calico
+          hostPath:
+            path: /var/run/calico
+        # Used to
+        - name: var-lib-calico
+          hostPath:
+            path: /var/lib/calico
       tolerations:
         # Make sure calico/node gets scheduled on all nodes.
         - effect: NoSchedule
