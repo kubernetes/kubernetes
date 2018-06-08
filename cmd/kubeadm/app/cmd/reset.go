@@ -76,7 +76,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 	)
 
 	cmd.PersistentFlags().StringVar(
-		&criSocketPath, "cri-socket", "/var/run/dockershim.sock",
+		&criSocketPath, "cri-socket", kubeadmapiv1alpha3.DefaultCRISocket,
 		"The path to the CRI socket to use with crictl when cleaning up containers.",
 	)
 
