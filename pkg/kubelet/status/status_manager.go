@@ -512,7 +512,8 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			return
 		}
 		glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
-		m.deletePodStatus(uid)
+		// If the Pod is deleted the status will be cleared in
+		// RemoveOrphanedStatuses, so we just ignore the update here.
 	}
 }
 
