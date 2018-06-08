@@ -615,12 +615,7 @@ func (c *containerData) updateStats() error {
 		}
 		return err
 	}
-
-	cInfo := info.ContainerInfo{
-		ContainerReference: ref,
-	}
-
-	err = c.memoryCache.AddStats(&cInfo, stats)
+	err = c.memoryCache.AddStats(ref, stats)
 	if err != nil {
 		return err
 	}

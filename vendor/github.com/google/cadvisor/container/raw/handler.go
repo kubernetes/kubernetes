@@ -26,6 +26,7 @@ import (
 	"github.com/google/cadvisor/machine"
 
 	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
@@ -33,23 +34,32 @@ import (
 type rawContainerHandler struct {
 	// Name of the container for this handler.
 	name               string
+	cgroupSubsystems   *libcontainer.CgroupSubsystems
 	machineInfoFactory info.MachineInfoFactory
 
 	// Absolute path to the cgroup hierarchies of this container.
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
 	cgroupPaths map[string]string
 
+	// Manager of this container's cgroups.
+	cgroupManager cgroups.Manager
+
 	fsInfo         fs.FsInfo
 	externalMounts []common.Mount
 
-	libcontainerHandler *libcontainer.Handler
+	rootFs string
+
+	// Metrics to be ignored.
+	ignoreMetrics container.MetricSet
+
+	pid int
 }
 
 func isRootCgroup(name string) bool {
 	return name == "/"
 }
 
-func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *common.FsnotifyWatcher, rootFs string, ignoreMetrics container.MetricSet) (container.ContainerHandler, error) {
+func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *common.InotifyWatcher, rootFs string, ignoreMetrics container.MetricSet) (container.ContainerHandler, error) {
 	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
 
 	cHints, err := common.GetContainerHintsFromFile(*common.ArgContainerHints)
@@ -78,15 +88,17 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		pid = 1
 	}
 
-	handler := libcontainer.NewHandler(cgroupManager, rootFs, pid, ignoreMetrics)
-
 	return &rawContainerHandler{
-		name:                name,
-		machineInfoFactory:  machineInfoFactory,
-		cgroupPaths:         cgroupPaths,
-		fsInfo:              fsInfo,
-		externalMounts:      externalMounts,
-		libcontainerHandler: handler,
+		name:               name,
+		cgroupSubsystems:   cgroupSubsystems,
+		machineInfoFactory: machineInfoFactory,
+		cgroupPaths:        cgroupPaths,
+		cgroupManager:      cgroupManager,
+		fsInfo:             fsInfo,
+		externalMounts:     externalMounts,
+		rootFs:             rootFs,
+		ignoreMetrics:      ignoreMetrics,
+		pid:                pid,
 	}, nil
 }
 
@@ -219,7 +231,7 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 }
 
 func (self *rawContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := self.libcontainerHandler.GetStats()
+	stats, err := libcontainer.GetStats(self.cgroupManager, self.rootFs, self.pid, self.ignoreMetrics)
 	if err != nil {
 		return stats, err
 	}
@@ -255,7 +267,7 @@ func (self *rawContainerHandler) ListContainers(listType container.ListType) ([]
 }
 
 func (self *rawContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	return self.libcontainerHandler.GetProcesses()
+	return libcontainer.GetProcesses(self.cgroupManager)
 }
 
 func (self *rawContainerHandler) Exists() bool {

@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 
@@ -134,23 +133,6 @@ func areCgroupsPresent(available map[string]int, desired []string) (bool, string
 	return true, ""
 }
 
-func validateCpuCfsBandwidth(available_cgroups map[string]int) string {
-	ok, _ := areCgroupsPresent(available_cgroups, []string{"cpu"})
-	if !ok {
-		return "\tCpu cfs bandwidth status unknown: cpu cgroup not enabled.\n"
-	}
-	mnt, err := cgroups.FindCgroupMountpoint("cpu")
-	if err != nil {
-		return "\tCpu cfs bandwidth status unknown: cpu cgroup not mounted.\n"
-	}
-	_, err = os.Stat(path.Join(mnt, "cpu.cfs_period_us"))
-	if os.IsNotExist(err) {
-		return "\tCpu cfs bandwidth is disabled. Recompile kernel with \"CONFIG_CFS_BANDWIDTH\" enabled.\n"
-	}
-
-	return "\tCpu cfs bandwidth is enabled.\n"
-}
-
 func validateMemoryAccounting(available_cgroups map[string]int) string {
 	ok, _ := areCgroupsPresent(available_cgroups, []string{"memory"})
 	if !ok {
@@ -199,7 +181,6 @@ func validateCgroups() (string, string) {
 	out = fmt.Sprintf("Available cgroups: %v\n", available_cgroups)
 	out += desc
 	out += validateMemoryAccounting(available_cgroups)
-	out += validateCpuCfsBandwidth(available_cgroups)
 	return Recommended, out
 }
 
