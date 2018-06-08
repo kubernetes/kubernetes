@@ -32,6 +32,19 @@ func UserInfo(namespace, name, uid string) user.Info {
 	}
 }
 
+func isServiceAccountToken(name, uid, saName, saUID string) bool {
+	if name != saName {
+		// Name must match
+		return false
+	}
+	if len(uid) > 0 && uid != string(saUID) {
+		// If UID is specified, it must match
+		return false
+	}
+
+	return true
+}
+
 // IsServiceAccountToken returns true if the secret is a valid api token for the service account
 func IsServiceAccountToken(secret *v1.Secret, sa *v1.ServiceAccount) bool {
 	if secret.Type != v1.SecretTypeServiceAccountToken {
@@ -40,19 +53,10 @@ func IsServiceAccountToken(secret *v1.Secret, sa *v1.ServiceAccount) bool {
 
 	name := secret.Annotations[v1.ServiceAccountNameKey]
 	uid := secret.Annotations[v1.ServiceAccountUIDKey]
-	if name != sa.Name {
-		// Name must match
-		return false
-	}
-	if len(uid) > 0 && uid != string(sa.UID) {
-		// If UID is specified, it must match
-		return false
-	}
 
-	return true
+	return isServiceAccountToken(name, uid, sa.Name, string(sa.UID))
 }
 
-// TODO: remove the duplicate code
 // InternalIsServiceAccountToken returns true if the secret is a valid api token for the service account
 func InternalIsServiceAccountToken(secret *api.Secret, sa *api.ServiceAccount) bool {
 	if secret.Type != api.SecretTypeServiceAccountToken {
@@ -61,14 +65,6 @@ func InternalIsServiceAccountToken(secret *api.Secret, sa *api.ServiceAccount) b
 
 	name := secret.Annotations[api.ServiceAccountNameKey]
 	uid := secret.Annotations[api.ServiceAccountUIDKey]
-	if name != sa.Name {
-		// Name must match
-		return false
-	}
-	if len(uid) > 0 && uid != string(sa.UID) {
-		// If UID is specified, it must match
-		return false
-	}
 
-	return true
+	return isServiceAccountToken(name, uid, sa.Name, string(sa.UID))
 }
