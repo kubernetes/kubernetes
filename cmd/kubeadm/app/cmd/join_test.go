@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/scheme"
 )
 
 const (

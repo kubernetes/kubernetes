@@ -24,10 +24,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/scheme"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/validation"
 	"k8s.io/kubernetes/pkg/util/node"
 )
 

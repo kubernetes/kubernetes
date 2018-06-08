@@ -24,9 +24,9 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/scheme"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"

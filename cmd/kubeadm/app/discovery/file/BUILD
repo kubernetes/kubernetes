@@ -10,7 +10,7 @@ go_library(
     srcs = ["file.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/discovery/file",
     deps = [
-        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

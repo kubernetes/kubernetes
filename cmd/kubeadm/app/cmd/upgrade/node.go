@@ -24,8 +24,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"

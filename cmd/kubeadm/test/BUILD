@@ -11,7 +11,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/test",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
         "//cmd/kubeadm/test/certs:go_default_library",
         "//vendor/github.com/renstrom/dedent:go_default_library",

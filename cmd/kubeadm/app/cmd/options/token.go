@@ -23,8 +23,8 @@ import (
 	"github.com/spf13/pflag"
 
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // NewBootstrapTokenOptions creates a new BootstrapTokenOptions object with the default values

@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 )
 
 func TestMutatePodSpec(t *testing.T) {

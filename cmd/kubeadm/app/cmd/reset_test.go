@@ -25,9 +25,9 @@ import (
 	"strings"
 	"testing"
 
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"

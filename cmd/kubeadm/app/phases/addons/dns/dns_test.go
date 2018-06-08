@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )

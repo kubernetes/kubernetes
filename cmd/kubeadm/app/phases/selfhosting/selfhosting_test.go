@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 

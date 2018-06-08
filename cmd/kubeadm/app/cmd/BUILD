@@ -1,10 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -19,17 +15,18 @@ go_library(
         "version.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd",
+    visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
+        "//cmd/kubeadm/app/apis/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/validation:go_default_library",
         "//cmd/kubeadm/app/cmd/options:go_default_library",
         "//cmd/kubeadm/app/cmd/phases:go_default_library",
         "//cmd/kubeadm/app/cmd/upgrade:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/discovery:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
@@ -88,10 +85,10 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/apis/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/validation:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -105,6 +102,18 @@ go_test(
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_xtest",
+    srcs = ["config_test.go"],
+    deps = [
+        ":go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
+        "//cmd/kubeadm/app/features:go_default_library",
+        "//cmd/kubeadm/app/util/config:go_default_library",
+        "//vendor/github.com/renstrom/dedent:go_default_library",
     ],
 )
 
@@ -125,16 +134,4 @@ filegroup(
         "//cmd/kubeadm/app/cmd/util:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_xtest",
-    srcs = ["config_test.go"],
-    deps = [
-        ":go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
-        "//cmd/kubeadm/app/features:go_default_library",
-        "//cmd/kubeadm/app/util/config:go_default_library",
-        "//vendor/github.com/renstrom/dedent:go_default_library",
-    ],
 )

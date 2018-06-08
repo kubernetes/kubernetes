@@ -28,9 +28,11 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//cmd/kubeadm/app/apis/fuzzer:all-srcs",
         "//cmd/kubeadm/app/apis/kubeadm:all-srcs",
+        "//cmd/kubeadm/app/apis/scheme:all-srcs",
+        "//cmd/kubeadm/app/apis/validation:all-srcs",
         "//cmd/kubeadm/app/cmd:all-srcs",
-        "//cmd/kubeadm/app/constants:all-srcs",
         "//cmd/kubeadm/app/discovery:all-srcs",
         "//cmd/kubeadm/app/features:all-srcs",
         "//cmd/kubeadm/app/images:all-srcs",

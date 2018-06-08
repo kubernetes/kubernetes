@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	clientset "k8s.io/client-go/kubernetes"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
