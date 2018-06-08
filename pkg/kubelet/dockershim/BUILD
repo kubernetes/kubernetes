@@ -21,56 +21,67 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "docker_image_unsupported.go",
+            "docker_sandbox_others.go",
             "docker_stats_unsupported.go",
             "helpers_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "docker_image_unsupported.go",
+            "docker_sandbox_others.go",
             "docker_stats_unsupported.go",
             "helpers_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
             "docker_image_unsupported.go",
+            "docker_sandbox_others.go",
             "docker_stats_unsupported.go",
             "helpers_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
             "docker_image_unsupported.go",
+            "docker_sandbox_others.go",
             "docker_stats_unsupported.go",
             "helpers_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "docker_image_linux.go",
+            "docker_sandbox_others.go",
             "docker_stats_linux.go",
             "helpers_linux.go",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "docker_image_unsupported.go",
+            "docker_sandbox_others.go",
             "docker_stats_unsupported.go",
             "helpers_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
             "docker_image_unsupported.go",
+            "docker_sandbox_others.go",
             "docker_stats_unsupported.go",
             "helpers_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
             "docker_image_unsupported.go",
+            "docker_sandbox_others.go",
             "docker_stats_unsupported.go",
             "helpers_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
             "docker_image_unsupported.go",
+            "docker_sandbox_others.go",
             "docker_stats_unsupported.go",
             "helpers_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
             "docker_image_unsupported.go",
+            "docker_sandbox_others.go",
             "docker_stats_unsupported.go",
             "helpers_unsupported.go",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "docker_image_windows.go",
+            "docker_sandbox_windows.go",
             "docker_stats_windows.go",
             "helpers_windows.go",
         ],

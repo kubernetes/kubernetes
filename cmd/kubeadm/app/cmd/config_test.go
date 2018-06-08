@@ -29,6 +29,7 @@ import (
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
 const (
@@ -194,5 +195,44 @@ func TestImagesPull(t *testing.T) {
 	}
 	if puller.count["a"] != 2 {
 		t.Fatalf("expected 2 but found %v", puller.count["a"])
+	}
+}
+
+func TestMigrate(t *testing.T) {
+	cfg := []byte(dedent.Dedent(`
+		apiVersion: kubeadm.k8s.io/v1alpha2
+		kind: MasterConfiguration
+	`))
+	configFile, cleanup := tempConfig(t, cfg)
+	defer cleanup()
+
+	var output bytes.Buffer
+	command := cmd.NewCmdConfigMigrate(&output)
+	err := command.Flags().Set("old-config", configFile)
+	if err != nil {
+		t.Fatalf("failed to set old-config flag")
+	}
+	command.Run(nil, nil)
+	_, err = config.BytesToInternalConfig(output.Bytes())
+	if err != nil {
+		t.Fatalf("Could not read output back into internal type: %v", err)
+	}
+}
+
+// Returns the name of the file created and a cleanup callback
+func tempConfig(t *testing.T, config []byte) (string, func()) {
+	t.Helper()
+	tmpDir, err := ioutil.TempDir("", "kubeadm-migration-test")
+	if err != nil {
+		t.Fatalf("Unable to create temporary directory: %v", err)
+	}
+	configFilePath := filepath.Join(tmpDir, "test-config-file")
+	err = ioutil.WriteFile(configFilePath, config, 0644)
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Failed writing a config file: %v", err)
+	}
+	return configFilePath, func() {
+		os.RemoveAll(tmpDir)
 	}
 }
