@@ -321,10 +321,6 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 
 			if watchDir {
 				NewSourceFile(dirName, hostname, 100*time.Millisecond, ch)
-				defer func() {
-					// Remove the file
-					deleteFile(dirName, fileName, ch, t)
-				}()
 			} else {
 				NewSourceFile(file, hostname, 100*time.Millisecond, ch)
 			}
@@ -361,22 +357,6 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 			}
 		}()
 	}
-}
-
-func deleteFile(dir, file string, ch chan interface{}, t *testing.T) {
-	path := filepath.Join(dir, file)
-	if _, err := os.Stat(path); err != nil {
-		// The file might absent if it's renamed, deleted..
-		return
-	}
-	go func() {
-		err := os.Remove(path)
-		if err != nil {
-			t.Errorf("unable to remove test file %s: %s", path, err)
-		}
-	}()
-
-	expectEmptyUpdate(t, ch)
 }
 
 func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
