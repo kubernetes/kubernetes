@@ -44,7 +44,7 @@ import (
 var (
 	validEnvNameRegexp = regexp.MustCompile("[^a-zA-Z0-9_]")
 	envResources       = `
-  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
+  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs), cronjob`
 
 	envLong = templates.LongDesc(`
 		Update environment variables on a pod template.
