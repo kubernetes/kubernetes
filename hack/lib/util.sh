@@ -474,9 +474,25 @@ kube::util::go_install_from_commit() {
   local -r pkg=$1
   local -r commit=$2
 
+  # force creating a new temp dir so that the GOPATH is not polluted by previous
+  # calls to go_install_from_commit
+  KUBE_TEMP=""
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
   GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}"
+  # If the requested package has vendored dependencies, go get -d won't install
+  # them into GOPATH. This may break things if the dependencies weren't vendored
+  # at the commit requested.
+  # As a hacky workaround, copy the dependencies from tip into GOPATH.
+  (
+    cd "${KUBE_TEMP}/go/src/${pkg}"
+    while [[ "$(pwd)" != "${KUBE_TEMP}/go/src" && "$(pwd)" != "/" ]]; do
+      if [[ -d vendor/ ]]; then
+        cp -a vendor/* "${KUBE_TEMP}/go/src"
+      fi
+      cd ..
+    done
+  )
   (
     cd "${KUBE_TEMP}/go/src/${pkg}"
     git checkout -q "${commit}"
