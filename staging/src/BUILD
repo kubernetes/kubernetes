@@ -2,6 +2,7 @@
 # "k8s.io/kubernetes/staging/src" to the importpath.
 # Using this directive ensures that it sets the correct importpath.
 # gazelle:prefix
+# gazelle:importmap_prefix k8s.io/kubernetes/vendor
 
 filegroup(
     name = "package-srcs",
