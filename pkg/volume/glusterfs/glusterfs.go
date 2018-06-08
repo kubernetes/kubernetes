@@ -788,13 +788,13 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		return nil, 0, "", fmt.Errorf("failed to get cluster nodes for volume %s: %v", volume, err)
 	}
 
-	// The 'endpointname' is created in form of 'glusterfs-dynamic-<claimname>'.
+	// The 'endpointname' is created in form of 'glusterfs-dynamic-<claimuid>'.
 	// createEndpointService() checks for this 'endpoint' existence in PVC's namespace and
 	// If not found, it create an endpoint and service using the IPs we dynamically picked at time
 	// of volume creation.
-	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
+	epServiceName := dynamicEpSvcPrefix + string(p.options.PVC.UID)
 	epNamespace := p.options.PVC.Namespace
-	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
+	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, string(p.options.PVC.UID), p.options.PVC.Name)
 	if err != nil {
 		glog.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
 		deleteErr := cli.VolumeDelete(volume.Id)
@@ -811,7 +811,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	}, sz, volID, nil
 }
 
-func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvcname string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
+func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvcID string, pvcName string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
 
 	addrlist := make([]v1.EndpointAddress, len(hostips))
 	for i, v := range hostips {
@@ -822,7 +822,10 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 			Namespace: namespace,
 			Name:      epServiceName,
 			Labels: map[string]string{
-				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
+				"gluster.kubernetes.io/provisioned-for-pvc-uid": pvcID,
+			},
+			Annotations: map[string]string{
+				"gluster.kubernetes.io/provisioned-for-pvc": pvcName,
 			},
 		},
 		Subsets: []v1.EndpointSubset{{
@@ -848,7 +851,10 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 			Name:      epServiceName,
 			Namespace: namespace,
 			Labels: map[string]string{
-				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
+				"gluster.kubernetes.io/provisioned-for-pvc-uid": pvcID,
+			},
+			Annotations: map[string]string{
+				"gluster.kubernetes.io/provisioned-for-pvc": pvcName,
 			},
 		},
 		Spec: v1.ServiceSpec{
