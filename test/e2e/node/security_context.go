@@ -131,18 +131,14 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 	It("should support container.SecurityContext.RunAsNonRootGroup [Feature:RunAsGroup]", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
-		groupID := int64(0)
-		overrideUserID := int64(1002)
-		overrideGroupID := int64(2002)
+		zeroGroupID := int64(0)
+		nonZeroGroupID := int64(2004)
 		trueVal := true
 		pod.Spec.SecurityContext.RunAsNonRootGroup = &trueVal
 		pod.Spec.SecurityContext.RunAsUser = &userID
 
 		// Zero RunAsGroup should fail
-		pod.Spec.SecurityContext.RunAsGroup = &groupID
-		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
-		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
-		pod.Spec.Containers[0].SecurityContext.RunAsGroup = &overrideGroupID
+		pod.Spec.SecurityContext.RunAsGroup = &zeroGroupID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
@@ -151,19 +147,26 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 
 		// Zero FSGroup should fail
 		pod.Spec.SecurityContext.RunAsGroup = nil
-		pod.Spec.SecurityContext.FSGroup = &groupID
+		pod.Spec.SecurityContext.FSGroup = &zeroGroupID
 		pod, err = client.Create(pod)
 		Expect(err).To(HaveOccurred())
 
 		// Zero SupplementalGroup should fail
 		pod.Spec.SecurityContext.RunAsGroup = nil
 		pod.Spec.SecurityContext.FSGroup = nil
-		pod.Spec.SecurityContext.SupplementalGroups = []int64{groupID}
+		pod.Spec.SecurityContext.SupplementalGroups = []int64{zeroGroupID}
 
 		pod, err = client.Create(pod)
 		Expect(err).To(HaveOccurred())
 
 		// Verify non zero RunAsGroup Succeeds
+		pod.Spec.SecurityContext.RunAsGroup = &nonZeroGroupID
+		pod.Spec.SecurityContext.FSGroup = nil
+		pod.Spec.SecurityContext.SupplementalGroups = nil
+		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsNonRootGroup", pod, 0, []string{
+			fmt.Sprintf("uid=%v", userID),
+			fmt.Sprintf("gid=%v", nonZeroGroupID),
+		})
 
 	})
 
