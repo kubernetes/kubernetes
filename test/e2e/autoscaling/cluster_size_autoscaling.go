@@ -312,6 +312,29 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		})
 	}
 
+	// TODO consider moving to [Feature:ClusterSizeAutoscalingGpu] as soon as NAP goes out of beta. Currently
+	// project needed to run the NAP tests require whitelisting for NAP alpha
+	It("NAP should add a pool with GPUs if unschedulable POD which require GPU exists [Feature:ClusterSizeAutoscalingScaleWithNAP]", func() {
+		framework.SkipUnlessProviderIs("gke")
+
+		installNvidiaDriversDaemonSet()
+		framework.ExpectNoError(enableAutoprovisioning(`
+"resource_limits":{"name":"nvidia-tesla-k80", "minimum":0, "maximum": 3},
+"resource_limits":{"name":"cpu", "minimum":0, "maximum":64},
+"resource_limits":{"name":"memory", "minimum":0, "maximum":1000000000000}`))
+
+		By("Schedule a pod which requires GPU and wait until it is started")
+		framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+		defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "gpu-pod-rc")
+
+		By("Verify cluster size increased")
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount+1 }, scaleUpTimeout))
+
+		By("Check if NAP group was created")
+		Expect(getNAPNodePoolsNumber()).Should(Equal(1))
+	})
+
 	It("should increase cluster size if pending pods are small and one node is broken [Feature:ClusterSizeAutoscalingScaleUp]",
 		func() {
 			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleUpTest(1) })
