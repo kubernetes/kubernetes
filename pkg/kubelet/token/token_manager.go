@@ -72,7 +72,7 @@ type Manager struct {
 // * If the token is refreshed successfully, save it in the cache and return the token.
 // * If refresh fails and the old token is still valid, log an error and return the old token.
 // * If refresh fails and the old token is no longer valid, return an error
-func (m *Manager) GetServiceAccountToken(name, namespace string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	key := keyFunc(name, namespace, tr)
 	ctr, ok := m.get(key)
 
